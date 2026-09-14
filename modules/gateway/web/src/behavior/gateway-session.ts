@@ -1,16 +1,6 @@
 /**
- * The reads the gateway screens used to get from `useOrganizationTeamProject`
- * and `useRequiredSession`.
- *
- * The platform hook resolved the active scope AND redirected on it: a reader
- * without a project was bounced to onboarding unless the caller opted out.
- * Landing policy is not a screen's business and does not travel with it, so
- * what is left here is the reading half — the organization the page is about,
- * the project and team the reader is standing in, and what they may do —
- * served by the host.
- *
- * The options object is gone with the redirects it configured. That is the one
- * shape change every call site of this hook carries.
+ * Reads the active gateway scope (organization, project, team, capabilities).
+ * Landing policy moved to the platform hook; this hook now handles only the reading half.
  */
 
 import { useMemo } from "react";

@@ -234,13 +234,8 @@ export function EligibleModelProvidersPreview({
 }
 
 /**
- * Single-sentence summary of the VK's reach + eligible-MP count. Rendered
- * by the drawer directly under the scope picker so the user reads the
- * implication of their scope choice before scanning the provider list.
- *
- * Kept as a separate component (rather than folded into the preview list)
- * so the summary copy sits next to the scope picker and the list sits
- * next to its own "Eligible model providers" section header.
+ * Summary of the VK's reach and eligible provider count, placed under the
+ * scope picker so users understand the implication of their choice.
  */
 export function EligibleModelProvidersSummary({
   scopes,
@@ -298,14 +293,8 @@ export function EligibleModelProvidersSummary({
 }
 
 /**
- * "Configure ↗" deep-link to /settings/model-providers, pre-seeded with
- * a `?scope=TYPE:ID` query param for each currently-selected VK scope.
- * Lands the admin on the provider list filtered to the same scope set the
- * VK already targets, so adding a missing provider is one click away.
- *
- * The receiving page hydrates its local scopeFilter from router.query;
- * if it doesn't, the user still arrives at the right page (option-a per
- * the bug-10 split — full hydrate lands as a follow-up).
+ * Deep-link to /settings/model-providers, pre-seeded with the VK's scopes,
+ * so adding a missing provider is one click away.
  */
 export function ConfigureModelProvidersLink({ scopes }: { scopes: VirtualKeyScopeEntry[] }) {
   const href = useMemo(() => {

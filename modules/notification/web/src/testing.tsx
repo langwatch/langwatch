@@ -1,13 +1,6 @@
 /**
- * What this package's suites mount the email-suppressions screen inside.
- *
- * The host port is an abstract class, so a test constructs one rather than
- * mocking a module: the fake below RECORDS what the screen asked the
- * application to say and answers the one grant the page reads, which is exactly
- * the surface the real adapter answers.
- *
- * Not exported from the package. A test imports it relatively; nothing outside
- * this package has any business constructing a host.
+ * Test fixture for mounting the email-suppressions screen. Implements the
+ * host port and records screen requests.
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

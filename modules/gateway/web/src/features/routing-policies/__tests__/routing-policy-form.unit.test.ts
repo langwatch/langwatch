@@ -1,11 +1,7 @@
 /**
  * @vitest-environment node
- *
- * The round trip between a stored policy and what the editor edits.
- *
- * The interesting cases are the ones where the two shapes disagree: tiers
- * live inside the same stored map as ordinary name mappings, and restriction
- * rules are arrays on the wire but newline-separated text in a textarea.
+ * Round-trip conversion between stored policy and editor formats.
+ * Covers tier mappings and textarea restriction parsing.
  */
 import { describe, expect, it } from "vitest";
 

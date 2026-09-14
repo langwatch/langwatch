@@ -8,14 +8,8 @@
 import { VK_TAG_MAX_LENGTH, VK_TAGS_MAX_COUNT } from "@langwatch/gateway-contract";
 
 /**
- * The paragraph behind the field's (i). Everything a person needs before
- * typing a tag: what tags buy them, that the tags become visible on every
- * trace the key produces, that cache rules match on them, and what saving
- * does to a list that runs past the limits.
- *
- * The numbers are interpolated from the limits the server actually applies
- * (`normalizeVkTags`), so the copy cannot promise a bound the code does not
- * enforce. `virtualKeyTagsField.unit.test.ts` pins that.
+ * The paragraph behind the field's (i). Describes what tags are, how they
+ * appear on traces, and what saving does with lists past the limits.
  */
 export const VK_TAGS_FIELD_DESCRIPTION =
   "Group this key's traffic by team, app, or environment. Every trace this " +
@@ -26,13 +20,8 @@ export const VK_TAGS_FIELD_DESCRIPTION =
   "characters, and drops blanks and repeats.";
 
 /**
- * Cap for the field itself, which holds the whole tag list on one
- * comma-separated line: every tag at its full length, plus ", " between them.
- *
- * `maxLength` counts UTF-16 code units while `normalizeVkTags` counts code
- * points, and a code point can take two units, so the per-tag budget is
- * doubled. That way the field cap can never clip a list the server would have
- * kept whole; it only stops a runaway paste from getting that far.
+ * Cap for the field holding the whole tag list as comma-separated text.
+ * Accounts for UTF-16 encoding; doubled to prevent clipping valid lists.
  */
 export const TAGS_CSV_MAX_LENGTH = VK_TAGS_MAX_COUNT * (VK_TAG_MAX_LENGTH * 2 + 2);
 

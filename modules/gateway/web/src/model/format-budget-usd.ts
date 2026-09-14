@@ -1,16 +1,6 @@
 /**
- * Currency formatter for gateway-budget amounts.
- *
- * Per-request costs in modern small-model workloads routinely fall
- * in the $0.0001–$0.001 range. Truncating to 2 decimals ("$0.00")
- * makes it impossible to tell whether spend is genuinely zero or
- * just sub-cent.
- *
- * Formatting strategy:
- *   - n === 0          → "$0.00"          (no spend)
- *   - 0 < n < 0.01     → "$0.000165"      (full precision under a cent)
- *   - 0.01 ≤ n < 1     → "$0.12345"       (5 decimals, drops trailing zeros)
- *   - n ≥ 1            → "$1.23"          (2 decimals)
+ * Currency formatter for gateway-budget amounts. Preserves sub-cent precision
+ * since modern small-model costs routinely fall below $0.01.
  */
 export function formatBudgetUsd(raw: string | number | null | undefined): string {
   if (raw === null || raw === undefined) return "—";

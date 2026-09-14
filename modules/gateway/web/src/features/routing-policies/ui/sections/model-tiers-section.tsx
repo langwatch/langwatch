@@ -13,13 +13,8 @@ import {
 import type { RoutingPolicyFormValues } from "../../model/routing-policy-form.ts";
 
 /**
- * The tier editor: one row per reserved name, plus the model every unanswered
- * tier falls back to.
- *
- * A tier is what a client sends instead of naming a model, so this section is
- * the one place in the product where an operator decides what "the most
- * capable model" means for their organization. The request snippet sits next
- * to it so the payoff is visible while choosing.
+ * Tier configuration editor: one row per reserved name plus the fallback model.
+ * Where operators define what each tier means for their organization.
  */
 export function ModelTiersSection({
   control,

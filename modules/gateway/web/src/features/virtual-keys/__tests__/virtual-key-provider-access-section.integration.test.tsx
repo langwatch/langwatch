@@ -1,15 +1,7 @@
 /**
  * @vitest-environment jsdom
- *
- * The "Provider access" section of the virtual-key drawers. The "All
- * providers" master checkbox: checking it stores the wildcard (every provider
- * in scope, current and future); unchecking it clears the selection, so no row
- * stays checked and the section asks the operator to pick at least one
- * provider.
- *
- * Renders the real component tree (real ProviderRow, real Chakra) with no
- * mocks.
- *
+ * Provider access section: all/none master checkbox stores wildcard or clears selection.
+ * Real component tree, no mocks.
  * Spec: specs/ai-gateway/governance/vk-provider-access.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

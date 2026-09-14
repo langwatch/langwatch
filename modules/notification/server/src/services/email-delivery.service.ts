@@ -19,14 +19,8 @@ import { SmtpEmailGatewayAdapter } from "./smtp.email-gateway.service.ts";
 const logger = createLogger("langwatch:mailer:runtime");
 
 /**
- * One mail delivery graph per executable. Provider choice and credentials are
- * immutable after boot; transport pools are retained until orderly shutdown.
- *
- * The gateway is resolved on the FIRST send rather than at construction, which
- * is what makes a deployment with no email provider an ordinary self-hosted
- * install rather than a process that will not start. What such a deployment
- * gets is a throwing send its caller is expected to survive — the notification
- * fan-outs treat a failed send as a missing courtesy, never as a lost fact.
+ * Per-executable mail delivery; gateway resolved on first send (not construction)
+ * to allow deployments without email provider. Send failures must be survived.
  */
 export class EmailDeliveryAdapter extends EmailDelivery {
   static create(input: {

@@ -1,13 +1,7 @@
 /**
  * @vitest-environment jsdom
- *
- * The create drawer is where a key's four decisions get made: where it
- * lives and where its traces land, what it may spend, which providers it
- * may reach, and whether it fails over. These tests render the real
- * component tree (ownership chips, budget field, provider checkboxes,
- * routing radios, real Chakra) and mock only the network boundary, so
- * what is asserted is what a person sees and what the wire receives.
- *
+ * Tests virtual key creation drawer: ownership, budget, providers, failover.
+ * Real component tree, network mocked only.
  * Spec: specs/ai-gateway/virtual-key-creation.feature
  */
 import type { Instant } from "@langwatch/time";

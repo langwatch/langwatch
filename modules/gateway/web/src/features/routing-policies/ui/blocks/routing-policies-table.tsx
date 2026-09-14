@@ -148,13 +148,8 @@ export function RoutingPoliciesTable({
 }
 
 /**
- * Files every policy under the level of its first scope, and everything else
- * under `unplaced`.
- *
- * Nothing is dropped. A policy with no scope rows, or one naming a scope kind
- * this build predates, still routes traffic, and a policy an operator cannot
- * see is one they cannot fix. A policy that applies at several levels is
- * listed under the first one it names; its chips show the rest.
+ * Groups policies by their first scope level, with unsupported scopes grouped as "unplaced".
+ * Ensures all policies remain visible for operator review.
  */
 function bucketByScopeLevel(policies: RoutingPolicyRow[]): {
   bucketed: Map<RoutingPolicyScopeLevel, RoutingPolicyRow[]>;

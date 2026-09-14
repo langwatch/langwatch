@@ -15,24 +15,8 @@ function buildConfig(
 }
 
 /**
- * ADR-038: the flow branches on the declared intent, recomputed from state —
- * the generic navigator itself stays linear (constraint C1).
- *
- * The intent fork rides release_ui_ai_governance_enabled (v5, on by
- * default): with the flag off (or still loading) the flow is exactly the
- * pre-fork one, no intent screen at all. False-while-loading is safe:
- * both shapes start at ORGANIZATION, so a late flag flip only inserts
- * screens ahead of the user.
- *
- * The governance track ends AT the intent screen: onboarding creates the
- * org and lands the user on /me, where the existing CLI install surface
- * already teaches setup (v4 — no CLI-related screen or component is
- * touched by onboarding).
- *
- * While intent is undefined the SaaS config takes the LLMOps shape. This
- * is load-bearing: WelcomeScreen derives isLastScreen from array position,
- * and INTENT must not present itself as the final screen before a choice
- * exists on SaaS.
+ * Flow branches on intent (ADR-038). Governance track ends at intent screen;
+ * undefined intent uses LLMOps shape.
  */
 export function getOnboardingFlowConfig({
   isSaaS,

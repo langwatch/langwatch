@@ -1,13 +1,6 @@
 /**
- * What the email-suppressions screen asks of the application it is mounted in.
- *
- * The same port shape every settings family since governance has written. Two
- * questions and two notices: which project the list is about, whether the
- * reader may undo an entry, and how a removal turned out.
- *
- * `canManage` is a GRANT and is deliberately not folded into a boolean the
- * screen computes: `triggers:view` opens the page and `triggers:manage` shows
- * the remove button, which is exactly the split the platform page made.
+ * Host port for email-suppressions screen: project scope, manage permission,
+ * and status notices.
  */
 
 import { createContext, useContext } from "react";

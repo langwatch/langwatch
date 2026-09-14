@@ -1,15 +1,7 @@
 /**
  * @vitest-environment jsdom
- *
- * The edit drawer must read back exactly what a key is (its routing
- * mode, its budget, its provider allowlist) and persist only what the
- * user changed. The sharp edges pinned here: an existing key's routing
- * choice survives an unrelated edit (nothing changes under a customer),
- * clearing the budget field archives the key's cap, and the key's own
- * budget is presented in the field rather than listed twice.
- *
- * Real component tree, network boundary mocked.
- *
+ * Edit drawer reads and persists key state: routing mode, budget, provider allowlist.
+ * Tests sharp edges: routing survival, budget archiving, no duplicate presentation.
  * Spec: specs/ai-gateway/virtual-key-creation.feature
  */
 import type { Instant } from "@langwatch/time";

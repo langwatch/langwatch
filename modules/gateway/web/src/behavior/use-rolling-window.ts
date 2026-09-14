@@ -1,14 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { Temporal, nowInstant, toDate } from "@langwatch/time";
 /**
- * A rolling `[now - days, now)` window that keeps rolling.
- *
- * The obvious version computes `new Date()` once and freezes: a dashboard
- * left open overnight keeps asking for the window it was opened with, so
- * spend recorded since then never appears and the page looks a day behind
- * until somebody reloads it. The tick advances the end of the window on a
- * cadence, and quantising it to the minute keeps the query key stable
- * enough that this is a refetch a minute rather than one a render.
+ * A rolling `[now - days, now)` window that ticks every minute to keep queries fresh.
+ * Quantizing to the minute prevents unnecessary refetches on every render.
  */
 export function useRollingWindow(range: number | "mtd", refreshMs = 60_000) {
   const [tick, setTick] = useState(() => quantiseToMinute(nowInstant().epochMilliseconds));

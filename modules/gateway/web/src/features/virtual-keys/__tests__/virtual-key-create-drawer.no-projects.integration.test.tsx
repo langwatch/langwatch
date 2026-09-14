@@ -1,12 +1,7 @@
 /**
  * @vitest-environment jsdom
- *
- * The create drawer in an organization with no projects. The ownership
- * seed effect has nothing to seed here; before the identity guard it
- * produced a fresh but value-identical state object on every pass and
- * re-armed itself, spinning the drawer at 100% CPU. Rendering in this
- * state is the revert-proof for that guard: without it, React aborts
- * with a maximum-update-depth error and this suite fails.
+ * Create drawer with no projects: edge case to verify ownership seed identity guard.
+ * Prevents the 100% CPU infinite re-render bug from before the guard was added.
  */
 import { cleanup, screen, waitFor } from "@testing-library/react";
 

@@ -1,16 +1,7 @@
 /**
  * @vitest-environment jsdom
- *
- * The Tags field in the New virtual key drawer, rendered for real: the actual
- * drawer, the actual (i) popover, the actual Chakra tree. Only the data
- * boundaries (tRPC, the org/team/project hook) are stubbed.
- *
- * Typing a tag is the moment a person decides what will show up on every
- * trace the key produces, so these lock in that the explanation is reachable
- * at exactly that moment, and that a list which would not survive the save
- * says so first.
- *
- * Spec: specs/ai-gateway/virtual-keys.feature (Tags field).
+ * Tags field integration test in New virtual key drawer. Verifies the
+ * explanation is reachable when typing a tag.
  */
 import { cleanup, screen, waitFor, within } from "@testing-library/react";
 

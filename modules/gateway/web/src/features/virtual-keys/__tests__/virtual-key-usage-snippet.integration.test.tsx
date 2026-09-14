@@ -1,12 +1,7 @@
 /**
  * @vitest-environment jsdom
- *
- * The copy-paste usage example must name a model the key can actually serve.
- * A key bound to a self-hosted / custom provider that shows the OpenAI-only
- * `gpt-5-mini` 404s on the first call, so the create/reveal/detail surfaces
- * thread the key's eligible-provider model (in resolver-safe `vendor/model`
- * form) into this snippet. These tests pin that the passed model reaches the
- * rendered code and that `gpt-5-mini` is only the no-context fallback.
+ * Tests that the usage example names a model the key can actually serve,
+ * threading the eligible-provider model into the snippet.
  */
 import { cleanup, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";

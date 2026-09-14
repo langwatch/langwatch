@@ -1,12 +1,6 @@
 /**
  * @vitest-environment jsdom
- *
- * A budget on a scope no active key can reach is refused, and the refusal
- * offers a way through: "Create it anyway", which resubmits the form with
- * `allowUnreachable`. That override is an answer to one question, about the
- * scope the server actually refused, so it must not survive the form being
- * pointed at a different one.
- *
+ * Budget override for unreachable scopes must not persist across scope changes.
  * Spec: specs/ai-gateway/gateway-budget-targeting.feature
  */
 import { cleanup, screen, waitFor } from "@testing-library/react";

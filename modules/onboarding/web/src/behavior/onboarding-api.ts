@@ -1,29 +1,6 @@
 /**
- * The procedures this package calls, and the hooks that call them.
- *
- * HAND-WRITTEN FOR NOW, MEANT TO BE GENERATED, exactly as `api-key-api.ts`,
- * `trace-api.ts`, `auth-api.ts` and every map since the governance family say of
- * their own: the procedures are mounted by the process out of the server
- * packages, which a web package may not import even for a type, and the router
- * type does not exist until a process instantiates it.
- *
- * THE SEGMENT NAMES ARE LOAD-BEARING. `onboarding`, `team`, `project`, `traces`
- * and `integrationsChecks` are mount points on the root router and tRPC hashes
- * that path into the React Query cache key; spell one differently and these
- * hooks quietly stop sharing a cache with the call sites that have not moved.
- *
- * ## NOTHING ON THIS MAP CARRIES A CREDENTIAL
- *
- * The setup guide prints the project's legacy base key, and it does NOT come
- * from here: it is `revealProjectApiKey()` on the host port, answered off the
- * organization graph the application shell already holds, under the server-side
- * `project:update` redaction. Adding a key-bearing read to this map would be a
- * wire change and a decision, not an addition.
- *
- * THIS MODULE IS THE ONE GOVERNED-CLOSURE EXCEPTION IN THE PACKAGE. ADR-004
- * seals a screen's closure off from `@langwatch/api/web`, and the
- * import below is the only one in the package. Recorded here so the finding it
- * raises is a decision rather than a surprise.
+ * API procedures for onboarding. Segment names are load-bearing for React Query
+ * cache keys. No credentials on this map.
  */
 
 import type { OrganizationIntent } from "@langwatch/organization-contract";
@@ -128,16 +105,8 @@ export type OnboardingApiMap = {
 
   organization: {
     /**
-     * The reader's organization graph, asked with the same input the application
-     * shell asks with — under tRPC's path-plus-input cache key that is the same
-     * entry, so the graph is fetched once for the document however many halves of
-     * the product want it.
-     *
-     * The declared row is a VIEW of the wire, not the whole of it: what the
-     * welcome redirect walks (membership, shared teams, their projects), what the
-     * product flow's "skip to my project" link needs, and `apiKey`, which is the
-     * one field the setup guide reads and which the server has already redacted
-     * to `""` for a reader without `project:update`.
+     * Organization graph: path-plus-input cache key matches app shell. Row is
+     * a wire view (membership, teams, projects, apiKey with redaction).
      */
     getAll: {
       query: {

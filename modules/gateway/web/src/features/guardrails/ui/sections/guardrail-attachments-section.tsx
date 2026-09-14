@@ -43,17 +43,8 @@ function flattenAttachedIds(attachments: GuardrailAttachment[]): Set<string> {
 }
 
 /**
- * VK opt-in editor for project guardrails. Lists every GatewayGuardrail in
- * the VK's project grouped by direction; each row has a checkbox that
- * attaches/detaches the guardrail. The attachment direction is the
- * guardrail's own direction (a PRE guardrail can only attach on pre), so
- * the saved tuples regroup checked guardrails by their direction.
- *
- * Project-scoped: a VK with no single PROJECT scope has no guardrail
- * surface and renders an explanatory empty state.
- *
- * Spec: specs/ai-gateway/governance/guardrails-project-scope.feature
- *       — @vk-attach scenarios.
+ * VK opt-in editor for project guardrails, grouped by attachment direction.
+ * Spec: specs/ai-gateway/governance/guardrails-project-scope.feature — @vk-attach scenarios.
  */
 export function GuardrailAttachmentsSection({
   organizationId,

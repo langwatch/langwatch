@@ -6,13 +6,8 @@ import {
 import { RedisTenantBroadcastRepository } from "../redis.tenant-broadcast.repository.ts";
 
 /**
- * Spec: modules/notification/specs/tenant-broadcast-twin.feature
- *
- * Every expectation below is a LITERAL. Deriving the channel or the body from
- * the module under test would assert only that it agrees with itself, and the
- * thing that breaks is agreement with a subscriber in another process
- * (`platform/app/src/server/app-layer/broadcast/broadcast.service.ts`), which
- * matches the channel by exact string and destructures `{ tenantId, event }`.
+ * Spec: modules/notification/specs/tenant-broadcast-twin.feature.
+ * Expectations are literals to verify compatibility with subscriber processes.
  */
 class RecordingPublisher extends TenantBroadcastPublisher {
   readonly published: Array<{ channel: string; message: string }> = [];

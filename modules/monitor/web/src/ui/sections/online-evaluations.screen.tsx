@@ -1,31 +1,7 @@
 /**
- * `/:project/online-evaluations` — what a project scores live traffic with.
- *
- * WHAT THIS SCREEN CAN DO ON ITS OWN: list every online evaluation and
- * guardrail with its last seven days, open the analytics filtered to one of
- * them, pause and resume, replicate into another project, and delete.
- *
- * WHAT IT ASKS THE APPLICATION FOR, and does not have today: CREATING an online
- * evaluation, EDITING one, and SETTING UP A GUARDRAIL. All three are
- * `platform/app` drawers — `onlineEvaluation` (four openers, three outside this
- * family, and 1,407 lines that reach into the evaluator editor, the trace
- * mapping vocabulary and the experiments workbench) and `guardrails` — and a
- * drawer with a caller outside the family does not move. So the screen writes
- * the ADDRESS through `host.openOverlay`, and under `apps/ui` today nothing
- * opens, because the registry is mounted by `DashboardPageBody`, which is chrome
- * a packaged screen has nothing above it to supply.
- *
- * THE ANALYTICS DESTINATION IS A REAL LINK, not an overlay, and it survives the
- * move intact: the spec asks that selecting a row's performance preview and
- * choosing "View analytics" from its row actions reach the SAME filtered
- * destination, which is what `analyticsHref` being one function guarantees.
- *
- * EDIT DOES NOT ALWAYS MEAN THE DRAWER. A monitor authored in the retired
- * evaluation wizard carries an `experimentId`, and its configuration lives in
- * the workbench rather than in the drawer's form; opening the drawer on one
- * would show a form that cannot represent it. The screen asks
- * `@langwatch/experiment-contract` which experiments are of that kind and
- * navigates to the workbench for those.
+ * `/:project/online-evaluations` — list and manage online evaluations
+ * (pause, resume, replicate, delete). Creation and editing are handled by
+ * platform/app drawers; analytics uses real links, not overlays.
  */
 
 import { Box, HStack, Spacer, Spinner, Text, VStack } from "@chakra-ui/react";

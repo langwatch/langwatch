@@ -50,14 +50,8 @@ export function emptyFormState(): CacheRuleFormState {
 }
 
 /**
- * A rejected submit, and where it belongs on screen.
- *
- * `field` is the input the complaint is about, or `null` when it is about the
- * relationship between several — "at least one matcher", "both a key and a
- * value". ADR-018 splits the surface on exactly that line: a complaint with
- * one home is marked there, and only the ones with no single home toast.
- * Before this the validator returned a bare string, so every complaint took
- * the toast and the user was left to work out which input it meant.
+ * A validation complaint targeting a specific field or multiple fields.
+ * Per ADR-018: field-specific complaints inline-mark; cross-field ones toast.
  */
 export type CacheRuleFormComplaint = {
   field: keyof CacheRuleFormState | null;

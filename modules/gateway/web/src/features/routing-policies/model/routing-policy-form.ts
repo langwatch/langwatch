@@ -1,12 +1,6 @@
 /**
- * The routing-policy form: its schema, and the two mappings between a stored
- * policy and what the drawer edits.
- *
- * Pure. No React, no network, no JSX, so the round trip (stored policy to form
- * values to mutation input) is testable on its own, which is where the
- * interesting bugs live: a policy carrying tier entries mixed into its model
- * name mapping, and restriction lists that are arrays on the wire and
- * newline-separated text in a textarea.
+ * Routing-policy form schema and mappings between stored and editor formats.
+ * Pure functions: testable without React/network/JSX.
  */
 import { z } from "zod";
 

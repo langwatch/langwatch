@@ -1,11 +1,6 @@
 /**
- * The outbound mail seam, as a background process can hold it.
- *
- * Everything here is a value or a shape: no environment is read, no client is
- * constructed at import time, and no gateway is chosen. A composition root
- * resolves one `MailerConfiguration` at boot and hands it down, which is what
- * keeps credentials stable for the lifetime of a process and lets a test
- * compose a delivery graph without an environment at all.
+ * Outbound mail seam: values and shapes only, no import-time side effects.
+ * Configuration from composition root.
  */
 
 export type EmailAttachment = {

@@ -2,25 +2,9 @@ import { Config, compileRuntimeConfig, RuntimeConfig, type ConfigValue } from "@
 import { z } from "zod";
 
 /**
- * The one outbound mail gateway every process that sends mail selects
- * through.
- *
- * A password-reset link leaving one process from a different sender domain
- * than a reminder leaving another would fail one deployment's SPF policy and
- * pass the other's, and the half that failed is the half nobody is watching —
- * so every leaf here is read identically wherever mail is sent.
- *
- * `ses.enabled` is presence-based rather than boolean on purpose: existing
- * deployments treat `USE_AWS_SES=false` as enabled, and changing that would
- * select a different gateway in one process and not another.
- *
- * Every gateway setting stays optional. A deployment with no email provider
- * configured is an ordinary self-hosted install: it composes, mounts every
- * pipeline, and fails only at the moment of a send.
- *
- * The base host a sender address and every mailed link derive from is NOT
- * here. Both processes already bind `BASE_HOST` for a purpose of their own,
- * and one variable may be bound once.
+ * Mail gateway config selected consistently across processes to maintain
+ * SPF/sender policy alignment. All settings optional; send fails at runtime
+ * if unconfigured.
  */
 export const notificationServerConfigDefinition = RuntimeConfig.define({
   defaultFrom: Config.value(z.string().optional(), { env: "EMAIL_DEFAULT_FROM" }),

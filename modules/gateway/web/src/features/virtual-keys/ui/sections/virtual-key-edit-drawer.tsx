@@ -110,14 +110,8 @@ type VirtualKeyEditDrawerProps = {
 const MANAGED_WINDOWS: ReadonlySet<string> = new Set(["DAY", "WEEK", "MONTH"]);
 
 /**
- * Whether the typed open-session cap is something other than blank or a whole
- * number of 1 or more.
- *
- * The whole string is read, not a prefix of it. `Number.parseInt` accepts
- * "1.9" as 1 and "12voice" as 12, so a typo would silently save a cap the
- * operator did not choose, and a cap is the thing that refuses a customer's
- * calls. Zero is refused too: an operator who means "no voice" removes the
- * provider, and a saved 0 would look like a mistake either way.
+ * Validates that the open-session cap is a whole number of 1 or more.
+ * Requires exact parsing to prevent typos from silently saving wrong values.
  */
 function maxOpenSessionsInvalid(value: string): boolean {
   const trimmed = value.trim();

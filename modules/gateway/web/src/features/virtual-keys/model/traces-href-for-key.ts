@@ -1,14 +1,6 @@
 /**
- * Deep link from a virtual key to the traces it produced, in the project
- * those traces land in.
- *
- * The gateway stamps `langwatch.virtual_key_id` on every span it proxies and
- * the trace fold hoists it onto the trace summary, so the Trace Explorer can
- * filter on it directly. The window defaults to 30 days rather than the key's
- * whole life: a key that has been quiet for months would otherwise open on an
- * empty table with no hint that the filter, not the key, is what is narrow.
- * A caller reading a period of its own passes it, so the list it lands on
- * covers the same days as the numbers it was reading.
+ * Deep link from a virtual key to its traces, filtered to 30 days by default.
+ * The gateway stamps langwatch.virtual_key_id on every span it proxies.
  */
 import { escapeValue } from "@langwatch/trace-contract";
 

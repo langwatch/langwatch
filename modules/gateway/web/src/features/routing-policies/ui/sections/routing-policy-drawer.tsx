@@ -32,19 +32,9 @@ import { useRoutingPolicyDrawerForm } from "../../behavior/use-routing-policy-dr
 import { useRoutingPolicyMutations } from "../../behavior/use-routing-policy-mutations.ts";
 
 /**
- * URL-routed shell for the routing-policy editor (see
- * dev/docs/best_practices/drawers.md). Every prop is a scalar that survives a
- * round trip through the address bar, and the policy being edited is fetched
- * here rather than threaded in, so a pasted link reopens the same policy.
- *
- * With no `policyId` this is the create flow; `seedScopeType` and
- * `seedScopeId` pre-select where the new policy applies.
- *
- * IT DOES NOT CLOSE ITSELF, which is the drawers doc's rule rather than a
- * consequence of where it lives: a target that reaches for `closeDrawer` clears
- * the navigator's whole stack and drops whoever opened it. So closing arrives
- * as a callback, and the composing application's registry adapter supplies the
- * navigator's own.
+ * URL-routed routing-policy editor shell (see dev/docs/best_practices/drawers.md).
+ * Props are address-bar-safe; policy is fetched to enable link reuse.
+ * Does not close itself; closing is a callback per the drawers pattern.
  */
 export function RoutingPolicyDrawer({
   policyId,

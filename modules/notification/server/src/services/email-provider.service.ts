@@ -14,11 +14,8 @@ const MISSING_SETTING_HINT: Record<EmailProviderName, string> = {
 };
 
 /**
- * Which outbound gateway one resolved configuration sends through.
- *
- * The sender-address derivation is static beside it, because a composition
- * root has to answer that question BEFORE it has a `MailerConfiguration` —
- * deriving `defaultFrom` from the deployment host is part of building one.
+ * Selects outbound gateway; sender-address derivation is static and resolved
+ * before MailerConfiguration.
  */
 export class EmailProviderService {
   static create(configuration: MailerConfiguration): EmailProviderService {
@@ -26,13 +23,8 @@ export class EmailProviderService {
   }
 
   /**
-   * The address mail leaves as, when the deployment did not name one.
-   *
-   * A frozen twin of the application's own derivation
-   * (`resolveMailerDefaultFrom`, `platform/app/src/runtime/app/mailer.private-config.ts`),
-   * spelling for spelling. Two processes sending the same notification from
-   * two sender addresses would fail one deployment's SPF and pass the other's,
-   * and the half that failed is the half nobody is watching.
+   * Default sender address; identical to app's derivation to maintain SPF
+   * consistency.
    */
   static resolveDefaultFrom(input: { emailDefaultFrom?: string; baseHost: string }): string {
     if (input.emailDefaultFrom) {
@@ -74,14 +66,8 @@ export class EmailProviderService {
   }
 
   /**
-   * The gateway to send through, or null when email is not configured at all.
-   *
-   * `EMAIL_PROVIDER` is authoritative when set; deployments that never set it
-   * are inferred from their credentials as before. A named-but-unusable
-   * provider throws rather than silently falling back to another gateway,
-   * because quietly sending from an unexpected sender domain is worse than a
-   * loud failure. The error names a configured alternative when there is one,
-   * since a chart default can supply a name the operator never chose.
+   * Gateway selection: EMAIL_PROVIDER authoritative; fails loudly on
+   * misconfiguration.
    */
   tryResolveName(): EmailProviderName | null {
     const configured = this.configuration.provider?.trim().toLowerCase();

@@ -51,20 +51,11 @@ interface TabItem {
 }
 
 /**
- * Copy-paste integration snippets for a LangWatch virtual key.
- *
- * Renders Python / TypeScript / Go / cURL examples that drop into the
- * OpenAI SDK baseURL override pattern — the one-line "swap the
- * endpoint, keep your existing code" story from the docs. Used in
- * the post-create secret-reveal dialog + the VK detail page so the
- * copy-secret → first-request path has no dead ends.
+ * Copy-paste integration snippets for a LangWatch virtual key, showing
+ * Python/TypeScript/Go/cURL examples for the OpenAI SDK baseURL pattern.
+ * The real default is the key's first eligible provider; gpt-5-mini is only
+ * the fallback.
  */
-// `gpt-5-mini` is only the fallback placeholder for callers that pass no
-// model. The real default is threaded in by the create / reveal / detail
-// surfaces as the key's first eligible provider in `vendor/model` form. The
-// gateway resolver strips the `vendor/` prefix before dispatch (it only
-// selects the provider, then forwards the bare model), so the prefixed form
-// is always safe, including for single-provider keys.
 export function VirtualKeyUsageSnippet({
   secret,
   gatewayBaseUrl,

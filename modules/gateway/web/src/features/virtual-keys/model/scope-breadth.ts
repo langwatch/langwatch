@@ -1,13 +1,6 @@
 /**
- * Scope breadth order, broadest first: ORGANIZATION reaches the most, then
- * TEAM, then PROJECT. The virtual-key provider picker sorts on it so an
- * organization-wide provider always sits above a team one, which sits above a
- * project one, and providers at the same scope read in name order.
- *
- * A family-local copy of `platform/app/src/utils/scopeBreadth.ts`. The platform
- * module keeps its own callers — the settings tables that share the ordering —
- * and dies with them; a shared home for this is the authz contract, which is a
- * promotion rather than part of this move.
+ * Scope breadth order for sorting: ORGANIZATION > TEAM > PROJECT. A
+ * family-local copy of platform/app/src/utils/scopeBreadth.ts.
  */
 export const SCOPE_BREADTH = {
   ORGANIZATION: 0,

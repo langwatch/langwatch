@@ -1,16 +1,7 @@
 /**
- * The expiration choice a virtual-key drawer offers, and the date it means.
- *
- * A period is easy to pick and impossible to check, so every surface that
- * offers one also states the date it resolves to. Both drawers share this
- * module so the create and edit paths cannot drift into meaning different
- * things by the same words.
- *
- * Everything here works in UTC. The stored value is an instant, and a
- * custom date is the end of the day the person picked: "the 20th" has to
- * keep working for the whole of the 20th, and resolving it in UTC is what
- * lets the preview echo back exactly the day that was chosen rather than
- * its neighbour.
+ * The expiration choice for a virtual key and its resolved date. Both create
+ * and edit drawers use this module to keep meanings consistent. All dates are
+ * stored and computed in UTC.
  */
 
 import { type Instant, Temporal, nowInstant, toDate, toEpochMs } from "@langwatch/time";
@@ -59,15 +50,8 @@ export function resolveExpiresAt({
 }
 
 /**
- * The last millisecond of a `yyyy-mm-dd` day, UTC.
- *
- * Built from the split parts rather than parsing the string: a parse lands
- * on midnight, so a key set to expire "today" would be born expired, and
- * the whole day the person picked would be gone.
- *
- * A day that does not exist is refused rather than moved. A calendar that
- * rolls `2026-02-31` forward into March would save a key that expires three
- * days after the date on the form, which is worse than one that refuses.
+ * The last millisecond of a yyyy-mm-dd day, UTC. Built from split parts to
+ * avoid parsing midnight and expiring the whole day the person picked.
  */
 function endOfDayUtc(value: string | undefined): Instant | null {
   if (!value) return null;

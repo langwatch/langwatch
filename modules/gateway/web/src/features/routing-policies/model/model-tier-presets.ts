@@ -1,39 +1,12 @@
 /**
- * Model tiers: the reserved names a caller may send as `model` instead of
- * naming a specific model, so a client written once keeps working when the
- * organization moves to a newer model.
- *
- * A family-local copy of `platform/app/src/utils/modelTierPresets.ts`, which
- * the gateway's own server half also reads. The platform module keeps that
- * caller; a shared home is `@langwatch/gateway-contract`, and putting it there
- * means repointing a `platform/app` server module, which this move may not do.
- *
- * A tier is an ordinary entry in a routing policy's model name mapping. The
- * gateway resolver needs no knowledge of it: the control plane emits
- * `tier -> the model the tier points at` alongside every other mapping, and
- * the resolver looks it up like any other name. What makes a tier different
- * is only that the names below are reserved, presented in the product as a
- * first-class choice, and fall through to the policy's default model when the
- * policy names no target for them.
- *
- * That fallthrough is deliberately limited to these names. A catch-all would
- * serve a caller a model they never asked for, turn every typo into a billed
- * call, and make an allowlist unenforceable, because nothing would ever reach
- * the rejection.
- *
- * Kept free of any catalog import: this is what the browser bundle uses, and
- * the model catalog is 441 KB. Ranked suggestions per tier live server-side in
- * `@langwatch/model-provider-server`'s tier-target adapter.
+ * Model tiers: reserved names for model selection that decouple clients from specific models.
+ * Tiers are resolved via control-plane-emitted mappings; names are reserved to prevent conflicts.
+ * No catalog imports to keep bundle size small.
  */
 
 /**
- * The reserved tier names, in the order they are presented.
- *
- * Three rather than four. A "simple" tier alongside "fast" reads as a synonym
- * in the product and resolves to the same small model in every real catalog,
- * while permanently taking one more name out of the caller's namespace. A
- * fourth tier is additive later; taking one away once callers script against
- * it is not.
+ * Reserved tier names: complex, reasoning, fast.
+ * Kept to three to avoid namespace conflicts; future tiers can extend this.
  */
 export const MODEL_TIERS = ["complex", "reasoning", "fast"] as const;
 

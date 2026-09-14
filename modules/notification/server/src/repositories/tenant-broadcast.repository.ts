@@ -1,23 +1,7 @@
 /**
- * The realtime half of telling somebody something changed.
- *
- * A tenant broadcast is one Redis publish. Every browser holding an SSE
- * subscription for that tenant is listening on the other side, so the channel
- * name and the message body are a WIRE FORMAT between two processes that never
- * type-check against each other: the publisher is whichever process advanced
- * the projection, and the subscriber is the application serving the tab.
- *
- * Getting either wrong fails silently. A channel nobody subscribed to accepts
- * the publish and returns zero; a body whose keys the subscriber cannot read is
- * dropped inside its `JSON.parse` handler. In both cases the durable write
- * succeeded, the job reported success, and the customer's screen simply stopped
- * moving — which is why the format is pinned by literal in the adapter's twin
- * test rather than derived from a shared constant that only one side compiles.
- *
- * The application's own publisher is
- * `platform/app/src/server/app-layer/broadcast/broadcast.service.ts`. It stays
- * as it is: it also OWNS the subscriber and the per-tenant emitters, which a
- * background process has no use for. This module is the publish half alone.
+ * Realtime updates via Redis publish; channel and message form a wire format
+ * between publisher and app subscriber, pinned by literal test to prevent
+ * silent failures.
  */
 
 /**
@@ -42,13 +26,8 @@ export const TENANT_BROADCAST_EVENT_TYPES = [
 export type TenantBroadcastEventType = (typeof TENANT_BROADCAST_EVENT_TYPES)[number];
 
 /**
- * The message body, exactly as the subscriber destructures it.
- *
- * `event` is an already-serialised string chosen by the producer; nothing here
- * inspects it. The subscriber reads `tenantId` and `event` and ignores
- * `timestamp`, which is carried for the receiving log line — it is not a
- * freshness gate, and no consumer may start treating it as one without the
- * publisher gaining a clock the subscriber trusts.
+ * Message body: event is pre-serialized; timestamp is for logging, not
+ * freshness checks.
  */
 export type TenantBroadcastMessage = {
   tenantId: string;

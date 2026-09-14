@@ -42,15 +42,8 @@ export class EmailMimeService {
   }
 
   /**
-   * A header parameter such as `filename`, emitted so that both strict and
-   * naive receivers get something usable.
-   *
-   * A quoted string may only hold ASCII (RFC 5322 §2.2), and RFC 2047
-   * encoded-words are not allowed inside one (RFC 2047 §5), so a name like
-   * `relatório.csv` can be carried only by the RFC 2231 extended form. That
-   * form is emitted alongside a transliterated plain parameter: receivers that
-   * understand `filename*` prefer it and the rest fall back to the ASCII name
-   * instead of a mangled or rejected header.
+   * Header parameter encoding for RFC 2231 (extended) and plain forms for
+   * compatibility with both strict and naive receivers.
    */
   encodeHeaderParam(name: string, value: string): string {
     const clean = this.sanitizeHeaderValue(value);
@@ -91,13 +84,8 @@ export class EmailMimeService {
   }
 
   /**
-   * RFC 2047-encode a header value as UTF-8 base64 encoded-words
-   * (`=?UTF-8?B?...?=`) when the text contains non-ASCII characters or is long
-   * enough to warrant encoding. Pure ASCII values that fit on one line are
-   * passed through unchanged (they are already valid RFC 5322 header text).
-   *
-   * Long inputs are split into several encoded-words separated by CRLF + WSP,
-   * which is header folding as RFC 2047 §5 requires.
+   * RFC 2047-encode header values as UTF-8 base64 when needed, with header
+   * folding for long inputs. Pure ASCII values that fit are passed through.
    */
   rfc2047EncodeHeader(value: string): string {
     const clean = value.replace(/[\r\n]+/g, " ").trim();

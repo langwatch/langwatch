@@ -132,13 +132,8 @@ const KIND_OPTIONS: Array<{
 ];
 
 /**
- * Ownership picker for the virtual-key drawers. Project (default) and
- * Personal are open to everyone; Team and Organization only appear for
- * roles that may create shared keys (`canCreateShared`).
- *
- * The consequence of the choice is stated inline: every ownership names
- * the project its traces and costs land in, because that is the feed
- * every budget accrues from; there is no untraced shape.
+ * Ownership picker for virtual-key drawers. Project and Personal are open
+ * to everyone; Team and Organization appear only for shared-key roles.
  */
 export function VirtualKeyOwnershipSection({
   value,
@@ -264,14 +259,8 @@ export function VirtualKeyOwnershipSection({
 }
 
 /**
- * Read-only ownership for the edit drawer: the scope chips the key
- * already has, plus where its traces land.
- *
- * The destination is the one stored on the key, not one re-derived from the
- * scopes, so what is shown here is what the gateway actually does. A key
- * whose destination was deleted keeps sending its traces there, which is the
- * one thing a reader cannot tell from anything else on the row, so it is
- * badged.
+ * Read-only ownership for the edit drawer, showing the stored scopes and
+ * where traces actually land (badged if the destination was deleted).
  */
 export function VirtualKeyOwnershipReadOnly({
   scopes,

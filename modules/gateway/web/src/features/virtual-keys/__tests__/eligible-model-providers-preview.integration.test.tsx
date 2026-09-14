@@ -1,23 +1,7 @@
 /**
  * @vitest-environment jsdom
- *
- * The "Eligible model providers" panel in the virtual-key drawers is the
- * only place a user sees, before issuing a key, what that key will be able
- * to reach. Three failure modes it must not have:
- *
- *   1. Advertising a provider the gateway would refuse to dispatch to. An
- *      admin who switches a provider off (or removes it) has withdrawn a
- *      credential; a key that still lists it as routable is a governance
- *      hole, not a stale count.
- *   2. Attributing an inherited provider to the key's own scope. An
- *      organization-wide provider reaching a project key comes FROM the
- *      organization, and must read that way.
- *   3. Printing the raw scope enum instead of the shared scope chip every
- *      other settings surface uses.
- *
- * Renders the real component tree (real ProviderScopeChips, real Chakra) with
- * no mocks, so a regression in any of the three shows up here.
- *
+ * Tests eligible model providers panel for three critical failure modes:
+ * unavailable provider advertising, inherited provider attribution, and scope display.
  * Spec: specs/ai-gateway/governance/vk-scope-inheritance.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
