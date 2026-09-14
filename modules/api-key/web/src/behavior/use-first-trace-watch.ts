@@ -1,23 +1,6 @@
-/**
- * The post-approval first-trace watch, as state.
- *
- * The stateful half of `platform/app/src/pages/cli/FirstTraceRedirect.tsx`; the
- * decisions it makes are pure and live in `model/first-trace-policy.ts`, so this
- * hook only holds what has happened so far and acts on the answer.
- *
- * After the user approves a device session on `/cli/auth`, their next step in
- * the terminal is running the wrapped tool (e.g. `langwatch claude`) for the
- * first time. If their personal project has never received a trace, this watch
- * polls until the first one lands and then redirects to the personal traces
- * page, so the first thing they see is their own session.
- *
- * Hidden tabs are covered by React Query itself: with the default
- * `refetchIntervalInBackground` (false), an interval query only ticks while the
- * tab is focused, per the focus manager's `visibilitychange` handling. That
- * option is deliberately never overridden, and the suite asserts so.
- *
- * Spec: specs/ai-governance/cli-onboarding/post-login-first-trace-redirect.feature
- */
+// Post-approval first-trace watch: hooks hold state and act on pure policy (first-trace-policy.ts).
+// Polls until first trace lands, then redirects. React Query handles hidden tabs.
+// Spec: specs/ai-governance/cli-onboarding/post-login-first-trace-redirect.feature
 
 import { useEffect, useMemo, useState } from "react";
 import {

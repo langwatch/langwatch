@@ -1,47 +1,5 @@
-/**
- * CLI device-flow approval page (RFC 8628 user_code entry + approval).
- *
- * Flow:
- *   1. User runs `langwatch login` in their terminal.
- *   2. CLI prints: "Open https://app.langwatch.com/cli/auth?user_code=WDJB-MJHT"
- *   3. User clicks → lands here. If unauthenticated, gets bounced through SSO.
- *   4. Page asks the host to look the code up, which is GET /api/auth/cli/lookup.
- *   5. User confirms the code matches the one in their terminal.
- *   6. User picks an organization (if they're in multiple), reviews what the
- *      CLI key will be able to access (scopes + permissions, preselected to
- *      the widest access they hold minus organization management), and clicks
- *      "Approve".
- *   7. The host POSTs /api/auth/cli/approve which:
- *        a. Mints (or returns existing) personal VK
- *        b. Flips the device-code record to `approved` with the VK secret and
- *           the reviewed `key_selection` (scopes + permissions); the exchange
- *           endpoint mints the user-scoped CLI key from it
- *   8. CLI's polling /exchange returns 200 with the secret on its next poll.
- *   9. Done, user closes the browser tab.
- *
- * Mirrors the screens-1-thru-4 storyboard in gateway.md.
- *
- * ## What changed when this moved out of `platform/app`, and what did not
- *
- * THE EXCHANGE IS UNCHANGED, and that is the property this move is judged on:
- * the CLI in `sdks/typescript` is polling the other side of it. The three
- * `fetch` calls did not travel - a screen may not name `fetch`, and the wire is
- * a transport concern - so they are `host.lookupDeviceCode`,
- * `host.approveDeviceCode` and `host.denyDeviceCode`, and the adapter in
- * `apps/ui/src/features/api-key` spells the same three URLs, methods, bodies and
- * status-code readings. The SELECTION a request carries is decided here and
- * pinned here; the WIRE it goes out on is pinned in `apps/ui/tests`.
- *
- * THE CREATE-PROJECT SUB-FLOW IS A RECORDED GAP. `CreateProjectDrawer` is a
- * registered `platform/app` drawer that `DashboardLayout` also opens, and its
- * closure is `ProjectForm` - 301 lines of team selection, slug minting and
- * validation belonging to the organization settings family - so this move may
- * neither delete nor copy it. The button addresses the drawer through the host,
- * which is right and does not open yet: nothing mounts that registry above a
- * screen served from `apps/ui`. The old page then ADOPTED the created project by
- * matching the slug the drawer reported; without the drawer's callback there is
- * nothing to adopt, so that half is a loss until the chrome layout route lands.
- */
+// CLI device-flow approval (RFC 8628): lookup code, review scopes/perms, approve. Exchange
+// unchanged; three fetch calls delegated to host. CreateProjectDrawer is recorded gap.
 
 import { Box, Button, HStack, Icon, Spinner, Stack, Text, VStack } from "@chakra-ui/react";
 import {

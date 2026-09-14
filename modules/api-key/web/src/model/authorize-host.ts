@@ -1,44 +1,5 @@
-/**
- * What the two handoff screens ask the application that mounts them.
- *
- * `/authorize` and `/mcp/authorize` are ONE family — the pages where a reader
- * grants something outside the browser access to a project — and they are the
- * two the manifests held back longest. Three things blocked them and all three
- * are answered here.
- *
- * ## 1. THE PROJECT SWITCHER IS THE CONSENT CONTROL
- *
- * On both pages the switcher in the card header is HOW you choose what is being
- * authorized: which project's API key gets copied into a terminal, and which
- * project an MCP client is granted. Shipping them without it would be a consent
- * screen that cannot say what it is consenting for. It arrives as a `ReactNode`
- * off the port — the shape `@langwatch/navigation-web`'s chrome established, and
- * what `@langwatch/organization-web` and `@langwatch/secret-web` already use —
- * so the screen decides where in its own header it goes.
- *
- * ## 2. `revealProjectApiKey()` IS A QUESTION, NOT A FIELD ON THE SCOPE
- *
- * `/authorize` prints `project.apiKey`. `apps/ui`'s scope graph carries ids,
- * names and slugs and NO key, deliberately: the base key is a project-level
- * write credential, `organization.getAll` redacts it to `""` server-side for
- * anyone without `project:update`, and widening the shell's graph to carry it
- * would put a credential in front of every surface that reads a scope. So the
- * key is asked for by name, off the SAME procedure under the SAME permission
- * check, and a reader who may not hold one gets `undefined` and an empty field —
- * exactly what the platform page rendered for a redacted key.
- *
- * ## 3. THE MCP EXCHANGE IS A REST CALL, AND IT STAYS THE APPLICATION'S
- *
- * `/mcp/authorize` POSTs to `/api/mcp/authorize`, an address the MCP client on
- * the other side is waiting on. A browser transport belongs in
- * `apps/ui/src/behavior`, which is where the `/cli/auth` device-flow exchange
- * went for the same reason, so the port takes the ANSWER rather than the wire.
- *
- * WHAT IS NOT ON THIS PORT is the redirect-scheme check. `model/redirect-schemes`
- * is in this package, moved verbatim, and the screen calls it directly: it is the
- * second lock behind the server's own registry check, and a lock that can be
- * answered differently by different hosts is not a lock.
- */
+// Handoff screen port (/authorize + /mcp/authorize). Switcher is consent control; key asked via
+// port; MCP exchange is app's REST call; redirect-scheme check stays on screen.
 
 import { createContext, useContext, type ReactNode } from "react";
 

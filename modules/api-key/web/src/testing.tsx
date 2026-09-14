@@ -1,21 +1,5 @@
-/**
- * What this package's suites mount a screen inside.
- *
- * The host port is an abstract class, so a test constructs one rather than
- * mocking a module: the fake below RECORDS what a screen asked the application
- * to do — which query it wrote, which drawer it addressed, what it reported,
- * what it copied, and every CLI device-flow call it made — which is exactly the
- * surface the real adapter answers. The same shape `@langwatch/gateway-web`'s
- * `testing.tsx` introduced.
- *
- * THE DEVICE-FLOW CALLS ARE PROGRAMMABLE, not stubbed to one answer: the four
- * lookup outcomes and the two approve outcomes each drive a different screen,
- * and a fake that could only answer "pending" would leave the expired card, the
- * unrecognised-code card and the refusal card untested.
- *
- * Not exported from the package. A test imports it relatively; nothing outside
- * this package has any business constructing a host.
- */
+// Test host: abstract class; fake records screen actions (queries, drawers, copies, device flow).
+// Device flow is programmable (four lookup outcomes, two approve outcomes). Not exported.
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { render } from "@testing-library/react";

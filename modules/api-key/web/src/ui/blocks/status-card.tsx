@@ -1,17 +1,5 @@
-/**
- * One state of the CLI authorize flow, said in a sentence.
- *
- * Moved from `platform/app/src/pages/cli/auth.tsx`, where it was a local
- * component. In the traces-v2 visual language — semantic palette tokens and a
- * lucide icon in a subtle tinted container (see
- * `features/traces-v2/docs/STANDARDS.md` §4) — which is what replaced the stock
- * Chakra `Alert` on this page.
- *
- * The ROLE is derived rather than passed, and it matters: a refusal interrupts
- * a screen reader (`role="alert"`), while a success or an explanation announces
- * politely (`role="status"`). Getting that backwards is invisible until somebody
- * is reading the page with their ears.
- */
+// CLI authorize flow state message. Traces-v2 visual language. Role derived (alert vs status)
+// matters for screen readers (refusals interrupt; success/explanation are polite).
 
 import { Box, HStack, Icon, Text, VStack } from "@chakra-ui/react";
 import type React from "react";

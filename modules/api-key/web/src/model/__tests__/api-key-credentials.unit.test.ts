@@ -1,25 +1,6 @@
-/**
- * The credential rules this family exists to keep, as tests rather than as
- * docblocks.
- *
- * Four properties, and every one of them has a way to fail silently:
- *
- *  1. **A list answer carries no key material.** The contract's `ApiKeyListEntry`
- *     is the shape every read answers, and widening it is what would turn a list
- *     request into a credential disclosure. A TYPE cannot be asserted at
- *     runtime, so what is checked is the one thing that would betray a widening:
- *     the field the table renders is a five-character lookup PREFIX, and the
- *     screen renders it behind `sk-lw-` with an ellipsis.
- *  2. **Masking never reveals more than it should**, including for values short
- *     enough that a naive slice would print the whole thing.
- *  3. **The `.env` snippet's masked form is not the copied form.** The copy path
- *     hands over the real value; only the rendered string is masked.
- *  4. **The MCP config's masked JSON does not contain the token.** This is the
- *     one the dialog gets right by construction and would lose to a one-line
- *     refactor of `displayConfigJson`.
- *
- * Spec: specs/api-keys/token-created-snippets.feature
- */
+// Four credential properties can each fail silently. Tests enforce: list carries no material; mask
+// hides full value; .env snippet copy path hands real value; MCP config JSON doesn't contain token.
+// Spec: specs/api-keys/token-created-snippets.feature
 
 import { describe, expect, it } from "vitest";
 import { buildMcpJson, formatEnvLines, maskApiKey, maskSecret } from "../api-key-snippets.ts";

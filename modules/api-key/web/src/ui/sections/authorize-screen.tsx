@@ -1,17 +1,5 @@
-/**
- * `/authorize` - copy this project's API key into a terminal or a notebook.
- *
- * Two things changed and both are the application's. `DashboardLayout` is drawn
- * by the chrome layout route above every page `apps/ui` serves, so rendering it
- * here would give the address two of everything. And the key is asked for by
- * name: `revealProjectApiKey()` rather than a field on the scope reading - see
- * `model/authorize-host` for why a credential is never carried on a scope.
- *
- * `trackEvent("api_key_copy")` did NOT travel. Product analytics is the
- * application's, and a port method the host could only answer with nothing is
- * worse than its absence - the line the navigation family drew for
- * `trackEvent("navigation_product_switch")`.
- */
+// /authorize: copy project API key. No DashboardLayout (chrome route draws it above). Key asked
+// by name; trackEvent("api_key_copy") is app's.
 
 import { Card, Container, Heading, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
 import { useAuthorizeHost } from "../../model/authorize-host.ts";

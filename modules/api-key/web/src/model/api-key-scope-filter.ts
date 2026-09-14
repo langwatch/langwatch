@@ -1,25 +1,5 @@
-/**
- * The API Keys table's scope filter, read off the address and applied to rows.
- *
- * The URL contract, the resolution of the two ambient kinds and the row
- * predicate are `@langwatch/authz-web`'s — the data-governance move harvested
- * them out of `platform/app/src/hooks/useUrlScopeFilter.ts` and
- * `~/utils/filterProvidersByScope` so the packages share one reading of
- * `?scope=` instead of several. What is here is the small part that is this
- * family's: the fan over rows that carry SEVERAL scopes, which is what a key
- * with several role bindings is.
- *
- * IT IS THE SECOND COPY OF THAT FAN, `@langwatch/model-provider-web`'s
- * `provider-scope-filter.ts` being the first, and the two are byte-identical
- * below the docblock. A web package may not import another web package, so the
- * choice is this or a third surface on `@langwatch/authz-web` publishing twenty
- * lines. Recorded rather than acted on: promoting it is a change to a shared
- * package a page move does not own, and it should happen when a third family
- * wants it.
- *
- * The platform util keeps its remaining callers (the default-models table and
- * the model-providers page's own tests), so nothing is repointed.
- */
+// API Keys scope filter: URL contract from authz-web. This family's part: fan over rows with
+// multiple scopes (keys with multiple bindings). Second copy; model-provider-web has the first.
 
 import {
   isScopeInFilter,

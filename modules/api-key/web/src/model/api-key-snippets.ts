@@ -1,28 +1,6 @@
-/**
- * The snippets the "Token Created" dialog shows once, and the masking around
- * them.
- *
- * CREDENTIAL HYGIENE IS THIS MODULE'S WHOLE SUBJECT, so it is worth stating the
- * rules in one place rather than leaving them implied by four call sites:
- *
- *  1. A minted token reaches the browser exactly once, in the `create` mutation's
- *     answer. Nothing on the list wire carries it — `apiKey.list` answers a
- *     `lookupIdPrefix`, which is why the table renders `sk-lw-<prefix>…` and can
- *     never render more.
- *  2. What is DISPLAYED is masked until the reader asks to see it; what is
- *     COPIED is always the real value. Those are different strings on purpose:
- *     a copy button that hands over the masked form gives the reader a
- *     credential that fails only when they paste it into an SDK.
- *  3. The Basic Auth tab masks the BASE64 BLOB, not the token. A token is not a
- *     substring of its own base64, so masking on the token there would silently
- *     fail open and render the credential in full.
- *
- * Moved from `platform/app/src/pages/settings/api-keys/utils.ts` and
- * `features/onboarding/components/sections/shared/{api-key-utils,build-mcp-config}.ts`.
- * The onboarding modules did not travel — eight other surfaces import them — so
- * these are family-local copies, and `token-created-snippets.unit.test.ts`
- * drives them rather than reading either file off disk.
- */
+// Token snippets and masking hygiene: minted token reaches browser once; display masked but copy
+// real; mask blob not token for base64. Moved from platform/app and onboarding; family-local
+// copies.
 
 /** The endpoint a snippet omits, because it is the default the SDK already has. */
 export const CLOUD_ENDPOINT = "https://app.langwatch.ai";

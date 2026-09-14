@@ -1,32 +1,6 @@
-/**
- * A snippet, highlighted, with the credential in it masked until asked for.
- *
- * A NARROWED FAMILY-LOCAL COPY of
- * `platform/app/src/features/onboarding/components/sections/observability/CodePreview.tsx`,
- * which stays: seven other onboarding surfaces render it. Three things changed,
- * and all three are worth naming:
- *
- *  1. **The highlighter is the shared one.** The platform component built its
- *     own Shiki adapter around an inline `await import("shiki")` — a lazy import
- *     the repo bans outside the CLI boot path, and a second Oniguruma engine
- *     besides. `@langwatch/design-system/shiki` already owns a singleton
- *     highlighter whose eager language set lists `ini` FOR THIS DIALOG, and
- *     `bash` covers `shellscript` because shiki registers the two as one grammar
- *     with `bash` as an alias. `token-created-snippets.unit.test.ts` asserts
- *     every language this dialog names resolves inside that eager set, which is
- *     a stronger guard than the substring match on a source file it replaces.
- *  2. **The `llmPrompt` action did not travel.** It is the only thing in the
- *     platform component that reached the toast singleton, no API-keys surface
- *     ever passed it, and the onboarding screens that do keep their own copy.
- *     `languageIconUrl`, `highlightLines`, `disableActions` and the controlled
- *     visibility pair went with it for the same reason: this family passes none
- *     of them.
- *  3. **`copyText` still bypasses the CodeBlock copy path.** That trigger copies
- *     whatever string is RENDERED, which is the masked form while a sensitive
- *     snippet is hidden — a credential that fails only when pasted. It is the
- *     one behaviour in this component that is a security property rather than a
- *     nicety, and `token-created-uniform.integration.test.tsx` pins it.
- */
+// Highlighted snippet with masked credential. Narrowed family-local copy (onboarding keeps
+// theirs). Uses shared shiki highlighter; copyText bypasses CodeBlock copy (security property).
+// Spec: token-created-uniform.integration.test.tsx
 
 import { ClientOnly, CodeBlock, HStack, IconButton } from "@chakra-ui/react";
 import { useColorMode } from "@langwatch/design-system/color-mode";

@@ -1,14 +1,6 @@
-/**
- * The permission ceiling, the binding derivation and the row summaries.
- *
- * Moved verbatim from `platform/app/src/pages/settings/api-keys/utils.unit.test.ts`
- * — the only edit is where the module under test lives. It still injects
- * `getTeamRolePermissions`, which the model keeps as an optional parameter for
- * exactly this reason: a test that has to construct a real built-in role bag is
- * testing `@langwatch/authz-contract` rather than the ceiling arithmetic.
- *
- * Spec: specs/api-keys/scope-based-permissions.feature
- */
+// Permission ceiling, binding derivation, row summaries. Moved from platform/app; injects
+// getTeamRolePermissions to avoid testing authz-contract.
+// Spec: specs/api-keys/scope-based-permissions.feature
 import { builtinRolePermissions } from "@langwatch/authz-contract";
 import { describe, expect, it } from "vitest";
 import {

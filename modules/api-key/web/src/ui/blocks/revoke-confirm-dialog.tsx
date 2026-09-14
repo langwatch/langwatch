@@ -1,13 +1,5 @@
-/**
- * "Are you sure?" before a key stops working.
- *
- * Moved from `platform/app/src/pages/settings/api-keys/RevokeConfirmDialog.tsx`
- * with the Design System's `Dialog` in place of `~/components/ui/dialog`. The
- * two differ: the platform wrapper adds an inline error boundary around the body
- * and stands `trapFocus` and `preventScroll` down. Ten package dialogs already
- * made that substitution — the RBAC family recorded it — so it is precedent, and
- * it is named here because it is real.
- */
+// Revoke key confirmation. Uses Design System Dialog (not platform ui/dialog wrapper).
+// Error boundary, trapFocus, preventScroll are platform-only differences.
 
 import { Button, HStack, Text, VStack } from "@chakra-ui/react";
 import { Dialog } from "@langwatch/design-system/dialog";

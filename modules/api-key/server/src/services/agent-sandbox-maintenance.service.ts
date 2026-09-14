@@ -17,24 +17,8 @@ export interface AgentSandboxMaintenancePipelineDeps {
   sandboxKeyReap: AgentSandboxKeyReapDeps;
 }
 
-/**
- * Credential maintenance for code agent runs, in its own pipeline for the same
- * reason blob_maintenance and langy_maintenance are in theirs: retiring the
- * keys a run left behind belongs to neither the run nor the queue.
- *
- * A sandbox key is minted per run and has no counterpart at the end of one, so
- * this sweep is the only thing that retires it.
- *
- * WHY IT LIVES WITH API KEYS rather than with the code agent that mints the
- * key: the sweep's whole predicate is over the `ApiKey` model, bounded by the
- * reserved name `@langwatch/api-key-contract` reserves, and the cross-tenant
- * hatch it rides is the ApiKey one in `guardOrganizationId`. The minting side
- * belongs to the run; retiring a credential belongs to the credential.
- *
- * The pipeline carries no events and no commands. A process manager with no
- * event handlers registers no subscriber, so this costs nothing beyond the
- * scheduled wake it exists for.
- */
+// Retiring sandbox keys belongs in credential maintenance, not run management. Keys are minted per
+// run and only reaped by this sweep. No events; costs nothing beyond scheduled wake.
 export class EventingAgentSandboxMaintenanceAdapter {
   private constructor(private readonly deps: AgentSandboxMaintenancePipelineDeps) {}
 

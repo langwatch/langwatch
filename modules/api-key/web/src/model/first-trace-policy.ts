@@ -1,30 +1,13 @@
-/**
- * When the CLI onboarding watch polls for the first trace, and what a landing
- * read means.
- *
- * The pure half of `platform/app/src/pages/cli/FirstTraceRedirect.tsx`. The
- * component that drives it is `ui/sections/first-trace-redirect.tsx` and the
- * hook that holds its state is `behavior/use-first-trace-watch.ts`; these two
- * functions decide, and having them here is what lets the policy be a unit test
- * rather than a timer-driven render.
- *
- * Behaviour rules: specs/ai-governance/cli-onboarding/post-login-first-trace-redirect.feature
- */
+// CLI first-trace polling policy: pure functions; separate from component (first-trace-redirect)
+// and state hook (use-first-trace-watch) so policy is unit-testable.
+// Spec: specs/ai-governance/cli-onboarding/post-login-first-trace-redirect.feature
 
 export const FIRST_TRACE_POLL_INTERVAL_MS = 3_000;
 export const FIRST_TRACE_POLL_TIMEOUT_MS = 10 * 60_000;
 export const FIRST_TRACE_REDIRECT_DELAY_MS = 1_200;
 
-/**
- * Pure polling policy: the query runs only while there is a project to watch
- * and nothing has concluded the watch (redirect underway, timeout reached, or
- * the project already had traces). The refetch interval additionally requires
- * either a confirmed never-synced state or no result yet, so a failed
- * initial read keeps retrying until the timeout instead of stalling.
- * Hidden tabs are covered by react-query itself: with the default
- * refetchIntervalInBackground (false), an interval query only ticks while
- * the tab is focused per the focus manager's visibilitychange handling.
- */
+// Polling policy: runs while project exists and watch hasn't concluded. Retry on failed reads;
+// react-query handles hidden tabs.
 export function resolveFirstTracePolling({
   hasProject,
   hasResult,

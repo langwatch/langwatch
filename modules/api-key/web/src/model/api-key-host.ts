@@ -1,31 +1,5 @@
-/**
- * What the API Keys settings screen and the CLI authorize screen ask of the
- * application they are mounted in.
- *
- * A screen may not import `@langwatch/ui`, the router, a toast singleton, the
- * session client or `fetch`: those are the imports and globals ADR-004 seals off
- * from a feature-web package, and reaching for any of them is also what would
- * make these screens untestable outside a running application. They ask this
- * port instead, and the frontend feature that owns it —
- * `apps/ui/src/features/api-key` — answers it by adapting the browser
- * capabilities the application resolves.
- *
- * THE ELEVENTH FAMILY TO DECLARE THIS SHAPE, after governance, gateway, the
- * personal workspace, automations, ops, agents, data governance, datasets,
- * model providers, RBAC and annotations. Every one of those recorded that a
- * repeat is the signal to promote it into one place, and every one left it, for
- * the same reason: promotion changes packages a page-family move does not own.
- * Recorded again in `dev/docs/plans/ui-family-move-manifests.md`.
- *
- * WHAT THIS FAMILY ASKS THAT NO OTHER DID is the CLI DEVICE FLOW. `/cli/auth`
- * talks to three REST endpoints the application serves — `/api/auth/cli/lookup`,
- * `/api/auth/cli/approve` and `/api/auth/cli/deny` — and the CLI in
- * `sdks/typescript` polls the other side of that exchange. A screen may not call
- * `fetch`, and the exchange is a transport concern rather than a screen one, so
- * the three calls are port methods and the adapter owns the wire. That split is
- * what lets the wire be pinned where it lives (`apps/ui/tests`) and the
- * SELECTION be pinned where it is decided (this package).
- */
+// API Keys and CLI authorize port. Screens can't reach ui, router, fetch, or session client;
+// ask this instead. Unique: CLI device flow (three REST endpoints: lookup, approve, deny).
 
 import { createContext, useContext } from "react";
 
@@ -38,48 +12,20 @@ export type ApiKeyHostScope = {
   projectName: string | undefined;
   /** The slug of the project the reader last worked in, for the CLI picker's default. */
   projectSlug: string | undefined;
-  /**
-   * The LEGACY project base key, as the API Keys table renders it.
-   *
-   * This is a credential, and it is on the port because the row exists: the
-   * platform page read `project.apiKey` off the organization graph the shell
-   * already holds, showed `sk-…` plus the last four characters, and offered a
-   * copy action carrying the full value. Nothing here widens that — the value
-   * was already in the browser before this family moved, and the only surface
-   * that reveals it in full is the reader's own clipboard.
-   */
+  /** LEGACY project base key. Credential: was already in browser before this family moved. */
   projectApiKey: string | undefined;
 };
 
-/**
- * The organization, teams and projects the reader can SEE.
- *
- * The scope FILTER at the top of the API Keys table offers every one of them,
- * and the scope chips on a key row resolve a scope id to the name it should
- * read as.
- *
- * Declared structurally rather than as `AvailableScopes` from
- * `@langwatch/authz-web`: the two are the same three fields, and naming that
- * package here would put a second `ui-screen-closure` finding on the family for
- * a shape the port can spell out.
- */
+// Visible scopes: filter options and chip names. Declared structurally not via authz-web to avoid
+// ui-screen-closure finding.
 export type ApiKeyAvailableScopes = {
   organization: { id: string; name: string } | null;
   teams: Array<{ id: string; name: string }>;
   projects: Array<{ id: string; name: string; teamId?: string | null }>;
 };
 
-/**
- * The organization graph the CLI authorize screen walks.
- *
- * Wider than {@link ApiKeyAvailableScopes} because the project picker asks
- * questions the filter never does: which project is the CALLER'S OWN personal
- * workspace (`ownerUserId`), which team is a personal one, which project is the
- * hidden tenancy project (`kind`), and which slug the reader last worked in.
- * Narrowed to exactly those fields rather than restating
- * `FullyLoadedOrganization`, which is a server type built from Prisma rows and
- * has no business in a browser package.
- */
+// CLI authorize organization graph: wider than visible scopes (adds ownerUserId, kind, slug),
+// narrowed from FullyLoadedOrganization (server-only Prisma type).
 export type ApiKeyOrganizationProject = {
   id: string;
   name: string;
@@ -105,26 +51,11 @@ export type ApiKeyOrganization = {
 /** Who is signed in, as these screens need to know them. */
 export type ApiKeyActor = { id: string } | null;
 
-/**
- * Whether the session answer has arrived.
- *
- * `/cli/auth` needs the difference: a reader who is NOT signed in is bounced
- * through SSO with the device code preserved, and a reader whose session is
- * still arriving must not be, or every load of the page would round-trip through
- * sign-in before the answer landed.
- */
+// Session status: /cli/auth needs the difference to avoid SSO bounce on loading.
 export type ApiKeySessionStatus = "loading" | "authenticated" | "unauthenticated";
 
-/**
- * The path parameters, query string and FRAGMENT a screen was opened with.
- *
- * The fragment is here because of one behaviour worth keeping: a trace's
- * `langwatch.api_key` attribute links to `/settings/api-keys#api-key-<id>`, and
- * the row it names does not exist until the keys query resolves — long after the
- * browser has given up on scrolling to it. The screen re-does that scroll once
- * the rows are in, and reading `window.location.hash` to do it would be a screen
- * naming a browser global.
- */
+// Route params, query, fragment. Fragment kept: screen re-scrolls to api-key-<id> after keys
+// query resolves, avoiding window.location.hash.
 export type ApiKeyRouteReading = {
   params: Readonly<Record<string, string | undefined>>;
   query: Readonly<Record<string, string | undefined>>;
@@ -139,62 +70,24 @@ export type ApiKeySuccessNotice = {
   id?: string;
 };
 
-/**
- * A failure, as a screen knows it.
- *
- * The raw `error` travels and never a sentence the screen composed: the wire
- * message of a handled error is its code slug, so a screen that wrote its own
- * copy would print the slug at the customer. `fallbackTitle` names the action
- * that failed, so an unrecognised code still says what the reader was doing.
- */
+// Failure: raw error + fallbackTitle. Wire message is code slug, never screen-composed copy.
 export type ApiKeyFailureNotice = {
   error: unknown;
   fallbackTitle: string;
-  /**
-   * A sentence for a refusal the SCREEN made rather than the server.
-   *
-   * The two form guards on the API Keys page — a restricted key with no scope,
-   * and a personal key for somebody who holds no bindings at all — are decided
-   * in the browser and have no code to look up. Without this they would degrade
-   * to the generic "something went wrong on our side", which is both untrue and
-   * unactionable. Ignored the moment the error carries a code the host knows.
-   */
+  // Screen-made refusal copy (e.g., restricted key with no scope). Ignored if error has code.
   description?: string;
   id?: string;
 };
 
-/**
- * A `platform/app` drawer these screens open by address rather than by mounting.
- *
- * `createProject` is registered in `platform/app/src/components/drawerRegistry.ts`
- * and opened by `DashboardLayout` as well, so this move may not delete it, and a
- * screen may not carry a copy of a registry — nor of `ProjectForm`, which is 301
- * lines of team selection and slug validation belonging to the organization
- * settings family.
- */
+// Platform drawer opened by address (createProject): not deleted because DashboardLayout uses it.
 export type ApiKeyPlatformDrawer = "createProject";
 
-/**
- * Which credential the CLI is asking for.
- *
- *  - `device_session`: user-scoped CLI session token written to
- *    `~/.langwatch/config.json`. Used by `langwatch claude/codex/etc`,
- *    `whoami`, governance commands.
- *  - `project_api_key`: project-scoped SDK API key written to `.env`. Used by
- *    `langwatch sync`, `langwatch eval`, `langwatch prompt`, and the SDK
- *    auto-instrumentation.
- */
+// CLI credential type: device_session (user-scoped, ~/.langwatch/config.json) or project_api_key
+// (SDK key, .env).
 export type CliCredentialType = "device_session" | "project_api_key";
 
-/**
- * What `/api/auth/cli/lookup` answered.
- *
- * Four outcomes, because the endpoint has four: a pending code, a 410 for one
- * that expired, a 404 for one nothing recognises, and everything else. They are
- * separate cases rather than one nullable answer because the screen says
- * something different for each, and collapsing "expired" into "failed" would
- * lose the one sentence that tells the reader to run `langwatch login` again.
- */
+// Device code lookup result: four cases (pending, expired, unknown, failed) not one nullable;
+// screen needs different messages for each.
 export type CliDeviceCodeLookup =
   | {
       outcome: "pending";
@@ -207,15 +100,8 @@ export type CliDeviceCodeLookup =
   | { outcome: "unknown" }
   | { outcome: "failed"; message: string };
 
-/**
- * The selection an approval carries, in the screen's own vocabulary.
- *
- * The adapter turns this into the request body — `user_code`,
- * `organization_id`, `project_id` and the `key_selection` whose bindings are
- * `scope_type`/`scope_id` — because the snake-cased wire is the CLI's, not the
- * screen's. `permissions` is already narrowed to what the caller holds at every
- * selected scope; the mint refuses the whole approval rather than dropping one.
- */
+// Approval selection in screen vocabulary. Adapter converts to snake_case wire (user_code,
+// organization_id, etc.). Permissions already narrowed to caller's holdings.
 export type CliDeviceApproval = {
   userCode: string;
   organizationId: string;
@@ -270,45 +156,19 @@ export abstract class ApiKeyHostApi {
 
   abstract failed(failure: ApiKeyFailureNotice): void;
 
-  /**
-   * Writes something to the reader's clipboard and says so.
-   *
-   * The success notice is the SCREEN's, because only the screen knows what was
-   * copied — a key, a snippet, a config path. The FAILURE line is the
-   * application's: a clipboard write that is refused (Safari private mode, a
-   * non-secure context) is not a failure of anything the screen did, and every
-   * copy button in the product says the same thing about it. Answers whether
-   * the write actually landed, so a button only shows its tick when it did.
-   */
+  // Clipboard write + notice. Success notice is screen's (knows what copied); failure is app's
+  // (clipboard refused). Returns true only if write landed.
   abstract copyToClipboard(request: {
     text: string;
     succeeded: ApiKeySuccessNotice;
   }): Promise<boolean>;
 
-  /**
-   * First-touch acquisition source, recorded only when nothing claimed it yet.
-   *
-   * A browser opened by `langwatch login` carries no `utm_*` or `ref`
-   * parameters, so the CLI stamps itself here and the round trip through
-   * onboarding lands it in `signupData`. FIRST-TOUCH: a reader who originally
-   * arrived through a campaign keeps their real source, which is why the port
-   * says `IfAbsent` rather than `set`.
-   */
+  // Lead source: CLI stamps itself (langwatch login carries no utm_* or ref). First-touch keeps
+  // campaign source.
   abstract recordLeadSourceIfAbsent(source: string): void;
 
-  /**
-   * Puts a `platform/app` drawer's address in the URL.
-   *
-   * `params` are the DRAWER'S OWN parameter names, unprefixed — the `drawer.`
-   * vocabulary belongs to the host, which writes `?drawer.open=<drawer>` plus
-   * one `drawer.<name>` per parameter and clears every stale `drawer.*` key,
-   * exactly as `openDrawer` does. The model-provider family's shape.
-   *
-   * KNOWN GAP, shared with the agents, me, automations, model-provider,
-   * annotations and gateway families: nothing mounts that registry above a
-   * screen served from `apps/ui` until the chrome layout route exists, so the
-   * address is right and the drawer does not open yet.
-   */
+  // Platform drawer URL: params are drawer's own names (unprefixed). Host writes ?drawer.open +
+  // drawer.<name>. KNOWN GAP: registry unmounted until chrome layout route exists.
   abstract openPlatformDrawer(request: {
     drawer: ApiKeyPlatformDrawer;
     params?: Readonly<Record<string, string | undefined>>;

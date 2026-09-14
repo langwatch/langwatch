@@ -1,26 +1,6 @@
-/**
- * What a `langwatch login` key is preselected to be able to do.
- *
- * Two things are pinned here and the second is the one worth reading.
- *
- * THE SCOPE DEFAULTS are the widest access the caller holds, and they can never
- * offer a scope the approve endpoint would refuse, because they are derived from
- * the same bindings the mint checks against.
- *
- * THE PERMISSION DEFAULT CHANGED IN EXACTLY ONE WAY when this family moved, and
- * it is recorded rather than hidden. The ceiling now comes from
- * `@langwatch/authz-contract`'s built-in role bags instead of
- * `platform/app/src/server/api/rbac`'s, and the contract's `admin` bag lists
- * `langy:create`, `langy:update` and `langy:delete` explicitly where the legacy
- * bag left them to `langy:manage` and the hierarchy rule. The default list is
- * filtered by PLAIN set membership, so an organization admin's minted key now
- * carries those three strings alongside the `langy:manage` it already carried.
- * The key can do exactly what it could before — manage implies all three at the
- * engine — but the stored list is three entries longer, and that is a
- * difference somebody should be able to find.
- *
- * Spec: specs/ai-governance/cli-onboarding/login-user-scoped-key.feature
- */
+// Login key preselection: scope defaults from mint-check bindings. Permission default now from
+// authz-contract builtin bags (was platform/app rbac); admin bag explicit on langy perms.
+// Spec: specs/ai-governance/cli-onboarding/login-user-scoped-key.feature
 
 import { defaultCliKeyPermissions } from "@langwatch/api-key-contract";
 import { builtinRolePermissions, permissionSatisfiedBy } from "@langwatch/authz-contract";

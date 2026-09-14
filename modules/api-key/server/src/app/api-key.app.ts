@@ -56,15 +56,8 @@ type ApiKeyDependencies = Readonly<{
   projects: typeof ProjectApi;
 }>;
 
-/**
- * Everything the process hands this module, one member per key: its own
- * repositories, the peer applications it names, and its own config slice. The
- * HMAC pepper is in that slice rather than in a member of its own — it is a
- * value the module already declares an environment binding for
- * (`API_KEY_PEPPER`), and the ksuid generator, the grant-id derivation and the
- * warning log below are derived from what is already here rather than asked
- * of the process, so this list IS the module's member set.
- */
+// Module dependencies from the process: repositories, peer APIs, config (HMAC pepper, ksuid, grant
+// derivation). This list IS the complete member set.
 export type ApiKeySetup = Readonly<{
   repositories: ApiKeyRepositories;
   dependencies: Readonly<{

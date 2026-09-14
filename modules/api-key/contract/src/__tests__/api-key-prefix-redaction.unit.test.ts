@@ -3,16 +3,9 @@ import { describe, expect, it } from "vitest";
 
 import { API_KEY_PREFIX, INGEST_KEY_PREFIX, LEGACY_PAT_PREFIX } from "../api-key.tokens.ts";
 
-/**
- * The redaction package lists our own key prefixes as known vendor prefixes, and
- * has to duplicate the literals to do it: `@langwatch/redaction` ships inside
- * the SDK and stays dependency-free, so it cannot import from the app.
- *
- * This is the seam that keeps the duplicate honest. It mints a token the real
- * way and asserts the scrubber recognises it, so renaming a prefix here without
- * following it there fails the build rather than quietly un-redacting every
- * LangWatch key in a transcript.
- */
+// Redaction package duplicates key prefixes (can't import SDK). This test keeps them in sync.
+// Renaming a prefix here without following it there fails the build rather than silently leaking
+// keys.
 describe("the redaction rules, given the API key prefixes the app mints", () => {
   const prefixes: Array<[string, string]> = [
     ["API key", API_KEY_PREFIX],

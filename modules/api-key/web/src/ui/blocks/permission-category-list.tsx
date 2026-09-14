@@ -1,13 +1,5 @@
-/**
- * The per-category read/write picker both drawers and the CLI authorize screen
- * render, and the counter above it.
- *
- * Moved from `platform/app/src/pages/settings/api-keys/PermissionCategoryList.tsx`
- * unchanged except for where `categoryAccessAvailability` comes from. A row the
- * caller cannot grant renders LOCKED rather than hidden, which is the whole
- * point of the surface: a reader who cannot see why a permission is unavailable
- * asks support instead of asking their administrator.
- */
+// Per-category read/write picker. Shows LOCKED rows (not hidden) so unavailable permissions
+// don't confuse users to ask support.
 
 import { Box, HStack, Text } from "@chakra-ui/react";
 import { Menu } from "@langwatch/design-system/menu";

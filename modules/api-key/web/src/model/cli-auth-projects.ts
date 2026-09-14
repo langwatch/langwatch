@@ -1,32 +1,6 @@
-/**
- * Project list + default selection for the CLI device-flow project-login
- * picker (`/cli/auth`, credential_type project_api_key).
- *
- * Project login hands the CLI a project's API key, so the picker offers:
- *
- *   - the org's shared projects, grouped under their teams (the internal
- *     internal_governance tenancy project is never user-visible), and
- *   - the caller's OWN personal workspace project as a separate, explicit
- *     "Personal" entry. Explicit is the point: the historical hazard was a
- *     coding agent silently AUTO-selecting a personal project and routing a
- *     team's evaluations there (customer report), so personal is never
- *     implied by any other selection; picking it is a deliberate act, and
- *     the server (`/api/auth/cli/approve`) only honours the caller's own.
- *
- * The personal entry is matched by the PROJECT's `ownerUserId ===
- * currentUserId`, the same predicate `/api/auth/cli/approve` authorizes with,
- * never by "first personal team in the payload". `organization.getAll`
- * retains EVERY team for an org admin, including OTHER members' personal
- * workspaces; without the owner filter an admin in a shared-project-less org
- * would see a colleague's workspace preselected and labelled "Personal", and
- * approval would then fail server-side with `personal_project_not_allowed`.
- * The caller's id must be passed for the personal entry to resolve at all.
- *
- * The default selection prefers the last project the user worked in (when
- * offered), then the sole shared project, then, when the org has no shared
- * projects at all, the personal project, so a fresh solo user is never
- * dead-ended on an empty picker.
- */
+// CLI project picker: shared projects + explicit personal entry (ownerUserId filter prevents
+// admins seeing others' workspaces). Personal is deliberate act (prevents auto-select hazard).
+// Default: last worked, sole shared, then personal (never dead-ends).
 
 export interface CliAuthProjectOption {
   id: string;

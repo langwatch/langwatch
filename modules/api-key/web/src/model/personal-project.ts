@@ -1,23 +1,5 @@
-/**
- * Resolves the signed-in user's personal project from the organizations
- * payload: the personal team owned by the user carries exactly one personal
- * project.
- *
- * A FAMILY-LOCAL COPY of `platform/app/src/utils/personalProject.ts`, which
- * stays for `PersonalSidebar`'s navigation links. Thirty lines of traversal over
- * a graph shape this package already declares on its host port, and the
- * predicate — the personal team OWNED BY THIS USER, never merely a personal team
- * — is the same one `/api/auth/cli/approve` authorizes with, which is why it is
- * worth having exactly once on each side rather than approximated.
- *
- * A personal workspace belongs to ONE organization — PersonalWorkspaceService
- * .ensure takes an organizationId and creates a workspace per organization —
- * so a user in several organizations owns several personal projects and the
- * caller has to name which organization it is asking about. `organizationId`
- * is required rather than optional for that reason: scanning every
- * organization returned whichever personal team came first in a list the
- * server sends unordered, which is not a choice any caller means to make.
- */
+// Personal project: family-local copy (PersonalSidebar nav). One per organization per user;
+// organizationId required (otherwise unordered scan is undefined behavior).
 export function findPersonalProject({
   organizations,
   userId,
