@@ -3,19 +3,19 @@
  *
  * The `gatewaySpendEvents.list` transport: it is a thin handler over
  * {@link GatewayApp.findSpendEventsPage}, so this file pins only the wiring -
- * the declared scope and the degrade when the application answers null -
- * leaving the assembly itself to `gateway-spend-events-page.unit.test.ts`.
+ * the declared scope and the shape it hands back - leaving the assembly
+ * itself to `gateway-spend-events-page.unit.test.ts`.
  */
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import { createTrpcRuntime, type TrpcRuntimePorts } from "@langwatch/api/trpc";
+import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { ResourceScope } from "@langwatch/runtime-composition";
-import { Temporal } from "@langwatch/time";
 import { initTRPC } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { GatewayApp, type GatewayAppDependencies } from "../../app/gateway.app.ts";
-import type { GatewaySpendEventsService } from "../../services/gateway-spend-events.service.ts";
+import { GatewayApp } from "../../app/gateway.app.ts";
 import { gatewaySpendEventTrpcTransport } from "../gateway-spend-event.trpc.ts";
 
 type GatewayTrpcTestContext = { actor: { id: string } };
@@ -52,29 +52,83 @@ function testPorts(
   };
 }
 
-const getSpendEventsPage = vi.fn();
-
-function spendEventsStub(overrides: Partial<GatewaySpendEventsService>): GatewaySpendEventsService {
-  return overrides as GatewaySpendEventsService;
+/** A peer that answers nothing: the composition resolves it, no test call reaches it. */
+function peer(name: string): never {
+  return new Proxy(
+    {},
+    {
+      get(_target, property) {
+        if (typeof property === "symbol") return undefined;
+        throw new Error(`The ${name} peer was called for "${String(property)}".`);
+      },
+    },
+  ) as never;
 }
 
 function projectsStub(overrides: Partial<ProjectApi>): ProjectApi {
   return overrides as ProjectApi;
 }
 
+const SPEND_EVENT_ROW = {
+  TenantId: "project_1",
+  GatewayRequestId: "req_1",
+  OrganizationId: "org_1",
+  VirtualKeyId: "vk_1",
+  PrincipalUserId: "",
+  EndUserId: "enduser-9",
+  TraceId: "trace_1",
+  Model: "gpt-5",
+  ProviderKey: "prov_1",
+  RequestType: "chat",
+  TokensInput: 100,
+  TokensOutput: 50,
+  TokensCacheRead: 0,
+  TokensCacheWrite: 0,
+  TokensReasoning: 0,
+  CostNanoUSD: 4_200_000,
+  RateVersion: "catalog@2026-07-26",
+  Status: "confirmed",
+  ErrorClass: "",
+  HttpStatus: 200,
+  NeedsReconciliation: 0,
+  SettleReason: "",
+  Labels: [] as string[],
+  Metadata: "",
+  DurationMS: 900,
+  OccurredAtMs: Date.parse("2026-07-20T12:00:00Z"),
+};
+
+const clickHouseQuery = vi.fn();
+
+/** A fake ClickHouse client answering one row of the spend ledger. */
+function fakeClickHouse(): ClickHouseQueryClient {
+  return {
+    query: clickHouseQuery,
+    insert: async () => {},
+  } as unknown as ClickHouseQueryClient;
+}
+
+/** A fake Prisma client answering the one virtual-key display-name lookup. */
+function fakePrisma(): PrismaClient {
+  return {
+    virtualKey: {
+      findMany: async () => [{ id: "vk_1", name: "Customer A key", displayPrefix: "..." }],
+    },
+  } as unknown as PrismaClient;
+}
+
 /** The slice of the application this surface reaches, and nothing else. */
-function gatewayAppStub({ clickHouse = true } = {}): GatewayApp {
-  const dependencies: Partial<GatewayAppDependencies> = {
-    spendEvents: clickHouse ? spendEventsStub({ getSpendEventsPage }) : undefined,
-    projects: projectsStub({ tryGetOrganizationId: async () => "org_1" }),
-    resolveVirtualKeyNames: async () => [{ id: "vk_1", name: "Customer A key" }],
-  };
+function gatewayAppStub(): GatewayApp {
   return GatewayApp.create({
-    dependencies: {},
-    // `virtualKeys` is the discriminant GatewayApp uses to tell a full core
-    // dependency bag from REST-only members; a stub exercising the
-    // core app must carry the key even when this suite never reads it.
-    members: { virtualKeys: {}, ...dependencies } as GatewayAppDependencies,
+    dependencies: {
+      webhooks: peer("webhooks"),
+      entitlement: peer("entitlement"),
+      authz: peer("authz"),
+      projects: projectsStub({ tryGetOrganizationId: async () => "org_1" }),
+      evaluators: peer("evaluators"),
+      monitors: peer("monitors"),
+    },
+    members: { prisma: fakePrisma(), clickhouse: fakeClickHouse() },
     config: undefined,
     resources: new ResourceScope(),
   });
@@ -86,11 +140,8 @@ const BASE_INPUT = {
   toMs: Date.parse("2026-07-29T00:00:00Z"),
 };
 
-function caller(
-  permits?: (permission: AuthzPermission) => boolean,
-  options?: { clickHouse?: boolean },
-) {
-  const app = gatewayAppStub(options);
+function caller(permits?: (permission: AuthzPermission) => boolean) {
+  const app = gatewayAppStub();
   const trpc = initTRPC.context<GatewayTrpcTestContext>().create();
   const router = createTrpcRuntime<GatewayTrpcTestContext>({
     root: trpc,
@@ -103,32 +154,21 @@ function caller(
 
 beforeEach(() => {
   vi.clearAllMocks();
-  getSpendEventsPage.mockResolvedValue({
-    rows: [{ virtualKeyId: "vk_1", occurredAt: Temporal.Instant.from("2026-07-20T12:00:00Z") }],
-    nextCursor: null,
-  });
+  clickHouseQuery.mockResolvedValue({ rows: [SPEND_EVENT_ROW] });
 });
 
 describe("gatewaySpendEvents.list", () => {
   describe("given the caller holds gatewayUsage:view", () => {
     /** @scenario Ledger rows resolve virtual key display names */
+    /** @scenario "Spend history is served with no ClickHouse-absent degrade path" */
     it("answers the page the application resolved", async () => {
       const result = await caller().list(BASE_INPUT);
 
       expect(result.virtualKeyNames).toEqual({ vk_1: "Customer A key" });
-      expect(getSpendEventsPage).toHaveBeenCalledWith(
+      expect(result.clickHouseDisabled).toBe(false);
+      expect(clickHouseQuery).toHaveBeenCalledWith(
         expect.objectContaining({ tenantId: BASE_INPUT.projectId }),
       );
-    });
-  });
-
-  describe("when the deployment has no ClickHouse spend path", () => {
-    /** @scenario The ledger degrades to an empty page without ClickHouse */
-    it("degrades to an empty page", async () => {
-      const result = await caller(undefined, { clickHouse: false }).list(BASE_INPUT);
-
-      expect(result).toMatchObject({ rows: [], nextCursor: null, clickHouseDisabled: true });
-      expect(getSpendEventsPage).not.toHaveBeenCalled();
     });
   });
 
@@ -136,7 +176,7 @@ describe("gatewaySpendEvents.list", () => {
     /** @scenario The ledger requires the gateway usage view scope */
     it("never reaches the application", async () => {
       await expect(caller(() => false).list(BASE_INPUT)).rejects.toThrow();
-      expect(getSpendEventsPage).not.toHaveBeenCalled();
+      expect(clickHouseQuery).not.toHaveBeenCalled();
     });
   });
 });

@@ -5,20 +5,20 @@
  *
  * Two things the screen cannot render without: the standing (how many people
  * are over their own cap) and the Scope column's anchor name. Both are
- * computed behind the budget-decision service and covered there; what this
- * file pins is that the transport carries them onto the wire unchanged rather
- * than dropping them in the projection.
+ * computed off the real ClickHouse-backed control plane here (fake Prisma and
+ * fake ClickHouse members, real `buildGatewayControlPlane`), so this file
+ * pins the same seat-counting and scope-resolution logic production runs.
  */
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import { createTrpcRuntime, type TrpcRuntimePorts } from "@langwatch/api/trpc";
+import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { ResourceScope } from "@langwatch/runtime-composition";
-import { Temporal } from "@langwatch/time";
 import { initTRPC } from "@trpc/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { GatewayApp, type GatewayAppDependencies } from "../../app/gateway.app.ts";
-import type { GatewayService } from "../../services/gateway.service.ts";
+import { GatewayApp } from "../../app/gateway.app.ts";
 import { gatewayBudgetTrpcTransport } from "../gateway-budget.trpc.ts";
 
 type GatewayTrpcTestContext = { actor: { id: string } };
@@ -55,30 +55,23 @@ function testPorts(
   };
 }
 
-/** The slice of the application this surface reaches, and nothing else. */
-function gatewayAppStub(dependencies: Partial<GatewayAppDependencies>): GatewayApp {
-  return GatewayApp.create({
-    dependencies: {},
-    // `virtualKeys` is the discriminant GatewayApp uses to tell a full core
-    // dependency bag from REST-only members; a stub exercising the
-    // core app must carry the key even when this suite never reads it.
-    members: { virtualKeys: {}, ...dependencies } as GatewayAppDependencies,
-    config: undefined,
-    resources: new ResourceScope(),
-  });
-}
-
-function budgetDecisionsStub(overrides: Partial<GatewayService>): GatewayService {
-  return overrides as GatewayService;
-}
-
-function projectsStub(overrides: Partial<ProjectApi>): ProjectApi {
-  return overrides as ProjectApi;
+/** A peer that answers nothing: the composition resolves it, no test call reaches it. */
+function peer(name: string): never {
+  return new Proxy(
+    {},
+    {
+      get(_target, property) {
+        if (typeof property === "symbol") return undefined;
+        throw new Error(`The ${name} peer was called for "${String(property)}".`);
+      },
+    },
+  ) as never;
 }
 
 const ORG_ID = "org_1";
 const ANCHOR_VK_ID = "vk_anchor";
 const ANCHOR_PROJECT_ID = "project_anchor";
+const TENANT_PROJECT_ID = "project_1";
 
 /** Decimal money, as the contract asks for it: stringable and DB-library-free. */
 const money = (value: string) => ({
@@ -86,7 +79,8 @@ const money = (value: string) => ({
   toFixed: () => value,
 });
 
-function template(overrides: Record<string, unknown> = {}) {
+/** The raw shape `prisma.gatewayBudget.findMany` answers a row in. */
+function budgetRow(overrides: Record<string, unknown> = {}) {
   return {
     id: "bdg_template",
     organizationId: ORG_ID,
@@ -102,36 +96,93 @@ function template(overrides: Record<string, unknown> = {}) {
     providerKey: null,
     externalId: null,
     metadata: null,
-    currentPeriodStartedAt: Temporal.Instant.from("2099-01-01T00:00:00Z"),
-    resetsAt: Temporal.Instant.from("2099-02-01T00:00:00Z"),
+    currentPeriodStartedAt: new Date("2099-01-01T00:00:00Z"),
+    resetsAt: new Date("2099-02-01T00:00:00Z"),
     lastResetAt: null,
     cycleAnchorAt: null,
     archivedAt: null,
-    createdAt: Temporal.Instant.from("2026-01-01T00:00:00Z"),
-    updatedAt: Temporal.Instant.from("2026-01-01T00:00:00Z"),
+    createdAt: new Date("2026-01-01T00:00:00Z"),
+    updatedAt: new Date("2026-01-01T00:00:00Z"),
     createdById: "usr_1",
     managedByVirtualKeyId: null,
-    endUsersSeen: 2,
-    endUsersOver: 1,
     ...overrides,
   };
 }
 
-const listWithHealth = vi.fn();
-const resolveScopeTargets = vi.fn();
-const assertOrganizationExists = vi.fn();
-const resolveProviderLabels = vi.fn();
-const listGroupTargets = vi.fn();
+let bucketRows: Array<{ ScopeId: string; SpentNanoUSD: string }> = [];
+
+const clickHouseQuery = vi.fn(async (input: { sql: string }) => {
+  // The per-budget rollup totals (BudgetId, Scope, ScopeId) are never
+  // asserted here — only the per-person bucket breakdown (ScopeId alone) is.
+  if (input.sql.includes("GROUP BY BudgetId")) return { rows: [] };
+  return { rows: bucketRows };
+});
+
+/** A fake ClickHouse client answering the budget spend + per-person bucket reads. */
+function fakeClickHouse(): ClickHouseQueryClient {
+  return {
+    query: clickHouseQuery,
+    insert: async () => {},
+  } as unknown as ClickHouseQueryClient;
+}
+
+const virtualKeyFindMany = vi.fn(async (args: { where: { id?: { in: string[] } } }) => {
+  // The attributed-user anchor lookup names the ids it wants; the scope-reach
+  // candidate walk (below every `listWithHealth`) names none - no active keys
+  // is a legitimate answer there, since no test needs a reach fact.
+  if (!args.where.id) return [];
+
+  return args.where.id.in.includes(ANCHOR_VK_ID)
+    ? [{ id: ANCHOR_VK_ID, name: "prod-openai", displayPrefix: "lw_sk_ab" }]
+    : [];
+});
+
+/** A fake Prisma client answering the budget row, its bucket boundaries and its scope anchor. */
+function fakePrisma(budgets: Array<Record<string, unknown>>): PrismaClient {
+  return {
+    organization: { findUnique: async () => ({ id: ORG_ID }) },
+    gatewayBudget: { findMany: async () => budgets },
+    gatewayBudgetBucketBoundary: { findMany: async () => [] },
+    virtualKey: { findMany: virtualKeyFindMany },
+  } as unknown as PrismaClient;
+}
+
+function projectsStub(overrides: Partial<ProjectApi>): ProjectApi {
+  return overrides as ProjectApi;
+}
 
 function callerFor(budgets: Array<Record<string, unknown>>) {
-  listWithHealth.mockResolvedValue({ budgets, spendAvailable: true, scopeReach: new Map() });
-
-  const app = gatewayAppStub({
-    budgetDecisions: budgetDecisionsStub({ listWithHealth, resolveScopeTargets }),
-    projects: projectsStub({ tryGetOrganizationId: async () => ORG_ID }),
-    assertOrganizationExists,
-    resolveProviderLabels,
-    listGroupTargets,
+  const app = GatewayApp.create({
+    dependencies: {
+      webhooks: peer("webhooks"),
+      entitlement: peer("entitlement"),
+      authz: peer("authz"),
+      projects: projectsStub({
+        tryGetOrganizationId: async () => ORG_ID,
+        listIdsByOrganization: async () => [TENANT_PROJECT_ID],
+        // The scope-reach walk resolves a destination per active key's trace
+        // project; no test here supplies an active key, so this is never fed
+        // a non-empty list.
+        listTraceDestinations: async () => [],
+        listNamesByIds: async ({ projectIds }) =>
+          projectIds
+            .filter((id) => id === ANCHOR_PROJECT_ID)
+            .map((id) => ({
+              id,
+              name: "gateway-demo",
+              slug: "gateway-demo",
+              teamId: "team_1",
+              organizationId: ORG_ID,
+              isPersonal: false,
+              ownerUserId: null,
+            })),
+      }),
+      evaluators: peer("evaluators"),
+      monitors: peer("monitors"),
+    },
+    members: { prisma: fakePrisma(budgets), clickhouse: fakeClickHouse() },
+    config: undefined,
+    resources: new ResourceScope(),
   });
   const trpc = initTRPC.context<GatewayTrpcTestContext>().create();
   const router = createTrpcRuntime<GatewayTrpcTestContext>({
@@ -145,32 +196,21 @@ function callerFor(budgets: Array<Record<string, unknown>>) {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  assertOrganizationExists.mockResolvedValue(undefined);
-  resolveProviderLabels.mockResolvedValue(new Map());
-  resolveScopeTargets.mockResolvedValue(
-    new Map([
-      [
-        `ATTRIBUTED_USER:${ANCHOR_VK_ID}`,
-        {
-          kind: "ATTRIBUTED_USER",
-          id: ANCHOR_VK_ID,
-          name: "prod-openai",
-          secondary: "lw_sk_ab…",
-        },
-      ],
-      [
-        `ATTRIBUTED_USER:${ANCHOR_PROJECT_ID}`,
-        { kind: "ATTRIBUTED_USER", id: ANCHOR_PROJECT_ID, name: "gateway-demo", secondary: null },
-      ],
-    ]),
-  );
+  bucketRows = [];
+  virtualKeyFindMany.mockClear();
 });
 
 describe("gatewayBudgets.list for a per-person template", () => {
   describe("given a template the ledger has seen people under", () => {
     /** @scenario "A per-person template counts the people it has seen and the people over cap" */
     it("carries the per-person standing onto the wire", async () => {
-      const { budgets } = await callerFor([template()]).list({ organizationId: ORG_ID });
+      // One anchor over its own $1.00 cap, one still under it.
+      bucketRows = [
+        { ScopeId: "enduser-over", SpentNanoUSD: "1500000000" },
+        { ScopeId: "enduser-under", SpentNanoUSD: "500000000" },
+      ];
+
+      const { budgets } = await callerFor([budgetRow()]).list({ organizationId: ORG_ID });
 
       expect(budgets[0]?.endUsersSeen).toBe(2);
       expect(budgets[0]?.endUsersOver).toBe(1);
@@ -180,9 +220,9 @@ describe("gatewayBudgets.list for a per-person template", () => {
   describe("given a template nobody has used yet", () => {
     /** @scenario "A per-person template nobody has used yet says so instead of showing a dash" */
     it("reports zero seen and zero over", async () => {
-      const { budgets } = await callerFor([template({ endUsersSeen: 0, endUsersOver: 0 })]).list({
-        organizationId: ORG_ID,
-      });
+      bucketRows = [];
+
+      const { budgets } = await callerFor([budgetRow()]).list({ organizationId: ORG_ID });
 
       expect(budgets[0]?.endUsersSeen).toBe(0);
       expect(budgets[0]?.endUsersOver).toBe(0);
@@ -192,7 +232,7 @@ describe("gatewayBudgets.list for a per-person template", () => {
   describe("given a template anchored on a virtual key", () => {
     /** @scenario "Budget list Scope column renders the shared scope chip on one line" */
     it("names the virtual key the template anchors on", async () => {
-      const { budgets } = await callerFor([template()]).list({ organizationId: ORG_ID });
+      const { budgets } = await callerFor([budgetRow()]).list({ organizationId: ORG_ID });
 
       expect(budgets[0]?.scopeTarget).toMatchObject({
         kind: "ATTRIBUTED_USER",
@@ -206,9 +246,9 @@ describe("gatewayBudgets.list for a per-person template", () => {
   describe("given a template anchored on a project", () => {
     /** @scenario "Budget list Scope column renders the shared scope chip on one line" */
     it("names the project the template anchors on", async () => {
-      const { budgets } = await callerFor([template({ scopeId: ANCHOR_PROJECT_ID })]).list({
-        organizationId: ORG_ID,
-      });
+      const { budgets } = await callerFor([
+        budgetRow({ scopeId: ANCHOR_PROJECT_ID }),
+      ]).list({ organizationId: ORG_ID });
 
       expect(budgets[0]?.scopeTarget).toMatchObject({
         kind: "ATTRIBUTED_USER",
@@ -222,12 +262,10 @@ describe("gatewayBudgets.list for a per-person template", () => {
     /** @scenario "A per-person template counts the people it has seen and the people over cap" */
     it("leaves the standing null", async () => {
       const { budgets } = await callerFor([
-        template({
+        budgetRow({
           id: "bdg_project",
           scopeType: "PROJECT",
           scopeId: ANCHOR_PROJECT_ID,
-          endUsersSeen: undefined,
-          endUsersOver: undefined,
         }),
       ]).list({ organizationId: ORG_ID });
 
