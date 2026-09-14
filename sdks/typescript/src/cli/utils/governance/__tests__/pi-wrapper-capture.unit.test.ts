@@ -151,6 +151,27 @@ function assistantRow(id: string): string {
   });
 }
 
+/**
+ * What to print beside any failed assertion about the wire.
+ *
+ * An empty wire has several causes that are indistinguishable from the outside
+ * of `posted`, and each one announces itself somewhere else: a run that never
+ * reached the final sweep leaves a non-zero code in `exitCalls`; capture that
+ * was never started for want of an endpoint says so on stderr
+ * (`wrapper.ts:873`); a sweep cut off by its deadline says so too
+ * (PI_FINAL_SWEEP_DEADLINE_MS). Without them, a failure here reads
+ * `expected '' to contain ...` and names none of the three - which is exactly
+ * what one CI-only failure of this file left behind, and the reason the cause
+ * had to be hunted rather than read.
+ */
+function why(): string {
+  return [
+    `posts=${posted.length}`,
+    `exits=${JSON.stringify(exitCalls)}`,
+    `stderr=${JSON.stringify(stderrText())}`,
+  ].join(" ");
+}
+
 let dir: string;
 let posted: string[];
 let exitCalls: number[];
@@ -255,11 +276,11 @@ describe("given a pi session launched through the wrapper", () => {
 
       await launchPi();
 
-      expect(exitCalls).toEqual([0]);
+      expect(exitCalls, why()).toEqual([0]);
       // The reader ran and its output reached the wire: not that a factory was
       // called, but that this session's own id is in a posted body.
-      expect(posted.length).toBeGreaterThan(0);
-      expect(wire()).toContain(OWN_ID);
+      expect(posted.length, why()).toBeGreaterThan(0);
+      expect(wire(), why()).toContain(OWN_ID);
     });
 
     /**
@@ -293,9 +314,13 @@ describe("given a pi session launched through the wrapper", () => {
 
       await launchPi();
 
-      expect(wire()).toContain("parent_session_id");
-      expect(wire()).toContain(PARENT_ID);
-      expect(wire()).toContain("is_fork");
+      // Asserted before the lineage claims below, because a run that ended any
+      // other way never reached the sweep that posts them, and "no parent on
+      // the wire" would be a true statement about a run that captured nothing.
+      expect(exitCalls, why()).toEqual([0]);
+      expect(wire(), why()).toContain("parent_session_id");
+      expect(wire(), why()).toContain(PARENT_ID);
+      expect(wire(), why()).toContain("is_fork");
       // The parent's PATH is what pi wrote and what must never leave the
       // machine; only the id it resolves to may.
       expect(wire()).not.toContain(parentPath);
@@ -323,9 +348,12 @@ describe("given a pi session launched through the wrapper", () => {
 
       await launchPi();
 
-      // Both halves, or this passes when nothing was captured at all.
-      expect(wire()).toContain(OWN_ID);
-      expect(wire()).not.toContain(UNTOUCHED_ID);
+      // Both halves, or this passes when nothing was captured at all - and the
+      // exit code first, so a run that never reached the sweep says so instead
+      // of failing as a missing id.
+      expect(exitCalls, why()).toEqual([0]);
+      expect(wire(), why()).toContain(OWN_ID);
+      expect(wire(), why()).not.toContain(UNTOUCHED_ID);
     });
 
     /**
