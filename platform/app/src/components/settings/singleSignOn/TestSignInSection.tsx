@@ -48,35 +48,53 @@ export function TestSignInSection({
         </Alert.Root>
       )}
       {canManage && (
-        <Button
-          alignSelf="start"
-          // A failed attempt is still the step to do, so the button stays
-          // solid — an outline button after a failure reads as "this is
-          // finished, do it again if you like".
-          variant={testSignIn.done && !failure ? "outline" : "solid"}
-          loading={sending}
-          onClick={() => void start()}
-        >
-          {/* IT LEAVES. Pressing this hands the browser to somebody else's
-              sign-in screen and brings it back, which is not what a plain
-              button promises — so it is marked the way every other control
-              that navigates away is, and a repeat is marked as a repeat. */}
-          {(failure ?? testSignIn.done) ? (
-            <RefreshCw size={14} />
-          ) : (
-            <ExternalLink size={14} />
-          )}
-          {failure
-            ? "Try the sign-in again"
-            : testSignIn.done
-              ? "Test it again"
-              : "Test sign-in"}
-        </Button>
+        <TestSignInButton
+          done={testSignIn.done}
+          failed={failure !== undefined && failure !== null}
+          sending={sending}
+          onStart={() => void start()}
+        />
       )}
       {/* AS SOMEBODY WHO IS NOT YOU, which is the test that actually proves
           the connection: signing in as the administrator who registered it
           exercises a path most of the organization will never take. */}
       {canManage && <TestFromAnotherBrowser />}
     </VStack>
+  );
+}
+
+/**
+ * The control that hands the browser to the identity provider.
+ *
+ * A failed attempt is still the step to do, so the button stays SOLID — an
+ * outline button after a failure reads as "this is finished, do it again if
+ * you like". It leaves the application, so it carries the same mark every
+ * other control that navigates away does, and a repeat is marked as a repeat.
+ */
+function TestSignInButton({
+  done,
+  failed,
+  sending,
+  onStart,
+}: {
+  done: boolean;
+  failed: boolean;
+  sending: boolean;
+  onStart: () => void;
+}) {
+  return (
+    <Button
+      alignSelf="start"
+      variant={done && !failed ? "outline" : "solid"}
+      loading={sending}
+      onClick={onStart}
+    >
+      {failed || done ? <RefreshCw size={14} /> : <ExternalLink size={14} />}
+      {failed
+        ? "Try the sign-in again"
+        : done
+          ? "Test it again"
+          : "Test sign-in"}
+    </Button>
   );
 }

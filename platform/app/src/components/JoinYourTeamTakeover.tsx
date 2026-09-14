@@ -67,28 +67,11 @@ export function JoinYourTeamTakeover({
   const waiting = mine.data?.[0] ?? null;
 
   if (waiting) {
-    const name =
-      decision && decision.outcome === "ask"
-        ? (decision.organizations.find(
-            (organization) =>
-              organization.organizationId === waiting.organizationId,
-          )?.name ?? null)
-        : null;
     return (
-      <Takeover title="Waiting for an administrator" testId="join-team-waiting">
-        <Text fontSize="14px" lineHeight="1.65" color="fg.muted">
-          {name === null
-            ? "Your request to join is with the administrators."
-            : `Your request to join ${name} is with their administrators.`}{" "}
-          We will email you as soon as somebody answers, either way. There is
-          nothing else for you to do.
-        </Text>
-        <SecondaryAction
-          onClick={() => void utils.joinRequests.mine.invalidate()}
-        >
-          Check again
-        </SecondaryAction>
-      </Takeover>
+      <WaitingForAnAdministrator
+        organizationName={organizationNameFor({ decision, waiting })}
+        onCheckAgain={() => void utils.joinRequests.mine.invalidate()}
+      />
     );
   }
 
@@ -239,5 +222,61 @@ function SecondaryAction({
     >
       {children}
     </Button>
+  );
+}
+
+/**
+ * The name of the organization somebody is waiting on, when we know it.
+ *
+ * `null` rather than a guess: the offer that named the organizations is a
+ * separate query from the request itself, so it may be absent or may no longer
+ * carry the one they asked about. The waiting screen reads better without a
+ * name than with the wrong one.
+ */
+function organizationNameFor({
+  decision,
+  waiting,
+}: {
+  decision:
+    | {
+        outcome: string;
+        organizations?: { organizationId: string; name: string }[];
+      }
+    | undefined;
+  waiting: { organizationId: string };
+}): string | null {
+  if (decision?.outcome !== "ask") return null;
+  return (
+    decision.organizations?.find(
+      (organization) => organization.organizationId === waiting.organizationId,
+    )?.name ?? null
+  );
+}
+
+/**
+ * THE WAITING HALF. Asking is not joining: an administrator has to say yes.
+ *
+ * Somebody who has asked sees this rather than a dashboard that looks like
+ * nothing happened — which is the moment people ask again, or give up and make
+ * the second workspace this screen exists to prevent.
+ */
+function WaitingForAnAdministrator({
+  organizationName,
+  onCheckAgain,
+}: {
+  organizationName: string | null;
+  onCheckAgain: () => void;
+}) {
+  return (
+    <Takeover title="Waiting for an administrator" testId="join-team-waiting">
+      <Text fontSize="14px" lineHeight="1.65" color="fg.muted">
+        {organizationName === null
+          ? "Your request to join is with the administrators."
+          : `Your request to join ${organizationName} is with their administrators.`}{" "}
+        We will email you as soon as somebody answers, either way. There is
+        nothing else for you to do.
+      </Text>
+      <SecondaryAction onClick={onCheckAgain}>Check again</SecondaryAction>
+    </Takeover>
   );
 }
