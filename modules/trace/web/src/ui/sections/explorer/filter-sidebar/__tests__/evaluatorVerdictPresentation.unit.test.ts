@@ -19,15 +19,8 @@ const verdictSection = (
     totalDistinct: topValues.length,
   }) as unknown as CategoricalSection;
 
-/**
- * The Evaluator Verdict facet and the evaluator drilldown render the same
- * verdicts on the same screen, one directly above the other. They are wired
- * through completely different code (a facet colour map vs `buildVerdictSpecs`
- * in EvaluatorDrilldown), so nothing but a test stops them drifting back into
- * disagreement — which is how they got there: with no entry in FACET_COLORS
- * the facet fell through to `hashColor`, and the two surfaces showed the same
- * words in different colours.
- */
+// Two independent code paths (facet colors vs drilldown) need test to
+// prevent rendering disagreement.
 describe("evaluator verdict presentation", () => {
   describe("given verdict rows built for the section", () => {
     /** @scenario "Verdicts carry the drilldown's traffic light" */

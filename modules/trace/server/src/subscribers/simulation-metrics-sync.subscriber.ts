@@ -27,18 +27,8 @@ export function hasSimulationMetrics(foldState: TraceSummaryData): boolean {
   return !(foldState.spanCount === 0 && foldState.totalCost === null);
 }
 
-/**
- * Trace-side ECST publisher: when a simulation trace stabilises, publishes
- * its metrics to the simulation pipeline.
- *
- * Uses delay+dedup (60s) for terminal detection — fires once per trace
- * after 60s of quiet (no new spans). Carries the metrics data in the
- * command payload (Event-Carried State Transfer) so the simulation
- * pipeline doesn't need to query back.
- *
- * Scenario filtering: only fires for traces with scenario.run_id
- * in their hoisted span attributes.
- */
+// Delay+dedup fires once per trace after 60s of quiet; ECST avoids
+// querying back for metrics.
 export function createSimulationMetricsSyncHandler(
   deps: SimulationMetricsSyncSubscriberDeps,
 ): (event: TraceProcessingEvent, context: TriggerContext<TraceSummaryData>) => Promise<void> {

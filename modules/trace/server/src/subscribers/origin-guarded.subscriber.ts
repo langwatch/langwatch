@@ -85,27 +85,8 @@ export type TraceSummarySubscriber = {
  */
 type ExtraGuard = (event: TraceProcessingEvent) => boolean;
 
-/**
- * Defines a trace-processing subscriber on the traceSummary fold that fires
- * only when:
- *   1. the event is recent (<1h old, skips replay/resync floods),
- *   2. the event is a message event (span_received / origin_resolved) — derived
- *      enrichment events like topic_assigned do not re-run side effects,
- *   3. the trace itself is not older than MAX_TRACE_AGE_MS,
- *   4. the trace is not blocked by guardrail with no output, and
- *   5. `langwatch.origin` is resolved on the fold state.
- *
- * The originGate subscriber handles deferred resolution for traces that
- * arrive without a resolved origin, so other origin-dependent subscribers
- * just no-op until the gate has fired.
- *
- * The full guard chain — fold-state guards included — rejects pre-enqueue via
- * `when`, which receives the committed fold state: a filtered event
- * never pays a serialize + gzip + blob write that the queue's dedup would then
- * discard. A 10k-span trace fans a subscriber out once per span; the guards
- * reject nearly all of it. The handler re-checks, staying safe for any caller
- * and for a fail-open `when`.
- */
+// Guards pre-enqueue to prevent serialization waste on fold fan-outs;
+// handler re-checks for fail-open safety.
 export function defineOriginGuardedTraceSubscriber(opts: {
   name: string;
   ttl?: number;

@@ -19,19 +19,8 @@ export interface ProjectMetadataSubscriberDeps {
    * every existing caller passes what it already passed.
    */
   projects: TraceProjectMetadata;
-  /**
-   * ADR-051: ensures the project's topic clustering process exists and has a
-   * scheduled daily wake.
-   *
-   * Called on EVERY real ingest, not just the first — this is the
-   * reconciliation path, so a project that somehow lost its schedule gets it
-   * back on its next trace instead of waiting for an operator to run the
-   * backfill. Safe to call repeatedly: a bootstrap-trigger request evolves an
-   * already-bootstrapped process to the same state and cannot move its wake.
-   * The injected implementation is rate-limited (see
-   * createRateLimitedBootstrap), so this costs at most one commit per project
-   * per claim window.
-   */
+  // ADR-051: reconciliation path ensures topic clustering runs daily; safe
+  // to call repeatedly as it's rate-limited.
   bootstrapTopicClustering?: (projectId: string) => Promise<void>;
   /**
    * The process's product-analytics sink (server-side capture, never the
@@ -180,53 +169,20 @@ export class ProjectMetadataSync {
     }
   }
 
-  /**
-   * One queue lane per project, matching this subscriber's per-project dedup id.
-   *
-   * The queue's dedup key is global to the queue, but the check that decides
-   * whether a duplicate is still squashable looks the existing job up in the
-   * CURRENT group's job set. So a dedup id that spans groups never squashes:
-   * the lookup misses, the key is treated as stale, and it is deleted before a
-   * fresh job stages — which also drops the guard protecting the pending job in
-   * the other group. A per-project dedup id therefore only bites under a
-   * per-project lane, and inheriting the default per-trace lane silently turns
-   * the dedup into a no-op that leaves one live job per concurrent trace.
-   *
-   * This subscriber's work is per-project and level-triggered — it asserts the
-   * project's metadata from whichever trace happens to carry it — so all of a
-   * project's jobs belong in one serialized lane where the dedup collapses them
-   * to one. The queue prefixes `<tenantId>/fold/traceSummary/reactor/
-   * projectMetadata/` around this key.
-   */
+  // Per-project dedup lane: level-triggered subscriber needs serialization
+  // to collapse concurrent traces to one assertion.
   static projectMetadataGroupKey(event: { tenantId: string }): string {
     return `project-metadata:${event.tenantId}`;
   }
 
-  /**
-   * Pure relevance guard, shared by `when` (pre-enqueue, sees the committed
-   * fold state) and the handler (fail-open path). Sample traces (seeded from
-   * the empty-state "Seed sample traces" path; every span carries
-   * `langwatch.origin = "sample"`) are not a real first ingest. Flipping
-   * `firstMessage` / `integrated` on them would prematurely dismiss the
-   * empty-state onboarding card even though the user hasn't connected their own
-   * app yet. Skip entirely — a real trace will trigger this subscriber again.
-   */
+  // Skip sample traces from empty-state onboarding; they should not flip
+  // the integrated flag or dismiss the onboarding card.
   static isRealFirstIngest(foldState: TraceSummaryData): boolean {
     return foldState.attributes?.["langwatch.origin"] !== "sample";
   }
 
-  /**
-   * Subscriber handler that marks the project as having received its first
-   * message.
-   *
-   * Sets project.firstMessage = true, project.integrated (unless
-   * optimization_studio), and detects the SDK language from span resource
-   * attributes. On the firstMessage transition it also tracks the
-   * `first_trace_integrated` analytics event against the org admin.
-   *
-   * Uses a long dedup TTL so we only hit the database once per project in a
-   * given window.
-   */
+  // Long dedup TTL ensures at most one database write per project window
+  // for setting first message and SDK language.
   static createProjectMetadataHandler(
     deps: ProjectMetadataSubscriberDeps,
   ): (event: TraceProcessingEvent, context: TriggerContext<TraceSummaryData>) => Promise<void> {

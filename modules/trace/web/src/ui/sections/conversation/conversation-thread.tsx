@@ -16,16 +16,8 @@ import type {
   DisplayPart,
 } from "./conversation.types.ts";
 
-/**
- * ConversationThread — renders flattened conversation parts.
- *
- * The single renderer behind the prompt playground and the simulations grid
- * and drawer. Everything it draws already existed somewhere in the product:
- * `Bubble` from the Traces V2 conversation view, `ToolPairCard` from its
- * transcript, `MediaPart` from simulations. What was missing was one place
- * that put them together, which is why the playground rendered no tool calls
- * at all and simulations drew a different tool card from the trace drawer.
- */
+// Single renderer for playground, simulations grid, and drawer; reuses
+// existing components (Bubble, ToolPairCard, MediaPart) in one place.
 
 /**
  * `compact` is the simulations grid cell — smaller type, tighter truncation,
@@ -42,16 +34,8 @@ interface ConversationThreadProps {
    * test. `scenario` swaps the sides so the agent reads as the subject.
    */
   roleMode?: ConversationRoleMode;
-  /**
-   * Names the two sides of the conversation, keyed by the role the message was
-   * sent with. A surface supplies this when it knows who is actually speaking:
-   * the playground labels one side with the reader's own name and the other
-   * with the model under test, because "User" and "Assistant" name neither of
-   * the two parties the reader is comparing.
-   *
-   * A side left unset keeps the label its role already carries, which is what
-   * a scenario run depends on to read as "User Simulator" and "Agent".
-   */
+  // Custom labels for sides; playground needs reader's name and model under
+  // test instead of generic "User" and "Assistant".
   labels?: { user?: string; assistant?: string };
   /** Owns the stored objects behind any media parts. */
   projectId: string;
@@ -66,15 +50,8 @@ interface ConversationThreadProps {
    * wrote and should read as they wrote it.
    */
   shouldRenderStructuredOutput?: boolean;
-  /**
-   * Frames the thread as a standalone chat panel rather than a section inside
-   * a drawer: the scrollbar sits at the panel's own edge while the messages
-   * stay centred at `contentMaxWidth`, and there is room above the first
-   * message and below the last.
-   *
-   * The simulations drawer supplies its own frame and padding, so it leaves
-   * this off and keeps the section behaviour it already had.
-   */
+  // Standalone chat panel framing: scrollbar at panel edge, messages centred;
+  // drawer supplies its own frame and keeps section behavior.
   panel?: { contentMaxWidth: string };
   /**
    * A reply has been asked for and has not begun arriving. Draws the waiting
@@ -83,15 +60,8 @@ interface ConversationThreadProps {
    * gap reads as nothing having happened.
    */
   hasPendingReply?: boolean;
-  /**
-   * The conversation is being written now rather than read back. A turn is
-   * then numbered from the moment it starts, and its trace affordance appears
-   * when the trace lands — instead of the whole separator waiting on a trace
-   * that arrives after the reply it belongs to.
-   *
-   * Off for a recorded transcript, where an untraced message is simply one
-   * that has no trace to offer.
-   */
+  // Live mode numbers turns from start and shows affordances as trace lands,
+  // vs recorded transcript where untraced messages have no trace to offer.
   live?: boolean;
   /** Draws one media part. The host owns stored-object probing and playback. */
   renderMediaPart: RenderMediaPart;

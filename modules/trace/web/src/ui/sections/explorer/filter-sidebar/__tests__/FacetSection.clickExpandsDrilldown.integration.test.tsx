@@ -62,16 +62,8 @@ const renderActiveRowExtras = (item: FacetItem) => (
   <div data-testid={`pinned-drilldown-${item.value}`} />
 );
 
-/**
- * Holds the filter state the way the real sidebar does, including the part
- * that matters here: a row click cycles neutral → include → exclude → neutral,
- * it is NOT a two-state on/off. Modelling it as on/off would let this suite
- * pass while the second click actually lands on "exclude" — an assertion that
- * the drilldown had closed would then be reading the wrong transition.
- *
- * The escape hatch mirrors reality too: the same filter can be dropped from
- * the query bar or a saved view, without the row being touched at all.
- */
+// Three-state cycling (not on/off) to test correct drilldown transitions
+// and escape hatch behavior.
 const Harness = ({
   withDrilldown = true,
   onToggleSpy,

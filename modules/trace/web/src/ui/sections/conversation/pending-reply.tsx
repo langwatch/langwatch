@@ -1,19 +1,5 @@
-/**
- * The reply that has been asked for and has not started arriving.
- *
- * A model takes a beat before its first token — longer with a slow provider, a
- * cold cache or a long prompt — and until now that beat drew nothing at all.
- * The send button went quiet and the thread stayed exactly as it was, which
- * reads as the message not having been sent rather than as an answer on its
- * way.
- *
- * Shaped like the reply it precedes: the assistant's avatar and bubble, in the
- * assistant's place in the thread, so the answer lands where the waiting state
- * already is instead of appearing somewhere new. The word shimmers the way
- * thinking text does elsewhere in the product, rather than animating a row of
- * dots beside it — one moving thing, and it is the word that says what is
- * happening.
- */
+// Waiting state shows avatar and bubble in answer's final place with
+// shimmer, so arrival feels intentional not accidental.
 import { Box, Circle, Flex, Icon } from "@chakra-ui/react";
 import { keyframes } from "@emotion/react";
 

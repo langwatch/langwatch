@@ -1,12 +1,6 @@
 /**
  * @vitest-environment node
- * What `GET /api/trace/:id` answers a customer when the read fails for a reason
- * nobody anticipated. The family used to render that failure itself (internal
- * message, absolute source paths, stack frames straight into the body) while its
- * sibling `GET /api/traces/:traceId`, on the same failure in the same process,
- * degraded to the generic unknown. Finding F4 of
- * `dev/docs/plans/e2e-walk-2026-09-04.md`. Run over the real declaration and the
- * REST runtime that mounts it.
+ * Verifies error handling consistency for GET /api/trace/:id (F4 of e2e-walk).
  */
 import { createRestRuntime } from "@langwatch/api/rest";
 import { HandledError } from "@langwatch/handled-error";

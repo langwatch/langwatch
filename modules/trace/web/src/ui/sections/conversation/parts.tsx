@@ -17,15 +17,8 @@ import type {
  * rather than holding every layout decision in one switch.
  */
 
-/**
- * Which side of the thread a role's content sits on.
- *
- * Derived from the DISPLAY role, not the wire role, for two reasons. A scenario
- * run swaps the sides (`roleMode`), so the wire role alone points at the wrong
- * edge there. And `Bubble` already picks its side from the display role — when
- * this disagreed with it, a message's own hover actions landed against the
- * opposite edge of the thread from the bubble they belong to.
- */
+// Align to display role (not wire role) to match Bubble's behavior and
+// handle scenario role swapping.
 export function alignForRole({
   role,
   roleMode = "chat",

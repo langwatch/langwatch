@@ -67,16 +67,8 @@ export interface TrackedEventSyncSubscriberDeps {
 
 type OtlpSpanEvent = NonNullable<OtlpSpan["events"]>[number];
 
-/**
- * Tracked events reconstructed from the spans that carried them.
- *
- * A customer's feedback arrives as span EVENTS, not as its own record, so this
- * reads them back out and writes them where the product looks. Two rules make
- * that safe on redelivery: the event id is derived from the span rather than
- * minted, and a reconstructed event is validated before it is stored — a span
- * whose feedback cannot be read must be skipped, not recorded as an empty
- * event a customer never gave.
- */
+// Reconstructs feedback from span events: ID derived from span makes it
+// idempotent; validation prevents recording invalid events.
 export class TrackedEventSync {
   /**
    * An event type is recordable only when it is present, non-empty, and not the
@@ -90,15 +82,8 @@ export class TrackedEventSync {
     return typeof value === "string" && value.length > 0 && value !== FEEDBACK_EVENT_NAME;
   }
 
-  /**
-   * Deterministic event id so a replayed span re-records the same tracked event
-   * rather than duplicating it. Keyed on (trace, span, event type, occurrence
-   * ordinal): nothing stops a span carrying two `langwatch.event` entries of the
-   * same type, and without the ordinal both would hash to one id, so idempotent
-   * recording would collapse them into a single tracked event. The ordinal is the
-   * event's index within the span's own event list, which is fixed for a given
-   * span and therefore identical on every replay.
-   */
+  // Deterministic ID with ordinal ensures replay is idempotent; prevents
+  // collapsing duplicate event types within a span.
   private static deterministicEventId({
     traceId,
     spanId,
@@ -117,16 +102,8 @@ export class TrackedEventSync {
     return `event_sha_${hash.slice(0, 32)}`;
   }
 
-  /**
-   * Reads a metric attribute as a number.
-   *
-   * OTLP carries a numeric attribute as either `doubleValue` or `intValue`, and an
-   * `intValue` reaches us as a number, a decimal string, or a protobuf Long
-   * (`{ low, high }`) depending on the transport. An SDK recording an integer
-   * `event.metrics.vote` sends `intValue`, so reading `doubleValue` alone would
-   * drop the vote and then fail the predefined `thumbs_up_down` schema, discarding
-   * valid feedback.
-   */
+  // OTLP metrics come as doubleValue or intValue (the latter as
+  // number/string/Long); must read both to avoid dropping valid feedback.
   private static readMetricValue(value: OtlpAnyValue | undefined): number | undefined {
     const raw = value?.doubleValue ?? value?.intValue;
     if (raw === null || raw === undefined) return undefined;
@@ -233,17 +210,8 @@ export class TrackedEventSync {
     };
   }
 
-  /**
-   * Cheap presence check — no parsing. Runs on the projection hot path with
-   * attacker-supplied span payloads, so it only looks for a `langwatch.event`
-   * event carrying a recordable `event.type` string; full reconstruction and
-   * validation stay in handle() off the hot path.
-   *
-   * Spans named `TRACK_EVENT_SPAN_NAME` are this subscriber's own output, re-ingested
-   * through the trace-processing pipeline by `recordTrackedEventSpan`. Skipping
-   * them by name is what stops the subscriber reacting to itself, whatever event type
-   * the caller supplied.
-   */
+  // Cheap check for presence on hot path; skips self-generated spans to
+  // prevent subscriber reacting to itself.
   private static spanHasFeedbackEvents(span: OtlpSpan): boolean {
     if (span.name === TRACK_EVENT_SPAN_NAME) return false;
 
@@ -260,15 +228,8 @@ export class TrackedEventSync {
     );
   }
 
-  /**
-   * Validates a reconstructed event the way the REST `POST /api/events/track`
-   * handler does: every payload is parsed with
-   * `trackEventRESTParamsValidatorSchema` first, and a predefined event type
-   * (thumbs_up_down, selected_text, waited_to_finish) is then additionally parsed
-   * with `predefinedEventsSchemas`. Custom event types clear the base schema only,
-   * exactly as they do over REST. Returns false for anything that fails either
-   * check so it is dropped rather than ingested.
-   */
+  // Mirrors REST handler validation: predefined event types get extra
+  // schema checks, custom types clear base schema only.
   private static isValidTrackedEvent({
     event,
     traceId,
@@ -410,16 +371,8 @@ export class TrackedEventSync {
     return `${event.tenantId}:${event.aggregateId}:${event.id}`;
   }
 
-  /**
-   * Reconstructs tracked-event payloads from a span's `langwatch.event` events.
-   *
-   * Each event carries `event.type` (string), `event.metrics.<key>` (double or
-   * int) and `event.details.<key>` (string) attributes; this rebuilds the
-   * `{ event_type, metrics, event_details }` shape the track-event path expects.
-   * Events without an `event.type`, and events reserving the envelope's own name
-   * as their type, are skipped. Spans this path emitted itself are never
-   * reconstructed at all.
-   */
+  // Rebuilds { event_type, metrics, event_details } shape from span
+  // attributes; skips empty and reserved types.
   static extractTrackedEventsFromSpan(span: OtlpSpan): ReconstructedTrackedEvent[] {
     const events: ReconstructedTrackedEvent[] = [];
 
@@ -445,17 +398,8 @@ export class TrackedEventSync {
     return TrackedEventSync.spanHasFeedbackEvents(event.data.span);
   }
 
-  /**
-   * Subscriber handler that turns live span feedback into tracked events.
-   *
-   * Reads `langwatch.event` events directly from each SpanReceivedEvent's OTLP
-   * span, reconstructs the `{ event_type, metrics, event_details }` payload, and
-   * records each through the same path as `POST /api/events/track` so an
-   * SDK-emitted thumbs_up_down lands identically to a REST call. Uses
-   * deterministic IDs for idempotency on retries; events that fail the same
-   * validation the REST handler applies are logged and skipped (mirrors
-   * customEvaluationSync's parse-failure path).
-   */
+  // Reconstructs and records span feedback identically to POST /api/events/track;
+  // deterministic IDs ensure idempotency on retries.
   static createTrackedEventSyncHandler(
     deps: TrackedEventSyncSubscriberDeps,
   ): (event: TraceProcessingEvent, context: TriggerContext<TraceSummaryData>) => Promise<void> {

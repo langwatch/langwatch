@@ -1,13 +1,7 @@
 /**
  * @vitest-environment node
- * What the collector says about a body it refuses, over the real declaration
- * and the REST runtime that mounts it.
- *
- * The rejection log used to carry the whole body and the whole span. These
- * suites hold the two halves of the replacement: the payload reaches neither
- * the log nor the error reporter, and what replaces it is specific enough to
- * tell us whether our schema — rather than the sender — is the thing that is
- * wrong.
+ * Verifies rejection payloads are specific enough to distinguish schema bugs
+ * from sender errors.
  */
 import { createRestRuntime } from "@langwatch/api/rest";
 import { beforeEach, describe, expect, it, vi } from "vitest";

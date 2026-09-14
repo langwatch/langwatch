@@ -1,11 +1,7 @@
 /**
  * @vitest-environment jsdom
- *
- * Saved suggestions read as a list under the message output, and editing one
- * happens in the correction popover rather than in a textarea whose only save
- * button lived in another column.
- *
- * Spec: specs/traces-v2/annotations.feature
+ * Saved suggestions edit in correction popover (not textarea) so save button
+ * and input stay together.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";

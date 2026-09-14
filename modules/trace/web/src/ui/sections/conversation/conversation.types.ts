@@ -1,18 +1,8 @@
 import type { ParsedLLMError } from "@langwatch/prompt-contract";
 import type { MediaPartData } from "../../../behavior/shared/traces/media-parts.ts";
 
-/**
- * One renderable unit of a conversation.
- *
- * Every surface that shows a chat transcript — the prompt playground, the
- * simulations grid and drawer, and anything that follows — flattens its raw
- * messages into this union and renders it through `ConversationThread`. A new
- * content shape is taught to `flattenMessages` once, and every surface gets it.
- *
- * A tool call and the result that answers it are ONE part, not two: that is
- * what `ToolPairCard` renders, and it is what a reader is actually looking at.
- * The pairing happens in the flattener, where both halves are in scope.
- */
+// One renderable unit; tool calls and results pair into one part. Every
+// surface flattens and renders through ConversationThread.
 export type DisplayPart =
   | {
       kind: "text";

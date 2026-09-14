@@ -5,26 +5,8 @@ interface ErrorMessageProps {
   error: ParsedLLMError;
 }
 
-/**
- * Displays error messages in the chat with type-specific styling and actions.
- *
- * This used to render `error.message`, which is NOT the message of an error we
- * threw: `parseLLMError` pulls it out of the model provider's own response
- * body. The justification was that the provider's sentence is the point ("Your
- * credit balance is too low" is a fix; "something went wrong" is not), with a
- * credential mask over the top to make it safe.
- *
- * The mask was the flaw. It matched credential SHAPES, so it could only ever
- * cover the shapes someone had thought of — and the body it was covering is the
- * one OpenAI fills with `Incorrect API key provided: sk-proj-…`, where on a
- * managed provider the key is LangWatch's rather than the customer's.
- *
- * What survived the removal is the part that was always doing the work:
- * `parseLLMError` already classifies the failure into a small closed set of
- * types, and this component branches on that set to choose both the sentence
- * and the action link. Each one is written below, says what the customer can
- * actually do, and cannot contain anything an upstream wrote.
- */
+// Type-specific rendering of provider errors: parseLLMError classifies to
+// a closed set, enabling customer-actionable copy per type.
 export function ErrorMessage({ error }: ErrorMessageProps) {
   const description = error.type === "unknown" ? UNKNOWN_FAILURE : describeLLMError(error.type);
 

@@ -1,16 +1,5 @@
-/**
- * flattenMessages — the one place raw chat messages become renderable parts.
- *
- * Three surfaces used to do this independently: the playground converted to
- * CopilotKit message classes, the simulations renderer walked content itself,
- * and the Traces V2 transcript had its own block parser. The first of those
- * silently dropped every tool call it built, which is what a third
- * implementation buys you.
- *
- * All the shape-sniffing is delegated to `visitContentPart`, the canonical
- * decoder shared with the server-side extraction walk (see `./contentParts`).
- * A new content shape is taught there once.
- */
+// One place to teach new content shapes: delegated to visitContentPart
+// (canonical decoder shared with server extraction).
 import type { ParsedLLMError } from "@langwatch/prompt-contract";
 import type { SimulationMessage } from "@langwatch/scenario-contract";
 import { coerceContentToArray } from "../../../model/shared/content-parts/coerce-content-to-array.ts";
@@ -18,15 +7,8 @@ import { safeJsonParseOrStringFallback } from "../../../model/shared/content-par
 import { collapseAudioTranscript, decodeContentPart, type PartContext } from "./content-parts.ts";
 import type { ConversationTurn, DisplayPart } from "./conversation.types.ts";
 
-/**
- * The message shape every caller already holds.
- *
- * `SimulationMessage` is a union of the agent dialect's message
- * schema, langwatch's own `chatMessageSchema`, and the scenario audio shape —
- * intersected with optional `id` / `trace_id`. The playground persists
- * `chatMessageSchema` + `id`, so it is already a member and needs no
- * conversion step.
- */
+// Union type; playground already persists chatMessageSchema, so no
+// conversion needed.
 export type FlattenableMessage = SimulationMessage;
 
 /** A reply still arriving, not yet part of the stored message list. */
@@ -66,19 +48,8 @@ function readToolCalls(
   return Array.isArray(calls) ? calls : [];
 }
 
-/**
- * The prefix every part of one message hangs off.
- *
- * `chatMessageSchema` makes `id` optional, so an id-less message is an
- * ordinary shape rather than a broken one — and two of them used to build the
- * same part ids (`-c0`, `-c0`). `ConversationThread` keys on `part.id`, so
- * React reconciled the second message's content onto the first's nodes.
- *
- * The list position stands in. It is stable for as long as the list is, which
- * is what reconciliation needs; a fresh UUID per flatten would instead remount
- * every part of the message on every render. The `#` keeps a derived key out
- * of the space of ids a provider actually mints.
- */
+// Stable part key prefix: id-less messages need list position, not UUID,
+// to prevent React reconciliation bugs.
 function messageKey({ msg, index }: { msg: FlattenableMessage; index: number }): string {
   return msg.id ?? `#${index}`;
 }
@@ -282,24 +253,8 @@ export function flattenMessages({
   ];
 }
 
-/**
- * Groups consecutive parts that share a trace into numbered turns.
- *
- * A turn is an exchange, not a reply. Only the traced half carries the trace —
- * the playground writes a user message locally and the trace id arrives with
- * the answer — so grouping on the trace alone put the separator *between* the
- * question and its answer, splitting the exchange it was supposed to bound.
- * Untraced parts therefore lead into the traced turn that follows them.
- *
- * Untraced parts with no traced turn after them are the live case: a message
- * just sent, a reply still streaming. Whether that counts as a turn depends on
- * what the surface is showing. A live conversation numbers it — the exchange
- * starts when the reader sends, and waiting for the trace made the separator
- * appear a beat late, under content already on screen; the trace affordance is
- * what waits, not the number. A recorded transcript does not: an untraced
- * message there is one that was never traced, and numbering it would promise a
- * trace that is not coming.
- */
+// Groups untraced and traced parts into numbered turns: untraced parts
+// lead into traced turn that follows (live case) or stand alone (recorded).
 export function groupIntoTurns(
   parts: DisplayPart[],
   { live = false }: { live?: boolean } = {},

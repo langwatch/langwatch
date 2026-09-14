@@ -1,11 +1,7 @@
 /**
  * @vitest-environment node
- *
- * The scenario role swap normally renders a run's "user" side as the LLM "User
- * Simulator". On a voice "Call it myself" run the caller is a real person, so
- * their turns read as "You" instead (#8020, decision 5).
- *
- * @see specs/features/agents/voice-agents-v1.feature
+ * Scenario runs label user side as User Simulator; voice runs label caller
+ * side as You.
  */
 import { describe, expect, it } from "vitest";
 import { getDisplayRoleVisuals } from "../scenario-roles.tsx";
