@@ -6,7 +6,7 @@ import { useCallback, useMemo } from "react";
 
 import { useRouter } from "@langwatch/ui-host/use-router";
 
-/** Any overlay the application registers. Untyped here on purpose: the registry is not this package's. */
+/** Any overlay the application registers (registry untyped: not this package's). */
 export type DrawerType = string;
 export type DrawerProps<_T extends DrawerType = DrawerType> = Record<string, unknown>;
 export type DrawerCallbacks<_T extends DrawerType = DrawerType> = Record<string, unknown>;

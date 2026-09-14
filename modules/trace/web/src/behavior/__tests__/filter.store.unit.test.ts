@@ -202,7 +202,7 @@ describe("lastAiTranslation lifecycle", () => {
     describe("when swapOperator runs", () => {
       it("clears the translation", () => {
         useFilterStore.getState().applyQueryText("status:error AND model:gpt-4o");
-        useFilterStore.getState().recordAiTranslation(TRANSLATION); // re-set after applyQueryText cleared it
+        useFilterStore.getState().recordAiTranslation(TRANSLATION); // re-set after cleared
         // AND lives at offsets 13..16 in the trimmed string.
         useFilterStore.getState().swapOperator(13, 16);
         expect(useFilterStore.getState().lastAiTranslation).toBeNull();
@@ -252,7 +252,7 @@ describe("lastAiTranslation lifecycle", () => {
     describe("when setQuery runs", () => {
       it("clears the translation", () => {
         useFilterStore.getState().applyQueryText("status:error");
-        useFilterStore.getState().recordAiTranslation(TRANSLATION); // re-set after applyQueryText cleared it
+        useFilterStore.getState().recordAiTranslation(TRANSLATION); // re-set after cleared
         const { ast } = useFilterStore.getState();
         useFilterStore.getState().setQuery("status:error", ast);
         expect(useFilterStore.getState().lastAiTranslation).toBeNull();

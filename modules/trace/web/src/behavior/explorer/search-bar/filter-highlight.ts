@@ -396,16 +396,8 @@ export function setFilterChipLabels(next: Record<string, Record<string, string>>
 }
 
 /**
- * The text the chip paints, in every pointer state. Always field-qualified
- * (`evaluator:Policy Check`) so the chip reads as a filter and not as a bare
- * name. The raw id is reachable through the tooltip and by clicking the chip,
- * never by swapping the visible text — see editorStyles for why.
- *
- * Returns undefined when there's no human label, or it equals the raw value
- * (overlaying `status:error` on `status:error` is pointless) — the CSS
- * overlay only fires when the attr is set, so omission keeps the chip in its
- * raw text-render mode. Shared with the placeholder editor so both renderers
- * paint an identical overlay.
+ * Chip overlay label: field-qualified text. Undefined when no label or equals
+ * raw value. Shared with placeholder editor.
  */
 export function chipOverlayLabel({
   field,

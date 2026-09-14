@@ -2,9 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import { create } from "zustand";
 
 /**
- * Tracks accordion open-state with auto-expand: - On identity change (new trace / new span), reset to all sections that currently have
- * content. - On content arriving asynchronously within the same identity, open the newly-populated section (without re-opening sections the
- * user closed). - User toggles inside an identity are preserved.
+ * Auto-expand accordion: reset on identity change, open new sections, preserve
+ * user toggles within identity.
  */
 export function useAutoOpenSections(
   identity: string,

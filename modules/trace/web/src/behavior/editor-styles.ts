@@ -48,22 +48,8 @@ export const editorStyles: SystemStyleObject = {
     paddingRight: "6px",
     marginLeft: "1px",
   },
-  // Label collapse: when a chip carries a human-readable `label`, render the
-  // field-qualified label (`evaluator:Policy Check`) as in-flow ::after text
-  // and collapse the underlying id to zero width (font-size:0). The chip then
-  // hugs the *label*, not the longer id — no spare space reserved for the
-  // value tail. The id stays in the DOM (selection / copy / the query
-  // language all keep it) and is surfaced on demand through the chip's
-  // `title` tooltip, which costs no layout.
-  //
-  // The chip width never changes with pointer state. An earlier version
-  // swapped the label back to the id on hover; because ids are much wider
-  // than names (`monitor_0005p7YMsdI0Oy…` vs `Ragas Response Relevancy`),
-  // the pill grew in place and pushed the remove button out from under the
-  // cursor — and the `:has(+ .filter-token-delete:hover)` half of the rule
-  // kept it expanded once the pointer arrived, so the X never settled and
-  // the chip could not be deleted. The tooltip gives the same information
-  // without moving anything.
+  // Label collapse: render label as ::after, collapse id to zero width.
+  // Tooltip surfaces id without layout changes or hover-induced resize.
   "& .filter-token[data-filter-chip-label]": {
     fontSize: "0px",
   },

@@ -1,15 +1,6 @@
 /**
- * The SDK collector: `POST /api/collector`, one already-normalized span at a
- * time. Declared public because the door resolves its own project-scoped
- * credential through `app.credential` (the process's
- * `ApiHandlerManagedCredentials`, composed in `api-trace-ingest.composition.ts`)
- * rather than the framework's project-key door: the refusal an SDK's own copy
- * quotes is this family's sentence, which a declared `project` door does not
- * let a route choose.
- *
- * `/api/collector` is a literal path nothing else claims, but it MUST be
- * mounted before the OTLP path-alias re-dispatcher, which claims
- * `/api/collector/*` with a wildcard.
+ * SDK collector: POST /api/collector, one span at a time. Resolves its own
+ * project credential. MUST mount before `/api/collector/*` wildcard dispatcher.
  */
 import { publicRoute } from "@langwatch/api/access";
 import {

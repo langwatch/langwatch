@@ -15,7 +15,8 @@ import type { SpanTreeNode, TraceHeader, TraceResourceInfoDto } from "@langwatch
 
 /**
  * @see specs/traces-v2/sessions-lens.feature (the session-rollup cost gate)
- * The share-safe gates are the single guarantee that an anonymous share viewer never receives spend, restricted attributes, captured event content or evaluator text that quotes the trace. See ADR-057.
+ * Share-safe gates ensure anonymous viewers never see spend, attributes,
+ * captured content, or evaluator quotes. See ADR-057.
  */
 
 const anonProtections: Protections = {

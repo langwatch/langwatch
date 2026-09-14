@@ -1,13 +1,6 @@
 /**
- * `/api/traces`: the v1 trace reads — search, get-by-id, transcript, metadata
- * PATCH. Route order is load-bearing: the two `:traceId` sub-resources
- * register before the bare `:traceId`, so the literal segments are not
- * swallowed by the parameter.
- *
- * `platformUrl` resolves through `TraceApi.platformUrl`, and the caller's
- * read-time redactions through `TraceApi.resolveApiKeyProtections` - the
- * module declares `authz` among its dependencies, so it answers its own
- * credential question and the family registers on `traceServer`.
+ * /api/traces: v1 trace reads (search, get-by-id, transcript, metadata PATCH).
+ * Route order load-bearing: register :traceId sub-resources before bare :traceId.
  */
 import { TraceFormattingService } from "#services/support/trace-formatting.service";
 import { TraceReadableSpanService } from "#services/read/trace-readable-span.service";
@@ -159,7 +152,7 @@ export type TracesRestOptions = Readonly<{
   updateTraceMetadata?:
     | ((input: Readonly<{ projectId: string; traceId: string; metadata: unknown }>) => Promise<void>)
     | undefined;
-  /** Absent where the process composed no coding-agent session store; the route is not registered. */
+  /** Absent when coding-agent session store not composed; route unregistered. */
   readCodingAgentTranscript?:
     | ((
         input: Readonly<{

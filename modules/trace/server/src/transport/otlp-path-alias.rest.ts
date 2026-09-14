@@ -1,11 +1,6 @@
 /**
- * Serves the OTLP paths a misconfigured exporter produces, replayed internally
- * (not redirected) into the canonical handlers `./otlp-ingest.rest.ts`
- * declares. Must mount AFTER the canonical OTLP family: the mount file wires
- * this family's `app.canonical` to that family's own mounted
- * `MountableRestApp`. Declares `public` access since it terminates nothing -
- * the canonical route it forwards to authenticates the request. See
- * `specs/otlp/endpoint-path-canonicalisation.feature`.
+ * Replays misconfigured OTLP paths internally to canonical handlers. Must mount
+ * after canonical OTLP family. Declares public (canonical route authenticates).
  */
 import {
   declined,
@@ -18,9 +13,8 @@ import { canonicalOtlpPath, stampCorrectedPath } from "@langwatch/otlp";
 import { moduleApi } from "@langwatch/runtime-composition";
 
 /**
- * The canonical family this alias forwards into, supplied at mount time so
- * the two cannot be wired out of step: a process that composed no OTLP
- * family mounts no aliases either.
+ * Canonical family this alias forwards to, supplied at mount to prevent
+ * wiring drift.
  */
 export interface OtlpPathAliasApp {
   canonical(): MountableRestApp;

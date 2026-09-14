@@ -110,9 +110,9 @@ describe("<FacetSection /> row ordering", () => {
     });
   });
 
-  // The search input lives inside the same hover-Box that triggers the freeze, so naive freeze-on-hover would
-  // mask the typed-search narrow: searchQuery → filtered → facetWindow would update live, but rendered rows
-  // would still come from the frozen pre-search snapshot.
+  // Search input inside hover-Box that triggers freeze: freeze-on-hover would
+  // mask typed-search narrow (update live but render frozen).
+  //
   describe("when search is active while the pointer is inside the section", () => {
     /** @scenario "Value search narrows the list live even while the layout would otherwise be frozen" */
     it("bypasses freeze and narrows rows as the user types", () => {

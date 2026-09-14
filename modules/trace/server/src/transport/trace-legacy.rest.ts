@@ -1,32 +1,7 @@
 /**
- * The deprecated trace family: `GET /api/trace/:id`, `POST /api/trace/:id/share`,
- * `POST /api/trace/:id/unshare`, `POST /api/trace/search` and `GET /api/thread/:id`.
- * Was `platform/app/src/server/routes/traces-legacy.ts`, itself a replacement for
- * five `pages/api` handlers. The two routes that have a successor carry
- * `Deprecation: true` and a `Link` naming it; the bodies are transcribed rather
- * than rewritten, because a released SDK parses them.
- *
- * Declared public because the family resolves its own project credential through
- * `app.credential` rather than the framework's project-key door: its refusals
- * predate the framework envelope (a bare `{ message }` for an unauthenticated
- * caller, the full handled payload for a ceiling denial), and a declared `project`
- * door does not let a route choose the sentence it refuses with.
- *
- * These five addresses ARE authenticated. The reads resolve `traces:view` and the
- * share pair resolves `traces:share` — in the handler, through the resolver the
- * process supplies, exactly where they were resolved before. `publicRoute` is the
- * only access kind the framework's closed `RouteAccess` union admits for a
- * handler-resolved door: `handlerManagedAuth` is not one of the four members, and
- * the runtime synthesises a handler-managed registry entry only from a declared
- * `withPermission`, which would put the framework door in front of the handler and
- * rewrite the two refusal bodies a released SDK parses. The recorded cost of
- * choosing the wire over the label is that the address inventory shows a
- * credential of `public` and a credential class of `none` for these five
- * addresses, which is wrong about them; the permission each one enforces is
- * written into its `reason` so an audit reading the registry finds it there.
- *
- * The addresses are literal with no `/api/v1` twin: they are the exact paths the
- * released SDK dials, and a superseded family negotiates no dated contract.
+ * Deprecated trace family (v0): GET /api/trace/:id, share/unshare/search, thread.
+ * Declared public, resolves own credential, checks permissions in handler. Literal
+ * paths (no versioning) that released SDKs dial.
  */
 import { TraceReadableSpanService } from "#services/read/trace-readable-span.service";
 import { TraceFormattingService } from "#services/support/trace-formatting.service";
@@ -122,15 +97,7 @@ export interface TraceLegacyRestMembers<TSearchBody, TSearchBodyRaw> {
     input: Readonly<{ projectId: string; credential: RestCredentialPrincipal }>,
   ): Promise<unknown>;
   /**
-   * The search body a caller may send: the deployment's shared analytics filter
-   * vocabulary plus this family's own four additive fields. Parsed STRICTLY here,
-   * unlike the v1 family — this deprecated endpoint has always behaved that way,
-   * and loosening it would silently accept a typo the caller currently gets told
-   * about.
-   *
-   * A method rather than a field: the application a mounted family reads is a
-   * proxy that answers callable operations only, so a property member would
-   * throw where it is read.
+   * Search body schema: strict parsing (method, not field).
    */
   searchBodySchema(): z.ZodType<TSearchBody, TSearchBodyRaw>;
   /** Renders a schema failure as the one sentence this family answers with. */

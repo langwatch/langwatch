@@ -83,17 +83,7 @@ export function ErrorActions({
         </Link>
       )}
       {/*
-        No clipboard API — an insecure origin (a self-hosted instance on plain
-        http), or a browser that withholds it. The id is the only handle a
-        customer has to give support, so it is shown as text rather than
-        withheld along with the button that would have copied it.
-
-        `hasFailed` is the same predicament arrived at the other way: the API
-        exists, so the button rendered, but the write was refused (an unfocused
-        document, a denied permission). `hasFailed` only clears on a later
-        success, so without this the button reads "Couldn't copy" for good and
-        the id is unobtainable — worst on the anonymous share page, where it is
-        the viewer's only handle to quote.
+        No clipboard API or hasFailed: show ID as text (only handle to support/quote).
       */}
       {traceId && (!canCopy || hasFailed) && (
         <chakra.span userSelect="all">Error ID: {traceId}</chakra.span>

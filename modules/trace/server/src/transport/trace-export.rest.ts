@@ -1,18 +1,6 @@
 /**
- * REST for the trace export download.
- *
- * `POST /api/export/traces/download` streams the export as CSV or JSONL
- * straight to the response, and broadcasts progress to the tenant so a tRPC
- * subscription on any pod can relay it to the browser that asked. The export
- * id rides back on the `X-Export-Id` response header.
- *
- * This is the HTTP layer: authentication, authorization, headers and
- * streaming. Everything else arrives as a port - the session, the permission
- * probe, the caller's read-time redactions, the export itself, the tenant
- * broadcast, and the two errors the application's registry writes copy for.
- * The request schema is a port too (the deployment's own analytics filter
- * vocabulary), so the body is read raw and validated by hand rather than
- * through `withInput`, which needs a schema fixed at declaration time.
+ * HTTP layer for trace export download: authentication, authorization, headers,
+ * streaming. Everything else arrives as ports (schema included).
  */
 import { deferredScope } from "@langwatch/api/access";
 import {

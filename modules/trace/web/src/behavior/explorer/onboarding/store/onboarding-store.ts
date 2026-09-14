@@ -137,9 +137,8 @@ const DEFAULT_PERSISTED: PersistedShape = {
 };
 
 /**
- * Resolve the global first-trace-tour flag from a persisted blob, migrating the old per-project map: if the
- * stored shape predates the global flag, treat "fired in any project" as globally seen so existing users on this
- * browser aren't re-toured after the migration.
+ * Resolve global first-trace-tour flag, migrating old per-project map.
+ * Treat "fired in any project" as globally seen for existing users.
  */
 function firstTraceFiredFrom(raw: unknown): boolean {
   if (typeof raw !== "object" || raw === null) return false;

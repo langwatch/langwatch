@@ -7,7 +7,8 @@ import { TraceAttributeRedactionService } from "../../services/attribute/trace-a
 import type { SpanTreeNode, TraceHeader, TraceResourceInfoDto } from "@langwatch/trace-contract";
 
 /**
- * Viewer-scoped gates for the v2 trace read DTOs (header, span tree, resource info, evaluator verdicts). These enforce the SAME `Protections` on BOTH trace surfaces — the authenticated in-app drawer (`tracesV2.*`) and the anonymous share page (`sharedTrace.get`) — so neither can drift behind the other. Cost is gated by the viewer's own `cost:view` permission (`protections.canSeeCosts`): the legacy full-span path already strips per-span cost via `applySpanProtections`, so the summary-derived header/tree DTOs must strip it too or a viewer without `cost:view` would see in the header/waterfall exactly the spend the detail pane hides (ADR-057). The two transports that call these still live in the application; the gates are here because they are the trace read's rule, not the transport's, and a package-owned gate cannot be quietly re-implemented by whichever surface is written next.
+ * Gates for v2 trace read DTOs: enforces same Protections on both transports
+ * (authenticated and anonymous share). Cost gated by cost:view permission.
  */
 
 /** Strip provider spend from a header for a viewer without cost:view. */
@@ -35,7 +36,8 @@ export function gateTreeCost({
 }
 
 /**
- * Strip session spend from Sessions-lens rows for a viewer without cost:view. A per-session rollup is strictly more revealing than the per-trace cost the header and waterfall already gate, so it follows the same permission. Zeroed rather than nulled: the row's cost is a total, and the chips that render it already treat zero as "nothing to show".
+ * Strip session spend for viewers without cost:view. Zeroed rather than nulled
+ * to match existing chip rendering.
  */
 export function gateSessionCost<T extends { totalCost: number }>({
   sessions,
@@ -49,7 +51,8 @@ export function gateSessionCost<T extends { totalCost: number }>({
 }
 
 /**
- * Strip the generated session title from Sessions-lens rows for a viewer who may not read captured content. The title is written BY the model FROM the conversation, a one-line summary of what the human asked for, so it follows content visibility (`canReadCapturedContent`) rather than the cost permission; the git identity on the same object is operational metadata about where the session ran and is deliberately untouched. `titleRedacted` is set only when there WAS a title, mirroring `redactV2Content`: an ordinary session that never had one must not render the redaction placeholder.
+ * Strip session title for viewers who cannot read captured content. `titleRedacted`
+ * set only when a title existed (mirrors redactV2Content).
  */
 export function gateSessionTitle<T extends { codingAgent: { title: string | null } | null }>({
   sessions,
@@ -106,7 +109,8 @@ export function gateResources({
 }
 
 /**
- * Evaluator verdicts follow content visibility: `inputs` echo captured trace content verbatim and are never shared; `details` is free-text evaluator output that routinely quotes BOTH the trace's input and output, and an error's `message` can do the same, so both survive only for a viewer who may read input AND output — a viewer allowed one side but not the other could otherwise reconstruct the hidden side from the free text. Stacktraces are internal implementation detail and are never shared.
+ * Evaluator verdicts follow content visibility: inputs never shared, details
+ * survive only for viewers who may read input AND output. Stacktraces never shared.
  */
 export function gateEvaluations({
   evaluations,
@@ -132,7 +136,8 @@ export function gateEvaluations({
 }
 
 /**
- * Internal cost-classification markers the receiver stamps on a span's resource so the fold can roll the bundled portion into NonBilledCost — plumbing, not user-facing metadata (the billed/bundled split is shown as real amounts), so filtered out of the drawer's resource view. A fixed set, unlike {@link gateResources}: it depends on nothing about the viewer. Both passes run on the resource DTO, this one first, so the rules layer on top of it rather than around it.
+ * Internal cost-classification markers filtered from drawer resource view.
+ * Fixed set, independent of viewer. Applied before gateResources.
  */
 export const HIDDEN_RESOURCE_ATTRS: ReadonlySet<string> = new Set([NON_BILLABLE_ATTR]);
 

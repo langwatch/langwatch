@@ -183,9 +183,7 @@ export const ONBOARDING_JOURNEY: StageDef[] = [
   },
   {
     id: "auroraLanding",
-    // Second beat of the marquee moment: ribbon stays visible while the new arrivals slide in underneath it, so
-    // the user reads "the aurora is what brought these in." Total time on the ribbon (auroraArrival +
-    // auroraLanding) lands ~5.8s, matching what the previous single stage held.
+    // Ribbon stays visible, new arrivals slide underneath. Total timing ~5.8s.
     heading: "Watch out for the aurora...\nNew traces tend to follow it.",
     holdMs: 4000,
     next: "postArrival",

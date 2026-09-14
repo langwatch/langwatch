@@ -1,34 +1,8 @@
 import type { Protections } from "@langwatch/trace-contract";
 /**
  * @vitest-environment node
- *
- * The captured-content matrix for `GET /api/traces/:traceId/transcript`.
- *
- * An API-key caller has no session, so the data-privacy policy resolves it as
- * a public viewer: only a `capture` category is readable, `restrict` and `drop`
- * are not. This suite drives the REAL policy resolution into the REAL
- * transcript read, and pins what content survives per cell.
- *
- * It covers every agent wire shape, not just claude's, because the log gate
- * matches `event.name` while the transcript derivation normalizes it: claude
- * emits bare names (`user_prompt`), codex and gemini namespace theirs
- * (`codex.tool_result`, `gemini_cli.api_response`). A gate that only knows the
- * bare spelling hands a session-less caller the namespaced agents' content
- * whatever the policy says.
- *
- * ## What this suite reaches, and what it cannot
- *
- * The policy stored for a scope becomes a `ResolvedDataPrivacy` through
- * `resolveDataPrivacy`, and a public viewer's per-category decision comes from
- * `isContentVisibleToPublic` — both the real functions the API process runs,
- * both owned by the data-privacy contract this package depends on. The one
- * step this package cannot reach is the process's `getApiKeyProtections`
- * (`ApiTraceProtections` in `apps/api/src/app/api-trace-read-stack.composition.ts`,
- * a private class): it is what CHOOSES the anonymous branch for a key, and it
- * resolves the policy out of Postgres. So the projection below stands where the
- * suite's predecessor read a stored row, and what stays unguarded here is the
- * API process picking the wrong branch for a key — an apps/api binding, not one
- * this package can hold.
+ * API-key callers resolve as public viewers subject to data-privacy gates.
+ * Covers every agent wire shape (claude, codex, gemini) with different event names.
  */
 
 import { beforeEach, describe, expect, it } from "vitest";

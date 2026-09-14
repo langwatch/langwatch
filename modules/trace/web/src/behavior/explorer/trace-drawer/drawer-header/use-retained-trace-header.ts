@@ -9,9 +9,8 @@ interface RetainedFields {
 }
 
 /**
- * Root cause of the "chips flash then vanish" bug: the drawer opens against a header *seeded from the table row* (`useOpenTraceDrawer`
- * calls `header.setData` with `attributes: {}` but real `conversationId` / `userId`), and the row-click / URL-hydration / refetch sequence
- * can swap which cache entry (with vs. without the `occurredAtMs` key part) backs `useTraceHeader`.
+ * Prevent "chips flash then vanish": retain header seeded from table row across
+ * cache swaps during row-click / URL-hydration / refetch sequence.
  */
 export function useRetainedTraceHeader(trace: TraceHeader): TraceHeader {
   const retained = useRef<RetainedFields | null>(null);

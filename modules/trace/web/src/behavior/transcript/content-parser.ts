@@ -91,7 +91,7 @@ export function extractInlineBlocks(content: string): ContentBlock[] {
 }
 
 /**
- * Parses `trimmed` (already known to look like a JSON object or array) into content blocks, but only when doing so actually produces structure worth having — a real block type, or a single non-raw record.
+ * Parse trimmed JSON into content blocks only when structure is worth having.
  */
 function tryParseNestedJsonTextBlock(trimmed: string): ContentBlock[] | null {
   try {
