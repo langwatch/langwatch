@@ -44,6 +44,16 @@ export default defineConfig({
   use: {
     baseURL: BASE_URL,
 
+    /* Quiet every animation that honours prefers-reduced-motion. The auth
+     * screens paint a live shader ground and a one-shot entrance, and both
+     * stand down under this setting (AuthGround, LogoHandoff, the tweened
+     * ground). Without it the perpetual ground keeps interactive elements
+     * from ever settling, so Playwright's "visible, enabled and stable"
+     * actionability wait on a button never resolves and the click times out.
+     * This became load-bearing when the ground stopped being hosted-only and
+     * started rendering on the self-hosted (non-IS_SAAS) surface CI runs. */
+    reducedMotion: "reduce",
+
     /* In CI, use the runner's preinstalled Google Chrome
      * (E2E_BROWSER_CHANNEL=chrome) to skip the ~170 MB Chromium download.
      * Locally it falls back to Playwright's bundled Chromium. Applies to all
