@@ -1069,6 +1069,38 @@ Feature: One cost screen, three honest lanes
     # already looking when they are told to try again.
 
   @integration
+  Scenario: A period the server declined says so instead of offering a retry
+    Given the records behind a provider's period are open
+    When the server declines that read because the plan does not cover it
+    Then the records say the reader does not have access to them
+    And nothing there offers to try the read again
+    And nothing there says the records are still being read
+    # The same rule the lanes above this panel already follow: a decline is
+    # not a fault. This read carries the permission and plan gates the chart
+    # above it already passed, so a reader meets a decline here only when
+    # something changed under them between drawing the chart and opening a
+    # period — the grant withdrawn, or the plan lapsed. Pressing again cannot
+    # give either back.
+    #
+    # The third line is why the decline needs words of its own rather than
+    # merely losing the button. Nothing is in hand and nothing is in flight,
+    # so a panel that only stopped offering the retry would sit forever on
+    # the line that says the records are being read.
+
+  @integration
+  Scenario: A period declined for want of a grant reads the same as one declined by the plan
+    Given the records behind a provider's period are open
+    When the server declines that read because the reader lacks the grant
+    Then the records say the reader does not have access to them
+    And nothing there offers to try the read again
+    # Both declines are answered the same way here, deliberately. This panel
+    # cannot tell a lapsed plan from a withdrawn grant without reading the
+    # live plan, and naming the wrong one sends the reader to the wrong
+    # place, so it names neither. The notice one screen up does read the live
+    # plan and so can name one, and it replaces the whole body rather than
+    # sitting beside the figures, so it is never beside an opened period.
+
+  @integration
   Scenario: The screen does not quietly read the figures again on its own
     When a permitted viewer leaves the cost screen open
     Then the screen does not read the figures again by itself
