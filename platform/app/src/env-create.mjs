@@ -74,6 +74,30 @@ export const azureBlobAuthModeSchema = z
   .enum(["sharedKey", "workloadIdentity", "managedIdentity", "azureCli"])
   .optional();
 
+/**
+ * The sign-in provider, under its supported name. `AUTH_PROVIDER` is the one
+ * to set; the NextAuth-era `NEXTAUTH_PROVIDER` still works but is deprecated
+ * — the modern name wins when both are set, and a deployment still on the
+ * old one is told once at boot, deliberately: the rename must never break a
+ * running install. The resolved value keeps flowing through the internal
+ * `NEXTAUTH_PROVIDER` field its readers already name; renaming those is a
+ * sweep of its own.
+ *
+ * Exported for unit testing.
+ */
+export const resolveConfiguredAuthProvider = () => {
+  const modern = process.env.AUTH_PROVIDER;
+  if (modern) return modern;
+  const legacy = process.env.NEXTAUTH_PROVIDER;
+  if (legacy) {
+    console.warn(
+      "NEXTAUTH_PROVIDER is deprecated - set AUTH_PROVIDER instead. The configured value still applies.",
+    );
+    return legacy;
+  }
+  return "email";
+};
+
 /** @param {import('zod').ZodTypeAny} schema */
 const optionalIfBuildTime = (schema) => {
   return process.env.BUILD_TIME ? schema.optional() : schema;
@@ -648,7 +672,7 @@ export function createEnvConfig() {
       NODE_ENV: process.env.NODE_ENV,
       ENVIRONMENT: process.env.ENVIRONMENT,
       BASE_HOST: process.env.BASE_HOST,
-      NEXTAUTH_PROVIDER: process.env.NEXTAUTH_PROVIDER ?? "email",
+      NEXTAUTH_PROVIDER: resolveConfiguredAuthProvider(),
       NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET,
       NEXTAUTH_URL: process.env.NEXTAUTH_URL,
       LW_GATEWAY_INTERNAL_SECRET: process.env.LW_GATEWAY_INTERNAL_SECRET,
