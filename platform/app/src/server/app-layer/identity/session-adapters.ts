@@ -143,6 +143,37 @@ export class VerifiedCallbackProviderAssertions
       providerAccountId,
       assertedFactors,
     };
+    if (
+      current.evidence?.providerId === providerId &&
+      current.evidence.providerAccountId === providerAccountId
+    ) {
+      current.evidence = {
+        ...current.evidence,
+        assertedFactors,
+        verifiedTokenClaims: true,
+      };
+    }
+  }
+
+  /** Records the exact account accepted by the SSO plugin's resolveUser seam.
+   * Unlike account after-hooks, this runs before the plugin creates a session. */
+  recordAuthenticatedSsoAccount({
+    providerId,
+    providerAccountId,
+  }: {
+    providerId: string;
+    providerAccountId: string;
+  }): void {
+    const current = this.scope.getStore();
+    if (!current || !providerId || !providerAccountId) {
+      return;
+    }
+    current.evidence = {
+      providerId,
+      providerAccountId,
+      assertedFactors: [],
+      verifiedTokenClaims: false,
+    };
   }
 
   recordAuthenticatedCallbackAccount({

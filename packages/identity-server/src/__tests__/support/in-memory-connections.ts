@@ -1,5 +1,6 @@
 import {
   emptySsoConnection,
+  qualifySsoDomainOwnership,
   reduceSsoConnection,
   type SsoConnectionFactInput,
   type SsoConnectionState,
@@ -8,8 +9,13 @@ import type {
   SsoBreakGlassBindingRepository,
   SsoConnectionReadRepository,
   SsoConnectionStrandingRepository,
+  SsoLicenseAuthorityRepository,
   SsoPlatformOperatorRepository,
 } from "../../sso-connection.repository";
+import type {
+  SsoConnectionRegistrationRepository,
+  SsoConnectionRegistrationSlot,
+} from "../../sso-connection-registration.repository";
 
 /**
  * The connection guards' three reads, in memory — and, deliberately, the SAME
@@ -17,8 +23,55 @@ import type {
  * idea of what an event does to a connection would let a guard pass against
  * a state the real projection never produces.
  */
-export class InMemoryConnections implements SsoConnectionReadRepository {
+export class InMemoryConnections
+  implements SsoConnectionReadRepository, SsoConnectionRegistrationRepository
+{
   private readonly states = new Map<string, SsoConnectionState>();
+  private readonly registrationSlots = new Map<
+    string,
+    SsoConnectionRegistrationSlot
+  >();
+
+  async claim(
+    candidate: SsoConnectionRegistrationSlot,
+  ): Promise<SsoConnectionRegistrationSlot> {
+    const key = `${candidate.organizationId}:${candidate.kind}`;
+    const held = this.registrationSlots.get(key);
+    if (held !== undefined && held.connectionId !== candidate.connectionId) {
+      const heldState = this.states.get(held.connectionId);
+      if (
+        heldState?.state !== "DISCARDED" &&
+        heldState?.state !== "TORN_DOWN"
+      ) {
+        return held;
+      }
+      if (heldState === undefined) return held;
+    }
+
+    const oppositeKind = candidate.kind === "legacy" ? "direct" : "legacy";
+    const opposite = this.registrationSlots.get(
+      `${candidate.organizationId}:${oppositeKind}`,
+    );
+    if (opposite !== undefined) {
+      const oppositeState = this.states.get(opposite.connectionId);
+      const oppositeIsLive =
+        oppositeState === undefined ||
+        (oppositeState.state !== "DISCARDED" &&
+          oppositeState.state !== "TORN_DOWN");
+      const exactPair =
+        candidate.kind === "direct"
+          ? candidate.replacesConnectionId === opposite.connectionId
+          : opposite.replacesConnectionId === candidate.connectionId;
+      if (oppositeIsLive && !exactPair) return opposite;
+    }
+
+    if (held === undefined || held.connectionId === candidate.connectionId) {
+      this.registrationSlots.set(key, candidate);
+      return candidate;
+    }
+    this.registrationSlots.set(key, candidate);
+    return candidate;
+  }
 
   async findConnection({
     connectionId,
@@ -34,7 +87,12 @@ export class InMemoryConnections implements SsoConnectionReadRepository {
     domain: string;
   }): Promise<{ connectionId: string; organizationId: string } | null> {
     for (const state of this.states.values()) {
-      if (state.state === "ACTIVE" && state.verifiedDomains.includes(domain)) {
+      const qualification = qualifySsoDomainOwnership({ state, domain });
+      if (
+        state.state !== "DISCARDED" &&
+        state.state !== "TORN_DOWN" &&
+        qualification.status !== "UNKNOWN"
+      ) {
         return {
           connectionId: state.connectionId,
           organizationId: state.organizationId,
@@ -42,6 +100,37 @@ export class InMemoryConnections implements SsoConnectionReadRepository {
       }
     }
     return null;
+  }
+
+  /**
+   * The one connection an organization is setting up or running. Terminal
+   * states are excluded, exactly as the Prisma read does — a torn-down
+   * connection is a tombstone rather than a setup in progress.
+   */
+  async findConnectionForOrganization({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<SsoConnectionState | null> {
+    for (const state of this.states.values()) {
+      if (state.organizationId !== organizationId) continue;
+      if (state.state === "DISCARDED" || state.state === "TORN_DOWN") continue;
+      return state;
+    }
+    return null;
+  }
+
+  async findConnectionsForOrganization({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<readonly SsoConnectionState[]> {
+    return [...this.states.values()].filter(
+      (state) =>
+        state.organizationId === organizationId &&
+        state.state !== "DISCARDED" &&
+        state.state !== "TORN_DOWN",
+    );
   }
 
   /** Fold facts in, exactly as the projection would. */
@@ -63,6 +152,12 @@ export class InMemoryConnections implements SsoConnectionReadRepository {
     return state;
   }
 
+  /** Every connection this store holds — what a cross-organization read,
+   *  such as the tier-3 claim queue, scans. */
+  all(): readonly SsoConnectionState[] {
+    return [...this.states.values()];
+  }
+
   /** Put a connection into a state directly, for a precondition a test does
    *  not want to spell out event by event. */
   seed(state: SsoConnectionState): void {
@@ -74,6 +169,10 @@ export class StubBreakGlassBindings implements SsoBreakGlassBindingRepository {
   constructor(private live: boolean) {}
 
   async hasLiveBinding(): Promise<boolean> {
+    return this.live;
+  }
+
+  async reserveActivationRecovery(): Promise<boolean> {
     return this.live;
   }
 
@@ -97,6 +196,24 @@ export class StubPlatformOperators implements SsoPlatformOperatorRepository {
 
   async isPlatformOperator({ actorId }: { actorId: string }): Promise<boolean> {
     return this.operators.has(actorId);
+  }
+}
+
+/**
+ * Whether the installation's licence may authorize a domain claim (D05 tier
+ * 2). A boolean rather than a set, because a licence speaks for an
+ * INSTALLATION and not for a person — which is the whole reason a hosted
+ * organization can never reach the licence-bound path.
+ */
+export class StubLicenseAuthority implements SsoLicenseAuthorityRepository {
+  constructor(private licensed = false) {}
+
+  async licenseAuthorizesDomainClaims(): Promise<boolean> {
+    return this.licensed;
+  }
+
+  set(licensed: boolean): void {
+    this.licensed = licensed;
   }
 }
 

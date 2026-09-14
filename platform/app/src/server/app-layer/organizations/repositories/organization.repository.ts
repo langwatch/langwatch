@@ -198,8 +198,17 @@ export interface EnrichedAuditLog {
   args: unknown;
   user: { id: string; name: string | null; email: string | null } | null;
   project: { id: string; name: string } | null;
-  /** Computed: gateway = `targetKind` populated, platform = otherwise. */
-  source: "platform" | "gateway";
+  /**
+   * Computed: gateway = a `gateway.` action, directory = a membership change
+   * the customer's identity provider authored, platform = otherwise.
+   *
+   * `directory` exists because a change nobody in the organization made needs
+   * an author before anybody goes looking for who made it (ADR-122). Such a
+   * row has a null `userId` — the actor is `system:scim` — so without this it
+   * reads as "User not found", which is the one reading that sends somebody
+   * hunting for a person who does not exist.
+   */
+  source: "platform" | "gateway" | "directory";
   /** Gateway resource kind — only set when source="gateway". */
   targetKind: string | null;
   /** Gateway resource id — only set when source="gateway". */

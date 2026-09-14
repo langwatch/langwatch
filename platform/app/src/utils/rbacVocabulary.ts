@@ -152,6 +152,18 @@ export const Resources = {
   // admin surface with it. Read-only: `governanceCost:view` is the only
   // grain, since nothing on the screen is editable.
   GOVERNANCE_COST: "governanceCost",
+  // Enterprise single sign-on (D05). Org-tier only, and split in two on
+  // purpose: `sso:view` reads the connection, its domains and its state,
+  // which is what a security reviewer needs; `sso:manage` sets it up and
+  // changes it, which is an IT administrator's job. A connection decides how
+  // EVERYONE in the organization signs in, so a team- or project-scoped
+  // grant of it would have an organization-wide blast radius under a label
+  // that said otherwise.
+  SSO: "sso",
+  // The directory that provisions people into the organization, at the same
+  // tier and for the same reasons. Separate from `sso` because a customer may
+  // federate sign-in without letting a directory write their membership.
+  SCIM: "scim",
 } as const;
 
 export type Resource = (typeof Resources)[keyof typeof Resources];

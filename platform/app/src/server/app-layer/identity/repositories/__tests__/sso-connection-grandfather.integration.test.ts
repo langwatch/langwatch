@@ -14,6 +14,7 @@ import type { SsoConnectionFoldState } from "~/server/event-sourcing/pipelines/s
 import { SsoConnectionStateFoldProjection } from "~/server/event-sourcing/pipelines/sso-connections/projections/ssoConnectionState.foldProjection";
 import { LocalDoorBreakGlassBinding } from "../../break-glass-binding";
 import { AdminEmailPlatformOperators } from "../../platform-operators";
+import { LicenseDomainClaimAuthority } from "../../sso-self-serve-adapters";
 import { PrismaIdentityUsersRepository } from "../identity-users.prisma.repository";
 import { LegacySsoDomainRoutingRepository } from "../legacy-sso-domain.prisma.repository";
 import { PrismaLegacySsoOrganizationRepository } from "../legacy-sso-organization.prisma.repository";
@@ -22,6 +23,7 @@ import {
   PrismaSsoConnectionReadRepository,
   PrismaSsoConnectionStrandingRepository,
 } from "../sso-connection-reads.prisma.repository";
+import { PrismaSsoConnectionRegistrationRepository } from "../sso-connection-registration.prisma.repository";
 import { SsoConnectionDomainRoutingRepository } from "../sso-connection-routing.prisma.repository";
 
 /**
@@ -67,7 +69,7 @@ const legacyRouting = new LegacySsoDomainRoutingRepository(
 );
 const connectionRouting = new SsoConnectionDomainRoutingRepository(
   prisma,
-  async (methodId) => methodId === PROVIDER,
+  async ({ methodId }) => methodId === PROVIDER,
 );
 
 let appended = 0;
@@ -129,6 +131,9 @@ function grandfather() {
     connections: new SsoConnectionService(
       new SsoConnectionGuards({
         connections: new PrismaSsoConnectionReadRepository(prisma),
+        registrationSlots: new PrismaSsoConnectionRegistrationRepository(
+          prisma,
+        ),
         breakGlass: new LocalDoorBreakGlassBinding(),
         stranding: new PrismaSsoConnectionStrandingRepository(prisma),
         // The real binding, over the same prisma the rest of this suite uses:
@@ -137,6 +142,7 @@ function grandfather() {
         platformOperators: new AdminEmailPlatformOperators(
           new PrismaIdentityUsersRepository(prisma),
         ),
+        licenseAuthority: new LicenseDomainClaimAuthority(() => false),
       }),
       ledger,
     ),
@@ -193,7 +199,7 @@ describe("the sso connection grandfather migration against Postgres", () => {
         source: "legacy-grandfathered",
         type: "oidc",
         verifiedDomains: [DOMAIN],
-        allowsJit: true,
+        arrivalPolicy: "admit",
       });
       // The domain went through the whole ceremony as history: claimed,
       // approved, verified — not injected straight into ACTIVE.
@@ -228,7 +234,6 @@ describe("the sso connection grandfather migration against Postgres", () => {
       expect(connection).toMatchObject({
         state: "ACTIVE",
         configured: true,
-        allowsJit: strings?.allowsJit,
       });
       expect(connection?.method.id).toBe(strings?.method.id);
     });
@@ -259,6 +264,9 @@ describe("the sso connection grandfather migration against Postgres", () => {
         connections: new SsoConnectionService(
           new SsoConnectionGuards({
             connections: new PrismaSsoConnectionReadRepository(prisma),
+            registrationSlots: new PrismaSsoConnectionRegistrationRepository(
+              prisma,
+            ),
             breakGlass: new LocalDoorBreakGlassBinding(),
             stranding: new PrismaSsoConnectionStrandingRepository(prisma),
             // The real binding, over the same prisma the rest of this suite uses:
@@ -267,6 +275,7 @@ describe("the sso connection grandfather migration against Postgres", () => {
             platformOperators: new AdminEmailPlatformOperators(
               new PrismaIdentityUsersRepository(prisma),
             ),
+            licenseAuthority: new LicenseDomainClaimAuthority(() => false),
           }),
           ledger,
         ),

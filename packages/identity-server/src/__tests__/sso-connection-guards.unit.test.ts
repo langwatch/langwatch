@@ -15,6 +15,7 @@ import { SsoConnectionGuards } from "../sso-connection-guards";
 import {
   InMemoryConnections,
   StubBreakGlassBindings,
+  StubLicenseAuthority,
   StubPlatformOperators,
   StubStranding,
 } from "./support/in-memory-connections";
@@ -65,7 +66,7 @@ async function run(
 }
 
 async function reachVerified(): Promise<void> {
-  await run(() => guards.registerConnection({ ...identity, type: "oidc", idp: IDP, allowsJit: true }));
+  await run(() => guards.registerConnection({ ...identity, type: "oidc", idp: IDP, arrivalPolicy: "admit" }));
   await run(() => guards.claimDomain({ ...identity, domain: "acme.com" }));
   await run(() =>
     guards.approveDomainClaim({ ...identity, actor: OPS, domain: "acme.com" }),
@@ -94,9 +95,11 @@ beforeEach(() => {
   stranding = new StubStranding([]);
   guards = new SsoConnectionGuards({
     connections,
+    registrationSlots: connections,
     breakGlass,
     stranding,
     platformOperators: new StubPlatformOperators([OPS.id]),
+    licenseAuthority: new StubLicenseAuthority(),
   });
 });
 
@@ -109,7 +112,7 @@ describe("sso connection guards", () => {
           ...identity,
           type: "oidc",
           idp: IDP,
-          allowsJit: true,
+          arrivalPolicy: "admit",
         }),
       );
 
@@ -137,7 +140,7 @@ describe("sso connection guards", () => {
           ...identity,
           type: "oidc",
           idp: IDP,
-          allowsJit: true,
+          arrivalPolicy: "admit",
         }),
       );
     });
@@ -171,7 +174,7 @@ describe("sso connection guards", () => {
           ...identity,
           type: "oidc",
           idp: IDP,
-          allowsJit: true,
+          arrivalPolicy: "admit",
         }),
       );
       await run(() => guards.claimDomain({ ...identity, domain: "acme.com" }));
@@ -226,7 +229,7 @@ describe("sso connection guards", () => {
           ...identity,
           type: "oidc",
           idp: IDP,
-          allowsJit: true,
+          arrivalPolicy: "admit",
         }),
       );
       await run(() => guards.claimDomain({ ...identity, domain: "acme.com" }));
@@ -263,6 +266,7 @@ describe("sso connection guards", () => {
       expect(requested.state.state).toBe("VERIFICATION_PENDING");
       expect(requested.state.pendingVerification).toEqual({
         domain: "acme.com",
+        expiresAtMs: null,
         method: "dns-txt",
         tokenHash: "sha256:9f86d0",
       });
@@ -284,13 +288,25 @@ describe("sso connection guards", () => {
         organizationId: "org_first",
         state: "ACTIVE",
         verifiedDomains: ["acme.com"],
+        domainVerifications: [
+          {
+            domain: "acme.com",
+            method: "dns-txt",
+            actorId: "user_first",
+            verifiedAtMs: T0,
+            proofState: "VERIFIED",
+            firstAbsentAtMs: null,
+            graceEndsAtMs: null,
+            tokenHash: "sha256:first-proof",
+          },
+        ],
       });
       await run(() =>
         guards.registerConnection({
           ...identity,
           type: "oidc",
           idp: IDP,
-          allowsJit: true,
+          arrivalPolicy: "admit",
         }),
       );
       await run(() => guards.claimDomain({ ...identity, domain: "acme.com" }));
@@ -361,6 +377,37 @@ describe("sso connection guards", () => {
         guards.activateConnection({ ...identity, testLoginAccountId: null }),
       ).rejects.toMatchObject({ code: "sso_connection_activation_blocked" });
     });
+
+    it("reuses one actor-bound recovery reservation across activation retries", async () => {
+      const first = await guards.activateConnection({
+        ...identity,
+        commandId: "cmd_first_delivery",
+        testLoginAccountId: "acc_test",
+      });
+      const retry = await guards.activateConnection({
+        ...identity,
+        commandId: "cmd_retry_delivery",
+        testLoginAccountId: "acc_test",
+      });
+      const otherActor = await guards.activateConnection({
+        ...identity,
+        commandId: "cmd_other_actor",
+        actor: { type: "user", id: "user_other" },
+        testLoginAccountId: "acc_test",
+      });
+
+      const firstReservation = first.find(
+        (fact) => fact.type === CONNECTION_ACTIVATED_EVENT_TYPE,
+      )?.data.activationReservationCommandId;
+      const retryReservation = retry.find(
+        (fact) => fact.type === CONNECTION_ACTIVATED_EVENT_TYPE,
+      )?.data.activationReservationCommandId;
+      const otherReservation = otherActor.find(
+        (fact) => fact.type === CONNECTION_ACTIVATED_EVENT_TYPE,
+      )?.data.activationReservationCommandId;
+      expect(firstReservation).toBe(retryReservation);
+      expect(otherReservation).not.toBe(firstReservation);
+    });
   });
 
   describe("given an ACTIVE connection", () => {
@@ -372,12 +419,18 @@ describe("sso connection guards", () => {
         guards.suspendConnection({ ...identity, reason: "IdP maintenance" }),
       );
       expect(suspended.state.state).toBe("SUSPENDED");
-      // Stops routing: ownership is scoped to ACTIVE, so a suspended
-      // connection's domains answer nobody.
-      expect(
-        await connections.findDomainOwner({ domain: "acme.com" }),
-      ).toBeNull();
+      // Suspension stops routing but does not relinquish global ownership.
+      // Otherwise another organization could seize the domain during an IdP
+      // outage and keep it after this connection resumes.
+      expect(await connections.findDomainOwner({ domain: "acme.com" })).toEqual(
+        { connectionId: CONNECTION, organizationId: ORG },
+      );
 
+      breakGlass.set(false);
+      await expect(
+        guards.resumeConnection({ ...identity }),
+      ).rejects.toMatchObject({ code: "sso_connection_activation_blocked" });
+      breakGlass.set(true);
       const resumed = await run(() => guards.resumeConnection({ ...identity }));
       expect(resumed.state.state).toBe("ACTIVE");
       expect(await connections.findDomainOwner({ domain: "acme.com" })).toEqual(
@@ -439,6 +492,30 @@ describe("sso connection guards", () => {
         await connections.findDomainOwner({ domain: "acme.com" }),
       ).toBeNull();
     });
+
+    /** @scenario "Asking again while a removal waits brings the date forward" */
+    it("accepts a re-ask and re-derives the deadline from it", async () => {
+      const { state } = await run(() =>
+        guards.requestTeardown({ ...identity, reason: null, graceMs: 0 }),
+      );
+      expect(state.state).toBe("TEARDOWN_PENDING");
+      expect(state.tearDownAfterMs).toBe(T0);
+
+      const done = await run(() =>
+        guards.completeTeardown({ ...identity, occurredAtMs: T0 }),
+      );
+      expect(done.state.state).toBe("TORN_DOWN");
+    });
+
+    /** @scenario "Asking again while a removal waits brings the date forward" */
+    it("runs the stranding check again on the way through", async () => {
+      stranding.set(["user_sam"]);
+      await expect(
+        guards.requestTeardown({ ...identity, reason: null, graceMs: 0 }),
+      ).rejects.toMatchObject({
+        code: "sso_connection_teardown_strands_users",
+      });
+    });
   });
 
   describe("given a grandfathered ACTIVE connection", () => {
@@ -450,7 +527,7 @@ describe("sso connection guards", () => {
           source: "legacy-grandfathered",
           type: "oidc",
           idp: IDP,
-          allowsJit: true,
+          arrivalPolicy: "admit",
           domains: ["acme.com"],
         }),
       );
@@ -463,10 +540,24 @@ describe("sso connection guards", () => {
       });
       expect(held?.state).toBe("ACTIVE");
       expect(held?.source).toBe("legacy-grandfathered");
+      expect(held?.domainVerifications).toEqual([
+        expect.objectContaining({
+          domain: "acme.com",
+          method: "legacy-configuration",
+          legacyImport: {
+            migration: "sso-connection-grandfather-v1",
+            version: 1,
+            organizationId: ORG,
+            predecessorConnectionId: CONNECTION,
+            domain: "acme.com",
+            importedAtMs: T0,
+            evidenceRef: `legacy-sso-config:${ORG}:${CONNECTION}:acme.com`,
+          },
+        }),
+      ]);
 
-      // Suspend it, then try to bring it back with no break-glass binding:
-      // the activation-shaped guard is not what resume runs, so the honest
-      // check is the one a grandfathered connection would actually hit.
+      // Suspend it and bring it back through the same recovery reservation
+      // boundary as an ordinary connection.
       await run(() => guards.suspendConnection({ ...identity, reason: null }));
       stranding.set(["user_sam"]);
       await run(() => guards.resumeConnection({ ...identity }));
@@ -511,7 +602,7 @@ describe("sso connection guards", () => {
           source: "legacy-grandfathered" as const,
           type: "oidc" as const,
           idp: IDP,
-          allowsJit: true,
+          arrivalPolicy: "admit",
           domains: ["acme.com"],
         });
 
@@ -526,6 +617,138 @@ describe("sso connection guards", () => {
       });
       expect(held?.state).toBe("ACTIVE");
       expect(held?.verifiedDomains).toEqual(["acme.com"]);
+    });
+
+    it("refuses a legacy import attributed to a user", async () => {
+      await expect(
+        guards.grandfatherConnection({
+          ...identity,
+          source: "legacy-grandfathered",
+          type: "oidc",
+          idp: IDP,
+          arrivalPolicy: "admit",
+          domains: ["acme.com"],
+        }),
+      ).rejects.toMatchObject({ code: "sso_connection_invalid_transition" });
+    });
+  });
+
+  describe("when a published record is what decides the claim", () => {
+    /** @scenario "A published record decides the claim, with nobody at LangWatch in the loop" */
+    it("states the approval on the record's authority and the proof together, in that order", async () => {
+      await run(() =>
+        guards.registerConnection({
+          ...identity,
+          type: "oidc",
+          idp: IDP,
+          arrivalPolicy: "admit",
+        }),
+      );
+      await run(() => guards.claimDomain({ ...identity, domain: "acme.com" }));
+      // The record may be asked for against an undecided claim, which is
+      // what makes a decision-free journey possible at all.
+      await run(() =>
+        guards.requestVerification({
+          ...identity,
+          domain: "acme.com",
+          method: "dns-txt",
+          tokenHash: "sha256:proof",
+        }),
+      );
+
+      const { facts, state } = await run(() =>
+        guards.verifyDomain({ ...identity, domain: "acme.com" }),
+      );
+
+      expect(facts.map((fact) => fact.type)).toEqual([
+        DOMAIN_CLAIM_APPROVED_EVENT_TYPE,
+        DOMAIN_VERIFIED_EVENT_TYPE,
+      ]);
+      expect(facts[0]!.data).toMatchObject({
+        authority: "dns-proof",
+        actor: ANA,
+      });
+      expect(state.state).toBe("VERIFIED");
+      expect(state.verifiedDomains).toEqual(["acme.com"]);
+      expect(state.domainClaims).toEqual([
+        expect.objectContaining({ state: "APPROVED", authority: "dns-proof" }),
+      ]);
+    });
+
+    /** @scenario "Claiming the record's authority without the record proves nothing" */
+    it("refuses a caller that names the record's authority itself", async () => {
+      await run(() =>
+        guards.registerConnection({
+          ...identity,
+          type: "oidc",
+          idp: IDP,
+          arrivalPolicy: "admit",
+        }),
+      );
+      await run(() => guards.claimDomain({ ...identity, domain: "acme.com" }));
+
+      await expect(
+        guards.approveDomainClaim({
+          ...identity,
+          domain: "acme.com",
+          authority: "dns-proof",
+        }),
+      ).rejects.toMatchObject({ code: "sso_connection_invalid_transition" });
+
+      const held = await connections.findConnection({
+        connectionId: CONNECTION,
+      });
+      expect(held?.approvedDomains).toEqual([]);
+      expect(held?.domainClaims[0]?.state).toBe("WAITING");
+    });
+
+    /** @scenario "Entitlement cannot stand in for domain ownership" */
+    it("refuses a licence ceremony against a claim nobody decided", async () => {
+      await run(() =>
+        guards.registerConnection({
+          ...identity,
+          type: "oidc",
+          idp: IDP,
+          arrivalPolicy: "admit",
+        }),
+      );
+      await run(() => guards.claimDomain({ ...identity, domain: "acme.com" }));
+
+      await expect(
+        guards.requestVerification({
+          ...identity,
+          domain: "acme.com",
+          method: "license-token",
+          tokenHash: "sha256:licence",
+        }),
+      ).rejects.toMatchObject({ code: "sso_connection_invalid_transition" });
+    });
+  });
+
+  describe("when a domain nobody could own alone is claimed", () => {
+    /** @scenario "A consumer mail domain cannot be claimed on any tier" */
+    /** @scenario "A public suffix with no company behind it cannot be claimed either" */
+    it("refuses a shared mail provider, a domain ending and a bare label, stating nothing", async () => {
+      await run(() =>
+        guards.registerConnection({
+          ...identity,
+          type: "oidc",
+          idp: IDP,
+          arrivalPolicy: "admit",
+        }),
+      );
+
+      for (const domain of ["gmail.com", "OUTLOOK.com", "co.uk", "com"]) {
+        await expect(
+          guards.claimDomain({ ...identity, domain }),
+        ).rejects.toMatchObject({ code: "sso_domain_not_eligible" });
+      }
+
+      const held = await connections.findConnection({
+        connectionId: CONNECTION,
+      });
+      expect(held?.state).toBe("DRAFT");
+      expect(held?.domainClaims).toEqual([]);
     });
   });
 });

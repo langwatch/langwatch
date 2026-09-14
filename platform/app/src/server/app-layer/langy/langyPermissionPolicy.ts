@@ -191,6 +191,7 @@ const FULLY_EXCLUDED_FAMILIES: Record<string, string> = {
  * and delete all remain.
  */
 const AUTH_SCOPE_FAMILIES: Record<string, string> = {
+  sso: "SSO and directory-sync configuration controls authentication authority",
   organization: "org membership and role administration IS the auth scope",
   team: "team membership administration decides who holds what",
   project:

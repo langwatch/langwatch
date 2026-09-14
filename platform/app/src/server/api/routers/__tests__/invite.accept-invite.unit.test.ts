@@ -60,6 +60,7 @@ vi.mock("@ee/governance/services/personalWorkspace.service", () => ({
 // tests exercise exactly the legacy branch.
 const verifiedEmailsOfMock = vi.hoisted(() => vi.fn().mockResolvedValue(null));
 vi.mock("~/server/app-layer/identity/runtime", () => ({
+  clearSignUpConfirmationPending: async () => void 0,
   identityEmail: () => ({ verifiedEmailsOf: verifiedEmailsOfMock }),
   // The credential boundary asks this before it lets a password through; no
   // organization routes this suite's addresses.
@@ -77,6 +78,8 @@ vi.mock("~/server/app-layer/identity/runtime", () => ({
   PASSWORD_HASH_ROUNDS: 10,
   BACKUP_CODE_COUNT: 10,
   passkeySignUp: () => ({}),
+  ssoAssertion: () => ({}),
+  databaseHooks: () => ({}),
   signUpConfirmationEndpoint: () => ({}),
   lastWayInGuard: () => ({}),
   twoStepAccount: () => ({}),

@@ -4,10 +4,12 @@ import {
   RECORD_SCIM_APPLY_FAILURE_COMMAND_TYPE,
   RECORD_SCIM_GROUP_MAPPING_COMMAND_TYPE,
   RECORD_SCIM_USER_PUSH_COMMAND_TYPE,
+  REDRIVE_SCIM_APPLY_COMMAND_TYPE,
   REVOKE_SCIM_SYNC_COMMAND_TYPE,
   recordScimApplyFailureCommandDataSchema,
   recordScimGroupMappingCommandDataSchema,
   recordScimUserPushCommandDataSchema,
+  redriveScimApplyCommandDataSchema,
   revokeScimSyncCommandDataSchema,
   type ScimSyncCommand,
 } from "@langwatch/identity";
@@ -19,12 +21,12 @@ import { scimSyncEventsFor } from "../envelope";
 import type { ScimSyncEvent } from "../schemas/events";
 
 /**
- * The directory-sync pipeline's five verbs, as the queue's STAGED RE-RUN of
+ * The directory-sync pipeline's six verbs, as the queue's STAGED RE-RUN of
  * each: the same guard the calling path ran, the same envelope. A retried
  * command carries the same commandId, so the re-run costs no second event.
  *
  * Every one is the identical move, so it is written once here rather than
- * five times across five files — the connection pipeline's
+ * six times across six files — the connection pipeline's
  * `ssoConnectionCommands.ts` shape, for the same reason.
  */
 
@@ -102,6 +104,14 @@ export const RecordScimApplyFailureCommand = scimSyncCommand({
   description:
     "Record a directory apply that failed, and retire it if it never can succeed",
   verb: "recordScimApplyFailure",
+});
+
+export const RedriveScimApplyCommand = scimSyncCommand({
+  type: REDRIVE_SCIM_APPLY_COMMAND_TYPE,
+  schema: redriveScimApplyCommandDataSchema,
+  description:
+    "Record a platform operator sending a retired directory apply through again",
+  verb: "redriveScimApply",
 });
 
 export const RevokeScimSyncCommand = scimSyncCommand({
