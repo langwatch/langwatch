@@ -16,15 +16,19 @@ import {
 import { DashboardSelect } from "./DashboardSelect.tsx";
 import { Info, Pencil, Plus, RotateCw, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
-import { EnterpriseLockedSurface } from "~/components/enterprise/EnterpriseLockedSurface";
-import { PermissionRequiredNotice } from "~/components/PermissionRequiredNotice";
-import { Drawer } from "~/components/ui/drawer";
-import { Link } from "~/components/ui/link";
-import { toaster } from "~/components/ui/toaster";
-import { HandledErrorAlert, showErrorToast } from "~/features/errors";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { api, type RouterOutputs } from "~/utils/api";
-import { docsUrl } from "~/utils/docsUrl";
+import { EnterpriseLockedSurface } from "../../ui/elements/enterprise-locked-surface.tsx";
+import { PermissionRequiredNotice } from "../../ui/elements/permission-required-notice.tsx";
+import { Drawer } from "@langwatch/design-system/drawer";
+import { Link } from "../../ui/elements/governance-link.tsx";
+import {
+  useGovernanceToaster,
+  useShowErrorToast,
+  type GovernanceToaster,
+} from "../../behavior/governance-feedback.ts";
+import { HandledErrorAlert } from "../../ui/elements/handled-error-alert.tsx";
+import { useGovernanceScope } from "../../behavior/governance-session.ts";
+import { api, type RouterOutputs } from "../../behavior/governance-api.ts";
+import { docsUrl } from "@langwatch/config/docs-url";
 
 /**
  * The Anomaly rules pane of the inventory page, wired to api.anomalyRules.*
@@ -361,9 +365,11 @@ function composerFromRule(rule: Rule): ComposerState {
 function buildRulePayload({
   composer,
   orgId,
+  toaster,
 }: {
   composer: ComposerState;
   orgId: string;
+  toaster: GovernanceToaster;
 }) {
   if (!composer.name.trim()) return null;
   if (!composer.scopeId.trim() && composer.scope !== "organization")
@@ -407,6 +413,8 @@ function useAnomalyRuleMutations({
   refetch: () => unknown;
   setComposer: (next: ComposerState | null) => void;
 }) {
+  const toaster = useGovernanceToaster();
+  const showErrorToast = useShowErrorToast();
   const create = api.anomalyRules.create.useMutation({
     onSuccess: () => {
       void refetch();
@@ -457,9 +465,8 @@ function useGroupedRules(rules: Rule[] | undefined) {
  * and callbacks only, the component owns the markup.
  */
 function useAnomalyRulesTab() {
-  const { organization, hasAnyPermission } = useOrganizationTeamProject({
-    redirectToOnboarding: false,
-  });
+  const { organization, hasAnyPermission } = useGovernanceScope();
+  const toaster = useGovernanceToaster();
   const orgId = organization?.id ?? "";
   const canRead = hasAnyPermission("anomalyRules:view");
   const canManage = hasAnyPermission("anomalyRules:manage");
@@ -482,7 +489,7 @@ function useAnomalyRulesTab() {
 
   const onSubmit = () => {
     if (!composer) return;
-    const payload = buildRulePayload({ composer, orgId });
+    const payload = buildRulePayload({ composer, orgId, toaster });
     if (!payload) return;
     if (composer.id) {
       updateMutation.mutate({ id: composer.id, ...payload });

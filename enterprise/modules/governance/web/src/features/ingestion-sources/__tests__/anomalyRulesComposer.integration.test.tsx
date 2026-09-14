@@ -22,45 +22,16 @@
  *
  * Specs: specs/ai-governance/dashboard/governance-ui-controls.feature
  */
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, screen } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { findNativeSelects } from "~/components/governance/filters";
-import { hasPermissionWithHierarchy } from "~/server/api/rbac";
+import { fakeGovernanceHost, renderWithGovernanceHost } from "../../../testing.tsx";
 
 const harness = vi.hoisted(() => ({
   permissions: [] as string[],
-}));
-
-vi.mock("~/hooks/useOrganizationTeamProject", () => {
-  const holds = (permission: string) =>
-    hasPermissionWithHierarchy(harness.permissions, permission);
-  return {
-    useOrganizationTeamProject: () => ({
-      isLoading: false,
-      organization: { id: "org-1", slug: "acme", name: "ACME", teams: [] },
-      organizations: [],
-      project: undefined,
-      hasPermission: holds,
-      hasOrgPermission: holds,
-      hasAnyPermission: holds,
-    }),
-  };
-});
-
-vi.mock("~/hooks/useActivePlan", () => ({
-  useActivePlan: () => ({
-    isEnterprise: true,
-    isLoading: false,
-    activePlan: undefined,
-  }),
-}));
-
-vi.mock("~/components/ui/toaster", () => ({
-  toaster: { create: vi.fn() },
 }));
 
 /**
@@ -92,7 +63,7 @@ const SOURCES = [
   },
 ];
 
-vi.mock("~/utils/api", () => {
+vi.mock("../../../behavior/governance-api.ts", () => {
   const mutation = () => ({
     useMutation: () => ({
       mutate: vi.fn(),
@@ -104,38 +75,35 @@ vi.mock("~/utils/api", () => {
       reset: vi.fn(),
     }),
   });
-  return {
-    api: {
-      useUtils: () => ({
-        anomalyRules: { list: { invalidate: vi.fn() } },
-      }),
-      anomalyRules: {
-        // An empty rule list is enough: the composer's pickers do not depend
-        // on there being any rules to compose against.
-        list: {
-          useQuery: () => ({ data: [], isLoading: false, error: null }),
-        },
-        create: mutation(),
-        update: mutation(),
-        archive: mutation(),
+  const api = {
+    useUtils: () => ({
+      anomalyRules: { list: { invalidate: vi.fn() } },
+    }),
+    anomalyRules: {
+      // An empty rule list is enough: the composer's pickers do not depend
+      // on there being any rules to compose against.
+      list: {
+        useQuery: () => ({ data: [], isLoading: false, error: null }),
       },
-      ingestionSources: {
-        list: {
-          useQuery: () => ({ data: SOURCES, isLoading: false, error: null }),
-        },
+      create: mutation(),
+      update: mutation(),
+      archive: mutation(),
+    },
+    ingestionSources: {
+      list: {
+        useQuery: () => ({ data: SOURCES, isLoading: false, error: null }),
       },
     },
   };
+  return { api, governanceApi: api };
 });
 
 import { AnomalyRulesTab } from "../AnomalyRulesTab";
 
 function mount() {
-  return render(
-    <ChakraProvider value={defaultSystem}>
-      <AnomalyRulesTab />
-    </ChakraProvider>,
-  );
+  return renderWithGovernanceHost(<AnomalyRulesTab />, {
+    host: fakeGovernanceHost({ permissions: harness.permissions }),
+  });
 }
 
 /** Opens the composer, failing loudly rather than silently doing nothing. */
