@@ -80,6 +80,27 @@ export const PHONE_CONNECT_REJECTED_PREFIX = "Twilio rejected the call";
 export const TWILIO_MAX_CALL_DURATION_CAP_SECONDS = 300;
 
 /**
+ * How long the callee must stay silent, in seconds, before the SDK ends the
+ * callee's turn and hands the floor back to the simulated caller.
+ *
+ * Twilio Media Streams deliver 20 ms frames continuously — silence included —
+ * and carry no speech/silence signal of their own (checked against Twilio's
+ * Media Streams docs, see ADR-131 "Turn-taking on the media stream"). The SDK's
+ * Twilio adapter therefore gates inbound frames on speech energy
+ * (`speechGate`, on by default since 1.7.0-dev.voice8) so that a pause in the
+ * callee's speech reaches the runtime as a real gap, and THIS knob is what turns
+ * that gap into a turn boundary. Without the gate the turn only ever ended on
+ * hang-up or the SDK's 60 s hard ceiling, so the caller spoke exactly once and
+ * the callee was left asking "hello? are you still there?" (#8014).
+ *
+ * 0.8 s rather than the SDK's 0.6 s default: a phone callee's inter-sentence
+ * pauses run longer than a browser agent's, and the a-leg round trip adds
+ * jitter. Long enough not to cut a sentence mid-way, short enough that the
+ * caller answers promptly.
+ */
+export const PHONE_RESPONSE_TAIL_SILENCE_SECONDS = 0.8;
+
+/**
  * A phone target was exercised on a path it has no meaning on (a browser mint
  * or record, or an availability guard). One code, so the failure reads the same
  * wherever it surfaces. Extends the same {@link HandledError} base the
@@ -153,7 +174,9 @@ export type TwilioAgentFactory = (options: {
 
 /** The real SDK adapter's `placeCall` shape. Its recording option is `record`
  *  — the SDK's published name, which must not change; our interface exposes it
- *  as `shouldRecord` and this factory translates at the vendor boundary. */
+ *  as `shouldRecord` and this factory translates at the vendor boundary.
+ *  `responseTailSilence` is the SDK base adapter's public turn-end knob (a
+ *  mutable field, not a constructor option). */
 type SdkTwilioAdapter = Omit<TwilioAdapterLike, "placeCall"> & {
   placeCall(args: {
     to: string;
@@ -162,6 +185,7 @@ type SdkTwilioAdapter = Omit<TwilioAdapterLike, "placeCall"> & {
     record?: boolean;
     streamNonce?: string;
   }): Promise<void>;
+  responseTailSilence: number;
 };
 
 /**
@@ -175,6 +199,11 @@ type SdkTwilioAdapter = Omit<TwilioAdapterLike, "placeCall"> & {
  */
 const defaultTwilioAgentFactory: TwilioAgentFactory = (options) => {
   const sdk = scenarioVoice.twilioAgent(options) as unknown as SdkTwilioAdapter;
+  // Phone turn-taking: end the callee's turn after this much silence. The
+  // SDK's inbound speech gate is left at its default (on), so silence between
+  // the callee's utterances actually reaches the runtime as a gap — see
+  // PHONE_RESPONSE_TAIL_SILENCE_SECONDS.
+  sdk.responseTailSilence = PHONE_RESPONSE_TAIL_SILENCE_SECONDS;
   const originalPlaceCall = sdk.placeCall.bind(sdk);
   const adapter = sdk as unknown as TwilioAdapterLike;
   // Translate our `shouldRecord` to the SDK's published `record` option; this
