@@ -183,8 +183,18 @@ describe("Langy asks before making a repository in a folder that has none", () =
                 }
               },
               // The answer is acted on in the next turn, so the run has to
-              // wait for that turn before it judges the path.
+              // wait for that turn before it judges the path. Not always a
+              // next turn, though: an answer that reaches the card while its
+              // call is still open is returned into the turn that asked, and
+              // that turn carries on and does the work itself.
               async (_state, executor) => {
+                const askedIn = seenTurns[seenTurns.length - 1] ?? "";
+                if (
+                  askedIn &&
+                  (await watcher!.cardAnsweredInsideTurn({ turnId: askedIn }))
+                ) {
+                  return;
+                }
                 const nextTurnId = await watcher!.waitForNewTurn({
                   knownTurnIds: seenTurns,
                 });

@@ -1383,6 +1383,17 @@ export interface ConversationWatcher {
     timeoutMs?: number;
   }) => Promise<string>;
   /**
+   * Whether a turn's own question card was answered while its call was still
+   * open.
+   *
+   * The question tool returns inside the turn when the answer reaches it in
+   * time, and ends the turn when it does not, in which case the answer starts
+   * a turn of its own. A step waiting for the work a card unlocks has to know
+   * which of the two shapes it got, or it waits out its timeout on a turn that
+   * already did that work.
+   */
+  cardAnsweredInsideTurn: (input: { turnId: string }) => Promise<boolean>;
+  /**
    * Wait until no turn is in flight.
    *
    * Idle says the turn ended, not that its answer is already readable: the
@@ -2162,6 +2173,13 @@ export function watchLangyConversation({
       const answer = await readTurnAnswer(input);
       if (!answer) return [];
       return judgeMessages(answer);
+    },
+    cardAnsweredInsideTurn: async ({ turnId }) => {
+      const answer = await readTurnAnswer({ turnId });
+      return (answer?.parts ?? []).some(
+        (part) =>
+          part.type === "tool-question" && part.state === "output-available",
+      );
     },
     stop: () => {
       stopped = true;
