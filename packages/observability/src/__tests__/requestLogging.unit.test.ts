@@ -127,6 +127,36 @@ describe("requestLogging", () => {
       });
     });
 
+    describe("when the request carries traffic attribution", () => {
+      /** @scenario The request log line carries the attribution fields */
+      it("flattens the endpoint class and client fields onto the log line", () => {
+        const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() } as any;
+
+        logHttpRequest(logger, {
+          method: "POST",
+          url: "/api/collector",
+          statusCode: 200,
+          duration: 42,
+          userAgent: "langwatch-sdk-node/3.1.0",
+          attribution: {
+            endpointClass: "collector",
+            clientSource: "sdk",
+            clientSdkName: "langwatch-observability-sdk",
+            clientSdkLanguage: "typescript",
+            clientSdkVersion: "3.1.0",
+          },
+        });
+
+        expect(logger.info.mock.calls[0][0]).toMatchObject({
+          endpointClass: "collector",
+          clientSource: "sdk",
+          clientSdkName: "langwatch-observability-sdk",
+          clientSdkLanguage: "typescript",
+          clientSdkVersion: "3.1.0",
+        });
+      });
+    });
+
     describe("when request fails with 5xx", () => {
       it("logs at error level", () => {
         const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() } as any;

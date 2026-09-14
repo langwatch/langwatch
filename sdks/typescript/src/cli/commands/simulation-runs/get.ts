@@ -5,8 +5,8 @@ import { resolveCredentials } from "../../utils/apiKey";
 import { readFetchFailure } from "../../utils/formatFetchError";
 import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
-import { buildAuthHeaders } from "@/internal/api/auth";
 import type { SimulationRunEvaluation } from "@/client-sdk/services/simulation-runs";
+import { buildRequestHeaders } from "@/internal/api/request-headers";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
 import { langwatchFetch } from "@/internal/http/langwatchFetch";
@@ -111,7 +111,7 @@ export const getSimulationRunCommand = async (
       `${endpoint}/api/simulation-runs/${encodeURIComponent(runId)}`,
       {
         method: "GET",
-        headers: buildAuthHeaders({ apiKey }),
+        headers: buildRequestHeaders({ apiKey }),
       },
     );
 

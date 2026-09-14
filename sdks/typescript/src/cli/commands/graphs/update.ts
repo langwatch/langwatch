@@ -5,7 +5,7 @@ import { resolveCredentials } from "../../utils/apiKey";
 import { formatFetchError } from "../../utils/formatFetchError";
 import { failSpinner } from "../../utils/spinnerError";
 import { commandValidationError, reportCommandError } from "../../utils/errorOutput";
-import { buildAuthHeaders } from "@/internal/api/auth";
+import { buildRequestHeaders } from "@/internal/api/request-headers";
 import type { CommandResult } from "../../utils/output";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
@@ -53,7 +53,7 @@ export const updateGraphCommand = async (
       method: "PATCH",
       headers: {
         "Content-Type": "application/json",
-        ...buildAuthHeaders({ apiKey }),
+        ...buildRequestHeaders({ apiKey }),
       },
       body: JSON.stringify(body),
     });

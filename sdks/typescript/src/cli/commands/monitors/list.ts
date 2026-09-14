@@ -6,7 +6,7 @@ import { formatFetchError } from "../../utils/formatFetchError";
 import { formatTable } from "../../utils/formatting";
 import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
-import { buildAuthHeaders } from "@/internal/api/auth";
+import { buildRequestHeaders } from "@/internal/api/request-headers";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
 import { langwatchFetch } from "@/internal/http/langwatchFetch";
@@ -34,7 +34,7 @@ export const listMonitorsCommand = async (): Promise<CommandResult | void> => {
   }>;
   try {
     const response = await langwatchFetch(`${endpoint}/api/monitors`, {
-      headers: buildAuthHeaders({ apiKey }),
+      headers: buildRequestHeaders({ apiKey }),
     });
 
     if (!response.ok) {

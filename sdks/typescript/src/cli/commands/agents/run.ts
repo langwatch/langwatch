@@ -10,7 +10,7 @@ import {
 import { resolveCredentials } from "../../utils/apiKey";
 import { formatFetchError } from "../../utils/formatFetchError";
 import { failSpinner } from "../../utils/spinnerError";
-import { buildAuthHeaders } from "@/internal/api/auth";
+import { buildRequestHeaders } from "@/internal/api/request-headers";
 import { parseRunParameterFlags } from "../../utils/keyValueFlags";
 import type { CommandResult } from "../../utils/output";
 
@@ -216,7 +216,7 @@ export const runAgentCommand = async (
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            ...buildAuthHeaders({ apiKey }),
+            ...buildRequestHeaders({ apiKey }),
           },
           body: JSON.stringify(input),
         },

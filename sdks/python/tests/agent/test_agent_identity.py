@@ -209,6 +209,9 @@ def test_connection_headers():
     assert headers == {
         "Authorization": "Bearer sk-lw-secret",
         "User-Agent": f"langwatch-python/{__version__}",
+        "X-LangWatch-SDK-Name": "langwatch-observability-sdk",
+        "X-LangWatch-SDK-Language": "python",
+        "X-LangWatch-SDK-Version": str(__version__),
     }
 
     with_project = connection_headers(api_key="sk-lw-secret", project_id="proj_1")

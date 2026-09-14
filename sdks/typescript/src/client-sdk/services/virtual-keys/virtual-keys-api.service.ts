@@ -1,3 +1,4 @@
+import { buildSdkIdentityHeaders } from "@/internal/api/request-headers";
 import { scopedApiKey } from "@/internal/credentialContext";
 import {
   CURSOR_WALK_PAGE_SIZE,
@@ -209,6 +210,7 @@ export class VirtualKeysApiService {
 
   private headers(): Record<string, string> {
     return {
+      ...buildSdkIdentityHeaders(),
       Authorization: `Bearer ${this.apiKey}`,
       "Content-Type": "application/json",
       // Org-anchored API keys carry no project of their own; the surface
