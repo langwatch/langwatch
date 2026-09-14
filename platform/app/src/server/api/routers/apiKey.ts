@@ -1,5 +1,6 @@
 import { auditLog } from "@ee/audit-log/auditLog";
 import { HandledError } from "@langwatch/handled-error";
+import { createLogger } from "@langwatch/observability";
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { RoleBindingScopeType, TeamUserRole } from "~/generated/prisma/client";
@@ -10,6 +11,8 @@ import {
   refineRestrictedPermissions,
 } from "~/server/api-key/restricted-permissions";
 import { permissionFormatSchema } from "~/server/rbac/custom-role-permissions";
+
+const logger = createLogger("langwatch:api:apiKey");
 
 function mapApiKeyHandledError(error: unknown): never {
   if (HandledError.isHandled(error)) {
@@ -332,7 +335,12 @@ export const apiKeyRouter = createTRPCRouter({
           bindings: input.bindings,
         });
 
-        void auditLog({
+        // Awaited, so the row is durable before the caller is told a key
+        // exists. The `.catch` earns its place twice over: this response
+        // shows the plaintext token exactly once, and an audit error thrown
+        // here would land in the catch below and be mapped as an API-key
+        // failure the caller cannot act on.
+        await auditLog({
           userId: ctx.session.user.id,
           organizationId: input.organizationId,
           action: "apiKey.create",
@@ -343,7 +351,12 @@ export const apiKeyRouter = createTRPCRouter({
             permissionMode: input.permissionMode,
             assignedToUserId: targetUserId,
           },
-        });
+        }).catch((error: unknown) =>
+          logger.warn(
+            { error, apiKeyId: apiKey.id },
+            "could not write the apiKey.create audit row",
+          ),
+        );
 
         return {
           token,
@@ -402,7 +415,10 @@ export const apiKeyRouter = createTRPCRouter({
           bindings: input.bindings,
         });
 
-        void auditLog({
+        // Awaited so the row is durable before the caller is told the key
+        // changed; caught so an audit failure is not mapped as an API-key
+        // failure by the handler below.
+        await auditLog({
           userId: ctx.session.user.id,
           organizationId: input.organizationId,
           action: "apiKey.update",
@@ -411,7 +427,12 @@ export const apiKeyRouter = createTRPCRouter({
             name: input.name,
             permissionMode: input.permissionMode,
           },
-        });
+        }).catch((error: unknown) =>
+          logger.warn(
+            { error, apiKeyId: input.apiKeyId },
+            "could not write the apiKey.update audit row",
+          ),
+        );
 
         return {
           id: updated.id,
@@ -455,12 +476,20 @@ export const apiKeyRouter = createTRPCRouter({
           organizationId: input.organizationId,
         });
 
-        void auditLog({
+        // Awaited so the row is durable before the caller is told the key is
+        // dead — that row is the record of who killed it; caught so an audit
+        // failure is not mapped as an API-key failure by the handler below.
+        await auditLog({
           userId: ctx.session.user.id,
           organizationId: input.organizationId,
           action: "apiKey.revoke",
           args: { apiKeyId: input.apiKeyId },
-        });
+        }).catch((error: unknown) =>
+          logger.warn(
+            { error, apiKeyId: input.apiKeyId },
+            "could not write the apiKey.revoke audit row",
+          ),
+        );
       } catch (error) {
         mapApiKeyHandledError(error);
       }
