@@ -308,7 +308,9 @@ describe("defineRestRouter", () => {
       expect(() => route().responds({ 700: report })).toThrow(/outside 200–599/);
     });
 
-    /** @scenario "An endpoint answers 201 when it created what it returned and 200 when it replaced it" */
+    /**
+     * @scenario "An endpoint answers 201 when it created what it returned and 200 when it replaced it"
+     */
     it("takes two successes carrying one body, and refuses two carrying different ones", () => {
       expect(() => route().responds({ 200: report, 201: report })).not.toThrow();
 
@@ -349,7 +351,9 @@ describe("defineRestRouter", () => {
       );
     });
 
-    /** @scenario "An endpoint answers outside the JSON contract when it declares what it produces" */
+    /**
+     * @scenario "An endpoint answers outside the JSON contract when it declares what it produces"
+     */
     it("refuses a route that declares both a schema and a raw answer, or names no media type", () => {
       expect(() => hook().withOutput(answer).withRawResponse({ produces: "text/plain" })).toThrow(
         /both an output schema and a raw response/,

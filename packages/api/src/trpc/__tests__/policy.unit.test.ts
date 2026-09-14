@@ -1,15 +1,7 @@
 /** @vitest-environment node */
 
-/**
- * The policy spine's own behaviour, over the ports interface: which decision
- * each declared builder asks for, what a declared check leaves on the request
- * context, how the lineage guard shapes its refusal, and the compile-time half
- * of the builder that makes a declaration mandatory.
- *
- * The authorization port is a bare mock here — the engine's own decisions are
- * `authz-service.facade.unit.test.ts`'s business.
- * Spec: modules/authz/specs/permission-resolution.feature
- */
+/** Policy spine behaviour over the ports interface; authz port mocked (spec:
+ * permission-resolution.feature) */
 import {
   type AuthzGetDecisionInput,
   type AuthzGetProjectAnyDecisionInput,

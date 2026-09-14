@@ -32,14 +32,9 @@ import { createRestRuntime, type RestDeprecationLog } from "../runtime.ts";
 import { getRoutePolicy } from "../security.ts";
 
 /**
- * The runtime's loggers (`outputLogger`, `capabilityLogger`, and every
- * family's `loggerMiddleware`) are created once, at module scope, so
- * spying on a later `createLogger(name)` call never reaches the instance the
- * runtime actually writes to — under vitest's silent default, `createLogger`
- * hands back a throwaway `pino` per call rather than a cached one at all (see
- * `resolveLoggerConfiguration`/`testLoggerLevel` in
- * `packages/observability/src/logger.ts`). Recording by name here, instead of
- * spying on an instance, is what makes these assertions observe the real call.
+ * The runtime's loggers are created at module scope, so spying on `createLogger` calls never
+ * reaches the real instance — vitest's silent default hands back a throwaway `pino` per call.
+ * Recording by name makes these assertions observe the real call.
  */
 const recordedLogs = new Map<
   string,
@@ -2221,7 +2216,9 @@ describe("an upsert whose status says only whether it created", () => {
     });
   }
 
-  /** @scenario "An endpoint answers 201 when it created what it returned and 200 when it replaced it" */
+  /**
+   * @scenario "An endpoint answers 201 when it created what it returned and 200 when it replaced it"
+   */
   it("answers 201 for the record it created and 200 for the one it replaced", async () => {
     const created = await replace("new");
     const replaced = await replace("old");
@@ -2232,7 +2229,9 @@ describe("an upsert whose status says only whether it created", () => {
     await expect(replaced.json()).resolves.toEqual({ id: "old" });
   });
 
-  /** @scenario "An endpoint answers 201 when it created what it returned and 200 when it replaced it" */
+  /**
+   * @scenario "An endpoint answers 201 when it created what it returned and 200 when it replaced it"
+   */
   it("lists both successes in the document it publishes", async () => {
     const published = await generateSpecs(datasetApp(), SPEC_OPTIONS);
 
