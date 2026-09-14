@@ -162,17 +162,30 @@ describe("given the generated OpenAPI document", () => {
       });
     });
 
-    describe("when both doors' descriptions are checked for the project header rule", () => {
-      /** @scenario "The OpenAPI descriptions for both query routes name the project header rule" */
+    describe("when both doors' descriptions are checked for the any-key scope rule", () => {
+      /** @scenario "The OpenAPI descriptions for both query routes name the any-key scope rule" */
       it.each([
         ["POST", RUN, "post"],
         ["GET", SCHEMA, "get"],
-      ])("names X-Project-Id and the organization-key rule in %s %s's description", (label, path, method) => {
+      ])("names analytics:view and the organization-key rule in %s %s's description", (label, path, method) => {
         const description: string = paths[path]?.[method]?.description ?? "";
 
-        expect(description, `${label} ${path}`).toContain("X-Project-Id");
+        expect(description, `${label} ${path}`).toContain("analytics:view");
         expect(description, `${label} ${path}`).toMatch(
-          /organization (?:API )?key/i,
+          /organization/i,
+        );
+      });
+
+      /** @scenario "The OpenAPI descriptions for both query routes name the any-key scope rule" */
+      it.each([
+        ["POST", RUN, "post"],
+        ["GET", SCHEMA, "get"],
+      ])("no longer names X-Project-Id or project_scope_required in %s %s's description", (label, path, method) => {
+        const description: string = paths[path]?.[method]?.description ?? "";
+
+        expect(description, `${label} ${path}`).not.toContain("X-Project-Id");
+        expect(description, `${label} ${path}`).not.toContain(
+          "project_scope_required",
         );
       });
     });

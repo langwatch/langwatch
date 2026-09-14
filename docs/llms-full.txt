@@ -66948,26 +66948,23 @@ Send your LangWatch API key in any one of these forms:
 | Bearer | `Authorization: Bearer <token>` |
 | Basic | `Authorization: Basic base64(projectId:token)` |
 
-Every request runs against one project. How you name that project depends on the kind of key you hold:
+Any LangWatch API key works here — project, organization, or personal. Rows come from every project the key holds the `analytics:view` permission on: a project key reaches its one project, an organization or personal key reaches every project it can read. No project header is required. To narrow the result to one project, filter inside the statement itself with `WHERE TenantId = '<project id>'`.
 
-- An **organization API key** reaches several projects, so it must say which one. Name it with an `X-Project-Id: <project id>` header, or send Basic auth as `base64(projectId:token)`. An organization key that names no project is refused with `project_scope_required`.
-- A **project key** already names its own project, so it needs no `X-Project-Id` header and ignores one if you send it.
-
-A key scoped to exactly one project may omit the header; any organization key without it is refused.
+A result that mixes rows from more than one project carries the `MULTI_PROJECT_RESULT` diagnostic, so a caller who expected a single project can tell.
 
 ## Errors
 
-Both endpoints answer with the standard LangWatch error envelope and a real HTTP status. No wrapper sits around it. See [Error Envelope](/ai-gateway/api/errors).
+Both endpoints answer with the standard LangWatch error envelope and a real HTTP status. No wrapper sits around it. See [Error Envelope](/ai-gateway/api/errors). Where a failure has a fix, the envelope's `meta` carries the corrective fields for it — for example `FUNCTION_NOT_ALLOWED` lists `allowedFunctions`.
 
 | Status | `code` | When |
 |--------|--------|------|
 | `400` | `validation_error` | The request body failed validation. |
 | `400` | `lwql_unparseable` | The statement is not valid LangWatchQL. |
-| `400` | `lwql_not_permitted` | The statement is valid but calls something the policy withholds, for example a function outside the allowlist. |
+| `400` | `lwql_not_permitted` | The statement is valid but calls something the policy withholds — for example a function outside the allowlist, or a `LIMIT` above 10,000 rows (`meta.violations` names it `LIMIT_TOO_HIGH`). |
 | `401` | `missing_credentials` | No supported authentication credential was sent. |
 | `401` | `invalid_credentials` | The API key is unknown, revoked, or has the wrong secret. |
-| `401` | `project_scope_required` | An organization key was sent with no `X-Project-Id` header and no Basic auth project id. Name a project and retry. |
-| `403` | `api_key_permission_denied` | The key lacks the `analytics:view` permission. |
+| `403` | `api_key_permission_denied` | The key lacks the `analytics:view` permission on any project. |
+| `413` | `lwql_result_too_large` | The result body exceeds about 8,000,000 bytes. |
 | `422` | `query_scan_limit_exceeded` | The statement is valid but would scan more data than the key allows. |
 
 ## Supported functions

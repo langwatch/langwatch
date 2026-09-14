@@ -1044,11 +1044,11 @@ export interface paths {
         put?: never;
         /**
          * Run a LangWatchQL query
-         * @description Executes one read-only LangWatchQL SELECT over the analytics datasets and returns typed columns, rows, execution statistics, truncation state and diagnostics. The query runs scoped to the authenticated project.
+         * @description Executes one read-only LangWatchQL SELECT over the analytics datasets and returns typed columns, rows, execution statistics and diagnostics. The query runs as a restricted database identity scoped to the projects this key can read.
          *
          *     Diagnostics are advisory and never reject a query. An empty diagnostics list means no known issue was detected. It is not proof that the answer is the one you meant.
          *
-         *     An organization API key must name the project it is querying: send it as `X-Project-Id: <project id>`, or as Basic auth `base64(projectId:token)`. A project API key already names its own project, so it needs neither and ignores the `X-Project-Id` header.
+         *     Any LangWatch API key — project, organization or personal — reaches every project it can read `analytics:view` on: an organization or personal key spans its projects, a project key its one. Rows from more than one project come back flagged with the `MULTI_PROJECT_RESULT` diagnostic — to read a single project, filter inside the statement with `WHERE TenantId = '<project id>'`.
          *
          *     A statement that names no `LIMIT` is capped at 10,000 rows: that `LIMIT` is appended before the query runs. A statement whose own `LIMIT` asks for more is refused with `LIMIT_TOO_HIGH` — lower it and page the rest with `LIMIT`/`OFFSET` and an `ORDER BY`. A result whose body exceeds about 8,000,000 bytes is refused outright with `lwql_result_too_large`, never cut — select fewer columns or a smaller `LIMIT`.
          *
@@ -1072,9 +1072,9 @@ export interface paths {
          * Discover the queryable LangWatchQL schema
          * @description Lists the LangWatchQL analytics datasets this key may query, with each column's type, description, the permissions that unlock it, and whether this caller holds them — plus each dataset's grain, join keys, partition-pruning time column, freshness and a runnable example query. It also lists, under `functions`, every function name a query may call.
          *
-         *     Scoped to the credential's own project and its permissions: a column this key cannot read is listed with `available: false` rather than hidden, so a caller can see what a wider key would unlock.
+         *     Scoped to the projects the credential can read and their permissions: a column this key cannot read in every one of them is listed with `available: false` rather than hidden, so a caller can see what a wider key would unlock.
          *
-         *     An organization API key must name the project it is querying: send it as `X-Project-Id: <project id>`, or as Basic auth `base64(projectId:token)`. A project API key already names its own project, so it needs neither and ignores the `X-Project-Id` header.
+         *     Any LangWatch API key — project, organization or personal — reaches every project it can read `analytics:view` on: an organization or personal key spans its projects, a project key its one. Rows from more than one project come back flagged with the `MULTI_PROJECT_RESULT` diagnostic — to read a single project, filter inside the statement with `WHERE TenantId = '<project id>'`.
          */
         get: operations["getApiV1QuerySchema"];
         put?: never;
@@ -8886,7 +8886,7 @@ export interface operations {
             };
         };
         responses: {
-            /** @description The query ran. Columns, rows, execution statistics, truncation state and diagnostics, scoped to the caller's project. */
+            /** @description The query ran. Columns, rows, execution statistics and diagnostics, scoped to the projects the key can read. */
             200: {
                 headers: {
                     [name: string]: unknown;

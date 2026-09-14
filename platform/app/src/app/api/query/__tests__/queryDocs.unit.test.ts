@@ -34,7 +34,6 @@ describe("docs/api-reference/query/overview.mdx", () => {
   describe("when the Authentication section is read", () => {
     const content = readDocs();
 
-    /** @scenario "The query docs describe every credential form and the project header rule" */
     it("documents X-Auth-Token", () => {
       expect(content).toContain("X-Auth-Token");
     });
@@ -48,18 +47,25 @@ describe("docs/api-reference/query/overview.mdx", () => {
       expect(content).toMatch(/base64\(projectId:token\)/);
     });
 
-    it("documents the X-Project-Id header", () => {
-      expect(content).toContain("X-Project-Id");
+    /** @scenario "The query docs describe the any-key scope rule and how to narrow to one project" */
+    it("states any key reaches every project it holds analytics:view on", () => {
+      expect(content).toMatch(/analytics:view/);
+      expect(content).toMatch(/organization/i);
     });
 
-    it("states that an organization key must send X-Project-Id or Basic auth with a project id", () => {
-      expect(content).toMatch(/organization (?:API )?key/i);
-      expect(content).toMatch(/X-Project-Id/);
+    /** @scenario "The query docs describe the any-key scope rule and how to narrow to one project" */
+    it("states how to narrow to one project inside the statement", () => {
+      expect(content).toMatch(/WHERE\s+TenantId\s*=/);
     });
 
-    it("states that a project key ignores the X-Project-Id header", () => {
-      expect(content).toMatch(/project key/i);
-      expect(content).toMatch(/ignores?/i);
+    /** @scenario "The query docs describe the any-key scope rule and how to narrow to one project" */
+    it("documents the MULTI_PROJECT_RESULT diagnostic", () => {
+      expect(content).toContain("MULTI_PROJECT_RESULT");
+    });
+
+    it("no longer documents the retired X-Project-Id header or project_scope_required", () => {
+      expect(content).not.toContain("X-Project-Id");
+      expect(content).not.toContain("project_scope_required");
     });
   });
 

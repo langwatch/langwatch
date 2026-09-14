@@ -14396,8 +14396,8 @@ func (e PostApiV1QueryJSONBodyGranularitySeconds2) Valid() bool {
 const (
 	INCOMPLETECOMPARISONPERIOD PostApiV1Query200JSONResponseBodyDiagnosticsCode = "INCOMPLETE_COMPARISON_PERIOD"
 	MISSINGTIMEBUCKETS         PostApiV1Query200JSONResponseBodyDiagnosticsCode = "MISSING_TIME_BUCKETS"
+	MULTIPROJECTRESULT         PostApiV1Query200JSONResponseBodyDiagnosticsCode = "MULTI_PROJECT_RESULT"
 	POSSIBLEFANOUT             PostApiV1Query200JSONResponseBodyDiagnosticsCode = "POSSIBLE_FANOUT"
-	RESULTTRUNCATED            PostApiV1Query200JSONResponseBodyDiagnosticsCode = "RESULT_TRUNCATED"
 	UNBOUNDEDTIMERANGE         PostApiV1Query200JSONResponseBodyDiagnosticsCode = "UNBOUNDED_TIME_RANGE"
 )
 
@@ -14408,9 +14408,9 @@ func (e PostApiV1Query200JSONResponseBodyDiagnosticsCode) Valid() bool {
 		return true
 	case MISSINGTIMEBUCKETS:
 		return true
-	case POSSIBLEFANOUT:
+	case MULTIPROJECTRESULT:
 		return true
-	case RESULTTRUNCATED:
+	case POSSIBLEFANOUT:
 		return true
 	case UNBOUNDEDTIMERANGE:
 		return true
@@ -106055,7 +106055,6 @@ type PostApiV1QueryResponse struct {
 			RowsRead     float32 `json:"rowsRead"`
 			RowsReturned float32 `json:"rowsReturned"`
 		} `json:"statistics"`
-		Truncated bool `json:"truncated"`
 	}
 	JSON400 *struct {
 		Error struct {
@@ -132024,7 +132023,6 @@ func ParsePostApiV1QueryResponse(rsp *http.Response) (*PostApiV1QueryResponse, e
 				RowsRead     float32 `json:"rowsRead"`
 				RowsReturned float32 `json:"rowsReturned"`
 			} `json:"statistics"`
-			Truncated bool `json:"truncated"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err

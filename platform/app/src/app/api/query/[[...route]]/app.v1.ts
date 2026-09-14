@@ -127,11 +127,11 @@ async function callerContext(c: Context) {
  * Shared by both doors so the two cannot describe the rule differently. Any
  * LangWatch API key reaches every project it can read `analytics:view` on — an
  * organization or personal key spans its projects, a project key its one. No
- * project header is required; the `X-Project-Id` header is ignored. To read one
- * project, filter inside the statement with `WHERE project_id = '<id>'`.
+ * project header is required. To read one project, filter inside the
+ * statement with `WHERE TenantId = '<project id>'`.
  */
 const HEADER_RULE =
-  "Any LangWatch API key reaches every project it can read `analytics:view` on: an organization or personal key spans its projects, a project key its one. No project header is required, and `X-Project-Id` is ignored — to read a single project, filter inside the statement with `WHERE project_id = '<project id>'`.";
+  "Any LangWatch API key — project, organization or personal — reaches every project it can read `analytics:view` on: an organization or personal key spans its projects, a project key its one. Rows from more than one project come back flagged with the `MULTI_PROJECT_RESULT` diagnostic — to read a single project, filter inside the statement with `WHERE TenantId = '<project id>'`.";
 
 /**
  * The response ceilings, read off the executor's own limits so this copy and
