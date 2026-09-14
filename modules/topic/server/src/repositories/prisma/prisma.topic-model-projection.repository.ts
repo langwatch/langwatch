@@ -13,7 +13,7 @@ export type TopicModelProjectionDatabase = Pick<
 >;
 import type { ProjectedTopic, TopicModelData } from "../../projections/topic-model.projection.ts";
 
-/** KSUID resource for topic-model projection cursor rows (the app's KSUID_RESOURCES.TOPIC_MODEL_PROJECTION). */
+// KSUID resource for topic-model projection cursor rows (KSUID_RESOURCES.TOPIC_MODEL_PROJECTION).
 const TOPIC_MODEL_PROJECTION_KSUID_RESOURCE = "topicmodel";
 
 /**
@@ -112,17 +112,8 @@ export class PrismaTopicModelProjectionRepository implements StateProjectionStor
         },
         update: cursorData,
       }),
-      // Fail-safe: no event can legitimately fold the model to zero topics
-      // (replace requires a non-empty list, seeds skip empty projects), so
-      // an empty state must never reconcile the table — `notIn: []` would
-      // delete every row for the project. Advancing the cursor while
-      // leaving the rows is the recoverable direction.
-      //
-      // Two phases, children then parents: the client-emulated Subtopics
-      // relation (relationMode = "prisma") refuses to delete a parent that
-      // still has children — even when the same deleteMany removes both.
-      // A batch replace drops the whole previous model at once, so a
-      // single-phase reconcile would fail on every re-cluster.
+      // Fail-safe: never fold model to zero topics. Delete in two phases (children then parents)
+      // to avoid relation violations that fail batch replace on every re-cluster.
       ...(keptIds.length > 0
         ? [
             this.prisma.topic.deleteMany({

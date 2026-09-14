@@ -13,9 +13,8 @@ const { mockClickHouseQuery, mockPrismaFindUnique } = vi.hoisted(() => ({
   mockPrismaFindUnique: vi.fn(),
 }));
 
-/**
- * The process's tenant-keyed connection, as this suite supplies it — arrives as a CONSTRUCTOR argument now. The suite used to mock the platform application's singleton; the repository takes the resolver instead, so the fake sits where every other dependency of the read does.
- */
+// Tenant-keyed connection supplied to the suite as a CONSTRUCTOR argument; fake sits where
+// every other dependency of the read does, not in platform application's singleton.
 const testResolveClickHouseClient = () => Promise.resolve({ query: mockClickHouseQuery } as never);
 
 vi.mock("langwatch", () => ({
@@ -1185,9 +1184,8 @@ describe("TraceLegacyReadClickHouseRepository", () => {
 });
 
 describe("isClickHouseMemoryLimitError", () => {
-  /**
-   * The two handled errors the resilient ClickHouse client raises, as this suite states them — named here rather than imported, since they're the ANALYTICS package's, raised by client assembly after retries exhaust, and this predicate reads only code/reasons. The suite used to assert against a platform module that never exported them, so every construction was new undefined(...) and all three were red before the read stack moved.
-   */
+  // Two handled errors the resilient ClickHouse client raises, named here rather than imported
+  // (they're the ANALYTICS package's); predicate reads only code/reasons, not response body.
   class TranslatedClickHouseError extends HandledError {
     constructor(code: "query_memory_exceeded" | "clickhouse_unavailable", reasons: Error[]) {
       super(code as never, "The analytics store could not answer this query", {

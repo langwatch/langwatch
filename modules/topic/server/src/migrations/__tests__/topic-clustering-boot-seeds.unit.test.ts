@@ -2,18 +2,8 @@ import { describe, expect, it, vi } from "vitest";
 import { LegacyImportTopicClusteringMigration } from "../legacy-import.topic-clustering.migration.ts";
 import type { TopicClusteringRepository } from "../../repositories/topic-clustering.repository.ts";
 
-/**
- * The boot-seed wiring's contract with composition: one synchronous call
- * fires both seeds in the background and never lets a failure escape to the
- * boot path. The seed walks themselves are tested in topic-model-seed /
- * topic-clustering-schedule-seed unit tests; here only the composition is
- * real.
- *
- * Both seeds page the GLOBAL `Project` model (the tenancy guard exempts it),
- * so they are told apart by the repository method each walk drives: the
- * topic-model seed pages the projects that own Topic rows, the schedule seed
- * pages eligible projects.
- */
+// Boot-seed wiring fires both seeds in background without escaping failures to boot path.
+// Seeds page the GLOBAL `Project` model, distinguished by which repository method each drives.
 
 function fakeRepository() {
   const repository = {

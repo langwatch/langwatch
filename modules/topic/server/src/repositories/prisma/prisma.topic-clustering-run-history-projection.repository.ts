@@ -29,7 +29,7 @@ function fromRow(row: Row): StoredProjection<TopicClusteringRunHistoryData> {
   };
 }
 
-/** KSUID resource for run-history projection rows (the app's KSUID_RESOURCES.TOPIC_CLUSTERING_RUN_HISTORY). */
+// KSUID resource for run-history projection rows (KSUID_RESOURCES.TOPIC_CLUSTERING_RUN_HISTORY).
 const TOPIC_CLUSTERING_RUN_HISTORY_KSUID_RESOURCE = "topicrunhist";
 
 type Row = Prisma.TopicClusteringRunHistoryProjectionGetPayload<object>;

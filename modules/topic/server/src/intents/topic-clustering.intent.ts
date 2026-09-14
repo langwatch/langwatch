@@ -304,17 +304,8 @@ function errorText(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
-/**
- * Announce the page before working it, so "a run is in progress" is a
- * recorded fact rather than something the settings page has to infer.
- * A scheduled run emits nothing at its start (the wake is internal to
- * the process) and a single-page run never had an in-flight moment in
- * the log at all, so the badge was unreachable for both.
- *
- * Best-effort by design: this is a status announcement, and losing it
- * must never cost the clustering page that follows. Retrying it through
- * the outbox would redeliver the whole intent and re-bill the page.
- */
+// Announce the page before working it so "a run is in progress" is recorded; best-effort so
+// losing it doesn't cost the clustering page.
 async function announceRunStarted(params: {
   commands: TopicClusteringOutcomeCommands;
   context: PageContext;
@@ -336,20 +327,8 @@ async function announceRunStarted(params: {
   }
 }
 
-/**
- * The final-attempt failure record. Swallow-and-log like the success path,
- * and for the same reason: the OUTCOME WRITE is never worth a redelivery.
- * This branch used to let a failing write propagate, which was strictly
- * worse than the failure it was reporting — the outbox marked the message
- * dead, so no run_failed event was ever written, `currentRun` stayed pinned
- * at this page, and the settings page showed a run stuck in progress with
- * no error on it. The asymmetry bought nothing: the retry it triggered
- * could only re-run the page that had ALREADY failed maxAttempts times.
- *
- * Swallowed, the process self-heals on the same schedule as the success
- * path — the stale-run guard abandons the pinned run after
- * TOPIC_CLUSTERING_STALE_RUN_MS and the next daily wake starts fresh.
- */
+// Final-attempt failure record; swallowed so outcome write failure doesn't re-run exhausted page.
+// Process self-heals when stale-run guard abandons the run and next daily wake starts fresh.
 async function recordClusteringFailure(params: {
   commands: TopicClusteringOutcomeCommands;
   context: PageContext;
@@ -402,25 +381,8 @@ async function recordClusteringFailure(params: {
   }
 }
 
-/**
- * The completion record. The clustering work is DONE and already durable:
- * topics are written, traces assigned, a Cost row billed. Only the
- * bookkeeping is left, and it gets its own failure handling because the two
- * have opposite retry economics. Rethrowing here would hand the message back
- * to the outbox, which redelivers the whole intent — re-running embeddings
- * and LLM naming over the same page and billing it again — to fix a write
- * that costs nothing to lose. We cannot make the page cheaply replayable
- * either: the effect has no read of the run projection to short-circuit on,
- * so "already recorded" is not knowable from here.
- *
- * So: swallow the redelivery, never the signal. The failure is logged loudly
- * with the full outcome (an operator can replay the command by hand), and
- * the process self-heals within a day — `currentRun` stays pinned at this
- * page's start, the stale-run guard abandons it after
- * TOPIC_CLUSTERING_STALE_RUN_MS, and the next daily wake starts a fresh run
- * that re-derives the remaining backlog from live unassigned traces. The
- * cost of this branch is a deferred remainder, not lost or doubled work.
- */
+// Completion record; work is durable (topics written, traces assigned). Swallow outcome-write
+// failures (opposite retry economics); process self-heals when stale-run guard starts a fresh run.
 async function recordClusteringSuccess(params: {
   commands: TopicClusteringOutcomeCommands;
   context: PageContext;
@@ -450,27 +412,8 @@ async function recordClusteringSuccess(params: {
   }
 }
 
-/**
- * The `run` intent executor (ADR-051 §4): one clustering page per dispatch.
- *
- * At-least-once + idempotent: re-running a page re-derives its work from
- * live data (unassigned traces), and the outcome commands carry
- * deterministic idempotency keys, so a redelivered intent cannot
- * double-record.
- *
- * Failure contract, split by which half failed:
- * - the CLUSTERING call — a user-actionable failure (classified by
- *   `classifyClusteringError`) records run_failed on the FIRST attempt:
- *   retrying cannot configure the customer's model for them, and the code on
- *   the record is what the settings page turns into guidance. Everything
- *   else: attempts below the cap rethrow so the outbox retries with backoff;
- *   the final attempt records a durable run_failed instead and retires the
- *   message dispatched, so the failure is a visible outcome rather than a
- *   dead row an operator has to find.
- * - the OUTCOME write — never retried through the outbox, on either branch,
- *   because that would redeliver the intent and re-run a page that has
- *   already either succeeded or exhausted its attempts.
- */
+// The `run` intent executor (ADR-051 §4): one clustering page per dispatch.
+// At-least-once + idempotent; outcome commands carry deterministic idempotency keys.
 export function createTopicClusteringRunHandler(
   deps: TopicClusteringDispatchDeps,
 ): IntentExecutor<TopicClusteringRunIntent> {

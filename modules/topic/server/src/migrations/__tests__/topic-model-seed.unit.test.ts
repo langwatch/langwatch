@@ -3,25 +3,8 @@ import { describe, expect, it, vi } from "vitest";
 import { LegacyImportTopicClusteringMigration } from "../legacy-import.topic-clustering.migration.ts";
 import { PrismaTopicClusteringRepository } from "../../repositories/prisma/prisma.topic-clustering.repository.ts";
 
-/**
- * Unit tests for the ADR-051 one-time topic-model seed.
- *
- * The Prisma stub here routes EVERY call through a stand-in for the real
- * tenancy guard rather than answering blindly. That is the point: the seed
- * shipped in #5930 paged over the project-scoped `Topic` model with no
- * projectId predicate on its first page, so the guard threw on every worker
- * boot and no project was ever seeded ("Topic model seed pass failed; the
- * next boot retries", forever). A stub that skips the guard cannot observe
- * that failure, so these tests run its accept/reject rule for real.
- *
- * The stand-in replicates the two rules this walk depends on — the GLOBAL
- * `Project` model is exempt, and project-scoped models require a projectId
- * predicate. The real guard (`guardProjectId`, applied to the app's Prisma
- * client at connection construction) has its own app-side suite in
- * `platform/app/src/utils/__tests__/dbMultiTenancyProtection.unit.test.ts`;
- * if the two ever disagree, the walk is covered end-to-end by the
- * topic-clustering lifecycle integration test against the real stack.
- */
+// ADR-051 one-time topic-model seed: Prisma stub routes all calls through a stand-in for the
+// real tenancy guard to observe and test the accept/reject rule (not blindly answered).
 
 /** The middleware params Prisma hands the guard for a model-API call. */
 const modelParams = (model: string, action: string, args: unknown) => ({
@@ -123,15 +106,8 @@ const guardedPrismaStub = ({
   return { prisma, pageArgs };
 };
 
-/**
- * A faithful in-memory Postgres for Project/Topic: `project.findMany`
- * implements the exact contract the seed relies on — the `topics: { some }`
- * EXISTS filter, keyset pagination by `id`, ascending order, and `take`. Ids
- * are compared lexically, as Postgres compares the nanoid PK. This lets a test
- * drive the seed over the real page-size walk and assert it enumerates every
- * project that owns topics, exactly once: a botched cursor (a skipped or
- * double-counted boundary row) fails it. Every call still runs the guard.
- */
+// Faithful in-memory Postgres for Project/Topic: tests drive the seed over real page-size walk
+// and assert it enumerates every project that owns topics, exactly once. Every call runs the guard.
 const fakeDbStub = ({
   projectsWithTopics,
   projectsWithoutTopics = [],

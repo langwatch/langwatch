@@ -10,15 +10,8 @@ import {
 } from "../topic-clustering.repository.ts";
 import type { TopicDatabase } from "./prisma.topic.repository.ts";
 
-/**
- * The Prisma capability consumed by Topic's private persistence adapters.
- *
- * Every model the clustering repositories read or write, and `$transaction`
- * for the model-projection swap — named rather than taking the whole client,
- * for the same reason every other feature package narrows: the composition
- * root holds one client, and a package that demanded all of it would make
- * that client's exact generated shape part of this package's contract.
- */
+// Prisma capability consumed by Topic's private persistence adapters; named to keep
+// client's exact generated shape out of this package's contract.
 export type TopicClusteringDatabase = Pick<
   PrismaClient,
   "$transaction" | "cost" | "processManagerInstance" | "project" | "topicModelProjection"

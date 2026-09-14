@@ -54,21 +54,9 @@ function toStartOfMinute(unixMs: number): Date {
   return new Date(Math.floor(unixMs / 60_000) * 60_000);
 }
 
-/**
- * Map projection that transforms SpanReceivedEvents into per-span rollup rows
- * for `trace_analytics_rollup` (ADR-034, Phase 1).
- *
- * This projection replaces the prior MV approach (an interim materialized-view migration that was never deployed):
- * the same SpanReceivedEvent the trace-summary fold consumes is also the source
- * of the rollup increment, computed in TypeScript using the same
- * `SpanCostService` extraction keys so a span's rollup contribution matches its
- * contribution to the trace total.
- *
- * Idempotency / re-delivery: each insert is a separate row in the
- * AggregatingMergeTree; a rare retry over-counts the bucket by one span's
- * contribution. ADR-034 accepts that explicitly. Replay rebuilds the rollup
- * truncate-first rather than incrementing it.
- */
+// Map projection that transforms SpanReceivedEvents into per-span rollup rows for
+// `trace_analytics_rollup` (ADR-034 Phase 1); replaces interim MV approach, uses same keys so
+// span's rollup contribution matches its contribution to trace total. Idempotent via replay.
 export class TraceAnalyticsRollupMapProjection
   extends AbstractMapProjection<TraceAnalyticsRollupRow, typeof spanEvents>
   implements MapEventHandlers<typeof spanEvents, TraceAnalyticsRollupRow>

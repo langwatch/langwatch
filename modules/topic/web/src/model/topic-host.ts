@@ -1,15 +1,5 @@
-/**
- * What the topic-clustering screen asks of the application it is mounted in.
- *
- * The same port shape every settings family since governance has written:
- * declared here without importing anything of the composing application's, so
- * everything the platform page read off `useOrganizationTeamProject` and the
- * toaster arrives through these methods and the screen moves with its
- * `topicApi.x.y.useQuery` call sites unchanged.
- *
- * NOTHING HERE FETCHES. A host is a value object over what the application has
- * already resolved, which is what lets a test construct one.
- */
+// Topic-clustering screen's port: declared without importing the composing application,
+// so everything the platform page resolved arrives through methods and call sites unchanged.
 
 import { createContext, useContext } from "react";
 
@@ -24,16 +14,8 @@ export type TopicSuccessNotice = {
   description?: string;
 };
 
-/**
- * A failure, as the screen knows it.
- *
- * The raw `error` travels, never a sentence the screen composed: the words a
- * customer reads are resolved from the error's `code` by the host's
- * presentation registry (#5984). `fallbackTitle` names the action that failed.
- * `description` is the screen's own copy for a refusal that carries no code,
- * which is what the platform page wrote inline — the server's message for a
- * clustering trigger is a fixed sentence and deliberately not echoed.
- */
+// A failure as the screen knows it: raw `error` travels, words resolved from error's `code`
+// by host's presentation registry (#5984); `fallbackTitle` names the failed action.
 export type TopicFailureNotice = {
   error: unknown;
   fallbackTitle: string;

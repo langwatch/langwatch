@@ -3,16 +3,8 @@ import { describe, expect, it } from "vitest";
 import { CLUSTERING_ERROR_CODES, ClusteringError } from "@langwatch/topic-contract";
 import { classifyClusteringError } from "../topic-clustering.intent.ts";
 
-/**
- * Classification is decided at the throw site, so these tests are about the
- * CONTRACT — a failure carries its own code, and anything unattributed is ours.
- *
- * The previous implementation regexed the message text, and the tests only
- * covered messages it was designed to match, so the interesting cases could
- * not fail: an internal error whose body happened to quote an upstream `401`
- * was reported to the customer as their credentials being wrong. The negative
- * cases below are the ones that matter now.
- */
+// Classification decided at the throw site; tests check the contract.
+// Negative cases below matter (previous regex-based approach had blind spots).
 describe("classifyClusteringError", () => {
   describe("given a failure that knows what it is", () => {
     it("reports the code it was thrown with", () => {

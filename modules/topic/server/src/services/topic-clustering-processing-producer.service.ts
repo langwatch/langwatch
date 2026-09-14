@@ -29,7 +29,7 @@ function producerOnly(processName: string, capability: string): Error {
   );
 }
 
-/** An operational projection store that cannot load or write, because this process consumes nothing. */
+// Operational projection store that cannot load or write; this process consumes nothing.
 class ProducerOnlyStateProjectionStore<TState> implements StateProjectionStore<TState> {
   constructor(
     private readonly processName: string,

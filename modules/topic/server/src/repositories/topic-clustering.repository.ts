@@ -68,16 +68,8 @@ export abstract class TopicClusteringRepository {
   /** A project's full pre-ownership Topic rows, for the seed event. */
   abstract findSeedTopicRows(projectId: string): Promise<TopicClusteringSeedTopicRow[]>;
 
-  /**
-   * One page of projects that still hold pre-ownership Topic rows, ascending
-   * by id, strictly after `afterId`. Keyset paging rather than offset: the
-   * walk stays O(1) per page and never repeats a project.
-   *
-   * Pages the GLOBAL `Project` model — the tenancy guard exempts it (it IS
-   * the tenant, addressed by its own id) — filtered to projects that own
-   * Topic rows via a `topics: { some }` EXISTS filter. Topic.projectId is a
-   * FK, so that is the same set as a distinct-projectId scan of `Topic`.
-   */
+  // One page of projects that hold pre-ownership Topic rows (keyset paging O(1) per page).
+  // Pages the GLOBAL `Project` model filtered by `topics: { some }` EXISTS filter.
   abstract findProjectsWithTopicsPage(params: {
     afterId: string | null;
     take: number;

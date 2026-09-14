@@ -36,52 +36,16 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 /** The embeddings dimension the clustering params pin (text-embedding-3-small). */
 const OPENAI_EMBEDDING_DIMENSION = 1536;
 
-/**
- * Look-back for the batch-vs-incremental MODE decision
- * (`fetchCountsFromClickHouse`). Deliberately wide: it answers "does this
- * project already have a mature topic model?", which depends on the project's
- * whole history, not just recent traffic. Narrowing it silently flips
- * historically-mature-but-quiet projects out of incremental mode into the
- * heavy full-batch re-cluster path — measured on prod, dropping this to 49d
- * would flip 54 of 73 incremental projects to batch. This query reads only
- * light key columns (no ComputedInput), so its scan stays cheap even across
- * cold-tier partitions.
- */
+// 12-month look-back for batch-vs-incremental decision; narrowing flips mature-but-quiet projects
+// into expensive full-batch re-cluster (measured: 49d threshold would flip 54 of 73 projects).
 const CLUSTERING_MODE_WINDOW_DAYS = 365;
 
-/**
- * Look-back for the trace FETCH (`fetchTracesFromClickHouse`) that reads the
- * heavy ComputedInput payload. Kept inside the ClickHouse hot tier (~90 days)
- * so cursor-paging never walks the payload column back into S3 cold storage —
- * the source of the multi-hundred-MB cold reads that stalled the worker event
- * loop. 49 days matches the retention recovery floor and sits comfortably
- * within hot. Trade-off: an unassigned trace older than 49 days is no longer
- * retroactively clustered; for the 2-day batch cadence and hot-tier ingest
- * this is negligible, and new/recent traffic (all within the window) is
- * unaffected.
- */
+// Fetch window stays in ClickHouse hot tier to avoid cold reads that stalled the worker loop;
+// trade-off: unassigned traces >49 days old are no longer retroactively clustered.
 const CLUSTERING_FETCH_WINDOW_DAYS = 49;
 
-/**
- * Hard deadline on a single langevals clustering call, DERIVED from the outbox
- * lease so the two cannot drift apart.
- *
- * The outbox leases a clustering intent for
- * {@link TOPIC_CLUSTERING_OUTBOX_LEASE_DURATION_MS}. A request with no client
- * deadline can outlive that lease; the row then becomes visible again, a second
- * replica leases it, and two runs cluster the same page concurrently. In batch
- * mode that is destructive, not merely wasteful: the second run's
- * delete-then-recreate in `storeResults` tears down the topic model the first
- * run is still writing into, and the first run's `createMany` lands against a
- * model the second one has already replaced.
- *
- * Sizing this comfortably below the lease makes that race structurally
- * impossible rather than unlikely — the call is aborted (and classified as a
- * retryable clustering-service failure) while the lease is still held, so the
- * message is redelivered through the outbox's own retry path with only one run
- * of this page ever in flight. 60% of the lease leaves ample room for response
- * handling, the store, and the outcome write to finish inside the remainder.
- */
+// Hard deadline on langevals call derived from outbox lease to prevent concurrent runs
+// destroying the model in batch mode; 60% of lease leaves room for response + store + outcome.
 export const TOPIC_CLUSTERING_REQUEST_DEADLINE_MS = Math.floor(
   TOPIC_CLUSTERING_OUTBOX_LEASE_DURATION_MS * 0.6,
 );
@@ -155,15 +119,8 @@ export class TopicClusteringRunner implements TopicClusteringRun {
   }
 }
 
-/**
- * Runs one clustering page for a project.
- *
- * The cadence gate throttles run STARTS only; a continuation page
- * (searchAfter present) is the same run and never re-takes it. The caller
- * owns continuing the walk (the process manager via a continuation intent,
- * or the CLI task via a loop); this function never schedules its own next
- * page.
- */
+// Runs one clustering page; cadence gate throttles run STARTS only, not continuation pages.
+// Caller owns continuing the walk; this function never schedules its own next page.
 export const clusterTopicsForProject = async (
   deps: TopicClusteringRunnerDeps,
   {
@@ -205,8 +162,8 @@ export const clusterTopicsForProject = async (
   const topicIds = topics.filter((topic) => !topic.parentId).map((topic) => topic.id);
   const subtopicIds = topics.filter((topic) => topic.parentId).map((topic) => topic.id);
 
-  // If we have topics and more than 1200 traces are already assigned, we are in incremental processing mode
-  // This checks helps us getting back into batch mode if we simply delete all the topics for a given project
+  // If topics exist and >=1200 traces are assigned, run incremental mode; check allows return to
+  // batch mode if all topics for a project are deleted.
   const isIncrementalProcessing = topicIds.length > 0 && assignedTracesCount >= 1200;
 
   const lastTopicCreatedAt = topics.reduce(
@@ -367,21 +324,8 @@ export async function fetchCountsFromClickHouse({
   // batch-vs-incremental, so it must reflect the project's whole history.
   const twelveMonthsAgo = nowInstant().epochMilliseconds - CLUSTERING_MODE_WINDOW_DAYS * DAY_MS;
 
-  // trace_summaries is a ReplacingMergeTree, so we count one row per trace
-  // (its latest version). Rather than the IN-tuple dedup pattern — which
-  // scans the 12-month window twice (once to build the latest-version key
-  // set, once for the outer aggregate) and materialises a key set sized to
-  // every trace — fold to the latest version in a single GROUP BY pass with
-  // argMax(expr, UpdatedAt). The conditional counts read the latest version's
-  // OccurredAt / assigned-state, identical to the previous shape, but with one
-  // scan and no IN-set build. Light columns only (no heavy payloads).
-  //
-  // The assigned check folds over `argMax(TopicId IS NOT NULL AND TopicId !=
-  // '', UpdatedAt)`, not `argMax(TopicId, UpdatedAt)`: TopicId is Nullable and
-  // argMax skips rows whose first argument is NULL, so a trace whose latest
-  // version cleared its topic (latest TopicId = NULL) would otherwise fold to
-  // an older non-null TopicId and be over-counted. The boolean expression is
-  // non-nullable, so the fold reads the true latest version.
+  // Fold to latest trace version in one GROUP BY pass (not IN-tuple dedup's two scans).
+  // Assigned check uses TopicId boolean to handle NULL, so a cleared topic doesn't fold to stale.
   const result = await clickhouse.query({
     query: `
       SELECT
@@ -424,35 +368,8 @@ export async function fetchTracesFromClickHouse(
   // reads the heavy ComputedInput column, keeping it off S3 cold storage.
   const fetchWindowStartMs = nowInstant().epochMilliseconds - CLUSTERING_FETCH_WINDOW_DAYS * DAY_MS;
 
-  // Page selection runs on the lightweight key columns only: it picks the
-  // 2000 most-recent matching traces without ever reading ComputedInput.
-  // ComputedInput (a potentially large payload) is read in the outer query
-  // for those <=2000 traces alone — never across the whole 12-month window,
-  // which is what tipped this query into MEMORY_LIMIT_EXCEEDED. The topic
-  // and cursor predicates run against the latest version of each trace
-  // (argMax over UpdatedAt), so they live in the CTE's HAVING.
-  //
-  // The outer query deliberately does NOT filter on ComputedInput: empty /
-  // null inputs are dropped downstream by `extractInputFromComputed`, while
-  // the raw rows still carry the full page so `lastSort` (the pagination
-  // cursor) tracks the page boundary. Filtering here would advance the cursor
-  // by the surviving subset and could strand older eligible traces behind a
-  // run of empty-input traces.
-  //
-  // The outer query also has NO `ORDER BY` and NO outer `LIMIT`. The page CTE
-  // has already chosen the exact (<=2000) set of traces to return, so an outer
-  // sort would only re-order that fixed set — but `ORDER BY ... LIMIT` makes
-  // ClickHouse buffer a top-N of full rows, retaining every row's ComputedInput
-  // payload at once. For tenants with large inputs that buffer alone exceeded
-  // max_memory_usage_per_query (3.5 GiB) and the read failed with
-  // MEMORY_LIMIT_EXCEEDED. Without the sort the rows stream out (ComputedInput
-  // is read in small adaptive blocks and released), and the page ordering is
-  // reapplied in JS over the small result set below.
-  //
-  // An outer `LIMIT 2000` is also omitted: it would cap physical rows *before*
-  // the JS TraceId de-dupe, so if a trace had duplicate latest-version rows the
-  // cap could drop other selected TraceIds and break `returnedCount`/`lastSort`
-  // pagination. The page CTE bounds the result, so the cap is unnecessary.
+  // Page CTE selects <=2000 traces on key columns; outer query reads ComputedInput for selection
+  // only. No outer ORDER BY/LIMIT/LIMIT 2000 to avoid buffering full rows (killed prod at 3.5 GiB).
   const pageHaving: string[] = [];
 
   if (isIncrementalProcessing && (topicIds.length > 0 || subtopicIds.length > 0)) {
@@ -744,19 +661,7 @@ export const storeResults = async (
   isIncremental: boolean,
   runContext?: ClusteringRunContext,
 ): Promise<ClusteringStoreSummary | null> => {
-  // NO RESULT IS A SKIP, NOT AN EMPTY CLUSTERING.
-  //
-  // This used to default an absent result to empty arrays and fall through.
-  // In batch mode that walked straight into the delete-then-recreate below,
-  // wiping the project's entire topic model and writing nothing back — and it
-  // still returned a summary, so the caller's `not_configured` skip was
-  // unreachable and the run was recorded as "completed, 0 topics" moments
-  // after destroying the model. `fetchTopics*Clustering` returns undefined
-  // whenever the langevals endpoint is unset, so on any deployment without a
-  // clustering endpoint that was every batch run.
-  //
-  // Returning null makes it a true no-op: no delete, no writes, and the
-  // callers report it as a skip rather than a successful empty run.
+  // No result is a skip, not an empty run: return null (not deleting the model if endpoint unset).
   if (!clusteringResult) {
     logger.warn(
       { projectId, isIncremental },
@@ -777,17 +682,8 @@ export const storeResults = async (
     "found new topics, subtopics and traces to assign for project",
   );
 
-  // The topic model is recorded as an event; the Topic table is that
-  // event's projection (spec: modules/topic/specs/topics-source-of-truth
-  // .feature). Batch mode REPLACES the model — but only when there is a new
-  // model to put back: an empty result from an otherwise successful call
-  // would leave the project with no topics at all, which is strictly worse
-  // than keeping the previous ones. Everything else merges. Ids pass through
-  // unchanged so ClickHouse TopicId/SubTopicId references stay valid.
-  //
-  // The projection applies asynchronously: the next incremental page may
-  // read a model that is one event behind. The merge event converges either
-  // way, and pages are minutes apart while projections settle in seconds.
+  // Batch mode replaces the model only when there's a new one (not leaving project empty).
+  // Everything else merges; projection applies asynchronously (eventually consistent).
   if (topics.length > 0 || subtopics.length > 0) {
     const embeddingsModel = await deps.models.resolveEmbeddingsModel(projectId);
     // No clustering topics_recorded may be appended before the project's

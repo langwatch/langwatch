@@ -1,20 +1,8 @@
 /**
  * @vitest-environment jsdom
  *
- * Settings → Topic Clustering: what the card says about a run that failed, and
- * what it says about one that was already underway.
- *
- * THE PLATFORM PAGE HAD NO SUITE. Nothing mounted it, so the two decisions
- * worth pinning were unasserted, and both are about not putting the wrong words
- * in front of a customer:
- *
- *   - a failure the customer can act on is named with our own fixed copy, and a
- *     failure they cannot is a single "on our side" line — the server's code is
- *     the only thing that travels, never a provider's response body, which
- *     carries tracebacks, internal hostnames and echoed key prefixes;
- *   - asking for a run while one is underway is INFORMATION, not an error. It
- *     reaches the reader as a success notice, because a red toast for "already
- *     running" reads as a fault the customer has to do something about.
+ * Settings → Topic Clustering: what the card says about a run that failed vs. one already underway.
+ * Actionable failures use fixed copy; "already running" is a success notice, not an error.
  */
 
 import { cleanup, fireEvent, screen } from "@testing-library/react";
