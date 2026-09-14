@@ -438,7 +438,8 @@ const DEFAULT_VIOLATION_HINTS: Record<LangWatchQLViolationCode, string> = {
     "Remove the field, or use one of the columns named in this violation's availableColumns.",
   WILDCARD_NOT_ALLOWED:
     "List the fields you need by name instead of using a wildcard.",
-  NESTING_TOO_DEEP: "Flatten the query — reduce subquery, CTE, or expression nesting.",
+  NESTING_TOO_DEEP:
+    "Flatten the query — reduce subquery, CTE, or expression nesting.",
   UNSUPPORTED_SYNTAX:
     "Rewrite the query as a plain read query over the analytics datasets.",
 };

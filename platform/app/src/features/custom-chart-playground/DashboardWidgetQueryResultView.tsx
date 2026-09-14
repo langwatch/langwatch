@@ -18,7 +18,6 @@ function elapsedMsOf(run: QueryLastRun): number | undefined {
   return typeof value === "number" ? value : undefined;
 }
 
-
 interface DashboardWidgetQueryResultViewProps {
   run: QueryLastRun | undefined;
 }

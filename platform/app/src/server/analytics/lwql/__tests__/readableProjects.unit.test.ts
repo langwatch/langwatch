@@ -40,11 +40,8 @@ function fakePrisma(candidates: LwqlProjectCandidate[]): {
 }
 
 /** A viewable cut that admits exactly the named project ids. */
-const admitting =
-  (ids: string[]) =>
-  async () =>
-  (projectId: string) =>
-    ids.includes(projectId);
+const admitting = (ids: string[]) => async () => (projectId: string) =>
+  ids.includes(projectId);
 
 describe("given candidate projects and an analytics:view verdict", () => {
   describe("when the readable set is selected", () => {

@@ -337,8 +337,12 @@ describe("given the LangWatchQL analytics setup applied to a ClickHouse 25.10 se
           `INNER JOIN ${database}.spans AS s ON s.TraceId = t.TraceId`,
       );
 
-      const traceTenants = [...new Set(rows.map((row) => row.traceTenant))].sort();
-      const spanTenants = [...new Set(rows.map((row) => row.spanTenant))].sort();
+      const traceTenants = [
+        ...new Set(rows.map((row) => row.traceTenant)),
+      ].sort();
+      const spanTenants = [
+        ...new Set(rows.map((row) => row.spanTenant)),
+      ].sort();
       const expectedTenants = [
         harness.tenantA.tenantId,
         harness.tenantB.tenantId,

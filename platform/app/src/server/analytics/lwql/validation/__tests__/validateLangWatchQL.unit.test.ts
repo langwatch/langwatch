@@ -921,9 +921,7 @@ describe("validateLangWatchQL", () => {
       const result = validate("SELECT TraceId FROM traces OFFSET 40");
       expect(codesOf(result)).toEqual([]);
       expect(result.ok && result.appendRowLimit).toBe(true);
-      expect(
-        result.ok && result.appendRowLimitBeforeOffset,
-      ).toBeDefined();
+      expect(result.ok && result.appendRowLimitBeforeOffset).toBeDefined();
     });
 
     it("accepts the offset,count form of LIMIT as an explicit LIMIT", () => {
@@ -938,9 +936,7 @@ describe("validateLangWatchQL", () => {
     });
 
     it("flags a statement that names only LIMIT BY for the default cap to be appended", () => {
-      const result = validate(
-        "SELECT TraceId FROM traces LIMIT 1 BY TraceId",
-      );
+      const result = validate("SELECT TraceId FROM traces LIMIT 1 BY TraceId");
       expect(codesOf(result)).toEqual([]);
       // LIMIT BY caps rows per group, not the response, so it does not count
       // as an explicit LIMIT — the statement is still unbounded overall.

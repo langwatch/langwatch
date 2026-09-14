@@ -141,7 +141,10 @@ describe("given a LangWatchQL query that ran", () => {
     const PROJECT_SQL =
       "SELECT TenantId FROM analytics.traces " +
       "WHERE OccurredAt >= toDateTime64('2026-02-16 00:00:00', 3)";
-    const TENANT_COLUMN: LangWatchQLColumn = { name: "TenantId", type: "String" };
+    const TENANT_COLUMN: LangWatchQLColumn = {
+      name: "TenantId",
+      type: "String",
+    };
 
     /** @scenario "A result spanning several projects carries a diagnostic naming the count" */
     it("names how many projects contributed", () => {

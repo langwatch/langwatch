@@ -93,7 +93,10 @@ describe("given the LangWatchQL schema catalog", () => {
         const tenantColumn = dataset.columns.find(
           (column) => column.name === "TenantId",
         );
-        expect(tenantColumn, `${dataset.name} has no TenantId column`).toBeDefined();
+        expect(
+          tenantColumn,
+          `${dataset.name} has no TenantId column`,
+        ).toBeDefined();
         expect(tenantColumn?.gates, dataset.name).toEqual([]);
         expect(tenantColumn?.available, dataset.name).toBe(true);
         expect(dataset.joinKeys, dataset.name).toContain("TenantId");

@@ -157,14 +157,14 @@ export function resolveLangWatchQLPolicy(
     reservedDatabases: new Set(RESERVED_DATABASES),
     defaultDatabase,
     limits: policy.limits ?? DEFAULT_LWQL_LIMITS,
-    availableDatasets: [...new Set(policy.allowedTables.map((entry) => entry.trim()))].sort(
-      (left, right) => left.localeCompare(right),
-    ),
+    availableDatasets: [
+      ...new Set(policy.allowedTables.map((entry) => entry.trim())),
+    ].sort((left, right) => left.localeCompare(right)),
     datasetColumns: new Map(
       Object.entries(policy.datasetColumns ?? {}).map(([table, columns]) => [
         qualifyTableName({ table, defaultDatabase }),
-        [...new Set(columns.map((column) => column.trim()))].sort((left, right) =>
-          left.localeCompare(right),
+        [...new Set(columns.map((column) => column.trim()))].sort(
+          (left, right) => left.localeCompare(right),
         ),
       ]),
     ),

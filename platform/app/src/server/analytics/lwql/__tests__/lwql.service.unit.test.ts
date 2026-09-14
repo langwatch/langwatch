@@ -14,12 +14,12 @@
 import { describe, expect, it, vi } from "vitest";
 
 import type { Protections } from "../../../traces/protections";
+import { lwqlTenantCapability } from "../capability";
 import { LWQL_VIEW_CATALOG } from "../catalog/lwqlViews";
 import {
   DEFAULT_LWQL_RESULT_LIMITS,
   type LangWatchQLExecutor,
 } from "../executor";
-import { lwqlTenantCapability } from "../capability";
 import { recordingExecutor } from "../executor.testFakes";
 import {
   appendDefaultRowLimit,
@@ -273,7 +273,10 @@ describe("given the LangWatchQL service", () => {
       const service = new LangWatchQLService({
         executor: recordingExecutor({ rows: wideRows }),
         database: DATABASE,
-        limits: { maxRows: DEFAULT_LWQL_RESULT_LIMITS.maxRows, maxResultBytes: 500 },
+        limits: {
+          maxRows: DEFAULT_LWQL_RESULT_LIMITS.maxRows,
+          maxResultBytes: 500,
+        },
       });
 
       expect(
@@ -285,13 +288,15 @@ describe("given the LangWatchQL service", () => {
           }),
         ),
       ).toBe("lwql_result_too_large");
-      expect(await metaOf(() =>
-        service.execute({
-          projects: [PROJECT],
-          protections: FULLY_PERMITTED,
-          sql: BOUNDED_COUNT,
-        }),
-      )).toMatchObject({ maxResultBytes: 500 });
+      expect(
+        await metaOf(() =>
+          service.execute({
+            projects: [PROJECT],
+            protections: FULLY_PERMITTED,
+            sql: BOUNDED_COUNT,
+          }),
+        ),
+      ).toMatchObject({ maxResultBytes: 500 });
     });
 
     it("returns the whole result when it fits under the byte ceiling", async () => {
@@ -779,7 +784,10 @@ describe("given the LangWatchQL service", () => {
 
       expect(result.followsTimeWindow).toBe(false);
       expect(executor.calls[0]!.sql).toBe(
-        appendDefaultRowLimit(BOUNDED_COUNT, DEFAULT_LWQL_RESULT_LIMITS.maxRows),
+        appendDefaultRowLimit(
+          BOUNDED_COUNT,
+          DEFAULT_LWQL_RESULT_LIMITS.maxRows,
+        ),
       );
       expect(
         executor.calls[0]!.parameters,

@@ -84,8 +84,8 @@ import {
 import { describeLangWatchQLSchema, type LangWatchQLSchema } from "./schema";
 import type { LangWatchQLTimeWindow } from "./timeWindow";
 import { LWQL_PERIOD_GRANULARITY_PARAMETER } from "./timeWindow";
-import type { SqlSourcePosition } from "./validation/parser";
 import { lwqlValidationError } from "./validation/errors";
+import type { SqlSourcePosition } from "./validation/parser";
 import {
   type AcceptedLangWatchQL,
   validateLangWatchQL,
@@ -219,10 +219,7 @@ export function appendDefaultRowLimit(
  * expression, which a string literal or comment containing the word `OFFSET`
  * could mislead.
  */
-function charIndexOfPosition(
-  sql: string,
-  position: SqlSourcePosition,
-): number {
+function charIndexOfPosition(sql: string, position: SqlSourcePosition): number {
   const lines = sql.split("\n");
   let index = 0;
   for (let i = 0; i < position.line - 1; i++) {
@@ -613,7 +610,8 @@ export class LangWatchQLService {
     onBudgetOverflow,
   }: LangWatchQLExecuteInput): Promise<LangWatchQLQueryResult> {
     // Only logging reads this; the database resolves the tenant set itself.
-    const scopeLabel = projects.map((project) => project.id).join(",") || "(none)";
+    const scopeLabel =
+      projects.map((project) => project.id).join(",") || "(none)";
     const validation = this.validate({
       projectId: scopeLabel,
       protections,

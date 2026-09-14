@@ -387,7 +387,10 @@ async function resolveKeyPrincipal({
       projectId: credentials.projectId,
     });
   } catch (error) {
-    logger.error({ ...diag, error }, "Database error during key authentication");
+    logger.error(
+      { ...diag, error },
+      "Database error during key authentication",
+    );
     return {
       ok: false,
       refusal: {
@@ -401,7 +404,11 @@ async function resolveKeyPrincipal({
 
   if (resolved) {
     if (resolved.type === "legacyProjectKey") {
-      return { ok: true, principal: { kind: "project", project: resolved.project }, resolved };
+      return {
+        ok: true,
+        principal: { kind: "project", project: resolved.project },
+        resolved,
+      };
     }
     // A scoped API key that resolved (self-scoped to one project, or given a
     // project id). It still fans out across its organization — the narrowing
@@ -424,7 +431,10 @@ async function resolveKeyPrincipal({
   try {
     org = await resolver.resolveOrgOnly({ token: credentials.token });
   } catch (error) {
-    logger.error({ ...diag, error }, "Database error during key authentication");
+    logger.error(
+      { ...diag, error },
+      "Database error during key authentication",
+    );
     return {
       ok: false,
       refusal: {
