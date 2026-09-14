@@ -216,6 +216,10 @@ const DEFAULT_GO_TEST_ROOTS: string[] = [
   // specs/setup/idp-simulator.feature) are satisfied by Go tests and by
   // nothing else.
   "services/idpsim",
+  // The mail sink. Its service-side scenarios (SMTP intake, the message API,
+  // security headers, the browser inbox — specs/setup/mail-sink.feature) are
+  // satisfied by Go tests and by nothing else.
+  "services/mailsim",
   // The Go SDK. Its span-attribute scenarios (typed input/output envelopes,
   // binary content parts, metadata hoisting, data capture) are satisfied by Go
   // tests and by nothing else, so without this root those scenarios could only
@@ -610,11 +614,6 @@ const LEGACY_INERT: string[] = [
   "specs/simulation-testing/voice-agents/testing-elevenlabs-convai.feature",
   "specs/simulation-testing/voice-agents/testing-phone-agents.feature",
   "specs/setup/docker-dev-worktree-isolation.feature",
-  // The local mail sink (mailsim) ships spec-first: the service, the haven
-  // lane, the `haven mail` CLI and the seeded addresses are all unbuilt, so
-  // every scenario is @unimplemented on purpose. Remove this entry with the
-  // first binding.
-  "specs/setup/mail-sink.feature",
   "specs/setup/simplified-setup.feature",
   "specs/skills/agent-insight-skills.feature",
   "specs/skills/docs-skills-directory.feature",

@@ -13,26 +13,26 @@ Feature: Local mail sink (mailsim)
 
   # --- Catching mail over SMTP -------------------------------------------
 
-  @unit @unimplemented
+  @unit
   Scenario: A message delivered over SMTP is stored and never relayed
     When a client delivers a message over SMTP addressed to any recipient
     Then the message lands in the stack's inbox
     And nothing is forwarded anywhere, even when the recipient is a real external domain
 
-  @unit @unimplemented
+  @unit
   Scenario: A stored message keeps everything the sender said
     When a message with a subject, a text body, an HTML body and an attachment is delivered
     Then reading it back returns the envelope sender and recipients, the headers,
       both bodies, the attachment and the time it arrived
 
-  @unit @unimplemented
+  @unit
   Scenario: Credentials are accepted but never required
     When one client delivers with a username and password and another delivers with none
     Then both deliveries succeed
     # So a production-shaped SMTP configuration works against the sink unchanged —
     # the app never needs a special "no auth" mode to test locally.
 
-  @unit @unimplemented
+  @unit
   Scenario: An oversized message is refused at delivery time
     When a client delivers a message larger than the sink's size limit
     Then the delivery fails with a permanent SMTP error naming the limit
@@ -45,7 +45,7 @@ Feature: Local mail sink (mailsim)
     Then the stack has an email address derived from the worktree's slug
     And `haven mail address` prints it, so a signup form or a script can be handed it directly
 
-  @unit @unimplemented
+  @unit
   Scenario: Any local part at the stack's mail domain lands in the inbox
     When messages are delivered to two different local parts at the stack's mail domain
     Then both land in the stack's inbox, each remembering the exact address it was sent to
@@ -121,7 +121,7 @@ Feature: Local mail sink (mailsim)
 
   # --- The API --------------------------------------------------------------
 
-  @unit @unimplemented
+  @unit
   Scenario: Everything the CLI can do, a test can do over plain HTTP
     When a client calls the sink's HTTP API to list the inbox, fetch one message and delete it
     Then each call succeeds with a JSON body
@@ -129,13 +129,13 @@ Feature: Local mail sink (mailsim)
 
   # --- The browser inbox -----------------------------------------------------
 
-  @unit @unimplemented
+  @unit
   Scenario: The inbox is served in the browser at the stack's mail hostname
     When the developer opens the stack's mail hostname
     Then the inbox lists the caught messages
     And opening one renders its HTML body
 
-  @unit @unimplemented
+  @unit
   Scenario: Every response the sink serves carries the standard security headers
     When any page or API response is served
     Then it declares its content type may not be sniffed
@@ -143,7 +143,7 @@ Feature: Local mail sink (mailsim)
     And it sends no referrer
     And API responses are marked never to be cached
 
-  @unit @unimplemented
+  @unit
   Scenario: A caught message's HTML is rendered inert
     When a message's HTML body is viewed in the browser inbox
     Then it renders inside a sandboxed frame whose policy blocks scripts and external requests
@@ -154,18 +154,42 @@ Feature: Local mail sink (mailsim)
   # --- Seeding ---------------------------------------------------------------
 
   @unit @unimplemented
-  Scenario: The default seeded identity reads its mail at the sink
-    When the developer runs `haven db seed`
-    Then the seeded user's email address is at the stack's mail domain by default
-    And an email the app sends that user lands in the stack's inbox
-    # The stable local identity becomes a reachable one: verification, alerts
-    # and digests addressed to it can be caught and read instead of vanishing.
+  Scenario: The seeded identity keeps one address everywhere
+    When the developer runs `haven db seed` in any worktree
+    Then the seeded user's address is the same stable one on every worktree
+    # A saved login (a password manager entry) keeps working across worktrees
+    # and reseeds. Nothing about the address varies by stack.
 
   @unit @unimplemented
-  Scenario: Every account a preset seeds reads its mail at the sink
+  Scenario: Email to the seeded identity lands in the stack that sent it
+    Given two worktrees' stacks seeded with the same admin address
+    When each stack's app emails its own admin
+    Then each message lands in its own stack's inbox
+    # Isolation comes from which sink caught the message, never from the
+    # address: each stack sends through its own sink, and the sink is a
+    # catch-all, so a global address needs no per-stack rewriting.
+
+  @unit @unimplemented
+  Scenario: Every account a preset seeds is reachable through the sink
     When a preset seeds additional members
-    Then each seeded account's address is at the stack's mail domain
-    And an invite sent to any of them can be read back with `haven mail`
+    Then an invite the app sends any of them lands in the stack's inbox
+    And can be read back with `haven mail`
+
+  @unit @unimplemented
+  Scenario: Per-stack seed addresses remain available on ask
+    Given a developer who sets the seed email domain explicitly
+    When the database is seeded
+    Then every seeded account's address moves to that domain, local parts unchanged
+    And leaving it unset seeds the stable global addresses
+
+  @unit @unimplemented
+  Scenario: A database seeded before the address rename reseeds onto the new one
+    Given a database whose admin was seeded under the previous default address
+    When the developer reseeds
+    Then the same admin account carries the new address and no second admin exists
+    # The seeded default moved once, to admin@mail.langwatch.localhost. A
+    # reseed updates the existing account in place; duplicating the admin
+    # would break every saved login and every open session.
 
   @unit @unimplemented
   Scenario: Reseeding keeps the seeded addresses stable
