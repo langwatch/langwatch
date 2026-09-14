@@ -60,8 +60,10 @@ export interface AuthDoorApi {
   featureFlags: () => FeatureFlagApi;
   /** The typed client the born-finalized entrance reads its allowlist through. */
   directory: () => AuthDirectory;
-  /** The origin every state-changing auth request is checked against. */
-  baseUrl: string;
+  /** The origin every state-changing auth request is checked against. An
+   * operation, not a property: the feature-API proxy serves operations only,
+   * and a plain property read through it throws at request time. */
+  baseUrl: () => string;
   /** Where a GET logout lands, once the local cookies are cleared. */
   federatedLogout: AuthRestFederatedLogout;
   /** Runs the born-finalized handler inside Identity's birth context. */
@@ -196,7 +198,7 @@ async function endSession({
   const headers = clearedCookies();
 
   if (request.method === "GET") {
-    const federated = await app.federatedLogout({ returnTo: `${app.baseUrl}/auth/signin` });
+    const federated = await app.federatedLogout({ returnTo: `${app.baseUrl()}/auth/signin` });
 
     headers.set("Location", federated ?? "/auth/signin");
 
@@ -227,7 +229,7 @@ async function betterAuthHandshake({
       method: request.method,
       origin: origin ?? undefined,
       referer: referer ?? undefined,
-      baseUrl: app.baseUrl,
+      baseUrl: app.baseUrl(),
     })
   ) {
     // The 403 body carries no detail on purpose. Without this line the reason
@@ -237,7 +239,7 @@ async function betterAuthHandshake({
       {
         path: new URL(request.url).pathname,
         method: request.method,
-        expectedOrigin: app.baseUrl,
+        expectedOrigin: app.baseUrl(),
         receivedOrigin: origin,
         receivedReferer: referer,
       },

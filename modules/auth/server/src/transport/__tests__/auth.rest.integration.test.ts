@@ -35,7 +35,7 @@ function authWorld(overrides: Partial<AuthDoorApi> = {}) {
     findProjectSlugByToken: async () => null,
     featureFlags: () => ({ isEnabled: async () => false }) as never,
     directory: () => ({}) as never,
-    baseUrl: BASE_URL,
+    baseUrl: () => BASE_URL,
     federatedLogout: async () => null,
     runWithIdentityBirth: (run) => run(),
     ...overrides,

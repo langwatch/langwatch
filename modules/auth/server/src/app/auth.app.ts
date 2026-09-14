@@ -289,8 +289,10 @@ export class AuthApp implements AuthApiContract {
     return PrismaAuthDirectoryRepository.create(this.#members.prisma);
   }
 
-  /** The origin every state-changing auth request is checked against. */
-  get baseUrl(): string {
+  /** The origin every state-changing auth request is checked against. An
+   * operation rather than a getter: the feature-API proxy the sign-in door
+   * reads this through serves operations only. */
+  baseUrl(): string {
     return this.#config.browserSession?.baseUrl ?? "";
   }
 
