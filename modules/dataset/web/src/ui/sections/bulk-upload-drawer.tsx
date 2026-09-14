@@ -1,23 +1,4 @@
-/**
- * Bulk upload (D1/D2/D4/D6-9 UI): a dedicated drawer to drop several files at
- * once. Each file is its own row with an inline collapsed column-type confirm;
- * "Upload all" prepares them in the background, independently. Shares the
- * single-file dropzone visuals (dotted grid + growing cloud + rainbow) so the
- * two flows look identical.
- *
- * MOVED HERE FROM `platform/app/src/components/datasets/bulkUpload`: the
- * datasets list page was its only opener, so the whole drawer travelled with the
- * screen rather than being copied. Three substitutions, all because this package
- * carries a narrower dependency set than the application did:
- *
- *  - the icons are `lucide-react`'s, which the Design System already uses and
- *    this package already depends on, rather than `react-feather`'s;
- *  - the confirm-columns section mounts and unmounts outright rather than
- *    animating open through `motion`, so a collapsed row still holds no
- *    focusable inputs and the drawer carries no animation library;
- *  - the file size is spelled by this package's own `formatFileSize` rather
- *    than `react-papaparse`'s.
- */
+// Bulk upload drawer with per-file column-type confirms, using lucide icons and formatFileSize.
 import {
   Box,
   Button,

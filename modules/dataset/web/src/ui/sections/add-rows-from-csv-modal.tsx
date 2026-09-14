@@ -1,18 +1,4 @@
-/**
- * Appends rows from a CSV, JSON or JSONL file to a saved dataset.
- *
- * A family-local copy of
- * `platform/app/src/components/datasets/AddRowsFromCSVModal`, which the upload
- * drawer still renders. Deletes-only forbids repointing it, so the platform copy
- * stays for that flow and this one travels with the dataset editor. Two things
- * changed and nothing else: the dropzone is this package's own (see
- * `tabular-file-dropzone`), and the two notices go to the host rather than to a
- * toast singleton a package may not import.
- *
- * The mapping is FILE COLUMN -> DATASET COLUMN and every dataset column has to
- * be answered before the upload unlocks, because a column left unmapped would
- * append blank values rather than nothing.
- */
+// Appends CSV/JSON/JSONL rows; requires all dataset columns mapped or unmapped columns get blanks.
 
 import { Box, Button, HStack, NativeSelect, Spacer, Text } from "@chakra-ui/react";
 import {

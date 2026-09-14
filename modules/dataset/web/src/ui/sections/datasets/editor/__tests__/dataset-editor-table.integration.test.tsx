@@ -779,18 +779,7 @@ describe("given rows are deleted from a paginated dataset", () => {
     // Regression: count refresh must fire on batch settle via the error path
     // too — not a feature scenario.
     it("still refreshes the total — a committed delete must not be masked by an update error", async () => {
-      // Force the bug-triggering interleave: both ops are dispatched, the delete
-      // commits, and the update fails LAST — so the batch only reaches zero
-      // pending ops via the error path. The count refresh must fire from there
-      // too, or a committed delete leaves the pager count stale. (Settling the
-      // delete synchronously would hide the bug, since ops would hit zero on the
-      // delete's own success.)
-      //
-      // Every dispatched callback is collected, not just the most recent one. A
-      // stall longer than the 500ms sync debounce splits the typing across two
-      // flushes, so the edit can reach the server as two updates. Keeping only
-      // the last one leaves a pending op outstanding, the batch never drains,
-      // and the assertion below fails for a reason this test is not about.
+      // Test: delete commits, update fails; collect all callbacks to avoid debounce splitting.
       const resolveDeletes: (() => void)[] = [];
       const rejectUpdates: ((e: { message: string }) => void)[] = [];
       deleteManyMutate.mockImplementation((_args: unknown, opts?: { onSuccess?: () => void }) => {

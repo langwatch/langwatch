@@ -1,18 +1,4 @@
-/**
- * Replicates a dataset into another project the reader may create datasets in.
- *
- * MOVED HERE FROM `platform/app/src/components/datasets/CopyDatasetDialog`: the
- * datasets list page was its only opener, so the whole dialog travelled with the
- * screen rather than being copied.
- *
- * ONE THING DID NOT TRAVEL, and it is the point: the platform dialog imported
- * `~/server/api/rbac` into the browser to work out, per team, whether the reader
- * may create a dataset there. A package may not reach `~/server`, and it does
- * not have to — the answer is the application's, and it arrives already decided
- * as `host.copyTargets()`. `@langwatch/authz-contract` publishes the same two
- * rules the platform hook used, and `apps/ui` applies them; the Agents family
- * made the same move for its replication picker.
- */
+// Replicates datasets across projects using host.copyTargets() for authz instead of server imports.
 
 import { Button, createListCollection, Field, VStack } from "@chakra-ui/react";
 import { Dialog } from "@langwatch/design-system/dialog";

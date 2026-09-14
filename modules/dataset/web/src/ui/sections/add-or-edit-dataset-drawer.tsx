@@ -1,31 +1,4 @@
-/**
- * Creates a dataset, or edits an existing one's columns.
- *
- * A NARROWED family-local copy of
- * `platform/app/src/components/AddOrEditDatasetDrawer`, which the workbench, the
- * upload confirm step, the add-record drawer and the platform drawer registry
- * still render. Deletes-only forbids repointing those, so the platform copy
- * stays for them and this one travels with the two Datasets screens.
- *
- * WHAT DID NOT TRAVEL, because these screens never pass it:
- *
- * - `columnVisibility` and `isColumnsLocked`, the workbench's and the upload
- *   confirm step's props.
- * - The `datasetRecords` re-mapping branch, which is how a workflow draft
- *   carries its rows onto renamed columns. It reached
- *   `@langwatch/workflow-web`, and dropping it is what keeps this closure free
- *   of a web-to-web import for a path the Datasets pages cannot take: neither
- *   screen has records in hand when it opens this drawer.
- * - `useDrawer`, which supplied a default `onClose`. Both callers pass one, and
- *   the platform drawer registry is not something a package may reach.
- *
- * ONE SUBSTITUTION, deliberate: the platform drawer drives its form through
- * `react-hook-form` plus a `zodResolver`, neither of which this package depends
- * on. The rules that resolver added by hand — a required name, no blank column
- * name, no duplicate column name — are stated below as one `describeProblems`
- * function, which is a value a test can assert on rather than a resolver's side
- * effects.
- */
+// Create/edit datasets with validation for required name and no duplicate column names.
 
 import { Button, Field, Heading, HStack, Input, NativeSelect, VStack } from "@chakra-ui/react";
 import { Drawer } from "@langwatch/design-system/drawer";
@@ -175,7 +148,7 @@ export function AddOrEditDatasetDrawer({
     setColumnTypes(datasetToSave?.columnTypes ?? DATASET_DEFAULT_COLUMNS);
     setProblems({});
     resetSlugInfo();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- the drawer opening is the reset, not every prop identity
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- drawer open resets, not each prop
   }, [open]);
 
   const isEditing = !!datasetToSave?.datasetId || localOnly;
@@ -354,16 +327,7 @@ export function AddOrEditDatasetDrawer({
 /** The code the dataset transport refuses a taken name with. */
 export const DATASET_NAME_TAKEN_CODE = "dataset_name_taken";
 
-/**
- * Whether the server refused because another dataset already holds the name.
- *
- * The wire message of a handled error IS its code slug, and the dataset
- * transport sets exactly this one for a name conflict
- * (`DatasetConflictError`, raised by the dataset application). Comparing the
- * code is what the
- * platform drawer did through `readHandledError`; a screen may not import that
- * reader, and the equality below asks the same question of the same value.
- */
+// Check if server refused because the dataset name is already taken (wire message is code slug).
 function isNameTaken(error: unknown): boolean {
   return (error as { message?: unknown } | null)?.message === DATASET_NAME_TAKEN_CODE;
 }

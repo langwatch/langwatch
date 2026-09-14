@@ -1,19 +1,4 @@
-/**
- * Drop a CSV, JSON or JSONL file here, and get its rows back.
- *
- * A NARROWED family-local replacement for `CSVReaderComponent`'s parsing path
- * in `platform/app/src/components/datasets/UploadCSVDrawer`, which the upload
- * drawer still renders. What travelled is the one flow the CSV append modal
- * uses: pick or drop a file, parse it in the browser, hand back header-plus-body
- * rows, and offer to remove it again.
- *
- * ONE SUBSTITUTION, deliberate: the platform component drives its dropzone
- * through `react-papaparse`'s `useCSVReader`, which this package does not depend
- * on and which a page move is not the place to add. The surface below is the
- * package's own dropzone chrome — the same one the bulk upload drawer already
- * renders — over a native file input, which is also what makes it reachable and
- * operable by keyboard rather than only by pointer.
- */
+// Parses CSV/JSON/JSONL to rows via native input for keyboard accessibility, not papaparse.
 
 import { Box, chakra, HStack, Text, VStack } from "@chakra-ui/react";
 import { X } from "lucide-react";

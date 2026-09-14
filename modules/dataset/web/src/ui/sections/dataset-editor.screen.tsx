@@ -1,15 +1,4 @@
-/**
- * One dataset, open in the editor.
- *
- * Moved from `platform/app/src/pages/[project]/datasets/[id].tsx`. The read gate
- * and the preparing/failed banners are decided HERE (ADR-032 I-READY) and the
- * editor only reads records once the dataset is ready, exactly as the page did.
- *
- * The dataset id comes off the address through the host's route reading rather
- * than through a router hook, which a screen closure may not reach.
- *
- * Spec: specs/datasets/dataset-editor.feature.
- */
+// Dataset editor respecting I-READY gate; dataset ID from host route (screen decides readiness).
 
 import { Alert, Box, Button, Spinner, Text } from "@chakra-ui/react";
 import { FlaskConical } from "lucide-react";

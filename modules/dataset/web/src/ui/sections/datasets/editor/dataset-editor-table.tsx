@@ -209,18 +209,7 @@ export function DatasetEditorTable({
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(DATASET_EDITOR_PAGE_SIZE);
 
-  // ── Row search ────────────────────────────────────────────────────
-  //
-  // Paging is how you read a dataset in order and a poor way to find one row in
-  // hundreds. The search is served by the same paged read: the server returns
-  // the matching rows and a `count` of the matches, so the pager pages the
-  // matches with no changes of its own.
-  //
-  // Saved datasets only. Narrowing an in-memory draft would mean filtering the
-  // local store, and rows are addressed by their POSITION in it (`selectedRows`
-  // is a Set of indices, `rowData` reads `records[index]`) — a filtered view
-  // would leave a selection pointing at rows the user never picked. A draft is
-  // also entirely on screen already, so there is nothing to search for.
+  // Row search via paged read; saved datasets only (in-memory selection by position).
   const [searchInput, setSearchInput] = useState("");
   // The term is debounced TOGETHER with the dataset it was typed against. A
   // bare-string debounce leaves the previous dataset's term in the debounced
@@ -255,17 +244,7 @@ export function DatasetEditorTable({
   // count derivation below, which maintains it.
   const unsearchedRecordCount = useRef<number | undefined>(undefined);
 
-  // Search term, page and the remembered dataset total each describe ONE
-  // dataset. The editor stays mounted when the user moves between datasets
-  // client-side — the route param changes underneath it — so unless they are
-  // dropped here they carry over: the new dataset opens narrowed by a word
-  // typed against the old one, at a page it may not have, with the old one's
-  // size on the count chip and nothing on screen explaining any of it.
-  //
-  // Reset during render, not in an effect: an effect runs after the render that
-  // has already put the stale page into the query key, so the request for it
-  // goes out regardless. `setData` clears the row selection when the new
-  // dataset's rows land, so there is nothing to clear here.
+  // Reset search/page/count per dataset during render (not effect) to avoid stale values.
   const [openDatasetId, setOpenDatasetId] = useState(datasetId);
   const datasetChanged = openDatasetId !== datasetId;
   if (datasetChanged) {
@@ -325,17 +304,7 @@ export function DatasetEditorTable({
   // empty dataset never asks for page 0. currentPage is clamped to it.
   const serverRecordCount = datasetId ? databaseDataset.data?.count : undefined;
 
-  // While a search is in effect `count` is the number of MATCHES, so the
-  // dataset's own total has to be remembered from the last unsearched read —
-  // otherwise the header could only say how many rows matched, which reads as
-  // the dataset having shrunk. The editor always loads unsearched first (the
-  // box starts empty), so this is populated before any search can run.
-  // While `keepPreviousData` serves the prior key's result during a key change,
-  // `isPlaceholderData` is true. Skip hydrating from it: a `datasetId` switch
-  // would otherwise populate the grid with the OLD dataset's rows under the NEW
-  // id (a data-integrity mismatch until the new query settles). For a
-  // same-dataset page switch this just holds the current page until the next one
-  // lands.
+  // During search, count is matches; remember unsearched total; avoid placeholder data on switches.
   const holdingPreviousData = databaseDataset.isPlaceholderData;
   // Only ever remembered from a SETTLED read of the dataset being shown. Held
   // over from a placeholder, the number belongs to whichever dataset was open
@@ -348,20 +317,7 @@ export function DatasetEditorTable({
   const pageCount = Math.max(1, Math.ceil((serverRecordCount ?? 0) / pageSize));
   const currentPage = Math.min(page, pageCount);
   const isLastPage = currentPage >= pageCount;
-  // Snap a now-out-of-range page back into range — e.g. the last page's rows
-  // were all deleted under us (the post-delete refetch shrinks the count) or a
-  // navigation refetch returned a smaller dataset. Acts ONLY on an authoritative
-  // count — never on absent data, never on data held over from the previous
-  // request, and never while the debounce is still catching up with the search
-  // box — so an in-flight change can't bounce navigation back to page 1.
-  //
-  // That last guard is the one with teeth. Clearing a search restores the page
-  // the user searched from, but `activeSearch` trails the input by the debounce,
-  // so for those 300ms the count on hand is still the MATCH count. Without the
-  // guard the clamp reads "page 3 of 1" and snaps a user who was three pages in
-  // back to page 1 — undoing the restore it was meant to protect.
-  //
-  // Floored at 1, so it never drives the page to 0.
+  // Snap page back into range; guard against search settling to avoid bouncing to page 1.
   const isSearchSettling = (searchInput.trim() || undefined) !== activeSearch;
   useEffect(() => {
     if (serverRecordCount == null || holdingPreviousData || isSearchSettling)
@@ -382,7 +338,7 @@ export function DatasetEditorTable({
       datasetId
         ? ((databaseDataset.data?.columnTypes ?? []) as DatasetColumns)
         : (inMemoryDataset?.columnTypes ?? []),
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- in-memory columns sync on load only, like the data below
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- in-memory columns sync on load only
     [datasetId, databaseDataset.data],
   );
 
@@ -459,27 +415,7 @@ export function DatasetEditorTable({
     setAutosave,
   } = store.getState();
 
-  // Typing in the search box resets the page and drops the selection
-  // IMMEDIATELY, before the debounce lets the search reach the query.
-  //
-  // Both have to happen ahead of the read, not after it. Resetting the page
-  // afterwards fires a real request for (old page, new search) — a page that
-  // usually does not exist within the matches, so it returns an empty one.
-  // Dropping the selection afterwards is worse: rows are selected by their
-  // POSITION (`selectedRows` holds indices, `deleteSelectedRows` filters by
-  // index), so for the moment the new rows are in place under an old selection,
-  // a delete would remove records the user never picked. Paging clears the
-  // selection for the same reason.
-  // Where the user was before the search started, so clearing it puts them back
-  // rather than on page 1. Not cosmetic: the add-row affordances live on the
-  // LAST page, so returning a multi-page dataset to page 1 would withdraw them
-  // for the rest of the session — a search would silently cost the user their
-  // place and their way of adding a row.
-  // The bookkeeping is done HERE, in the event handler, and not inside a
-  // `setPage` updater: React replays updaters in StrictMode to surface impurity,
-  // and an updater that writes this ref reads it back as `undefined` on the
-  // replay — so clearing a search would land on page 1 in development and on the
-  // remembered page in production. Event handlers are not replayed.
+  // Search resets page/selection immediately; use event handler to avoid StrictMode replay.
   const onSearchChange = useCallback(
     (next: string) => {
       setSearchInput(next);
@@ -563,15 +499,7 @@ export function DatasetEditorTable({
   // ── Table assembly ────────────────────────────────────────────────
 
   const rowCount = records.length;
-  // The trailing phantom row (Excel-style "click to add") appends to the END of
-  // the dataset, so on the paged saved view it belongs only on the last page —
-  // adding it on an earlier full page would create a row the user can't see.
-  // In-memory mode (no datasetId) is one local list, so it always shows it.
-  // ...and never once a search owns the grid: a new row is empty, so it would
-  // not match the search and would appear to vanish the moment it was created.
-  // This one flag covers both the button and the phantom row (via
-  // `displayRowCount`); the CSV import is withdrawn alongside them, for the same
-  // reason — its rows land at the end of the dataset, outside the matches.
+  // Show add-row only on last page (or in-memory), never during search (empty row wouldn't match).
   const showAddRow = (!datasetId || isLastPage) && !hasSearchTakenTheGrid;
   // A refused search leaves the rows read BEFORE it on screen: the store is only
   // written from a settled `data` (see the effect above), so an error leaves the
@@ -579,19 +507,7 @@ export function DatasetEditorTable({
   // and leaving them under a search box reads as "here is what matched" — a
   // complete, confident, false answer. Withdraw them and say what happened.
   const hasSearchFailed = isSearching && !!databaseDatasetError;
-  // A number of matches is the search's OWN answer, so it can only be reported
-  // once the search's own read has settled. Two states have no such answer and
-  // both used to report one anyway:
-  //
-  //   - a refusal, which never produces a count at all;
-  //   - a read still in flight, where `keepPreviousData` is serving the last
-  //     unsearched page and the `count` riding with it is the DATASET's size.
-  //     Fed to the two-number chip that renders "54,000 of 54,000 records" —
-  //     every row matched — over rows that were never searched. On a large
-  //     dataset that read takes seconds.
-  //
-  // In both, fall back to the dataset's own size, which is what the chip says
-  // with no search in effect and is true either way.
+  // Match count only reportable once search settles; avoid false counts during in-flight or error.
   const isMatchCountKnown = !hasSearchFailed && !holdingPreviousData;
   const displayRowCount = hasSearchFailed
     ? 0
