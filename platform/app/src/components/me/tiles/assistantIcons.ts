@@ -16,6 +16,7 @@ export const ASSISTANT_KINDS = [
   "opencode",
   "cursor",
   "github_copilot",
+  "pi",
   "custom",
 ] as const;
 
@@ -73,6 +74,16 @@ export const ASSISTANT_PRESETS: Record<
     label: "GitHub Copilot",
     iconUrl: "/images/external-icons/github-copilot.svg",
     darkModeInvert: true,
+  },
+  // No icon asset: we hold no pi mark we are licensed to redistribute, and
+  // inventing one would ship a fake logo. `iconUrl: null` is the supported
+  // no-asset state — TileIcon and the drawer preview both fall through to the
+  // neutral coding-assistant glyph. Swap in a real asset (with its licence
+  // recorded here) if one is ever obtained. ADR-132.
+  pi: {
+    label: "pi",
+    iconUrl: null,
+    darkModeInvert: false,
   },
 };
 

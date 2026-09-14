@@ -72,6 +72,34 @@ export function copilotSeatBypassSuffix(tool: string): string {
 }
 
 /**
+ * The one sentence the user gets when a tool that cannot use the gateway is
+ * put on direct OTLP ingestion instead. Shared, because the same decision is
+ * reached at two seams that print independently — `resolveWrapperPath`'s
+ * single-allowed-path branch (the ordinary launch, which passes the result in
+ * as a forced mode) and this module's downgrade branch (a pinned or
+ * flag-forced gateway). Drift between them is a user-visible inconsistency,
+ * so there is one function.
+ *
+ * pi is checked BEFORE the org-row branch, and that order is the point.
+ * `allowVk:false` for pi is forced by us, not chosen by an admin, and a
+ * logged-in user's cached policy map DOES carry a pi row — so testing the row
+ * first would blame the admin for a decision they never made and send them
+ * looking for a switch that is nailed shut.
+ */
+export function ingestionOnlyNotice(
+	tool: string,
+	policies?: Record<string, unknown>,
+): string {
+	if (tool === "pi") {
+		return `${lwTag()} pi is captured from its session file rather than through the gateway; using direct OTLP ingestion.`;
+	}
+	if (policies?.[tool] !== undefined) {
+		return `${lwTag()} gateway path is disabled for ${tool} by your org admin; using direct OTLP ingestion instead.`;
+	}
+	return `${lwTag()} ${tool} supports direct OTLP ingestion only; using it.`;
+}
+
+/**
  * Whether an env value expresses an explicit content-capture opt-out.
  * OTel booleans are parsed case-insensitively, and this repo's sibling
  * parsers also honour "0"/"no"/"off", so `FALSE`, `False`, `0`, `no`,
@@ -219,10 +247,19 @@ export async function resolveWrapperMode(
 	const policy = resolvePlatformToolPolicy(tool, cfg.tool_policies);
 
 	if (!policy.allowVk && !policy.allowOtelDirect) {
+		// Name only the lever that can actually be pulled. For most tools both
+		// are real, so the generic message is right. For pi it is not: allowVk
+		// is clamped false as a structural fact (pi ignores base-URL
+		// overrides), so an admin who followed the generic advice would enable
+		// the gateway, see nothing change, and have no way to learn why. That
+		// state is reachable only because this change forces allowVk false —
+		// so the message it produces is this change's to fix. ADR-132 §7.
 		throw new GovernanceCliError(
 			403,
 			"tool_disabled",
-			`Tool '${tool}' is disabled in the platform policy (both gateway and direct OTLP paths off). Ask your org admin to enable allow_vk or allow_otel_direct.`,
+			tool === "pi"
+				? "Tool 'pi' is disabled in the platform policy: direct OTLP ingestion is off, and pi cannot use the gateway path at all — it ignores base-URL overrides, so a virtual key would never route its traffic through LangWatch. Ask your org admin to enable allow_otel_direct; enabling allow_vk would change nothing."
+				: `Tool '${tool}' is disabled in the platform policy (both gateway and direct OTLP paths off). Ask your org admin to enable allow_vk or allow_otel_direct.`,
 		);
 	}
 
@@ -271,10 +308,7 @@ export async function resolveWrapperMode(
 		// Blame accurately: a hardcoded platform policy (no org row — e.g.
 		// `code`, which is ingestion-only by design) is a product fact, not
 		// an admin decision.
-		notice =
-			cfg.tool_policies?.[tool] !== undefined
-				? `${lwTag()} gateway path is disabled for ${tool} by your org admin; using direct OTLP ingestion instead.`
-				: `${lwTag()} ${tool} supports direct OTLP ingestion only; using it.`;
+		notice = ingestionOnlyNotice(tool, cfg.tool_policies);
 		// Self-heal a pinned gateway preference that can never be honored —
 		// otherwise the notice prints on every run forever (the gateway-side
 		// pin-forgetting in wrapper.ts only runs on runs that STAY gateway).

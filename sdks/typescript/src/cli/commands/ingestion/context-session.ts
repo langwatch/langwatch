@@ -32,8 +32,16 @@ import {
 import { findRolloutForThread } from "@/cli/utils/governance/codex-rollout-otlp";
 import { resolveLiveCodexSession } from "@/cli/utils/governance/codex-live-session";
 
-/** The agents a declaration can name, keyed by their normalized spelling. */
-const AGENTS = new Set(["claude_code", "codex", "opencode"]);
+/**
+ * The agents a declaration can name, keyed by their normalized spelling.
+ *
+ * pi is here for the explicit-flag path only: it exports no telemetry and
+ * installs no hooks, so nothing auto-resolves a pi session, but the wrapper
+ * knows the session id and a pi session that switches checkout has no other
+ * way to say so. `resolveTarget` reads the personal ingest key by this same
+ * spelling, so the declaration posts under pi's own key. ADR-132.
+ */
+export const AGENTS = new Set(["claude_code", "codex", "opencode", "pi"]);
 
 /** Which session the declaration is for, and what titles its seams carry. */
 export interface ResolvedSession {
@@ -66,7 +74,7 @@ async function resolveExplicitSession({
   const trimmedSessionId = sessionId?.trim() ?? "";
   if (!trimmedSessionId || !AGENTS.has(normalized)) {
     writeLine(
-      "Pass both --agent (claude-code, codex or opencode) and --session-id to declare for an explicit session.",
+      "Pass both --agent (claude-code, codex, opencode or pi) and --session-id to declare for an explicit session.",
     );
     return null;
   }

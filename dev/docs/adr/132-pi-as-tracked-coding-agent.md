@@ -22,10 +22,14 @@ then one row per event. Rows are of several kinds — `message`, `model_change`,
 `branch_summary`, `label`, `session_info` and two custom kinds — and only
 assistant rows carry model, provider, stop reason and cost; user and tool-result
 rows carry none of them. Assistant rows carry `usage` with tokens split four ways and
-`cost.total`; and a `parentId` on every row but the header and the root message,
-forming the fork tree. Counted, not estimated: 132 rows, 130 with a `parentId`,
-43 assistant turns, every one of them carrying a `cost.total`, summing to
-$3.4405 — of which 5 were exactly zero (see §9).
+`cost.total`; and a `parentId` on every row but two, forming the fork tree.
+The two are the header and the row immediately after it, which in the measured
+session is a `model_change` — not a message, as an earlier draft of this
+paragraph said. Counted, not estimated: 132 rows, 130 with a `parentId`, 43
+assistant turns, every one of them carrying a `cost.total`, summing to $3.4405
+— of which 5 were exactly zero, and correctly so (see §9). The same session
+changed model three times and used two different providers, which is §4's
+"pi is a host" observed rather than argued.
 
 The format is documented (`docs/session-format.md`), carries an explicit
 `version`, is on its third revision, and auto-migrates older files on load.
@@ -202,6 +206,18 @@ rather than to an entry an org admin can govern. The server twin
 (`platformToolPolicy.service.ts:27-34`) needs the same entry; its file comment
 asks a human to keep the two in sync and nothing enforces it.
 
+Those defaults are the wrong answer for pi, and dangerously so. pi's entry is
+`{ allowVk: false, allowOtelDirect: true }`, not the permissive default — see the
+first Invariant for the probes proving pi ignores base-URL environment variables.
+It follows that `tool-env.ts` needs no `pi` case at all: with `allowVk: false` the
+downgrade at `wrapper-mode.ts:269-277` turns any gateway preference into ingestion
+before the 501 can fire, so the 501 above is unreachable for pi rather than
+something to fix. Only the `otel-env-block.ts` half of the 501 problem is real.
+The `case "pi"` an earlier rung added there is therefore **removed**, not merely
+left unreachable: its comment claimed pi reads the OpenAI-compatible pair on every
+lane, which is false, and dead code carrying a false claim comes alive the moment
+someone flips the flag back.
+
 The settings tile that an org uses to govern a tool runs on a further chain of
 four lists, of which only the first was previously in scope:
 
@@ -275,9 +291,13 @@ scenario asserting it has been deleted rather than fixed.
 pi reports cost and tokens. It does not report lines changed, commits, or pull
 requests. Those stay empty rather than showing a confident zero.
 
-This has a known limit worth stating: some assistant turns in real pi sessions
-record `cost.total` of exactly `0`. That is pi's own gap, not ours, and it
-renders identically to a genuinely cheap turn. See §Known gaps.
+Some assistant turns in real pi sessions record `cost.total` of exactly `0`.
+An earlier draft called that pi's own gap. It is not a gap. All five such turns
+in the measured session ended with `stopReason: "error"`, `totalTokens: 0`, and
+a provider rejection recorded against them — the request was refused before
+anything was billed, so zero is the correct number and not a missing one. A
+genuine zero and an absent measurement are different facts, and the reader must
+keep them apart for exactly that reason.
 
 The distinction cuts one level deeper, and the reader must honour it. A turn
 whose `cost` object is **missing entirely** — because pi did not write one, or
@@ -289,13 +309,38 @@ have their own scenario, bound at rung 10 of the ladder.
 
 ## Invariants
 
-- **One capture path per run.** The no-double-trace rule (`wrapper-mode.ts:18-21`)
-  holds by the same guard codex uses: the reader runs only when
-  `modeResult.mode === "ingestion"` (`wrapper.ts:743`). With a virtual key the
-  gateway captures server-side and the reader does not run. This matters more
-  for pi than for codex, because pi honours a base-URL swap — `langy` proves it
-  (`spawn.go:23`, `OPENAI_BASE_URL`) — so gateway mode will genuinely capture
-  once §7 lands.
+- **One capture path per run, and for pi that path is always ingestion.** The
+  no-double-trace rule (`wrapper-mode.ts:18-21`) holds by the same guard codex
+  uses: the reader runs only when `modeResult.mode === "ingestion"`
+  (`wrapper.ts:743`). For codex, the other branch is a working gateway. **For pi
+  there is no other branch: pi ignores base-URL environment variables entirely.**
+  Every catalog model carries a hardcoded `baseUrl` in pi's shipped `dist`, and
+  both client factories pass it explicitly into the vendor SDK constructor, so the
+  SDK's own `readEnv("OPENAI_BASE_URL")` / `readEnv("ANTHROPIC_BASE_URL")` default
+  is never reached. Probed against pi 0.85.1 with nothing listening on the target
+  port — a connection error would have proven pi obeyed, and instead both probes
+  returned genuine vendor 401s:
+
+  ```
+  OPENAI_BASE_URL=http://127.0.0.1:41777/v1 OPENAI_API_KEY=sk-bogus… pi -p --model openai/gpt-5-mini "say hi"
+  → OpenAI API error (401): Incorrect API key provided: sk-bogus********  [api.openai.com]
+  ANTHROPIC_BASE_URL=http://127.0.0.1:41777 ANTHROPIC_API_KEY=sk-ant-bogus… pi -p --model anthropic/claude-haiku-4-5 "say hi"
+  → 401 {"type":"authentication_error","message":"API key is invalid."}   [api.anthropic.com]
+  ```
+
+  So pi is `{ allowVk: false, allowOtelDirect: true }` — ingestion-only, the same
+  shape as `code`, and the existing downgrade at `wrapper-mode.ts:269-277` turns a
+  gateway preference into ingestion with an accurate notice. Leaving pi on the
+  permissive default would have been silent total data loss for every user who has
+  a gateway key: gateway mode selected, base URL ignored, gateway sees nothing, and
+  the reader skipped because the mode was not ingestion.
+
+  The earlier claim here — that `langy` proves pi honours a swap (`spawn.go:23`) —
+  was a misreading. `spawn.go` spawns the langy-worker wrapper, not pi; the wrapper
+  writes the base URL into a generated pi `models.json`
+  (`services/langyworker/src/models.ts:105-121`). Redirecting pi is possible, but
+  only by writing config into the user's pi install, which the "no writes to the
+  user's machine" invariant below forbids.
 - **No writes to the user's machine.** No settings file, no extensions folder,
   no rc-file function, no `--profile`-style flag.
 - **No `anthropic` in scope or `service.name`.** See §4.
@@ -313,7 +358,7 @@ is where review turns into theatre.
 | Path | Reversible? | Blast radius | Required gate |
 | --- | --- | --- | --- |
 | Publishing a `langwatch pi` subcommand | **No** — npm versions do not unpublish | Large: public CLI surface | Ships `{ hidden: true }`, matching `program.ts:415`–`:580`. A test asserts the command is registered and not listed in help output. |
-| Posting captured turns to the ingestion endpoint | **No** — the transcript is the user's source code, and it leaves the machine | Large | Runs only when `modeResult.mode === "ingestion"` (`wrapper.ts:743`). A test asserts the streamer is `null` when a virtual key is present. |
+| Posting captured turns to the ingestion endpoint | **No** — the transcript is the user's source code, and it leaves the machine | Large | A test asserts the streamer runs **whether or not** a virtual key is present. **This row said the opposite until v10** — it demanded a test asserting the streamer is `null` when a key is present, which is the pre-v10 belief that pi honours a base-URL swap. pi does not (see revision v10), so a key-holder has no gateway capture to fall back on and that test would have pinned total silent data loss for every paying customer. A gate that names the wrong assertion is worse than an empty cell: implementation and review both read this table, so it would have been built to order. |
 | pi's entry in `CODING_AGENT_REGISTRY` | Yes | Large: a bare-`pi` matcher relabels every Claude Code, Cowork and Copilot record | A test asserts the matcher rejects scope `com.anthropic.claude_code.events` and service `copilot-cli`, and that `piAgent` is last in the registry. Both are load-bearing; test them separately so a reorder fails on its own. |
 | The nineteen registration sites | Yes | Large: a missed site ships a half-registered agent that fails at save time, as `claude_cowork` did | Human review against the enumerated list in #8128. The compiler catches none of them — measured, see §6. This is the weakest gate in the table and the reason #8134 exists. |
 | Governance policy entry, both copies | Yes | Medium: a missing entry silently resolves to the both-permitted defaults at `platform-tool-policy.ts:44-47` instead of something an admin can govern | A test asserting `PLATFORM_TOOL_POLICIES` and the server's `PLATFORM_TOOL_SLUGS` hold the same slugs. Nothing enforces this today for any tool. |
@@ -332,10 +377,14 @@ Time to detection for a silent pi capture failure is unbounded. pi inherits a
 monitoring floor of zero from the agents already shipped; this ADR does not
 raise it, and the gap belongs to all of them.
 
-**Cost fails to the worse mode.** A missing or renamed cost field reads as
-`0`, which renders as a real $0.00 rather than as absent. Combined with pi's own
-zero-cost turns, a genuine capture failure is not visually distinguishable from
-a cheap session.
+**Cost must not fail to the worse mode, and now cannot.** A missing or renamed
+cost field would naturally read as `0` and render as a real $0.00 rather than as
+absent — a capture failure wearing the face of a cheap session. The reader
+built in rung 8 makes that collapse impossible to write rather than merely
+discouraged: an unreported cost has no total field at all, so the one-character
+mistake that turns absent into zero does not compile. Genuine zeros still occur
+and are still correct — a turn the provider rejected before billing is honestly
+$0.00 — but they are now a different value from a measurement we never got.
 
 Both point at the same follow-up: an ingest-side check that a captured assistant
 turn carries non-null cost, and an alert when a tracked agent's capture rate
@@ -417,6 +466,41 @@ this is the first ADR to write the number down — and the first to establish, b
 measurement, that the compiler flags none of them. The list is a checklist, and
 until #8134 lands it is the only safety net there is.
 
+A review lesson, learned here and not specific to pi: **a leak assertion placed
+after an identity assertion in the same test is unreachable whenever the break
+moves the identity too.** Rung 13's privacy guarantee — the parent's file path,
+which contains the user's home directory, must reach no emitted attribute — was
+asserted at the end of a test that first checked the resolved parent id. Both
+breaks that actually move a path into that id sailed past it: making the raw
+path the fallback when the parent header cannot be read left that very test
+GREEN (it reddened one unrelated test), and using the path as the id outright
+reddened it on `expected '/var/folders/…' to be '01a09b6b-…'` — an identity
+message from a line above the payload checks. The guarantee was provable by
+exactly one mutation of seven, the one that leaves the id correct and stamps the
+path beside it. That is a guarantee held by luck. The fix is structural and
+cheap: give an assertion with a security consequence its own test, with nothing
+in front of it that can throw. Both breaks now fail on the payload assertion
+itself. When reviewing a test that ends in a privacy or leak check, read upward
+and ask what else in it can throw first.
+
+A second lesson, about specs rather than tests: **a scenario that asserts
+something the system does not do should be deleted, not parked.** "Measurements
+pi never reports are left blank rather than shown as zero" was refused three
+times by three rungs working independently — vacuous at the builder, false at
+the projection, and finally unbindable at the agent definition, where the
+proposed fix (`?? 0` on the pi definition) could not have compiled because
+`CodingAgentDefinition` has no value-mapping field at all. The measurements are
+bare `number` initialised to zero and returned unconditionally
+(`coding-agent-session.types.ts:306-309`,
+`coding-agent-session.derivation.ts:1328-1379`); they are never blank. The real
+blanking is a display guard over zeros in `SessionView.tsx:518-524`, `:544` and
+`:547`, agent-agnostic and older than pi — a test of it passes with every line of
+pi deleted, which is the rung-4 vacuity test failing. `@unimplemented` is a
+queue, not a graveyard: a false claim left in a spec teaches the next reader the
+wrong invariant whether or not a gate measures it, and the only way to make this
+one true would have been to change production nullability to fit the sentence.
+Note that the behaviour it reached for is already out of scope below (#8129).
+
 Out of scope, each with a filed follow-up:
 
 | Follow-up | Issue |
@@ -428,6 +512,7 @@ Out of scope, each with a filed follow-up:
 | Capture-health monitoring — not pi-specific | #8133 |
 | One source of truth for the agent list — not pi-specific | #8134 |
 | Public onboarding entry and docs page | #8135 |
+| Session Outcome stat gate — not pi-specific, belongs in `specs/trace-drawer/` | to file |
 | Any change to langy | none — explicitly untouched |
 
 ## Implementation entry point
@@ -437,7 +522,11 @@ one that unblocks testing anything else.
 
 1. `otel-env-block.ts:11-25` — add `pi` to `SOURCE_TYPE_BY_TOOL`, and the `pi`
    case to `tool-env.ts`. Until both exist, `langwatch pi` exits 501 and nothing
-   downstream can be exercised by hand.
+   downstream can be exercised by hand. **Add a `case "pi": return {}` to
+   `buildOtelEnvBlock` in the same change** — being in the slug table must not
+   mean pi's child gets an env block. Skipping this hands a live ingest token to
+   every process in the session; see Revision v9, which reverses the original
+   wording here.
 2. `platform-tool-policy.ts:23-30` and `:49`, then the server twin
    `platformToolPolicy.service.ts:27-34` and `:45`.
 3. The registry matcher and its test — `agents/pi.ts`, appended last in
@@ -510,6 +599,9 @@ passes an unknown agent through untouched.
 | v5 | 2026-09-14 | Sergio Esteban | Spec red team returned refuted on all five lenses against `specs/coding-agent/pi-session-capture.feature`. §8 was the only decision found actually wrong, and only in part. Corrected: lineage is kept, not dropped — the parent path resolves to an id by opening the parent file's first line, which reuses the header reader capture already needs, and a deleted parent stores null against an already-nullable field. Removed: the claim that resuming a session records a parent. `session-format.md:3` and `:197` show resume appends in place and writes no `parentSession`, so there is no second session to link. `isFork` was redefined as "the header carries a `parentSession`", because pi does not distinguish fork from clone and the model never asks it to. The losing argument, recorded because I initially accepted it: drop lineage entirely, since a user can delete the parent file. It lost because the field is already nullable — a missing ancestor is an ordinary outcome, and one deletable input does not justify discarding the feature. The spec was rewritten from 25 scenarios to 28, every one tagged `@unimplemented`, and the file added to `LEGACY_INERT` with a note to retire the entry on the commit that binds the first scenario. |
 | v6 | 2026-09-14 | Sergio Esteban | Second spec red team, four lenses, all refuted. No decision changed; four factual claims did, each measured against pi's shipped `SessionManager` rather than its docs. (a) pi does **not** write each turn as it goes: it buffers until the first assistant reply, so a session abandoned before that leaves no file and capture must treat an absent file as normal. (b) A current-version file only ever grows — three runs, same inode, byte-exact prefixes — but opening a session from an older pi rewrites it in place once, 874 → 869 bytes, so the reader must re-check size each pass instead of trusting an offset. (c) **New hazard, previously unstated:** a fork copies the parent's row identifiers verbatim, so de-duplication must key on (session id, row id); keying on row id alone would silently drop a branch's inherited history. (d) The session directory has three sources, not one; the draft specified only the flag, and the other two would have captured nothing. §7 grew from four surfaces to seven: the settings tile runs on a chain of four lists of which only the write gate was in scope, and the mapping from a saved choice to a tool slug fails silently — registering pi in one and not the rest reproduces the `claude_cowork` half-registration this ADR cites as its own warning. Site count sixteen → nineteen. The 85% reuse figure was narrowed: it covers discovery, tailing and transport, not the turn-content event builder, which is net-new. The spec went 28 → 33 scenarios (three of them outlines): 18 of the previous 28 could not fail and were rewritten, merged or dropped, and the holes above were filled. The losing argument, recorded because it was mine: that the two governed-tool lists hold different kinds of thing and their agreement did not need a scenario. They hold the same seven slugs, byte-identical, and the Gates table already demanded that test — the scenario was restored. |
 | v7 | 2026-09-14 | Sergio Esteban | Commit ladder cut: `132-implementation-ladder.md`, twenty-one rungs covering all 33 scenarios, each naming its files, bound scenario titles and proving command. No decision changed. Three refusals the ADR had missed were found while cutting it and are recorded under the implementation entry point, each verified in the code rather than inferred: the personal ingestion key mint throws for pi (`ingestionKey.service.ts:214-215`), a command-registration drift test hard-fails the moment pi is registered (`feature-map-drift.unit.test.ts`, qualifying §6's claim that nothing outside the edited file breaks — two source-scanning tests do, they are simply not the compiler), and the direct-telemetry policy lookup skips its check entirely for an unmapped tool (`platformToolPolicy.service.ts:88` read at `auth-cli.ts:2582-2603`), so an organisation that switched pi's direct path off would still mint the key. That third one is the same silent-permissive failure §7 already flags, on a map §7 does not mention. Two corrections of record: three spec scenarios are outlines, not two; and the registration-site count of nineteen does not reconcile with the ladder's twenty distinct symbols — the ladder works from the symbols and the discrepancy is not yet chased. Ordering consequence worth naming: the rename of the shared reader parts off `codex` is rung 6, before the pi reader exists. Deferring it is precisely how the duplicated reader §5 rejects gets shipped anyway. |
+| v8 | 2026-09-14 | Sergio Esteban | Three factual corrections, all found by builders during implementation and all re-measured against the real session file before being accepted. (a) §Context said a `parentId` sits on every row but the header and the root message. Two rows lack one, and the second is a `model_change`, not a message — the first *message* row is parented. The count of 130 was right; the description of which two was wrong, and it was wrong in a correction I had already made once. (b) §9 and §Known gaps called the five zero-cost turns "pi's own gap". They are not a gap: all five ended with a provider rejection, zero tokens billed, so $0.00 is the correct figure. The wording overstated a limitation that does not exist, and the spec's own phrasing was already the accurate one. (c) §Known gaps warned that cost fails to the worse mode, an absent measurement rendering as a real zero. Rung 8 made that collapse impossible to express rather than merely discouraged — an unreported cost carries no total field, so the mistake does not compile. The gap is closed, not merely noted, and the entry now says so. Also recorded, because it will bite the next rung: each row carries two clocks in two different units, and the shipped tool-result rows carry no usage at all despite the format documentation saying they may, so any assertion about work inside tools has no ground truth on this machine. |
+| v9 | 2026-09-14 | Sergio Esteban | **A decision reversed, not a correction.** §7 said pi takes the generic endpoint-and-headers env block because pi would simply ignore vars it does not read. That reasoning was wrong and it shipped: rung 2 encoded it as an assertion (`wrapper-mode.unit.test.ts`) that the ingest token *was* handed to pi's child. It stopped one step short of the child's environment not being pi's alone. `wrapper.ts:707` merges the block into the child env, and on an interactive shell `buildShellReapply` (`wrapper.ts:296-312`) re-`export`s it into the session, so every process a developer starts inside `langwatch pi` — a dev server, a test run, their own app — inherits a live ingest token and an endpoint, and anything OTel-instrumented among them posts spans to us authenticated as pi. This is the hazard `ingestKeyProvenance.utils.ts:150-158` already documents for the VS Code extension; that mitigation is a server-side scope gate which early-returns for any other source type (`:181-183`), so it would never have covered pi. Confirmed by execution, not by reading: a spawned child was observed holding the bearer token, and pi was shown to be indistinguishable from a typo'd tool slug, both getting the same two keys. Also verified in the other direction — pi ships no exporter at all (zero hits for `OTEL_`, `otlp` or `opentelemetry` across the 884 files of its shipped `dist/`), so the block bought no capture in exchange for the exposure. **New decision: pi receives no env block whatsoever, the only tool for which that is true.** Capture is unaffected; the endpoint and token stay in the mode result (`wrapper-mode.ts:600-601`) for the post-exit transcript POST. Receiver-side filtering was considered and rejected: the exposed token is itself the harm, independent of which spans get accepted. **A second finding falls out of the same root cause.** `SOURCE_TYPE_BY_TOOL` was doing two unrelated jobs — naming a mint source type, and gating which tools may be instrumented. pi needs the first and must fail the second, but `instrument.ts:56` read the one table for both, so `langwatch instrument pi` passed validation, passed the `allowOtelDirect` default, minted a real ingest key and wrote persistent wiring that captures nothing forever; the command's own help string (`program.ts:487`) still advertised the older, correct set. Fixed by deriving instrumentability from the env block (`exportsTelemetry`) rather than adding a second hand-kept list — a tool handed no vars is a tool with nothing to instrument, by construction, so the two cannot drift. Rung 5 had already declined to touch the installer for this reason and named the help string as the tell; that judgement was right and this closes it properly. Two scenarios added to the spec, both bound and both falsified. |
+| v10 | 2026-09-14 | Sergio Esteban | **A second decision reversed, and the load-bearing factual claim of §7 killed.** The ADR asserted that pi honours a base-URL swap, cited `langy` as proof (`spawn.go:23`, `OPENAI_BASE_URL`), and concluded that gateway mode "will genuinely capture once §7 lands". Every part of that is false. pi ignores base-URL environment variables outright: each catalog model carries a hardcoded `baseUrl` in pi's shipped `dist` and both client factories pass it explicitly into the vendor SDK constructor, so the SDK's own `readEnv("OPENAI_BASE_URL")` / `readEnv("ANTHROPIC_BASE_URL")` default is never reached. Proven by execution against pi 0.85.1 with **nothing listening** on the redirect target, so a connection error would have proven pi obeyed: both probes instead returned genuine vendor 401s from `api.openai.com` and `api.anthropic.com`. The `langy` citation was a misreading — `spawn.go` spawns the langy-worker wrapper, not pi, and the wrapper injects the base URL through a generated pi `models.json` (`services/langyworker/src/models.ts:105-121`), a config file, not an env var. **Consequence, and the reason this is a P1 rather than a documentation fix:** pi was left on the permissive default `{allowVk: true, allowOtelDirect: true}`, `wrapper-mode.ts:247-257` resolves `hasVk → gateway`, and gateway and ingestion are mutually exclusive (`wrapper-mode.ts:18-21`), so every user holding a gateway key would have got gateway mode selected, the base URL ignored, the gateway seeing nothing, and the session reader skipped because the mode was not ingestion — silent total data loss, no error, with a reassuring notice printed. It would have hit exactly the users most likely to have a key, and looked like working software. **And it is worse than data loss: it is credential exposure.** The openai lane does not merely fail to capture — it sends the LangWatch virtual key to `api.openai.com` as an OpenAI key, and the probe has the vendor echoing it back in the 401 body. So the shipped state leaked our own credential to a third party on every run of a lane we could not capture. **New decision: pi is `{ allowVk: false, allowOtelDirect: true }` — ingestion-only, the same shape as `code`.** The existing downgrade at `wrapper-mode.ts:269-277` then converts a gateway preference into ingestion with an accurate notice, and no new mechanism is needed. It further follows that `tool-env.ts` needs no `pi` case at all: the downgrade fires before the 501 can, so half of the two-501 problem §7 opens with is unreachable for pi rather than something to fix. Recorded because the process point matters more than the fix: this was found by an adversarial refuter sent to kill a *different*, weaker finding of mine — I had suspected doubled capture, which would at least have been visible. The refuter refuted my finding and returned a worse one, and both probes were then reproduced independently by the lead before the fix was written. |
 
 ## References
 

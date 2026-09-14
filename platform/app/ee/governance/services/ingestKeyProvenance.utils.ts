@@ -89,6 +89,9 @@ const CODING_AGENT_SOURCE_TYPES: ReadonlySet<string> = new Set([
   "copilot_cli",
   "copilot_app",
   "copilot_vscode",
+  // pi (ADR-132) is a coding CLI like the rest; without it pi's captured
+  // sessions land as origin=ai_tool and fall out of the coding-agent filters.
+  "pi",
 ]);
 
 /**

@@ -52,12 +52,63 @@ describe("deriveSessionBanner", () => {
       ["codex", "codex"],
       ["gemini-cli", "gemini_cli"],
       ["copilot-cli", "copilot"],
+      ["pi", "pi"],
     ] as const)("identifies %s as %s", (serviceName, agent) => {
       const banner = deriveSessionBanner({
         resourceAttributes: { "service.name": serviceName },
         spans: [],
       });
       expect(banner.agent).toBe(agent);
+    });
+  });
+
+  describe("given a service name that merely contains pi's letters", () => {
+    // "pi" sits inside "anthropic", "copilot" and "pipeline". A substring
+    // test here would relabel those sessions as pi, so the banner matches
+    // the service name whole.
+    it.each([
+      ["copilot-cli", "copilot"],
+      ["anthropic-claude-code", "claude_code"],
+      ["pipeline-runner", "unknown"],
+      ["my-api", "unknown"],
+    ] as const)("does not call %s pi", (serviceName, agent) => {
+      const banner = deriveSessionBanner({
+        resourceAttributes: { "service.name": serviceName },
+        spans: [],
+      });
+      expect(banner.agent).toBe(agent);
+    });
+  });
+
+  describe("given no service name and a pi-named call span", () => {
+    it("identifies pi off the dotted name prefix", () => {
+      const banner = deriveSessionBanner({
+        resourceAttributes: {},
+        spans: [
+          {
+            spanId: "s1",
+            name: "pi.llm_request",
+            startTimeMs: 1,
+            params: {},
+          } as unknown as SpanDetail,
+        ],
+      });
+      expect(banner.agent).toBe("pi");
+    });
+
+    it("stays unknown for a span whose name only starts with the letters", () => {
+      const banner = deriveSessionBanner({
+        resourceAttributes: {},
+        spans: [
+          {
+            spanId: "s1",
+            name: "pipeline.step",
+            startTimeMs: 1,
+            params: {},
+          } as unknown as SpanDetail,
+        ],
+      });
+      expect(banner.agent).toBe("unknown");
     });
   });
 
