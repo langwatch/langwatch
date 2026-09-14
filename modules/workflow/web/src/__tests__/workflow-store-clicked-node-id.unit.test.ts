@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  *
- * `clickedNodeId` gates the StudioNodeDrawer behind a real click (mousedown + mouseup, no drag; fixes issue #2269). Pins the store contract only — the drawer's render-time predicate has its own component tests.
+ * `clickedNodeId` gates the StudioNodeDrawer behind real clicks; store contract only.
  */
 import { beforeEach, describe, expect, it } from "vitest";
 import { createStore, type StoreApi } from "zustand";

@@ -22,20 +22,7 @@ const typesMap: Record<Field["type"], string> = {
   code: "str",
 };
 
-/**
- * Rewrites a code block's entrypoint signature to match its declared inputs.
- *
- * Used wherever a code block's inputs change (the studio code node and the
- * custom code-evaluator drawer) so the `__call__` / `forward` parameter list
- * stays in sync with the wired inputs. Without this, the engine calls the
- * entrypoint with a keyword it does not accept.
- *
- * Matches either the idiomatic `__call__` or the legacy `forward`, preserving
- * whichever the code already uses, and only rewrites the signature line (the
- * body is left untouched). An optional `-> ReturnType` annotation is preserved.
- * Every parameter defaults to `None` so an unconnected input does not raise
- * "missing a required argument" at run time.
- */
+/** Rewrite entrypoint signature to match declared inputs (__call__/__forward in sync). */
 export const rewriteCodeSignature = (
   code: string,
   inputs: Array<{ identifier: string; type: string }>,

@@ -1,17 +1,4 @@
-/**
- * `/api/cron` — the deployment's own housekeeping door. A Kubernetes CronJob
- * curls these paths with the shared `CRON_API_KEY` bearer and nothing else may
- * reach them, because a caller reaching `old_lambdas_cleanup` can delete this
- * deployment's Lambda functions.
- *
- * The gate is the DOOR's, not a handler's: every route answers behind
- * `internalSecret`, so the deployment's shared-secret check runs ahead of both
- * of them and a route whose author forgets a check still ships authenticated.
- *
- * It is declared here rather than by the process because the Lambdas it deletes
- * are the studio's per-project NLP engines and the policy deciding which are
- * quiet is this module's own service.
- */
+/** Deployment housekeeping door: shared-secret gate prevents unauthenticated Lambda deletion. */
 import { anyAuthenticated } from "@langwatch/api/access";
 import { defineRestRouter, MANAGEMENT_API_VERSION } from "@langwatch/api/rest";
 import {
@@ -24,15 +11,7 @@ import type { z } from "zod";
 /** Why the bearer alone is the whole gate on both addresses. */
 const CRON_BEARER_IS_THE_GATE = "the deployment's own cron bearer is the whole gate";
 
-/**
- * Both addresses the CronJob already curls, literally. `v1Twin: false`: the
- * family was never aliased under `/api/v1`, and a deployment secret's door is
- * not somewhere to publish a second address nobody asked for.
- *
- * Two methods on one path because the Kubernetes job has always sent whichever
- * its manifest happened to name, and dropping either would silently stop a
- * running cluster's sweep.
- */
+/** Two methods on one path match the CronJob manifest's actual behavior. */
 export const cronRest = defineRestRouter(WorkflowApi)
   .withNamespace("cron")
   .withVersion(MANAGEMENT_API_VERSION)

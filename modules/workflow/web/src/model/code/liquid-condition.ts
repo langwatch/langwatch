@@ -9,19 +9,7 @@ export interface LiquidConditionValidation {
   missingVariables: string[];
 }
 
-/**
- * Wraps the bare condition in a Liquid `{% if %}` so liquidjs parses it the
- * same way the engine does, then reports two problems the if/else condition
- * input otherwise swallows silently:
- *
- *  - syntax errors (an unbalanced or malformed expression), and
- *  - references to variables that are not among the node's declared inputs.
- *
- * An empty condition is treated as valid so the field does not nag while it
- * is being typed. Variable extraction is best-effort: anything liquidjs
- * cannot analyze yields no missing-variable warnings rather than a false
- * alarm.
- */
+/** Validate Liquid condition: catch syntax errors and undefined variable references. */
 export function validateLiquidCondition(
   condition: string,
   availableVariables: string[],

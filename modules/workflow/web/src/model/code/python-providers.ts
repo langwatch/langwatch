@@ -12,15 +12,7 @@ export interface RegisterPythonProvidersOptions {
   contract: PythonContract;
 }
 
-/**
- * Register all Monaco providers used by the workflow Python editor. Returns
- * a single handle whose `dispose()` tears everything down — call it on
- * editor unmount to avoid leaking globally-registered providers across
- * remounts.
- *
- * Each provider lives in its own module under `./python/` — see `shared.ts`
- * for the common types, regexes, marker codes, and helpers they all draw on.
- */
+/** Register Monaco providers for Python editor; returns disposable handle for cleanup. */
 export function registerPythonProviders({
   monaco,
   contract,

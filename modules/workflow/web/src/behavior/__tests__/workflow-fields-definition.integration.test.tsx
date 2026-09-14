@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  *
- * The shared studio field editor picks a field's type through the same outline FieldTypeSelect used app-wide, not a bare decorative label over a hidden native select. Picking a type writes it back through the node.
+ * Field editor uses shared FieldTypeSelect UI; picked type writes back through node.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, waitFor, within } from "@testing-library/react";

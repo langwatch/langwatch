@@ -1,14 +1,4 @@
-/**
- * The studio's per-project Lambda deployment, as one already-parsed value.
- *
- * `LANGWATCH_NLP_LAMBDA_CONFIG` is a single JSON blob naming the account, the
- * image and the network every per-project engine function is created in. Its
- * classified fields (the account credentials) mean the blob itself is parsed
- * in `apps/api/src/platform/config/api.config.ts`, the process's one boot seam
- * for reading such environment variables — this module stays pure functions
- * over the already-parsed fields, so it can be unit-tested with no environment
- * at all.
- */
+/** Pre-parsed per-project Lambda deployment; pure functions stay testable without env. */
 export const NLP_LAMBDA_CONFIG_ENV = "LANGWATCH_NLP_LAMBDA_CONFIG";
 
 /** Every per-project studio function is named for the project behind it. */

@@ -34,10 +34,7 @@ export const _useWorkflowStore = create<WorkflowStore>()(
           handleSet(pastState);
         },
 
-        // Our goal is to store the previous state to mark it as a "history entry" whenever state changes,
-        // however, sometimes two pieces of state change in a very short period of time, and we don't want to
-        // create two or more entries on the undo. We then store the pastState as soon as the debounce begins,
-        // and only try to store again if more than 100ms has passed since the last state change.
+        // Debounce history to avoid multiple undo entries when state changes rapidly.
         100,
         { leading: true, trailing: false },
       );

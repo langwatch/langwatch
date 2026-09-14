@@ -1,29 +1,6 @@
 import { useEffect } from "react";
 
-/**
- * Single owner of the Crisp chat bubble's visibility.
- *
- * The bubble renders in the same bottom corner as the Langy launcher, so it
- * must never idle-show on its own: it becomes visible only through a
- * deliberate open (sidebar Chat button, command palette) or an incoming
- * operator message, and returns to hidden when the chat box is closed.
- *
- * Crisp's script re-shows the bubble on its own schedule (session restore,
- * tab visibility changes, its container re-mounting), so a single boot-time
- * "chat:hide" is not enough. Suppression is layered:
- *
- * - CSS backstop: index.html ships `<html data-crisp-suppressed>` and
- *   globals.scss keeps the Crisp container `display: none !important` while
- *   the attribute is present, so the bubble stays hidden before any script
- *   runs and regardless of what Crisp does to its own inline styles.
- * - "chat:hide" re-asserts: queued on install (drained the moment Crisp
- *   boots), and pushed again when Crisp becomes ready (CRISP_READY_TRIGGER),
- *   on visibilitychange, pageshow and focus, when the Crisp container is
- *   (re-)inserted into the DOM, and when the user closes the chat box.
- *
- * Every `$crisp` access is guarded: self-hosted builds and local dev never
- * load Crisp, and there the policy only maintains the (inert) attribute.
- */
+/** Crisp bubble visibility: CSS backstop + event-driven suppression (shared corner). */
 
 const SUPPRESSED_ATTRIBUTE = "data-crisp-suppressed";
 const CRISP_CONTAINER_SELECTOR = "#crisp-chatbox, .crisp-client";

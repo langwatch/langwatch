@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  *
- * Entry-point dataset semantics: attach MERGES columns into the entry's fields (user-defined inputs survive); legacy "Entry" names normalize to "Entry point" on load.
+ * Entry dataset merges columns; user inputs survive; legacy "Entry" normalizes.
  */
 import { beforeEach, describe, expect, it } from "vitest";
 import { createStore, type StoreApi } from "zustand";

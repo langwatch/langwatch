@@ -59,7 +59,7 @@ export type State = StudioWorkflow & {
   triggerValidation: boolean;
   /** The workflow state as of the last autosave. Used as the baseline for hasPendingChanges(). */
   autosavedWorkflow: StudioWorkflow | undefined;
-  /** The workflow state as of the last manual commit (or version restore/load). Used as the baseline for checkCanCommitNewVersion(). */
+  /** Last committed workflow state; baseline for checkCanCommitNewVersion(). */
   lastCommittedWorkflow: StudioWorkflow | undefined;
   /** The DB id of the current workflow version. Updated on load, autosave, commit, and restore. */
   currentVersionId: string | undefined;
@@ -68,7 +68,7 @@ export type State = StudioWorkflow & {
   isDraggingNode: boolean;
   /** The node ID confirmed by onNodeClick (genuine click, not drag). Gates drawer opening. */
   clickedNodeId: string | null;
-  /** True while dragging an If/Else branch handle. Grows a temporary green "gate" input on every connectable node. */
+  /** True while dragging If/Else branch; shows temporary gate input. */
   branchConnectionInProgress: boolean;
   /** The If/Else node a branch drag started from, so it does not offer itself a gate. */
   branchConnectionSourceId: string | null;
@@ -88,16 +88,16 @@ export type WorkflowStore = State & {
   setAutosavedWorkflow: (workflow: StudioWorkflow | undefined) => void;
   /** Update the committed baseline. Called on load, manual commit, and version restore. */
   setLastCommittedWorkflow: (workflow: StudioWorkflow | undefined) => void;
-  /** Update the current version ID. Called on load, autosave, manual commit, and version restore. */
+  /** Update current version ID (on load, autosave, commit, restore). */
   setCurrentVersionId: (id: string | undefined) => void;
-  /** Returns true if the current workflow differs from the last committed version. Synchronous — no DB query needed. */
+  /** True if workflow differs from last committed; synchronous. */
   checkCanCommitNewVersion: () => boolean;
   setSocketStatus: (status: SocketStatus | ((status: SocketStatus) => SocketStatus)) => void;
   onNodesChange: (changes: NodeChange[]) => void;
   onEdgesChange: (changes: EdgeChange[]) => void;
   onNodesDelete: () => void;
   onConnect: (connection: Connection) => { error?: string } | undefined;
-  /** Called when a connection drag starts; flags If/Else branch drags so nodes show the temporary gate input. */
+  /** On connection drag start; flags If/Else branches for temp gate display. */
   onConnectStart: (params: { nodeId: string | null; handleId: string | null }) => void;
   /** Called when a connection drag ends; clears the branch-drag flag. */
   onConnectEnd: () => void;

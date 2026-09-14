@@ -1,14 +1,6 @@
 import type { Node } from "@xyflow/react";
 
-/**
- * If/Else branch routing. A branch (the `true` / `false` output of an If/Else
- * node) routes execution down one path AND carries its boolean value, so it
- * connects like a normal edge into a bool input. To make wiring obvious, while
- * a branch is being dragged every connectable node grows a temporary green
- * "gate" bool input; dropping onto it materializes a real `gate` input wired
- * to the branch (see workflowStoreCore.onConnect). The engine gates the target
- * on the branch and passes the branch boolean into that input.
- */
+/** If/Else branches: true/false outputs route execution and carry boolean to bool inputs. */
 
 /** Identifier of the bool input a branch lands on by default. */
 export const GATE_FIELD = "gate";

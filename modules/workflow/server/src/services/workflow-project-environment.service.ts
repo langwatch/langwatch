@@ -1,12 +1,4 @@
-/**
- * The environment a Studio run executes with: the project's API key and its
- * project-scoped secrets, decrypted.
- *
- * The cipher stays injected. The platform app reached its module-level
- * `decrypt`, which reads the process's own validated environment; a process
- * that composes its own cipher hands it in here instead, and neither can
- * silently become the other.
- */
+/** Execution environment: project API key and decrypted secrets with injected cipher. */
 import { type WorkflowProjectEnvironment } from "../app/workflow.app.ts";
 import type { WorkflowProjectEnvironmentRepository } from "../repositories/workflow-project-environment.repository.ts";
 

@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  *
- * If/else branch-to-gate connections: dropping a branch on a node's temporary gate materializes a real bool "gate" input; the branch-drag flag (plus source id) drives the temporary gate rows nodes render.
+ * Branch-to-gate: dropping a branch on a temporary gate creates a bool input.
  */
 import type { Node } from "@xyflow/react";
 import { beforeEach, describe, expect, it } from "vitest";
