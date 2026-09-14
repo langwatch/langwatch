@@ -458,9 +458,20 @@ naming its files, the scenarios it binds and the command that proves it — is
 ### Three refusals this ADR missed
 
 Cutting the ladder surfaced three places that refuse or misbehave before capture
-can work. All three are verified in the code. Step 1 above is therefore
-incomplete as written: removing the two 501 refusals gets past the command-line
-tool and straight into a server refusal.
+can work. Step 1 above is therefore incomplete as written: removing the two 501
+refusals gets past the command-line tool and straight into a server refusal.
+
+Each was checked by reading the code, not inferred from the ladder. What was run
+and what came back:
+
+| Claim | Command | What it returned |
+|---|---|---|
+| The mint refuses pi | `grep -n 'PERSONAL_INGEST_SOURCE_TYPES\|isWrappedTool\|IngestionKeySourceNotAllowedError' platform/app/ee/governance/services/ingestionKey.service.ts` | `:214 if (!isWrappedTool(sourceType))`, `:215 throw new IngestionKeySourceNotAllowedError(sourceType)`, and `:655 function isWrappedTool` reading the list at `:51`. pi is not in that list. |
+| The policy check is skipped | Read `platform/app/src/server/routes/auth-cli.ts:2578-2603` | `policedSlug` is `undefined` when the source type has no entry, and the `allowOtelDirect` branch is inside `if (policedSlug)`. No entry means the check never runs. |
+| The drift test hard-fails | Read `sdks/typescript/src/cli/__tests__/feature-map-drift.unit.test.ts:1-45` | It reads `program.ts` from disk, imports `PLUMBING_COMMANDS`, and asserts every top-level command has feature-map coverage. |
+
+These are reads, not test runs — no test can be run for pi until pi exists in
+the code. The three become executable assertions at ladder rungs 3, 2 and 5.
 
 - **The personal ingestion key mint refuses pi.**
   `ingestionKey.service.ts:214-215` — `isWrappedTool("pi")` is false, so the mint
