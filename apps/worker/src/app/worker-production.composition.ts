@@ -1254,6 +1254,7 @@ export class WorkerProductionComposition {
               projects: foundation.tenancy.projects,
               organizations: foundation.tenancy.organizations,
               authorization: foundation.tenancy.authorization,
+              apiKeys: foundation.tenancy.apiKeys,
               users: foundation.users,
               retention: foundation.retention,
               shares: foundation.tenancy.shares,

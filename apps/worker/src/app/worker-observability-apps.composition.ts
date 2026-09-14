@@ -1,6 +1,7 @@
 import type { ClickHouseClient } from "@clickhouse/client";
 import { AnnotationApi } from "@langwatch/annotation-contract";
 import { annotationServer } from "@langwatch/annotation-server";
+import { ApiKeyApi } from "@langwatch/api-key-contract";
 import { AuditLogApi } from "@langwatch/audit-log-contract";
 import { AuthzApi } from "@langwatch/authz-contract";
 import { CodingAgentApi } from "@langwatch/coding-agent-contract";
@@ -54,6 +55,7 @@ export type WorkerObservabilityFoundation = Readonly<{
   projects: ProjectApi;
   organizations: OrganizationApi;
   authorization: AuthzApi;
+  apiKeys: ApiKeyApi;
   users: UserApi;
   retention: DataRetentionApi;
   shares: ShareApi;
@@ -164,6 +166,7 @@ export async function createWorkerObservabilityApps(
     .withProvided(ProjectApi, foundation.projects)
     .withProvided(OrganizationApi, foundation.organizations)
     .withProvided(AuthzApi, foundation.authorization)
+    .withProvided(ApiKeyApi, foundation.apiKeys)
     .withProvided(UserApi, foundation.users)
     .withProvided(DataRetentionApi, foundation.retention)
     .withProvided(ShareApi, foundation.shares)
