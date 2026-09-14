@@ -17,24 +17,7 @@ import { TasksEventingInfrastructure } from "./platform/tasks-eventing.compositi
 import { TasksHost } from "./platform/tasks-host.composition.ts";
 import { buildTasksCatalogue } from "./tasks.catalogue.ts";
 
-/**
- * The runnable task process — `pnpm --filter @langwatch/tasks task <name>
- * [args]`, and the same words inside the container CMD:
- * `pnpm -s task <name>`.
- *
- * Loads config, composes the real infrastructure handles this environment
- * has (a missing one is a named absence, not a silent stub), builds the
- * catalogue — the built-in tasks plus whatever `LANGWATCH_TASK_MODULES`
- * names as plugins (Part 2 of the launch-interface plan doc) — runs the
- * requested tasks, and exits. An unknown or failing module fails boot outright.
- *
- * Several names in one invocation run in one process, in the order given,
- * stopping at the first failure: `pnpm -s task prisma-migrate
- * clickhouse-migrate lwql-provision` is the whole preparation step, and it
- * resolves secrets and parses config once. A run that includes a schema
- * migration takes the migration lock first, so a second runner waits rather
- * than rebuilding the schema underneath this one.
- */
+// Runnable task process. Builds catalogue, runs requested tasks in order.
 const bootLogger = (): Logger => createLogger("langwatch:tasks");
 
 async function main(): Promise<number> {

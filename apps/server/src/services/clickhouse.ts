@@ -121,18 +121,7 @@ function writeClickhouseConfig(path: string, ctx: RuntimeContext): void {
   writeFileSync(path, xml);
 }
 
-/**
- * Inspect the most recent clickhouse-server.err.log lines for known
- * failure patterns and surface a friendlier hint than the generic
- * "did not become ready" message.
- *
- * The cryptic exit-code-210 ('NETWORK_ERROR') case has bitten dogfood
- * users multiple times — almost always a zombie clickhouse from a
- * previous shell session still holding the port (the pre-flight
- * portsToCheck doesn't always catch tty-detached holders). Surface the
- * exact port + pkill command instead of leaving the user to grep
- * server.err.log themselves.
- */
+// Diagnose ClickHouse failures. Surface port + pkill command for zombies.
 function diagnoseClickhouseFailure(ctx: RuntimeContext): string | null {
   const errLog = join(ctx.paths.logs, "clickhouse-server.err.log");
   if (!existsSync(errLog)) return null;

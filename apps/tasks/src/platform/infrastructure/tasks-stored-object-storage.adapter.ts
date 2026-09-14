@@ -22,17 +22,7 @@ export type TasksProjectS3Target = Readonly<{
   }>;
 }>;
 
-/**
- * The per-project BYOC S3 lookup: project -> organization -> that
- * organization's own bucket. Read fresh on every resolution — projects move
- * between organizations, and a cached answer would keep writing to (and
- * reading from) the previous tenant's bucket.
- *
- * `getPrisma` is a thunk rather than a client so this port can be composed
- * before `TasksHost` finishes constructing; it refuses BY NAME
- * (`host.requirePrisma()`'s own error) if a lookup is ever attempted without
- * `DATABASE_URL` configured, rather than failing every task at boot.
- */
+// Per-project BYOC S3 lookup. Read fresh each time; projects move between orgs.
 export class TasksProjectS3Source extends StoredObjectProjectS3Config {
   constructor(
     private readonly getPrisma: () => Pick<PrismaClient, "project">,
@@ -64,26 +54,14 @@ export class TasksProjectS3Source extends StoredObjectProjectS3Config {
   }
 }
 
-/** `apps/tasks` has no outbound proxy configuration of its own yet, matching `object-storage-migrate.composition.ts`. */
+/** No outbound proxy configuration yet (matches object-storage-migrate). */
 class TasksNoOutboundProxy extends OutboundProxyResolver {
   tryResolveForHost(): string | undefined {
     return undefined;
   }
 }
 
-/**
- * The object storage this process reads and writes through — the BYOC
- * routing and backend selection any task needing stored objects shares, so a
- * dataset backfill (or a future task) lands a project's bytes exactly where
- * the live application would.
- *
- * AZURE IS A NAMED ABSENCE: this process composes no Azure driver.
- * `destination.resolve()` still reads the real `STORED_OBJECTS_BACKEND`, so a
- * deployment actually running on Azure gets a clear refusal (thrown by
- * `StoredObjectDestinationPolicyAdapter` itself, naming the missing configuration)
- * the moment a project resolves to it — never a silent fall-through to the
- * local filesystem fallback.
- */
+// Object storage this process reads/writes through. BYOC routing.
 export type TasksObjectStorage = Readonly<{
   aws: AwsClientProcessRuntime;
   destination: StoredObjectDestinationPolicyAdapter;

@@ -46,25 +46,8 @@ function isUnderNodeModules(p: string): boolean {
   return p.split(/[\\/]/).includes("node_modules");
 }
 
-/**
- * Relocate the @langwatch/server tree out of node_modules into LANGWATCH_HOME/app/.
- *
- * Why: tsx 4.x's CJS resolveTsPaths skips the tsconfig-paths matcher when
- * the *requesting* file's path includes "/node_modules/" (intentional guard
- * against transpiling third-party deps). Because npx caches @langwatch/server
- * under a node_modules tree, every file in the langwatch app inherits that
- * skip — `~/server/app-layer/...` imports never get aliased and the app
- * dies on the first `pnpm clickhouse:migrate` boot. Moving the tree to
- * ~/.langwatch/app/ takes the source out of any node_modules ancestry.
- *
- * Copies apps/, packages/, services/langevals/, sdks/python/, etc. as siblings —
- * preserves the relative `editable+../../sdks/python` references that
- * services/langevals/ts-integration's generators rely on.
- *
- * Skips node_modules subtrees: those are reinstalled by ensureLangwatchDeps
- * directly in the relocated dir. Idempotent via a .installed-version
- * marker — same version → no-op.
- */
+// Relocate @langwatch/server tree out of node_modules to LANGWATCH_HOME/app/.
+// Idempotent via .installed-version marker.
 export async function ensureAppDir(ctx: RuntimeContext, bus: EventBus): Promise<void> {
   const src = locatePackageSource();
   if (!src) throw new Error("could not locate @langwatch/server package source");

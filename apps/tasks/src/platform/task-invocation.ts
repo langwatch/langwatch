@@ -10,16 +10,7 @@ export type TaskInvocation = Readonly<{
   args: readonly string[];
 }>;
 
-/**
- * Reads the argument list after the program name.
- *
- * Leading words that name a task are the tasks to run, in order; the rest are
- * that task's own arguments. Arguments only make sense for one task — a flag
- * written after three names belongs to none of them in particular — so the
- * combination is refused rather than guessed at. A first word that names no
- * task is passed through untouched, so the catalogue is the one that reports
- * it, with the names it does answer to.
- */
+// Parse task names and arguments. Task names first, then args for last task.
 export function parseTaskInvocation({
   argv,
   isTaskName,

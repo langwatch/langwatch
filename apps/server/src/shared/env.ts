@@ -11,17 +11,8 @@ export type EnvScaffoldInput = {
   overrides?: EnvOverrides;
 };
 
-// Keys whose generated value MUST be stable across .env regenerations —
-// they encrypt rows in postgres (CREDENTIALS_SECRET), sign session/JWT
-// cookies (NEXTAUTH_SECRET, API_TOKEN_JWT_SECRET), and re-keying them
-// orphans every encrypted ModelProvider key + invalidates every active
-// session. We persist these to a sidecar `secrets.json` next to the .env
-// on first scaffold, and re-use them on subsequent scaffolds (e.g. user
-// `rm`s the .env to start clean but kept `data/postgres/`).
-//
-// We also persist gateway secrets (LW_VIRTUAL_KEY_PEPPER, LW_GATEWAY_*)
-// because rotating the gateway pepper invalidates every issued virtual
-// key.
+// Stable-across-regenerations keys. Encrypt rows, sign cookies. Persist to
+// secrets.json on first scaffold.
 const PERSISTENT_SECRET_KEYS = [
   "NEXTAUTH_SECRET",
   "CREDENTIALS_SECRET",
@@ -199,28 +190,14 @@ export function buildEnv({ ports, baseHost, overrides = {} }: EnvScaffoldInput):
   return lines.join("\n") + "\n";
 }
 
-/**
- * The env-file scaffolder both the CLI's [2/4] env phase and
- * services/runtime.ts's `scaffoldEnv` call into. Idempotent — once a
- * .env has been written it's never overwritten so the user's edits
- * (e.g. OPENAI_API_KEY) survive across runs.
- *
- * The list of passthrough keys (OPENAI_API_KEY etc.) is intentionally
- * NOT honoured here — those propagate via RuntimeContext.userEnv so the
- * .env file stays free of user secrets. See 04-validation.feature.
- */
+// Env-file scaffolder. Idempotent; user edits survive across runs.
 export function scaffoldEnvFile(
   input: EnvScaffoldInput & { path: string; shouldReconcilePorts?: boolean },
 ): { written: boolean; path: string; reconciledKeys: string[] } {
   const secretsPath = join(dirname(input.path), "secrets.json");
 
   if (existsSync(input.path)) {
-    // .env already exists. Backfill secrets.json from it if the sidecar
-    // hasn't been written yet — this covers users upgrading from a prior
-    // beta that didn't ship the secret-persistence path. Without this,
-    // their existing CREDENTIALS_SECRET stays in the .env but the
-    // sidecar is empty, so the next `rm ~/.langwatch/.env` rotates the
-    // secret and orphans encrypted ModelProvider rows.
+    // Backfill secrets.json from .env for upgrading users.
     if (!existsSync(secretsPath)) {
       writePersistedSecrets(secretsPath, readFileSync(input.path, "utf8"));
     }

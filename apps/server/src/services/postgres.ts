@@ -30,17 +30,7 @@ export function postgresLayout(postgresBinPath: string): PostgresLayout {
   };
 }
 
-// Embedded postgres tarballs (built by .github/workflows/embedded-binaries-
-// publish.yml on a Linux runner) ship with a RUNPATH leaked from the build
-// host: /home/runner/work/langwatch/langwatch/postgresql-${ver}/_install/lib.
-// On any other host ld.so cannot find libpq.so.5 even though it sits in the
-// sibling …/postgres/lib/ dir. We compensate at exec time by injecting
-// LD_LIBRARY_PATH (DYLD on macOS) pointing at that lib dir. No-op when the
-// lib dir is absent (e.g. when detect() reuses an apt-installed system
-// postgres at /usr/lib/postgresql/${major}/bin/). Long-term fix is to
-// rebuild the embeds tarball with --with-rpath '$ORIGIN/../lib' or run
-// patchelf post-extract — tracked as a follow-up against the embeds
-// repo, this is the surgical runtime fix.
+// Compensate for embedded postgres RUNPATH leak by injecting LD_LIBRARY_PATH.
 function pgEnv(resolvedPath: string, base: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
   const libDir = join(dirname(dirname(resolvedPath)), "lib");
   if (!existsSync(libDir)) return base;
