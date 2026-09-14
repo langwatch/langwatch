@@ -83,3 +83,57 @@ a real defect.
 20 `operation-missing-on-base` ops are branch-only additions (admin
 impersonation, gateway virtual keys, langy conversations…) — expected.
 The 349 `spec-*` rows are document-level drift context, not probes.
+
+## Run 5 (2026-09-14, retest against the run-2 baseline)
+
+Invoked from a clean detached worktree (`.claude/worktrees/apidiff-branch`,
+HEAD a8c43d2f11) after two boot gates fell: run 3 hit an uncommitted mid-port
+langy export in the shared checkout (not repaired — the rest-chain-port lane
+owns it; the clean worktree sidesteps it), run 4 exposed a real fresh-checkout
+defect (mail's tsc checked ksuid's vendored source because nothing had built
+ksuid's `dist`; fixed in ensure-built as 9a03ec7015). Exit 1: 17 of the 21
+baselined causes remain, 6 new. Report/ledger: `.apidiff/{report,ledger}-20260914-r5.json`.
+
+**Cleared by the fix wave** (seven collected lanes + the door/config seams):
+`handled-refusal-degraded:400-500`, `:422-500`, `status-class-mismatch:201-500`
+and `permission-diff:404-200` are gone entirely; `401-500` shrank 16→5 ops
+(prompts ×4, role-bindings ×2, test-suites ×2, dspy, experiment/init all
+fixed); `200-500` shrank 13→3 (experiments, me/project, groups,
+organization ×4, model-defaults, model-providers ×2 all answer now).
+
+**Still crashing, attributed:**
+- Webhooks ×2 (200→500): `#dependencies.assertEndpointsEntitled is not a
+  function` — webhook module never got its members (b383462d96 family).
+  Lane `webhook-members-green` spawned.
+- POST /api/scenarios (401→500): strict `scenarioSchema.parse(row)` rejects
+  the `callerVoice` COLUMN the module rewrite never learned — every scenario
+  create/read on a non-empty database crashes; empty seeds masked it.
+  Lane `scenario-callervoice-green` spawned.
+- GET /api/projects (200→500): known parked `app.apiKeys()` operations-only
+  proxy defect — lint session's flight path.
+- Analytics family ×4 (401→500): parked, debt-5 lane territory.
+
+**New causes, triaged:**
+- `status-class-mismatch:200-402` ×5 + `:201-402` ×1 (groups, organization
+  family): the entitlement module now answers `enterprise_plan_required`
+  (feature MANAGEMENT_API) where main served the same key 200. These ops
+  moved out of the crash class — the fix wave worked — into a deliberate
+  Enterprise gate the apidiff seed org fails. This is the queued
+  EntitlementApi tier-override product decision: decide whether self-hosted /
+  non-SaaS grants MANAGEMENT_API by default before baselining.
+- `handled-refusal-degraded:401-503` (GET /api/simulation-runs): the named
+  `ScenarioSimulationsUnavailableError` refusal the scenario lanes installed
+  on purpose — the `simulations` member is blocked on the ClickHouse client
+  shape mismatch (scenario-composition-green-2 handoff, Risk #3). Baseline
+  until that adapter lands.
+- `permission-leak` ×2 (model-defaults, model-providers): restricted keys
+  key-b/key-c see system entities (`system_anthropic`,
+  `local-dev-model-default-config`) that main's 200 hides. Secrets are
+  redacted (`customKeys: null`); the leak is entity visibility. Model-provider
+  follow-up to decide filter-vs-intended.
+- `status-class-mismatch:401-201` ×2 (POST prompts/tags, POST test-suites):
+  the intended key-authenticated publication class — these are the fixes
+  succeeding where main refuses the credential.
+- `mutation-not-visible` (GET /api/model-providers): derivative of the
+  intended 401→200 publication — main 401s the read, so the created entity
+  can never appear on that side. Benign.
