@@ -20,7 +20,7 @@
  * WCAG 4.5:1 ratio for normal-weight 14px text is the one number this button
  * has ever been wrong about, and it is the one this test checks.
  */
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 import {
   FRONT_DOOR_PASSWORD,
   generateFrontDoorEmail,

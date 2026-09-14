@@ -15,7 +15,7 @@
  * account that can sign in with one at all, which is what #5's negative half
  * and #9 both need to observe.
  */
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 import { addVirtualAuthenticator, removeVirtualAuthenticator } from "./webauthn";
 import {
   FRONT_DOOR_PASSWORD,

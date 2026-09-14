@@ -16,7 +16,8 @@
  * covers both suffixes, so this costs nothing at collection time. See the
  * added `tests/agentic-e2e/tests` root in `check-feature-parity.ts`.
  */
-import { expect, type Page, test } from "@playwright/test";
+import { type Page } from "@playwright/test";
+import { expect, test } from "./fixtures";
 import {
   addVirtualAuthenticator,
   removeVirtualAuthenticator,

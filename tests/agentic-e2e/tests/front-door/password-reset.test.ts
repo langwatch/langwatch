@@ -15,7 +15,7 @@
  * directly and reads the token back out of where better-auth actually keeps
  * it: Redis, its secondary storage, keyed by the account's id (`redis.ts`).
  */
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 import { findUserIdByEmail } from "./db";
 import { closeRedis, findPasswordResetToken } from "./redis";
 import { addVirtualAuthenticator, removeVirtualAuthenticator } from "./webauthn";

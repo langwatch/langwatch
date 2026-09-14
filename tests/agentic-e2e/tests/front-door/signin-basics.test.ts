@@ -10,7 +10,7 @@
  *   #7 Forgot-password is prefilled with the address typed on the sign-in
  *      screen.
  */
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 import {
   FRONT_DOOR_PASSWORD,
   generateFrontDoorEmail,
