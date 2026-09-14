@@ -355,7 +355,15 @@ export function VerificationFirstSignUp() {
         lastUsedMethodId={lastUsedMethodId}
         callbackUrl={callbackUrl}
         onFederatedMethodChosen={dialFederated}
-        onUseDifferentEmail={() => setWelcomeBackEmail(null)}
+        onUseDifferentEmail={() => {
+          setWelcomeBackEmail(null);
+          // The refusal that sent this address here belonged to THAT
+          // address: `sendTo` set it below when the router found an
+          // existing account. Leaving it standing would greet the next
+          // address typed with somebody else's rejection, on a step that
+          // has not asked the server anything yet.
+          requestVerification.reset();
+        }}
       />
     );
   }
@@ -863,7 +871,14 @@ function MethodChoice({
           // account-creation step. The dedicated button above creates a new
           // credential bound to the verified address proof.
           methodSet={methodSet.filter((method) => method.kind !== "passkey")}
-          reasonCode="identifier_unknown"
+          // Quiet on purpose: the address was just confirmed, so "why was I
+          // moved here" is a question this screen already answered above
+          // ("{email} is confirmed."). The guidance copy under
+          // `identifier_unknown` exists for the moment a sign-in attempt
+          // turns into a sign-up (`NoAccountYet`, IdentifierFirstSignIn.tsx)
+          // — repeating it here told somebody who had just done the right
+          // thing that there was no account for their address yet.
+          reasonCode="account_methods"
           lastUsedMethodId={lastUsedMethodId}
           onFederatedMethodChosen={onFederatedMethodChosen}
           callbackUrl={callbackUrl}

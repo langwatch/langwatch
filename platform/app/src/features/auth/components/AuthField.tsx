@@ -2,7 +2,6 @@ import { Box, HStack, Text, VisuallyHidden } from "@chakra-ui/react";
 import { type ReactNode, useId } from "react";
 import type { FieldError } from "react-hook-form";
 import "../auth.css";
-import { MONO_FONT } from "../authTheme";
 
 /**
  * One labelled row of the auth screens' forms: a small quiet label, the input,
@@ -53,16 +52,13 @@ export function AuthField({
            wander is worse than a lone label off the centre line. The label
            marks where reading a field STARTS, and that is the edge. */
         <HStack width="full" justify="space-between" marginBottom="7px">
-          {/* The site's small technical voice: mono, spaced, quiet — the same
-              register the "or" divider speaks in. */}
-          <Text
-            asChild
-            fontFamily={MONO_FONT}
-            fontSize="11px"
-            textTransform="uppercase"
-            letterSpacing="0.14em"
-            color="fg.muted"
-          >
+          {/* An ordinary form label, the way the rest of the product sets
+              one: sentence case, the body font, no tracking. The mono,
+              spaced, uppercase treatment this used to carry read as an
+              unlabelled system message rather than a field's name — that
+              register stays reserved for the small technical asides that
+              actually are one, like the "or" divider. */}
+          <Text asChild fontSize="13px" fontWeight="medium" color="fg.muted">
             <label htmlFor={id}>{label}</label>
           </Text>
           {labelEnd ?? null}

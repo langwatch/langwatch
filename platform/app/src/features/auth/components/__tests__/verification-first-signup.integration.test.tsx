@@ -73,7 +73,11 @@ vi.mock("~/utils/api", async () => {
       },
       [mutateAsync],
     );
-    return { mutate, mutateAsync, isPending, error };
+    // The real hook's escape hatch for a refusal that no longer applies: a
+    // screen that has moved on from the address that was refused clears it
+    // here rather than carrying it into whatever comes next.
+    const reset = useCallback(() => setError(null), []);
+    return { mutate, mutateAsync, isPending, error, reset };
   };
 
   return {
@@ -498,6 +502,51 @@ describe("given the sign-up screen", () => {
       expect(container.textContent).not.toMatch(/already (have|has)/i);
       expect(container.textContent).not.toMatch(/registered|exists/i);
       expect(container.querySelector('[role="alert"]')).toBeNull();
+    });
+
+    describe("when I go back to use a different email", () => {
+      /** @scenario Returning to the address step clears the refusal that sent me to log-in */
+      it("clears the previous address's refusal from the address step", async () => {
+        routeMock.mockResolvedValue(localPicker);
+        requestVerificationMock.mockRejectedValue({
+          data: {
+            error: {
+              code: "email_already_registered",
+              httpStatus: 409,
+              fault: "customer",
+            },
+          },
+        });
+
+        const { container } = renderScreen();
+
+        await userEvent.type(
+          await screen.findByLabelText(/email/i),
+          "sam@acme.com",
+        );
+        await userEvent.click(
+          screen.getByRole("button", { name: /^continue$/i }),
+        );
+
+        // Landed on the log-in step the same way the scenario above does.
+        await screen.findByTestId("method-picker");
+        expect(screen.getByTestId("routed-identifier")).toHaveTextContent(
+          "sam@acme.com",
+        );
+
+        await userEvent.click(
+          screen.getByRole("button", { name: /use a different email/i }),
+        );
+
+        // Back on the address step, and the refusal from the address just
+        // left behind must not follow: it answered a question about THAT
+        // address, and this step has not asked the server anything yet.
+        expect(await screen.findByLabelText(/email/i)).toBeTruthy();
+        expect(screen.queryByTestId("method-picker")).toBeNull();
+        expect(screen.queryByRole("alert")).toBeNull();
+        expect(container.textContent).not.toMatch(/already (have|has)/i);
+        expect(container.textContent).not.toMatch(/registered|exists/i);
+      });
     });
   });
 
