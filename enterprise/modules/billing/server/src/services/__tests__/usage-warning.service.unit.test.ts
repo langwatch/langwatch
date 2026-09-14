@@ -55,7 +55,7 @@ describe("UsageWarningService", () => {
         usageUnit,
       } as unknown as UsageWarningServiceOptions);
 
-      await service.findCheckAndSendWarning({
+      await service.checkAndSendWarning({
         organizationId: "org-1",
         currentMonthMessagesCount: 800,
         maxMonthlyUsageLimit: 1000,
@@ -91,7 +91,7 @@ describe("UsageWarningService", () => {
         nextStep,
       } as unknown as UsageWarningServiceOptions);
 
-      await service.findCheckAndSendWarning({
+      await service.checkAndSendWarning({
         organizationId: "org-1",
         currentMonthMessagesCount: 800,
         maxMonthlyUsageLimit: 1000,

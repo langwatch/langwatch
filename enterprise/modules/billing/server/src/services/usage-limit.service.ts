@@ -7,12 +7,9 @@ import type {
   ResourceLimitNotifierInput,
   UsageLimitData,
 } from "@langwatch/enterprise-billing-contract";
-import type {
-  NotificationApi as NotificationRecordService,
-  Notification,
-} from "@langwatch/notification-contract";
+import type { NotificationApi as NotificationRecordService } from "@langwatch/notification-contract";
 import { NotificationService } from "./billing-usage-notice.service.ts";
-import { UsageWarningService } from "./usage-warning.service.ts";
+import { UsageWarningService, type CheckAndSendWarningResult } from "./usage-warning.service.ts";
 import type { BillingErrorReporter } from "./billing-error-reporter.service.ts";
 import {
   MIN_DAYS_BETWEEN_ALERTS,
@@ -316,7 +313,7 @@ export class UsageLimitService {
    * allowance. Owned by {@link UsageWarningService}; it stays on this class
    * because this is the entry point every caller already holds.
    */
-  findCheckAndSendWarning(data: UsageLimitData): Promise<Notification | null> {
-    return this.warnings.findCheckAndSendWarning(data);
+  checkAndSendWarning(data: UsageLimitData): Promise<CheckAndSendWarningResult> {
+    return this.warnings.checkAndSendWarning(data);
   }
 }

@@ -36,17 +36,17 @@ const createMockSubscriptionRepository = (): {
   [K in keyof BillingWebhookSubscription]: ReturnType<typeof vi.fn>;
 } => ({
   findLastNonCancelled: vi.fn(),
-  findCreatePending: vi.fn(),
-  findUpdateStatus: vi.fn(),
-  findUpdatePlan: vi.fn(),
+  createPending: vi.fn(),
+  updateStatus: vi.fn(),
+  updatePlan: vi.fn(),
   findByStripeId: vi.fn(),
   linkStripeId: vi.fn(),
-  findActivate: vi.fn(),
+  activate: vi.fn(),
   recordPaymentFailure: vi.fn(),
   cancel: vi.fn(),
   cancelTrialSubscriptions: vi.fn(),
   migrateToSeatEvent: vi.fn(),
-  findUpdateQuantities: vi.fn(),
+  updateQuantities: vi.fn(),
 });
 
 const createMockOrganizationRepository = (): {
@@ -179,9 +179,10 @@ describe("EEWebhookService", () => {
         subRepo.findByStripeId.mockResolvedValue(
           makeSubscription({ status: SubscriptionStatus.PENDING }),
         );
-        subRepo.findActivate.mockResolvedValue(
-          makeSubscriptionWithOrg({ status: SubscriptionStatus.ACTIVE }),
-        );
+        subRepo.activate.mockResolvedValue({
+          outcome: "activated",
+          subscription: makeSubscriptionWithOrg({ status: SubscriptionStatus.ACTIVE }),
+        });
 
         const promise = service.handleCheckoutCompleted({
           subscriptionId: "sub_stripe_1",
@@ -205,9 +206,10 @@ describe("EEWebhookService", () => {
         subRepo.findByStripeId.mockResolvedValue(
           makeSubscription({ status: SubscriptionStatus.PENDING }),
         );
-        subRepo.findActivate.mockResolvedValue(
-          makeSubscriptionWithOrg({ status: SubscriptionStatus.ACTIVE }),
-        );
+        subRepo.activate.mockResolvedValue({
+          outcome: "activated",
+          subscription: makeSubscriptionWithOrg({ status: SubscriptionStatus.ACTIVE }),
+        });
 
         const promise = service.handleCheckoutCompleted({
           subscriptionId: "sub_stripe_1",
@@ -217,7 +219,7 @@ describe("EEWebhookService", () => {
         await vi.advanceTimersByTimeAsync(2000);
         await promise;
 
-        expect(subRepo.findActivate).toHaveBeenCalledWith({
+        expect(subRepo.activate).toHaveBeenCalledWith({
           id: "sub_db_1",
           previousStatus: SubscriptionStatus.PENDING,
         });
@@ -243,9 +245,10 @@ describe("EEWebhookService", () => {
         subRepo.findByStripeId.mockResolvedValue(
           makeSubscription({ status: SubscriptionStatus.PENDING }),
         );
-        subRepo.findActivate.mockResolvedValue(
-          makeSubscriptionWithOrg({ status: SubscriptionStatus.ACTIVE }),
-        );
+        subRepo.activate.mockResolvedValue({
+          outcome: "activated",
+          subscription: makeSubscriptionWithOrg({ status: SubscriptionStatus.ACTIVE }),
+        });
         orgRepo.updateCurrency.mockRejectedValue(new Error("DB error"));
 
         const promise = service.handleCheckoutCompleted({
@@ -257,7 +260,7 @@ describe("EEWebhookService", () => {
         await vi.advanceTimersByTimeAsync(2000);
         await promise;
 
-        expect(subRepo.findActivate).toHaveBeenCalled();
+        expect(subRepo.activate).toHaveBeenCalled();
         expect(subRepo.cancelTrialSubscriptions).toHaveBeenCalledWith("org_123");
       });
 
@@ -284,9 +287,10 @@ describe("EEWebhookService", () => {
           subRepo.findByStripeId.mockResolvedValue(
             makeSubscription({ status: SubscriptionStatus.PENDING }),
           );
-          subRepo.findActivate.mockResolvedValue(
-            makeSubscriptionWithOrg({ status: SubscriptionStatus.ACTIVE }),
-          );
+          subRepo.activate.mockResolvedValue({
+            outcome: "activated",
+            subscription: makeSubscriptionWithOrg({ status: SubscriptionStatus.ACTIVE }),
+          });
 
           const promise = published().handleCheckoutCompleted({
             subscriptionId: "sub_stripe_1",
@@ -332,9 +336,10 @@ describe("EEWebhookService", () => {
         subRepo.findByStripeId.mockResolvedValue(
           makeSubscription({ status: SubscriptionStatus.PENDING }),
         );
-        subRepo.findActivate.mockResolvedValue(
-          makeSubscriptionWithOrg({ status: SubscriptionStatus.ACTIVE }),
-        );
+        subRepo.activate.mockResolvedValue({
+          outcome: "activated",
+          subscription: makeSubscriptionWithOrg({ status: SubscriptionStatus.ACTIVE }),
+        });
 
         const promise = service.handleCheckoutCompleted({
           subscriptionId: "sub_stripe_1",
@@ -344,7 +349,7 @@ describe("EEWebhookService", () => {
         await vi.advanceTimersByTimeAsync(2000);
         await promise;
 
-        expect(subRepo.findActivate).toHaveBeenCalled();
+        expect(subRepo.activate).toHaveBeenCalled();
         expect(subRepo.cancelTrialSubscriptions).toHaveBeenCalledWith("org_123");
       });
 
@@ -354,9 +359,10 @@ describe("EEWebhookService", () => {
         subRepo.findByStripeId.mockResolvedValue(
           makeSubscription({ status: SubscriptionStatus.PENDING }),
         );
-        subRepo.findActivate.mockResolvedValue(
-          makeSubscriptionWithOrg({ status: SubscriptionStatus.ACTIVE }),
-        );
+        subRepo.activate.mockResolvedValue({
+          outcome: "activated",
+          subscription: makeSubscriptionWithOrg({ status: SubscriptionStatus.ACTIVE }),
+        });
 
         const promise = service.handleCheckoutCompleted({
           subscriptionId: "sub_stripe_1",
@@ -367,7 +373,7 @@ describe("EEWebhookService", () => {
         await promise;
 
         // No invite approver configured — should not throw
-        expect(subRepo.findActivate).toHaveBeenCalled();
+        expect(subRepo.activate).toHaveBeenCalled();
       });
     });
 
@@ -377,9 +383,10 @@ describe("EEWebhookService", () => {
         subRepo.findByStripeId.mockResolvedValue(
           makeSubscription({ status: SubscriptionStatus.PENDING }),
         );
-        subRepo.findActivate.mockResolvedValue(
-          makeSubscriptionWithOrg({ status: SubscriptionStatus.ACTIVE }),
-        );
+        subRepo.activate.mockResolvedValue({
+          outcome: "activated",
+          subscription: makeSubscriptionWithOrg({ status: SubscriptionStatus.ACTIVE }),
+        });
       };
 
       const annualStripeSubscription = () => ({
@@ -430,7 +437,7 @@ describe("EEWebhookService", () => {
         const result = await promise;
 
         expect(result.earlyReturn).toBe(false);
-        expect(subRepo.findActivate).toHaveBeenCalled();
+        expect(subRepo.activate).toHaveBeenCalled();
         expect(subRepo.cancelTrialSubscriptions).toHaveBeenCalledWith("org_123");
       });
 
@@ -485,7 +492,7 @@ describe("EEWebhookService", () => {
         await vi.advanceTimersByTimeAsync(2000);
 
         await expect(promise).resolves.toEqual({ earlyReturn: false });
-        expect(subRepo.findActivate).toHaveBeenCalled();
+        expect(subRepo.activate).toHaveBeenCalled();
       });
     });
 
@@ -496,9 +503,10 @@ describe("EEWebhookService", () => {
         subRepo.findByStripeId.mockResolvedValue(
           makeSubscription({ status: SubscriptionStatus.PENDING }),
         );
-        subRepo.findActivate.mockResolvedValue(
-          makeSubscriptionWithOrg({ status: SubscriptionStatus.ACTIVE }),
-        );
+        subRepo.activate.mockResolvedValue({
+          outcome: "activated",
+          subscription: makeSubscriptionWithOrg({ status: SubscriptionStatus.ACTIVE }),
+        });
         mockStripeInstance.subscriptions.retrieve.mockResolvedValue({
           id: "sub_stripe_1",
           status: "active",
@@ -540,7 +548,7 @@ describe("EEWebhookService", () => {
         await vi.advanceTimersByTimeAsync(2000);
         await promise;
 
-        expect(subRepo.findActivate).not.toHaveBeenCalled();
+        expect(subRepo.activate).not.toHaveBeenCalled();
       });
     });
 
@@ -550,12 +558,13 @@ describe("EEWebhookService", () => {
         subRepo.findByStripeId.mockResolvedValue(
           makeSubscription({ status: SubscriptionStatus.PENDING }),
         );
-        subRepo.findActivate.mockResolvedValue(
-          makeSubscriptionWithOrg({
+        subRepo.activate.mockResolvedValue({
+          outcome: "activated",
+          subscription: makeSubscriptionWithOrg({
             status: SubscriptionStatus.ACTIVE,
             organization: { name: "Acme", license: "trial-license-key" },
           }),
-        );
+        });
 
         const promise = service.handleInvoicePaymentSucceeded({
           subscriptionId: "sub_stripe_1",
@@ -564,7 +573,7 @@ describe("EEWebhookService", () => {
         await vi.advanceTimersByTimeAsync(2000);
         await promise;
 
-        expect(subRepo.findActivate).toHaveBeenCalledWith({
+        expect(subRepo.activate).toHaveBeenCalledWith({
           id: "sub_db_1",
           previousStatus: SubscriptionStatus.PENDING,
         });
@@ -585,9 +594,10 @@ describe("EEWebhookService", () => {
         subRepo.findByStripeId.mockResolvedValue(
           makeSubscription({ status: SubscriptionStatus.ACTIVE }),
         );
-        subRepo.findActivate.mockResolvedValue(
-          makeSubscriptionWithOrg({ status: SubscriptionStatus.ACTIVE }),
-        );
+        subRepo.activate.mockResolvedValue({
+          outcome: "activated",
+          subscription: makeSubscriptionWithOrg({ status: SubscriptionStatus.ACTIVE }),
+        });
 
         const promise = service.handleInvoicePaymentSucceeded({
           subscriptionId: "sub_stripe_1",
@@ -596,7 +606,7 @@ describe("EEWebhookService", () => {
         await vi.advanceTimersByTimeAsync(2000);
         await promise;
 
-        expect(subRepo.findActivate).toHaveBeenCalledWith({
+        expect(subRepo.activate).toHaveBeenCalledWith({
           id: "sub_db_1",
           previousStatus: SubscriptionStatus.ACTIVE,
         });
@@ -622,12 +632,13 @@ describe("EEWebhookService", () => {
             plan: "GROWTH_SEAT_EUR_MONTHLY",
           }),
         );
-        subRepo.findActivate.mockResolvedValue(
-          makeSubscriptionWithOrg({
+        subRepo.activate.mockResolvedValue({
+          outcome: "activated",
+          subscription: makeSubscriptionWithOrg({
             status: SubscriptionStatus.ACTIVE,
             plan: "GROWTH_SEAT_EUR_MONTHLY",
           }),
-        );
+        });
         subRepo.migrateToSeatEvent.mockResolvedValue([
           { stripeSubscriptionId: "sub_old_1" },
           { stripeSubscriptionId: "sub_old_2" },
@@ -669,12 +680,13 @@ describe("EEWebhookService", () => {
             plan: "GROWTH_SEAT_EUR_MONTHLY",
           }),
         );
-        subRepo.findActivate.mockResolvedValue(
-          makeSubscriptionWithOrg({
+        subRepo.activate.mockResolvedValue({
+          outcome: "activated",
+          subscription: makeSubscriptionWithOrg({
             status: SubscriptionStatus.ACTIVE,
             plan: "GROWTH_SEAT_EUR_MONTHLY",
           }),
-        );
+        });
         subRepo.migrateToSeatEvent.mockResolvedValue([{ stripeSubscriptionId: "sub_old_1" }]);
 
         const promise = service.handleInvoicePaymentSucceeded({
@@ -696,12 +708,13 @@ describe("EEWebhookService", () => {
             plan: "GROWTH_SEAT_EUR_MONTHLY",
           }),
         );
-        subRepo.findActivate.mockResolvedValue(
-          makeSubscriptionWithOrg({
+        subRepo.activate.mockResolvedValue({
+          outcome: "activated",
+          subscription: makeSubscriptionWithOrg({
             status: SubscriptionStatus.ACTIVE,
             plan: "GROWTH_SEAT_EUR_MONTHLY",
           }),
-        );
+        });
         subRepo.migrateToSeatEvent.mockResolvedValue([]);
 
         const promise = service.handleInvoicePaymentSucceeded({
@@ -729,12 +742,13 @@ describe("EEWebhookService", () => {
             plan: "GROWTH_SEAT_EUR_MONTHLY",
           }),
         );
-        subRepo.findActivate.mockResolvedValue(
-          makeSubscriptionWithOrg({
+        subRepo.activate.mockResolvedValue({
+          outcome: "activated",
+          subscription: makeSubscriptionWithOrg({
             status: SubscriptionStatus.ACTIVE,
             plan: "GROWTH_SEAT_EUR_MONTHLY",
           }),
-        );
+        });
         subRepo.migrateToSeatEvent.mockResolvedValue([]);
         // The org already tuned traces retention high; a billing event must NOT
         // clobber it back to the platform default (that would shorten the
@@ -767,12 +781,13 @@ describe("EEWebhookService", () => {
             plan: "GROWTH_SEAT_EUR_MONTHLY",
           }),
         );
-        subRepo.findActivate.mockResolvedValue(
-          makeSubscriptionWithOrg({
+        subRepo.activate.mockResolvedValue({
+          outcome: "activated",
+          subscription: makeSubscriptionWithOrg({
             status: SubscriptionStatus.ACTIVE,
             plan: "GROWTH_SEAT_EUR_MONTHLY",
           }),
-        );
+        });
         subRepo.migrateToSeatEvent.mockResolvedValue([]);
         mockSetOrganizationRetention.mockRejectedValueOnce(new Error("retention store down"));
 
@@ -802,12 +817,13 @@ describe("EEWebhookService", () => {
             plan: "LAUNCH",
           }),
         );
-        subRepo.findActivate.mockResolvedValue(
-          makeSubscriptionWithOrg({
+        subRepo.activate.mockResolvedValue({
+          outcome: "activated",
+          subscription: makeSubscriptionWithOrg({
             status: SubscriptionStatus.ACTIVE,
             plan: "LAUNCH",
           }),
-        );
+        });
 
         const promise = service.handleInvoicePaymentSucceeded({
           subscriptionId: "sub_stripe_1",
@@ -829,12 +845,13 @@ describe("EEWebhookService", () => {
             plan: "GROWTH_SEAT_EUR_MONTHLY",
           }),
         );
-        subRepo.findActivate.mockResolvedValue(
-          makeSubscriptionWithOrg({
+        subRepo.activate.mockResolvedValue({
+          outcome: "activated",
+          subscription: makeSubscriptionWithOrg({
             status: SubscriptionStatus.ACTIVE,
             plan: "GROWTH_SEAT_EUR_MONTHLY",
           }),
-        );
+        });
 
         const promise = service.handleInvoicePaymentSucceeded({
           subscriptionId: "sub_stripe_1",
@@ -869,7 +886,7 @@ describe("EEWebhookService", () => {
         await vi.advanceTimersByTimeAsync(2000);
         await promise;
 
-        expect(subRepo.findActivate).not.toHaveBeenCalled();
+        expect(subRepo.activate).not.toHaveBeenCalled();
         expect(mockSendSlackSubscriptionEvent).not.toHaveBeenCalled();
       });
     });
@@ -896,7 +913,7 @@ describe("EEWebhookService", () => {
         await vi.advanceTimersByTimeAsync(2000);
         await promise;
 
-        expect(subRepo.findActivate).not.toHaveBeenCalled();
+        expect(subRepo.activate).not.toHaveBeenCalled();
         expect(mockSendSlackSubscriptionEvent).not.toHaveBeenCalled();
       });
     });
@@ -910,9 +927,10 @@ describe("EEWebhookService", () => {
         subRepo.findByStripeId.mockResolvedValue(
           makeSubscription({ status: SubscriptionStatus.PENDING }),
         );
-        subRepo.findActivate.mockResolvedValue(
-          makeSubscriptionWithOrg({ status: SubscriptionStatus.ACTIVE }),
-        );
+        subRepo.activate.mockResolvedValue({
+          outcome: "activated",
+          subscription: makeSubscriptionWithOrg({ status: SubscriptionStatus.ACTIVE }),
+        });
 
         const promise = service.handleInvoicePaymentSucceeded({
           subscriptionId: "sub_stripe_1",
@@ -921,7 +939,7 @@ describe("EEWebhookService", () => {
         await vi.advanceTimersByTimeAsync(2000);
         await promise;
 
-        expect(subRepo.findActivate).toHaveBeenCalledWith({
+        expect(subRepo.activate).toHaveBeenCalledWith({
           id: "sub_db_1",
           previousStatus: SubscriptionStatus.PENDING,
         });
@@ -952,7 +970,7 @@ describe("EEWebhookService", () => {
         await vi.advanceTimersByTimeAsync(2000);
         await promise;
 
-        expect(subRepo.findActivate).not.toHaveBeenCalled();
+        expect(subRepo.activate).not.toHaveBeenCalled();
         expect(mockSendSlackSubscriptionEvent).not.toHaveBeenCalled();
       });
     });
@@ -962,9 +980,10 @@ describe("EEWebhookService", () => {
         subRepo.findByStripeId.mockResolvedValue(
           makeSubscription({ status: SubscriptionStatus.PENDING }),
         );
-        subRepo.findActivate.mockResolvedValue(
-          makeSubscriptionWithOrg({ status: SubscriptionStatus.ACTIVE }),
-        );
+        subRepo.activate.mockResolvedValue({
+          outcome: "activated",
+          subscription: makeSubscriptionWithOrg({ status: SubscriptionStatus.ACTIVE }),
+        });
 
         const promise = service.handleInvoicePaymentSucceeded({
           subscriptionId: "sub_stripe_1",
@@ -973,7 +992,7 @@ describe("EEWebhookService", () => {
         await vi.advanceTimersByTimeAsync(2000);
         await promise;
 
-        expect(subRepo.findActivate).toHaveBeenCalledWith({
+        expect(subRepo.activate).toHaveBeenCalledWith({
           id: "sub_db_1",
           previousStatus: SubscriptionStatus.PENDING,
         });
@@ -1253,7 +1272,7 @@ describe("EEWebhookService", () => {
         await promise;
 
         expect(subRepo.cancel).not.toHaveBeenCalled();
-        expect(subRepo.findUpdateQuantities).not.toHaveBeenCalled();
+        expect(subRepo.updateQuantities).not.toHaveBeenCalled();
       });
     });
 
@@ -1309,9 +1328,10 @@ describe("EEWebhookService", () => {
         subRepo.findByStripeId.mockResolvedValue(
           makeSubscription({ status: SubscriptionStatus.ACTIVE }),
         );
-        subRepo.findUpdateQuantities.mockResolvedValue(
-          makeSubscriptionWithOrg({ status: SubscriptionStatus.ACTIVE }),
-        );
+        subRepo.updateQuantities.mockResolvedValue({
+          outcome: "updated",
+          subscription: makeSubscriptionWithOrg({ status: SubscriptionStatus.ACTIVE }),
+        });
 
         const promise = service.handleSubscriptionUpdated({
           subscription: {
@@ -1327,7 +1347,7 @@ describe("EEWebhookService", () => {
         await promise;
 
         expect(subRepo.cancel).not.toHaveBeenCalled();
-        expect(subRepo.findUpdateQuantities).toHaveBeenCalled();
+        expect(subRepo.updateQuantities).toHaveBeenCalled();
       });
     });
 
@@ -1345,13 +1365,14 @@ describe("EEWebhookService", () => {
         itemCalculator.calculateQuantityForPrice
           .mockReturnValueOnce(5) // users
           .mockReturnValueOnce(30_000); // traces
-        subRepo.findUpdateQuantities.mockResolvedValue(
-          makeSubscriptionWithOrg({
+        subRepo.updateQuantities.mockResolvedValue({
+          outcome: "updated",
+          subscription: makeSubscriptionWithOrg({
             status: SubscriptionStatus.ACTIVE,
             maxMembers: 5,
             maxMessagesPerMonth: 30_000,
           }),
-        );
+        });
 
         const promise = service.handleSubscriptionUpdated({
           subscription: {
@@ -1371,7 +1392,7 @@ describe("EEWebhookService", () => {
         await vi.advanceTimersByTimeAsync(2000);
         await promise;
 
-        expect(subRepo.findUpdateQuantities).toHaveBeenCalledWith({
+        expect(subRepo.updateQuantities).toHaveBeenCalledWith({
           id: "sub_db_1",
           maxMembers: 5,
           maxMessagesPerMonth: 30_000,
@@ -1386,9 +1407,10 @@ describe("EEWebhookService", () => {
             plan: "LAUNCH",
           }),
         );
-        subRepo.findUpdateQuantities.mockResolvedValue(
-          makeSubscriptionWithOrg({ status: SubscriptionStatus.ACTIVE }),
-        );
+        subRepo.updateQuantities.mockResolvedValue({
+          outcome: "updated",
+          subscription: makeSubscriptionWithOrg({ status: SubscriptionStatus.ACTIVE }),
+        });
 
         const promise = service.handleSubscriptionUpdated({
           subscription: {
@@ -1419,9 +1441,10 @@ describe("EEWebhookService", () => {
             plan: "LAUNCH",
           }),
         );
-        subRepo.findUpdateQuantities.mockResolvedValue(
-          makeSubscriptionWithOrg({ status: SubscriptionStatus.ACTIVE }),
-        );
+        subRepo.updateQuantities.mockResolvedValue({
+          outcome: "updated",
+          subscription: makeSubscriptionWithOrg({ status: SubscriptionStatus.ACTIVE }),
+        });
 
         const promise = service.handleSubscriptionUpdated({
           subscription: {
@@ -1503,12 +1526,13 @@ describe("EEWebhookService", () => {
         subRepo.findByStripeId.mockResolvedValue(
           makeSubscription({ status: SubscriptionStatus.PENDING }),
         );
-        subRepo.findActivate.mockResolvedValue(
-          makeSubscriptionWithOrg({
+        subRepo.activate.mockResolvedValue({
+          outcome: "activated",
+          subscription: makeSubscriptionWithOrg({
             status: SubscriptionStatus.ACTIVE,
             organization: { name: "Acme", license: null },
           }),
-        );
+        });
 
         const promise = service.handleInvoicePaymentSucceeded({
           subscriptionId: "sub_stripe_1",
@@ -1516,7 +1540,7 @@ describe("EEWebhookService", () => {
         await vi.advanceTimersByTimeAsync(2000);
 
         await expect(promise).resolves.not.toThrow();
-        expect(subRepo.findActivate).toHaveBeenCalled();
+        expect(subRepo.activate).toHaveBeenCalled();
         expect(mockSendSlackSubscriptionEvent).toHaveBeenCalled();
       });
     });

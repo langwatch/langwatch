@@ -35,10 +35,10 @@ export interface ReportUsageForMonthCommandDeps {
   organizations: BillingReportOrganizationRepository;
   billingCheckpoints: BillingCheckpointRepository;
   getUsageReportingService: () => UsageReportingService | undefined;
-  /** Nullable by contract: `null` means ClickHouse was unavailable, and the
-   *  caller must skip the month rather than report a total it did not read.
-   *  The service spells that with the repo's `find` prefix. */
-  queryBillableEventsTotal: BillableEventsQueryService["findQueryBillableEventsTotal"];
+  /** `{ outcome: "unavailable" }` means ClickHouse was unreachable, and the
+   *  caller must skip the month rather than report a total it did not read —
+   *  a distinct outcome from a verified `{ outcome: "counted"; total: 0 }`. */
+  queryBillableEventsTotal: BillableEventsQueryService["queryBillableEventsTotal"];
   selfDispatch: (data: ReportUsageForMonthCommandData) => Promise<void>;
   /** Shared organization-read cache; see `billing-organization-cache.repository.ts`. */
   organizationCache: BillingOrganizationCache;
@@ -238,15 +238,17 @@ export class ReportUsageForMonthCommandHandler implements CommandHandler<
       );
     } else {
       // Normal path: query ClickHouse for deduplicated count.
-      const currentTotal = await this.deps.queryBillableEventsTotal({
+      const totalResult = await this.deps.queryBillableEventsTotal({
         organizationId,
         billingMonth,
       });
 
-      if (currentTotal === null) {
+      if (totalResult.outcome === "unavailable") {
         // ClickHouse not available
         return false;
       }
+
+      const currentTotal = totalResult.total;
 
       if (currentTotal <= lastReportedTotal) {
         logger.debug(

@@ -5,6 +5,17 @@ import { nowInstant, Temporal, type Instant } from "@langwatch/time";
 const logger = createLogger("langwatch:billing:billableEventsQuery");
 
 /**
+ * A ClickHouse outage and a verified zero are both ordinary, and they call
+ * for different responses: the reporting command must skip the month on an
+ * outage but may legitimately report zero. A bare `number | null` cannot
+ * carry that distinction once the total itself can be zero, so the outage is
+ * named instead of collapsed into a value the query never actually produced.
+ */
+export type BillableEventsTotalResult =
+  | { outcome: "counted"; total: number }
+  | { outcome: "unavailable" };
+
+/**
  * Queries ClickHouse for the count of distinct billable events for an org in a billing month.
  */
 export class BillableEventsQueryService {
@@ -44,81 +55,84 @@ export class BillableEventsQueryService {
     ];
   }
 
-  async findQueryBillableEventsTotal({
+  async queryBillableEventsTotal({
     organizationId,
     billingMonth,
   }: {
     organizationId: string;
     billingMonth: string;
-  }): Promise<number | null> {
+  }): Promise<BillableEventsTotalResult> {
     const repository = this.repository;
     if (!repository) {
       logger.warn({ organizationId }, "ClickHouse not available, skipping billable events query");
 
-      return null;
+      return { outcome: "unavailable" };
     }
 
     const [startDate, endDate] = BillableEventsQueryService.billingMonthDateRange(billingMonth);
+    const total = await repository.findTotal({ organizationId, startDate, endDate });
 
-    return await repository.findTotal({ organizationId, startDate, endDate });
+    return { outcome: "counted", total };
   }
 
   /**
    * Approximate count of distinct billable events for an org in a billing month.
    * Uses HyperLogLog (~1% error, constant memory).
    */
-  async findQueryBillableEventsTotalUniq({
+  async queryBillableEventsTotalUniq({
     organizationId,
     billingMonth,
   }: {
     organizationId: string;
     billingMonth: string;
-  }): Promise<number | null> {
+  }): Promise<BillableEventsTotalResult> {
     const repository = this.repository;
     if (!repository) {
       logger.warn({ organizationId }, "ClickHouse not available, skipping billable events query");
 
-      return null;
+      return { outcome: "unavailable" };
     }
 
     const [startDate, endDate] = BillableEventsQueryService.billingMonthDateRange(billingMonth);
-
-    return await repository.findTotalUniq({
+    const total = await repository.findTotalUniq({
       organizationId,
       startDate,
       endDate,
     });
+
+    return { outcome: "counted", total };
   }
 
   /**
    * Approximate count of distinct trace events for an org in a current month.
    * Uses HyperLogLog (~1% error, constant memory).
    */
-  async findQueryTraceSummariesTotalUniq({
+  async queryTraceSummariesTotalUniq({
     projectIds,
     billingMonth,
   }: {
     projectIds: string[];
     billingMonth: string;
-  }): Promise<number | null> {
+  }): Promise<BillableEventsTotalResult> {
     if (projectIds.length === 0) {
-      return 0;
+      return { outcome: "counted", total: 0 };
     }
 
     const repository = this.repository;
     if (!repository) {
       logger.warn({ projectIds }, "ClickHouse not available, skipping trace summaries query");
 
-      return null;
+      return { outcome: "unavailable" };
     }
 
     const [startDate, endDate] = BillableEventsQueryService.billingMonthDateRange(billingMonth);
-
-    return await repository.findTraceSummariesTotalUniq({
+    const total = await repository.findTraceSummariesTotalUniq({
       tenantIds: projectIds,
       startDate,
       endDate,
     });
+
+    return { outcome: "counted", total };
   }
 
   /**

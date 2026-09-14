@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import {
+  type ActivateSubscriptionResult,
   type CancelledSubscription,
+  type SubscriptionMutationResult,
   type SubscriptionWithOrg,
   BillingWebhookSubscription,
 } from "../billing-webhook-subscription.repository.ts";
@@ -12,8 +14,9 @@ import type {
 import type { MemoryBillingStore } from "./memory-billing.store.ts";
 
 /**
- * The webhook's nullable view of the subscription aggregate. Null means only
- * one thing here, as it does in the Prisma twin: the row Stripe named is gone.
+ * The webhook's view of the subscription aggregate. `missing_subscription`
+ * means only one thing here, as it does in the Prisma twin: the row Stripe
+ * named is gone.
  */
 export class MemoryBillingWebhookSubscriptionRepository extends BillingWebhookSubscription {
   private constructor(
@@ -30,36 +33,34 @@ export class MemoryBillingWebhookSubscriptionRepository extends BillingWebhookSu
     return new MemoryBillingWebhookSubscriptionRepository(options.subscriptions, options.store);
   }
 
-  async findLastNonCancelled(
-    organizationId: string,
-  ): Promise<BillingSubscriptionRecord | null> {
+  async findLastNonCancelled(organizationId: string): Promise<BillingSubscriptionRecord | null> {
     return this.subscriptions.findLastNonCancelled(organizationId);
   }
 
-  async findCreatePending(input: {
+  async createPending(input: {
     organizationId: string;
     plan: string;
-  }): Promise<BillingSubscriptionRecord | null> {
+  }): Promise<BillingSubscriptionRecord> {
     return this.subscriptions.createPending(input);
   }
 
-  async findUpdateStatus(input: {
+  async updateStatus(input: {
     id: string;
     status: string;
-  }): Promise<BillingSubscriptionRecord | null> {
-    return this.present(input.id) ? this.subscriptions.updateStatus(input) : null;
+  }): Promise<SubscriptionMutationResult<BillingSubscriptionRecord>> {
+    if (!this.present(input.id)) return { outcome: "missing_subscription" };
+    return { outcome: "updated", subscription: await this.subscriptions.updateStatus(input) };
   }
 
-  async findUpdatePlan(input: {
+  async updatePlan(input: {
     id: string;
     plan: string;
-  }): Promise<BillingSubscriptionRecord | null> {
-    return this.present(input.id) ? this.subscriptions.updatePlan(input) : null;
+  }): Promise<SubscriptionMutationResult<BillingSubscriptionRecord>> {
+    if (!this.present(input.id)) return { outcome: "missing_subscription" };
+    return { outcome: "updated", subscription: await this.subscriptions.updatePlan(input) };
   }
 
-  async findByStripeId(
-    stripeSubscriptionId: string,
-  ): Promise<BillingSubscriptionRecord | null> {
+  async findByStripeId(stripeSubscriptionId: string): Promise<BillingSubscriptionRecord | null> {
     return this.subscriptions.findByStripeId(stripeSubscriptionId);
   }
 
@@ -70,13 +71,13 @@ export class MemoryBillingWebhookSubscriptionRepository extends BillingWebhookSu
     return this.subscriptions.linkStripeId(input);
   }
 
-  async findActivate(input: {
+  async activate(input: {
     id: string;
     previousStatus: string;
-  }): Promise<SubscriptionWithOrg | null> {
-    if (!this.present(input.id)) return null;
+  }): Promise<ActivateSubscriptionResult> {
+    if (!this.present(input.id)) return { outcome: "missing_subscription" };
     const activated = await this.subscriptions.activate(input);
-    return this.withLicense(activated);
+    return { outcome: "activated", subscription: this.withLicense(activated) };
   }
 
   async recordPaymentFailure(input: { id: string; currentStatus: string }): Promise<void> {
@@ -98,14 +99,14 @@ export class MemoryBillingWebhookSubscriptionRepository extends BillingWebhookSu
     return this.subscriptions.migrateToSeatEvent(input);
   }
 
-  async findUpdateQuantities(input: {
+  async updateQuantities(input: {
     id: string;
     maxMembers: number | null;
     maxMessagesPerMonth: number | null;
-  }): Promise<SubscriptionWithOrg | null> {
-    if (!this.present(input.id)) return null;
+  }): Promise<SubscriptionMutationResult<SubscriptionWithOrg>> {
+    if (!this.present(input.id)) return { outcome: "missing_subscription" };
     const updated = await this.subscriptions.updateQuantities(input);
-    return this.withLicense(updated);
+    return { outcome: "updated", subscription: this.withLicense(updated) };
   }
 
   private present(id: string): boolean {

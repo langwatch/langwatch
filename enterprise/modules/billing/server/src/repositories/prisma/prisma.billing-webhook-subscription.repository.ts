@@ -2,19 +2,25 @@
  * The subscription writes a Stripe webhook makes, over the feature's own
  * Postgres repository.
  *
- * The port answers `null` for exactly one thing: the row Stripe named is not
- * there. Prisma reports that as `P2025` and the lifecycle services already read
- * the `null` as "nothing to change". Every other failure is rethrown, because
- * the webhook maps an unhandled error to a 500 and a 500 is what makes Stripe
- * redeliver — swallowing a connection failure here would acknowledge a payment
- * whose plan change never landed.
+ * Every write here reports `{ outcome: "missing_subscription" }` for exactly
+ * one thing: the row Stripe named is not there. Prisma reports that as
+ * `P2025`, and the lifecycle services already read that outcome as "nothing
+ * to change" — a redelivered or raced webhook, not an anomaly. `createPending`
+ * is the one exception: it inserts a new row rather than targeting an
+ * existing one, so it has no "missing" outcome to report and returns the
+ * created record directly. Every other failure is rethrown, because the
+ * webhook maps an unhandled error to a 500 and a 500 is what makes Stripe
+ * redeliver — swallowing a connection failure here would acknowledge a
+ * payment whose plan change never landed.
  */
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { createLogger } from "@langwatch/observability";
 
 import {
   BillingWebhookSubscription,
+  type ActivateSubscriptionResult,
   type CancelledSubscription,
+  type SubscriptionMutationResult,
   type SubscriptionWithOrg,
 } from "../billing-webhook-subscription.repository.ts";
 import type {
@@ -47,22 +53,25 @@ export class PrismaBillingWebhookSubscriptionRepository extends BillingWebhookSu
     return this.subscriptions.findLastNonCancelled(organizationId);
   }
 
-  findCreatePending(input: {
+  createPending(input: {
     organizationId: string;
     plan: string;
-  }): Promise<BillingSubscriptionRecord | null> {
-    return this.orNull("createPending", () => this.subscriptions.createPending(input));
+  }): Promise<BillingSubscriptionRecord> {
+    return this.subscriptions.createPending(input);
   }
 
-  findUpdateStatus(input: {
+  updateStatus(input: {
     id: string;
     status: string;
-  }): Promise<BillingSubscriptionRecord | null> {
-    return this.orNull("updateStatus", () => this.subscriptions.updateStatus(input));
+  }): Promise<SubscriptionMutationResult<BillingSubscriptionRecord>> {
+    return this.asMutationResult("updateStatus", () => this.subscriptions.updateStatus(input));
   }
 
-  findUpdatePlan(input: { id: string; plan: string }): Promise<BillingSubscriptionRecord | null> {
-    return this.orNull("updatePlan", () => this.subscriptions.updatePlan(input));
+  updatePlan(input: {
+    id: string;
+    plan: string;
+  }): Promise<SubscriptionMutationResult<BillingSubscriptionRecord>> {
+    return this.asMutationResult("updatePlan", () => this.subscriptions.updatePlan(input));
   }
 
   findByStripeId(stripeSubscriptionId: string): Promise<BillingSubscriptionRecord | null> {
@@ -73,12 +82,14 @@ export class PrismaBillingWebhookSubscriptionRepository extends BillingWebhookSu
     return this.subscriptions.linkStripeId(input);
   }
 
-  async findActivate(input: {
+  async activate(input: {
     id: string;
     previousStatus: string;
-  }): Promise<SubscriptionWithOrg | null> {
+  }): Promise<ActivateSubscriptionResult> {
     const activated = await this.orNull("activate", () => this.subscriptions.activate(input));
-    return activated ? await this.withTrialLicense(activated) : null;
+    return activated
+      ? { outcome: "activated", subscription: await this.withTrialLicense(activated) }
+      : { outcome: "missing_subscription" };
   }
 
   recordPaymentFailure(input: { id: string; currentStatus: string }): Promise<void> {
@@ -100,15 +111,17 @@ export class PrismaBillingWebhookSubscriptionRepository extends BillingWebhookSu
     return this.subscriptions.migrateToSeatEvent(input);
   }
 
-  async findUpdateQuantities(input: {
+  async updateQuantities(input: {
     id: string;
     maxMembers: number | null;
     maxMessagesPerMonth: number | null;
-  }): Promise<SubscriptionWithOrg | null> {
+  }): Promise<SubscriptionMutationResult<SubscriptionWithOrg>> {
     const updated = await this.orNull("updateQuantities", () =>
       this.subscriptions.updateQuantities(input),
     );
-    return updated ? await this.withTrialLicense(updated) : null;
+    return updated
+      ? { outcome: "updated", subscription: await this.withTrialLicense(updated) }
+      : { outcome: "missing_subscription" };
   }
 
   /**
@@ -140,6 +153,16 @@ export class PrismaBillingWebhookSubscriptionRepository extends BillingWebhookSu
       logger.warn({ operation }, "[stripeWebhook] Subscription write found no row");
       return null;
     }
+  }
+
+  private async asMutationResult<T>(
+    operation: string,
+    run: () => Promise<T>,
+  ): Promise<SubscriptionMutationResult<T>> {
+    const subscription = await this.orNull(operation, run);
+    return subscription
+      ? { outcome: "updated", subscription }
+      : { outcome: "missing_subscription" };
   }
 }
 

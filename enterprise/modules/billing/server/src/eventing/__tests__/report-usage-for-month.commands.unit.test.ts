@@ -246,7 +246,7 @@ describe("ReportUsageForMonthCommand", () => {
     it("returns empty events without reporting", async () => {
       mockOrganizations.getOrganizationForBilling.mockResolvedValue(usageBilledOrg());
       mockBillingCheckpoints.findCheckpoint.mockResolvedValue(null);
-      mockQueryBillableEventsTotal.mockResolvedValue(null);
+      mockQueryBillableEventsTotal.mockResolvedValue({ outcome: "unavailable" });
       const handler = await createHandler();
 
       const result = await handler.handle(makeCommand());
@@ -265,7 +265,7 @@ describe("ReportUsageForMonthCommand", () => {
         pendingReportedTotal: null,
         consecutiveFailures: 0,
       });
-      mockQueryBillableEventsTotal.mockResolvedValue(100);
+      mockQueryBillableEventsTotal.mockResolvedValue({ outcome: "counted", total: 100 });
       const handler = await createHandler();
 
       const result = await handler.handle(makeCommand());
@@ -288,7 +288,7 @@ describe("ReportUsageForMonthCommand", () => {
         pendingReportedTotal: null,
         consecutiveFailures: 0,
       });
-      mockQueryBillableEventsTotal.mockResolvedValue(150);
+      mockQueryBillableEventsTotal.mockResolvedValue({ outcome: "counted", total: 150 });
       mockReportUsageDelta.mockResolvedValue([{ reported: true }]);
       mockBillingCheckpoints.writeIntent.mockResolvedValue(undefined);
       mockBillingCheckpoints.confirm.mockResolvedValue(undefined);
@@ -333,7 +333,7 @@ describe("ReportUsageForMonthCommand", () => {
     it("creates checkpoint at reported total", async () => {
       mockOrganizations.getOrganizationForBilling.mockResolvedValue(usageBilledOrg());
       mockBillingCheckpoints.findCheckpoint.mockResolvedValue(null);
-      mockQueryBillableEventsTotal.mockResolvedValue(50);
+      mockQueryBillableEventsTotal.mockResolvedValue({ outcome: "counted", total: 50 });
       mockReportUsageDelta.mockResolvedValue([{ reported: true }]);
       mockBillingCheckpoints.writeIntent.mockResolvedValue(undefined);
       mockBillingCheckpoints.confirm.mockResolvedValue(undefined);
@@ -408,7 +408,7 @@ describe("ReportUsageForMonthCommand", () => {
         pendingReportedTotal: null,
         consecutiveFailures: 0,
       });
-      mockQueryBillableEventsTotal.mockResolvedValue(150);
+      mockQueryBillableEventsTotal.mockResolvedValue({ outcome: "counted", total: 150 });
       mockReportUsageDelta.mockResolvedValue([{ reported: false, error: "meter_event_invalid" }]);
       mockBillingCheckpoints.writeIntent.mockResolvedValue(undefined);
       mockBillingCheckpoints.clearPendingAndIncrementFailures.mockResolvedValue(undefined);
@@ -442,7 +442,7 @@ describe("ReportUsageForMonthCommand", () => {
         pendingReportedTotal: null,
         consecutiveFailures: 0,
       });
-      mockQueryBillableEventsTotal.mockResolvedValue(10);
+      mockQueryBillableEventsTotal.mockResolvedValue({ outcome: "counted", total: 10 });
       mockBillingCheckpoints.writeIntent.mockResolvedValue(undefined);
       mockReportUsageDelta.mockRejectedValue(new Error("Stripe rate limit"));
       mockBillingCheckpoints.incrementFailures.mockResolvedValue(undefined);
@@ -511,7 +511,7 @@ describe("ReportUsageForMonthCommand", () => {
         pendingReportedTotal: null,
         consecutiveFailures: 3,
       });
-      mockQueryBillableEventsTotal.mockResolvedValue(200);
+      mockQueryBillableEventsTotal.mockResolvedValue({ outcome: "counted", total: 200 });
       mockReportUsageDelta.mockResolvedValue([{ reported: true }]);
       mockBillingCheckpoints.writeIntent.mockResolvedValue(undefined);
       mockBillingCheckpoints.confirm.mockResolvedValue(undefined);

@@ -24,9 +24,9 @@ describe.each(backends)("given the $name billing repositories", ({ create }) => 
 
       expect(pending.status).toBe("PENDING");
       await expect(repositories.subscriptions.findActive("org-1")).resolves.toBeNull();
-      await expect(
-        repositories.subscriptions.findLastNonCancelled("org-1"),
-      ).resolves.toMatchObject({ id: pending.id });
+      await expect(repositories.subscriptions.findLastNonCancelled("org-1")).resolves.toMatchObject(
+        { id: pending.id },
+      );
     });
   });
 
@@ -50,9 +50,7 @@ describe.each(backends)("given the $name billing repositories", ({ create }) => 
 
       await repositories.subscriptions.cancel({ id: pending.id });
 
-      await expect(
-        repositories.subscriptions.findLastNonCancelled("org-1"),
-      ).resolves.toBeNull();
+      await expect(repositories.subscriptions.findLastNonCancelled("org-1")).resolves.toBeNull();
     });
   });
 
@@ -124,21 +122,21 @@ describe.each(backends)("given the $name billing repositories", ({ create }) => 
     });
   });
   describe("when the webhook names a subscription that is not there", () => {
-    it("answers null rather than raising, on every nullable write", async () => {
+    it("reports a missing subscription rather than raising, on every write", async () => {
       const repositories = create();
 
       await expect(
-        repositories.webhookSubscriptions.findUpdateStatus({ id: "sub-absent", status: "ACTIVE" }),
-      ).resolves.toBeNull();
+        repositories.webhookSubscriptions.updateStatus({ id: "sub-absent", status: "ACTIVE" }),
+      ).resolves.toEqual({ outcome: "missing_subscription" });
       await expect(
-        repositories.webhookSubscriptions.findUpdatePlan({ id: "sub-absent", plan: "GROWTH" }),
-      ).resolves.toBeNull();
+        repositories.webhookSubscriptions.updatePlan({ id: "sub-absent", plan: "GROWTH" }),
+      ).resolves.toEqual({ outcome: "missing_subscription" });
       await expect(
-        repositories.webhookSubscriptions.findActivate({
+        repositories.webhookSubscriptions.activate({
           id: "sub-absent",
           previousStatus: "PENDING",
         }),
-      ).resolves.toBeNull();
+      ).resolves.toEqual({ outcome: "missing_subscription" });
     });
   });
 
@@ -149,7 +147,9 @@ describe.each(backends)("given the $name billing repositories", ({ create }) => 
       await expect(
         repositories.webhookOrganizations.findByStripeCustomerId("cus_absent"),
       ).resolves.toBeNull();
-      await expect(repositories.webhookOrganizations.findNameById("org-absent")).resolves.toBeNull();
+      await expect(
+        repositories.webhookOrganizations.findNameById("org-absent"),
+      ).resolves.toBeNull();
     });
   });
 });

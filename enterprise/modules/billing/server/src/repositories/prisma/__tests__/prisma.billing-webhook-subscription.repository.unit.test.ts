@@ -82,7 +82,7 @@ describe("PrismaBillingWebhookSubscriptionRepository", () => {
     it("carries the organization's trial licence beside the activated row", async () => {
       const { adapter, subscriptions } = compose({ license: "trial-key" });
 
-      const activated = await adapter.findActivate({
+      const result = await adapter.activate({
         id: "subscription-1",
         previousStatus: "PENDING",
       });
@@ -91,11 +91,16 @@ describe("PrismaBillingWebhookSubscriptionRepository", () => {
         id: "subscription-1",
         previousStatus: "PENDING",
       });
-      expect(activated?.organization).toEqual({
-        id: "organization-1",
-        name: "Acme",
-        stripeCustomerId: "cus_1",
-        license: "trial-key",
+      expect(result).toEqual({
+        outcome: "activated",
+        subscription: expect.objectContaining({
+          organization: {
+            id: "organization-1",
+            name: "Acme",
+            stripeCustomerId: "cus_1",
+            license: "trial-key",
+          },
+        }),
       });
     });
   });
@@ -105,7 +110,7 @@ describe("PrismaBillingWebhookSubscriptionRepository", () => {
     it("writes both quantities and reports no trial licence where there is none", async () => {
       const { adapter, subscriptions } = compose();
 
-      const updated = await adapter.findUpdateQuantities({
+      const result = await adapter.updateQuantities({
         id: "subscription-1",
         maxMembers: 12,
         maxMessagesPerMonth: 100_000,
@@ -116,13 +121,14 @@ describe("PrismaBillingWebhookSubscriptionRepository", () => {
         maxMembers: 12,
         maxMessagesPerMonth: 100_000,
       });
-      expect(updated?.organization.license).toBeNull();
+      expect(result.outcome).toBe("updated");
+      expect(result.outcome === "updated" && result.subscription.organization.license).toBeNull();
     });
   });
 
   describe("when Stripe names a subscription row that is gone", () => {
     /** @scenario "A subscription row Stripe names that is gone is not a failed delivery" */
-    it("answers nothing rather than failing the delivery", async () => {
+    it("reports a missing subscription rather than failing the delivery", async () => {
       const { adapter } = compose({
         repository: repositoryDouble({
           activate: vi.fn(() => Promise.reject(recordNotFound())),
@@ -130,8 +136,8 @@ describe("PrismaBillingWebhookSubscriptionRepository", () => {
       });
 
       await expect(
-        adapter.findActivate({ id: "subscription-gone", previousStatus: "PENDING" }),
-      ).resolves.toBeNull();
+        adapter.activate({ id: "subscription-gone", previousStatus: "PENDING" }),
+      ).resolves.toEqual({ outcome: "missing_subscription" });
     });
   });
 
@@ -145,7 +151,7 @@ describe("PrismaBillingWebhookSubscriptionRepository", () => {
       });
 
       await expect(
-        adapter.findActivate({ id: "subscription-1", previousStatus: "PENDING" }),
+        adapter.activate({ id: "subscription-1", previousStatus: "PENDING" }),
       ).rejects.toThrow("connection refused");
     });
   });

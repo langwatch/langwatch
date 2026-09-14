@@ -136,9 +136,7 @@ export class BillingSubscriptionLifecycleService {
   }): Promise<void> {
     await waitForStripeConsistency();
 
-    const existingSubForUpdate = await this.subscriptionRepository.findByStripeId(
-      subscription.id,
-    );
+    const existingSubForUpdate = await this.subscriptionRepository.findByStripeId(subscription.id);
 
     if (!existingSubForUpdate) {
       logger.warn(
@@ -188,13 +186,14 @@ export class BillingSubscriptionLifecycleService {
   }): Promise<void> {
     const shouldNotify = existing.status !== SubscriptionStatus.ACTIVE;
     const { usersQuantity, tracesQuantity } = this.quantitiesOf({ subscription, existing });
-    const updatedSubscription = await this.subscriptionRepository.findUpdateQuantities({
+    const quantitiesResult = await this.subscriptionRepository.updateQuantities({
       id: existing.id,
       ...planQuantities({ members: usersQuantity, messagesPerMonth: tracesQuantity }),
     });
-    if (!updatedSubscription) {
+    if (quantitiesResult.outcome === "missing_subscription") {
       return;
     }
+    const updatedSubscription = quantitiesResult.subscription;
 
     await this.clearTrialLicenseIfPresent(updatedSubscription, "subscription updated to active");
     if (!shouldNotify) {
@@ -277,8 +276,7 @@ export class BillingSubscriptionLifecycleService {
   }): Promise<void> {
     await waitForStripeConsistency();
 
-    const previousSubscription =
-      await this.subscriptionRepository.findByStripeId(subscriptionId);
+    const previousSubscription = await this.subscriptionRepository.findByStripeId(subscriptionId);
 
     if (!previousSubscription) {
       if (throwOnMissing) {
@@ -297,14 +295,15 @@ export class BillingSubscriptionLifecycleService {
       return;
     }
 
-    const updatedSubscription = await this.subscriptionRepository.findActivate({
+    const activationResult = await this.subscriptionRepository.activate({
       id: previousSubscription.id,
       previousStatus: previousSubscription.status,
     });
 
-    if (!updatedSubscription) {
+    if (activationResult.outcome === "missing_subscription") {
       return;
     }
+    const updatedSubscription = activationResult.subscription;
 
     if (previousSubscription.status !== SubscriptionStatus.ACTIVE) {
       await this.clearTrialLicenseIfPresent(updatedSubscription, "subscription activated");

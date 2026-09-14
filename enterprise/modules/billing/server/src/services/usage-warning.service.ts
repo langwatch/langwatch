@@ -18,6 +18,16 @@ import type { NotificationService, UsageLimitEmailData } from "./billing-usage-n
 
 const logger = createLogger("langwatch:notifications:usageWarning");
 
+/**
+ * Most calls check usage that has not crossed a warning threshold yet, or
+ * find the warning already sent this month — "no email went out" is the
+ * ordinary outcome, not an anomaly, so it is a named result rather than
+ * `null`.
+ */
+export type CheckAndSendWarningResult =
+  | { outcome: "sent"; notification: Notification }
+  | { outcome: "skipped" };
+
 import {
   USAGE_WARNING_THRESHOLDS,
   findCrossedUsageThreshold,
@@ -66,7 +76,7 @@ export class UsageWarningService {
   /**
    * Sends a usage-limit warning email if one is due, and records that it went.
    */
-  async findCheckAndSendWarning(data: UsageLimitData): Promise<Notification | null> {
+  async checkAndSendWarning(data: UsageLimitData): Promise<CheckAndSendWarningResult> {
     const { organizationId, currentMonthMessagesCount, maxMonthlyUsageLimit } = data;
 
     const usagePercentage =
@@ -79,7 +89,7 @@ export class UsageWarningService {
         "Usage below all warning thresholds, skipping notification",
       );
 
-      return null;
+      return { outcome: "skipped" };
     }
 
     const organization = await this.organizations.findWithAdmins(organizationId);
@@ -87,22 +97,22 @@ export class UsageWarningService {
     if (!organization) {
       logger.warn({ organizationId }, "Organization not found");
 
-      return null;
+      return { outcome: "skipped" };
     }
 
     if (organization.members.length === 0) {
       logger.warn({ organizationId }, "No admin members found for organization");
 
-      return null;
+      return { outcome: "skipped" };
     }
 
     if (await this.alreadyWarnedThisMonth({ organizationId, crossedThreshold })) {
-      return null;
+      return { outcome: "skipped" };
     }
 
     const projectUsageData = await this.projectUsage({ organizationId, crossedThreshold });
     if (projectUsageData === null) {
-      return null;
+      return { outcome: "skipped" };
     }
 
     const deliverableAdmins = organization.members.filter((member) => member.user.email);
@@ -118,10 +128,10 @@ export class UsageWarningService {
         "No admins with email addresses found, skipping notification (no deliverable recipients)",
       );
 
-      return null;
+      return { outcome: "skipped" };
     }
 
-    return this.sendAndRecord({
+    const notification = await this.sendAndRecord({
       organizationId,
       organizationName: organization.name,
       deliverableAdmins,
@@ -141,6 +151,8 @@ export class UsageWarningService {
       usagePercentage,
       crossedThreshold,
     });
+
+    return { outcome: "sent", notification };
   }
 
   /**

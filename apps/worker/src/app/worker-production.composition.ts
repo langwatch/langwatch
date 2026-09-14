@@ -1487,7 +1487,7 @@ export class WorkerProductionComposition {
         organizations: billingReportingPersistence.reportOrganizations,
         billingCheckpoints: billingReportingPersistence.checkpoints,
         getUsageReportingService: () => usageReporting,
-        queryBillableEventsTotal: (input) => billableEvents.findQueryBillableEventsTotal(input),
+        queryBillableEventsTotal: (input) => billableEvents.queryBillableEventsTotal(input),
         organizationCache: RedisBillingOrganizationCacheAdapter.create({
           redis: eventingOptions.groupQueue.redis,
         }),

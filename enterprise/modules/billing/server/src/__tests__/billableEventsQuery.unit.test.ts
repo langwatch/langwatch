@@ -148,12 +148,12 @@ describe("queryTraceSummariesTotalUniq", () => {
     it("queries with tenant-scoped and month-bounded params and returns the total", async () => {
       findTraceSummariesTotalUniq.mockResolvedValue(42);
 
-      const result = await service().findQueryTraceSummariesTotalUniq({
+      const result = await service().queryTraceSummariesTotalUniq({
         projectIds: ["proj-1", "proj-2"],
         billingMonth: "2026-02",
       });
 
-      expect(result).toBe(42);
+      expect(result).toEqual({ outcome: "counted", total: 42 });
       expect(findTraceSummariesTotalUniq).toHaveBeenCalledWith({
         tenantIds: ["proj-1", "proj-2"],
         startDate: "2026-02-01 00:00:00.000",
@@ -163,26 +163,26 @@ describe("queryTraceSummariesTotalUniq", () => {
   });
 
   describe("when no ClickHouse repository is available", () => {
-    it("returns null so callers can distinguish outage from zero usage", async () => {
+    it("reports unavailable so callers can distinguish outage from zero usage", async () => {
       billableEvents = undefined;
 
-      const result = await BillableEventsQueryService.create(null).findQueryTraceSummariesTotalUniq({
+      const result = await BillableEventsQueryService.create(null).queryTraceSummariesTotalUniq({
         projectIds: ["proj-1"],
         billingMonth: "2026-02",
       });
 
-      expect(result).toBeNull();
+      expect(result).toEqual({ outcome: "unavailable" });
     });
   });
 
   describe("when projectIds is empty", () => {
-    it("returns 0 without resolving a repository", async () => {
-      const result = await service().findQueryTraceSummariesTotalUniq({
+    it("returns a counted zero without resolving a repository", async () => {
+      const result = await service().queryTraceSummariesTotalUniq({
         projectIds: [],
         billingMonth: "2026-02",
       });
 
-      expect(result).toBe(0);
+      expect(result).toEqual({ outcome: "counted", total: 0 });
       expect(findTraceSummariesTotalUniq).not.toHaveBeenCalled();
     });
   });
