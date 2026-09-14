@@ -1,11 +1,6 @@
-/**
- * @vitest-environment node
- *
- * `VoiceTargetSchema` is a discriminated union on `transport`: each branch
- * carries only the credential shape its transport can use, so a job payload
- * cannot ship a Twilio credential to the ElevenLabs runner or the reverse.
- *
- * @see specs/features/agents/voice-phone.feature
+/** @vitest-environment node
+ * VoiceTargetSchema discriminates on transport: each branch carries only
+ * the credentials its transport can use.
  */
 import { describe, expect, it } from "vitest";
 import { VoiceTargetSchema } from "../../../contract/src/evaluations/types.ts";

@@ -1,31 +1,14 @@
 /**
- * The remote-trace fragment of the SDK run configuration.
- *
- * The scenario SDK owns remote-trace judging: with `fetchRemoteTraces` on,
- * its judge collects the trace ids stamped on the conversation's messages,
- * fetches them from the trace API, settle-waits at verdict time, and degrades
- * to a synthetic error span when spans do not arrive. The platform's part is
- * this configuration: enable the capability for http targets, hand the SDK
- * the project's endpoint and key (the SDK's fetcher reads them off the run
- * config's `langwatch` block, with env vars as fallback), and pass the
- * prefetcher's ingest-lag wait budget. Omitting `traceWaitTimeoutMs` leaves
- * the SDK's own default in place.
- *
- * @see dev/docs/adr/097-scenario-remote-trace-judging.md
- * @see specs/scenarios/remote-trace-judging.feature
+ * Remote-trace fragment of SDK run configuration. Platform enables capability for http targets,
+ * hands SDK endpoint/key; SDK judge fetches traces by message-stamped trace ids.
+ * See dev/docs/adr/097-scenario-remote-trace-judging.md and remote-trace-judging.feature.
  */
 
 import type { TargetConfig } from "@langwatch/scenario-contract";
 
 /**
- * Upper bound on the verdict-time wait, and the size of the judge's one extra
- * `wait_for_traces` wait. Production measurement (per-trace stored_spans lag,
- * 24h window): global p95 6.6s, p99 12.4s; per-tenant p95 median 8.2s, p90
- * 27.3s. 30 seconds covers the p90 tenant, and the judge-requested extension
- * covers the tail once more when the missing spans are essential.
- *
- * Lives in this child-safe module (no ClickHouse import chain) because both
- * the server-side budget clamp and the child's run configuration read it.
+ * Verdict-time wait cap (30s covers p90 tenant per prod measurement). Shared by
+ * server-side clamp and child's run config (child-safe module, no ClickHouse imports).
  */
 export const TRACE_WAIT_CAP_MS = 30_000;
 

@@ -1,18 +1,6 @@
-/**
- * @vitest-environment node
- *
- * Integration regression tests for issue #3576.
- *
- * The `SerializedHttpAgentAdapter` used to throw `HTTP <status>: <statusText>`
- * on non-2xx responses and discarded the response body, request URL, and
- * upstream identifiers. These tests drive the adapter against a real
- * in-process HTTP stub server and assert the richer error surface (AC #2)
- * and per-call diagnostic logging (AC #4) that the fix provides.
- *
- * The adapter wires its own logger by default via `createChildProcessLogger`
- * (see #3779). For test capture we inject a fake logger through the
- * constructor's second parameter — same pattern as
- * http-agent.adapter.logging.unit.test.ts.
+/** @vitest-environment node
+ * Regression tests for issue #3576: adapter provides rich error surface
+ * with diagnostic logging; tests inject a fake logger via constructor.
  */
 
 import http from "node:http";

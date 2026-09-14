@@ -111,7 +111,7 @@ export function mapClickHouseRowToScenarioRunData(
   const createdAt = Number(row.CreatedAt);
   const finishedAt = row.FinishedAt != null ? Number(row.FinishedAt) : null;
   const durationMs = row.DurationMs != null ? parseInt(row.DurationMs, 10) : null;
-  // Use StartedAt for duration calculation (CreatedAt is CH insertion time, which can be after FinishedAt)
+  // Use StartedAt for duration (CreatedAt is CH insertion time, can be after FinishedAt)
   const startTimestamp = startedAt ?? createdAt;
 
   // Unfinished runs collapse to IN_PROGRESS; only a finished run keeps its

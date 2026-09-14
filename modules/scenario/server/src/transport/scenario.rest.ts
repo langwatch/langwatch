@@ -170,6 +170,7 @@ export function createScenarioRest() {
     .withMiddleware(projectRestFacts, scenarioRestSurface)
     .handle(async ({ app, input: body, scope }, project, surface) => {
       logger.info({ projectId: scope.id }, "Creating scenario");
+      const label = scenarioAuthorLabel(surface);
       const scenario = await app.create(
         {
           projectId: scope.id,
@@ -177,6 +178,12 @@ export function createScenarioRest() {
           situation: body.situation,
           criteria: body.criteria,
           labels: body.labels,
+          // `viewerUserId` is null for a credential that names no person (a
+          // legacy project key). Naming that explicitly here is what lets the
+          // app write NULL to `lastUpdatedById` instead of the project id -
+          // the id the door falls back to for a key with nobody behind it,
+          // which does not exist as a `User` row and violates its FK.
+          actor: { userId: project.viewerUserId, label },
           ...(body.parameters !== undefined && { parameters: body.parameters }),
           ...(body.simulatorModel !== undefined && { simulatorModel: body.simulatorModel }),
           ...(body.judgeModel !== undefined && { judgeModel: body.judgeModel }),
@@ -185,7 +192,7 @@ export function createScenarioRest() {
           ...(body.testSuiteId !== undefined && { testSuiteId: body.testSuiteId }),
           ...(body.fields !== undefined && { fields: body.fields }),
         },
-        { id: project.actorId, label: scenarioAuthorLabel(surface) },
+        { id: project.actorId, label },
       );
       return withPlatformUrl(app, scenario, project.projectSlug);
     })

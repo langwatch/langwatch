@@ -3,23 +3,8 @@ import { APICallError, RetryError } from "ai";
 import { z } from "zod";
 
 /**
- * nlpgo's handled-error envelope (services/nlpgo herr package). Every
- * handled failure on the Go side arrives as this JSON body, e.g.:
- *
- * ```json
- * {"error":{"type":"bad_request","message":"bad_request",
- *   "meta":{"reason":"missing_provider"},
- *   "reasons":[{"type":"unknown","message":"unknown"}]}}
- * ```
- *
- * Exported so every reader of an nlpgo error body parses the same shape —
- * see also the scenario code-agent adapter's `parseErrorEnvelope`.
- *
- * Note `fault` is declared optional because the shared `HerrEnvelope` type
- * carries it, but Go's writer does NOT put it on the wire: `ErrorBody`
- * (`pkg/herr/http.go`) is `{type,message,meta,trace_id,span_id,reasons}` and
- * `toErrorBody` never sets a fault. It is a log field in `writeHandlerError`
- * only. Do not classify on it — it will always be undefined.
+ * nlpgo error envelope: `fault` is declared optional but never on wire; don't classify on it.
+ * See scenario code-agent adapter's `parseErrorEnvelope`.
  */
 export const goErrorEnvelopeSchema = z.object({
   error: z.object({
@@ -35,26 +20,12 @@ export const goErrorEnvelopeSchema = z.object({
 });
 
 /**
- * Maps an AI SDK call failure into a `HandledError` when the
- * upstream response body carries nlpgo's handled-error envelope.
- * Returns null for anything else (network failures, provider errors
- * that aren't envelope-shaped, non-AI-SDK errors) — those stay on the
- * caller's unhandled path.
- *
- * Unwraps the AI SDK's RetryError to the last attempt, since
- * generateObject surfaces exhausted retries that way.
+ * Maps AI SDK call failure to HandledError when response carries nlpgo's envelope.
+ * Returns null for other failures; unwraps RetryError to last attempt for generateObject.
  */
 /**
- * True when `error` is an abort — e.g. an `AbortSignal.timeout` cap firing.
- * `AbortSignal.timeout().reason` is a `DOMException` (name "TimeoutError"), not
- * `instanceof Error` in this runtime, so match on the `name` property directly.
- * Mirrors the abort names in `@ai-sdk/provider-utils`' `isAbortError`
- * ("AbortError" / "TimeoutError" / Next.js "ResponseAborted") — kept as a local
- * copy because `ai` doesn't re-export it and provider-utils isn't a direct dep.
- * No `RetryError` unwrap: the AI SDK re-throws aborts RAW before wrapping, so an
- * abort is never a `RetryError.lastError` (verified against ai@6.0.217). Lives
- * here beside `nlpgoHandledErrorFrom` so every `generateObject` caller can share
- * one abort predicate.
+ * True when error is an abort; e.g., AbortSignal.timeout() — a DOMException.
+ * Match on name property. Mirrors @ai-sdk/provider-utils isAbortError.
  */
 export function isAbortLikeError(error: unknown): boolean {
   const name = (error as { name?: unknown } | null | undefined)?.name;

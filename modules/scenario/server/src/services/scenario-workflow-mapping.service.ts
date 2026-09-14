@@ -1,23 +1,14 @@
 /**
- * Pre-run validation for workflow agent scenario mappings.
- *
- * Validates that a workflow agent has the necessary scenario mappings
- * configured before execution begins. This prevents confusing runtime
- * failures when a multi-input workflow receives empty strings for all
- * but its first input.
+ * Pre-run validation for workflow agent scenario mappings: prevents runtime failures
+ * when multi-input workflow receives empty strings.
  */
 
 import { TRPCError } from "@trpc/server";
 import type { WorkflowAgentData } from "@langwatch/scenario-contract";
 
 /**
- * Validates that a workflow agent's scenario mappings are sufficient to
- * execute the workflow.
- *
- * Throws a structured BAD_REQUEST error when the workflow has more than one
- * declared input and no scenario mappings are configured. The single-input
- * case is allowed through because the legacy fallback (first input ← last
- * user message) handles it correctly.
+ * Validates workflow agent's scenario mappings. Throws BAD_REQUEST for multi-input
+ * workflows with no mappings; single-input allowed (legacy fallback handles it).
  */
 export class ScenarioWorkflowMappingService {
   static create(): ScenarioWorkflowMappingService {

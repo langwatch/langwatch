@@ -1,18 +1,6 @@
 /**
- * `POST /api/export/scenario-runs/download` - streams a project's run history
- * as gzipped CSV straight to the response, and broadcasts progress to the
- * tenant so a tRPC subscription on any pod can relay it to the browser that
- * asked. The export id rides back on the `X-Export-Id` response header.
- *
- * The permission is asked against a `projectId` the BODY names, not the one
- * the credential scoped, so the route declares `deferredScope` and resolves
- * the session itself. Everything else arrives as a port - the request
- * schema, the session, the permission probe, the audit sink, the export
- * itself, the tenant broadcast and the export id - the same shape the trace
- * export next door is built with, because the two downloads differ only in
- * what they serialize.
- *
- * @see specs/scenarios/scenario-run-export.feature
+ * `POST /api/export/scenario-runs/download`: streams run history as gzipped CSV.
+ * Broadcasts progress; permission from body projectId. See scenario-run-export.feature.
  */
 import { deferredScope } from "@langwatch/api/access";
 import { defineRestRouter, MANAGEMENT_API_VERSION, type AppRestBroadcast } from "@langwatch/api/rest";
@@ -206,18 +194,8 @@ export function createScenarioRunExportRest<
 }
 
 /**
- * Gzips a stream while letting backpressure reach its producer.
- *
- * `pipeThrough(new CompressionStream("gzip"))` does not: the transform drains
- * whatever it is piped from without bound, so a paused reader still leaves the
- * producer running flat out. Measured on this route's own shape - one read,
- * then stop - a raw pull-driven source is asked for 2 more pages, the same
- * source through CompressionStream for ~65,000. That is the whole export in
- * memory for one slow client.
- *
- * zlib through Node's stream plumbing honours the pipe's high-water mark, so
- * read-ahead is bounded in bytes (~800KB here) rather than in pages, and a
- * bigger page simply means fewer of them buffered.
+ * Gzips stream while letting backpressure reach producer (pipeThrough doesn't honor it).
+ * zlib through Node's stream honors high-water mark, limiting read-ahead to ~800KB.
  */
 function gzipped(source: ReadableStream<Uint8Array>): ReadableStream<Uint8Array> {
   const gzip = createGzip();

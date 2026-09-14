@@ -1,14 +1,6 @@
 /**
- * The half of the export contract that only exists as SQL.
- *
- * Every scope the dialog offers — date range, scenario, set, project — is a
- * WHERE clause, and archived exclusion happens on the way out of the row
- * mapper. None of that can be observed against a stubbed
- * repository, so this runs against a real ClickHouse: a filter that silently
- * matches nothing looks identical to one that correctly matched nothing, and
- * only real rows tell the two apart.
- *
- * @see specs/scenarios/scenario-run-export.feature
+ * Export filters are SQL WHERE clauses; tested against real ClickHouse (stubs can't verify).
+ * Archived exclusion is handled in the mapper. See scenario-run-export.feature.
  */
 
 import { createClient, type ClickHouseClient } from "@clickhouse/client";
@@ -273,15 +265,8 @@ integration("scenario run export sweep (integration)", () => {
 
   describe("given a run whose StartedAt moved between versions", () => {
     /**
-     * The projection opens a run with StartedAt null — persisted as CreatedAt —
-     * and only sets the real value when the started event lands. So a run can
-     * have an early provisional timestamp inside the window and a corrected one
-     * outside it.
-     *
-     * Deduplicating with the date filter inside the subquery picks the newest
-     * version *within the range*, which here is the stale one: it would export
-     * a run as IN_PROGRESS with no messages long after it finished. The latest
-     * version has to be chosen first, and the range applied to that.
+     * Runs with null StartedAt fall back to CreatedAt; value set when started event lands.
+     * Subquery date filter picks newest in-range (stale): apply range to latest version instead.
      */
     it("judges the range on the latest version, not the newest in-range one", async () => {
       const runId = `run-moved-${nanoid()}`;

@@ -1,57 +1,5 @@
-/**
- * Formats failures originating in the SerializedCodeAgentAdapter NLP request.
- *
- * Tracks lw#3439. The previous "[SerializedCodeAgentAdapter] Error: Code
- * execution failed: HTTP 500 - <raw blob>" string interleaved AI SDK warnings
- * and OTEL flush notices with the actual user-code traceback, making customer
- * debugging require stderr archaeology.
- *
- * ## The contract this formats against
- *
- * The adapter dials `/go/studio/execute_sync`, served by the Go NLP engine
- * (`services/nlpgo`). That engine reports failures in two distinct shapes, and
- * the user-code one does NOT come back as a non-2xx:
- *
- * 1. **A node failed while running the workflow — HTTP 200.** The engine
- *    finalizes the run as `{ trace_id, status: "error", error: { node_id,
- *    type, message, traceback } }` with `result` omitted
- *    (`services/nlpgo/app/engine/engine.go` `finalize`, shape at
- *    `services/nlpgo/app/app.go:121-137`). For this adapter the workflow is
- *    always entry -> one code node -> end, so a node failure here is the
- *    customer's Python: `type` carries the exception class
- *    (`AttributeError`, `SyntaxError`, …) — see the engine's own integration
- *    tests in `services/nlpgo/tests/integration/code_block_spec_test.go`,
- *    which assert HTTP 200 for exactly these cases.
- * 2. **The request envelope failed — non-2xx.** `writeHandlerError` emits the
- *    herr envelope `{ error: { type, message, meta, trace_id } }`
- *    (`pkg/herr/http.go:30-74`), with the status registered in
- *    `services/nlpgo/adapters/httpapi/router.go` `registerErrorStatuses`.
- *
- * There is no FastAPI `{ detail: … }` on this path — `grep '"detail"'
- * services/nlpgo --include='*.go'` returns nothing and no Python
- * `execute_sync` remains. The legacy `detail` shape is still parsed as a
- * fallback for any deployment that still fronts the endpoint with FastAPI,
- * but it is not the primary contract.
- *
- * ## What the formatter guarantees
- *
- * - distinguishes user-code failures from infra failures so the surfaced
- *   message reads "user code raised: …" vs "NLP service returned HTTP 503".
- *   The classification is computed in exactly one place per shape
- *   (`classifyEngineFailure` / `classifyHttpFailure`) and the format
- *   functions return the derived `source` alongside the message, so the
- *   adapter's structured `source` field can never drift from the wording the
- *   customer sees;
- * - deliberately omits the internal NLP endpoint host:port from every
- *   rendered message — including the fetch-failure path, where undici puts
- *   the address in the error `cause`. This string is persisted onto the
- *   user-visible scenario-run record, so the endpoint lives only on the
- *   structured `.endpoint` field (programmatic) and server logs;
- * - strips known unrelated noise (AI SDK compat warnings, OTEL flush
- *   chatter) from the rendered detail; the raw payload is still attached
- *   to the thrown error for deep debugging;
- * - truncates long bodies at a clear marker rather than letting them blow
- *   out worker logs.
+/** Formats NLP engine failures from SerializedCodeAgentAdapter: distinguishes
+ * user-code from infra, omits endpoints, strips noise, caps length.
  */
 
 import { goErrorEnvelopeSchema } from "./rules/scenario-generate-nlpgo-error.rules.ts";
@@ -94,28 +42,8 @@ export interface NlpEngineResult {
   error?: NlpEngineError;
 }
 
-/**
- * Engine error types that are NOT the customer's Python, even though they
- * arrive on the same 200-with-`status:"error"` path.
- *
- * `engine_error` / `llm_executor_unavailable` are `classifyNodeFault`'s
- * platform bucket in `services/nlpgo/app/engine/faults.go`. The other two are
- * this adapter's own responsibility rather than the engine's taxonomy:
- * `invalid_workflow` means the DSL failed to parse, and **this adapter
- * synthesizes that DSL** (entry -> code -> end) from the agent config — the
- * customer never writes it; `context_canceled` is `finalize`'s response to a
- * cancelled request, which is our timeout, not their bug.
- *
- * Both were observed arriving as HTTP 200 from a live engine while recording
- * `__tests__/fixtures/nlpgo-recorded-responses.json` — neither was reachable
- * through the hand-written mocks this PR replaced.
- *
- * This adapter submits a workflow of exactly one code node, so **every other**
- * node failure is the customer's Python (the type is then the raised
- * exception class — `TimeoutException`, `SyntaxError`, `KeyError`, all
- * observed live). Denylisting rather than allowlisting exception classes is
- * what keeps an unseen Python exception classified as user code instead of
- * silently inverting to infra — the exact failure lw#3439 is about.
+/** Engine error types that are NOT customer Python: platform errors only,
+ * everything else is user code (denylist not allowlist to catch unknowns).
  */
 const PLATFORM_ENGINE_ERROR_TYPES: ReadonlySet<string> = new Set([
   "engine_error",
@@ -124,22 +52,8 @@ const PLATFORM_ENGINE_ERROR_TYPES: ReadonlySet<string> = new Set([
   "context_canceled",
 ]);
 
-/**
- * herr codes the NLP engine attributes to the customer, mirroring
- * `handlerFault` in `services/nlpgo/adapters/httpapi/handler_errors.go`.
- *
- * Deliberate divergence from that Go function: it also counts `unauthorized`,
- * `not_found` and `invalid_workflow` as customer faults, but on this path all
- * three describe the *adapter's own* request envelope — the adapter supplies
- * the API key and the synthetic workflow id, and it synthesizes the DSL, so
- * the customer authors none of them. Blaming user code for a bad platform
- * credential is the same mislabelling in the other direction, so all three
- * stay infra here.
- *
- * `invalid_workflow` in particular MUST agree with its entry in
- * `PLATFORM_ENGINE_ERROR_TYPES` above: the engine can report the same root
- * cause on either transport, and the same cause must not get opposite blame
- * depending on which one it took.
+/** herr codes engine attributes to customer (not platform errors like
+ * bad key/id which adapter supplies, not customer).
  */
 const CUSTOMER_FAULT_HERR_CODES: ReadonlySet<string> = new Set([
   "bad_request",
@@ -206,11 +120,8 @@ export function parseErrorEnvelope(rawBody: string): ParsedErrorEnvelope {
   return { isLegacyDetail: false };
 }
 
-/**
- * Classify a **200** whose run the engine finalized as failed.
- *
- * Anything the engine does not attribute to itself is the customer's code —
- * see `PLATFORM_ENGINE_ERROR_TYPES`.
+/** Classify 200 with failed run: anything not in PLATFORM_ENGINE_ERROR_TYPES
+ * is customer code.
  */
 export function classifyEngineFailure(args: {
   errorType?: string;
@@ -220,13 +131,8 @@ export function classifyEngineFailure(args: {
   return "user_code";
 }
 
-/**
- * Classify a non-2xx response.
- *
- * Primary predicate is the herr code, mirroring the engine's own customer /
- * platform split (`CUSTOMER_FAULT_HERR_CODES`). The legacy FastAPI shape —
- * an HTTP 500 carrying a `detail` — is honoured as a fallback so a
- * FastAPI-fronted deployment still classifies correctly.
+/** Classify non-2xx response: herr code primary (fallback to legacy FastAPI
+ * 500 with detail).
  */
 export function classifyHttpFailure(args: {
   status: number;
@@ -281,16 +187,8 @@ function renderUserCodeFailure(args: {
   ].join("\n");
 }
 
-/**
- * The customer-facing rendering of an NLP-service failure.
- *
- * The detail is redacted here and NOT in `renderUserCodeFailure`, and the
- * split is deliberate. An infra body is written by our own stack — an nginx
- * 502 page, an Envoy `upstream connect error`, a herr `child_unavailable`
- * message — and routinely names the upstream `host:port` this module promises
- * to withhold from the persisted run record. A user-code detail is the
- * customer's own traceback, which may legitimately contain a URL *they* wrote;
- * redacting that would hide their bug from them.
+/** NLP-service failure rendering: redacts detail (infra names host:port),
+ * but not user-code detail (customer's traceback).
  */
 function renderServiceFailure(args: {
   headline: string;
@@ -303,14 +201,8 @@ function renderServiceFailure(args: {
   ].join("\n");
 }
 
-/**
- * Format a **200** whose run the engine finalized as failed — the shape a
- * user's Python exception actually arrives in.
- *
- * Returns the customer-facing `message`, the `source` it derived, and the
- * `rawDetail` the adapter attaches for deep debugging. The engine's traceback
- * is preferred over its one-line message because it is what a customer
- * debugs from.
+/** Format 200 with failed run (customer's Python exception): returns message,
+ * source, and rawDetail; prefers traceback over one-line message.
  */
 export function formatEngineError(args: {
   engineError: NlpEngineError | undefined;
@@ -364,15 +256,8 @@ export function formatEngineError(args: {
   };
 }
 
-/**
- * Format a non-2xx response from the NLP service.
- *
- * Takes the body as raw text and does its own parsing, so the caller never
- * has to assert a shape onto it (an unchecked cast here previously let a
- * non-string `detail` crash the formatter). Returns both the customer-facing
- * `message` and the `source` it derived, so the adapter sets its structured
- * `source` field from the exact same classification that chose the wording.
- * The internal endpoint is intentionally absent from the message.
+/** Format non-2xx NLP response: parses raw body, omits internal endpoint from
+ * message, returns customer-facing message and classification source.
  */
 export function formatHttpError(args: { status: number; rawBody: string }): {
   message: string;
@@ -406,12 +291,8 @@ export function formatHttpError(args: { status: number; rawBody: string }): {
   };
 }
 
-/**
- * Format a 2xx whose body is not the JSON the engine promises — something is
- * answering on the NLP service's behalf (a proxy, a captive portal).
- *
- * Shares `renderServiceFailure` with the non-2xx path so the two cannot drift
- * in wording, truncation limit, noise-stripping or redaction.
+/** Format 2xx with non-JSON body (proxy/portal): shares renderServiceFailure
+ * with non-2xx path to keep wording consistent.
  */
 export function formatMalformedBodyError(args: {
   status: number;
@@ -430,23 +311,13 @@ export function formatMalformedBodyError(args: {
 /** IPv4 (and bracketed IPv6) addresses, with or without a port. */
 const IP_ADDRESS =
   /\[[0-9a-fA-F:]+\](?::\d{1,5})?|\b\d{1,3}(?:\.\d{1,3}){3}(?::\d{1,5})?\b/g;
-/**
- * A `token:port` pair — the candidate shape for `nlp-internal:5561`.
- *
- * Deliberately ONE unnested quantifier. The obvious "host is labels joined by
- * separators" form — `[A-Za-z0-9_-]*(?:[.-][A-Za-z0-9_-]+)+` — lets a `-` be
- * consumed by either side, which is exponential backtracking on a run of
- * `--` (CodeQL `js/redos`, high). This function runs over error bodies
- * written by upstreams we do not control, so that is reachable. Whether a
- * match is really a host is decided in code below, not by the pattern.
+/** `token:port` pair (e.g., `nlp-internal:5561`): deliberate single
+ * quantifier to avoid redos on `--` runs; host vs code location decided in code.
  */
 const TOKEN_WITH_PORT = /\b[A-Za-z0-9][A-Za-z0-9._-]*:\d{2,5}\b(?![.:\d])/g;
 
-/**
- * Source-file suffixes that make a `token:port` a code location rather than
- * an address. `File "script.py:42"` is the single most common shape in a
- * Python traceback, and this function now runs over rendered infra detail —
- * redacting it would corrupt the customer's own debugging information.
+/** Source-file suffixes: distinguish code location from address; don't
+ * redact customer's own debugging info like `script.py:42`.
  */
 const SOURCE_FILE_SUFFIX =
   /\.(py|pyc|ts|tsx|js|jsx|mjs|cjs|go|rb|java|kt|c|cc|cpp|h|hpp|rs|sh|sql|json|ya?ml|toml|txt|log)$/i;
@@ -460,14 +331,8 @@ function looksLikeHostPort(match: string): boolean {
 }
 /** Absolute URLs. */
 const URL_PATTERN = /\b[a-z][a-z0-9+.-]*:\/\/\S+/gi;
-/**
- * The engine's own execution-harness frames, e.g.
- * `File "/tmp/nlpgo-codeblock-369240540/runner.py", line 143, in main`.
- *
- * The engine already anonymizes the customer's own frame to `<code-block>`,
- * but its wrapper frames ride along in the same traceback. They are both an
- * internal server path and pure noise to the customer — the frames they can
- * act on are their own.
+/** Engine's execution-harness frames (internal path, pure noise): engine
+ * anonymizes customer's frame to `<code-block>`, wrapper frames stay.
  */
 const ENGINE_HARNESS_FRAME =
   /^[ \t]*File "\/tmp\/nlpgo-codeblock-[^"]*",.*$\n?(?:^[ \t]{4,}[^ \t\n].*$\n?|^[ \t]*\^+[ \t]*$\n?)*/gm;
@@ -487,19 +352,8 @@ export function redactInternalAddresses(text: string): string {
     );
 }
 
-/**
- * Replace known secret values with a marker, literally.
- *
- * Defence-in-depth, independent of what the engine puts in its error text.
- * The adapter puts a live provider credential (`workflow.api_key`) and the
- * project's secrets into the outgoing request, and this error text is
- * persisted onto a customer-visible run record. If any upstream ever echoes a
- * rejected credential, or a validation error quotes the submitted value back,
- * pattern-based redaction would not catch it — only knowing the actual values
- * does.
- *
- * Short values are skipped: a one- or two-character "secret" would rewrite
- * ordinary text and destroy the message.
+/** Replace known secrets literally (not pattern): defence-in-depth for
+ * echoed credentials; skip short values to avoid corrupting ordinary text.
  */
 export function scrubKnownSecrets(text: string, secrets: string[]): string {
   let out = text;
@@ -510,13 +364,8 @@ export function scrubKnownSecrets(text: string, secrets: string[]): string {
   return out;
 }
 
-/**
- * Format a fetch-time failure (DNS, connect, abort/timeout).
- *
- * The internal endpoint is intentionally absent from the message; it lives
- * on the thrown error's structured `.endpoint` field instead. The cause is
- * reduced to its `code`/`errno` where the platform provides one — that is
- * the actionable part — and otherwise redacted.
+/** Format fetch-time failure (DNS/connect/abort/timeout): omits internal
+ * endpoint from message, keeps only actionable code/errno.
  */
 export function formatFetchError(args: {
   cause: unknown;

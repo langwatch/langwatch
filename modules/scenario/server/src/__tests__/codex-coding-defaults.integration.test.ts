@@ -1,25 +1,7 @@
-/**
- * @vitest-environment node
+/** @vitest-environment node
  * @integration
- *
- * A project whose FAST / coding-default role is pinned to a codex model must
- * still be able to run scenario simulations against workflow / code / http
- * targets.
- *
- * The bug this guards: the prefetcher used to resolve an adapter-role model
- * for every target type, even though workflow / code / http targets never
- * consume an LLM key for the agent under test. A project that ran the Codex
- * "apply coding defaults" action — which pins FAST to a codex model —
- * therefore had every non-prompt simulation refused by the codex execution
- * backstop.
- *
- * The model-provider boundary is the REAL service here, composed over the
- * real Postgres repositories: the FAST and DEFAULT role rows are read back
- * from `ModelDefaultConfig`, and `prepareExecution` is the production path
- * that raises `ModelRestrictedForExecutionError` for a codex model. Faking
- * that boundary would hide exactly the failure this file exists to catch.
- *
- * @see specs/model-providers/codex-account-provider.feature
+ * Codex in FAST/coding-default: project runs simulations against
+ * workflow/code/http targets (real Postgres and model-provider boundary).
  */
 import { randomBytes } from "node:crypto";
 import type { Agent } from "@langwatch/agent-contract";

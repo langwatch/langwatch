@@ -2,30 +2,8 @@
  * @vitest-environment node
  * @unit
  *
- * Redelivery contract for the `snapshotUpdateBroadcast` subscriber, required by
- * the `eventing-subscriber-idempotency` architecture rule.
- *
- * The contract: handling one simulation event twice leaves ONE externally
- * visible result on the tenant's SSE channel.
- *
- * What holds it, and it is not the queue:
- *
- *  1. The payload is a pure function of the event. Every field is copied from
- *     `event.aggregateId` / `event.data`; nothing is read from the clock, a
- *     counter, or a generated id. Two deliveries therefore serialise to the
- *     same bytes, so the channel carries one distinct message however many
- *     times the job runs.
- *  2. The message is a nudge, not a delta. It names the run and (on `finished`)
- *     its status, and the client answers by refetching the run. A refetch is a
- *     read of current state, so applying the nudge N times converges on the
- *     same view. Nothing downstream of it accumulates.
- *
- * What explicitly does NOT hold it: `dedupId` + `ttl`. Those are compiled by
- * `buildProjectionSubscriberDedup` (packages/eventing/src/pipeline/staticBuilder.ts)
- * into a queue-level key with a finite window that squashes PENDING jobs only.
- * A redelivery after the window closes reaches the handler, and the handler has
- * no guard of its own, as the third test here shows. Queue deduplication is not
- * sufficient under this rule, and here it is not what makes redelivery safe.
+ * Redelivery contract: one event twice leaves ONE visible result.
+ * Payload is pure function (idempotent); client refetch on nudge converges to same view.
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 

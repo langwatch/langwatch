@@ -10,12 +10,15 @@ import {
 import {
   createScenarioRestTestApp,
   createScenarioRestTestRuntime,
+  PROJECT_ID,
   scenarioRestTestErrors,
 } from "./scenario-rest.harness.ts";
 
-function buildScenarioFamily() {
+function buildScenarioFamily(
+  runtimeOptions?: Parameters<typeof createScenarioRestTestRuntime>[0],
+) {
   const { app } = createScenarioRestTestApp();
-  const { runtime, projectFacts } = createScenarioRestTestRuntime();
+  const { runtime, projectFacts } = createScenarioRestTestRuntime(runtimeOptions);
   const mounted = runtime.mount(
     createScenarioRest().router(),
     {
@@ -26,6 +29,7 @@ function buildScenarioFamily() {
   );
 
   return {
+    app,
     request: (path: string, init?: RequestInit) =>
       mounted.fetch(new Request(`http://api.test${path}`, init)),
   };
@@ -43,6 +47,25 @@ async function createScenario(
 }
 
 describe("the scenarios REST declaration", () => {
+  describe("when a legacy project key creates a scenario", () => {
+    it("creates the scenario with no user attached, rather than crashing", async () => {
+      // A legacy project key names no person: the door's actor rule answers
+      // the project id for `actorId`, which is not a `User` row. Before the
+      // fix this crashed the write with the `lastUpdatedById` foreign key.
+      const family = buildScenarioFamily({ viewerUserId: null, actorId: PROJECT_ID });
+
+      const response = await createScenario(family, {
+        name: "Project-key Scenario",
+        situation: "A project-bound key creates this",
+      });
+
+      expect(response.status).toBe(201);
+      const created = scenarioRestResponseWithPlatformUrlSchema.parse(await response.json());
+      const row = await family.app.tryGetById({ id: created.id, projectId: PROJECT_ID });
+      expect(row?.lastUpdatedById).toBeNull();
+    });
+  });
+
   describe("when creating with model overrides and turn limits", () => {
     /** @scenario "Create over REST accepts model overrides and turn limits" */
     it("carries the values back on create and read", async () => {

@@ -262,18 +262,8 @@ function isTerminalStatus(status: string): boolean {
 }
 
 /**
- * The status a finished run reads with.
- *
- * An explicit TERMINAL status takes priority, otherwise the status derives
- * from the verdict. The explicit status arrives from the scenario-events
- * ingest route, whose schema types it as the full ScenarioRunStatus enum,
- * non-terminal members included. Taking it at face value would write a
- * non-terminal Status alongside FinishedAt, which is the one state nothing
- * can recover: the orphan reconciler skips it (FinishedAt IS NULL) and no
- * read-time status derivation remains to mask it.
- *
- * Shared with RecordEvaluationsCommand, which needs the status the run held
- * after its finished event without reading the fold.
+ * Status a finished run reads with: explicit TERMINAL takes priority, else derives
+ * from verdict. Shared with RecordEvaluationsCommand.
  */
 export function finishedStatusOf({
   explicitStatus,

@@ -32,14 +32,8 @@ export const SIMULATION_RUN_EXECUTION_INTENT_TYPES = {
 export const CANCEL_GRACE_MS = 60_000;
 
 /**
- * How long a finished run may owe its evaluator results before the process
- * records them as errored.
- *
- * The evaluation job records a result for every attachment on its final
- * attempt, so the evaluated event normally always arrives: its retries span
- * about three minutes while the trace lands, plus one evaluator call per
- * attachment. The deadline only catches a job lost outright, a wiped queue or
- * a worker that died with no retry, so it sits well above that window.
+ * Evaluation deadline: finished run owes evaluator results before marking errored.
+ * Catches jobs lost outright; sits above normal 3-minute window.
  */
 export const EVALUATION_DEADLINE_MS = 15 * 60_000;
 

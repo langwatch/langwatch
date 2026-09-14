@@ -1,25 +1,7 @@
 import { afterEach, beforeEach, vi } from "vitest";
 
-/**
- * Makes the global fetch throw for the duration of each test in the calling
- * suite.
- *
- * Node's global fetch is bound to the undici that ships inside Node, and it
- * rejects a dispatcher built by the undici npm package with
- * "InvalidArgumentError: invalid onRequestStart method". Code that passes a
- * dispatcher must therefore call undici's own fetch export. A suite that mocks
- * only that export would still pass if the code fell back to the global fetch,
- * so this guard turns that fallback into a clear failure.
- *
- * The stub is installed before each test and removed after it, because the
- * unit config runs with `isolate: false`: a stub left in place would reach
- * every later file in the same worker.
- *
- * It saves and restores the fetch property itself rather than calling
- * `vi.stubGlobal` and `vi.unstubAllGlobals`, for the same reason: those work on
- * one shared registry, so the cleanup would also drop globals that another file
- * in the worker installed.
- */
+// Guard that makes global fetch throw, ensuring code calls undici's fetch
+// (installed/removed per test to avoid isolation issues with isolate: false)
 export function guardAgainstGlobalFetch(): void {
   let original: PropertyDescriptor | undefined;
 

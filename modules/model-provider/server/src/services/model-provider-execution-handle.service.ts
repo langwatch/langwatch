@@ -31,7 +31,7 @@ export type ModelProviderExecutionHandleOptions = {
   /** The composed gateway every provider row and prepared credential is read from. */
   modelProviders: Pick<
     ModelProviderApi,
-    "resolveModelForFeature" | "findAlternateModel" | "getExecutionProviders" | "prepareExecution"
+    "resolveModelForFeature" | "findAlternateModel" | "getExecutionProviders"
   >;
   /**
    * The project read that decides whether the id names anything at all.
@@ -59,7 +59,7 @@ async function resolveModel({
   projectId: string;
   featureKey: string;
   modelProviders: Record<string, LegacyModelProviderExecution>;
-  modelProviderService: ModelProviderExecutionHandleOptions["modelProviders"];
+  modelProviderService: ModelProviderApi;
 }): Promise<string> {
   // 1. Explicit model always wins. A latest alias resolves to the concrete
   //    model here so the provider lookup below reads the real prefix.
@@ -112,7 +112,7 @@ async function tryResolveFeatureDefault({
   projectId: string;
   featureKey: string;
   modelProviders: Record<string, LegacyModelProviderExecution>;
-  modelProviderService: ModelProviderExecutionHandleOptions["modelProviders"];
+  modelProviderService: ModelProviderApi;
 }): Promise<string | null> {
   try {
     const resolved = await modelProviderService.resolveModelForFeature({ projectId, featureKey });
@@ -157,7 +157,7 @@ async function disabledProviderError({
   projectId: string;
   featureKey: string;
   modelProviders: Record<string, LegacyModelProviderExecution>;
-  modelProviderService: ModelProviderExecutionHandleOptions["modelProviders"];
+  modelProviderService: ModelProviderApi;
 }): Promise<ModelProviderDisabledError> {
   // `resolved.scope` is always non-null on the success path, but the type is
   // loose — narrow here so the typed error stays correct.
@@ -206,7 +206,7 @@ async function tryFindAlternate({
   skipFromScope: NonNullable<
     Awaited<ReturnType<ModelProviderApi["resolveModelForFeature"]>>["scope"]
   >;
-  modelProviderService: ModelProviderExecutionHandleOptions["modelProviders"];
+  modelProviderService: ModelProviderApi;
 }): Promise<ModelProviderAlternateResolution | null> {
   try {
     return await modelProviderService.findAlternateModel({ projectId, featureKey, skipFromScope });

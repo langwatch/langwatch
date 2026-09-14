@@ -1,11 +1,6 @@
 /**
- * The process capabilities a scenario write reaches that are not scenario's
- * own: product analytics, and the lifecycle nurturing that fires when someone
- * writes their first test cases.
- *
- * Fire-and-forget by design - none of them may fail a write - so every method
- * answers nothing and a failure goes to {@link ScenarioActivity.failed}
- * rather than to the caller.
+ * Process capabilities a scenario write reaches: product analytics and lifecycle nurturing.
+ * Fire-and-forget; failures go to captureException, not the caller.
  */
 export abstract class ScenarioActivity {
   /** Records the product-analytics event for a newly created scenario. */

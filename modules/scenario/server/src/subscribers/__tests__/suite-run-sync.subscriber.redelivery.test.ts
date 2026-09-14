@@ -2,38 +2,8 @@
  * @vitest-environment node
  * @unit
  *
- * Redelivery contract for the `suiteRunSync` subscriber, required by the
- * `eventing-subscriber-idempotency` architecture rule.
- *
- * The contract at this seam: handling one simulation event twice must dispatch
- * the SAME suite-run-item command twice, not two different ones, so the two
- * dispatches name ONE suite run item rather than two.
- *
- * What holds it: the whole command is event-carried state. `occurredAt` comes
- * from `event.occurredAt`, every identity field comes from `event.data`, and
- * nothing is read from the clock. A second delivery therefore produces a
- * byte-identical payload, which is what keeps the downstream identity stable:
- * `RecordSuiteRunItemStartedCommand` / `CompleteSuiteRunItemCommand`
- * (modules/suite/server/src/adapters/suite-run-commands.adapter.ts)
- * key both their event `idempotencyKey` and their `makeJobId` on
- * `tenantId : batchRunId : scenarioRunId : itemStarted|itemCompleted`, and the
- * `event_log` table replaces on `(TenantId, AggregateType, AggregateId,
- * IdempotencyKey)`. Same payload in, same key out, one logical item.
- *
- * KNOWN DOWNSTREAM GAP, deliberately not asserted here because it lives in
- * another package: nothing in the live path acts on that stable key.
- * `createSuiteRunProcessingPipeline` registers all three suite commands with no
- * `deduplication` option, and `withCommand` never reads a handler class's
- * static `makeJobId` (only `CommandHandlerOptions.deduplication` reaches the
- * queue, the way `computeRunMetrics` wires it at
- * modules/scenario/server/src/eventing/simulation-processing.pipeline.ts:88).
- * `SuiteRunStateFoldProjection` then accumulates (`CompletedCount + 1`,
- * `GradedCount + 1`), and `FoldProjectionExecutor.dropAlreadyApplied` skips
- * redeliveries by `event.id` only, which two distinct events sharing an
- * idempotency key do not share. So a redelivery here does currently
- * double-count a suite run's progress until something forces a re-fold from
- * the log, where `deduplicateEvents` collapses the pair. The subscriber's half
- * of the contract is the part this file can prove, and it holds.
+ * Redelivery contract for suiteRunSync: dispatches SAME command twice (byte-identical).
+ * Known downstream gap: deduplication not wired, causes double-counting (outside scope).
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 

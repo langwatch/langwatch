@@ -1,18 +1,7 @@
 /**
- * `{{ secrets.NAME }}` references in an http target's request.
- *
- * A code target and a workflow target already read a project secret this way.
- * An http target gets the same reference in the places a credential actually
- * belongs, the url, the header values and the auth fields, so an API key
- * never has to be typed into the target's configuration, where anyone who can
- * open the target can read it back.
- *
- * The semantics mirror the engine's (services/nlpgo/app/engine/secrets.go):
- * substitution happens at request-build time so a rotated value is honored on
- * the next turn, a name the project does not have is left exactly as written,
- * and every resolved value is scrubbed out of anything the run shows back.
- *
- * @see specs/scenarios/http-agent-secret-references.feature
+ * `{{ secrets.NAME }}` references in http target requests: url, headers, auth fields.
+ * Mirroring engine semantics: rotate-aware at request-build time, resolve-blind refs left
+ * verbatim, all values scrubbed. See specs/scenarios/http-agent-secret-references.feature.
  */
 
 import { randomUUID } from "crypto";
@@ -73,20 +62,9 @@ export class ScenarioSecretReferenceAdapter {
   }
 
   /**
-   * Lifts every secret reference out of a template that a Liquid engine renders
-   * afterwards, and hands back the substitution that restores them.
-   *
-   * A resolved value never reaches the template engine at all. Fencing it with
-   * `{% raw %}` instead would put it there, and Liquid ends a raw block at the
-   * first literal `{% endraw %}`, so a value carrying that text would close its
-   * own fence and hand the rest of the template back to the engine as source.
-   * Whoever writes a project secret is not always whoever writes the scenario,
-   * so that is a boundary worth keeping.
-   *
-   * Both halves of the contract survive the round trip: a resolved value reaches
-   * the wire byte for byte, and a reference to a name the project does not have
-   * comes back exactly as written rather than being rendered to an empty string
-   * by an engine that never binds `secrets`.
+   * Lifts secret references out of template for Liquid rendering, returns restore fn.
+   * Avoids Liquid's `{% raw %}` (values unreachable if containing `{% endraw %}`),
+   * keeping credential/scenario author boundary.
    */
   static fence({
     template,
@@ -121,14 +99,8 @@ export class ScenarioSecretReferenceAdapter {
   }
 
   /**
-   * Lifts every secret reference out of a template without resolving any.
-   *
-   * This is what "left untouched" has to mean for the body template. The body
-   * carries the conversation and is authored by whoever writes the scenario, not
-   * by whoever holds the credential, so no secret is ever substituted into it,
-   * but the engine that renders it does not bind `secrets` either, so leaving
-   * the reference alone would silently render it to an empty string. Lifting it
-   * out and putting it back sends it on exactly as the author wrote it.
+   * Lifts secret references out of body template without resolving (engine doesn't
+   * bind `secrets` either, so leaving refs alone renders them empty).
    */
   static preserve(template: string): FencedTemplate {
     return ScenarioSecretReferenceAdapter.fence({ template, secrets: {} });
@@ -175,16 +147,8 @@ export class ScenarioSecretReferenceAdapter {
   }
 
   /**
-   * Replaces every resolved secret *value* in a message with the placeholder.
-   *
-   * The failure path is where a substituted credential escapes: a fetch error
-   * commonly embeds the whole request url (query string included), and the
-   * message the adapter throws becomes the run's recorded error, its span, and
-   * its log line. Scrub before any of them see it.
-   *
-   * Longest value first, because one secret can contain another: with `abc` and
-   * `abcdef` in the project, replacing `abc` first leaves `[redacted]def` and
-   * hands back the tail of the longer credential.
+   * Replaces resolved secret values in message with placeholder. Scrub before
+   * errors escape. Longest value first (one secret can contain another).
    */
   static redact({
     message,

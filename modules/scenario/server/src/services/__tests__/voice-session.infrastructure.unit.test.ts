@@ -1,11 +1,6 @@
 /**
- * The infrastructure composition for the "Talk to it" route, driven against
- * in-memory fakes for `AgentService`/`ScenarioService` — no Prisma in the
- * loop. Verifies the infrastructure translates service results into the
- * shapes {@link VoiceSessionInfrastructure} promises, since that translation
- * (the config parse, the scenario-set lookup) is the only logic this module
- * owns; the services themselves are exercised by their own tests.
- *
+ * Infrastructure composition for "Talk to it" route over in-memory fakes.
+ * Verifies infrastructure translates service results to promised shapes.
  * @see specs/features/agents/voice-agents-v1.feature
  */
 import { ScenarioRunStatus } from "@langwatch/scenario-contract";

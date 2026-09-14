@@ -1,14 +1,6 @@
-/**
- * @vitest-environment node
- *
- * The child's env allowlist. Covers the voice-only forward of
- * `VOICE_PUBLIC_BASE_URL` / `BASE_HOST` / `VOICE_WS_PORT`, which the phone
- * transport reads once it is running inside the pool child (see
- * `resolvePublicBaseUrl` / `resolveHttpPort` in `../../voice/transports/phone.transport.ts`).
- * This allowlist is the only gate between the operator's process env and the
- * child, so a variable missing here means the transport never sees it.
- *
- * @see specs/features/agents/voice-phone.feature
+/** @vitest-environment node
+ * Child's env allowlist: voice-only forward of VOICE_PUBLIC_BASE_URL/
+ * BASE_HOST/VOICE_WS_PORT is the only gate between operator and child.
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 

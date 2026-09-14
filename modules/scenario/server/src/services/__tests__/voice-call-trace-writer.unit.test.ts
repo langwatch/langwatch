@@ -1,11 +1,8 @@
 /**
  * @vitest-environment node
  * @see specs/features/agents/voice-agents-v1.feature
- *
- * Unit tests for the voice-call trace writer: how turns group into exchanges,
- * the deterministic ids a re-drive recomputes, the OTLP span attributes the
- * fold and previews read, the timestamp fallback, and the best-effort posture
- * on a `recordSpan` failure.
+ * Unit tests for voice-call trace writer: turn grouping, deterministic ids, re-drive,
+ * OTLP attributes, timestamp fallback, recordSpan best-effort.
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -135,7 +132,7 @@ describe("recordVoiceCallTraces", () => {
   });
 
   describe("given a call with a greeting and one exchange", () => {
-    /** @scenario "A finished browser call writes one trace per exchange and every message links to its exchange's trace" */
+    /** @scenario "Finished browser call writes one trace per exchange; messages link to exchange trace" */
     it("returns one trace id per turn, shared within an exchange", async () => {
       const record = fakeRecord({
         turns: [
@@ -326,7 +323,7 @@ describe("recordVoiceCallTraces", () => {
   });
 
   describe("when recordSpan fails", () => {
-    /** @scenario "A finished browser call writes one trace per exchange and every message links to its exchange's trace" */
+    /** @scenario "Finished browser call writes one trace per exchange; messages link to exchange trace" */
     it("swallows the failure and still returns the ids", async () => {
       mockRecordSpan.mockRejectedValue(new Error("queue down"));
       const record = fakeRecord({

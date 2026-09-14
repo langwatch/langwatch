@@ -1,11 +1,5 @@
-/**
- * @vitest-environment node
- *
- * Secret references and run parameters in an http target's request.
- *
- * @see specs/scenarios/http-agent-secret-references.feature
- * @see specs/scenarios/scenario-run-parameters.feature
- * @see specs/scenarios/secret-run-parameters.feature
+/** @vitest-environment node
+ * Secret and parameter references in HTTP target requests.
  */
 
 import { type AgentInput, AgentRole } from "@langwatch/scenario";
@@ -149,7 +143,10 @@ describe("SerializedHttpAgentAdapter secret references", () => {
   });
 
   describe("given headers and auth fields that reference a project secret", () => {
-    /** @scenario "Secret references resolve in header values and auth token, value, username, and password" */
+    /**
+     * @scenario "Secret references resolve in header values and auth
+     * token, value, username, and password"
+     */
     it("carries the secret's value in the header value", async () => {
       const adapter = createMockHttpAgentAdapter({
         config: config({
@@ -162,7 +159,10 @@ describe("SerializedHttpAgentAdapter secret references", () => {
       expect(requestedHeaders()["X-Agent-Key"]).toBe(SECRET_VALUE);
     });
 
-    /** @scenario "Secret references resolve in header values and auth token, value, username, and password" */
+    /**
+     * @scenario "Secret references resolve in header values and auth
+     * token, value, username, and password"
+     */
     it("carries the secret's value in a bearer auth token", async () => {
       const adapter = createMockHttpAgentAdapter({
         config: config({
@@ -175,7 +175,10 @@ describe("SerializedHttpAgentAdapter secret references", () => {
       expect(requestedHeaders().Authorization).toBe(`Bearer ${SECRET_VALUE}`);
     });
 
-    /** @scenario "Secret references resolve in header values and auth token, value, username, and password" */
+    /**
+     * @scenario "Secret references resolve in header values and auth
+     * token, value, username, and password"
+     */
     it("carries the secret's value in an api key auth value", async () => {
       const adapter = createMockHttpAgentAdapter({
         config: config({
@@ -192,7 +195,10 @@ describe("SerializedHttpAgentAdapter secret references", () => {
       expect(requestedHeaders()["X-Api-Key"]).toBe(SECRET_VALUE);
     });
 
-    /** @scenario "Secret references resolve in header values and auth token, value, username, and password" */
+    /**
+     * @scenario "Secret references resolve in header values and auth
+     * token, value, username, and password"
+     */
     it("carries the secret's value in basic auth username and password", async () => {
       const adapter = createMockHttpAgentAdapter({
         config: config({
@@ -210,7 +216,10 @@ describe("SerializedHttpAgentAdapter secret references", () => {
       expect(requestedHeaders().Authorization).toBe(`Basic ${expected}`);
     });
 
-    /** @scenario "Secret references resolve in header values and auth token, value, username, and password" */
+    /**
+     * @scenario "Secret references resolve in header values and auth
+     * token, value, username, and password"
+     */
     it("leaves the target's own auth config unresolved for the next turn", async () => {
       const agentConfig = config({
         auth: { type: "bearer", token: "{{ secrets.AGENT_TOKEN }}" },

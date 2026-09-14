@@ -16,16 +16,7 @@ describe("Worker integration behavior (documented contract)", () => {
 
   /** @scenario Failure handler errors do not crash worker */
   it("documents that worker catches errors from finishUnsuccessfulRun", () => {
-    // This is a documentation test - the actual behavior is:
-    // worker.on("completed", async (job, result) => {
-    //   if (result && !result.success) {
-    //     try {
-    //       await failureHandler.finishUnsuccessfulRun(...);
-    //     } catch (error) {
-    //       logger.error(...); // Log but don't crash
-    //     }
-    //   }
-    // });
+    // Documentation test: worker catches finishUnsuccessfulRun errors to prevent crash.
     expect(true).toBe(true);
   });
 

@@ -1,21 +1,6 @@
-/**
- * @vitest-environment node
- *
- * Issue #6634's child-process serialization boundary. Every model-params
- * field is individually optional — workflow / code / http targets resolve no
- * adapter-role `modelParams`, and a job queued before the simulator/judge
- * split carries only `modelParams` — but the payload as a whole must still
- * yield a model for each role. The schema enforces that as a refinement, and
- * `selectRoleModelParams` applies the pre-split fallback, so
- * `scenario-child-process.ts` fails loudly with a named Zod error instead of
- * an opaque `undefined` crash three layers into model construction.
- *
- * These tests run the real parse and then the real selection, so a payload
- * that would break a straddling deploy cannot pass them.
- *
- * @see specs/scenarios/simulation-run-model-resolution.feature
- *   ("A job payload missing every model params field fails at schema
- *   parse", "An older job payload shape still parses and runs")
+/** @vitest-environment node
+ * Child-process serialization boundary (issue #6634): model params optional
+ * per field but payload must yield a model for each role (real parse/selection).
  */
 import { describe, expect, it } from "vitest";
 import { ChildProcessJobDataSchema, type LiteLLMParams } from "@langwatch/scenario-contract";

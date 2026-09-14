@@ -82,27 +82,8 @@ export function createFinishRunHandler(
 }
 
 /**
- * The `record_evaluations` intent executor: record one errored result per
- * evaluator the run still owes, through the pipeline's own record evaluations
- * command, so the fold applies the same gate a graded run gets. The results
- * carry the evaluator's name when it still exists and its id otherwise, the
- * way the evaluation job records an evaluator it cannot find.
- *
- * `resolveEvaluatorNames` is optional: neither process-manager wiring site
- * carries an evaluator lookup today (scenario must not grow a value
- * dependency on the evaluator module for this), so until one is wired every
- * result's name degrades to the evaluator id, which is exactly the original's
- * own fallback branch.
- *
- * Builds the errored result inline rather than through
- * `toScenarioEvaluationResult` (`@langwatch/scenario-contract`,
- * `evaluations/runScenarioEvaluations.ts`): that module still carries several
- * unrelated dangling `~/` imports, and re-exporting a value from it loads the
- * whole module at runtime, which broke ~87 of this package's 97 test files
- * when tried. This inlines exactly its `"error"` branch (`{ ...base, status:
- * "error", details }` with `base` carrying `evaluatorId`, `name`, `required`
- * and `inputs` only when non-empty) for the one call shape this handler ever
- * makes, with no branching this handler does not need.
+ * Records evaluations intent: one errored result per evaluator through
+ * pipeline command; carries evaluator name/id; builds result inline to avoid imports.
  */
 export function createRecordEvaluationsHandler(
   simulations: SimulationService,

@@ -1,7 +1,6 @@
 /**
- * Combinatorial test for simulation run fold ordering. Proves that the fold produces correct final
- * state regardless of event processing order. Simulates the incremental fold pattern: store.tryGet() →
- * apply(event) → store.store() for each event.
+ * Combinatorial test for simulation run fold ordering: correct final state regardless
+ * of event order. Simulates incremental fold pattern: store.tryGet() → apply(event) → store().
  */
 
 import type { FoldProjectionStore, ProjectionStoreContext } from "@langwatch/eventing";

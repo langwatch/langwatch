@@ -1,7 +1,6 @@
 /**
- * Serialized code agent adapter for scenario worker execution: operates on
- * pre-fetched config with no database access, so it can run in isolated
- * worker threads. Executes Python via a minimal entry->code->end DSL workflow sent to nlpgo's /go/studio/execute_sync as an execute_flow event.
+ * Serialized code agent adapter: isolated worker thread executing Python DSL workflows
+ * via nlpgo's /go/studio/execute_sync endpoint.
  */
 
 import { injectTraceContextHeaders } from "@langwatch/observability/tracing";
@@ -31,14 +30,9 @@ import {
 import { SerializedAgent } from "./serialized-agent.service.ts";
 
 /**
- * Categories for adapter failures, surfaced as the `error.kind` span attribute.
- *
- * `execution` is a run the NLP engine accepted and then finalized as failed —
- * it arrives as a 200, so it is not an `http` failure. `parse` is a 2xx whose
- * body is not the JSON the engine promises, and `output` is a run that
- * succeeded without producing the field the agent declared. Keeping these
- * distinct is the point: an operator filtering `error.kind=http` must not be
- * handed a 200.
+ * Adapter failure categories for `error.kind` span attribute: `execution` (200 with failure),
+ * `parse` (2xx with non-JSON), `output` (missing field), timeout/fetch/http so operators
+ * can filter failures without reading message text.
  */
 type AdapterErrorKind =
   | "timeout"
@@ -58,17 +52,8 @@ function isAbortError(error: unknown): boolean {
 }
 
 /**
- * Failure surfaced by the adapter to the scenario runner.
- *
- * Carries two orthogonal classifications so both observability and customer
- * debugging are served from a single thrown error:
- * - `kind` (lw#3438): coarse failure category mirrored onto the parent span's
- *   `error.kind` attribute so a timeout is greppable from a network failure or
- *   a non-2xx response without reading the message string.
- * - `source` (lw#3439): whether the failure came from the user's Python code
- *   vs the NLP service/network, used to render the user-friendly message while
- *   `rawDetail` keeps the original NLP payload for deep debugging. Derived
- *   from the Go engine's own error contract — see `format-execution-error.ts`.
+ * Adapter failure to scenario runner: carries `kind` (lw#3438, span attributes) and
+ * `source` (lw#3439, user code vs service) for observability and customer messaging.
  */
 export class SerializedCodeAgentAdapterError extends Error {
   readonly kind: AdapterErrorKind;
@@ -205,9 +190,8 @@ export class SerializedCodeAgentAdapter extends SerializedAgent {
   }
 
   /**
-   * The `params` namespace for one turn: the run's resolved values plus this
-   * turn's trace context, so tested code can forward `params.trace_id`/
-   * `traceparent`. Captured per call (every turn opens its own trace); these two names are reserved and win over a same-named run parameter.
+   * The `params` namespace for one turn: resolved values plus trace context
+   * (trace_id, traceparent). These names are reserved and win over run parameters.
    */
   private turnParameters(): RunParameterValues {
     const { headers, traceId } = injectTraceContextHeaders({ headers: {} });
@@ -319,9 +303,8 @@ export class SerializedCodeAgentAdapter extends SerializedAgent {
   }
 
   /**
-   * Builds the code node that executes the agent's Python code. A configured
-   * `timeoutMs` travels as `timeout_ms` (`nodeTimeout` in engine.go) but is a
-   * request for a SHORTER budget only — the executor clamps to the operator's ceiling (`NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS`), so a larger value buys nothing.
+   * Builds the code node that executes the agent's Python code. `timeoutMs` is
+   * clamped by `NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS`, so larger values buy nothing.
    */
   private buildCodeNode(
     inputs: { identifier: string; type: string; value: unknown }[],
@@ -358,9 +341,8 @@ export class SerializedCodeAgentAdapter extends SerializedAgent {
   }
 
   /**
-   * How long to wait on the NLP service for one turn: at least
-   * {@link NlpFetchAdapter.floorTimeoutMs} (the engine's ceiling plus
-   * headroom), above the agent's own budget when longer (so the engine enforces the timeout), bounded by {@link NlpFetchAdapter.maxTimeoutMs}. An over-large `timeoutMs` is clamped, not rejected — the schemas stay unbounded since the engine's own contract is to clamp, not fail.
+   * Fetch timeout for one turn: max of floor (engine ceiling + headroom) and agent budget,
+   * clamped to max. Over-large values are clamped, not rejected.
    */
   private fetchTimeoutMs(): number {
     const { timeoutMs } = this.config;
@@ -390,9 +372,8 @@ export class SerializedCodeAgentAdapter extends SerializedAgent {
   }
 
   /**
-   * Executes the workflow via /go/studio/execute_sync, using execute_flow
-   * (not execute_component) since /execute_sync only monitors
-   * ExecutionStateChange events. Wrapped in an OTel span (lw#3438, via `withActiveSpan`) annotated with `error.kind`/`http.status_code` so failures are greppable without reading the message string.
+   * Executes the workflow via /go/studio/execute_sync with execute_flow events.
+   * OTel span annotates `error.kind`/`http.status_code` for grepping failures without message text.
    */
   private async executeOnNlpService(
     workflow: ReturnType<typeof this.buildWorkflow>,
@@ -575,19 +556,8 @@ export class SerializedCodeAgentAdapter extends SerializedAgent {
           if (error instanceof SerializedCodeAgentAdapterError) {
             throw this.scrubFailure(error);
           }
-          // The abort timer stays armed once headers arrive, so it can fire
-          // while the body is still streaming. That rejection surfaces here,
-          // outside the fetch try — classify it as the timeout it is rather
-          // than letting a bare "The operation was aborted." escape unwrapped
-          // (review lw#3439).
-          //
-          // `responseComplete` covers the narrow race where the timer fired
-          // DURING the body read but the body arrived anyway: the latch is
-          // then true over a response that demonstrably completed, and a
-          // later failure must not be relabelled a timeout. It is
-          // defence-in-depth — today every post-body failure is already
-          // wrapped as a SerializedCodeAgentAdapterError and returns above —
-          // and it is what keeps that true if a future path throws raw.
+          // Abort timer can fire while body streams; race-safe check via responseComplete (lw#3439)
+          // classifies post-header failures as timeout, not bare "The operation was aborted."
           if (!responseComplete && (timedOut || isAbortError(error))) {
             span.setAttribute(
               "error.kind",

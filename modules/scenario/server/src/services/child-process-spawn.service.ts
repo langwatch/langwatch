@@ -1,17 +1,6 @@
 /**
- * Resolves the command and arguments for spawning a scenario child process.
- *
- * In production, uses the pre-compiled esbuild bundle (node + dist/server/scenario-child-process.cjs).
- * If the bundle is missing, this resolver logs the remediation and returns the
- * tsx command rather than throwing. That fallback only actually runs where dev
- * dependencies are present: tsx is a devDependency, so the Docker image and the
- * published npx tree both prune it and the spawn fails there — a missing bundle
- * is a build fault to fix, not a degraded mode to live in.
- * Outside production the bundle is still used while it is current, because tsx
- * costs seconds on every spawn. It is dropped the moment any child source is
- * newer, so editing the child still takes effect without a rebuild.
- *
- * @see specs/scenarios/pre-compiled-child-process.feature
+ * Spawn command resolver: production uses pre-compiled bundle or fallback tsx,
+ * dev uses bundle if current else tsx. See specs/scenarios/pre-compiled-child-process.feature.
  */
 
 import { createLogger } from "@langwatch/observability";
@@ -26,16 +15,8 @@ export interface SpawnConfig {
 }
 
 /**
- * Resolves the spawn command and args for the scenario child process.
- *
- * Production uses the pre-compiled bundle whenever it is present, and falls
- * back to tsx after logging remediation when it is not. Every other value
- * (development, test, staging, undefined) uses the bundle too while it is
- * newer than the child's sources, and tsx otherwise.
- *
- * @param packageRoot - Absolute path to the langwatch package root
- * @param nodeEnv - Current NODE_ENV value
- * @returns Command and args to pass to child_process.spawn
+ * Spawn command resolver: production uses bundle or tsx fallback, dev uses bundle if
+ * current else tsx (edit child -> next spawn uses tsx, no rebuild needed).
  */
 export class ChildProcessSpawnAdapter {
   static create(): ChildProcessSpawnAdapter {
@@ -59,15 +40,8 @@ export class ChildProcessSpawnAdapter {
       return resolveProductionSpawn(packageRoot, sourcePath);
     }
 
-    // Outside production the bundle is an optimisation rather than a
-    // requirement, so it is used only while it is demonstrably current. tsx
-    // costs seconds on every spawn — measured at 4-6s alone and ~10s with the
-    // pool's three running at once — and a simulation pays that per run, which
-    // is the difference between a run starting promptly and a suite crawling.
-    //
-    // Currency is decided by mtime against the child's own sources: edit any of
-    // them and the next spawn returns to tsx by itself, so the fast path can
-    // never run code you did not build. Rebuild with `pnpm run build:server`.
+    // Bundle is optimisation, used if current; tsx costs 4-6s per spawn.
+    // mtime check: edit any child source -> next spawn uses tsx (no rebuild needed).
     const bundlePath = bundlePathFor(packageRoot);
     if (isBundleCurrent({ bundlePath, sourceRoots })) {
       logger.debug({ bundlePath }, "Using pre-compiled bundle for child process");
@@ -86,14 +60,8 @@ function bundlePathFor(packageRoot: string): string {
 }
 
 /**
- * True when the bundle exists and nothing under the child's source tree is
- * newer than it.
- *
- * The whole `scenarios/execution` tree is checked, not just the entry point:
- * the child pulls in the adapters, the model factory and the serialized
- * adapter registry, and a change to any of those is as much a reason to stop
- * trusting the bundle. Anything unreadable counts as stale, so every failure
- * direction lands on tsx rather than on stale code.
+ * True when bundle exists and nothing in `scenarios/execution` tree is newer.
+ * Any unreadable file counts as stale, landing on tsx rather than stale code.
  */
 function isBundleCurrent({
   bundlePath,

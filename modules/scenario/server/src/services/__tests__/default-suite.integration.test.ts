@@ -173,7 +173,7 @@ describe.skipIf(!databaseUrl)("the Default test suite on the write path", () => 
     expect([...suites[0]!.scenarioIds].sort()).toEqual([first.id, second.id].sort());
   });
 
-  /** @scenario "A Default suite created while another suite already owns the slug takes a numbered slug" */
+  /** @scenario "Default suite owning slug takes numbered slug when another suite owns 'default'" */
   it("takes a numbered slug when another suite of the project owns 'default'", async () => {
     await database().simulationSuite.create({
       data: {
@@ -211,7 +211,7 @@ describe.skipIf(!databaseUrl)("the Default test suite on the write path", () => 
     expect([...suites[0]!.scenarioIds].sort()).toEqual([first!.id, second!.id].sort());
   });
 
-  /** @scenario "Removing a scenario from its suite files it into Default instead of leaving it loose" */
+  /** @scenario "Removing scenario from suite files it into Default, not leaving it loose" */
   /** @scenario "Taking a scenario out of its test suite files it into Default" */
   /** @scenario "Taking a scenario out of its suite moves it to Default" */
   it("files a scenario cleared out of its suite into Default and drops it from the old one", async () => {

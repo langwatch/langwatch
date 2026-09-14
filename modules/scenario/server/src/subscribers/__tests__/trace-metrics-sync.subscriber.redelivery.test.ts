@@ -2,46 +2,8 @@
  * @vitest-environment node
  * @unit
  *
- * Redelivery contract for the `traceMetricsSync` subscriber, required by the
- * `eventing-subscriber-idempotency` architecture rule.
- *
- * The contract holds, but NOT the way this pipeline's schema says it does, and
- * the difference is a real defect rather than a documentation nit. These tests
- * pin both halves.
- *
- * What holds: every key downstream of this subscriber is
- * `tenantId : scenarioRunId : traceId`, and none of them contains a timestamp.
- * `ComputeRunMetricsAdapter` stamps that string as the emitted event's
- * `idempotencyKey`; `simulation_run_metrics` orders on
- * `(TenantId, ScenarioRunId, TraceId)`; `SimulationRunStateFoldProjection`
- * writes `TraceMetrics[traceId]` as a keyed replacement and recomputes the
- * run's totals from the map rather than adding to them; and the read path
- * (`ClickHouseSimulationRunMetricsRepository.getRunMetrics`) merges
- * `argMaxMerge(...) GROUP BY TraceId` over the rollup. Redelivery therefore
- * leaves one visible metrics figure per trace. That is the mechanism, and the
- * tests below pin it.
- *
- * What does NOT hold: the subscriber builds its command with
- * `occurredAt: Date.now()`, so a second delivery of one `RunFinished` produces
- * a command that differs from the first. Migrations 00080 and 00081 are
- * written against the opposite invariant, in as many words: "a retry re-inserts
- * a row with the SAME OccurredAt (stamped from event.occurredAt by the map
- * projection)". `simulation_run_metrics` is
- * `ReplacingMergeTree(OccurredAt) PARTITION BY toYYYYMM(OccurredAt)`, and a
- * ReplacingMergeTree never collapses across partitions, so a redelivery whose
- * fresh clock reading lands in a different calendar month leaves two permanent
- * rows for one trace in the fact table (and, by `PARTITION BY PartitionMonth`,
- * two in the rollup). The read path still collapses them, so the figure a
- * customer sees stays correct; the stored fact does not, and any future read
- * that skips the `GROUP BY TraceId` collapse the migration warns about would
- * double-count. The surviving row also carries the retry's wall clock as its
- * `OccurredAt` rather than the run's.
- *
- * The one-line fix is `occurredAt: event.occurredAt`, which is what the sibling
- * `suiteRunSync` subscriber already does. Note that it is necessary but not
- * sufficient: `ComputeRunMetricsAdapter.handle` restamps `occurredAt: Date.now()`
- * on each `scheduleRetry`, so a run whose metrics land on a later attempt
- * breaks the same invariant from inside the command handler.
+ * Redelivery contract for traceMetricsSync: contract holds but violates schema.
+ * OccurredAt drifts on retry across calendar months; fix is use event.occurredAt.
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -172,14 +134,8 @@ describe("traceMetricsSync subscriber redelivery", () => {
 
   describe("given a redelivery that crosses the fact table's month partition", () => {
     /**
-     * The case the invariant exists for. `simulation_run_metrics` is a
-     * ReplacingMergeTree partitioned by month, and a ReplacingMergeTree never
-     * collapses across partitions — so a redelivery whose row lands in the next
-     * month is a row that survives forever. It only lands there if `occurredAt`
-     * moves, which is why this test and the wall clock are the same test.
-     *
-     * Migrations 00080 and 00081 state the invariant in their headers: "a retry
-     * re-inserts a row with the SAME OccurredAt". This is what holds them to it.
+     * ReplacingMergeTree partitioned by month never collapses across partitions.
+     * Redelivery in next month survives forever. Migrations 00080/00081 state this invariant.
      */
     it("retains one metrics row for the trace", async () => {
       vi.useFakeTimers();

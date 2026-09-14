@@ -22,7 +22,7 @@ import type { ScenarioRepository } from "../../repositories/scenario.repository.
 import type { ScenarioId, ScenarioTestSuiteId } from "../scenario.app.ts";
 import type { ScenarioClock } from "../scenario.app.ts";
 import type { ScenarioSecretCipher } from "../scenario.app.ts";
-import { ScenarioApp } from "../scenario.app.ts";
+import { ScenarioApp, ScenarioSimulationsUnavailableError } from "../scenario.app.ts";
 
 function harness() {
   const commands: SimulationQueueRun[] = [];
@@ -222,7 +222,10 @@ describe("ScenarioApp.queueSimulationRun", () => {
   });
 
   describe("given a run carrying nothing but its target", () => {
-    /** @scenario "A run queued without a note records metadata identical to before notes existed" */
+    /**
+     * @scenario "A run queued without a note records metadata identical to
+     * before notes existed"
+     */
     it("records only the reserved namespace", async () => {
       const { queue, metadata } = harness();
 
@@ -309,4 +312,43 @@ describe("ScenarioApp.queueSimulationRun", () => {
     });
   });
 
+});
+
+describe("ScenarioApp.getRunDataForAllSuites", () => {
+  describe("given a process that composed no simulation reads", () => {
+    it("refuses the read by name instead of crashing on the missing member", async () => {
+      // `members.simulations` is typed as always present, but the
+      // composition that actually supplies it for every process is still
+      // open work (scenario-composition-green handover, item 2). This
+      // constructs the app the way that gap reaches it at runtime: the type
+      // says `SimulationService`, the value is `undefined`.
+      const app = ScenarioApp.create({
+        repositories: { scenarios: {} as ScenarioRepository },
+        dependencies: { users: {} as UserApi },
+        config: undefined,
+        resources: {} as ResourceOwnership,
+        members: {
+          agentTesting: createApiFixture<AgentTestService>(),
+          simulations: undefined as unknown as SimulationService,
+          scenarioExecution: {} as ScenarioExecutionService,
+          scenarioTabs: {} as ScenarioTabRegistry,
+          resultAtoms: {} as ResultAtomsService,
+          runConfigurations: {} as RunConfigurationsService,
+          ids: {} as ScenarioId,
+          testSuiteIds: {} as ScenarioTestSuiteId,
+          clock: {} as ScenarioClock,
+          secretCipher: {} as ScenarioSecretCipher,
+          broadcast: {
+            getTenantEmitter: () => {
+              throw new Error("this read subscribes to nothing");
+            },
+          },
+        },
+      });
+
+      await expect(
+        app.getRunDataForAllSuites({ projectId: "project-1", limit: 20 }),
+      ).rejects.toBeInstanceOf(ScenarioSimulationsUnavailableError);
+    });
+  });
 });

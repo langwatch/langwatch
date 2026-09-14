@@ -12,16 +12,8 @@ export interface TraceMetricsSyncSubscriberDeps {
 }
 
 /**
- * Simulation-side subscriber: on RunFinished, dispatches computeRunMetrics
- * (pull mode) for every traceId carried on the event (ECST).
- *
- * This handles the case where traces arrived before the simulation events
- * and were already processed by the trace pipeline. The command reads
- * the trace summary itself (pull-based).
- *
- * For traces not yet available, the command schedules a deferred retry.
- * Dispatch failures THROW so the GroupQueue retries — this is the last
- * chance (RunFinished pull path); swallowing would permanently lose metrics.
+ * On RunFinished, dispatches computeRunMetrics (pull mode) for every traceId.
+ * Handles pre-arrived traces. Throws dispatch failures so GroupQueue retries (last chance).
  */
 export function createTraceMetricsSyncSubscriber(
   deps: TraceMetricsSyncSubscriberDeps,

@@ -91,7 +91,7 @@ export class SerializedPromptConfigAdapter extends SerializedAgent {
       })),
     );
 
-    // Build messages: system + template messages + conversation history (if not handled by template)
+    // Build messages: system + template messages + conversation (if not in template)
     const messages = [
       { role: "system" as const, content: systemPrompt },
       ...promptMessages,

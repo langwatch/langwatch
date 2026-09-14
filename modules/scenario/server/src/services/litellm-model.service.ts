@@ -27,23 +27,9 @@ const JUDGE_MODELS_REQUIRING_DISABLED_REASONING = new Set<string>([
 ] as const);
 
 /**
- * `/v1/chat/completions` rejects function tools on some reasoning models unless
- * reasoning is explicitly switched off ("Function tools with reasoning_effort
- * are not supported for <model> in /v1/chat/completions. To use function tools,
- * use /v1/responses or set reasoning_effort to 'none'."). The judge forces a
- * `finish_test` / `continue_test` tool call on every criteria-graded run, so on
- * such a model no run could reach a verdict — #6369, and the same signature in
- * the Python SDK judge, langwatch/scenario#864.
- *
- * Reasoning is disabled by RETRY as the general mechanism: whether a model
- * accepts reasoning off is not knowable up front (Gemini 2.5 Pro rejects it
- * with "Budget 0 is invalid. This model only works in thinking mode."), so the
- * request is sent untouched and re-sent with reasoning off only when the
- * provider's rejection asks for exactly that. Models that work today are never
- * sent anything new. `createJudgeModelFromParams` additionally defaults
- * reasoning off preemptively for the exact models already observed to require
- * it (#6620), which skips the wasted rejected round-trip on every judge turn;
- * the retry stays as the net for models nobody has listed yet.
+ * Some reasoning models reject function tools unless reasoning is off (#6369).
+ * Use retry: send untouched, re-send with reasoning off only if provider asks (#6620).
+ * Preemptively disable for known models to avoid wasted round-trips.
  */
 const REASONING_OFF = "none";
 
@@ -66,15 +52,9 @@ const retryRequestBodySchema = z.looseObject({
 });
 
 /**
- * Whether a 400 is the provider telling us to turn reasoning off to use tools.
- *
- * Two signals, and both are required: the rejection has to be about the
- * reasoning setting (the structured `param`, or the parameter named in the
- * prose), AND its remediation has to ask for reasoning off by quoting the value
- * to send. `param` alone is not that signal — a provider reports a missing,
- * invalid or unsupported reasoning setting under the same `param`, and
- * answering any of those by re-sending the request with a value nobody asked
- * for rewrites the caller's request on a guess.
+ * Whether 400 is provider asking to turn reasoning off to use tools. Both signals
+ * required: rejection about reasoning (structured param or prose) AND remediation
+ * asks for off by quoting the value. Avoid rewriting caller's request on a guess.
  */
 function rejectionAsksForReasoningOff(body: string): boolean {
   let raw: unknown;
@@ -177,14 +157,8 @@ export class LitellmModelAdapter {
   }
 
   /**
-   * Creates the model used by Scenario's JudgeAgent.
-   *
-   * JudgeAgent always sends a forced function tool. The gpt-5.6 Chat
-   * Completions models above enable reasoning when it is omitted, and reject
-   * that combination. Supply `none` as a DEFAULT only for those judge models;
-   * defaultSettingsMiddleware deep-merges call options over this value, so an
-   * explicit future JudgeAgent option still wins rather than being silently
-   * rewritten.
+   * Creates JudgeAgent's model. Preemptively supply `reasoning_effort: 'none'`
+   * for gpt-5.6 models (they enable reasoning when omitted, reject with tools).
    */
   static createJudgeModel(input: CreateModelFromParamsInput): LanguageModelV3 {
     const model = LitellmModelAdapter.createModel(input);

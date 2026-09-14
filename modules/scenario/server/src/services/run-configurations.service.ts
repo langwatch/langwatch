@@ -177,7 +177,7 @@ function scenarioIdsOf(scope: RunConfigurationScope): string[] | undefined {
   return scope.mode === "scenarios" ? scope.scenarioIds : undefined;
 }
 
-/** The targets a plan row holds, by key and by reference, dropping anything that no longer parses. */
+/** Plan row targets by key and by reference, dropping anything that no longer parses. */
 function planTargets(raw: unknown): PlanTargets {
   const entries = Array.isArray(raw) ? raw : [];
   const byKey = new Map<string, SuiteTarget>();

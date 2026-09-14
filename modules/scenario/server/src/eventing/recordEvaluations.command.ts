@@ -172,18 +172,8 @@ function buildEvaluatedEventData(params: {
 }
 
 /**
- * Command handler that records evaluator results on a finished run.
- *
- * Emits the RunEvaluated event with everything a reader needs on the event
- * itself: the results, the verdict and status the run holds after the gate,
- * the verdict and status it held before, and the run's identity. All of it
- * is read from the run's prior events, never from the fold, so the fold and
- * the subscribers stay pure.
- *
- * A run that has not finished cannot take evaluations: the command is
- * refused with a validation error, which the queue does not retry.
- *
- * @see specs/scenarios/scenario-run-evaluations.feature
+ * Handler that records evaluator results on finished runs: emits RunEvaluated
+ * with results/verdict/status from prior events (not fold); rejects unfinished runs.
  */
 export class RecordEvaluationsCommand
   implements

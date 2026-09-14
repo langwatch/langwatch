@@ -100,7 +100,19 @@ export function createScenarioRestTestApp(
   return { app, simulations, scenarioTabs };
 }
 
-export function createScenarioRestTestRuntime(options: { authenticated?: boolean } = {}) {
+export function createScenarioRestTestRuntime(
+  options: {
+    authenticated?: boolean;
+    /**
+     * Who the door names beyond "is there a request": defaults to a person,
+     * signed in as themself. A legacy project key names no person - pass
+     * `viewerUserId: null` with an `actorId` that is not a `User` row (a
+     * project id is what the real door falls back to) to exercise that case.
+     */
+    viewerUserId?: string | null;
+    actorId?: string;
+  } = {},
+) {
   const runtime = createRestRuntime({
     identity: {
       authenticate: () => {
@@ -118,8 +130,8 @@ export function createScenarioRestTestRuntime(options: { authenticated?: boolean
 
   const projectFacts = bindRestMiddleware(projectRestFacts, () => ({
     projectSlug: PROJECT_SLUG,
-    viewerUserId: "user_scenario_rest",
-    actorId: "user_scenario_rest",
+    viewerUserId: options.viewerUserId === undefined ? "user_scenario_rest" : options.viewerUserId,
+    actorId: options.actorId ?? "user_scenario_rest",
   }));
 
   return { runtime, projectFacts };

@@ -1,13 +1,6 @@
 /**
- * The simulation pipeline builds with the command instances the composition
- * root gives it.
- *
- * Three of its commands carry dependencies and are registered as instances
- * rather than classes. A mismatch between what the builder expects and what
- * the registry passes only shows when the pipeline is built, which happens on
- * boot and in no other test.
- *
- * @see specs/scenarios/scenario-evaluation-pending.feature
+ * Simulation pipeline wiring: validates command instances from composition
+ * root are correctly registered (mismatch only shows on boot).
  */
 
 import { describe, expect, it, vi } from "vitest";

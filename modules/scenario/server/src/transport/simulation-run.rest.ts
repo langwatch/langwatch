@@ -1,11 +1,5 @@
 /**
- * `/api/simulation-runs` - the runs a simulation produced: the individual
- * runs, and the batch summaries that aggregate them.
- *
- * Every read is answered off `ScenarioApi` directly: `app.platformUrl(...)`
- * resolves the deployment's own origin, and `app.findBatchSummary(...)`
- * answers a single batch's summary, so this family declares no factory
- * ports of its own.
+ * `/api/simulation-runs`: individual runs and batch summaries read from ScenarioApi.
  */
 import { createLogger } from "@langwatch/observability";
 import {
@@ -35,13 +29,8 @@ import {
 const logger = createLogger("langwatch:api:simulation-runs");
 
 /**
- * The platform's own address for ONE simulation run.
- *
- * A run opens in the `scenarioRunDetail` drawer on the base simulations route.
- * This family no longer takes a builder of this shape itself - it resolves
- * `app.platformUrl(...)` directly - but the type is kept for
- * `createScenarioRunPlatformUrlBuilder` (`apps/api`), which still builds one
- * of this shape for the application's own UI and Langy's navigate fallback.
+ * Platform's own address for ONE simulation run (opens in scenarioRunDetail drawer).
+ * Type kept for createScenarioRunPlatformUrlBuilder (app.platformUrl resolves directly).
  */
 export type ScenarioRunPlatformUrlBuilder = (args: {
   projectSlug: string;

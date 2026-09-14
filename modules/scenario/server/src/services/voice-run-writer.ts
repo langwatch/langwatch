@@ -1,19 +1,7 @@
 /**
- * Writes a finished voice call down as a scenario-style run the results pages
- * render: one message per turn (caller → user, agent → assistant), the caller
- * marked human.
- *
- * Only a "Call it myself" scenario call is written here (#8020): it lands under
- * the real scenario id and its set, beside the scenario's simulated runs,
- * tagged `metadata.langwatch.callerKind = "human"`. Finishing it emits a
- * RunFinished that names the scenario, which is what the scenario-evaluations
- * subscriber keys on to grade the human transcript against the scenario's
- * attached evaluators, the same grading a simulated run gets. A drawer "Talk
- * to it" call has no scenario, so it is never written as a run at all; it
- * leaves only its per-exchange traces (3a).
- *
- * Kept apart from the session service so the service stays a pure orchestrator
- * over injected ports.
+ * Writes finished voice call as scenario-style run: one message per turn (caller/user,
+ * agent/assistant), marked human. Only scenario calls (#8020) written; drawer calls leave
+ * only per-exchange traces.
  */
 
 import { HandledError } from "@langwatch/handled-error";

@@ -1,13 +1,6 @@
-/**
- * @vitest-environment node
- *
- * The prefetcher's per-transport credential resolution. Phone resolves the
- * project's Twilio provider; ElevenLabs resolves its own. Either is `null` when
- * the project has no provider row, which the child surfaces as the transport's
- * named missing-key failure. The two credential services are mocked at their
- * seams so this exercises only the branch selection and the credential shaping.
- *
- * @see specs/features/agents/voice-phone.feature
+/** @vitest-environment node
+ * Tests per-transport credential resolution: phone uses Twilio, ElevenLabs
+ * uses its own (services mocked at seams).
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 

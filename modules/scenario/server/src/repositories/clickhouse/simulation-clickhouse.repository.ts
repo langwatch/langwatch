@@ -89,9 +89,8 @@ export const TABLE_NAME = "simulation_runs" as const;
 export const RUN_ID_CAP = 10000;
 
 /**
- * Sort key for the export sweep as one SQL expression: ORDER BY, the cursor
- * predicate and the returned cursor must all be it, or the next page filters
- * on a column it didn't sort by and silently drops/repeats boundary runs — also coalesces NULL StartedAt so those rows don't strand on page one.
+ * Sort key for export sweep: ORDER BY, cursor predicate and returned cursor must align or
+ * silently drops/repeats boundary runs. Coalesces NULL StartedAt preventing row stranding.
  */
 const EXPORT_SORT_KEY = "toUnixTimestamp64Milli(ifNull(t.StartedAt, t.CreatedAt))";
 
@@ -113,14 +112,8 @@ const RUNNING_STATUSES =
 const AGENT_TEST_SET_EXCLUSION = `AND NOT endsWith(ScenarioSetId, '${AGENT_TEST_SET_SUFFIX}') AND ScenarioSetId != '${VOICE_CALL_SCENARIO_SET_ID}'`;
 
 /**
- * Batch-level aggregate SELECT list, shared by the batch history page and the
- * single-batch summary so the two queries cannot drift.
- *
- * SettledCount is the complement of RUNNING_STATUSES, never a list of terminal
- * names: ClickHouse stores a raw FAILURE status that the terminal status enum
- * does not carry, so a positive list would report a failed batch as unfinished
- * forever. A run stored PENDING_EVALUATION counts as running, so a batch is
- * complete only once every run has been graded.
+ * Batch aggregate SELECT shared by batch history and single-batch summary. SettledCount is
+ * complement of RUNNING_STATUSES (not terminal); PENDING_EVALUATION counts as running.
  */
 const BATCH_AGGREGATE_COLUMNS = `BatchRunId,
         toString(count())                                               AS TotalCount,
@@ -176,9 +169,8 @@ const RUN_COLUMNS = `
   toString(toUnixTimestamp64Milli(ArchivedAt)) AS ArchivedAt` as const;
 
 /**
- * Columns for list/grid views — truncated messages (first 6), no heavy JSON
- * (Messages.Rest/TraceId, TraceIds, Reasoning, Error — detail-drawer only).
- * `TotalMessageCount` must stay table-qualified (`t.`) or it measures the sliced array and always reports 6.
+ * Columns for list/grid views: truncated messages (first 6), excludes heavy JSON data.
+ * `TotalMessageCount` must be table-qualified or it measures the sliced array only.
  */
 const LIST_COLUMNS = `
   ScenarioRunId, ScenarioId, BatchRunId, ScenarioSetId,
@@ -1472,9 +1464,8 @@ export class SimulationClickHouseRepository extends SimulationRepository {
   }
 
   /**
-   * Forward-only page for a CSV export sweep — distinct from
-   * getRunDataForAllSuites (capped, freshness-shaped); an export needs a plain
-   * chronological sweep to exhaustion via keyset (not OFFSET) pagination on (StartedAt, ScenarioRunId), reading RUN_COLUMNS (never LIST_COLUMNS, which nulls Reasoning/Error).
+   * Forward-only CSV export via keyset pagination (not OFFSET) on (StartedAt, ScenarioRunId),
+   * reading RUN_COLUMNS (not LIST_COLUMNS), unlike getRunDataForAllSuites which is capped.
    */
   async findRunsForExport({
     projectId,
@@ -1749,9 +1740,8 @@ export class SimulationClickHouseRepository extends SimulationRepository {
   }
 
   /**
-   * Dedup predicate for a query reading simulation_runs through the `t`
-   * alias — outer columns MUST be `t.`-qualified, since RUN_COLUMNS aliases
-   * timestamps to strings and an unqualified column silently matches zero rows (String vs DateTime64) instead of erroring.
+   * Dedup predicate with `t.`-qualified outer columns (RUN_COLUMNS aliases timestamps).
+   * Unqualified columns silently match zero rows instead of erroring.
    */
   private static qualifiedDedupPredicate(whereFilters: string): string {
     return `AND (t.TenantId, t.ScenarioSetId, t.BatchRunId, t.ScenarioRunId, t.UpdatedAt) IN (
@@ -1771,9 +1761,8 @@ export class SimulationClickHouseRepository extends SimulationRepository {
   }
 
   /**
-   * Date filter clauses: `whereClause` filters StartedAt for partition
-   * pruning (simulation_runs is partitioned by toYearWeek(StartedAt); without
-   * it ClickHouse scans cold storage too), `havingClause` filters max(CreatedAt) post-aggregation for exact edge cases.
+   * Date filters: `whereClause` filters StartedAt for partition pruning (skips cold storage scans).
+   * `havingClause` filters max(CreatedAt) post-aggregation for exact edge cases.
    */
   private static buildDateFilter({
     startDate,

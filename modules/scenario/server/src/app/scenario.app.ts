@@ -1,6 +1,7 @@
 /**
  * The scenario feature's application: what all of its doors call.
  */
+import { HandledError } from "@langwatch/handled-error";
 import {
   startScenarioTabPresence,
   ScenarioApi,
@@ -114,14 +115,8 @@ export interface ScenarioAppDependencies {
 }
 
 /**
- * The technical collaborators `installApiScenario` still assembles outside the
- * repository seam: the private services this feature builds over several
- * other verticals (agent testing, the run executor, the live buffer, the
- * ClickHouse-backed reads) and the four small ports the scenario CRUD service
- * itself is built over. None of these are peer APIs - moving their
- * construction fully inside this factory (agent testing over Suite/Prompt/
- * model providers, the executor over Suite's prefetch) is unfinished; see the
- * scenario module handover.
+ * Technical collaborators assembled outside the repository seam: private
+ * services (agent testing, executor, buffer, reads) and four small ports.
  */
 export interface ScenarioAppInfrastructure {
   agentTesting: AgentTestService;
@@ -152,6 +147,23 @@ export interface ScenarioAppInfrastructure {
   scenarioTabStore: ScenarioTabStore;
   /** The deployment's public origin, for `platformUrl`. Optional: not every install serves REST. */
   publicBaseUrl?: string;
+}
+
+/**
+ * Error when ClickHouse-backed simulation reads are not composed yet,
+ * refusing raw crash with undefined.
+ */
+export class ScenarioSimulationsUnavailableError extends HandledError {
+  declare readonly code: "service_unavailable";
+
+  constructor() {
+    super(
+      "service_unavailable",
+      "This deployment cannot read simulation runs yet, because its simulation reads are not composed.",
+      { httpStatus: 503, fault: "platform" },
+    );
+    this.name = "ScenarioSimulationsUnavailableError";
+  }
 }
 
 /** The one peer API this feature reads directly. */
@@ -330,7 +342,13 @@ export class ScenarioApp implements ScenarioApi {
   ): Promise<Scenario> {
     const scenario = await this.#dependencies.scenarios.create({
       ...input,
-      lastUpdatedById: by.id,
+      // A door that named an explicit actor (REST, where a credential can
+      // name no person) knows better than `by.id` whether anyone is really
+      // behind this write - `by.id` alone answers "the key" or "the project"
+      // for a caller with nobody behind it, and neither is a `User` row.
+      // A door that named none (tRPC, always a signed-in person) keeps the
+      // old behavior.
+      lastUpdatedById: input.actor ? input.actor.userId : by.id,
     });
 
     this.reportScenarioCreated({ scenario, projectId: input.projectId, userId: by.id });
@@ -619,8 +637,13 @@ export class ScenarioApp implements ScenarioApi {
   }
 
   /** Runs across every suite, one page at a time. */
-  getRunDataForAllSuites(input: SimulationAllSuitesInput): Promise<SimulationAllSuitesRunData> {
-    return this.#dependencies.simulations.getRunDataForAllSuites(input);
+  async getRunDataForAllSuites(
+    input: SimulationAllSuitesInput,
+  ): Promise<SimulationAllSuitesRunData> {
+    const simulations = this.#dependencies.simulations;
+    if (!simulations) throw new ScenarioSimulationsUnavailableError();
+
+    return simulations.getRunDataForAllSuites(input);
   }
 
   // -- the live stream -------------------------------------------------------

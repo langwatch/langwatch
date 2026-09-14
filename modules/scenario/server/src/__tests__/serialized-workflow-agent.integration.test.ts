@@ -1,22 +1,6 @@
-/**
- * @vitest-environment node
- *
- * End-to-end integration test for issue #3415.
- *
- * Drives the real `SerializedWorkflowAgentAdapter` against a running `langwatch_nlp`
- * service using the two reproducer workflows committed under `./fixtures/`. This is
- * the exact code path scenario runs go through — the test closes the loop between the
- * scenarios framework and the NLP fix landed in PR #3416.
- *
- * Skipped automatically when `LANGWATCH_NLP_SERVICE` (default `http://localhost:5561`)
- * is unreachable so CI without NLP doesn't red-X.
- *
- * Expected behavior:
- *   AC 2: chat_messages-typed signature input → no HTTP 500
- *   AC 1: str-typed workflow w/ {{question}} / {{thread_id}} / {{messages}} /
- *         {{random_static_value}} in the prompt → echoed output contains every value
- *         (case-insensitive) and no unresolved mustache markers
- *   AC 4: conversation history preserved as distinct turns — no escaped-JSON blob leak
+/** @vitest-environment node
+ * Integration test for issue #3415: SerializedWorkflowAgentAdapter against
+ * running NLP service (skipped if unreachable).
  */
 
 import { readFileSync } from "node:fs";

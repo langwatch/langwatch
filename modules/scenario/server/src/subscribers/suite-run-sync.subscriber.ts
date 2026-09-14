@@ -55,16 +55,8 @@ export interface SuiteRunSyncSubscriberDeps {
 }
 
 /**
- * Cross-pipeline subscriber that syncs simulation events to the suite run
- * pipeline. Event-carried state (ECST) only — identity fields ride on the
- * event, so this never reads fold state.
- *
- * Lives on the simulation pipeline (consumes simulation events).
- * Dispatches commands to the suite run pipeline.
- * Uses isSuiteSetId() to filter — only processes simulation runs belonging to suites.
- *
- * Dispatch failures THROW so the GroupQueue retries (durable) — the old
- * subscriber's warn-swallow could permanently lose a suite item update.
+ * Cross-pipeline subscriber syncs simulation events to suite run pipeline using ECST.
+ * Throws dispatch failures to trigger GroupQueue retries (old warn-swallow lost updates).
  */
 export function createSuiteRunSyncSubscriber(
   deps: SuiteRunSyncSubscriberDeps,

@@ -1,13 +1,6 @@
 /**
- * The processor path a succeeded job takes, end to end on this side of the
- * child: the pool spawns the child, the child writes log lines and then its
- * result line on stdout and exits, and the parent reads the instance off that
- * line and records it on the run.
- *
- * The child is a real process — a small node script in place of the scenario
- * runner — so the stdout capture, the result-line parse and the close handler
- * are the ones the worker runs.
- *
+ * Processor path for succeeded job end-to-end: pool spawns child, child writes result
+ * line to stdout, parent parses and records it. Child is real node script.
  * @see specs/scenarios/served-agent-instance-on-runs.feature
  */
 import { ScenarioExecutionService } from "@langwatch/scenario-contract";

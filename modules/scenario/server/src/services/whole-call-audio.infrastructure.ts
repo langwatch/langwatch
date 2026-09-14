@@ -1,16 +1,7 @@
 /**
- * The real {@link WholeCallAudioInfrastructure} the run-audio route runs
- * against.
- *
- * Split from the resolution service the same way
- * `voice-session.infrastructure.ts` is split from `voice-session.service.ts`:
- * this is the only place the run-audio resolution touches the two reads it
- * needs (the run's traces, the trace's spans), so the service itself stays
- * testable against a fake reader.
- *
- * Both reads arrive as collaborators from the module's composition — the run
- * read is Scenario's own, the span read is Trace's — so nothing here reaches
- * for a global application locator.
+ * Production {@link WholeCallAudioInfrastructure} for run-audio route. Split from
+ * service (like voice-session.infrastructure): touches the two reads (run traces,
+ * trace spans) so service stays testable against fake reader.
  */
 
 import type {

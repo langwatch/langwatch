@@ -83,16 +83,7 @@ export type AppDefinitionWithoutConfig<
     ) => NoInfer<App>;
   }>;
 
-/**
- * What one module binds for the facts its own declarations name.
- *
- * A route names a fact the request does not carry — the organization behind
- * the credential, the deep link into the product, the media type it arrived
- * as. The value is the MODULE's to state, because stating it reads the
- * module's own App and the peers the module declared; the process holds
- * neither, and the alternative to this seam is the process re-declaring the
- * route, which it must never do.
- */
+/** Module supplies facts (org, link, media type) its routes declare. */
 export interface ModuleTransportFactSetup<Dependencies extends TokenMap, Members, App> {
   /** This module's own App, already constructed by the same boot. */
   readonly app: App;
@@ -211,14 +202,8 @@ export interface FeatureInstallArguments<Members> {
 }
 
 /**
- * A declaration as the application root holds it.
- *
- * Two things are NOT erased, because a process must be held to both: the
- * module's own NAME, as the literal it was declared with, and the type of the
- * config slice its schema parses. Together they are what lets `withModules`
- * refuse a process that installs a module whose config it never stated
- * (ADR-144, ruling 19). Everything else is erased, because the root installs
- * modules it knows nothing else about.
+ * Application root's view of a module. Retains name + config schema for
+ * compile-time checking (ADR-144).
  */
 export interface InstallableServerFeature<
   Members,
@@ -226,12 +211,7 @@ export interface InstallableServerFeature<
   Config = unknown,
 > {
   readonly name: Name;
-  /**
-   * The schema this module's config slice is parsed through, where it declared
-   * one. It is here rather than closed over alone so a process's own config
-   * type can be derived from the modules it installs; `install` still parses
-   * through the schema it captured, and never reads this.
-   */
+  /** Config schema for compile-time validation (ADR-144). */
   readonly configSchema?: FeatureConfigSchema<Config>;
   /** Every door this feature declared, for the process root to mount at boot. */
   readonly transports?: readonly FeatureTransportDescriptor[];
@@ -246,12 +226,7 @@ export interface InstallableServerFeature<
   readonly workers?: readonly unknown[];
   /** One-shot work the tasks role exposes, declared with `withTasks`. */
   readonly tasks?: readonly unknown[];
-  /**
-   * The event sourcing this module declared with `withEventing`. A role whose
-   * pool holds no eventing runtime ignores it; a role that runs one builds the
-   * pipeline over this module's own repositories and app, registers it, and
-   * hands the senders back through `connect`.
-   */
+  /** Event sourcing declared with withEventing. */
   readonly eventing?: FeatureEventing;
   /**
    * What this module's App declared it reads. Types erase, so this is what
@@ -259,14 +234,7 @@ export interface InstallableServerFeature<
    * the member, when this process cannot supply one.
    */
   readonly members?: readonly string[];
-  /**
-   * Which of this module's two repository tiers a process installs it on.
-   *
-   * Absent is live, and live is not a default that an absence chose: a store's
-   * address is what says it is reached, and a module whose live tier needs a
-   * client this process was not given refuses at boot. The one way to get the
-   * memory tier is {@link withMemoryRepositories}, in code, at the install.
-   */
+  /** Repository tier: live (default) or memory via withMemoryRepositories. */
   readonly tier?: Tier;
   readonly install: (args: FeatureInstallArguments<Members>) => InstalledFeatureState;
 }
@@ -289,14 +257,7 @@ type ConfiguredModuleName<Module> =
 type ConfiguredModuleConfig<Module> =
   Module extends InstallableServerFeature<never, string, infer Config> ? Config : never;
 
-/**
- * The config a process installing exactly these modules must state.
- *
- * A module that declared no schema contributes nothing; one that did
- * contributes its own name as the key and what its schema parses as the value.
- * A composition annotates its config with this, so the slice it writes is
- * checked where it is written rather than where it is installed.
- */
+/** Config each module's schema requires for the process to install it. */
 export type ModuleConfigFor<Modules extends readonly unknown[]> = {
   readonly [Module in Modules[number] as ConfiguredModuleName<Module>]: ConfiguredModuleConfig<Module>;
 };
@@ -320,13 +281,7 @@ type ModulesMissingConfig<Required, Supplied> = string extends keyof Supplied
             : Name;
     }[keyof Required];
 
-/**
- * What `withModules` asks for from a process that did not state a module's config.
- *
- * It is a type nothing satisfies, carrying the module names in its one
- * property, so the refusal names the modules and the key rather than printing
- * the structural mismatch between two forty-member tuples.
- */
+/** Guard type refusing processes that didn't state a module's config. */
 export interface ModuleConfigMissing<Modules extends string> {
   readonly "config this process did not state, by module": Modules;
 }
@@ -342,14 +297,8 @@ export type ModuleConfigGuard<Modules extends readonly unknown[], Supplied> =
     : ModuleConfigMissing<ModulesMissingConfig<ModuleConfigFor<Modules>, Supplied> & string>;
 
 /**
- * This module, installed on its memory repositories.
- *
- * It is the only place the word "memory" may be written about a running
- * process, and the only way to run a module without its stores. Memory is
- * therefore always a choice somebody made in code, never what a lost
- * `DATABASE_URL` selected: a module installed this way requires no client, so
- * boot asks for none, and every module beside it still refuses if the store it
- * needs has no address.
+ * Run module on memory repositories (no external store needed).
+ * Always explicit; never chosen by missing DATABASE_URL.
  */
 export function withMemoryRepositories<Declaration extends Readonly<{ name: string }>>(
   module: Declaration,
@@ -439,14 +388,7 @@ export class ServerFeatureBuilder<
     return new ServerFeatureBuilder({ ...this.shape, transportDependencies });
   }
 
-  /**
-   * What this feature reads off the process's members.
-   *
-   * A module states this on its App with `reads(...)`, and that list is the
-   * one boot uses. This is the same declaration for a feature that has no App
-   * yet, and it goes with the last of them: it exists so an unconverted
-   * feature still gets exactly what it named, rather than the whole record.
-   */
+  /** Declare members this feature reads (or use App's reads()). */
   withMembers(
     ...members: readonly string[]
   ): ServerFeatureBuilder<Config, Members, Dependencies, TransportDependencies, Name> {
@@ -696,16 +638,7 @@ export class ServerFeatureAssembly<
     return new ServerFeatureAssembly({ ...this.state, rest: create });
   }
 
-  /**
-   * What this feature binds for the facts its own declarations name.
-   *
-   * A route names a fact the request does not carry - the organization behind
-   * the credential, the deep link into the product, the media type it arrived
-   * as - and the value for it is the MODULE's to state: it reads the module's
-   * own App and the peers the module declared, which the process holds none of
-   * and must never re-declare a route to supply. Runs once, at install, in a
-   * role that serves doors, and the doors mount what it returned.
-   */
+  /** Module supplies facts its routes declare. Runs once at install. */
   withTransportFacts(
     bind: (
       args: FeatureTransportArguments<
@@ -936,15 +869,7 @@ type ModuleRepositories<Live extends AnyProvider, Memory extends AnyProvider> = 
   Tier
 >;
 
-/**
- * What the App says it reads off the process's members, as boot reads it back.
- *
- * The list is on the App and nowhere else: `static readonly reads =
- * reads("clock", "logger")`. Types erase, so this is what boot reads at runtime
- * to build exactly that set and to refuse naming both the module and the
- * member; and because `reads(...)` is also the source of the App's own setup
- * type, there is no second list to keep in agreement with it.
- */
+/** Extract member reads from the App's static readonly reads declaration. */
 function declaredReads(app: Readonly<{ reads?: readonly string[] }>): readonly string[] {
   return Object.freeze([...(app.reads ?? [])]);
 }
@@ -1422,16 +1347,8 @@ class UnconfiguredAppBuilder<
 }
 
 /**
- * A declaration that is already installable and still accepts the work a role
- * other than the api owns. Every call answers a declaration, so a module can
- * never be left half-declared (ADR-144 s1).
- *
- * This is the one termination rule: the moment a module states a contribution
- * - its doors, its workers, its tasks, its eventing, the facts it binds - it
- * is installable, and it stays installable through every further call. There
- * is nothing left to build, which is why this type carries no `build()`: the
- * deprecated identity that once stood in for the installers written before
- * that was true is gone now that none of them call it.
+ * Installable declaration accepting further work contributions.
+ * Stays installable after any contribution (ADR-144).
  */
 export type ModuleContributions<
   Declaration,
@@ -1465,13 +1382,7 @@ interface InstallableDeclaration {
   readonly install: (args: FeatureInstallArguments<never>) => InstalledFeatureState;
 }
 
-/**
- * The same declaration, with its own transport facts bound at install.
- *
- * Nothing runs outside the api role: a worker installs the same module and
- * builds no doors, so binding facts there would construct a request-time
- * closure over an App nothing ever calls it with.
- */
+/** Bind transport facts at install (API role only). */
 function bindingTransportFacts<Declaration extends object>(
   declaration: Declaration,
   bind: ModuleTransportFacts<TokenMap, never, never>,

@@ -10,23 +10,8 @@ export interface SnapshotUpdateBroadcastSubscriberDeps {
 }
 
 /**
- * Raw event subscriber that broadcasts simulation updates to connected SSE
- * clients. The payload is built from the EVENT (ECST) and carries only ids
- * plus status — the frontend refetches the run on receipt.
- *
- * Not fold-attached: `delay` absorbs fold-commit lag so the refetch almost
- * always sees settled state. The residual race is a broadcast landing before
- * the fold writes, e.g. under queue backlog.
- *
- * Mid-run that self-corrects, because another event follows and broadcasts
- * again. On `finished` and `evaluated` nothing is sure to follow, so the
- * correction there is not a later broadcast but the payload: both carry
- * `status`, so a client that refetches early still learns the terminal state
- * from the message rather than from what it read back. `evaluated` lands
- * after `finished`, once the run's evaluators reported, and is what makes a
- * results page that already shows the run read it again.
- *
- * Broadcast failure is swallowed — it must not block the pipeline.
+ * Broadcasts simulation updates to SSE clients (payload: ids + status from EVENT ECST).
+ * Not fold-attached; delay absorbs lag. Frontend refetches on receipt. Failure swallowed.
  */
 export function createSnapshotUpdateBroadcastSubscriber(
   deps: SnapshotUpdateBroadcastSubscriberDeps,

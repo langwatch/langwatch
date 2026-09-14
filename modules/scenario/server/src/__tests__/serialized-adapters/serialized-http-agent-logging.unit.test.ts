@@ -1,13 +1,6 @@
-/**
- * @vitest-environment node
- *
- * Unit tests for the structured logging path in SerializedHttpAgentAdapter.
- *
- * Tracking lw#3593 — adapter must log every request (success and failure)
- * at info/warn/error level with enough fields to reconstruct the call from
- * CloudWatch.
- *
- * @see specs/scenarios/observability-context.feature
+/** @vitest-environment node
+ * Structured logging in SerializedHttpAgentAdapter: every request logged
+ * at appropriate level with CloudWatch-friendly fields (lw#3593).
  */
 
 import { type AgentInput, AgentRole } from "@langwatch/scenario";

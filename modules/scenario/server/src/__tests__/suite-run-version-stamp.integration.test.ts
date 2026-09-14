@@ -238,9 +238,8 @@ describe.skipIf(!databaseUrl)("the version stamp on suite runs", () => {
       secretCipher: new TestSecretCipher(),
     });
     const scenarioApi = scenarioApiOver(scenarios);
-    suites = SuiteApp.create({
-      config: undefined,
-      resources: { own: () => undefined, ownService: () => undefined },
+    suites = SuiteApp.createForTesting({
+      repositories: PostgresSuiteRepositories.create({ prisma: db }),
       dependencies: {
         scenarios: scenarioApi,
         agents: fakeAgentApi(agents),
@@ -249,16 +248,13 @@ describe.skipIf(!databaseUrl)("the version stamp on suite runs", () => {
           findWithTeam: async (id: string) => (id === projectId ? project : null),
         }),
       },
-      members: {
+      infrastructure: {
         execution: SuiteExecutionService.create({
           commands,
           ids: new RunIds(),
           scenarios: scenarioApi,
         }),
-        resolveClickHouseClient: null,
-        defaultRetentionDays: 30,
       },
-      repositories: PostgresSuiteRepositories.create({ prisma: db }),
     });
   });
 

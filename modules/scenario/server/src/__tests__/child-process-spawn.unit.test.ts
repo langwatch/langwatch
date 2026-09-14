@@ -119,7 +119,10 @@ describe("resolveChildProcessSpawn", () => {
         vi.mocked(fs.existsSync).mockReturnValue(false);
       });
 
-      /** @scenario 'Processor falls back to tsx with loud logging when bundle is missing in production' */
+      /**
+       * @scenario "Processor falls back to tsx with loud logging when bundle
+       * is missing in production"
+       */
       it("falls back to tsx instead of crashing", () => {
         const result = resolveChildProcessSpawn(spawnOptions("production"));
 

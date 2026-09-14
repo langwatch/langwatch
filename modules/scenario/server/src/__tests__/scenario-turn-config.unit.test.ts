@@ -1,12 +1,6 @@
-/**
- * @vitest-environment node
- *
- * Turn configuration (maxTurns / minTurns) threading tests.
- * Verifies schema parsing and data-prefetcher mapping.
- *
- * @see specs/scenarios/scenario-editor.feature   (Turn Configuration ADR-015)
- * @see specs/scenarios/scenario-execution.feature (Turn Config Threading ADR-015)
- * @see docs/adr/015-scenario-turn-config-ui.md
+/** @vitest-environment node
+ * Unit tests for turn configuration (maxTurns/minTurns): schema parsing
+ * and data-prefetcher mapping.
  */
 import { describe, expect, it } from "vitest";
 import { ScenarioExecutionPrefetcherService } from "@langwatch/scenario-server";

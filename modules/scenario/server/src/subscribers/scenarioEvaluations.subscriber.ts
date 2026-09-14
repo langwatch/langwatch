@@ -89,25 +89,8 @@ function jobPayloadOf({
 }
 
 /**
- * On RunFinished, queues the evaluation job for the run when its suite or
- * its plan attaches evaluators.
- *
- * The attachments, the scenario's field values and the evaluator definitions
- * come off the event, where the queue command pinned them when the run was
- * scheduled, so the run is graded with what it was queued with and the job
- * payload carries the same set to every retry. An event without them is a
- * run scheduled before they were recorded: the suite and the plan are read
- * now instead.
- *
- * A run whose finished results already carry evaluations was graded by the
- * code that ran it, and is stored as sent. A run that errored or was
- * cancelled has no conversation to grade. The plan is read off the set id
- * the run was filed under; the suite is the scenario's own test suite.
- *
- * Throws when the queue refuses the job, so the subscriber is retried.
- *
- * @see specs/scenarios/scenario-evaluators.feature
- * @see specs/scenarios/scenario-evaluation-pending.feature
+ * On RunFinished, queues evaluation job when suite/plan has evaluators; data from event.
+ * Throws on queue failure for retry. See scenario-evaluators.feature and -pending.feature.
  */
 export function createScenarioEvaluationsSubscriber(
   deps: ScenarioEvaluationsSubscriberDeps,

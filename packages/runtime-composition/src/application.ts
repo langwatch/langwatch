@@ -80,25 +80,13 @@ export class BootedRuntime<Members, Rest = never, Trpc = never> {
   constructor(
     readonly name: string,
     readonly role: ServerRole,
-    /**
-     * The members this process actually built: exactly the union its installed
-     * modules declared and their repository tiers required, and nothing else.
-     * It is partial because that union is the point - a process builds no
-     * client no module asked for.
-     */
+    /** Members built: union of modules' required members, nothing else. */
     readonly members: Readonly<Partial<Members>>,
-    /**
-     * Every declared transport this process mounted, in install order for REST
-     * and by namespace for tRPC. Empty where the application was given no door.
-     */
+    /** Mounted transports, in install/namespace order. */
     readonly transports: MountedTransports<Rest, Trpc>,
     private readonly installed: ReadonlyMap<string, InstalledFeatureState>,
     private readonly provided: ReadonlyMap<TokenIdentity, unknown>,
-    /**
-     * The background work this role owns: everything the installed modules
-     * declared with `withWorkers` under the worker role, and with `withTasks`
-     * under the tasks role. Every other role reads an empty list.
-     */
+    /** Background work this role owns (workers/tasks/empty for others). */
     readonly contributions: readonly unknown[],
     scope: ResourceScope,
     services: readonly RuntimeService[],
@@ -185,12 +173,7 @@ interface DeclaredFeature {
   readonly contributesWorkerWork: boolean;
   /** What this module's App declared it reads, built before any create runs. */
   readonly requiredMembers: readonly string[];
-  /**
-   * Which of the module's two repository tiers this process installs. Live
-   * unless the caller said otherwise in code with `withMemoryRepositories`,
-   * which is the one seam that may say "memory" and the only way to run a
-   * module without its stores.
-   */
+  /** Repository tier: live or memory (withMemoryRepositories). */
   readonly tier: Tier;
   readonly install: (args: FeatureInstallArguments<unknown>) => InstalledFeatureState;
 }
@@ -210,12 +193,7 @@ interface BuilderState<Rest, Trpc> {
   hosts: TransportHostSource<Rest, Trpc>;
 }
 
-/**
- * A process's doors, stated either as the hosts themselves or as the factory
- * that builds them once every module's App exists. The factory is what a
- * process whose doors read a module - every credential this one resolves -
- * has to state, because there is no earlier moment at which it could.
- */
+/** Factory to build doors after all modules install (needed when doors read modules). */
 export type TransportHostFactory<Rest, Trpc> = (
   peers: TransportPeers,
 ) => FeatureTransportHosts<Rest, Trpc>;
@@ -225,31 +203,12 @@ export type TransportHostSource<Rest, Trpc> =
   | FeatureTransportHosts<Rest, Trpc>
   | TransportHostFactory<Rest, Trpc>;
 
-/**
- * What a process is: a role, its parsed config, and where its members come
- * from (ADR-144).
- *
- * There is no word here for which backend a store has. A store's ADDRESS is
- * the statement - `DATABASE_URL` present means Postgres is reached, absent
- * means every repository that needs it refuses at boot naming the module and
- * the member - so a lost variable can never read as a decision. The only way
- * to run a module without its stores is to say so in code, by installing it
- * with `withMemoryRepositories`.
- */
+/** Process role, config, and member sources (ADR-144). */
 export interface ApplicationOptions<Members, Config extends ModuleConfigRecord = ModuleConfigRecord> {
   readonly role: ServerRole;
-  /**
-   * One slice per module name, for the modules that declared a config. Written
-   * as a literal, this is the type `withModules` checks the installed list
-   * against, so a module whose slice is missing is refused where it installs.
-   */
+  /** Module config slices, checked at install. */
   readonly config?: Config;
-  /**
-   * Where the members come from, built by `@langwatch/infrastructure`.
-   *
-   * Omitted, the process opens no client. That is not a quiet downgrade: a
-   * module that reads a member still refuses by name at boot.
-   */
+  /** Member sources; omitted means no client, module refusing by name. */
   readonly members?: MemberSource<Members>;
 }
 
@@ -275,14 +234,8 @@ export class ApplicationBuilder<
   }
 
   /**
-   * The doors this process opens. Every transport an installed feature
-   * declares is mounted on them at boot, and a feature declaring one for a
-   * protocol this process opened no door for is refused by name.
-   *
-   * A process whose doors are built from what its own modules resolve - every
-   * credential this api answers behind - states a FACTORY instead of the
-   * hosts. Boot runs it once, after every module is installed and its App
-   * bound, and before anything is mounted or served.
+   * Process doors; features' transports mount on them. Can be a factory
+   * run after all modules install.
    */
   withTransports<NextRest, NextTrpc>(
     hosts: TransportHostSource<NextRest, NextTrpc>,
@@ -293,12 +246,7 @@ export class ApplicationBuilder<
     );
   }
 
-  /**
-   * Every module this process installs. A module whose Members names a member
-   * this pool lacks does not compile, and neither does one whose config slice
-   * this process did not state - see {@link ModuleConfigGuard} for the case it
-   * cannot check, which each module's own schema still refuses at boot.
-   */
+  /** Modules to install; guards ensure members and config align. */
   withModules<const Modules extends readonly InstallableServerFeature<Members>[]>(
     modules: Modules & ModuleConfigGuard<Modules, Config>,
   ): this {
@@ -329,14 +277,7 @@ export class ApplicationBuilder<
     return this;
   }
 
-  /**
-   * One peer this process answers for itself, by the token that names it.
-   *
-   * A peer is not a member: it is another module's App, and the alternative to
-   * this seam is installing that module, which installs its peers after it,
-   * down to the authorization ledger. A process that hands a peer in AND
-   * installs the module that provides it is refused by the token both claim.
-   */
+  /** Provide a peer by token; install module providing same token to refuse. */
   withProvided<Instance>(token: DependencyToken<Instance>, instance: Instance): this {
     if (this.state.provisions.some((provision) => provision.token === token)) {
       throw new DuplicateProviderError(tokenName(token), ["the process", "the process"]);
@@ -449,12 +390,7 @@ export class ApplicationBuilder<
       // After every application exists, so a handler reaching a peer through
       // its own app gets the same instance every other caller holds.
       if (role === "api") {
-        // The one moment both are true: every App exists, and nothing is
-        // serving yet. A door built from a module could not be built before
-        // this line, and a route mounted after it would never be reached.
-        // `provided` holds one reference per installed module's contract token
-        // and per peer the process handed in itself, so it IS the answer to
-        // what this build installed.
+        // Now: all Apps exist, nothing serves yet. Only moment doors can be built.
         const hosts = this.openDoors((token) => provided.get(token));
         if (hosts.rest !== void 0 || hosts.trpc !== void 0) {
           transports = mountDeclaredTransports({ declared, hosts });
@@ -490,12 +426,7 @@ export class ApplicationBuilder<
     return typeof source === "function" ? source(transportPeersOf(resolve)) : source;
   }
 
-  /**
-   * A reference per module-provided API token, and the instance itself for a
-   * peer the process handed in. An instance a caller made is stored as it
-   * stands: wrapping it would make a test double answer for whatever it does
-   * not implement, which is the opposite of what a double is for.
-   */
+  /** Store peer instances as-is; declare module API tokens. */
   private allocateApiClients(
     apis: LocalFeatureApis,
     providerOf: ReadonlyMap<TokenIdentity, string>,
@@ -605,23 +536,7 @@ export function createApp<Members, const Config extends ModuleConfigRecord = Mod
   return new ApplicationBuilder<Members, never, never, Config>(options);
 }
 
-/**
- * Every member one module makes this process build: what its App declared it
- * reads, and what the repository tier it is installed on requires.
- *
- * A module installed on its memory tier requires nothing, which is what makes
- * `withMemoryRepositories` the whole of "run this without its stores": the
- * client is never asked for, so nothing refuses and nothing is opened.
- */
-/**
- * The event-sourcing runtime this process holds, where it holds one.
- *
- * It is the one member read outside the declared union, and the one absence
- * that is not a refusal: which log a role appends to and whether it claims the
- * queue are role decisions carried as a collaborator rather than an address, so
- * a role that runs no event sourcing has nothing to lose and every declaration
- * is inert. A STORE never behaves this way - an absent address always refuses.
- */
+/** The eventing runtime member if this process holds one and eventing is declared. */
 function eventingMemberFor<Members>(
   declarations: readonly DeclaredFeature[],
   source: MemberSource<Members>,
@@ -642,12 +557,7 @@ function claimedBy(declaration: DeclaredFeature): readonly string[] {
   return [...declaration.requiredMembers, ...tier];
 }
 
-/**
- * Installs one module's event sourcing, where this process runs any. The
- * pipeline is built after the module's app, over the app and the same
- * repository instances it was given. A pool with no eventing runtime installs
- * nothing, so a role that runs none ignores the declaration.
- */
+/** Install module's eventing pipeline if runtime exists. */
 function installModuleEventing(
   declaration: DeclaredFeature,
   state: InstalledFeatureState,
@@ -675,16 +585,7 @@ function roleContributions(
   return [];
 }
 
-/**
- * Every module's chosen tier has the members it requires.
- *
- * Nothing here infers a tier from what the process happens to hold: a module
- * asks for the tier it was installed on and gets it or a refusal. The old
- * `pool.prisma === undefined ? "memory" : "postgres"` is what this replaces,
- * and it was the exact failure the design exists to delete - a lost
- * `DATABASE_URL` read as a decision, and an API served empty lists out of
- * memory while readiness stayed green.
- */
+/** Verify each module's tier has required members; no inference from environment. */
 function assertRepositoryBackend(
   declarations: readonly DeclaredFeature[],
   selections: ReadonlyMap<string, RepositorySelection>,

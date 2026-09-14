@@ -1,24 +1,7 @@
 /**
- * Writes one trace per exchange of a finished voice call, so every message the
- * run renders can deep-link the trace of the exchange it belongs to (the drawer
- * probes `msg.trace_id`). This is the browser-call counterpart of the traces a
- * simulated run emits: same ingestion path (`getApp().traces.recordSpan` → the
- * standard OTLP fold), same thread grouping (`gen_ai.conversation.id`), same
- * `gen_ai.input/output.messages` shape the previews read.
- *
- * An exchange is one caller utterance plus the agent utterances that answer it;
- * a leading agent greeting is exchange 0 with no caller input. Every turn in an
- * exchange carries that exchange's trace id.
- *
- * The ids are derived from the conversation id and the exchange index alone, so
- * a re-driven finish (a retried hang-up completing a half-written run — #7973)
- * recomputes the identical ids and the fold dedupes rather than duplicating.
- *
- * Best effort: a `recordSpan` failure is logged and swallowed. The ids are
- * still returned so the messages link to them; the fold picks the span up if a
- * later attempt succeeds.
- *
- * Server-only: derives the ids with `node:crypto`.
+ * Writes one trace per voice-call exchange: one caller utterance + agent replies.
+ * IDs derived from conversation id and exchange index (dedupes re-driven finishes #7973).
+ * Best effort; recordSpan failures logged but swallowed.
  */
 
 import { createHash } from "node:crypto";

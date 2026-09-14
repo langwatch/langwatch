@@ -1,19 +1,7 @@
 /**
- * The real {@link VoiceSessionInfrastructure} the "Talk to it" route runs
- * against in production.
- *
- * The route itself stays HTTP-only (session auth, permission probe, zod
- * validation, the feature-flag gate) and calls
- * `mintVoiceSession`/`finishVoiceSession` with the infrastructure this module
- * composes. See `dev/docs/best_practices/error-handling.md` and the root
- * CLAUDE.md ("Hono routes calling repositories directly").
- *
- * Every collaborator arrives as an argument: the agent reads, the scenario
- * read, the run read, the provider credential, the two writers and the token
- * signing secret. Nothing here reaches for a global application locator, a
- * Prisma client or an environment variable — the module's composition binds
- * all of it, which is also what lets a unit test compose the whole
- * infrastructure over in-memory fakes.
+ * Production {@link VoiceSessionInfrastructure} for "Talk to it" route. Route stays
+ * HTTP-only; infrastructure composes from arguments. All collaborators testable
+ * against in-memory fakes.
  */
 
 import type {

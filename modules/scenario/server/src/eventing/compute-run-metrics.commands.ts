@@ -21,17 +21,8 @@ const MAX_RETRIES = 3;
 export const COMPUTE_METRICS_RETRY_DELAY_MS = 10_000;
 
 /**
- * The retry above, as the queue that carries it is told to stage it.
- *
- * Every other routing key on `event-sourcing/jobs` travels between the legacy
- * registry and the packaged worker inside a pipeline definition, which is a
- * static description handed across intact. This one does not: the retry is a
- * queue job registered against the pipeline SERVICE after registration, so its
- * name, delay and deduplication are spelled at the registration site rather
- * than declared by `simulation_processing`. Two spellings would be two keys on
- * one queue, and the consumer that did not stage a key never drains it — which
- * is why they are decided here, beside the handler that schedules them, and
- * read by whichever composition holds the live service.
+ * Retry scheduling for deferred compute-run-metrics job: registered after
+ * pipeline (not in definition), decided beside handler and read by service.
  */
 export const scenarioDeferredComputeRunMetricsJob = {
   name: "deferredComputeRunMetrics",
@@ -81,24 +72,9 @@ const SCHEMA = defineCommandSchema(
 );
 
 /**
- * Command handler for computing simulation run metrics.
- *
- * Supports two modes:
- * 1. ECST mode: metrics provided in payload (from trace-side subscriber) - emits event directly
- * 2. Pull mode: no metrics in payload (from simulation-side subscriber) - reads trace summary
- *
- * When a trace summary is not yet available, schedules a deferred retry.
- *
- * Uses constructor DI — instantiate with deps and pass via `.withCommandInstance()`.
- */
-/*
- * `occurredAt` is carried through every retry by the `...data` spread and never
- * restamped. It becomes the emitted event's `occurredAt`, which is both the
- * ReplacingMergeTree version and the monthly partition key of
- * `simulation_run_metrics`. Migrations 00080 and 00081 state this invariant —
- * "a retry re-inserts a row with the SAME OccurredAt" — and a fresh clock
- * reading breaks it: a retry that crosses a month boundary lands in a partition
- * where the engine cannot collapse it, leaving one trace with two rows forever.
+ * Handler for computing simulation run metrics: ECST (payload) and Pull
+ * (trace summary) modes; schedules retry if summary unavailable; carries
+ * occurredAt through retries as partition key.
  */
 export class ComputeRunMetricsAdapter implements CommandHandler<
   Command<ComputeRunMetricsCommandData>,

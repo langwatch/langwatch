@@ -72,22 +72,8 @@ export {
 } from "../processes/simulation-run-execution-data.process.ts";
 
 /**
- * The `simulation_run_execution` process-manager topology, exported
- * standalone so tests can build the exact definition the runtime mounts via
- * `buildProcessManager` — mirroring `TopicClusteringProcess.processManager`.
- *
- * One process per scenario run (process key = scenarioRunId). Owns:
- * - dispatch: queued -> execute intent -> this pod's execution pool;
- * - cancellation: cancel_requested -> cancel intent (Redis pub/sub stays the
- *   cross-pod transport) with a CANCEL_GRACE_MS force-terminal backstop;
- * - stalls: the wake finishes the run ERROR/"stalled" after
- *   STALL_THRESHOLD_MS without activity, replacing read-time derivation;
- * - lost grading jobs: a run that finished owing evaluator results waits in
- *   `evaluating`, and the wake records one errored result per evaluator
- *   after EVALUATION_DEADLINE_MS when the evaluated event never came.
- *
- * `message_snapshot`, `text_message_start` and `text_message_end` count as
- * activity only — their content never crosses `toPayload`.
+ * Simulation run execution process-manager topology (one per run): dispatch, cancellation,
+ * stall detection, lost grading job handling. Messages count as activity only.
  */
 export function simulationRunExecutionPM(
   execution: ScenarioExecutionService,

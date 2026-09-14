@@ -1,17 +1,5 @@
-/**
- * Builds four of the small ports `ScenarioApp` used to receive as members
- * (`apps/api/src/features/scenario/scenario.composition.ts`, deleted by
- * b383462d96): the scenario and test-suite id generators, the clock, and the
- * stored-secret cipher. `ScenarioApp.create` now builds them itself from the
- * one member it reads — `encryption` — since none of the four needs anything
- * else from the process.
- *
- * The remaining pre-b383462d96 collaborators (`agentTesting`,
- * `scenarioExecution`, `simulations`, `scenarioTabs`, `resultAtoms`,
- * `runConfigurations`, `broadcast`, `activity`, `publicBaseUrl`) still arrive
- * as members/dependencies exactly as they did before this change; see the
- * scenario-composition-green handover for the triage recorded there.
- */
+// Builds id generators, clock, and secret cipher from encryption member
+// (previously separate members of ScenarioApp)
 import { generate } from "@langwatch/ksuid";
 import { nanoid } from "nanoid";
 import { nowInstant, toDate } from "@langwatch/time";
@@ -89,7 +77,10 @@ class UnavailableScenarioSecretCipher implements ScenarioSecretCipher {
   }
 }
 
-/** What this process hands `ScenarioApp` at boot, built from its own member and three pure ports. */
+/**
+ * What this process hands `ScenarioApp` at boot, built from its own member
+ * and three pure ports.
+ */
 export function buildScenarioComposition(input: { encryption: Encryption | undefined }): {
   ids: ScenarioId;
   testSuiteIds: ScenarioTestSuiteId;

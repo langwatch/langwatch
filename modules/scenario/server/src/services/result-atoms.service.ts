@@ -33,9 +33,9 @@ const HOUR_SECONDS = 60 * 60;
 const DAY_SECONDS = 24 * HOUR_SECONDS;
 
 /**
- * Reads results as atoms and folds them the four ways the Results tab
- * groups — server-side, since a suite of 50 scenarios x 2 targets on every
- * merge produces ~60,000 atoms (~27 MB JSON) in 30 days; the atom list is a bounded drill-down, not what the page adds up.
+ * Reads results as atoms and folds them the four ways Results groups. Server-side:
+ * 50 scenarios x 2 targets per merge produces ~60k atoms (~27 MB) in 30 days;
+ * list is bounded drill-down, not what page adds up.
  */
 export class ResultAtomsService {
   static create(
@@ -51,9 +51,8 @@ export class ResultAtomsService {
   ) {}
 
   /**
-   * How wide one bucket of the pass-rate chart is, from the window's width.
-   * A fixed bucket count would make a one-day window draw 30 buckets of 48
-   * minutes, reading as precision the data doesn't have; anchoring on time keeps a bucket a unit a person recognises.
+   * Bucket width for pass-rate chart from window width. Anchoring on time keeps
+   * a bucket a recognizable unit rather than false precision.
    */
   static bucketSecondsFor({ startDate, endDate }: { startDate: number; endDate: number }): number {
     const days = (endDate - startDate) / (DAY_SECONDS * 1000);
@@ -202,9 +201,8 @@ export class ResultAtomsService {
   }
 
   /**
-   * Turns a label or test-suite filter into the scenario ids it names — the
-   * only place Postgres labels/suite membership meet the run row, which
-   * carries neither. INTERSECTS with an explicit scenario filter (two filters both narrow); an empty result stays empty, read as "none of them".
+   * Resolve label or test-suite filter to scenario ids (INTERSECTS with explicit
+   * scenario filter; empty result stays empty).
    */
   private async resolveScenarioScope(filter: ResultsFilter): Promise<ResultsFilter> {
     const hasLabels = (filter.labels?.length ?? 0) > 0;
@@ -246,9 +244,8 @@ export class ResultAtomsService {
   }
 
   /**
-   * The name each group row reads under. Only the scenario grouping needs a
-   * second read: a plan is already in the plan index, a target is named by
-   * the client from its reference id, and a one-execution group takes its title from the run itself.
+   * The name each group row reads under. Only scenario grouping needs a second read;
+   * plan is in index, target is named by client, one-execution group from run itself.
    */
   private async readGroupTitles({
     projectId,

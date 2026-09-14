@@ -220,26 +220,8 @@ export class ClickHouseSimulationRunStateRepository<
 
     try {
       const client = await this.options.resolveClient(context.tenantId);
-      // Latest-version read over the ReplacingMergeTree(UpdatedAt) for a single
-      // run. The inner scalar subquery finds the newest UpdatedAt reading only
-      // the light sort-key columns; the outer `t.UpdatedAt = (...)` equality is
-      // PREWHERE-able, so the heavy columns (Messages.*, TraceMetricsJson,
-      // RoleCosts, etc.) are materialized for only the single surviving row.
-      //
-      // The earlier `(TenantId, ScenarioRunId, UpdatedAt) IN (max-subquery)`
-      // tuple form was not applied as a PREWHERE on the version, so ClickHouse
-      // read the heavy Messages.* arrays across EVERY version of the run before
-      // discarding the stale ones. Runs with many snapshot versions exhausted
-      // the server memory limit (Code 241). For a single-aggregate get, scalar
-      // equality is preferable to the IN-tuple form (which stays the right
-      // choice for multi-key list reads); the sibling read path
-      // (simulation.clickhouse.repository.ts getScenarioRunData) already uses
-      // this scalar form for the same reason.
-      //
-      // Outer references UpdatedAt via the table alias because the column is
-      // also projected as `toUnixTimestamp64Milli(...) AS UpdatedAt` — without
-      // the alias the comparison resolves to the projected UInt64 instead of
-      // the raw DateTime64.
+      // Latest-version read via scalar equality on UpdatedAt (PREWHERE-able for heavy columns).
+      // IN-tuple form causes OOM on runs with many snapshots; scalar is better for single-row gets.
       const result = await client.query({
         query: `
           SELECT

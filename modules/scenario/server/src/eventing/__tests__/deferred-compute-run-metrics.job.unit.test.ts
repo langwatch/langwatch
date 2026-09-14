@@ -1,18 +1,6 @@
 /**
- * Whether the delayed metrics retry still spells itself the way both graphs
- * staged it.
- *
- * The legacy registry in platform/app keeps its own frozen copy of this
- * description, because the pipeline it retries has not moved yet. Nothing
- * relates the two copies at compile time, and the queue would not complain: a
- * drifted name is a second routing key on `event-sourcing/jobs` that only one
- * of the two consumers ever stages, and a drifted job id stops deduplicating
- * the retries of one run onto one entry. Both failures look like a queue that
- * is simply quiet. Only the delay is safe from drift — both copies read the
- * same exported constant — so everything else is pinned to a literal here, and
- * these literals may only change in a commit that changes the twin as well.
- *
- * Spec: modules/scenario/specs/simulation-service.feature
+ * Tests delayed metrics retry job name/ID matches both graphs' expectations;
+ * pinned literals here must match twin in legacy registry.
  */
 import type { ComputeRunMetricsCommandData } from "@langwatch/scenario-contract";
 import { describe, expect, it } from "vitest";

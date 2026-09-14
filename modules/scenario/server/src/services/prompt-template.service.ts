@@ -1,19 +1,7 @@
 /**
- * Builds the Liquid context a prompt agent's template renders against when it
- * runs as the agent under test in a simulation.
- *
- * Before #6590 this context held exactly two names, `input` and `messages`, so
- * a prompt's own declared input variables were never bound: they rendered as
- * empty strings and the model was shown a form with blank fields. `messages`
- * was a raw `JSON.stringify` of the conversation, which carries the internal
- * `id` and `traceId` the scenario runner stamps on every message — those
- * reached the model as prompt text.
- *
- * Declared inputs are bound through the same field-mapping machinery the code,
- * HTTP and workflow adapters use, so a prompt behaves like every other target:
- * an explicit mapping wins, and anything left over is matched against the
- * scenario sources by name (`question` → the latest user message, `thread_id` →
- * the thread id, and so on).
+ * Builds the Liquid context for prompt agent's template: declared inputs bound
+ * through field-mapping machinery (same as code/HTTP/workflow adapters). Sanitizes
+ * `messages` to role/content only; stripping id/traceId (#6590).
  */
 
 import type { AgentInput } from "@langwatch/scenario";
@@ -81,19 +69,8 @@ export class PromptTemplateAdapter {
   }
 
   /**
-   * The conversation rendered for a prompt: one `role: content` line per turn.
-   *
-   * A prompt template is prose, so history belongs in it as prose. It used to be
-   * bound to `JSON.stringify(input.messages)`, which showed the model a
-   * serialised payload — and a model shown a payload answers with one (#6590).
-   * That reply then became the next turn's history and was serialised again, so
-   * each turn's prompt carried the previous turn's escaped one level deeper: an
-   * instrumented four-turn run grew ×14.5 while the conversation itself grew
-   * ×3.6.
-   *
-   * Note this is a change in what `{{messages}}` renders. A template that parsed
-   * it as JSON has to loop the turns instead — and could not have been doing so
-   * safely anyway, since the array it received carried internal fields.
+   * Conversation as prose for prompt: one `role: content` line per turn. Avoids
+   * serialization recursion of #6590 (JSON.stringify carried internal fields).
    */
   private static transcriptForPrompt(messages: AgentInput["messages"]): string {
     return messages
@@ -117,15 +94,8 @@ export class PromptTemplateAdapter {
   }
 
   /**
-   * Build the template context for one turn.
-   *
-   * @param input - The turn the scenario runner handed the adapter
-   * @param inputs - The prompt's declared input variables
-   * @param scenarioMappings - Explicit bindings configured on the suite target.
-   *   These win; every declared input they leave out is matched by name.
-   * @param parameters - The values the run resolved, bound as `params` so the
-   *   template reads `{{ params.account_tier }}`. Bound before the declared
-   *   inputs, so a prompt input named `params` still wins.
+   * Build template context for one turn: input + messages + thread_id + params.
+   * Explicit mappings win; unbound inputs matched by name.
    */
   static buildContext({
     input,

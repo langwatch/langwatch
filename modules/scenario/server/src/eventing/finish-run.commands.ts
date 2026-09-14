@@ -81,16 +81,8 @@ function collectTraceIds(events: readonly SimulationProcessingEvent[]): string[]
 }
 
 /**
- * Classifies results that carry a failure nobody wrote a reason for.
- *
- * A judge's results carry its own reasoning, which is prose about the
- * conversation and must reach the customer verbatim. A run that failed
- * before any judging reports the raw failure instead: as the reasoning
- * itself, or with no reasoning at all. Those two shapes are what this
- * rewrites, so the drawer renders a named error rather than a Node stack.
- *
- * Everything else is returned untouched: a passing verdict, results with no
- * error, and any result whose reasoning says something the error does not.
+ * Classifies results with failures but no reasoning: rewrites raw failures
+ * so drawer renders named error instead of Node stack.
  */
 function classifyUnjudgedResults({
   results,
@@ -120,14 +112,8 @@ function classifyUnjudgedResults({
 }
 
 /**
- * The results envelope the finished event carries.
- *
- * Infrastructure callers (stall watchdog, cancel-grace) supply a bare `error`
- * and no verdict; they get the same failure-results envelope the in-process
- * failure path writes, so the reason is recorded on the event. Caller-supplied
- * results win, but a run that failed before any judging reports its raw
- * failure as the reasoning, so those are classified on the way in rather than
- * stored as a stack.
+ * Results envelope for finished event: infrastructure callers (watchdog,
+ * cancel-grace) supply bare error, classified on the way in.
  */
 function resolveFinishResults({
   data,
@@ -145,19 +131,8 @@ function resolveFinishResults({
 }
 
 /**
- * Command handler for finishing a simulation run.
- *
- * Emits the RunFinished event with event-carried state (ECST): identity
- * (scenarioId/batchRunId/scenarioSetId) and traceIds ride on the event so
- * downstream subscribers never read fold state. Callers may supply them on
- * the command; any gap is backfilled from the run's prior events via the
- * injected `loadPriorEvents`.
- *
- * Uses constructor DI like ComputeRunMetricsCommand. The deps are optional
- * ONLY so the pipeline's current `.withCommand("finishRun", FinishRunCommand)`
- * registration (zero-arg constructor) keeps compiling until the wiring
- * switches to `.withCommandInstance(...)`; without deps the handler emits
- * exactly what the caller supplied, with no backfill.
+ * Command handler for finishing runs: emits RunFinished with event-carried
+ * state (identity, traceIds; optional deps for backward compat).
  */
 export class FinishRunAdapter implements CommandHandler<
   Command<FinishRunCommandData>,
@@ -213,13 +188,8 @@ export class FinishRunAdapter implements CommandHandler<
   }
 
   /**
-   * Fills ECST gaps from the run's prior events. Caller-supplied fields
-   * always win; only missing ones are backfilled (identity from RunQueued,
-   * traceIds from MessageSnapshot/TextMessageEnd, the evaluators the run was
-   * queued with from RunQueued).
-   *
-   * The prior events are always read now: `evaluators` is a gap on every
-   * command, since no caller supplies it.
+   * Fills ECST gaps from prior events: caller-supplied fields win; backfills
+   * identity, traceIds, evaluators (prior events always read for evaluators).
    */
   private async backfillEcstFields(
     tenantId: string,
@@ -287,13 +257,8 @@ export class FinishRunAdapter implements CommandHandler<
   }
 
   /**
-   * The evaluators of a run that carries none on its own events, which is a
-   * run driven from code: it reported a start and a finish and never passed
-   * through the queue command that pins them. Read here so such a run still
-   * reports that its evaluators are pending, and still gets graded.
-   *
-   * A read that fails leaves the field off: the subscriber falls back to
-   * reading the suite and the plan itself, so the run is graded either way.
+   * Resolves evaluators for code-driven runs (no queue event): read so runs
+   * report evaluators pending and get graded (failed reads leave field off).
    */
   private async resolveEvaluators({
     tenantId,

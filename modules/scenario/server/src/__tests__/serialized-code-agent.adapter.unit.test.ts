@@ -130,15 +130,7 @@ describe("SerializedCodeAgentAdapter", () => {
     };
   };
 
-  /**
-   * A real `Response`, used by the error-surfacing suite below (lw#3439).
-   *
-   * A plain `{ ok, status, json, text }` literal has independently callable,
-   * infinitely re-readable `json`/`text`, so it cannot reproduce body-stream
-   * semantics — which is what let a non-JSON body ship dropped and let a
-   * `{ detail }` fixture encode a contract the Go engine never serves. Built
-   * with the constructor, `.text()`/`.status`/`.ok` all come for free.
-   */
+  // Real Response with proper body-stream semantics for error-surfacing tests (lw#3439)
   const jsonResponse = (body: unknown, status: number) =>
     new Response(JSON.stringify(body), {
       status,
@@ -804,7 +796,10 @@ describe("SerializedCodeAgentAdapter", () => {
           signal.addEventListener("abort", onAbort);
         });
 
-      /** @scenario code-agent adapter emits an error span with kind=timeout when the NLP service hangs */
+      /**
+       * @scenario "code-agent adapter emits an error span with kind=timeout
+       * when the NLP service hangs"
+       */
       it("throws SerializedCodeAgentAdapterError with kind=timeout and emits an error span", async () => {
         mockFetch.mockImplementation(async (_url: string, opts: { signal: AbortSignal }) =>
           abortAwareFetch(opts.signal),
@@ -886,7 +881,10 @@ describe("SerializedCodeAgentAdapter", () => {
     });
 
     describe("when the NLP service returns a non-2xx response", () => {
-      /** @scenario code-agent adapter emits an error span with kind=http when the NLP service returns non-2xx */
+      /**
+       * @scenario "code-agent adapter emits an error span with kind=http
+       * when the NLP service returns non-2xx"
+       */
       it("emits an error span with kind=http and the status code", async () => {
         mockFetch.mockResolvedValue({
           ok: false,
@@ -1384,7 +1382,10 @@ describe("SerializedCodeAgentAdapter", () => {
     };
 
     describe("when the engine finalizes the run as failed", () => {
-      /** @scenario adapter labels an engine failure attributed to the customer as a user-code failure */
+      /**
+       * @scenario "adapter labels an engine failure attributed to the
+       * customer as a user-code failure"
+       */
       it("labels a node failure the engine did not attribute to itself as user code", async () => {
         mockFetch.mockImplementation(async () =>
           engineFailureResponse({
@@ -1437,7 +1438,10 @@ describe("SerializedCodeAgentAdapter", () => {
         );
       });
 
-      /** @scenario adapter labels an engine failure attributed to the platform as an NLP service failure */
+      /**
+       * @scenario "adapter labels an engine failure attributed to the
+       * platform as an NLP service failure"
+       */
       it("labels an engine_error as an infra (NLP service) failure", async () => {
         mockFetch.mockImplementation(async () =>
           engineFailureResponse({
@@ -1670,7 +1674,10 @@ describe("SerializedCodeAgentAdapter", () => {
         return undefined;
       };
 
-      /** @scenario a missing declared output leaves the same structured footprint as any other failure */
+      /**
+       * @scenario "a missing declared output leaves the same structured
+       * footprint as any other failure"
+       */
       it("tags a missing declared output like every other failure", async () => {
         mockFetch.mockImplementation(async () =>
           jsonResponse(

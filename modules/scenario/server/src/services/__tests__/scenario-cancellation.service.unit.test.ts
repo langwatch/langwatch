@@ -1,12 +1,6 @@
 /**
- * Cancellation tests for the canonical ScenarioService.
- *
- * The service uses event-sourcing for cancellation:
- * - Dispatches cancel_requested event (always)
- * - The simulationRunExecution process manager takes it from there:
- *   queued runs are finished CANCELLED by the process manager itself;
- *   active runs are broadcast to workers, and the owning worker kills the child
- *
+ * Cancellation tests: service dispatches cancel_requested event; process manager
+ * finishes queued runs CANCELLED; workers kill active runs.
  * @see specs/features/suites/cancel-queued-running-jobs.feature
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";

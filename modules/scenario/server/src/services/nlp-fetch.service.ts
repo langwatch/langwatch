@@ -1,37 +1,37 @@
 /**
- * The client-side fetch deadline for nlpgo's /go/studio/execute_sync,
- * single-sourced for both code-agent and workflow-agent adapters after a
- * production bug (lw#7640): a raised engine ceiling left an independently-configured client abort cutting off still-legitimate runs. The deadline is DERIVED from the engine's own ceiling, which the composition root reads under the engine's own name, so the two cannot drift apart again.
+ * The client-side fetch deadline for nlpgo's /go/studio/execute_sync, single-sourced for
+ * both adapters after lw#7640: raised engine ceiling left independent client abort cutting
+ * off still-legitimate runs. Deadline derived from engine's own ceiling so they cannot drift.
  */
 
 import { Agent, type Dispatcher, type RequestInit as UndiciRequestInit } from "undici";
 
 /**
- * The engine's own code-block ceiling env var
- * (`NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS`, `services/nlpgo/config.go`), read under the *same* name so an operator sets it once for both sides — no separate client-side name exists.
- * @internal Exported for testing and the child-process environment allowlist.
+ * The engine's own code-block ceiling env var (`NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS`),
+ * read under the same name so operator sets it once — no separate client-side name.
+ * @internal Exported for testing and child-process environment allowlist.
  */
 export const NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS_ENV =
   "NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS";
 
 /**
- * Used when {@link NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS_ENV} is unset —
- * a copy of the engine's own fallback (codeblock.go:115,
- * `opts.DefaultTimeout = 600s`), kept in sync by hand if the Go default changes. Exported as the ONLY copy on this side; every other fallback (Lambda clamp included) imports this rather than restating 600.
+ * Used when {@link NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS_ENV} is unset — engine's own fallback
+ * (codeblock.go:115). Exported as the ONLY copy; all other fallbacks import this rather than
+ * restating 600.
  */
 export const NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_DEFAULT_SECONDS = 600;
 
 /**
- * The engine's own SSE silence budget
- * (`NLPGO_ENGINE_STREAM_IDLE_TIMEOUT_SECONDS`, handlers.go). A code block
- * running longer emits nothing, so the stream is torn down before the caller sees the verdict — an upper bound on any code-block ceiling (see {@link clampCodeBlockTimeoutSeconds}). Not env-configurable: the platform only has to stay under the engine's own default.
+ * The engine's own SSE silence budget (`NLPGO_ENGINE_STREAM_IDLE_TIMEOUT_SECONDS`).
+ * Running longer emits nothing; stream torn down before caller sees verdict. Upper bound
+ * on any code-block ceiling. Not env-configurable.
  */
 export const NLPGO_ENGINE_STREAM_IDLE_TIMEOUT_DEFAULT_SECONDS = 720;
 
 /**
- * Slack the client's socket hold gets ABOVE the engine's code-block
- * ceiling (and the agent's own budget, if longer), so the engine enforces
- * and REPORTS its own timeout rather than this client aborting first. Deliberately not env-configurable — tunability here would recreate the exact hand-kept-in-sync drift this module exists to prevent.
+ * Slack above engine's code-block ceiling so engine enforces and reports its timeout,
+ * not client abort first. Not env-configurable — tunability recreates the drift this
+ * module prevents.
  */
 export const NLP_FETCH_HEADROOM_MS = 30_000;
 
@@ -99,16 +99,15 @@ function maxFetchTimeoutMs(timeouts: NlpFetchTimeouts): number {
 }
 
 /**
- * Dispatcher cache keyed by effective `timeoutMs`: building a fresh `Agent`
- * per call (the original behaviour) leaked a socket/FD pool on every
- * scenario fetch and defeated keep-alive. `timeoutMs` comes from the process's own configuration, so key cardinality is small and fixed for its life — no eviction needed.
+ * Dispatcher cache keyed by `timeoutMs`: building fresh Agent per call leaked
+ * socket/FD pool and defeated keep-alive. Small fixed cardinality, no eviction needed.
  */
 const dispatchersByTimeoutMs = new Map<number, Dispatcher>();
 
 /**
- * Undici's own headersTimeout/bodyTimeout (300s default) live on the
- * DISPATCHER, not the request — an `AbortController` signal cannot raise
- * them, which is how a client deadline raised to 630s (lw#7640) still got cut off at 300s in production. Give this dispatcher only to undici's own `fetch`, never the global one (version-mismatched, fails fast); {@link FetchInitWithDispatcher} makes that mistake a compile error. Memoized by `timeoutMs`; call {@link NlpFetchAdapter.close} on shutdown.
+ * Undici's own headersTimeout/bodyTimeout (300s default) live on DISPATCHER, not request —
+ * AbortController cannot raise them. Give only to undici's `fetch`, never global one.
+ * {@link FetchInitWithDispatcher} makes that mistake a compile error. Memoized by timeoutMs.
  */
 function createNlpFetchDispatcher({ timeoutMs }: { timeoutMs: number }): Dispatcher {
   const cached = dispatchersByTimeoutMs.get(timeoutMs);
@@ -183,8 +182,7 @@ export class NlpFetchAdapter {
 }
 
 /**
- * The request init for a call carrying {@link NlpFetchAdapter.dispatcher}'s
- * dispatcher — deliberately undici's own `RequestInit`, not the DOM-lib
- * one, so handing the dispatcher to the global `fetch` is a compile error, not the outage {@link NlpFetchAdapter.dispatcher} describes.
+ * Request init carrying {@link NlpFetchAdapter.dispatcher}: deliberately undici's own
+ * RequestInit, not DOM-lib, so handing dispatcher to global fetch is a compile error.
  */
 export type FetchInitWithDispatcher = UndiciRequestInit;

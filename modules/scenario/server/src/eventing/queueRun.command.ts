@@ -43,21 +43,8 @@ const SCHEMA = defineCommandSchema(
 );
 
 /**
- * Command handler for scheduling a simulation run.
- *
- * Resolves the evaluators the run will be graded with and records them on the
- * queued event, so the set is fixed the moment the run is scheduled. Editing
- * the suite or the run plan while the batch executes changes the runs queued
- * after the edit and never the ones already scheduled, and the evaluation job
- * grades the same set on every retry.
- *
- * A caller that already resolved them supplies `evaluators` and the lookup is
- * skipped, which is how a batch resolves once for every run it schedules. A
- * lookup that fails leaves the field off the event: FinishRunCommand resolves
- * it again when the run finishes, so a run is never left ungraded because a
- * read failed at schedule time.
- *
- * @see specs/scenarios/scenario-evaluation-pending.feature
+ * Handler for scheduling runs: resolves evaluators and records on event
+ * (caller can supply to skip); lookup failure doesn't prevent grading.
  */
 export class QueueRunCommand
   implements

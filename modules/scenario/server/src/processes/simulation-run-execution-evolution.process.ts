@@ -25,17 +25,8 @@ import {
 export const STALL_THRESHOLD_MS = 30 * 60 * 1000;
 
 /**
- * The simulation run execution process (ADR-052), authored for the
- * `withProcessManager` builder: pure state logic only. One process instance
- * per scenario run (process key = scenarioRunId). It replaces the old
- * fire-and-forget execution subscriber, the ephemeral Redis-only cancellation
- * path, and read-time stall derivation with durable state: the outbox owns
- * dispatch retries, and the wake owns the stall, cancel-grace and
- * evaluation-deadline backstops.
- *
- * There is no `.schedule()` — wakes are per-run deadlines (stall threshold,
- * cancel grace, evaluation deadline), so every handler returns its own
- * explicit `nextWakeAt`.
+ * Simulation run execution process (ADR-052): pure state logic per run.
+ * Replaces fire-and-forget subscriber; outbox owns retry, wake owns stall/cancel/deadline backstops.
  */
 
 type Ctx = ProcessHandlerContext<SimulationRunExecutionIntents>;

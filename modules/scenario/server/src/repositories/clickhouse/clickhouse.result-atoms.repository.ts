@@ -1,7 +1,6 @@
 /**
- * The Results tab's own atom reads: run once per scenario/target off
- * `simulation_runs`, kept apart from `SimulationClickHouseRepository` (v1's
- * batch/set reads) since this reads the whole window flat for filter/group; SQL builders stay static methods per `restructure-bug-hunt-2026-09-03.md`.
+ * Results tab atom: flat `simulation_runs` for filter/group, distinct from v1 batch/set.
+ * SQL builders are static methods per restructure-bug-hunt-2026-09-03.md.
  */
 import {
   MAX_ATOM_PAGE,
@@ -828,9 +827,8 @@ export class ResultAtomsClickHouseRepository extends ResultAtomsRepository {
   }
 
   /**
-   * Sparkline points per group, trimmed to what a sparkline actually draws —
-   * read whole (one aggregate, bounded by run count) and trimmed HERE rather
-   * than after, since Results is now the default view. `LIMIT n BY` is safe over this GROUP BY output, not the base table.
+   * Sparkline points trimmed to sparkline needs; read whole and trim since Results is default.
+   * `LIMIT n BY` is safe over this GROUP BY output, not the base table.
    */
   async aggregateTrend({
     filter,

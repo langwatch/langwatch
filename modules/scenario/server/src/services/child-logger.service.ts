@@ -1,15 +1,6 @@
 /**
- * Bridges the parent's structured logger context across the parent → child
- * process boundary.
- *
- * The parent attaches a context object (scenarioRunId, batchRunId, projectId,
- * scenarioId) to its `logger.child(...)` call. Without this bridge, the
- * spawned scenario child gets a fresh logger with no context, so its log
- * lines aren't joinable to the parent's by ID in CloudWatch Insights.
- *
- * Tracking: lw#3593.
- *
- * @see specs/scenarios/observability-context.feature
+ * Bridges parent's logger context (scenarioRunId, batchRunId, projectId, scenarioId)
+ * to spawned child process. Without this, child logs aren't joinable by ID (lw#3593).
  */
 
 import { createLogger, type Logger } from "@langwatch/observability";

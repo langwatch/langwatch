@@ -1,12 +1,6 @@
-/**
- * @vitest-environment node
+/** @vitest-environment node
  * @integration
- *
- * Scenario tab presence, against real Redis.
- *
- * Covers specs/scenarios/scenario-tab-handoff.feature — the presence half. No
- * fakes: the registry writes to the same Redis the app uses, so TTLs, sorted
- * set semantics and key scoping are the real ones.
+ * Scenario tab presence against real Redis (specs/scenarios/scenario-tab-handoff.feature).
  */
 
 import { type RedisConnection, RedisConnectionService } from "@langwatch/redis-client";

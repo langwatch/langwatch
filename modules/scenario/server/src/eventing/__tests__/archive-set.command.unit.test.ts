@@ -1,12 +1,6 @@
-/**
- * @vitest-environment node
- *
- * Unit tests for ArchiveSetCommand + SimulationSetArchivedEvent (lw#3636).
- *
- * Covers schema parsing, command handler emit, idempotency-key
- * collapsing, and the corresponding type guard.
- *
- * @see specs/suites/simulation-set-archive.feature
+/** @vitest-environment node
+ * Unit tests for ArchiveSetCommand: schema parsing, emit, idempotency-key
+ * collapsing, type guard (lw#3636).
  */
 
 import type { TenantId } from "@langwatch/eventing";
@@ -42,7 +36,10 @@ function makeArchiveSetCommand(overrides?: {
 describe("ArchiveSetCommand (lw#3636)", () => {
   describe("given a tenant archives a set with three runs", () => {
     describe("when the ArchiveSetCommand handler runs", () => {
-      /** @scenario ArchiveSetCommand emits a SimulationSetArchived event with the snapshotted run ids */
+      /**
+       * @scenario "ArchiveSetCommand emits a SimulationSetArchived event
+       * with the snapshotted run ids"
+       */
       it("emits a single SimulationSetArchived event carrying the runs", async () => {
         const handler = new ArchiveSetCommand();
         const events = await handler.handle(makeArchiveSetCommand());

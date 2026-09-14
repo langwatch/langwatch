@@ -771,7 +771,10 @@ describe("SerializedHttpAgentAdapter", () => {
     };
 
     describe("when the response carries a value at the session path", () => {
-      /** @scenario "An HTTP agent receives the session it returned in the url, the headers and the body" */
+      /**
+       * @scenario "An HTTP agent receives the session it returned in the
+       * url, the headers and the body"
+       */
       /** @scenario "An HTTP agent renders an empty session on the first turn" */
       /** @scenario "Two threads of one HTTP agent run do not share a session" */
       it("renders it empty on the first turn, then in the url, a header and the body, and not for another thread", async () => {
@@ -799,7 +802,10 @@ describe("SerializedHttpAgentAdapter", () => {
         expect(sent(2).body.session).toBe("");
       });
 
-      /** @scenario "A response with no match at the session path leaves the held value unchanged" */
+      /**
+       * @scenario "A response with no match at the session path leaves the
+       * held value unchanged"
+       */
       it("keeps the held value when a later response has nothing at the path", async () => {
         mockSsrfSafeFetch
           .mockResolvedValueOnce(reply({ reply: "one", conversation_id: "conv_1" }))
