@@ -1,21 +1,6 @@
-/**
- * The gateway vertical's Enterprise tRPC surfaces, composed for the legacy web
- * application's router root.
- *
- * Two transports live here: routing policies (`routingPolicy`) and personal
- * virtual keys (`personalVirtualKeys`). `webhookEndpoints` is declared and the
- * process mounts it on its own runtime. Each router's behaviour — procedure
- * names, input and output shapes, refusals — belongs to its Enterprise feature
- * package. What this composition owns is the wiring: which policy wraps which
- * declaration, and which process capability answers each port.
- *
- * It sits in the Enterprise API composition rather than in `apps/api` for the
- * same reason its sibling does: a core package may not depend on an Enterprise
- * one. Everything the process must supply arrives through `create`, so this
- * package never imports an application.
- *
- * The remaining six gateway surfaces are core and mount from
- * `@langwatch/platform-api/app-trpc`.
+/** Compose Enterprise gateway tRPC surfaces (routing policies, personal virtual keys).
+ * Belongs here, not apps/api, because core packages cannot depend on Enterprise ones;
+ * this composition wires process dependencies through create().
  */
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import {

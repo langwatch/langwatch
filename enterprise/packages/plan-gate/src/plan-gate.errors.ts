@@ -1,13 +1,7 @@
 import { HandledError, remediation } from "@langwatch/handled-error";
 
-/**
- * The Enterprise capabilities a deployment can be refused, and the sentence
- * each refusal carries.
- *
- * One list, because the REST gate, the tRPC gate and the imperative assertion
- * all have to agree on what "Enterprise" covers: a capability named in one and
- * missing from another is a surface that sells differently depending on which
- * door a caller knocks on.
+/** Single source of truth for Enterprise capabilities across all gates (REST,
+ * tRPC, imperative) to prevent inconsistent sales.
  */
 export const ENTERPRISE_FEATURE_ERRORS = {
   RBAC: "Custom roles require an Enterprise plan",
@@ -23,18 +17,8 @@ export const ENTERPRISE_FEATURE_ERRORS = {
 
 export type EnterpriseFeature = keyof typeof ENTERPRISE_FEATURE_ERRORS;
 
-/**
- * The plan, not the request, is what refuses here, so the status is 402 and
- * the code is stable, letting a caller distinguish "buy the plan" from "fix
- * the request" (403/422) without reading prose.
- *
- * `meta.feature` names which capability was asked for, and the remediation
- * channel (tips + docs link) rides on the error so CLI and API consumers get
- * upgrade guidance without a UI. `fault` stays `customer`: the refusal is an
- * account state the customer resolves, not a platform failure.
- *
- * REST-only by design: the tRPC surface keeps `requireEnterprisePlan`, which
- * answers FORBIDDEN with the same sentences.
+/** Refuses plan status (402) not request validity (403/422); tRPC uses
+ * requireEnterprisePlan which answers FORBIDDEN with same copy.
  */
 export class EnterprisePlanRequiredError extends HandledError {
   declare readonly code: "enterprise_plan_required";
@@ -50,14 +34,8 @@ export class EnterprisePlanRequiredError extends HandledError {
   }
 }
 
-/**
- * The one place a plan type is read as "Enterprise".
- *
- * Deliberately an equality test rather than a tier ordering: every other plan
- * type a lookup can produce — the cloud free tier (`FREE`), the unlicensed
- * self-hosted baseline (`OPEN_SOURCE`), any paid tier below Enterprise — is
- * not Enterprise, so a plan this function has never heard of refuses rather
- * than passes.
+/** Single source for Enterprise plan checks; uses equality not ordering so
+ * unknown plans refuse rather than pass.
  */
 export function isEnterpriseTier(planType: string): boolean {
   return planType === "ENTERPRISE";

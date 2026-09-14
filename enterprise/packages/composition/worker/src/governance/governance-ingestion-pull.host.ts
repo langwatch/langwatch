@@ -34,15 +34,7 @@ const NANO_USD_PER_USD = 1_000_000_000;
 export const INGESTION_PULL_TOTAL_METRIC_NAME = "ingestion_pull_total";
 export const INGESTION_PULL_DURATION_METRIC_NAME = "ingestion_pull_duration_milliseconds";
 
-/**
- * How a torn URL reaches the world, fenced.
- *
- * A port rather than a bare `fetch`, because an ingestion source is a URL the
- * CUSTOMER typed: the pull walks it on a schedule, from inside the cluster,
- * with the customer's own credentials attached. A process that composed this
- * with an unfenced fetch would let an ingestion source address the instance
- * metadata endpoint.
- */
+/** Port (not bare fetch) to fence customer-provided URLs from instance metadata. */
 export abstract class GovernanceIngestionEgress {
   abstract fetch(url: string, init: GovernanceHttpRequest): Promise<GovernanceHttpResponse>;
 }
@@ -76,23 +68,8 @@ export type WorkerGovernanceIngestionPullHostOptions = {
   logger?: Logger;
 };
 
-/**
- * Worker-process members for the canonical ingestion-pull worker.
- *
- * Moved from the application, where the same five members were bound to
- * process globals: an SSRF-safe fetch, the shared AWS client factory, the
- * platform cipher, the feature-flag service and an error sink. Each is a port
- * here, because the worker holds each of them already and holds them once.
- *
- * RATING PRICES FROM THE STATIC CATALOG, exactly as the App's does — the App
- * reaches it through `rateSpendNanoUsd`'s `matchModelCostWithFallbacks` +
- * `estimateCost` pair, and this reaches the same rates through the one
- * canonical cascade both graphs' span pricing already uses. Pulled usage
- * reports four token quantities and no per-request attributes, so they are
- * handed in as the attribute record the cascade reads and the answer is the
- * same integer nano-USD. A second rate table would bill one customer two
- * different amounts for the same tokens depending on which process pulled
- * them.
+/** Worker-bound members for ingestion-pull (moved from app as ports); rates from
+ * static catalog for consistency to prevent billing discrepancies.
  */
 export class WorkerGovernanceIngestionPullHost extends GovernanceIngestionPullHost {
   static create(

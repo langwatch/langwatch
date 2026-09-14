@@ -1,25 +1,6 @@
-/**
- * The governance vertical's Enterprise tRPC surfaces, composed for the legacy
- * web application's router root.
- *
- * Every governance transport the application serves is built here: the member
- * surfaces they reach on their own devices and their own /me page
- * (`personalDashboard`, `personalSessions`, `ingestionKey`), and the org-scoped
- * ones an admin turns from `/governance`. Each router's behaviour — procedure
- * names, input and output shapes, refusals — belongs to the governance feature
- * package. What this composition owns is the wiring: which policy wraps which
- * declaration, and which process capability answers each port.
- *
- * It sits in the Enterprise API composition rather than in `apps/api` for the
- * same reason its siblings do: a core package may not depend on an Enterprise
- * one. Everything the process must supply arrives through `create`, so this
- * package never imports an application.
- *
- * One of them does not answer on a `governance.*` name at all:
- * `personalDashboard` is merged into the `user` namespace by the process,
- * because `user.personalUsage`, `user.budgetOverview` and `user.cliBootstrap`
- * are the names the /me page and the CLI call. Where a procedure lives is
- * decided by the data it reads; what it is called is decided by the wire.
+/** Compose governance vertical's Enterprise tRPC surfaces (personal and org-scoped).
+ * Belongs here, not apps/api, because core packages cannot depend on Enterprise;
+ * personalDashboard is merged into user namespace by the process for /me and CLI.
  */
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import {

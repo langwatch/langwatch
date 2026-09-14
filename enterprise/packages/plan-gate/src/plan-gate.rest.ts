@@ -19,26 +19,8 @@ export interface EnterprisePlanGateMembers {
   readonly plans: (context: Context) => PlanProvider;
 }
 
-/**
- * Bind the REST plan gate to one process's organization resolution and plan
- * lookup, and get back the middleware factory every gated route mounts.
- *
- * The gate is a plain middleware, not a feature of any route builder: a family
- * that needs it names it in its own chain, which is what lets the REST service
- * builder stay ignorant of Enterprise entirely.
- *
- * Mount it AFTER organization authentication and AFTER the RBAC check. It
- * reads the organization that authentication resolved, so an app-level `.use`
- * would run too early and find nothing; and "you don't have access" must beat
- * "your plan doesn't include this", which is the tRPC gate's ordering too.
- *
- * Fail-closed: a plan lookup that rejects propagates, so the request is
- * refused and the family's error handler renders it with a trace id. Only a
- * resolved Enterprise plan lets the request through.
- *
- * Throws rather than responding: the family's error handler owns the response
- * shape, and the error carries meta.feature plus the remediation channel so a
- * CLI or agent can render upgrade guidance.
+/** Plan gate middleware; mount after org auth and RBAC (before both). Throws so
+ * error handler renders with trace id and upgrade guidance.
  */
 export function createEnterprisePlanGate(
   ports: EnterprisePlanGateMembers,

@@ -20,15 +20,7 @@ type EnterpriseGateMiddlewareParams = {
   next: () => any;
 };
 
-/**
- * Refuse a resolved plan that is not Enterprise.
- *
- * Fail-closed by construction: it asks whether the plan IS Enterprise, so
- * every other answer — the cloud free tier, the unlicensed self-hosted
- * baseline, a paid tier below Enterprise, a tier that did not exist when this
- * was written — refuses. A lookup that fails never reaches here at all: the
- * rejection propagates out of the caller.
- */
+/** Fail-closed check: refuses all non-Enterprise plans (unknown tiers included). */
 export function assertEnterprisePlanType({
   planType,
   errorMessage,
@@ -67,18 +59,8 @@ export async function assertEnterprisePlan({
   assertEnterprisePlanType({ planType: plan.type, errorMessage });
 }
 
-/**
- * tRPC middleware that 403s any procedure whose org isn't on an
- * Enterprise plan. Compose AFTER `checkOrganizationPermission` so the
- * RBAC denial fires first (UNAUTHORIZED before FORBIDDEN — clearer
- * error attribution: "you don't have access to the org" trumps "your
- * org doesn't have the feature").
- *
- * Usage:
- *   procedure
- *     .use(checkOrganizationPermission("anomalyRules:view"))
- *     .use(requireEnterprisePlan(ENTERPRISE_FEATURE_ERRORS.ANOMALY_RULES))
- *     .query(...)
+/** tRPC middleware (403); compose after RBAC check so RBAC denial fires first
+ * (clearer error attribution).
  */
 export const requireEnterprisePlan =
   (errorMessage: string) =>
