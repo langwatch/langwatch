@@ -1,19 +1,5 @@
-/**
- * Drift guard between the MCP tools this server registers and the names
- * `feature-map.json` tells agents to call.
- *
- * The feature map is the canonical information architecture: it is embedded
- * into the CLI at codegen time and shipped inside the npx server package, so a
- * name in it is a name an agent will try. Two entries pointed at
- * `platform_run_evaluation` and `platform_evaluation_status`, which have never
- * existed — the tools are `platform_run_experiment` and
- * `platform_experiment_status`. An agent following the map for the experiments
- * feature called two tools that were not there.
- *
- * Nothing compared the two lists, which is why it went unnoticed. This does.
- *
- * @see .claude/skills/feature-map/SKILL.md
- */
+// Drift guard: the feature-map.json names must match actual MCP tool names or agents will call
+// non-existent tools. See .claude/skills/feature-map/SKILL.md
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";

@@ -8,15 +8,8 @@ import type {
 } from "./schemas/run-plan.js";
 import type { EvaluatorAttachmentWire } from "./schemas/suite-fields.js";
 
-/**
- * Client for `/api/v1/run-plans`.
- *
- * A run plan is what you run, and its NAME identifies it: running against a
- * name that exists replaces that plan's configuration, running against a new
- * name creates one. Configuration is the scope, the targets, the repeat count
- * and the two models. Parameters, the note and the idempotency key belong to
- * one run, not to the plan.
- */
+// Client for /api/v1/run-plans. A run plan is identified by name; re-using the
+// name replaces its config while parameters/notes belong to one run only.
 
 /**
  * The shapes the run plan tools accept, taken from the zod that validates

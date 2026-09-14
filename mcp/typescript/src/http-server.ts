@@ -82,16 +82,7 @@ function generateAccessToken(): string {
   return createHash("sha256").update(randomUUID()).digest("hex");
 }
 
-/**
- * Client address used for rate limiting.
- *
- * Forwarded headers only mean something when a trusted proxy sets them, so this
- * reads the socket peer unless proxy trust is turned on explicitly. Defaulting
- * to the socket keeps the limits countable: a caller that reaches the port
- * directly cannot rotate `X-Forwarded-For` to reset its own counter. Where that
- * default is wrong, it is wrong in the strict direction, counting a whole proxy
- * as one client rather than not counting at all.
- */
+// Rate limit key: socket peer unless LANGWATCH_MCP_TRUST_PROXY=true checks X-Forwarded-For.
 function rateLimitKey(req: Request): string {
   if (process.env.LANGWATCH_MCP_TRUST_PROXY === "true") {
     return req.ip ?? req.socket.remoteAddress ?? "unknown";
@@ -135,15 +126,8 @@ async function handleWithSessionConfig<T>(apiKey: string, fn: () => Promise<T>):
   return runWithConfig({ ...baseConfig, apiKey }, fn);
 }
 
-/**
- * Origin validation and CORS.
- *
- * The MCP transport specification requires servers to validate Origin on every
- * incoming connection, because a page on an attacker's domain can point DNS at
- * loopback and reach a server that only checks the token. Requests with no
- * Origin header are not browser requests, so they pass: browsers always send
- * Origin on the cross-origin requests this guards.
- */
+// MCP requires origin validation to prevent DNS-rebinding attacks. Requests without
+// Origin header pass since they're not browser requests and can't be compromised this way.
 function createOriginMiddleware({
   allowedOrigins,
 }: {
@@ -617,21 +601,8 @@ export interface StartedHttpServer {
   allowedOrigins: string[];
 }
 
-/**
- * Starts an Express HTTP server with Streamable HTTP and legacy SSE transports
- * for the LangWatch MCP server.
- *
- * Every request carries `Authorization: Bearer <key>`. The key is verified
- * against the LangWatch API before any per-session state is allocated, and
- * re-checked on every subsequent request against the key the session was
- * created with, so a session id on its own authorizes nothing.
- *
- * Endpoints:
- * - GET /health - Health check for Kubernetes probes (no auth)
- * - POST/GET/DELETE /mcp - Streamable HTTP transport (modern)
- * - GET /sse - Legacy SSE transport (backwards compatibility)
- * - POST /messages - Legacy SSE message endpoint
- */
+// HTTP server with Streamable HTTP and legacy SSE transports; every request
+// re-verifies the bearer token against the LangWatch API.
 export async function startHttpServer({
   port,
   host,

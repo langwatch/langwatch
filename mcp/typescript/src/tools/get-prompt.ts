@@ -24,15 +24,8 @@ function normalizeTag(tag: unknown): DeploymentTag | undefined {
   return undefined;
 }
 
-/**
- * Handles the platform_get_prompt MCP tool invocation.
- *
- * Retrieves a specific prompt by ID or handle. The API returns the requested
- * version's data flattened to the top level (version, versionId, model,
- * messages, inputs/outputs, parameters, tags). Defaults to an AI-readable
- * markdown digest; `format: "json"` instead returns the raw API payload
- * verbatim.
- */
+// Retrieves a prompt by ID/handle; returns a markdown digest by default or
+// raw JSON if format: "json" is specified.
 export async function handleGetPrompt(params: {
   idOrHandle: string;
   version?: number;

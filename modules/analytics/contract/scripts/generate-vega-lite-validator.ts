@@ -1,29 +1,5 @@
-/**
- * Compiles the bundled official Vega-Lite v6 JSON Schema into a standalone
- * validator module, ahead of time.
- *
- * ── WHY THIS SCRIPT EXISTS ─────────────────────────────────────────────────
- * Ajv compiles a schema by building a function with `new Function`. That needs
- * `script-src 'unsafe-eval'`. The chart runtime is deliberately built to run
- * under a Content-Security-Policy that forbids eval — that is the whole point
- * of handing Vega its expression interpreter — and a validator that dies under
- * the same policy would leave the chart layer accepting whatever it was given.
- *
- * Ajv's standalone code generation moves the `new Function` call to build time:
- * this script runs it once, on a developer's machine, and checks in the
- * resulting module. The browser only ever loads already-generated code.
- *
- * The schema is used verbatim, exactly as `vega-lite` publishes it. Nothing is
- * pruned, rewritten, or version-shifted, so "the bundled official schema
- * decides schema validity" stays literally true.
- *
- * Run:  pnpm generate:vega-validator
- * Pinned by: modules/analytics/web/tests/visualization/
- *            vega-lite-schema-validator.unit.test.ts, which regenerates from
- *            the installed schema and fails if the committed module has drifted,
- *            and separately compares its verdicts against a fresh runtime
- *            compile across the whole fixture corpus.
- */
+// Pre-compiles the Vega-Lite v6 JSON Schema into a standalone validator module. Required
+// because Ajv's runtime compilation uses eval, which violates our CSP policy.
 
 import { readFileSync, writeFileSync } from "node:fs";
 import { createRequire } from "node:module";
@@ -48,15 +24,8 @@ export const GENERATED_VALIDATOR_PATH = "src/visualization/vega-lite-schema-vali
 export const GENERATED_VALIDATOR_TYPES_PATH =
   "src/visualization/vega-lite-schema-validator.generated.d.ts";
 
-/**
- * The Ajv options the validator is compiled with. Exported so the drift guard
- * compiles with exactly these and cannot pass by disagreeing quietly.
- *
- * `allErrors` is load-bearing rather than generous: the Vega-Lite schema is a
- * forest of `anyOf` branches, so the first error is always a root-level "must
- * match a schema in anyOf", which names nothing a member could fix. It also
- * happens to generate *less* code here than `allErrors: false` does.
- */
+// Ajv options used for compilation. Exported so the drift guard uses exactly these.
+// allErrors must be true to see all errors in anyOf branches.
 export const VEGA_LITE_AJV_OPTIONS = {
   // The schema is draft-07 and uses union types and keywords Ajv would
   // otherwise refuse to compile.

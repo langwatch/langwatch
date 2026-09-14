@@ -6,20 +6,8 @@ import {
   type PromptTag,
 } from "../langwatch-api.js";
 
-/**
- * Handles the platform_update_prompt MCP tool invocation.
- *
- * Updates an existing prompt via the PUT endpoint. Every update with a
- * commitMessage creates a new version automatically. The mutation response
- * does not carry the tags the server actually applied, so this re-fetches
- * the prompt via getPrompt: the GET response is the prompt's latest version
- * flattened to the top level (version, versionId, commitMessage) plus a
- * `tags` array of { name, versionId } naming which version each tag points
- * to. The new version is identified by matching the request's commitMessage
- * against that top level (falling back to the versions listing), and
- * deployment state is derived from the tags that point at it — never from
- * the request's tags directly.
- */
+// Updates a prompt via PUT, creating a new version. Re-fetches the full prompt
+// to get tags since the mutation response doesn't include them.
 export async function handleUpdatePrompt(params: {
   idOrHandle: string;
   messages?: Array<{ role: string; content: string }>;

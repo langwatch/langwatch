@@ -6,19 +6,7 @@ export interface McpConfig {
   projectId?: string;
 }
 
-// ---------------------------------------------------------------------------
-// Singleton storage on globalThis
-//
-// When the langwatch app (CJS, no "type": "module") imports this module,
-// tsx creates a CJS-cached copy. When mcp-server's own ESM dist chunks
-// do `await import("./search-traces-*.js")`, Node creates a separate
-// ESM-cached copy. Module-level variables are NOT shared between them.
-//
-// By storing config on globalThis, both CJS and ESM instances read/write
-// the same object, fixing the "Config not initialized" error that occurs
-// when initConfig() runs on the CJS side but tool handlers execute on
-// the ESM side.
-// ---------------------------------------------------------------------------
+// Store on globalThis to share config between CJS and ESM module instances.
 
 const GLOBAL_KEY = "__langwatch_mcp_config" as const;
 const STORAGE_KEY = "__langwatch_mcp_config_storage" as const;
@@ -76,16 +64,8 @@ export function initConfig(args: { apiKey?: string; endpoint?: string; projectId
   };
 }
 
-/**
- * The current config, or undefined when there is none: the per-request scoped
- * config if inside a `runWithConfig()` callback, otherwise the global one.
- *
- * For the caller that is ASKING rather than demanding. A host embedding this
- * server initialises the config on a cold process, and the way to find out
- * whether it still has to used to be to call `getConfig()` and catch — which
- * printed a synthesized stack trace to the console first, on every boot, for
- * the entirely normal case of not having been initialised yet.
- */
+// Current config: per-request scoped if inside runWithConfig(), otherwise global.
+// Returns undefined rather than throwing so callers don't need try/catch.
 export function tryGetConfig(): McpConfig | undefined {
   const state = getGlobalState();
   return state.configStorage.getStore() ?? state.globalConfig;

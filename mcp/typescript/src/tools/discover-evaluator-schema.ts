@@ -54,8 +54,8 @@ function formatEvaluatorOverview(): string {
 }
 
 /**
- * Returns the full schema for a specific evaluator type.
- * Includes settings with descriptions and defaults, required/optional fields, env vars, and result fields.
+ * Returns the full schema for a specific evaluator type: settings, required/optional
+ * fields, env vars, and result fields.
  */
 function formatEvaluatorDetail(evaluatorType: string): string {
   const def = AVAILABLE_EVALUATORS[evaluatorType as EvaluatorTypes] as
