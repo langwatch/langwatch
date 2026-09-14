@@ -2,6 +2,7 @@ import process from "node:process";
 import { createLogger } from "@langwatch/observability";
 import { ApiHttpListener, type ApiListenerAddress } from "./api-http.listener.ts";
 import { ApiProcessLifecycleRoutes } from "./api-process.lifecycle.ts";
+import { createDiscoveryApp } from "./features/discovery/discovery.app.ts";
 import {
   ApiRuntimeBootstrap,
   ApiRuntimeComposition,
@@ -34,6 +35,10 @@ class ApiProductionComposition extends ApiRuntimeComposition {
     const application = ApiProcessLifecycleRoutes.create({});
     application.route("/", trpc.door(runtime.transports.trpc));
     for (const family of runtime.transports.rest) application.route("/", family);
+    // The OpenAPI description and its discovery locations, served by the
+    // process itself: the document describes every family at once, so no
+    // module's own declaration can carry it (see discovery.app.ts).
+    application.route("/", createDiscoveryApp());
 
     const listener = ApiHttpListener.create({
       application,
