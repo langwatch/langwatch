@@ -63,7 +63,7 @@ export type ConnectedDispatch = (params: {
   signal: AbortSignal;
 }) => Promise<CallOutcome>;
 
-/** What one connected agent cell needs to run, once the run's own world (ports, dispatcher, clock) is injected at `create`. */
+/** Execution input for a connected agent cell with run world injected. */
 export type ConnectedCellExecutionInput = {
   cell: ExecutionCell;
   projectId: string;
@@ -127,7 +127,7 @@ export class ExperimentConnectedCellService {
     };
   }
 
-  /** The one turn a row sends: the mapped row as a single user message, in its own conversation and trace. */
+  /** One turn per row: mapped message in isolated conversation and trace. */
   private connectedTurnParams({
     cell,
     projectId,

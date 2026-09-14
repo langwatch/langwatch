@@ -1,14 +1,5 @@
-/**
- * What this package's suites mount the SCIM screen inside.
- *
- * The host port is an abstract class, so a test constructs one rather than
- * mocking a module: the fake below RECORDS what the screen asked the
- * application to say and answers the base URL an identity provider posts to,
- * which is exactly the surface the real adapter answers.
- *
- * Not exported from the package. A test imports it relatively; nothing outside
- * this package has any business constructing a host.
- */
+// Test harness for mounting the SCIM screen: a fake host that records requests
+// and answers the base URL. Internal only, not exported.
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { render } from "@testing-library/react";

@@ -7,18 +7,8 @@ import {
 } from "@langwatch/config";
 import { z } from "zod";
 
-/**
- * Which product this deployment is, and who operates it.
- *
- * `isSaas` reads `1` or a case-insensitive `true` and nothing else, which is
- * the reading every tier already applies: three processes deriving one fact
- * from one variable must agree, or a hosted install's billable events go
- * uncounted with no error anywhere.
- *
- * `adminEmails` unset means NOBODY is a platform operator. That is the
- * fail-closed answer every surface must reach, so absence is stated here
- * rather than left for each caller to decide.
- */
+// Which product this deployment is and who operates it; isSaas is strict (1 or true)
+// so three processes deriving one fact must agree. Unset adminEmails means no operator.
 export const saasServerConfigDefinition = RuntimeConfig.define({
   isSaas: Config.value(environmentOneOrTrueSchema, { env: "IS_SAAS" }),
   adminEmails: Config.value(z.string().optional(), { env: "ADMIN_EMAILS" }),

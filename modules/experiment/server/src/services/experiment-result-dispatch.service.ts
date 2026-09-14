@@ -1,7 +1,6 @@
 /**
- * Turns what a run produced into the Eventing command payloads that store it. Model attribution is pinned at run
- * start, not read live, so an evaluator edited later does not retroactively misattribute a historical run. A falsy
- * target output persists as a value; only null/undefined become a null prediction.
+ * Converts run output to Eventing payloads with model attribution pinned at start,
+ * not live. Falsy outputs persist as values; only null/undefined become null.
  */
 
 import type {

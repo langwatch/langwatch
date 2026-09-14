@@ -66,7 +66,7 @@ export class ExperimentRunDriverService {
     return new ExperimentRunDriverService();
   }
 
-  /** Main orchestrator: executes all cells and yields SSE events, with parallel execution under a semaphore. */
+  /** Executes all cells and yields SSE events with parallel execution. */
   static async *runOrchestrator(input: OrchestratorInput): AsyncGenerator<EvaluationV3Event> {
     const { projectId, experimentId, ports, loadedAgents, actor } = input;
 
@@ -173,7 +173,7 @@ export class ExperimentRunDriverService {
     return prepared;
   }
 
-  /** The run's opening rows in storage: the run itself, then the board it carries rather than runs. */
+  /** Opening rows in storage: the run and its carried board. */
   private static async recordRunStart({
     input,
     run,
@@ -433,7 +433,7 @@ export class ExperimentRunDriverService {
     }
   }
 
-  /** The run's last frame: the summary a completed run reports, or nothing when a user stopped it. */
+  /** Final frame: summary when complete, nothing if stopped. */
   private static async *finishRun({
     loop,
     run,

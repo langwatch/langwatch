@@ -1,11 +1,5 @@
 /**
- * The server half of `experiments.*`. Transport only: the declared permission,
- * error translation, and delegation to the application. Everything a handler
- * reaches - the studio writes, the monitor publication, the author names, the
- * second project a copy reads - is an operation on the api, so no process
- * hands this file a collaborator of its own.
- *
- * Spec: modules/experiment/specs/experiment-service.feature.
+ * Server transport for experiments.*: permission, error translation, delegation.
  */
 import { defineTrpcRouter } from "@langwatch/api/trpc";
 import type { Dataset } from "@langwatch/dataset-contract";

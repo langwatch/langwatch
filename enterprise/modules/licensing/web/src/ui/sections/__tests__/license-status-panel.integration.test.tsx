@@ -1,14 +1,8 @@
 /**
  * @vitest-environment jsdom
  *
- * See specs/licensing/expired-license-enforcement.feature — a license past its
- * end date keeps metering the seats it sold, so the page has to say what
- * actually changed (nothing, except room to grow) and still show the over-seats
- * callout. A license we did not sign says nothing at all and must not be
- * mistaken for a lapsed one.
- *
- * Moved from `platform/app/src/components/__tests__/LicenseStatus.integration.test.tsx`
- * with the component, renamed `LicenseStatusPanel` on the way in.
+ * Tests expired license enforcement: metering still runs, over-seats callout shows,
+ * and unsigned licenses display nothing.
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

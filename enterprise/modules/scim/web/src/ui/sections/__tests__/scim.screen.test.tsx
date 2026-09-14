@@ -1,17 +1,8 @@
 /**
  * @vitest-environment jsdom
  *
- * Settings → SCIM: the address an identity provider posts to, and the token it
- * authenticates with.
- *
- * THE TOKEN IS SHOWN EXACTLY ONCE, and that is the decision worth pinning.
- * `generate` is the only answer that carries the plaintext — the list answers
- * metadata and never a secret — so a page that dropped the minted value on the
- * floor would leave the customer with a token nothing can recover and a
- * provisioning integration they cannot finish. The list never shows one, which
- * is the other half of the same guarantee.
- *
- * Spec: specs/settings/settings-page-chrome.feature
+ * Tests SCIM settings: IdP endpoint address and authentication token.
+ * Critical: token shown exactly once; generate shows plaintext, list never shows secrets.
  */
 
 import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";

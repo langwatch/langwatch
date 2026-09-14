@@ -533,9 +533,8 @@ describe("computeParetoDominance — a field that broke into groups that never m
     }));
 
   /**
-   * The real fit rather than a hand-built board, because the break is not visible at that level: every variant
-   * won and lost, so the solver's own degeneracy guard reports the field healthy, and the between-group gap
-   * arrives looking like an ordinary score difference.
+   * Real fit, not hand-built, because degenerate results (all won/lost) hide
+   * the between-group break.
    */
   const twoIslands = () =>
     computeBTLeaderboard({

@@ -1,13 +1,6 @@
 /**
- * `POST /api/experiment/init` - the first call an SDK run makes. Resolves a
- * caller-chosen slug through the one find-or-create rule the batch log uses,
- * so repeated runs under one slug group together.
- *
- * The door answers its own bodies rather than the handled-error envelope: an
- * SDK parses `{ message }`, `{ error }` and the flat limit shape, and those
- * three are the wire contract. That is why the route declares a raw answer -
- * a declared output schema would reshape every refusal on the way out.
- * Spec: modules/experiment/specs/experiment-service.feature.
+ * POST /api/experiment/init: find-or-create slug endpoint. Returns raw bodies
+ * (not handled-error envelope) to match SDK wire contract.
  */
 import { publicRoute } from "@langwatch/api/access";
 import { defineRestMiddleware, defineRestRouter, MANAGEMENT_API_VERSION } from "@langwatch/api/rest";

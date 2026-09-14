@@ -122,7 +122,7 @@ export class ExperimentComparisonVariantService {
     }
   }
 
-  /** Whether a column-target's backing DB evaluator is still the legacy `pairwise_compare` judge. */
+  /** True if column-target uses legacy pairwise_compare judge. */
   isLegacyPairwiseBacked(dbEvaluatorId: string | undefined): boolean {
     if (!dbEvaluatorId) {
       return false;

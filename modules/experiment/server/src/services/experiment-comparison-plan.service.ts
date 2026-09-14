@@ -1,4 +1,4 @@
-/** Phase 2: comparison cells (chip evaluators + column-style comparison targets), plus a typed skip reason for every row/comparison it could not build. */
+/** Phase 2: comparison cells with typed skip reasons for unfeasible rows. */
 
 import {
   COMPARISON_EVALUATOR_TYPE,

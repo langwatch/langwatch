@@ -1,13 +1,5 @@
-/**
- * What the SCIM screen asks of the application it is mounted in.
- *
- * Two questions and two notices: which organization the tokens belong to, and
- * what base URL an identity provider posts to. The second is on the port rather
- * than read from `window` because it is a DEPLOYMENT fact — the address the
- * customer's IdP will be configured with — and a screen that composes it from
- * `window.location.origin` is right only as long as nothing sits in front of
- * the application.
- */
+// What the SCIM screen asks of its host application: organization tokens and the
+// base URL for IdP posts, which must come from the deployment, not window.location.
 
 import { createContext, useContext } from "react";
 

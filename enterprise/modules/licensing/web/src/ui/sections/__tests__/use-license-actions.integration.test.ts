@@ -1,16 +1,8 @@
 /**
  * @vitest-environment jsdom
  *
- * See specs/licensing/sso-license-gating.feature — license activation is a
- * paid entry point, but the SSO gate is decided once per process (ADR-027),
- * so the activation flow must tell self-hosted admins a restart is required.
- *
- * Moved from `platform/app/src/components/license/__tests__/`. The hook now
- * reads the deployment and raises its notices through `LicensingHostApi`
- * instead of `usePublicEnv`, the toaster and `trpc.invalidate()`, so the fake
- * host below is where those three used to be mocked: `succeeded` is the
- * toaster, `refreshPlanDerivedState` is the invalidate. The assertions are
- * the originals.
+ * Tests SSO license gating: activation requires restart on self-hosted deployments
+ * because the SSO gate is decided once per process (ADR-027).
  */
 
 import { renderHook } from "@testing-library/react";

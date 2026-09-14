@@ -1,13 +1,6 @@
 /**
- * `POST /api/experiment/init` - the four refusals and the one success this
- * door owns. Each body is a shape an SDK parses, so the assertions are on the
- * body as well as the status.
- *
- * The door declares handler-managed auth, so the two credential refusals (no
- * token, and a key without `experiments:manage`) are the process's credential
- * port answering, not this family: they are covered where that port is bound.
- *
- * Spec: modules/experiment/specs/experiment-service.feature.
+ * Tests POST /api/experiment/init refusals and success. Credential refusals
+ * tested at their port.
  * @vitest-environment node
  */
 import { bindRestMiddleware, createRestRuntime } from "@langwatch/api/rest";

@@ -1,6 +1,6 @@
 /**
- * The reconciliation rule for a workbench someone else wrote to (specs/langy/langy-ui-actions-fallback.feature): a clean workbench reloads
- * silently, a dirty one banners and waits for the user, and a stale signal for some other experiment changes nothing.
+ * Workbench reconciliation when someone else writes: clean reloads silently,
+ * dirty banners for user, stale signal ignored.
  * @vitest-environment jsdom
  */
 import { act, cleanup, renderHook, waitFor } from "@testing-library/react";

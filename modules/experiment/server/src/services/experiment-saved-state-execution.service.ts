@@ -125,9 +125,8 @@ export class ExperimentSavedStateExecutionService {
   }
 
   /**
-   * Resolve the experiment, parse its saved state, and load everything the orchestrator needs. Throws
-   * `ExperimentNotFoundError` and `InvalidExperimentConfigurationError` like the run route always has;
-   * the loader's own refusals come back as `{error, status}` for the caller to map.
+   * Loads orchestrator input from saved state. Throws standard validation errors;
+   * loader refusals returned as {error, status}.
    */
   static async prepareSavedStateExecution({
     experiments,

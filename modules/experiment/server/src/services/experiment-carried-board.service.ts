@@ -1,7 +1,6 @@
 /**
- * The board cells a run carries rather than produces, so opening a run shows the whole board, not one column. Not
- * routed through storage's own event path or the SSE stream — that would re-report old verdicts and overwrite
- * cells this run never produced. A write failure is logged and dropped rather than stopping the run.
+ * Board cells carried by a run. Bypass storage event path and SSE to avoid
+ * re-reporting old verdicts. Write failures logged but not fatal.
  */
 
 import type {
@@ -24,7 +23,7 @@ export class ExperimentCarriedBoardService {
     commands,
     dispatches,
   }: {
-    /** Only read by `recordCarriedOverBoard` — `buildCarriedOverDispatches` is pure and never touches it. */
+    /** Only read by `recordCarriedOverBoard`; buildCarriedOverDispatches never touches it. */
     commands?: ExperimentService;
     dispatches: ExperimentResultDispatchService;
   }): ExperimentCarriedBoardService {
@@ -36,7 +35,7 @@ export class ExperimentCarriedBoardService {
     private readonly dispatches: ExperimentResultDispatchService,
   ) {}
 
-  /** The optional halves of a carried cell — an absent cost is not a zero cost, and an absent trace is not a missing one. */
+  /** Optional cell fields: absence has semantic meaning, not zero or missing. */
   private carriedCellFields(cell: CarriedOverCell) {
     return {
       ...(cell.cost !== undefined ? { cost: cell.cost } : {}),

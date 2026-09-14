@@ -1,5 +1,6 @@
 /**
- * The prompt column's menu offers "Optimize this prompt", and choosing it hands the column to Langy: the experiment chip is chosen, the prompt is absorbed as picked context, and the panel opens with an auto-sent ask.
+ * Prompt column's "Optimize" menu hands it to Langy with picked context and
+ * auto-sent ask.
  * @vitest-environment jsdom
  * @see specs/langy/langy-prompt-optimization-entrypoints.feature
  */

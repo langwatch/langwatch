@@ -6,16 +6,8 @@ interface OverSeatsCalloutProps {
   maxMembers: number;
 }
 
-/**
- * Shown when an organization holds more active members than the seats its
- * license covers.
- *
- * A deployment runs uncapped before it buys a license, so this is the normal
- * state right after activation rather than an error. Activation is never
- * blocked and nobody is signed out; the admin is asked to choose who keeps a
- * seat, and only new members are refused until they do. See
- * seat-reconciliation.feature.
- */
+// Shown when an organization has more active members than the license covers.
+// Normal state after activation, not an error.
 export function OverSeatsCallout({ currentMembers, maxMembers }: OverSeatsCalloutProps) {
   const overBy = currentMembers - maxMembers;
 

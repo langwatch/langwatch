@@ -9,16 +9,8 @@ import type { StudioClientEvent } from "@langwatch/workflow-contract";
 import type { LoadedWorkflow } from "./experiment-execution-data.service.ts";
 
 /**
- * The scoped key a run lends to the code it executes.
- *
- * A run that dispatches agent or workflow code mints a short-lived sandbox API
- * key for it. Minting has no signed-in member to authorize — the run mints for
- * itself — and it needs the project's organization, so the whole of that
- * (the organization lookup and the key service) sits behind one question.
- *
- * `undefined` means the run gets no key: either the project has no
- * organization, or the deployment composes no minting. Both already read that
- * way to the caller, which simply omits the credential.
+ * Scoped sandbox API key minted per run for executing agent/workflow code.
+ * Undefined if project has no organization or minting not configured.
  */
 export abstract class ExperimentSandboxCredential {
   abstract findRunKey(input: { projectId: string }): Promise<string | undefined>;
@@ -31,7 +23,7 @@ export class ExperimentRunSandboxKeyService {
 
   private constructor() {}
 
-  /** Whether any target this run executes puts Python in a sandbox — the only reason to mint a credential. */
+  /** True if run executes code targets (the only reason to mint a credential). */
   private runExecutesCode({
     loadedAgents,
     loadedWorkflows,
@@ -79,7 +71,7 @@ export class ExperimentRunSandboxKeyService {
     return sandboxCredentials.findRunKey({ projectId });
   }
 
-  /** Sets the run's sandbox credential on a studio event's workflow, so its code nodes authenticate as this run. */
+  /** Adds run's sandbox credential to studio event workflow for authentication. */
   withSandboxApiKey(
     event: StudioClientEvent,
     sandboxApiKey: string | undefined,

@@ -215,7 +215,7 @@ export class ExperimentWorkflowCellService {
     );
   }
 
-  /** The `target_result` event for the workflow's End node, first so storage links evaluator results to it. */
+  /** Workflow End node target_result event (emitted first for storage linking). */
   private targetResultEvent({
     cell,
     state,

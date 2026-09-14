@@ -1,18 +1,5 @@
-/**
- * SCIM provisioning, at `/settings/scim`.
- *
- * TWO THINGS AN IDENTITY PROVIDER NEEDS: the base URL it posts to, and a bearer
- * token to authenticate with. Okta, Entra ID and the rest then create and
- * deactivate people in LangWatch without anybody inviting them by hand.
- *
- * THE TOKEN IS SHOWN EXACTLY ONCE. `generate` is the only answer that carries
- * the plaintext; the list answers metadata and never a secret, so the minted
- * key lives in local state until its dialog closes and is then unrecoverable —
- * which is what the copy on that dialog says out loud.
- *
- * The screen carries no chrome: the settings frame is applied by whichever
- * application serves the address.
- */
+// SCIM provisioning at /settings/scim: endpoint address and bearer token.
+// Token shown exactly once; unrecoverable after dialog closes. No chrome.
 
 import {
   Badge,

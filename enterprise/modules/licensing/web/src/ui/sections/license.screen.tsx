@@ -1,19 +1,5 @@
-/**
- * The organization's license, at `/settings/license`.
- *
- * WHAT THIS PAGE IS FOR is a self-hosted operator: running LangWatch
- * commercially never needs a licence, and one covers the seats bought plus the
- * enterprise capabilities — single sign-on, SCIM provisioning and audit logs.
- *
- * THE GENERATOR IS OFFERED ONLY ON THE HOSTED PRODUCT, which is the one thing
- * `isSaaS` decides here. It is deliberately read as a settled pair rather than
- * a bare boolean: while the deployment answer is still arriving, the mint
- * button stays hidden, which is the harmless reading of an unknown.
- *
- * The screen carries no chrome: the settings frame is applied by whichever
- * application serves the address, exactly as `SettingsLayout` was applied by
- * the page file before the move.
- */
+// Organization license page for self-hosted operators; generator only on SaaS.
+// No chrome — the settings frame is applied by the host application.
 
 import { Heading, HStack, Spacer, Text, VStack } from "@chakra-ui/react";
 import { PageLayout } from "@langwatch/design-system/page-layout";
@@ -22,17 +8,7 @@ import { useState } from "react";
 import { useLicensingHost } from "../../model/licensing-host.ts";
 import { LicenseStatusPanel } from "./license-status-panel.tsx";
 
-/**
- * The grant this key carries.
- *
- * NONE, one for one with the platform page: `license.tsx` was the only page in
- * the settings family wrapped in no `withPermissionGuard` at all. It is not a
- * hole — `license.getStatus` carries `organization:view` and both writes carry
- * `organization:manage` as their own policy — so a reader without the grant
- * meets a card whose read refused rather than a licence they may not see. The
- * asymmetry is carried rather than tidied, because inventing a guard is a
- * change to who can reach a page and a page move does not own that decision.
- */
+// No page-level permission guard; enforcement is at the API level.
 export const LICENSE_PAGE_PERMISSION = void 0;
 
 export default function LicenseScreen() {

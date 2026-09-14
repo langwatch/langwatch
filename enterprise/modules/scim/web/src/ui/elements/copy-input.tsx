@@ -1,15 +1,5 @@
-/**
- * A read-only field whose whole job is being copied.
- *
- * Moved out of `platform/app/src/components/CopyInput.tsx` with the SCIM page,
- * which is one of its two remaining consumers. `pages/authorize.tsx` is the
- * other and is left where it is under the deletes-only ruling;
- * `@langwatch/organization-web` carries its own copy for the invitation link on
- * the members page, because a core package may not import an enterprise one.
- *
- * The three `react-icons/fi` glyphs became their `lucide-react` twins, which is
- * the icon set every moved package already uses.
- */
+// A read-only input field for copying values: toggle visibility, click to copy.
+// Uses lucide-react icons.
 
 import { Input } from "@chakra-ui/react";
 import { InputGroup, type InputGroupProps } from "@langwatch/design-system/input-group";
