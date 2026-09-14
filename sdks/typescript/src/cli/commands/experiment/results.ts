@@ -104,18 +104,8 @@ export const experimentResultsCommand = async ({
       evaluationsByRow.set(key, list);
     }
 
-    // Evaluations that belong to no dataset entry.
-    //
-    // The dataset is one entry per (row, target), and the join below walks it.
-    // A Comparison evaluator judges the whole field of targets in a single
-    // verdict, so its result is recorded against the comparison itself rather
-    // than any one target — leaving it with no (row, target) pair to attach
-    // to. Walking the dataset alone therefore drops it without a word, which
-    // is how a real four-way run reported 240 of its 300 evaluations while the
-    // run summary still advertised the comparison.
-    //
-    // These are keyed by row instead, and follow whichever rows survive the
-    // filter and limit below.
+    // Comparison evaluator verdicts: keyed to row, not (row, target).
+    // They follow rows that survive filter and limit.
     const datasetKeys = new Set(
       results.dataset.map((entry) => rowKey(entry.index, entry.targetId)),
     );
@@ -126,28 +116,18 @@ export const experimentResultsCommand = async ({
       return !datasetKeys.has(rowKey(evaluation.index, evaluation.targetId));
     });
 
-    // Determine evaluator columns to show
+    // Determine evaluator columns to show, capped at 3 to keep table readable
     const evaluatorNames = evaluatorFilter
       ? [evaluatorFilter]
-      : Array.from(new Set(results.evaluations.map((e) => e.evaluator))).slice(0, 3); // cap visible columns to keep table readable
+      : Array.from(new Set(results.evaluations.map((e) => e.evaluator))).slice(0, 3);
 
     let rows = results.dataset.map((entry) => ({
       entry,
       evaluations: evaluationsByRow.get(rowKey(entry.index, entry.targetId)) ?? [],
     }));
 
-    // A row's failures are not all reachable through the dataset join.
-    //
-    // `isFailedRow` was handed only the evaluations keyed to that (row,
-    // target), so a row whose ONLY failure was the comparison — every target
-    // produced output, every per-target evaluation passed, and the judge
-    // errored — looked clean and was filtered out. That is the evaluator this
-    // command was just taught to display, so `--filter failed` could hide
-    // exactly the failure a caller came to find.
-    //
-    // Grouped by row index because that is all a row-independent evaluation
-    // has. Every target-row of that index carries it, which is right: the
-    // comparison covers the whole field on that row, so the row failed.
+    // Comparison failures aren't visible through dataset join.
+    // Grouped by row index. The comparison covers the whole field on that row.
     const rowIndependentByIndex = new Map<number, ExperimentRunEvaluation[]>();
     for (const evaluation of rowIndependentEvaluations) {
       const list = rowIndependentByIndex.get(evaluation.index) ?? [];
@@ -166,13 +146,8 @@ export const experimentResultsCommand = async ({
 
     const totalMatching = rows.length;
 
-    // `--limit` shortens what a person reads. It never shortens the answer.
-    //
-    // A caller that asks for JSON is usually an agent, and it does arithmetic
-    // on what it receives. While the limit sliced the payload too, such a
-    // caller got the first 20 rows with nothing in them saying rows were
-    // missing, and any rate it worked out was quietly wrong: one report of
-    // "70%" was 14 of 20 rows of a run whose real figure was 30 of 40.
+    // `--limit` shortens table only, never the answer.
+    // Agents computing rates from the payload need every row.
     const shownRows = rows.slice(0, limit);
     const tableTruncated = rows.length > limit;
 
@@ -196,13 +171,8 @@ export const experimentResultsCommand = async ({
           tableLimit: limit,
           tableTruncated,
           /**
-           * Which run these rows came from, and whether the caller chose it.
-           *
-           * Without `--run-id` this resolves to whichever run is newest at the
-           * moment of the call. Every scoped execution mints its own run, so
-           * two calls made either side of one produce numbers from two
-           * different runs. A caller comparing a before against an after has
-           * to pin the run, and cannot know to unless it is told.
+           * "explicit" if --run-id was passed, "latest-at-call-time" otherwise.
+           * Two calls either side of a new run give different numbers.
            */
           runSelection: options.runId?.trim() ? "explicit" : "latest-at-call-time",
           filter,

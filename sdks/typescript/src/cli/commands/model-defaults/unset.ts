@@ -53,17 +53,8 @@ function resolveScope(
 }
 
 /**
- * Remove a single key from the config attached at the target scope.
- * If the config has no other keys left, deletes it outright — an empty
- * config doesn't carry any cascade signal and occupies the same-scope
- * tiebreak slot.
- *
- * Returns what it did rather than printing it: the output port renders the
- * result in whatever format the caller asked for (utils/output.ts). The two
- * mutating paths keep the shape the previous `--format json` branch
- * established. The no-op path used to emit NOTHING in json mode — a silent
- * exit 0 that a machine caller could not distinguish from a successful
- * removal — so it now answers the same shape carrying `noop: true`.
+ * Remove key from config at scope; delete config if empty.
+ * No-op path carries noop: true so callers distinguish from successful removal.
  */
 export const unsetModelDefaultCommand = async (
   key: string,

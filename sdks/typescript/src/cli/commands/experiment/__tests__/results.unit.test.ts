@@ -78,13 +78,8 @@ const sampleResults = {
 };
 
 /**
- * A run with a Comparison evaluator.
- *
- * The shape is the point: dataset entries are per (row, target), and the
- * comparison's verdict is per row only — recorded against its own id, which
- * is not one of the targets. Anything keyed that way has no dataset entry to
- * hang off, which is exactly how 60 real verdicts went missing on a live run
- * while the run summary still advertised the comparison.
+ * Comparison evaluator verdicts are keyed to row only, not (row, target).
+ * They have no dataset entry to attach to. Test ensures they don't vanish.
  */
 const comparisonResults = {
   experimentId: "exp_2",
@@ -408,7 +403,7 @@ describe("experimentResultsCommand()", () => {
 
   describe("given a run with a Comparison evaluator", () => {
     describe("when the results are returned", () => {
-      /** @scenario "A comparison verdict reaches the CLI even though it belongs to no single target" */
+      /** @scenario "Comparison verdict reaches CLI despite no single target" */
       it("keeps the verdicts that belong to no single target", async () => {
         mockGetRunResults.mockResolvedValue(comparisonResults);
 

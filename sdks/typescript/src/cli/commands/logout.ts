@@ -14,14 +14,8 @@ export interface LogoutOptions {
 }
 
 /**
- * Server-revoke the device refresh token AND clear the local
- * ~/.langwatch/config.json. Best-effort: the local clear happens even
- * when the remote revoke fails, so "logout" never leaves a usable token
- * on disk. Idempotent — safe when not logged in.
- *
- * Only the device session is cleared; the project SDK key in `$CWD/.env`
- * (`LANGWATCH_API_KEY`) is a separate, user-managed store and is never
- * touched.
+ * Revoke device token, clear config; best-effort local-first.
+ * Project key in .env/.LANGWATCH_API_KEY untouched.
  */
 const revokeAndClearSession = async (): Promise<void> => {
   const cfg = loadConfig();

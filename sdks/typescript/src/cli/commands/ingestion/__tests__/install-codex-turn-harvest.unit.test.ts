@@ -1,16 +1,5 @@
 /**
- * `langwatch ingest install codex` wires the turn harvest, not just telemetry.
- *
- * Codex exports tokens, model and timing and no conversation, so activating
- * capture without asking codex to run the harvest after a turn leaves a
- * scripted setup with traces nobody can read. Running this command explicitly
- * IS the consent, so nothing here asks a question: that is what makes it the
- * path a CI job or a setup script can take.
- *
- * The mint is the only thing faked. The config is a real file behind
- * LANGWATCH_CLI_CONFIG and the codex config.toml the command merges into is a
- * real file in a temp directory.
- *
+ * Install turn harvest for Codex; only mint is faked, config is real.
  * Feature: specs/coding-agent/codex-content-capture.feature
  */
 

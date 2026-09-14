@@ -1,15 +1,6 @@
 /**
- * What a FAILING command actually puts on stdout, stderr and the exit code.
- *
- * This drives a real command (`trace search` — the one Langy leans on most) with
- * only the API service faked, because the contract being tested is the command's
- * OUTPUT, and a test of the renderer alone would not catch a command that forgot
- * to call it, printed the document to the wrong stream, or exited 0 on failure.
- *
- * Langy runs this CLI over a shell and parses its stdout. If a failure arrives
- * there as prose, the agent cannot tell a transient failure from a terminal one,
- * so it guesses — and the whole typed-error chain degrades to "Something went
- * wrong". The assertions below are that contract.
+ * Failing command output contract: failure must land on stdout in machine
+ * parseable format (Langy cannot distinguish transient from terminal failures).
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { readCliErrorDocument } from "@langwatch/langy-contract/cards/handled-error";

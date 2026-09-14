@@ -1,13 +1,7 @@
 /**
- * `langwatch help-tree` — the whole command tree as a compact indented
- * listing with `# hint:` / `# skill:` annotations (gcx `help-tree` clone),
- * sized for injection into an agent's context window.
- *
- * Plain text in both human AND auto-detected agent mode — the tree already is
- * the compact agent format. Any EXPLICIT machine request (`-o json|agents|
- * yaml`, `--json`, `--jq`, `-f json`) emits the underlying catalog structure
- * instead: an explicit `-o agents` is a request for compact JSON, not for the
- * tree an agent caller would have gotten anyway.
+ * Help tree: compact indented listing with `# hint:` / `# skill:` annotations.
+ * Plain text by default (both human and auto-detected agent). Explicit format
+ * requests (`-o json`) emit the catalog structure instead.
  */
 import { buildProgram } from "../program";
 import { buildCatalog, renderHelpTree } from "../utils/commandCatalog";

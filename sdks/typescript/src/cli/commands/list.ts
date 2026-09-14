@@ -14,13 +14,8 @@ export interface PromptListOptions {
 }
 
 /**
- * `--limit` is the paging flag every other list command in this CLI takes, so a
- * caller that has used one of those reaches for it here too.
- *
- * A value that is not a positive whole number ends the command rather than
- * being dropped: dropping it lists everything, and the caller reads the whole
- * server as the page they asked for. This is what `experiment versions` does
- * with the same flag.
+ * Limit flag: non-positive rejects with error (not dropped), matching
+ * experiment versions behavior.
  */
 const resolveLimit = (raw: string | undefined): number | undefined => {
   if (raw === undefined) return undefined;

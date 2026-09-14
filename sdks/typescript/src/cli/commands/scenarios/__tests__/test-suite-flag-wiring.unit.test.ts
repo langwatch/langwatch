@@ -1,13 +1,5 @@
 /**
- * `--test-suite <test-suite>` and `--no-test-suite` share ONE commander
- * attribute, so whichever flag comes last on the line silently wins and a
- * caller who passed both is never told. program.ts records each flag as commander reads it, so
- * the command can refuse the pair.
- *
- * This drives the real program rather than the command function: the refusal
- * is only worth anything if the wiring hands both flags over, and a test of
- * the function alone cannot see that.
- *
+ * Conflicting flags (--test-suite + --no-test-suite) wired to command.
  * Spec: specs/features/scenario-cli.feature
  */
 import { describe, expect, it, vi } from "vitest";

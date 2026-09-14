@@ -1,12 +1,5 @@
 /**
- * Where the session context hook posts, and what authenticates the record.
- *
- * The environment comes first, per the OTel exporter spec, and cannot be the
- * only source: Claude Code strips every `OTEL_*` variable from the processes it
- * spawns, so a session exporting perfectly well hands its hooks an environment
- * with no endpoint in it at all. The CLI's own device config is the fallback,
- * and a CLI signed in with no key for this agent is a no-op rather than a guess.
- *
+ * Hook telemetry target: OTEL env first, CLI config fallback.
  * Feature: specs/ai-governance/cli-wrappers/session-context-hook.feature
  */
 

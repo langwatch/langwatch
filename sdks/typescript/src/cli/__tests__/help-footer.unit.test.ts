@@ -1,11 +1,6 @@
 /**
- * The "Coding assistants:" section of `langwatch --help` is hand-written
- * (the commands themselves are registered hidden, so commander cannot
- * render them as a group at the bottom). Hand-written means it can
- * drift in both directions: a wrapper registered without a footer line
- * is invisible in --help, and a footer line for a renamed or visible
- * command lies. This suite pins the footer and the registrations to
- * each other.
+ * Pins the "Coding assistants:" footer and command registrations to prevent
+ * drift in both directions.
  */
 import type { Command } from "commander";
 import { describe, expect, it, vi } from "vitest";

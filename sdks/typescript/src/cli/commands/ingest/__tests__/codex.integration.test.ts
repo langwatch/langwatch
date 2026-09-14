@@ -1,13 +1,6 @@
 /**
- * `langwatch ingest codex` end to end over a real codex home: a real
- * config.toml the command reads its endpoint and key back out of, real
- * transcripts on disk, and a real (failing) network call.
- *
- * The failure path is the one that matters most. Codex runs this after every
- * completed turn of every session, so a harvest that can throw, exit non-zero,
- * or print to the terminal is a harvest that damages the thing it is meant to
- * observe. That is asserted here against a genuinely unreachable endpoint
- * rather than a mocked rejection.
+ * End-to-end codex harvest test: real config, transcripts, unreachable
+ * endpoint. Failure path is critical; harvest must not damage the session.
  */
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";

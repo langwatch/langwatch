@@ -1,15 +1,7 @@
 /**
- * The evaluator-type catalog the CLI validates against — the SAME two sources
- * the platform's create route accepts, merged the same way (see the app's
- * `server/evaluations/evaluators.ts`): the generated langevals catalog plus
- * the hand-written native evaluators. Both modules are copied verbatim out of
- * the platform by copy-types.sh at build, so this cannot drift from the API
- * by hand-maintenance — only by not rebuilding.
- *
- * Why the CLI validates at all: an agent that invents a type slug used to
- * spend a network round-trip to learn "no", with the valid set nowhere in
- * sight. Failing before the request, with the closest real slugs in hand,
- * turns that dead end into a one-step correction.
+ * Catalog validated by CLI; synced with platform at build via copy-types.sh.
+ * Fails before network: if slug is wrong, closest matches and command to list
+ * all types are shown immediately (see server/evaluations/evaluators.ts).
  */
 import { AVAILABLE_EVALUATORS } from "@/internal/generated/types/evaluators.generated";
 import { NATIVE_EVALUATOR_DEFINITIONS } from "@/internal/generated/types/evaluators.native";
@@ -50,10 +42,8 @@ export const evaluatorTypeCatalog = (): EvaluatorTypeEntry[] =>
 export const isValidEvaluatorType = (slug: string): boolean => slug in catalog;
 
 /**
- * The catalog slugs closest to a miss, best first — plain Levenshtein over
- * the whole slug, which ranks a stale rename ("ragas/answer_relevancy") right
- * next to its live successor ("ragas/response_relevancy") without any
- * special-casing.
+ * Catalog slugs closest to a miss via Levenshtein distance.
+ * Handles stale renames like "ragas/answer_relevancy".
  */
 export const closestEvaluatorTypes = (input: string, count = 5): string[] =>
   Object.keys(catalog)

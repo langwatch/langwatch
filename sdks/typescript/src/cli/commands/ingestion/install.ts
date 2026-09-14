@@ -18,26 +18,8 @@ import { writeCodexOtelBlock } from "@/cli/utils/codex-config-toml";
 import { reportCommandError } from "@/cli/utils/errorOutput";
 
 /**
- * `langwatch ingest install <tool>` — Path B activation flow.
- *
- * Distinct from the gateway-only `langwatch <tool>` wrapper (Path A).
- * Mints the user's personal ingest key (sk-lw-*), prints the OTLP
- * export block, and wires whatever out-of-band activation the tool
- * needs so the user pastes nothing manual.
- *
- * Tools handled today:
- *   - codex      : toml merge + env exports + the turn harvest codex runs
- *                  after a completed turn + the session context hooks
- *                  merged into the codex hooks.json
- *   - claude_code: env exports + the session context hooks merged into
- *                  ~/.claude/settings.json
- *   - gemini     : env exports (no toml needed; envs are read directly)
- *   - opencode   : env exports + the session context plugin written into
- *                  the opencode plugins directory
- *
- * Returning early when the slug isn't recognised keeps the surface
- * forward-compatible — adding a new template is a one-line edit
- * here once we know whether it needs an out-of-band activation step.
+ * Path B activation: mint key, export OTLP, wire out-of-band activation.
+ * Forward-compatible: new tools need one-line edits.
  */
 
 const SUPPORTED_TOOLS = ["codex", "claude_code", "gemini", "opencode"] as const;
@@ -268,22 +250,7 @@ function buildEnvBlock(tool: SupportedTool, endpoint: string, token: string): st
         // receiver collapses every sub-agent into one synthesized per-turn
         // trace. Content still rides the log events, joined by request_id.
         `export CLAUDE_CODE_ENHANCED_TELEMETRY_BETA=1`,
-        // OTel content unlock knobs (all ON, collect-everything):
-        //   OTEL_LOG_USER_PROMPTS=1     lifts user prompt text onto user_prompt events
-        //   OTEL_LOG_TOOL_DETAILS=1     lifts tool metadata expansion onto tool_* events
-        //   OTEL_LOG_TOOL_CONTENT=1     lifts tool_input (Bash command, Edit diff, file
-        //                               paths) onto tool_decision + tool_result so the
-        //                               trace shows WHAT the tool did
-        //   OTEL_LOG_RAW_API_BODIES=1   emits api_request_body + api_response_body
-        //                               events carrying the FULL JSON of every claude
-        //                               API call: system prompts, rolling message
-        //                               history, assistant response text + reasoning,
-        //                               tool_use blocks. THIS is the only OTel surface
-        //                               that carries assistant text. May include PII /
-        //                               secrets a user pasted into a prompt; payloads
-        //                               can grow large turn-over-turn — the langwatch
-        //                               receiver caps oversized bodies before they
-        //                               reach storage to keep the CH merge ceiling safe.
+        // OTel content unlock knobs: log prompts, tool details, tool content, api bodies
         `export OTEL_LOG_USER_PROMPTS=1`,
         `export OTEL_LOG_TOOL_DETAILS=1`,
         `export OTEL_LOG_TOOL_CONTENT=1`,

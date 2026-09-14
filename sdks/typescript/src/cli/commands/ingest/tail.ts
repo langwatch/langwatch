@@ -5,16 +5,8 @@ import { getEventsForSource, type ActivityEventDetailRow } from "@/cli/utils/gov
 import { readCommandError, reportCommandError } from "@/cli/utils/errorOutput";
 
 /**
- * `langwatch ingest tail <sourceId> [--limit N] [--follow] [--json]`
- *
- * Stream recent OCSF-normalised events for an IngestionSource. Wraps
- * the same `eventsForSource` query the per-source detail page uses,
- * so what you see in `tail` and what you see in the web UI are
- * guaranteed identical.
- *
- * --follow polls every 3s for new events (cursor-paginated by
- * eventTimestamp DESC); deduplicates by eventId so replays don't
- * print twice. Ctrl-C exits cleanly.
+ * Stream OCSF events for an IngestionSource. --follow polls every 3s,
+ * deduplicates by eventId.
  */
 export async function ingestTailCommand(
   sourceId: string,
@@ -102,19 +94,8 @@ export async function ingestTailCommand(
 }
 
 /**
- * Pure dedup filter for the --follow polling loop. Given the latest
- * batch from the server (DESC by eventTimestamp) and the current
- * `(cursorIso, seen)` watermark, returns the events that are new
- * AND have not yet been printed, in chronological (oldest-first) order.
- *
- * Two paths produce a "new" event:
- *   1. eventTimestampIso strictly greater than cursorIso.
- *   2. eventTimestampIso equal to cursorIso AND eventId not in `seen`
- *      — handles multiple events that share the same second-resolution
- *      timestamp on the server's clock.
- *
- * Exported for unit testing; the follow loop owns the mutable state
- * (Set + cursor) and advances them after each printed row.
+ * Dedup filter for polling loop: returns new events (by timestamp + seen set)
+ * in chronological order. Exported for unit testing.
  */
 export function pickFreshEvents(
   next: readonly ActivityEventDetailRow[],
@@ -131,13 +112,8 @@ export function pickFreshEvents(
 }
 
 /**
- * Renders a single event row for the human (non-JSON) output mode.
- * Pure — no I/O — so it can be unit-tested by capturing stdout via
- * a spy or by calling `formatEventLine` directly.
- *
- * Cost is suppressed when ≤ 0 (no upstream cost attribute), tokens
- * are suppressed when both counts are zero. Both fields are rendered
- * as separate trailing meta cells separated by a single space.
+ * Render event row for human output. Pure (no I/O). Cost and token counts are
+ * meta cells (suppressed if zero).
  */
 export function formatEventLine(e: ActivityEventDetailRow): string {
   const ts = chalk.gray(e.eventTimestampIso);

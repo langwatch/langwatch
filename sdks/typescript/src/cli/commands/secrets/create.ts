@@ -12,14 +12,7 @@ import type { CommandResult } from "../../utils/output.ts";
 import { langwatchFetch } from "@/internal/http/langwatchFetch";
 
 /**
- * Returns the created secret's metadata rather than printing it: the output
- * port renders it in whatever format the caller asked for (utils/output.ts).
- *
- * `data` is `{ id, name }` — the whole create response. The VALUE the caller
- * passed in `--value` is never echoed back by the server and is never put in
- * the payload here: unlike an API key or virtual key, the caller already holds
- * this secret, so there is nothing a machine caller gains from re-emitting it
- * and a great deal it risks.
+ * Return secret metadata { id, name }; never echo --value back.
  */
 export const createSecretCommand = async (
   name: string,

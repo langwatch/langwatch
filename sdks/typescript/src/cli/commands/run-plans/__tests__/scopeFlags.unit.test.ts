@@ -1,12 +1,5 @@
 /**
- * The `--target` reader.
- *
- * A target is what to run against plus the parameter values that target alone
- * runs with, written as a query string after the reference id. What these
- * assertions pin is the grammar: where the reference id ends, how a value is
- * decoded and typed, and which spellings are refused before anything is
- * scheduled.
- *
+ * Target reader grammar: reference id + query string params.
  * Spec: specs/features/run-plan-cli.feature
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";

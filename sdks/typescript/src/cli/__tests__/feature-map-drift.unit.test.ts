@@ -1,17 +1,5 @@
 /**
- * Drift guard between the CLI's real command surface and `feature-map.json`.
- *
- * The CLI's `program.ts` is the ground truth for which command groups exist;
- * the feature map (embedded at codegen time as
- * `internal/generated/cli/feature-map.generated.ts`) is the canonical
- * information architecture every surface derives from. This test fails — with
- * a readable list, not a count — when a top-level CLI group has no feature-map
- * CLI coverage, or the map lists a group the CLI no longer registers.
- *
- * It lives in typescript-sdk (not next to the app-side capabilityCatalog
- * coverage test it mirrors) because this is where the dependencies to parse
- * and run exist; the parsing approach is the same regex over program.ts.
- *
+ * Keeps CLI's program.ts and feature-map.generated.ts in sync.
  * @see .claude/skills/feature-map/SKILL.md
  */
 import { readFileSync } from "fs";

@@ -1,9 +1,6 @@
 /**
- * `langwatch ingest context`: the agent declares the repository and branch it
- * is working on, itself. Which session it declares for, what it posts, what
- * it says back, and how it shares the fingerprint state with the hooks.
- *
- * Feature: specs/ai-governance/cli-wrappers/session-context-declare.feature
+ * Agent declares repo/branch. Tests session resolution, declaration sharing,
+ * fingerprint state. Feature: session-context-declare.feature.
  */
 
 import * as fs from "node:fs";
@@ -193,7 +190,7 @@ describe("the declare command's session resolution", () => {
     expect(lines[0]).toContain("--agent");
   });
 
-  /** @scenario "The invoking codex session is resolved from the ancestor process that holds the rollout open" */
+  /** @scenario "Codex session resolved from ancestor holding rollout" */
   it("declares for the session whose process this runs under", async () => {
     writeRollout({ sessionId: CODEX_SESSION, agoMs: 5 * 60_000 });
     writeRollout({ sessionId: OTHER_CODEX_SESSION, agoMs: 1_000 });
@@ -211,7 +208,7 @@ describe("the declare command's session resolution", () => {
     });
   });
 
-  /** @scenario "The invoking codex session is resolved from the ancestor process that holds the rollout open" */
+  /** @scenario "Codex session resolved from ancestor holding rollout" */
   it("declares for the ancestor session while a second session is mid-turn", async () => {
     writeRollout({ sessionId: CODEX_SESSION, agoMs: 5_000 });
     writeRollout({ sessionId: OTHER_CODEX_SESSION, agoMs: 2_000 });
@@ -335,7 +332,8 @@ describe("what the declaration posts", () => {
       "vcs.worktree.name": "review",
     });
     expect(lines).toEqual([
-      `Declared github.com/langwatch/langwatch@feat/session-context for claude_code session ${SESSION_ID}`,
+      `Declared github.com/langwatch/langwatch@feat/session-context for ` +
+        `claude_code session ${SESSION_ID}`,
     ]);
   });
 

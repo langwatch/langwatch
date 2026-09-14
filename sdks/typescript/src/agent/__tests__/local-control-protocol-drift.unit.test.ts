@@ -1,13 +1,6 @@
 /**
- * The CLI's local control frames against the platform's contract module.
- *
- * `platform/app/src/server/langy-local-control/protocol.ts` is the contract;
- * `src/agent/local-control-protocol.ts` is the CLI's copy. This test reads the
- * platform source from the repository and pins the frame type names, the
- * top-level keys of every frame and the budgets the CLI copied, so the two
- * cannot drift apart without a failing test. It compares key lists read from
- * the source text, never the zod objects. A published SDK checkout has no
- * platform tree, so the test skips there and says so.
+ * Pins CLI local-control-protocol.ts against platform's protocol.ts to prevent
+ * frame shape and budget drift.
  */
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";

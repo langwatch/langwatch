@@ -388,13 +388,9 @@ describe("deleteEvaluatorCommand()", () => {
 });
 
 /**
- * The migrated commands register `-f, --format` with a commander DEFAULT
- * ("table"/"digest"), so `options.format` is always defined. Passing it
- * explicitly into failSpinner made it beat the format the program's preAction
- * hook recorded — failures rendered as human prose even under `-o json` /
- * `--agent`. These tests simulate exactly what the hook does
- * (applyOutputContext over the resolved options, commander default included)
- * and then fail the command.
+ * Tests verify that format flags beat commander defaults in error rendering.
+ * Simulates the hook's applyOutputContext seam, ensuring JSON/agent formats
+ * override `-f table` default.
  */
 describe("listEvaluatorsCommand() failure shape under machine formats", () => {
   let mockGetAll: ReturnType<typeof vi.fn>;

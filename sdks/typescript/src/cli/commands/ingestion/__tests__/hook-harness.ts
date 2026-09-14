@@ -1,12 +1,6 @@
 /**
- * The fakes the session context hook suites share: a collector that records
- * what it was posted, a git runner that answers from a table, a temporary
- * fingerprint directory, and the stdout/exit capture that both of the hook's
- * promises to a session are asserted against.
- *
- * Not named `*.test.ts` on purpose. Vitest's `include` is `src/**\/*.test.ts`,
- * so this module is imported by the suites rather than collected as one.
- *
+ * Test harness: shared fakes for session context hook suites.
+ * Not a test file (imported by suites, not collected).
  * Feature: specs/ai-governance/cli-wrappers/session-context-hook.feature
  */
 

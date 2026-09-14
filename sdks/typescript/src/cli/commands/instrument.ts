@@ -1,21 +1,6 @@
 /**
- * `langwatch instrument <tool>` - write the persistent telemetry wiring
- * for a coding agent WITHOUT launching it. The wiring targets are the
- * same ones `langwatch <tool>` manages (claude settings.json env, codex
- * config.toml [otel] block with the Authorization header, scoped shell
- * functions for the rest), so a plain `<tool>` run captures afterwards.
- *
- * Scope selection:
- *   (none)                 personal workspace; needs `langwatch login`.
- *   --project <id-or-slug> team project; mints a project ingest key
- *                          (one per device, create-only) and pins the
- *                          tool to it. Needs login + traces:create on
- *                          the project.
- *   --key <ingest-key>     a pasted ingest key; no login needed. Made
- *                          for shared machines and servers. Combine with
- *                          --endpoint for self-hosted instances.
- *   --personal             clear a project pin and rewire the personal
- *                          path.
+ * Write persistent telemetry wiring for a coding agent without launching it.
+ * Supports: personal workspace, --project for team, --key for self-hosted.
  */
 
 import { lwTag } from "../utils/governance/brand";

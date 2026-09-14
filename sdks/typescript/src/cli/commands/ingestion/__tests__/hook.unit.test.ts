@@ -1,11 +1,5 @@
 /**
- * What the session context hook reports: the repository, branch and worktree a
- * session is working in, the agent whose seam invoked it, and the trace a Stop
- * invocation carries.
- *
- * Where the record goes is hook-target, when it stays quiet is hook-dedup, and
- * the promises it makes to the session are hook-silence.
- *
+ * Hook payloads: repo, branch, worktree, agent, trace.
  * Feature: specs/ai-governance/cli-wrappers/session-context-hook.feature
  */
 

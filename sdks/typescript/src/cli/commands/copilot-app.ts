@@ -14,14 +14,9 @@ import { installCopilotAppAgent } from "@/cli/utils/governance/copilot-app-agent
 import { isLoggedIn, loadConfig, type GovernanceConfig } from "@/cli/utils/governance/config";
 
 /**
- * `langwatch copilot-app connect` — provisions capture for the standalone
- * GitHub Copilot app (ADR-039 §Extension). The app is a long-running GUI,
- * not a per-invocation CLI, so it is connected once rather than wrapped:
- * resolve a personal ingest key of sourceType "copilot_app" (reusing the
- * cached one while the platform confirms it is live, minting otherwise),
- * then install a login agent that owns the app's launch and injects the
- * direct-OTLP env. Re-running re-points the agent; `langwatch logout`
- * tears it down.
+ * Connect the GitHub Copilot app for telemetry capture. Resolves or mints an
+ * ingest key and installs a login agent.
+ * @see dev/docs/adr/039-extension.md
  */
 
 const SOURCE_TYPE = "copilot_app";

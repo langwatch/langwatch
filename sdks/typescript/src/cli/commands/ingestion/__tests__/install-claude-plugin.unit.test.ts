@@ -1,12 +1,5 @@
 /**
- * `langwatch ingest install claude_code` wires the session context seam the same
- * way a consented wrapper run does: the LangWatch Claude Code plugin when this
- * `claude` can take one, the hook entries in the settings file when it cannot.
- *
- * The report has to say which of the two actually happened. A report claiming
- * hooks were written when the plugin took them sends the next reader looking for
- * entries that are not there.
- *
+ * Install session hooks via Claude Code plugin or settings file.
  * Feature: specs/ai-governance/cli-wrappers/claude-plugin-install.feature
  */
 

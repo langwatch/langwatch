@@ -1,10 +1,5 @@
 /**
- * Filing a scenario into a test suite from the command line.
- *
- * The test suite is named by id or by name, and it is resolved through the
- * test suites API before the scenario is written, so a name that matches
- * nothing leaves no half-filed scenario behind.
- *
+ * File scenario into test suite by id or name; resolve before write.
  * Spec: specs/features/scenario-cli.feature
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";

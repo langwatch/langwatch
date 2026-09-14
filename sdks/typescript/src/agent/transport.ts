@@ -1,13 +1,5 @@
 /**
- * The connection the client speaks over, behind one small interface so the
- * client never depends on how the frames travel.
- *
- * Two transports carry the same frames. The WebSocket is the default and it
- * needs the `ws` package: the platform authenticates from the request
- * headers of the upgrade, and no global `WebSocket` constructor can send
- * them. HTTP long polling is for a network that blocks WebSockets: one POST
- * registers, a GET waits for the next frames, a POST carries the answers. It
- * speaks through the global `fetch` (Node 20+).
+ * Connection abstraction for frame transport (WebSocket default, HTTP fallback).
  */
 
 import { createRequire } from "node:module";

@@ -1,15 +1,7 @@
 /**
- * `langwatch config <get|set|list>` — explicit persistence + introspection
- * for user-global CLI configuration. Mirrors `gh config`, `doctl auth init`,
- * and `stripe config` patterns. Replaces hand-editing
- * `~/.langwatch/config.json` for the common case (set the endpoint).
- *
- * Today's keys (whitelisted — no arbitrary key/value writes):
- *   - endpoint        → control_plane_url
- *   - gateway-url     → gateway_url
- *   - daemon          → daemon ("on" | "off" — persistent daemon opt-out)
- *
- * Spec: specs/ai-governance/cli-onboarding/login-unified.feature
+ * Config persistence for endpoint, gateway-url, daemon. Replaces hand-editing
+ * ~/.langwatch/config.json.
+ * @see specs/ai-governance/cli-onboarding/login-unified.feature
  */
 
 import chalk from "chalk";

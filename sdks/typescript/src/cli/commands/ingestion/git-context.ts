@@ -1,12 +1,5 @@
 /**
- * The git half of `langwatch ingest hook <tool>`: what a session's directory
- * says about the code it is working on.
- *
- * Separate from the command because it is the only part that shells out, and
- * because every branch here answers the same question the command asks once
- * ("which checkout is this?") rather than anything about hooks, telemetry or
- * state. The command injects the runner, so its tests never spawn git.
- *
+ * Git context for a session directory; command injects runner for testability.
  * Spec: specs/ai-governance/cli-wrappers/session-context-hook.feature
  */
 

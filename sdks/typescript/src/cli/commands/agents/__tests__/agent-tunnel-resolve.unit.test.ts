@@ -4,14 +4,8 @@ import type { AgentsApiService } from "@/client-sdk/services/agents/agents-api.s
 import { resolveLocalUrl, resolveTargetAgent } from "../tunnel/resolve";
 
 /**
- * Agent selection for `langwatch agent tunnel` when `--agent` is omitted.
- *
- * The selection order (flag, remembered agent, lone agent, picker) mostly
- * needs no test double beyond a fake service, but the edges do: with no HTTP
- * agents a terminal session offers to create one on the spot, and a session
- * without a terminal must fail with the exact command that skips the
- * interactivity.
- *
+ * Agent selection for `langwatch agent tunnel` when --agent is omitted.
+ * Terminal vs headless handling for create-or-pick and no-agents edges.
  * @see specs/agents/agent-dev-tunnel.feature
  */
 

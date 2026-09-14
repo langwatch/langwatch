@@ -1,13 +1,6 @@
 /**
- * The SDK's frame shapes against the platform's protocol module.
- *
- * `modules/agent/contract/src/connected-agent.protocol.ts` is the
- * contract; `src/agent/protocol.ts` is the SDK's copy. This test reads the
- * platform source from the repository and pins the frame type names and the
- * top-level keys of every frame, so the two cannot drift apart without a
- * failing test. It compares key lists read from the source text, never the
- * zod objects. A published SDK checkout has no platform packages, so the
- * test skips there and says so.
+ * Pins SDK protocol.ts against platform's connected-agent.protocol.ts to
+ * prevent frame shape drift.
  */
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
@@ -86,7 +79,8 @@ const withoutType = (keys: string[]): string[] => keys.filter((key) => key !== "
 describe("the SDK protocol, given the platform's protocol module", () => {
   if (!existsSync(PLATFORM_PROTOCOL)) {
     it.skip("matches the platform contract (skipped: no platform packages in this checkout)", () => {
-      // A published SDK checkout carries no platform packages; the drift check runs in the monorepo.
+      // A published SDK checkout carries no platform packages; the drift check runs in the
+      // monorepo.
     });
     return;
   }

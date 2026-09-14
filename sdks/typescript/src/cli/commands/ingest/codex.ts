@@ -1,23 +1,6 @@
 /**
- * `langwatch ingest codex` — recover codex conversation content and post it as
- * trace content.
- *
- * Codex exports tokens, model and timing over OpenTelemetry and nothing a human
- * can read: the assistant reply is parsed out of the streaming response and
- * dropped before export, and no codex setting turns it back on. The conversation
- * does land on disk, in the session's append-only rollout transcript, where each
- * turn records the exact trace id codex used for that turn's spans.
- *
- * Sessions launched as `langwatch codex` already have that recovered by the
- * wrapper, which polls the transcript while the session runs. This command
- * serves the sessions the wrapper never sees — which, once capture is enabled,
- * is the normal case, because the point of enabling it is that a plain `codex`
- * captures. It runs in two modes:
- *
- *   --notify   codex ran us itself, right after a turn completed, and appended
- *              the turn payload naming the session. The everyday path.
- *   (default)  backfill: sweep transcripts already on disk, for sessions that
- *              ran before capture was switched on.
+ * Recover codex conversation content from session transcripts and post as trace
+ * content. Two modes: --notify (real-time after turns) or backfill (sweep disk).
  */
 import { spawn } from "node:child_process";
 

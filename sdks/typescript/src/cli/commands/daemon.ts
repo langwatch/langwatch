@@ -46,16 +46,8 @@ function resolveIdleTimeout(option?: string): number {
 }
 
 /**
- * The trust problems that mean "something is WRONG", as opposed to the two that
- * simply mean "no daemon is running here yet".
- *
- * `requestStatus`/`requestStop` collapse every problem into `null`/`false`,
- * which is right for them — an untrusted socket is exactly "no daemon" on the
- * hot path. It is wrong for these commands: the user explicitly asked about the
- * daemon, so silently reporting "not running" (or worse, "starting in the
- * background" for a daemon that will immediately die) hides the one fact they
- * need. `socket-missing` and `socket-dir-missing` are the ordinary empty state
- * and are deliberately NOT in here.
+ * Trust problems that mean "something is WRONG" (not just "daemon not
+ * running"). Reported explicitly because user asked about the daemon.
  */
 function describeTrustProblem(problem: SocketTrustProblem): string | null {
   switch (problem) {

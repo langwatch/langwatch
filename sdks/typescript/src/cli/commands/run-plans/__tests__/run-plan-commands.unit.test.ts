@@ -1,11 +1,5 @@
 /**
- * The `run-plan` commands.
- *
- * A run plan is identified by its NAME, so what these assertions pin is the
- * request: one POST carrying the scope, the targets and the configuration, and
- * a refusal before anything is scheduled whenever the command line says two
- * things at once.
- *
+ * Run-plan commands: one POST per scope/targets/config; refuse conflicting flags.
  * Spec: specs/features/run-plan-cli.feature
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";

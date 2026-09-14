@@ -25,7 +25,10 @@ export const DEFAULT_TIMEOUT_MS = 120_000;
 export const MAX_TIMEOUT_MS = 300_000;
 export const DEFAULT_CONCURRENCY = 10;
 
-/** What a handler may return: a string, one message, a list of messages, or an output with a session. */
+/**
+ * What a handler may return: a string, one message, a list of messages, or an
+ * output with a session.
+ */
 export type AgentOutput = string | AgentMessage | AgentMessage[];
 
 /** The output of one turn plus the session the agent keeps for the next turn of the same thread. */
@@ -44,11 +47,17 @@ export interface AgentCall<P = Record<string, AgentParameterValue>> {
   newMessages: AgentMessage[];
   /** The platform's conversation id. */
   threadId: string;
-  /** The value the handler returned as `session` on the previous turn of this thread, null on the first. */
+  /**
+   * The value the handler returned as `session` on the previous turn of this
+   * thread, null on the first.
+   */
   session: unknown;
   /** The run parameters, validated and with defaults filled. */
   params: P;
-  /** The trace id of the turn, so the agent's own spans join it. Empty when the call carries none. */
+  /**
+   * The trace id of the turn, so the agent's own spans join it. Empty when the
+   * call carries none.
+   */
   traceId: string;
 }
 
@@ -67,7 +76,10 @@ export interface DirectAgentCall<P> {
 export interface ConnectAgentOptions<P extends ParameterInput = ParameterDefinitions> {
   /** The agent name. One row per name and environment on the platform. */
   name: string;
-  /** Resolved from LANGWATCH_AGENT_ENVIRONMENT, APP_ENV, ENVIRONMENT, NODE_ENV, else development. */
+  /**
+   * Resolved from LANGWATCH_AGENT_ENVIRONMENT, APP_ENV, ENVIRONMENT, NODE_ENV,
+   * else development.
+   */
   environment?: string;
   /** A definition map, a Standard JSON Schema object, or a JSON Schema object. */
   parameters?: P;
@@ -91,7 +103,10 @@ export interface ConnectAgentOptions<P extends ParameterInput = ParameterDefinit
   apiKey?: string;
   endpoint?: string;
   projectId?: string;
-  /** `websocket` (default, falls back to HTTP when the upgrade is refused) or `http`. Also LANGWATCH_AGENT_TRANSPORT. */
+  /**
+   * `websocket` (default, falls back to HTTP when the upgrade is refused) or
+   * `http`. Also LANGWATCH_AGENT_TRANSPORT.
+   */
   transport?: AgentTransport;
   logger?: Logger;
 }

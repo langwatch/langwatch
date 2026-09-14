@@ -1,16 +1,5 @@
 /**
- * Activating capture wires each tool's session context seam, the same run that
- * mints the ingest key: hook entries for Claude Code and Codex, a plugin file
- * for opencode.
- *
- * The mint is the only thing faked: the config is a real file behind
- * LANGWATCH_CLI_CONFIG, and the files the command merges into or writes are
- * real files in a temp directory.
- *
- * `claude` here is one without plugin support, so claude_code lands on the hook
- * entries rather than the LangWatch plugin. What the plugin path reports lives
- * in install-claude-plugin.unit.test.ts.
- *
+ * Wire session hooks for each tool; only mint is faked, config is real.
  * Feature: specs/ai-governance/cli-wrappers/session-context-hook.feature
  */
 

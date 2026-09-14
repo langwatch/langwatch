@@ -1,10 +1,5 @@
 /**
- * What the session context hook remembers between invocations: one fingerprint
- * per session, so a quiet session stays quiet and a branch switch re-posts.
- *
- * A post that does not land deliberately records nothing, so the next hook in
- * the same session retries rather than assuming the context arrived.
- *
+ * Session context hook: one fingerprint per session; failed posts retry.
  * Feature: specs/ai-governance/cli-wrappers/session-context-hook.feature
  */
 

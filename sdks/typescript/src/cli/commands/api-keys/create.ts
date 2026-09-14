@@ -27,14 +27,8 @@ export interface CreateApiKeyOptions {
 }
 
 /**
- * Returns the created key rather than printing it: the output port renders it
- * in whatever format the caller asked for (utils/output.ts).
- *
- * `data` deliberately includes `result.token`. This is the ONE moment the token
- * exists (the server never returns it again) and the human output prints it
- * in full for exactly that reason, as did the previous `--format json` branch.
- * Withholding it from the machine payload would make `api-key create -o json`
- * useless for the scripted case it exists to serve.
+ * Returns the created key (including result.token, the only moment it exists).
+ * Output port renders it in requested format.
  */
 export const createApiKeyCommand = async (
   options: CreateApiKeyOptions,

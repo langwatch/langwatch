@@ -1,11 +1,6 @@
 /**
- * The run parameters an agent declares, and the values a call supplies.
- *
- * Three forms are accepted: a definition map, any Standard JSON Schema object
- * (read through `"~standard".jsonSchema`, so zod 4, valibot and arktype work
- * without this package importing them), or a plain JSON Schema. A schema
- * library instance that offers no JSON Schema converter is refused with the
- * three forms named, because the SDK never takes a zod instance as a value.
+ * Run parameters: three forms accepted (definition map, Standard JSON Schema,
+ * or plain JSON Schema); no direct library instances.
  */
 
 import type { AgentParameterValue, JsonSchemaObject } from "./protocol";

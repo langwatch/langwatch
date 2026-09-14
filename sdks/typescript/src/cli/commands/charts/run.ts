@@ -29,13 +29,8 @@ type ChartRunGranularitySeconds = (typeof OFFERED_GRANULARITY_STEPS)[number];
 const OFFERED_GRANULARITY_STEP_NAMES = "1 (1 second), 60 (1 minute), 3600 (1 hour)";
 
 /**
- * Runs a saved chart by id: reads the chart, then executes its own statement
- * and stored parameter values through the LangWatchQL query door — the same
- * governed execution path every other surface uses, so what this prints is
- * what the workbench would show. `--start`/`--end` fill the reserved
- * `dashboard_context_period_start`/`dashboard_context_period_end` parameters
- * for statements that declare them, and `--granularity` the reserved
- * datapoint step, in seconds.
+ * Runs a saved chart through LangWatchQL (same path as workbench). --start/--end
+ * and --granularity fill reserved dashboard context parameters.
  */
 export const runChartCommand = async (
   id: string,
