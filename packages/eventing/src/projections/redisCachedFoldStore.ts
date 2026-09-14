@@ -28,17 +28,9 @@ export interface RedisCachedFoldStoreOptions<State = unknown> {
 }
 
 /**
- * The fold cache TTL is a correctness invariant, not a latency knob. A cache
- * miss is treated as authoritative only because it means the last write is at
- * least a TTL old and has therefore settled across the ClickHouse replicas, so
- * the TTL MUST stay >= the maximum cross-replica replication lag — the fold
- * cache is the event processor's read-your-write consistency layer (ADR-066).
- *
- * The replication assumption today is 5 minutes, which is BOTH the default and
- * the floor. Raising the TTL only ever adds settle margin and is always safe;
- * dropping it below the replication lag is a correctness bug, so a configured
- * override below the floor is clamped up to it rather than honoured. The default
- * therefore equals the floor, and the override can only raise the TTL.
+ * Fold cache TTL is a correctness invariant: must stay >= max cross-replica
+ * replication lag (5 min). Ensures settled reads for read-your-write
+ * consistency.
  */
 const FOLD_CACHE_REPLICATION_LAG_SECONDS = 300;
 const DEFAULT_FOLD_CACHE_TTL_SECONDS = FOLD_CACHE_REPLICATION_LAG_SECONDS;
@@ -85,25 +77,9 @@ function readUpdatedAt<State>(state: State): number {
 }
 
 /**
- * Wraps a fold store with a Redis write-through cache.
- *
- * - `get()`: Redis first, durable store on miss.
- * - `store()`: durable store first (throws on failure), then the cache.
- *
- * The entry also carries the ids of the events folded into it. Queue delivery
- * is at-least-once, so a fold job that fails after its state was stored is
- * re-dispatched with the same events; most fold handlers accumulate (counters,
- * sums, appends) rather than being idempotent, and would double-count. The
- * executor uses that set to recognise and skip a redelivery.
- *
- * The cache is the FAST tier for that set, not the only one. When the inner
- * store implements `getWithApplied` (first adopter: the codingAgentSession
- * ClickHouse store) it also persists the set durably alongside the state row,
- * and this wrapper reads it back on a cache miss — so a retry that reaches a
- * cold cache still recognises a batch it already committed, closing the
- * cold-cache redelivery double-count. An inner store without `getWithApplied`
- * keeps the pre-durable behaviour: eviction or Redis loss drops the set,
- * degrading to a blind re-apply, not to something worse.
+ * Redis write-through cache wrapper: get() tries cache first; store() durable
+ * first. Entry carries applied event ids for dedup. Cache is fast tier; if
+ * inner implements getWithApplied, set is persisted durably.
  */
 export class RedisCachedFoldStore<State> implements FoldProjectionStore<State> {
   private readonly keyPrefix: string;
@@ -298,15 +274,8 @@ export class RedisCachedFoldStore<State> implements FoldProjectionStore<State> {
     const key = this.redisKey(aggregateId, context);
 
     try {
-      // The applied-event-id set is decided upstream and stamped on the context:
-      // FoldProjectionExecutor.appliedIdsForCommit unions it on a retry and
-      // resets it on a fresh delivery, at all four of its commit sites, before
-      // store() runs. This tier is a dumb read/write cache (ADR-066), so it
-      // persists that set verbatim — it does not re-read the cache to re-merge,
-      // which on the executor path was a guaranteed no-op (an extra Redis GET
-      // plus a full state decode). The only other caller, replay, writes a
-      // fresh row carrying no set; an absent value is treated as empty, matching
-      // that path's prior result.
+      // Applied-event-id set is stamped on context by upstream executor (unions
+      // on retry, resets on fresh). Cache persists it verbatim (dumb tier).
       const payload = encodeFoldCacheEntry({
         state,
         updatedAt: this.updatedAtOf(state),

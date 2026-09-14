@@ -6,25 +6,8 @@ import type { ProjectionStoreContext } from "./projectionStoreContext.ts";
 import type { KillSwitchOptions } from "../kill-switch/killSwitchKeys.ts";
 
 /**
- * A stateless projection that transforms individual events into records.
- *
- * MapProjection replaces the old EventHandler interface for the common case
- * of mapping a single event to a stored record. The `map` function is pure
- * — it receives an event and returns a record (or null to skip). The
- * framework handles dispatch and persistence via the AppendStore.
- *
- * Unlike FoldProjection, MapProjection has no accumulated state — each
- * event is processed independently.
- *
- * @example
- * ```typescript
- * const spanStorage: MapProjectionDefinition<NormalizedSpan, SpanReceivedEvent> = {
- *   name: "spanStorage",
- *   eventTypes: ["lw.obs.trace.span_received"],
- *   map: (event) => normalizeSpan(event.tenantId, event.data.span, ...),
- *   store: spanAppendStore,
- * };
- * ```
+ * Stateless projection: pure map function transforms each event into a record
+ * (or null to skip). No accumulated state; unlike FoldProjection.
  */
 export interface MapProjectionDefinition<Record, E extends Event = Event> {
   /** Unique name for this projection within the pipeline. */
@@ -46,13 +29,8 @@ export interface MapProjectionDefinition<Record, E extends Event = Event> {
   options?: MapProjectionOptions<E>;
 
   /**
-   * Loads the aggregate's events up to AND INCLUDING `upToEvent` in log
-   * order, sorted by occurredAt ASC, with the store's idempotency-key dedup
-   * applied (first occurrence per key wins). Used by the executor for
-   * `options.dedupeByIdempotencyKey`.
-   *
-   * Auto-wired by EventSourcingService at registration time, like the fold
-   * projections' `eventLoaderUpTo`.
+   * Loads events up to upToEvent with idempotency-key dedup. Auto-wired by
+   * EventSourcingService; used for dedupeByIdempotencyKey.
    */
   eventLoaderUpTo?: (context: {
     tenantId: string;
@@ -62,27 +40,9 @@ export interface MapProjectionDefinition<Record, E extends Event = Event> {
 }
 
 /**
- * The map-projection half of the enqueue-time seam (ADR-069 invariant 4).
- *
- * Deliberately the subscriber's own declaration, narrowed: `filter` carries the
- * identical contract (pure, total, cheap, no retry behind it — read
- * {@link EnqueueDispatchOptions} for the full rules), while `stage` is
- * excluded because a map projection has no claim-check to swap in. Deriving the
- * type from the subscriber's rather than re-declaring it is what keeps the two
- * seams from drifting into two subtly different meanings of "filter".
- *
- * A map projection's `map()` already returns `null` for an event it has nothing
- * to say about — but only after a job was minted, a payload deserialized and a
- * worker slot spent. This is where that same answer costs nothing.
- *
- * **The filter must never reject what `map()` would map.** A superset is safe
- * (the event is queued and `map()` declines it, exactly as today); a subset is
- * silent data loss, because map fan-out is not replayed on the live path.
- * Derive both from one declaration so they cannot disagree.
- *
- * Introducing a filter carries no deploy-order dependency, unlike `stage`: the
- * job payload is unchanged, so jobs staged by a build without the filter drain
- * correctly on a build with it — `map()` re-decides and writes nothing.
+ * Map-projection enqueue-time filter seam: filter must never reject what map()
+ * would map (superset safe, subset is silent data loss). Derive both from one
+ * declaration.
  */
 export type MapEnqueueDispatchOptions<E extends Event = Event> = Pick<
   EnqueueDispatchOptions<E>,
@@ -90,13 +50,8 @@ export type MapEnqueueDispatchOptions<E extends Event = Event> = Pick<
 >;
 
 /**
- * Options for configuring map projection processing behavior.
- *
- * Generic in the projection's own event type so `enqueue.filter` is typed
- * against the events this projection actually declares. Under strict function
- * parameter checking a predicate over a narrower event is not assignable to
- * one over `Event`, so without the parameter a projection could only ever
- * supply a filter that widened its own type back out.
+ * Options for configuring map projection processing behavior. Generic in the
+ * projection's own event type for typed filters.
  */
 export interface MapProjectionOptions<E extends Event = Event> {
   /**
@@ -111,7 +66,7 @@ export interface MapProjectionOptions<E extends Event = Event> {
   /** Whether to disable this projection. */
   disabled?: boolean;
 
-  /** Custom group key function for queue routing. Enables per-item parallelism instead of per-aggregate serialization. */
+  /** Custom group key function for routing; enables per-item parallelism. */
   groupKeyFn?: (event: any) => string;
 
   /**
@@ -128,26 +83,8 @@ export interface MapProjectionOptions<E extends Event = Event> {
   coalesceMaxBatch?: number;
 
   /**
-   * Skip events that are DUPLICATE deliveries of an earlier event with the
-   * same `idempotencyKey`.
-   *
-   * The event log is append-only and at-least-once: a client re-report
-   * (deterministic ids, SDK retries) appends a SECOND event row with the
-   * same idempotency key. Fold projections are immune (read-time dedup
-   * collapses the duplicates before re-folding), but a map projection is
-   * invoked once per appended event — for an additive sink (an
-   * AggregatingMergeTree rollup) that means the increment lands twice,
-   * SYSTEMATICALLY for write paths designed around retries.
-   *
-   * With this option, the executor checks the aggregate's event history
-   * before mapping: if an EARLIER event holds this event's idempotency key,
-   * the delivery is a duplicate and is skipped. Fail-open — when the
-   * history read cannot see the key holder (event-log read lag), the event
-   * is mapped, so the worst case remains the rare transient over-count the
-   * projection already tolerates, never an undercount.
-   *
-   * Costs one event-log read per mapped event carrying an idempotency key;
-   * only enable on low-volume streams (evaluations — not spans).
+   * Skip duplicate deliveries with the same idempotencyKey. Fails open on
+   * read lag (worst case: transient over-count, never undercount).
    */
   dedupeByIdempotencyKey?: boolean;
 }

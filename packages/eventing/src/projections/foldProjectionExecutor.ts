@@ -131,36 +131,8 @@ function withAppliedEventIds(
   return { ...context, appliedEventIds };
 }
 
-/**
- * Executes a fold projection incrementally by applying a single event to existing state.
- *
- * Flow:
- * 1. Load existing state via `store.tryGet()` (or `init()` if none)
- * 2. If the store missed and `options.refoldOnStoreMiss` is set → re-fold
- *    from the event log up to the delivered event (see below)
- * 3. `state = projection.apply(state, event)`
- * 4. If out-of-order detected and the projection admits a re-fold → re-fold from scratch
- * 5. `projection.store.store(state, context)`
- *
- * For business-time folds, out-of-order detection compares event.occurredAt
- * against the state's LastEventOccurredAt (tracked by
- * AbstractFoldProjection). If the event occurred earlier than what we've
- * already seen, all events are re-loaded in occurredAt order and replayed
- * from init() — unless the projection set `options.refoldOnOutOfOrder` to
- * false (see {@link canRefold}). Accepted-order folds rely on their serialized
- * queue lane and do not business-time re-fold a backdated event.
- *
- * Store-miss re-fold (`options.refoldOnStoreMiss`): a fold whose persisted
- * row cannot be read back into fold state (lossy analytics rows) returns
- * null from `store.tryGet()` whenever its cache is cold. Starting from `init()`
- * there would fold only the delivered events — a partial state that
- * overwrites the complete row. Instead, the aggregate's history is loaded
- * up to AND INCLUDING the delivered event in log order (`eventLoaderUpTo`)
- * and folded from scratch. The log-order bound guarantees an event that is
- * persisted but still queued for this projection is NOT pre-applied (its own
- * delivery is next). If the delivered event is missing from the loaded
- * history (event-log read lag), it is applied on top.
- */
+// Incremental fold execution: load state, re-fold on miss/out-of-order,
+// apply event, store result. See ADR-066 for store-miss and re-fold logic.
 export class FoldProjectionExecutor {
   /**
    * Events per page for the streaming store-miss re-fold
@@ -184,29 +156,8 @@ export class FoldProjectionExecutor {
     this.refoldHistoryRetryDelaysMs = refoldHistoryRetryDelaysMs;
   }
 
-  /**
-   * Loads state along with the ids of the events already folded into it.
-   *
-   * A store that keeps an applied-event-id set — the Redis cache wrapper, or a
-   * store that persists the set durably next to its row — answers with it via
-   * `getWithApplied`. A store that keeps none has no `getWithApplied`; its read
-   * carries an empty set and the executor treats every delivery as fresh.
-   *
-   * When the fold declared a read window and the windowed read misses, the
-   * read is retried ONCE without the window: the row may sit outside the
-   * window (long-lived aggregate, clock skew, backfill), and concluding "new
-   * aggregate" from a windowed miss is how a partial batch folded onto
-   * `init()` permanently overwrites the complete row. The retry is the
-   * declared-window contract's correctness net; the windowed read is only the
-   * partition-pruning fast path.
-   *
-   * A fold that declared `trustAbsentMiss` has replaced that net with a
-   * stronger claim — its store always writes a row and its window provably
-   * covers every live one — so for it an absent windowed read IS the answer
-   * and the retry is skipped (see the option's docstring for the measured
-   * basis and the `HasSignal` prerequisite). An `undecodable` miss is outside
-   * the claim and keeps its own no-retry reasoning below.
-   */
+  // Loads state with applied-event-id set for dedup. Windowed read retries
+  // unwindowed once to find rows outside window; skipped if trustAbsentMiss set.
   private async loadWithApplied<State, E extends Event>({
     projection,
     key,
@@ -291,17 +242,9 @@ export class FoldProjectionExecutor {
   }
 
   /**
-   * The applied-event-id set to record at commit.
-   *
-   * On a fresh delivery the previous batch for this group already acked (the
-   * queue holds one active batch per group), so its ids can never be
-   * redelivered — the set resets to this batch's fresh ids, staying bounded to
-   * one batch. On a RETRY it must instead be the UNION of the set loaded at read
-   * time and the fresh ids: a retry chain that keeps losing its cache would
-   * otherwise record only each attempt's fresh ids, and a later attempt
-   * redelivering the whole batch would re-apply the events an earlier attempt
-   * already folded into the durable row (silent double-count). Merging keeps
-   * every id the durable row still needs to recognise, capped and deduped.
+   * The applied-event-id set to record at commit: fresh deliveries reset to
+   * this batch only; retries must UNION with the loaded set to avoid re-applying
+   * events from earlier attempts (silent double-count).
    */
   private appliedIdsForCommit({
     context,
@@ -312,16 +255,8 @@ export class FoldProjectionExecutor {
     loadedAppliedIds: readonly string[];
     deliveredIds: readonly string[];
   }): string[] {
-    // Replace ONLY on the first commit of a fresh delivery — that is the
-    // garbage collection that keeps the applied set bounded at one delivery's
-    // ids instead of growing forever. Everything else extends:
-    // - a retry (attempt > 1) must keep what earlier attempts recorded, or the
-    //   redelivery re-applies it;
-    // - a continuation (a later sub-batch of the same locked dispatch, from
-    //   batch bisection) must keep what the earlier sub-batches recorded — each
-    //   commit only carries its own sub-batch's ids, and replacing would erase
-    //   the rest of the chain, so a redelivery after a failed later sub-batch
-    //   would double-apply the committed prefix (#6578).
+    // Replace ONLY on the first commit of a fresh delivery (GC); otherwise
+    // extend to preserve prior attempts and sub-batches, preventing re-applies.
     const isRetry = (context.deliveryAttempt ?? 1) > 1;
     return isRetry || context.isDeliveryContinuation
       ? mergeAppliedEventIds({
@@ -331,14 +266,8 @@ export class FoldProjectionExecutor {
       : [...deliveredIds];
   }
 
-  /**
-   * Drops events already folded into the loaded state.
-   *
-   * Queue delivery is at-least-once: a fold job that fails after its state was
-   * stored is re-dispatched with the same events. Most handlers accumulate
-   * (counters, sums, appends) rather than being idempotent, so re-applying
-   * would double-count silently.
-   */
+  // Drops events already folded (queue is at-least-once; re-apply would
+  // double-count in accumulators).
   private dropAlreadyApplied<E extends Event>({
     projectionName,
     events,
@@ -579,19 +508,8 @@ export class FoldProjectionExecutor {
   }
 
   /**
-   * Applies a batch of events for the same aggregate in a single load/store cycle.
-   *
-   * Equivalent to calling `execute()` once per event, but reads the existing
-   * state once, folds every event in the projection's declared order, and
-   * writes the result once. This turns a backed-up group of N events from N
-   * load+store round-trips (O(n²) on growing fold state) into a single one
-   * (O(n)).
-   *
-   * Business-time out-of-order handling matches `execute()`: if the earliest
-   * event in the batch occurred before the persisted checkpoint, the aggregate
-   * is re-folded from scratch via `eventLoader` — when one exists and the
-   * projection has not opted out via `options.refoldOnOutOfOrder` (see
-   * {@link canRefold}).
+   * Applies a batch of events in one load/store cycle (O(n) vs O(n²)).
+   * Re-folds from scratch if the earliest event is out-of-order.
    */
   async executeBatch<State, E extends Event>(
     projection: FoldProjectionDefinition<State, E>,
@@ -741,32 +659,9 @@ export class FoldProjectionExecutor {
   }
 
   /**
-   * Out-of-order re-fold: replays the aggregate's history from the event log
-   * with the delivered events merged back in when the read did not return
-   * them.
-   *
-   * The read runs moments after the delivered event was appended, and on a
-   * replicated event log it can come back without it (the store-miss re-fold
-   * guards the same lag, see `refoldUpToDelivered`). Replaying that history
-   * alone commits a state without the delivered event while its id is
-   * recorded as applied, so the event is never folded again. A simulation
-   * run's `finished` event lost that race to the `agent_instance_recorded`
-   * event stamped 63 ms after it, and the run read IN_PROGRESS forever.
-   *
-   * The same lag can also hide an event ALREADY folded into the loaded
-   * state, and a replay from that read would silently drop it. Two fences
-   * catch an incomplete read before it can replace the state:
-   *
-   * - every applied id the state was loaded with must be in the read or in
-   *   the delivery (the applied set is exactly the most recent commit, the
-   *   events most exposed to read lag);
-   * - the read plus the delivery must reach the state's occurred-at
-   *   checkpoint (a state at checkpoint T absorbed an event at T, so a
-   *   complete read returns one).
-   *
-   * A read that fails a fence is re-read on a short backoff; if it still
-   * fails, this returns null and the caller keeps the loaded state, applying
-   * the delivery on top, out of order but with nothing thrown away.
+   * Out-of-order re-fold: replays the aggregate's history, detecting incomplete
+   * reads via applied-id and occurred-at fences. Returns null if fences fail
+   * after retry, leaving delivery applied on top of the loaded state.
    */
   private async refoldWithDelivered<State, E extends Event>({
     projection,
@@ -902,17 +797,8 @@ export class FoldProjectionExecutor {
   }
 
   /**
-   * What a history read is missing before it may replace the loaded state:
-   * applied ids of the previous commit that neither the read nor the delivery
-   * accounts for, and the state's occurred-at checkpoint when nothing in
-   * either reaches it. Null when the read is complete enough to replay.
-   *
-   * These are fences against read lag, not a proof that the read holds every
-   * event. The applied set is the recent commits (reset per fresh delivery,
-   * capped at MAX_APPLIED_EVENT_IDS), so an event folded earlier is not in it,
-   * and a later event sharing its occurred-at satisfies the checkpoint on its
-   * behalf. Proving completeness needs a checkpoint event id or log cursor
-   * persisted next to the fold row; see issue #7726.
+   * Returns missing applied ids or occurred-at checkpoint; null when the read
+   * is complete enough to replay (fences against read lag only).
    */
   private historyReadGap<E extends Event>({
     history,
@@ -970,28 +856,9 @@ export class FoldProjectionExecutor {
   }
 
   /**
-   * Refuse to fold onto `init()` when the store FOUND a row and rejected it.
-   *
-   * `absent` and `undecodable` are both "no state", but they must not be
-   * handled alike. An absent row means this batch is the aggregate's first, so
-   * folding from `init()` is exactly right. An undecodable row means a complete
-   * state exists and this build cannot read it — folding from `init()` would
-   * write a PARTIAL state stamped at the CURRENT version, which the gate that
-   * just rejected the row would then accept forever. The corruption launders
-   * itself and the original is gone.
-   *
-   * Refolding from `event_log` is what makes a rejection safe, so without it
-   * the only correct move is to stop. Throwing puts the job on its retry
-   * budget and surfaces to an operator; the alternative is silent, permanent,
-   * and undetectable after the fact.
-   *
-   * This pairing is easy to break from a distance: `refoldOnStoreMiss` is
-   * documented for deletion once its population ages out, and `eventLoaderUpTo`
-   * is auto-wired only when the service has an event store.
-   *
-   * This proves only that a rebuild is POSSIBLE, not that it happened — the
-   * refold can still come back empty. {@link assertUndecodableWasRebuilt}
-   * closes that half, and both are needed.
+   * Refuse folding onto init() when an undecodable row exists; refolding from
+   * event_log is the only safe recovery. Without it, corruption (partial state
+   * stamped at current version) becomes permanent and undetectable.
    */
   private assertUndecodableIsRecoverable<State, E extends Event>(
     projection: FoldProjectionDefinition<State, E>,
@@ -1008,17 +875,8 @@ export class FoldProjectionExecutor {
   }
 
   /**
-   * The second half of the undecodable guard: the rebuild must have PRODUCED
-   * something.
-   *
-   * `refoldUpToDelivered` returns null when the aggregate's history reads back
-   * empty — a truncated log, a retention sweep, an event store that answered
-   * nothing. For an `absent` miss that is ordinary and folding from `init()` is
-   * right. For an `undecodable` one it is the corruption case again by another
-   * route: a complete row exists, this build cannot read it, and the rebuild
-   * that was supposed to make refusing it safe came back with nothing. Falling
-   * through would commit a partial state at the current version and launder it
-   * past the gate exactly as if no refold had been configured at all.
+   * The second half of the undecodable guard: the rebuild must have produced
+   * something. A null return is also corruption for undecodable misses.
    */
   private assertUndecodableWasRebuilt<State, E extends Event>(
     projection: FoldProjectionDefinition<State, E>,
@@ -1033,15 +891,8 @@ export class FoldProjectionExecutor {
   }
 
   /**
-   * Store-miss re-fold: rebuild state from the aggregate's event history up
-   * to AND INCLUDING the log-latest delivered event, then apply any delivered
-   * event the history read did not return (event-log read lag on the
-   * just-persisted event).
-   *
-   * Returns null when the history read comes back empty — the caller falls
-   * through to the plain init+apply path, which is equivalent for a genuinely
-   * new aggregate. A failed history read propagates: correctness over
-   * availability, the queue's retry machinery re-delivers.
+   * Store-miss re-fold: rebuild from history up to the delivered event, then
+   * apply any event the read missed. Returns null on empty history (init+apply).
    */
   private async refoldUpToDelivered<State, E extends Event>(
     projection: FoldProjectionDefinition<State, E>,
@@ -1100,22 +951,8 @@ export class FoldProjectionExecutor {
 
   /**
    * Streaming store-miss re-fold for order-insensitive folds: pages the
-   * aggregate's history via `eventLoaderUpToPaged`, folding each page and
-   * discarding it. At most one page of events (plus the fold state and a set of
-   * seen dedup keys) is held at once — the difference between a bounded working
-   * set and OOMing on a 100k-event aggregate, where the array path's single
-   * unbounded read materialises every EventPayload blob simultaneously.
-   *
-   * Parity with the array `refoldUpToDelivered`:
-   * - Dedup: the store returns each page raw (undeduplicated), so the last
-   *   row always matches what was actually read and the cursor never stalls.
-   *   This `seen` set (idempotencyKey ?? id) does the deduplication instead,
-   *   reproducing `deduplicateEvents`'s effect across page boundaries — which
-   *   the strict `>` cursor alone cannot (a retry can share an idempotencyKey
-   *   under a different EventId).
-   * - Order: immaterial — this path is gated on `refoldOnOutOfOrder: false`.
-   * - Missing delivered: any delivered event the history read did not return
-   *   (event-log read lag) is applied on top, as the array path does.
+   * history, deduping across page boundaries. Bounded working set (one page)
+   * vs unbounded array path; applies missing delivered events on top.
    */
   private async streamRefoldUpToDelivered<State, E extends Event>(
     projection: FoldProjectionDefinition<State, E>,

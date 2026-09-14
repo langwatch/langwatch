@@ -45,24 +45,14 @@ export interface ProjectionStoreContext {
   occurredAtMs?: number;
 
   /**
-   * Time bound for the store's backing-table read, computed by the executor
-   * from the event's business time and the width the fold DECLARED
-   * (`FoldProjectionOptions.readWindow`). A store passes it through to its
-   * repository verbatim; it never chooses a width or implements a miss
-   * fallback itself — on a windowed miss the executor retries the read once
-   * without the window, so a row outside the window is still found and a
-   * live aggregate never reads back as null just because the window missed.
+   * Time bound for the store's backing-table read. Store passes it verbatim;
+   * executor retries without window on miss.
    */
   readWindow?: ReadTimeWindow;
 
   /**
-   * Skip the read cache for this read and go straight to the durable tier.
-   *
-   * Set by the executor on its read-window fallback: the retry runs moments
-   * after the windowed attempt already consulted the cache, so re-reading
-   * Redis is a guaranteed second miss that would double-count the cache (and
-   * dedup-unavailable) metrics and waste a round-trip. Stores without a cache
-   * tier ignore it.
+   * Skip the read cache and go to durable tier. Set by executor on read-window
+   * fallback to avoid re-consulting Redis (guaranteed miss, double-counts metrics).
    */
   bypassReadCache?: boolean;
 
@@ -76,34 +66,14 @@ export interface ProjectionStoreContext {
   retentionPolicy?: RetentionPolicy | null;
 
   /**
-   * Ids of the events folded into the state being stored.
-   *
-   * Recorded alongside the cached state so a redelivery can be recognised.
-   * Queue delivery is at-least-once: a fold job that fails after its state was
-   * stored is re-dispatched with the same events, and most fold handlers
-   * accumulate (counters, sums, appends) rather than being idempotent, so
-   * re-applying them would double-count. Absent for stores that do not cache.
+   * Event ids folded into the state. Recorded with cached state to recognize
+   * redeliveries (queue is at-least-once; re-apply would double-count).
    */
   appliedEventIds?: readonly string[];
 
   /**
-   * Which delivery of this job is being folded. 1 is a fresh delivery, higher
-   * values are retries of a chain that has not acked.
-   *
-   * This is `JobDelivery.attempt` under a longer name, and the pair below is
-   * `JobDelivery.isContinuation`. The prefix is deliberate rather than drift:
-   * `JobDelivery` describes one delivery and nothing else, so a bare `attempt`
-   * reads fine there, while this context is a grab-bag also carrying
-   * `aggregateId`, `tenantId`, `key` and `retentionPolicy` — an unqualified
-   * `attempt` here would not say attempt of what. Noted once so the next
-   * reader following the value across the boundary does not have to re-derive
-   * it (#6699).
-   *
-   * A caching store uses it to decide whether the ids it already recorded are
-   * still live. On a fresh delivery the previous batch for this group must have
-   * acked — the queue holds one active batch per group — so those ids can never
-   * be redelivered and are discarded. During a retry chain they must be kept,
-   * or a later attempt re-applies the batch the first attempt already folded.
+   * Which delivery (1 = fresh, >1 = retry). Fresh: discard recorded ids
+   * (previous batch acked). Retry: keep ids (else re-apply batch).
    */
   deliveryAttempt?: number;
   /**
