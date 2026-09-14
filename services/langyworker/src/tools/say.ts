@@ -9,12 +9,14 @@
  *
  * A rule handed in at creation can refuse a line: the tool then throws the
  * rule's own words, pi records the call as errored, and the panel draws
- * nothing for a say that errored. The guided path's closing line before the
- * complete-path command is the one rule (guided-turn-end.ts).
+ * nothing for a say that errored. Two rules apply: the guided path's closing
+ * line before the complete-path command (guided-turn-end.ts), and a line
+ * already said in the turn (below).
  */
 
 import { Type } from "typebox";
 import type { ExtensionAPI, InlineExtension } from "@earendil-works/pi-coding-agent";
+import type { SettledCall } from "./turn-context.js";
 
 export const SAY_TOOL_NAME = "say";
 
@@ -32,10 +34,41 @@ const sayParams = Type.Object({
   }),
 });
 
+/** What `say` answers to a line already said in the turn. */
+export const REPEATED_LINE_PUSHBACK = "Already said; do not repeat it. Go on with the step.";
+
 /** The tool result for one call: the text is either shown or refused. */
 export function renderSaid(text: unknown): string {
   if (typeof text !== "string" || text.trim() === "") return EMPTY_SAY_PUSHBACK;
   return SAID_RESULT;
+}
+
+/** A line as it is compared for repeats: the ends trimmed, runs of whitespace folded to one space. */
+function foldWhitespace(text: string): string {
+  return text.trim().replace(/\s+/g, " ");
+}
+
+/**
+ * The repeat rule: a line already said in this turn, whitespace aside, is
+ * refused and draws nothing. Only the turn's own settled says count, so a
+ * later turn may say the line again, and only the ones that were drawn: a
+ * say the rules refused was never said. The skill's rule is never to say a
+ * line twice; a step 2 block said twice in a row drew twice on film.
+ */
+export function repeatedLineRefusal({
+  text,
+  calls,
+}: {
+  text: string;
+  calls: readonly SettledCall[];
+}): string | undefined {
+  const line = foldWhitespace(text);
+  const said = calls.some((call) => {
+    if (call.name !== SAY_TOOL_NAME || call.isError) return false;
+    const previous = (call.input as { text?: unknown } | null)?.text;
+    return typeof previous === "string" && foldWhitespace(previous) === line;
+  });
+  return said ? REPEATED_LINE_PUSHBACK : undefined;
 }
 
 /** A rule over a line about to be said: the words of the refusal, or undefined to let it through. */

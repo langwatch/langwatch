@@ -34,7 +34,7 @@ import {
   createLocalWorkspaceExtension,
 } from "./tools/local-workspace.js";
 import { QUESTION_TOOL_NAME, createQuestionExtension } from "./tools/question.js";
-import { SAY_TOOL_NAME, createSayExtension } from "./tools/say.js";
+import { SAY_TOOL_NAME, createSayExtension, repeatedLineRefusal } from "./tools/say.js";
 import { guidedSkillRefusal } from "./guided-kickoff.js";
 import { closingLineRefusal } from "./guided-turn-end.js";
 import {
@@ -175,7 +175,9 @@ export async function createLangySession({
       }),
       createQuestionExtension({ turnContext }),
       createSayExtension({
-        refuse: (text) => closingLineRefusal({ text, calls: turnContext.calls }),
+        refuse: (text) =>
+          closingLineRefusal({ text, calls: turnContext.calls }) ??
+          repeatedLineRefusal({ text, calls: turnContext.calls }),
       }),
       createSecretSnippetExtension(),
       // Registers `bash` in place of pi's built-in: the extension's tool wins

@@ -1270,6 +1270,19 @@ Feature: Langy guides the first setup after sign-up
       And the panel draws nothing for a say that errored
       And the same line after a clean complete-path is said as usual, and every other line as before
 
+    # The step 2 block, the framework line, the pull request line and the
+    # branch line, was said twice in a row on film, both answered "Said.",
+    # and the panel drew the block twice. The skill's rule is never to say a
+    # line twice; the say tool reads it as the line is said.
+    @unit
+    Scenario: A line already said in the turn is refused
+      Given a say call carrying text a say of the same turn already said, whitespace aside
+      When the worker's say tool reads it
+      Then the tool answers an error: already said, do not repeat it, go on with the step
+      And the panel draws nothing for it
+      And a different line, the same line in a later turn, and a line whose earlier say was refused are said as usual
+      And the closing line rule reads first, as before
+
     # The manager spawns the worker with its stderr discarded, so a log line
     # written in the worker reaches no log: the report rides the protocol.
     # The pretty console draws an array field on a continuation line, which a
