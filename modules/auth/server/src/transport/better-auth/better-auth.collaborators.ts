@@ -1,33 +1,13 @@
 import type { SignInMethodPolicy } from "@langwatch/identity-contract";
 
 /**
- * Everything the deployment's ONE Better Auth instance reaches that this
- * package cannot build for itself.
- *
- * There is exactly one such instance per deployment, and that is the whole
- * reason these are ports rather than imports. Whether a cookie verifies is
- * decided entirely by the option set the instance was constructed with - the
- * signing secret, the base URL and trusted origins, the cookie prefix, the
- * session model mapping, the secondary-storage prefix, the mounted providers
- * and the provider ids a stored account row is keyed by. A second instance
- * built from a different option set does not fail loudly; it verifies nothing
- * and answers `null`, which reads to every caller as "signed out". That is the
- * failure mode a provider-id mismatch has already produced in production.
- *
- * So the instance moved here whole and its collaborators are named. A process
- * that holds one supplies it; a process that does not says so, by name, at the
- * seam rather than by handing over something that answers wrongly.
+ * The ONE Better Auth instance and its collaborators. Instance is a port (not
+ * imported) because configuration mismatch returns silent null, not loud failure.
  */
 
 /**
- * Better Auth's `database:` entry - the storage engine every one of its
- * adapters, transactions and join emulations runs on.
- *
- * Typed as the library's own option because it IS that option: an adapter
- * factory, not a client. Passing it rather than building it is what lets a
- * deployment route storage per user (the event-sourced identity branch)
- * without this package knowing that routing exists, and lets a deployment that
- * does not route hand over the stock Prisma adapter.
+ * Better Auth's storage engine. Typed as library option (adapter factory, not
+ * client) to support per-user routing without package knowledge.
  */
 export abstract class BetterAuthStorage {
   /** The value handed to `betterAuth({ database })`. */
@@ -35,12 +15,8 @@ export abstract class BetterAuthStorage {
 }
 
 /**
- * ADR-027's gate, and ADR-117's method policy, as the request hook asks them.
- *
- * Three questions with three different costs, kept apart on purpose:
- * `federationCapable` is synchronous by contract, because an email-mode
- * deployment must not wait on a licensing store to be told it has nothing to
- * wait for; the other two may read.
+ * ADR-027 SSO gate and ADR-117 method policy. federationCapable is synchronous
+ * by contract; other two may read (licensing store).
  */
 export abstract class BetterAuthFederation {
   /**
@@ -63,26 +39,15 @@ export abstract class BetterAuthFederation {
 }
 
 /**
- * The identity ceremonies the storage adapter and the database hooks share
- * (ADR-101 §2, ADR-116 §5).
- *
- * A user delete is an erasure, an account row is an identifier attach and its
- * removal a detach. The BRIDGE forms are the ones the hooks call: the storage
- * adapter states the same fact for every user it routes to the identity
- * branch, so a hook that stated it unconditionally would append the event
- * twice whenever the first fold had not landed.
+ * Identity ceremonies for storage adapter and database hooks (ADR-101 §2,
+ * ADR-116 §5). A user delete is erasure; account attach/detach is identifier.
  */
 export abstract class BetterAuthIdentityCeremonies {
   abstract beforeUserDelete(user: { id: string }): Promise<void>;
 
   /**
-   * Returns the row data Better Auth should write, which is what pins the
-   * account id - the live identifier id and the backfill's derived id have to
-   * be the same id.
-   *
-   * The row is read structurally rather than by Better Auth's own type, for
-   * the reason the identity package gives: neither side should track that
-   * type version to version.
+   * Returns row data Better Auth should write to pin account id. Structural
+   * read to avoid tracking type version (identity package convention).
    */
   abstract tryBeforeAccountCreate(
     account: BetterAuthAccountRow,
@@ -107,12 +72,8 @@ export type PendingOrganizationInvite = Readonly<{
 }>;
 
 /**
- * The invitation half of an SSO auto-join.
- *
- * A pending invite WINS over the default membership, because its role and team
- * assignments carry their own grants - an auto-join that ignored it would land
- * the person in the organization as a plain member while the invite kept
- * looking unused.
+ * SSO auto-join invitation half. Pending invite wins over default membership
+ * because its role/team assignments carry their own grants.
  */
 export abstract class BetterAuthPendingInvite {
   abstract tryFindPendingByOrganizationAndEmail(input: {
@@ -124,12 +85,8 @@ export abstract class BetterAuthPendingInvite {
 }
 
 /**
- * The announcements a sign-up and a session make on the way past, none of
- * which may fail the ceremony they ride on.
- *
- * Grouped because they share that one property: every method here is
- * fire-and-forget from the caller's point of view, and an implementation that
- * throws would turn a successful sign-in into a failed one.
+ * Announcements from sign-up and session, fire-and-forget only. Throwing here
+ * would fail the ceremony.
  */
 export abstract class BetterAuthAnnouncements {
   /** The product-analytics trail. */

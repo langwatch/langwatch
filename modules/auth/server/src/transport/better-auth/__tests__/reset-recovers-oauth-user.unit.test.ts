@@ -1,18 +1,6 @@
 /**
- * See specs/licensing/sso-license-gating.feature — "Existing users on an
- * unlicensed deployment self-recover via password reset".
- *
- * The whole ADR-027 v6 denied-mode reset exception rests on an upstream
- * better-auth behavior: `resetPassword` CREATES a credential account when
- * the user only has an OAuth account (routes/password.mjs). This test pins
- * that premise against the real library (memory adapter, real handlers) so
- * a better-auth upgrade that changes it goes red here instead of silently
- * hard-stranding every existing user on denied installs.
- *
- * Deliberately a `.test.ts` (unit bucket), not `.integration.test.ts`,
- * despite crossing into the real library: it is fully hermetic — an
- * in-memory adapter, no DB, no network, no filesystem, ~0.5s — so it must
- * not pay for the integration globalSetup's Docker Postgres/ClickHouse boot.
+ * ADR-027 v6 reset exception: resetPassword creates credential account when
+ * user only has OAuth. Unit test despite library call (fully hermetic).
  */
 
 import { betterAuth } from "better-auth";

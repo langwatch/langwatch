@@ -1,19 +1,6 @@
 /**
- * The auth module's application: browser sessions, and the signed-out door
- * that stands before anybody holds one.
- *
- * One application because it is one module and one person. The door decides
- * where an address signs in, confirms it and mints the account; the session
- * half is what the browser holds afterwards, and revoking it is how every
- * other feature ends somebody's access. Splitting them left two objects
- * describing the same person's access, agreeing by attention rather than by
- * construction.
- *
- * Nothing here reads ambient state. The process supplies the counter, the
- * sign-in router, the mail gateway, the account writes and the invitation
- * reads as members, because none of them is auth's to own: the `User`,
- * `Organization` and `OrganizationInvite` tables belong to other modules, and
- * the module reaches them through their owner rather than around it.
+ * Auth module application: browser sessions and signed-out door. One application
+ * for one person; reaches all state through member dependencies, not ambient.
  */
 import {
   AuthApi,
@@ -75,14 +62,8 @@ export type AuthSignUpCollaborators = Readonly<{
 }>;
 
 /**
- * What the process holds behind this module. None of it is auth's own.
- *
- * The first three arrive as DECLARED members ({@link AuthApp.reads}): a process
- * that cannot supply one refuses at boot, naming the module and the member.
- * The rest is still the pre-`reads` shape and is `undefined` at runtime — the
- * front-door half (`route`, `signUp`, `invites`, `identityEmails`, `rateLimit`,
- * `authProvider`) needs identity, organization and mail peers, which is a lane
- * of its own.
+ * Process-supplied infrastructure. Declared members required at boot;
+ * front-door features need identity, organization, and mail peers.
  */
 export type AuthInfrastructure = MembersRead<typeof AuthApp.reads> &
   Readonly<{
@@ -124,12 +105,8 @@ export type AuthInfrastructure = MembersRead<typeof AuthApp.reads> &
   }>;
 
 /**
- * The deployment's browser-session identity, whole or absent.
- *
- * The five fields travel together because Better Auth builds its callback,
- * cookie and redirect URLs from one configured base: half of them composes an
- * instance that signs everybody out while looking configured. A process that
- * states none composes no instance and says so when the door is asked.
+ * Browser-session identity. Five fields travel together: Better Auth builds
+ * callbacks from one base, so partial config signs everyone out while looking ok.
  */
 const browserSessionIdentitySchema = z.object({
   secret: z.string().min(1),
@@ -314,18 +291,8 @@ export class AuthApp implements AuthApiContract {
   readonly federatedLogout: AuthRestFederatedLogout = () => Promise.resolve(null);
 
   /**
-   * ADR-116 §3's birth context, which this module cannot establish.
-   *
-   * `BetterAuthIdentityBirthAdapter` is the one object that opens it, and
-   * `@langwatch/identity-server` publishes it nowhere: its
-   * `./adapters/better-auth-identity-birth` subpath still points at a file the
-   * identity module renamed, and its barrel does not re-export the class.
-   *
-   * Refuses rather than running the handler unwrapped. Reached only when the
-   * born-finalized entrance is switched on for this request, and a sign-up that
-   * completes OUTSIDE the birth context writes the legacy rows while every
-   * later read expects the finalized ones — a wrong answer is worse here than
-   * an answer that names what is missing.
+   * ADR-116 §3's birth context. Identity doesn't export the adapter, so this
+   * refuses to avoid finalized/legacy row mixing.
    */
   runWithIdentityBirth<T>(_run: () => Promise<T>): Promise<T> {
     return Promise.reject(

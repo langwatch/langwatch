@@ -2,17 +2,8 @@ import { Config, compileRuntimeConfig, RuntimeConfig, type ConfigValue } from "@
 import { z } from "zod";
 
 /**
- * The deployment's one browser-session identity.
- *
- * `secret` and `url` are required TOGETHER: either alone composes a session
- * transport that rejects every sign-in while looking configured, which is why
- * the pair is a refinement and not a check at first request. Neither is
- * derived from the other, and neither is derived from the public base URL.
- *
- * `mfaEnrollmentOpen` and `passkeysEnabled` are read as the literal `on`,
- * which is the reading the platform application applied. Any other value is
- * refused rather than silently read as off, because a plugin mounted in one
- * process and not another is a route that exists for half the fleet.
+ * Browser-session identity. Secret and URL are a refinement (both or neither);
+ * mfaEnrollmentOpen and passkeysEnabled are literal "on", other values refused.
  */
 const onSwitch = z
   .union([z.literal("on"), z.literal("")])

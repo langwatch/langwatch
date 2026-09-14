@@ -2,14 +2,8 @@ import { compareToLegacy, type RoutingDecision } from "@langwatch/identity-contr
 import { createLogger } from "@langwatch/observability";
 
 /**
- * The router half of the comparison, and the legacy answer it is compared
- * against, as the process supplies them.
- *
- * A port rather than an import for the same reason everything else on this
- * transport is: the router reads the deployment's own connection projection,
- * and the legacy provider is the deployment's own environment. Neither is this
- * package's to resolve, and a shadow run that resolved them for itself would
- * be comparing two answers the live path never gave.
+ * Router for comparison against legacy answer. Port (not import) because router
+ * reads deployment's own projection, legacy provider is deployment's environment.
  */
 export abstract class SignInRouterShadow {
   /** `IDENTITY_ROUTER_V2` as this deployment set it. */
@@ -27,19 +21,8 @@ export abstract class SignInRouterShadow {
 const logger = createLogger("langwatch:identity:signin-router-shadow");
 
 /**
- * `IDENTITY_ROUTER_V2` as the live path reads it (ADR-117 §7).
- *
- *   off      the legacy path is byte-for-byte untouched — this module returns
- *            before it computes, reads or logs anything at all.
- *   shadow   the router decides on every live login, the decision is compared
- *            against what the legacy path actually answered, and mismatches
- *            are logged with both. Behavior is never changed, in either
- *            direction, for any reason.
- *   enforce  the flip. The screens that render decisions are D13's slice, so
- *            today enforce reaches the engine and the services and changes
- *            nothing a person can see.
- *
- * Rollback is this value.
+ * IDENTITY_ROUTER_V2 value (ADR-117 §7): off (legacy only), shadow (compare
+ * decisions), or enforce (router decides). Rollback is this value.
  */
 export type SignInRouterMode = "off" | "shadow" | "enforce";
 

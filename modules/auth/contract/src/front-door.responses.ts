@@ -1,11 +1,6 @@
 /**
- * What the signed-out front door answers, as schemas.
- *
- * Every one of these is read by somebody with no session, so the shapes are
- * deliberately small: an acknowledgement, an address, and the two facts an
- * invitation link may say to whoever opens it. The routing decision itself is
- * NOT here — it is the identity feature's `routingDecisionSchema`, because
- * routing is its domain and the door only forwards it.
+ * Schemas for signed-out front door responses. Deliberately small for
+ * unauthenticated users; routing decisions live in identity's routingDecisionSchema.
  */
 import { z } from "zod";
 

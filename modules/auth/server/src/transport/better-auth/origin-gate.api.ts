@@ -1,16 +1,6 @@
 /**
- * Pure same-origin gate for `/api/auth/*` requests, extracted from
- * `src/pages/api/auth/[...all].ts` for unit testing.
- *
- * Returns `true` if the request should be allowed through to
- * BetterAuth, `false` if it should be rejected with 403 INVALID_ORIGIN.
- *
- * Rules:
- * - GET/OPTIONS/HEAD always allowed (read-only / preflight).
- * - State-changing methods (POST/PUT/DELETE/PATCH) require either
- *   `Origin` matching `baseUrl` OR (no `Origin`) `Referer` matching
- *   `baseUrl`. A real browser always sends one of them on POST.
- * - Malformed `baseUrl` → reject everything (fail-closed).
+ * Same-origin gate for /api/auth/*. GET/OPTIONS/HEAD allowed; state-changing
+ * methods require Origin or Referer matching baseUrl.
  */
 const STATE_CHANGING_METHODS = new Set(["POST", "PUT", "DELETE", "PATCH"]);
 

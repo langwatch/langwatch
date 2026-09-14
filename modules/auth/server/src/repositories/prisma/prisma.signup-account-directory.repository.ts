@@ -2,13 +2,8 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { SignUpAccountDirectory } from "../../services/signup-verification.service.ts";
 
 /**
- * Whether an address already has an account. Case-insensitive for the same reason
- * `user.register` is: rows written before sign-up lowercased addresses may carry capitals,
- * and a case-twin beside one would leave two accounts answering for one person.
- *
- * Unregistered on purpose: the `User` table belongs to the user module, so this
- * read is the PROCESS's, composed into auth's members rather than
- * claimed by auth's repository registry (ADR-133).
+ * Address lookup, case-insensitive to match legacy rows and prevent case-twin
+ * duplicates. Unregistered: User table belongs to user module (ADR-133).
  */
 export class PrismaSignUpAccountDirectoryRepository implements SignUpAccountDirectory {
   private constructor(private readonly prisma: PrismaClient) {}

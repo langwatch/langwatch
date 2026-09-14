@@ -1,16 +1,8 @@
 /**
  * @vitest-environment node
  *
- * The chart hands NEXTAUTH_URL to every process running the app image.
- *
- * File-content assertions against the real chart templates on disk, in the
- * same spirit as evaluations/__tests__/helm-langevals-memory.unit.test.ts: the
- * regression this guards is textual (the env entry lived on the app Deployment
- * only, so the workers pod booted into "[better-auth] Base URL could not be
- * determined"), so reading the templates is the direct check. What the chart
- * actually renders, value precedence and the once-per-container guarantee, is
- * asserted by rendering in charts/langwatch/tests/e2e-overlays.sh
- * (test_auth_base_url), which chart CI runs on every change under charts/.
+ * Chart hands NEXTAUTH_URL to every process. File-content regression test;
+ * actual rendering tested in charts/langwatch/tests/e2e-overlays.sh.
  */
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";

@@ -48,13 +48,8 @@ export interface AuthApi {
     input: Readonly<{ token: string }>,
   ): Promise<SignUpVerificationResult>;
   /**
-   * The invitation behind a code, reduced to what its landing page may say.
-   *
-   * Refuses rather than answering, and the three refusals are deliberately
-   * NOT one: a missing invitation and a REVOKED one both raise
-   * `invite_not_found`, so a guessed code cannot tell the two apart and the
-   * journey ends quietly; an EXPIRED one raises `invite_expired`, because it
-   * is recoverable in one click by the inviter (D11).
+   * The invitation behind a code. Missing and revoked both raise `invite_not_found`
+   * to prevent code guessing; expired raises `invite_expired` for recovery (D11).
    */
   readInviteLanding(input: Readonly<{ inviteCode: string }>): Promise<InviteLanding>;
   /**

@@ -264,20 +264,8 @@ export const createAuthOptions = ({
      */
     resetPasswordTokenExpiresIn: 60 * 60,
     /**
-     * Wires BetterAuth's /request-password-reset endpoint to our existing
-     * transactional mailer (SendGrid / SES via `sendEmail`). Without this the
-     * endpoint returns RESET_PASSWORD_DISABLED. We ignore BetterAuth's default
-     * `url` and build the link off BASE_HOST + the issued token so it lands on
-     * our own /auth/reset-password page. Reset is deliberately reachable on a
-     * deployment the SSO license gate denies, even with an IdP configured
-     * (ADR-027), so that a user whose account was born through that IdP can
-     * still recover through their inbox. It closes again once the gate allows.
-     */
-    /**
-     * After a successful reset, force-logout every existing session for the
-     * user. The self-service change-password flow revokes *other* sessions
-     * (keeping the current tab); here the user isn't signed in, and a reset is
-     * the recovery path for a possibly-compromised account, so we revoke all.
+     * Password reset wired to transactional mailer. Deliberately reachable on
+     * denied SSO deployments for recovery (ADR-027); after reset, force-logout all sessions.
      */
   },
 

@@ -1,11 +1,6 @@
 /**
- * Whether BetterAuth's email/password routes MOUNT (ADR-027).
- *
- * Mounting is not the gate — the `before` hook refuses the email routes when
- * the licence gate says so — but on SaaS a named identity provider is the only
- * door, and mounting a password route there would be a bypass of the IdP.
- *
- * Covers specs/auth/phase-1-better-auth-config.feature.
+ * Email/password route mounting (ADR-027). License gate is the refusal, but
+ * SaaS IdP is the only door, so mounting there would bypass it.
  */
 import { describe, expect, it } from "vitest";
 

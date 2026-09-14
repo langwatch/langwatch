@@ -1,18 +1,6 @@
 /**
- * This deployment's ONE Better Auth instance, built by the module that owns
- * sign-in rather than by the process that happens to host it.
- *
- * Ported from `apps/api/src/app/api-better-auth.composition.ts`, deleted by
- * b383462d96 along with the hand-wired api graph. Nothing composed a Better
- * Auth instance between that commit and this file, so `/api/auth/*` answered
- * nothing at all; every collaborator below is the one the deleted composition
- * passed, in the same posture, so the sign-in wire is the wire it had.
- *
- * The absences are deliberate and each one names itself: this module holds no
- * licence reader, no mail gateway, no grant writer and no identity pipeline,
- * because none of them is auth's to own and the peers that would carry them
- * are a later lane's. An absent collaborator refuses BY NAME or logs by name —
- * it never quietly succeeds.
+ * Auth module's ONE Better Auth instance. Ported from deleted composition;
+ * absences are deliberate—each collaborator refuses by name if absent.
  */
 import type { AuthApi } from "@langwatch/auth-contract";
 import type { AuthzGrantsService } from "@langwatch/authz-contract";

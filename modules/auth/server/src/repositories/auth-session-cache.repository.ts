@@ -1,11 +1,6 @@
 /**
- * Better Auth's optional shared session cache and active-session index.
- *
- * It is an accelerator, never the truth: the database holds the session, and a
- * deployment that composed no cache reads and writes nothing here. What it does
- * hold is the copy a second process serves from, so a revocation that skipped
- * it would leave the other tier answering "signed in" for the full session
- * lifetime.
+ * Better Auth's optional shared session cache. Accelerator not truth; needed
+ * so revocations hit all tiers, not just the database.
  */
 export interface AuthSessionCacheRepository {
   /** The cached value at one key, or nothing. A miss is the ordinary answer. */

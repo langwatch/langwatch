@@ -1,20 +1,6 @@
 /**
- * The key/value substrate the CLI device grant keeps its short-lived state in.
- *
- * Every record the RFC 8628 flow writes is ephemeral and TTL'd - a device code
- * lives ten minutes, an access token an hour, a refresh token a quarter - so
- * the store is a cache with expiry rather than a table. That is why this is a
- * port over five operations instead of a repository: there is no row to read
- * back by anything but its own key, and no query to write.
- *
- * `setIfAbsent` is not a convenience. It IS the poll throttle: `/exchange`
- * claims a per-device-code window with one atomic write, and a get-then-set
- * spelled by hand would let two concurrent polls both see nothing and both
- * pass.
- *
- * Every write is single-key on purpose. A Redis cluster CROSSSLOT-rejects a
- * multi-key operation whose keys hash to different slots, and the device code,
- * its user-code index and the two token records always do.
+ * CLI device grant's ephemeral key/value store. RFC 8628 flow writes TTL'd
+ * records (cache not table); single-key ops to avoid Redis CROSSSLOT.
  */
 export interface CliDeviceSessionRepository {
   /** The stored value at one key, or nothing. */

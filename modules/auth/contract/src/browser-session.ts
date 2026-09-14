@@ -11,22 +11,8 @@ const browserSessionUserSchema = z
   .strict();
 
 /**
- * What this feature reads off Better Auth's verified session.
- *
- * Deliberately NOT `.strict()`, unlike every other schema in this file. The
- * others describe objects we build; this one is a PROJECTION of a record we do
- * not own. `getSession` answers Better Auth's whole session and user rows —
- * `token`, `userId`, `createdAt`, `updatedAt`, `ipAddress`, `userAgent`,
- * `emailVerified`, plus every `additionalFields` entry the transport configures
- * (`pendingSsoSetup`, `deactivatedAt`, `lastLoginAt`, `impersonating`) — and
- * the composition hands that result through unreshaped, behind an
- * `as unknown as BetterAuthSessionLookup` cast that keeps the compiler out of
- * it. Strict here threw `unrecognized_keys` on EVERY signed-in request;
- * `authenticate` caught it and answered null, so a signed-in caller was served
- * as an anonymous one with nothing in the logs to say a credential had been
- * presented. A plain object still narrows — the parsed value carries only the
- * keys below and drops the rest, which is the whole job. Widening the key list
- * to match Better Auth's would only re-break on its next added column.
+ * Projection of Better Auth's verified session. Not strict to avoid rejecting
+ * valid sessions when additionalFields are present.
  */
 const verifiedBrowserSessionUserSchema = z.object({
   id: z.string().min(1),
