@@ -47,7 +47,7 @@ export function DirectoryCard({
   canReadMembership: boolean;
 }) {
   const facts = useDirectoryFacts({ organizationId, canReadMembership });
-  const { reconciliation, groups, provenance } = facts;
+  const { reconciliation } = facts;
 
   // The org structure the directory's people sit in. This card is also read
   // by holders of `sso:view` WITHOUT `governance:view`; the hook degrades to
@@ -89,8 +89,6 @@ export function DirectoryCard({
     );
   }
 
-  const shownGroups = facts.directoryGroups.slice(0, GROUPS_SHOWN);
-  const restGroups = facts.directoryGroups.length - shownGroups.length;
   /** No provider has ever pushed, so every fact here would be an absence. */
   const nothingHasArrived = facts.lastPushedAtMs === null;
   /**
@@ -123,41 +121,10 @@ export function DirectoryCard({
       // who arrived. Offering "see provisioned members" to somebody with no
       // provisioned members is an invitation to an empty table.
       actions={
-        <>
-          {nothingHasArrived ? (
-            waitingConnection ? (
-              <Link href="/settings/authentication/connectors">
-                <Button size="sm" variant="outline">
-                  Open the connector
-                  <ArrowRight size={14} />
-                </Button>
-              </Link>
-            ) : (
-              <Link href="/settings/authentication/connectors">
-                <Button size="sm" variant="solid" colorPalette="orange">
-                  Issue a token
-                  <ArrowRight size={14} />
-                </Button>
-              </Link>
-            )
-          ) : (
-            <Link href="/settings/directory">
-              <Button size="sm" variant="outline">
-                See who it manages
-                <ArrowRight size={14} />
-              </Button>
-            </Link>
-          )}
-          {/* The connectors themselves: their state, what they could not
-              apply, the address and the token. This card reads; that page
-              is where a connector is set up and taken down. */}
-          <Link href="/settings/authentication/connectors">
-            <Button size="sm" variant="ghost">
-              <Settings2 size={14} />
-              Edit
-            </Button>
-          </Link>
-        </>
+        <DirectoryCardActions
+          waiting={waitingConnection}
+          nothingHasArrived={nothingHasArrived}
+        />
       }
     >
       {/* ROWS OF NOTHING ARE NOT A STATUS. Until a provider has pushed once,
@@ -171,131 +138,229 @@ export function DirectoryCard({
           waiting on the provider's schedule, and a connection whose first
           pushes needed attention are three different next moves. */}
       {nothingHasArrived ? (
-        <VStack align="start" gap={1} paddingY={1}>
-          <Text fontSize="13px" fontWeight="500">
-            {waitingConnection
-              ? "Waiting for the first push"
-              : "Nothing has arrived yet"}
-          </Text>
-          <Text
-            fontSize="11.5px"
-            lineHeight="1.55"
-            color="fg.muted"
-            maxWidth="46ch"
-          >
-            {attention
-              ? `${attention.status.headline} — the connector says what it could not apply.`
-              : waitingConnection
-                ? "The token is issued and your provider pushes on its own schedule — when the first one lands, members, groups and sync times fill themselves in. Nobody has to sign in for it to work."
-                : "Paste a provisioning token into your identity provider and this card keeps itself current — members, groups and sync times arrive and stay in step on their own. Nobody has to sign in for it to work."}
-          </Text>
-        </VStack>
+        <DirectoryCardWaiting
+          waiting={waitingConnection}
+          attention={attention}
+        />
       ) : (
-        <>
-          <OverviewDetail
-            label="Members it manages"
-            hint={
-              facts.outsideDirectory > 0
-                ? `${facts.outsideDirectory} arrived another way, so removing them from your identity provider will not remove them here.`
-                : undefined
-            }
-          >
-            <DirectoryFactUnavailable
-              canRead={canReadMembership}
-              read={provenance}
-            >
-              <Text
-                fontVariantNumeric="tabular-nums"
-                whiteSpace="nowrap"
-                data-testid="directory-card-members"
-              >
-                {facts.insideDirectory} of {facts.members.length}
-              </Text>
-            </DirectoryFactUnavailable>
-          </OverviewDetail>
-
-          <OverviewDetail label="Last sync">
-            <Text whiteSpace="nowrap">
-              {facts.lastPushedAtMs === null
-                ? "No push yet"
-                : formatRelativeTime(facts.lastPushedAtMs)}
-            </Text>
-          </OverviewDetail>
-
-          {/* NAMED, NOT COUNTED, and under an eyebrow rather than in the
-              value column of a row: group names are the one thing on this
-              card an administrator recognises at a glance, and squeezed
-              right-aligned against a label they wrapped one word per line. */}
-          <VStack align="start" gap={1.5} paddingTop={1} width="full">
-            {/* The kit's eyebrow spelling, shared with `MetricStat` — 10.5px,
-                uppercase, `fg.subtle` — rather than a size invented here. */}
-            <Text
-              fontSize="10.5px"
-              fontWeight="600"
-              letterSpacing="0.06em"
-              textTransform="uppercase"
-              color="fg.subtle"
-            >
-              Groups it sent
-            </Text>
-            <DirectoryFactUnavailable canRead={canReadMembership} read={groups}>
-              {facts.directoryGroups.length === 0 ? (
-                <Text fontSize="11.5px" color="fg.muted">
-                  None yet
-                </Text>
-              ) : (
-                <HStack gap={1} flexWrap="wrap">
-                  {shownGroups.map((group) => (
-                    <IdentityChip
-                      key={group.id}
-                      label={group.name}
-                      data-testid="directory-card-group-chip"
-                    />
-                  ))}
-                  {restGroups > 0 && (
-                    <Text fontSize="11.5px" color="fg.subtle">
-                      {`+${restGroups} more`}
-                    </Text>
-                  )}
-                </HStack>
-              )}
-            </DirectoryFactUnavailable>
-          </VStack>
-
-          {/* THE SAME EYEBROW FOR THE ORG STRUCTURE, where there is one.
-              Departments are named rather than counted for the same reason
-              the groups are, and absent rather than empty when the org has
-              none — a "None yet" under a heading a reader cannot act on
-              would ask a question this card cannot answer. */}
-          {department.show && (
-            <VStack align="start" gap={1.5} paddingTop={1} width="full">
-              <Text
-                fontSize="10.5px"
-                fontWeight="600"
-                letterSpacing="0.06em"
-                textTransform="uppercase"
-                color="fg.subtle"
-              >
-                Departments
-              </Text>
-              <HStack gap={1} flexWrap="wrap">
-                {department.departments.slice(0, GROUPS_SHOWN).map((option) => (
-                  <IdentityChip
-                    key={option.id}
-                    label={option.name}
-                    data-testid="directory-card-department-chip"
-                  />
-                ))}
-                {department.departments.length > GROUPS_SHOWN && (
-                  <Text fontSize="11.5px" color="fg.subtle">
-                    {`+${department.departments.length - GROUPS_SHOWN} more`}
-                  </Text>
-                )}
-              </HStack>
-            </VStack>
-          )}
-        </>
+        <DirectoryCardFacts
+          facts={facts}
+          canReadMembership={canReadMembership}
+          department={department}
+        />
       )}
     </OverviewCard>
+  );
+}
+
+type DirectoryConnection = ReturnType<
+  typeof useDirectoryFacts
+>["connections"][number];
+
+/**
+ * The one action that would move this card on.
+ *
+ * No connection: issue a token. A token issued and the first push still out:
+ * the connector is the place to check, not another token. After a first push:
+ * go see who arrived. Offering "see provisioned members" to somebody with no
+ * provisioned members is an invitation to an empty table.
+ */
+function DirectoryCardActions({
+  waiting,
+  nothingHasArrived,
+}: {
+  waiting: DirectoryConnection | undefined;
+  nothingHasArrived: boolean;
+}) {
+  return (
+    <>
+      {nothingHasArrived ? (
+        waiting ? (
+          <Link href="/settings/authentication/connectors">
+            <Button size="sm" variant="outline">
+              Open the connector
+              <ArrowRight size={14} />
+            </Button>
+          </Link>
+        ) : (
+          <Link href="/settings/authentication/connectors">
+            <Button size="sm" variant="solid" colorPalette="orange">
+              Issue a token
+              <ArrowRight size={14} />
+            </Button>
+          </Link>
+        )
+      ) : (
+        <Link href="/settings/directory">
+          <Button size="sm" variant="outline">
+            See who it manages
+            <ArrowRight size={14} />
+          </Button>
+        </Link>
+      )}
+      {/* The connectors themselves: their state, what they could not
+        apply, the address and the token. This card reads; that page
+        is where a connector is set up and taken down. */}
+      <Link href="/settings/authentication/connectors">
+        <Button size="sm" variant="ghost">
+          <Settings2 size={14} />
+          Edit
+        </Button>
+      </Link>
+    </>
+  );
+}
+
+/**
+ * What the card says before any provider has pushed.
+ *
+ * Three states, not one: no connection at all, a connection whose token is
+ * issued but whose provider has not pushed yet, and a connection reporting
+ * attention before its first push. An empty state that says "nothing" to all
+ * three tells the one who already did the work that the work did not take.
+ */
+function DirectoryCardWaiting({
+  waiting,
+  attention,
+}: {
+  waiting: DirectoryConnection | undefined;
+  attention: DirectoryConnection | undefined;
+}) {
+  return (
+    <VStack align="start" gap={1} paddingY={1}>
+      <Text fontSize="13px" fontWeight="500">
+        {waiting ? "Waiting for the first push" : "Nothing has arrived yet"}
+      </Text>
+      <Text
+        fontSize="11.5px"
+        lineHeight="1.55"
+        color="fg.muted"
+        maxWidth="46ch"
+      >
+        {attention
+          ? `${attention.status.headline} — the connector says what it could not apply.`
+          : waiting
+            ? "The token is issued and your provider pushes on its own schedule — when the first one lands, members, groups and sync times fill themselves in. Nobody has to sign in for it to work."
+            : "Paste a provisioning token into your identity provider and this card keeps itself current — members, groups and sync times arrive and stay in step on their own. Nobody has to sign in for it to work."}
+      </Text>
+    </VStack>
+  );
+}
+
+/** The rows, the groups and — where the organization has them — departments. */
+function DirectoryCardFacts({
+  facts,
+  canReadMembership,
+  department,
+}: {
+  facts: ReturnType<typeof useDirectoryFacts>;
+  canReadMembership: boolean;
+  department: ReturnType<typeof useDepartmentColumn>;
+}) {
+  const { groups, provenance } = facts;
+  const shownGroups = facts.directoryGroups.slice(0, GROUPS_SHOWN);
+  const restGroups = facts.directoryGroups.length - shownGroups.length;
+  return (
+    <>
+      <OverviewDetail
+        label="Members it manages"
+        hint={
+          facts.outsideDirectory > 0
+            ? `${facts.outsideDirectory} arrived another way, so removing them from your identity provider will not remove them here.`
+            : undefined
+        }
+      >
+        <DirectoryFactUnavailable canRead={canReadMembership} read={provenance}>
+          <Text
+            fontVariantNumeric="tabular-nums"
+            whiteSpace="nowrap"
+            data-testid="directory-card-members"
+          >
+            {facts.insideDirectory} of {facts.members.length}
+          </Text>
+        </DirectoryFactUnavailable>
+      </OverviewDetail>
+
+      <OverviewDetail label="Last sync">
+        <Text whiteSpace="nowrap">
+          {facts.lastPushedAtMs === null
+            ? "No push yet"
+            : formatRelativeTime(facts.lastPushedAtMs)}
+        </Text>
+      </OverviewDetail>
+
+      {/* NAMED, NOT COUNTED, and under an eyebrow rather than in the
+        value column of a row: group names are the one thing on this
+        card an administrator recognises at a glance, and squeezed
+        right-aligned against a label they wrapped one word per line. */}
+      <VStack align="start" gap={1.5} paddingTop={1} width="full">
+        {/* The kit's eyebrow spelling, shared with `MetricStat` — 10.5px,
+          uppercase, `fg.subtle` — rather than a size invented here. */}
+        <Text
+          fontSize="10.5px"
+          fontWeight="600"
+          letterSpacing="0.06em"
+          textTransform="uppercase"
+          color="fg.subtle"
+        >
+          Groups it sent
+        </Text>
+        <DirectoryFactUnavailable canRead={canReadMembership} read={groups}>
+          {facts.directoryGroups.length === 0 ? (
+            <Text fontSize="11.5px" color="fg.muted">
+              None yet
+            </Text>
+          ) : (
+            <HStack gap={1} flexWrap="wrap">
+              {shownGroups.map((group) => (
+                <IdentityChip
+                  key={group.id}
+                  label={group.name}
+                  data-testid="directory-card-group-chip"
+                />
+              ))}
+              {restGroups > 0 && (
+                <Text fontSize="11.5px" color="fg.subtle">
+                  {`+${restGroups} more`}
+                </Text>
+              )}
+            </HStack>
+          )}
+        </DirectoryFactUnavailable>
+      </VStack>
+
+      {/* THE SAME EYEBROW FOR THE ORG STRUCTURE, where there is one.
+        Departments are named rather than counted for the same reason
+        the groups are, and absent rather than empty when the org has
+        none — a "None yet" under a heading a reader cannot act on
+        would ask a question this card cannot answer. */}
+      {department.show && (
+        <VStack align="start" gap={1.5} paddingTop={1} width="full">
+          <Text
+            fontSize="10.5px"
+            fontWeight="600"
+            letterSpacing="0.06em"
+            textTransform="uppercase"
+            color="fg.subtle"
+          >
+            Departments
+          </Text>
+          <HStack gap={1} flexWrap="wrap">
+            {department.departments.slice(0, GROUPS_SHOWN).map((option) => (
+              <IdentityChip
+                key={option.id}
+                label={option.name}
+                data-testid="directory-card-department-chip"
+              />
+            ))}
+            {department.departments.length > GROUPS_SHOWN && (
+              <Text fontSize="11.5px" color="fg.subtle">
+                {`+${department.departments.length - GROUPS_SHOWN} more`}
+              </Text>
+            )}
+          </HStack>
+        </VStack>
+      )}
+    </>
   );
 }
