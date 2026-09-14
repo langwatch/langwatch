@@ -77,11 +77,21 @@ type ContractMemberShape<Member> = Member extends {
  * web package restates none of its server's procedures. Intersect several when
  * a package calls more than one namespace.
  */
+/**
+ * A dotted namespace (`"analytics.lwql"`) declares a MEMBER namespace, and the
+ * real router nests it under its parent — so the map does too, or the type
+ * would deny a path the wire answers.
+ */
+type NamespaceKeyed<Namespace extends string, Procedures> =
+  Namespace extends `${infer Head}.${infer Rest}`
+    ? { [Segment in Head]: NamespaceKeyed<Rest, Procedures> }
+    : { [Segment in Namespace]: Procedures };
+
 export type ContractApiMap<TContract> = TContract extends {
   namespace: infer Namespace extends string;
   members: infer Members;
 }
-  ? { [Segment in Namespace]: { [Name in keyof Members]: ContractMemberShape<Members[Name]> } }
+  ? NamespaceKeyed<Namespace, { [Name in keyof Members]: ContractMemberShape<Members[Name]> }>
   : never;
 
 type ProceduresFrom<TMap> = {
