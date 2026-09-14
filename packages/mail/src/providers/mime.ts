@@ -7,15 +7,8 @@ export const sanitizeHeaderParam = (value: string): string =>
   sanitizeHeaderValue(value).replace(/(["\\])/g, "\\$1");
 
 /**
- * A header parameter such as `filename`, emitted so that both strict and naive
- * receivers get something usable.
- *
- * A quoted string may only hold ASCII (RFC 5322 §2.2), and RFC 2047
- * encoded-words are not allowed inside one (RFC 2047 §5), so a name like
- * `relatório.csv` can be carried only by the RFC 2231 extended form. That form
- * is emitted alongside a transliterated plain parameter: receivers that
- * understand `filename*` prefer it and the rest fall back to the ASCII name
- * instead of a mangled or rejected header.
+ * Header parameter encoding (filename, etc.) in dual form for compatibility:
+ * RFC 2231 extended for non-ASCII, transliterated ASCII for naive receivers.
  */
 export const encodeHeaderParam = (name: string, value: string): string => {
   const clean = sanitizeHeaderValue(value);
@@ -53,13 +46,8 @@ export const sanitizeHeaders = (
 };
 
 /**
- * RFC 2047-encode a header value as a single UTF-8 base64 encoded-word
- * (`=?UTF-8?B?...?=`) when the text contains non-ASCII characters or is long
- * enough to warrant encoding.  Pure ASCII values that fit on one line are
- * passed through unchanged (they are already valid RFC 5322 header text).
- *
- * Encoded-words must be ≤75 chars each (RFC 2047 §2).  We split long inputs
- * into multiple encoded-words separated by CRLF + WSP (header folding).
+ * RFC 2047 header encoding: UTF-8 base64 for non-ASCII/long text; pure ASCII
+ * passes through. Long inputs split into ≤75-char encoded-words (header folding).
  */
 export const rfc2047EncodeHeader = (value: string): string => {
   // Strip injection characters first

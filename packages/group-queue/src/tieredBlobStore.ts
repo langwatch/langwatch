@@ -26,19 +26,8 @@ export type { ObjectStore } from "./storage.ts";
 export const S3_TIER_THRESHOLD_BYTES = 256 * 1024;
 
 /**
- * A content-addressed reference to an offloaded blob; travels inside the job
- * envelope in place of the bytes. Both tiers carry only (projectId, hash) — the
- * read location is re-derived from these server-trusted inputs (the redis key /
- * a re-minted s3 uri), never trusted from a stored uri, so a tampered envelope
- * can't redirect a read across tenants (ADR-029).
- */
-/**
- * `tier` says WHERE the blob lives, not WHICH provider stored it: "redis", or
- * "s3" meaning the durable object store whatever its scheme. An Azure-only
- * deployment produces `tier: "s3"` refs whose bytes are in Azure Blob — the
- * provider is re-derived per operation by `mintUri`, never read off the ref
- * (ADR-029), so nothing branches on this value beyond "is it redis".
- * Renaming it is a job-envelope wire-format change; see issue #6096.
+ * Content-addressed blob reference (projectId, hash); tier indicates location
+ * (redis/s3), never provider. Read location re-derived per operation (ADR-029).
  */
 export type BlobRef =
   | { tier: "redis"; projectId: TenantId; hash: string }
@@ -78,7 +67,7 @@ function redisBlobId(params: { projectId: TenantId; hash: string }): string {
   return blobNamespaceId(params);
 }
 
-/** A stored object exceeded the read cap — treated as a corrupt/missing blob, not a transient error. */
+/** Stored object exceeded read cap; treated as corrupt/missing, not transient error. */
 class BlobTooLargeError extends Error {}
 
 /** Buffers a stream, capped at `maxBytes` so a tampered/oversized object can't OOM the worker. */
@@ -115,14 +104,8 @@ function isObjectMissingError(err: unknown): boolean {
 }
 
 /**
- * Content-addressed, tenant-namespaced blob store with two durable tiers: Redis
- * for mid-size bodies, the reused stored-objects object store for very large
- * ones. Keys are namespaced by `projectId` (the tenant id) so tenants never
- * share a blob and a project purge is a delete-by-prefix. See ADR-029.
- *
- * Dependencies are injected (no env coupling) so the store is exercised in
- * isolation: `objectStore` is satisfied by `StorageRegistry`, `resolveDestination`
- * by `resolveProjectStorageDestination`.
+ * Tenant-namespaced dual-tier blob store: Redis for mid-size bodies,
+ * stored-objects for large ones. Dependencies injected for isolated testing.
  */
 export class TieredBlobStore {
   private readonly redisBlobs: JobBlobStore;

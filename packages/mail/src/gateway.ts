@@ -1,12 +1,6 @@
 /**
- * The gateway half of this package: the four transports, the provider
- * selection and the delivery adapter, and nothing that renders.
- *
- * It exists as its own entry because the root entry pulls the templates, and
- * the templates pull react-email and so React. A process that only SENDS - the
- * infrastructure pool's mail member is exactly that - must not carry 2,000
- * browser modules on its boot graph to do it. Rendering stays at the root
- * entry, where the studio and the template tests read it.
+ * Gateway entry: transports, provider selection, delivery adapter (no rendering).
+ * Isolated to avoid pulling React/browser modules into send-only processes.
  */
 export { MailerAdapter } from "./adapters/mailer.adapter.ts";
 export { hasEmailProvider, resolveEmailProviderName } from "./providers/index.ts";

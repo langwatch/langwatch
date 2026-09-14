@@ -102,14 +102,8 @@ export class GroupQueueDispatcher {
   }
 
   /**
-   * BRPOP timeout for the next wait, clamped to the earliest due group.
-   * Send-time signals fire (and get drained by the dispatch cycle) while
-   * a delayed job is still inside its delay window, and nothing
-   * re-signals at the due time — without the clamp, a delayed group
-   * waits out the full fixed poll interval. A past-due score clamps to
-   * the floor, which also self-heals signals lost to the post-dispatch
-   * drain. When the processing queue is saturated, dispatch can't make
-   * progress anyway, so the fixed interval applies as before.
+   * Clamps BRPOP timeout to the earliest due group, handling delayed jobs
+   * and signal-loss edge cases; falls back to fixed interval when saturated.
    */
   private async nextWakeTimeoutSec(): Promise<number> {
     const saturated =

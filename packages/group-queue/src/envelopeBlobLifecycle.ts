@@ -216,14 +216,8 @@ export class EnvelopeBlobLifecycle {
   }
 
   /**
-   * Releases leases for retired staged values. Release only removes this
-   * holder's lease; blobs reclaim lazily through Redis TTL or the durable-store
-   * lifecycle sweep. Awaited by
-   * the caller (2026-07-11 fix): this was previously fire-and-forget, so a
-   * killed worker process could drop a release before it reached Redis,
-   * leaving a stale lifecycle entry (or racing a concurrent transfer).
-   * Each value's release still degrades to a warn + the TTL backstop rather
-   * than throwing — one bad value must not abort the rest of the batch.
+   * Releases leases for retired values; awaited to prevent worker crashes from
+   * leaving stale entries. Graceful per-value error handling (warns, doesn't abort batch).
    */
   async releaseLease({ values, groupId }: { values: string[]; groupId: string }): Promise<void> {
     const expected = this.projectIdFor(groupId);
@@ -277,19 +271,8 @@ export class EnvelopeBlobLifecycle {
   }
 
   /**
-   * Atomically moves the lease from a retired value to its replacement (retry
-   * re-encode or dedup squash): one eval takes the new lease and drops the old.
-   * No transfer path deletes blobs. Falls back to
-   * ordered take+release when either side isn't a GQ2 lease.
-   *
-   * Awaited by the caller (2026-07-11 fix): this was previously fire-and-forget
-   * end to end, so a killed worker process — or simply a subsequent squash on
-   * the same group racing ahead before this one's Redis round trip landed —
-   * could interleave with another transfer/release for the same blob in
-   * whatever order the network happened to deliver them, rather than the
-   * caller's own call order. Awaiting makes each transfer complete (or fail
-   * loudly into its own warn) before the next squash on this group can start
-   * its own.
+   * Atomically moves lease from retired to replacement value; awaited to
+   * serialize concurrent operations and prevent race conditions with transfers/releases.
    */
   async transferLease({
     newValue,

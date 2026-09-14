@@ -5,13 +5,8 @@ import { redisBlobKeyPrefix } from "./blobKeys.ts";
 import type { JobBlobStore } from "./jobEnvelope.ts";
 
 /**
- * Stores offloaded envelope bodies as raw gzip binary under standalone keys,
- * read and written directly by the client (never through Lua, so ioredis's
- * UTF-8 script-reply decoding is not a constraint). Keys share the queue
- * name's hash tag so they land in the queue's cluster slot.
- *
- * Every stored body is content addressed. Its renewable lease is the liveness
- * signal and the TTL is the final safety net when a holder disappears.
+ * Content-addressed gzip storage for envelope bodies; client-direct reads/writes
+ * (no Lua). Renewable leases signal liveness; TTL is final safety net.
  */
 export class RedisJobBlobStore implements JobBlobStore {
   private readonly redis: IORedis | Cluster;

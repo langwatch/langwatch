@@ -9,14 +9,8 @@ import {
 } from "../templates/trigger-digest-email.tsx";
 
 /**
- * The one renderer, and the only place react-email is evaluated on a backend
- * graph.
- *
- * `frontend-boundary.unit.test.ts` walks the value-import graph from every
- * process entrypoint and composition to the browser-only packages, and stops
- * on entry to `@langwatch/mail`. That terminal is what this class is for: a
- * composition root names it, the walk stops, and React stays off the graph of
- * every process that merely sends mail.
+ * The only place react-email is evaluated on backend; composition boundary
+ * enforced by frontend-boundary tests to keep React off send-only processes.
  */
 export class ReactEmailMailRenderer extends MailRender {
   static create(): ReactEmailMailRenderer {

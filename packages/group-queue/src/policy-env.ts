@@ -5,13 +5,8 @@ import {
 import type { GroupQueuePolicy } from "./contracts.ts";
 
 /**
- * The env-string shape both API and worker (and any future process) hand this
- * package to build a `GroupQueuePolicy`. Structural on purpose: every process
- * defines its own env projection, and this port takes the slice of it group
- * queue reads — never the whole thing.
- *
- * Numeric fields are unparsed env strings: this package owns the parse so a
- * `"NaN"` or a negative never reaches the policy.
+ * Env-string shape for GroupQueuePolicy; each process defines its projection
+ * and passes unparsed numeric fields for this package to validate and parse.
  */
 export interface GroupQueuePolicyEnvInputs {
   globalConcurrency?: string;

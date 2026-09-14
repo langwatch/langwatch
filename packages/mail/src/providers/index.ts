@@ -48,14 +48,8 @@ const inferredProviderHint = ({
 };
 
 /**
- * The gateway to send through, or null when email is not configured at all.
- *
- * `EMAIL_PROVIDER` is authoritative when set; deployments that never set it are
- * inferred from their credentials as before. A named-but-unusable provider
- * throws rather than silently falling back to another gateway, because quietly
- * sending from an unexpected sender domain is worse than a loud failure. The
- * error names a configured alternative when there is one, since a chart default
- * can supply a name the operator never chose.
+ * Resolves email provider from explicit EMAIL_PROVIDER or inferred credentials.
+ * Throws on misconfiguration rather than silently falling back (loud beats wrong sender).
  */
 export const resolveEmailProviderName = (
   configuration: MailerConfiguration,

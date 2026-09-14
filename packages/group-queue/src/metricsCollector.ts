@@ -20,14 +20,8 @@ import { type DispatchResult, type GroupStagingScripts, pendingGroupsKey } from 
 import { nowInstant } from "@langwatch/time";
 
 /**
- * How many of the soonest-future-scored ("nearest deferred") ready groups the
- * backlog-age gauge samples per collect. Retry-pinned groups' scores sit
- * within maxBackoffMs (600s) of now, so an ascending scan from just-past-now
- * finds them first; long-delayed groups (monitor timers, hours out) rank far
- * later in that same scan and can no longer displace them, unlike a sample
- * taken from the opposite (largest-score) end. In-flight groups sampled
- * alongside contribute nothing because their head job is not due. Bounded so
- * a collect cycle stays O(sample) pipeline commands whatever the backlog size.
+ * Sample size for backlog-age gauge; samples nearest deferred groups. Bounded
+ * to keep collect cycle O(sample) whatever the backlog size.
  */
 const OLDEST_BACKLOG_SAMPLE_GROUPS = 50;
 
@@ -48,14 +42,8 @@ export class GroupQueueMetricsCollector {
   private interval: ReturnType<typeof setInterval> | null = null;
 
   /**
-   * Whether a cycle is still running.
-   *
-   * The timer does not await `collect`, which was harmless while a cycle
-   * carried no state between calls. The rotation below does: two overlapping
-   * cycles would read the same cursor, both advance it, and skip the page
-   * between them. A cycle that pipelines a page of HLENs is also the cycle
-   * most likely to outlast the interval. Skipping a tick loses nothing a
-   * rotation does not pick up on the next one.
+   * Whether a cycle is running; guards against overlapping cycles that would
+   * skip pages in the rotation (timer doesn't await collect).
    */
   private isCollecting = false;
 
@@ -64,16 +52,8 @@ export class GroupQueueMetricsCollector {
   /** Deepest group seen so far in the rotation in progress. */
   private stagingDepthMax = 0;
   /**
-   * Groups over the threshold in the rotation in progress, by id.
-   *
-   * Ids rather than a counter because SSCAN promises each member at least
-   * once, not exactly once: a group present across a rehash can be returned on
-   * two pages, and counting sightings would report one hot group as several.
-   * The max is immune to that, a count is not, and telling one deep group from
-   * a stalled drainer is the whole reason the count exists.
-   *
-   * Only over-threshold ids are held, so this is empty in the steady state and
-   * never larger than the number it reports.
+   * Over-threshold groups in rotation, by id (not count, because SSCAN may
+   * return members across rehashes; set stays empty in steady state).
    */
   private stagingOverThreshold = new Set<string>();
 
@@ -153,62 +133,9 @@ export class GroupQueueMetricsCollector {
   }
 
   /**
-   * The two age gauges, from opposite clock origins.
-   *
-   * Oldest eligible-waiting age. A group's readyKey score is its
-   * dispatch-eligibility time, and every not-yet-dispatchable state is
-   * future-scored:
-   *   - genuinely eligible & waiting     → score <= now   (counted)
-   *   - in-flight (re-scored to activeUntil), backoff-pending retry,
-   *     and not-yet-due delayed stage    → score > now    (excluded)
-   * So the oldest eligible-waiting group is simply the smallest score in
-   * (sentinel, now]. STAGE writes the score with ZADD LT (keep-if-smaller)
-   * and COMPLETE rewrites it to the next remaining job, so the readyKey
-   * score already tracks the group's oldest still-pending job.
-   *
-   * This replaces the previous "min dispatchAfterMs over the first 10 ready
-   * groups" scan, which had two independent defects:
-   *   1. Sampling bias — zrange(readyKey, 0, 9) returns the 10 MOST
-   *      dispatch-eligible groups, not the oldest, so a real backlog sitting
-   *      past index 10 was never inspected and the gauge under-reported.
-   *   2. Wrong clock origin — it read the per-group jobs zset, whose scores
-   *      are PRESERVED across a block/park, so a just-unblocked group
-   *      reported its entire blocked duration as backlog age (0 -> hours in
-   *      one tick).
-   *
-   * Exclude every score that cannot be a timestamp, not just the sentinel.
-   * Administrative unblocking can re-add a group with an immediate sentinel
-   * score, while a malformed producer score can look like the Unix epoch. Both
-   * read as decades of age. The lower bound is therefore
-   * MIN_PLAUSIBLE_EPOCH_MS rather than `(1`, which drops the sentinel and every
-   * non-timestamp alike.
-   *
-   * This is the ABSOLUTE bound only, deliberately - not the two-sided one
-   * `resolveReadyScore` applies at staging. A genuine backlog IS arbitrarily
-   * far in the past, and reporting it is this gauge's entire job, so "old" must
-   * stay reportable while "not a timestamp" is skipped. Staging now bounds what
-   * can be written, so what this catches is rows staged before that guard
-   * existed; they are not counted here, because by the time a row is read back
-   * the producer that wrote it is no longer identifiable. The counter is raised
-   * at the staging fallback instead.
-   *
-   * Known residual: unpark restores a group's preserved (pre-park) ready
-   * score, so a long-parked group briefly over-reports on unpark until it is
-   * dispatched (one scan cycle). Closing that needs an unpark re-score
-   * decision (queue-fairness change), tracked separately.
-   *
-   * Backlog age regardless of eligibility. The eligible gauge is structurally
-   * blind to a group pinned in retry backoff: every failed attempt rewrites
-   * the group's ready score to now+backoff, so it is either future-scored
-   * (excluded) or freshly re-scored (reads as seconds old) — a head job due
-   * for a day never surfaces (2026-08-05 incident: day-old
-   * codingAgentSpanFactsDispatch backlogs under a ~2.5s gauge). The
-   * per-group jobs zset keeps the job's ORIGINAL due time across retries, so
-   * clock off that instead, sampling the soonest-future-scored ("nearest
-   * deferred") groups of ready — where retry-pinned groups live, their scores
-   * within maxBackoffMs of now — while long-delayed groups (hours out) rank
-   * far later and can no longer displace them, and folding in the eligible
-   * head so an old eligible group past the sample bound still registers.
+   * Collects two age gauges: eligible-waiting (min readyKey score) and
+   * backlog-regardless-of-eligibility (nearest-deferred groups + eligible head).
+   * Replaces flawed "top-10 groups" scan; validates scores against MIN_PLAUSIBLE_EPOCH_MS.
    */
   private async collectOldestAges({
     readyKey,
@@ -280,55 +207,9 @@ export class GroupQueueMetricsCollector {
   }
 
   /**
-   * Reads one page of groups' staging depth, continuing where the last cycle
-   * stopped.
-   *
-   * Over `pending-groups`, not over `ready`. A group is in exactly one of
-   * ready, parked, blocked or active, and staging keeps adding fields to the
-   * `:data` hash of a group in any of them: `parkGroup` ZREMs from ready and
-   * `addToReadyOrParked` then routes new work into the parked set, blocking
-   * removes from ready by design ("blocked => not in ready"), and a claimed
-   * group's member is ZREMed at claim time. Sweeping ready would therefore
-   * report zero for a hot group precisely while something is stopping its
-   * drainer, which is the state accumulation is most likely in, and would
-   * recreate the detection gap this exists to close.
-   *
-   * Reading the lifecycle indexes one after another does not fix it either,
-   * for the reason PENDING_INDEX_HELPER_LUA already gives: a group moving
-   * between them mid-read appears in none of the reads. `pending-groups` is
-   * keyed on "has jobs", which no lifecycle transition changes, and is written
-   * in the same atomic script as the job. Its membership is a deliberate
-   * superset, and over-inclusion costs nothing here: a drained group answers
-   * HLEN 0 and is dropped by the same filter that drops a missing key.
-   *
-   * A rotation rather than a sample, because a sample cannot find this. The
-   * failure being watched for is ONE group out of many holding an enormous
-   * staging hash, and the previous version of the age gauge above records what
-   * happens when you look for a per-group outlier in the first N members of an
-   * index: the gauge under-reported for as long as that code existed. Reading
-   * a fixed page per cycle and keeping the cursor covers every group instead
-   * of the same head repeatedly, at the same cost per cycle.
-   *
-   * What that costs is timeliness, and it is worth being exact about it. The
-   * gauges report the deepest group seen since the current rotation began, so
-   * a group that starts accumulating right after the cursor passes it is not
-   * reported until the next rotation reaches it: `ceil(groups / 1000)` cycles,
-   * one rotation, in the worst case. Against an accumulation that took hours
-   * to become an incident, and a capacity alarm that only fired at 50% of the
-   * cluster, a rotation's lag is not what makes this late.
-   *
-   * The running values reset when the cursor wraps, so a group that drained
-   * stops being reported within one rotation rather than pinning the gauge at
-   * its high-water mark for ever. That makes both gauges saw-tooth by
-   * construction: they climb through a rotation and fall to zero at the wrap.
-   * An alarm on the instantaneous value would therefore clear once per
-   * rotation whatever the queue is doing, so alarm on the maximum over a
-   * window that covers at least one rotation instead.
-   *
-   * SSCAN's guarantee is the one this relies on: every member present for the
-   * whole rotation is returned at least once. Members added or removed part
-   * way through may or may not be, which is why a fresh accumulation is
-   * bounded by a rotation and not by a cycle.
+   * Rotates through all groups' staging depth (one page per cycle) over
+   * pending-groups (not ready—lifecycle transitions can hide hot groups).
+   * Guarantees finding outliers; resets running max on cursor wrap to detect drained groups.
    */
   private async sweepStagingDepth({ keyPrefix }: { keyPrefix: string }): Promise<void> {
     const [nextCursor, groupIds] = await this.params.redisConnection.sscan(
@@ -364,17 +245,8 @@ export class GroupQueueMetricsCollector {
   }
 
   /**
-   * Reads one page of groups' staging-hash sizes.
-   *
-   * A group that drained between the scan and the read is gone, not deep:
-   * HLEN on a missing key is 0. An errored reply carries no value at all, so
-   * it reads as NaN. Neither is evidence of accumulation, and both are dropped
-   * by the same filter, because ioredis signals an error by omitting the
-   * value rather than alongside one, so the two shapes are not separable here.
-   *
-   * That filter is not observable through the gauges on its own: every
-   * comparison the caller makes is false for NaN already, so a NaN depth is
-   * inert whether it is dropped or not. It is here for the reader.
+   * Reads staging-hash sizes for one page. Missing keys and errors both read
+   * as zero/NaN and filter identically (not observable in gauges).
    */
   private async readStagingDepths({
     groupIds,
@@ -418,14 +290,8 @@ export class GroupQueueMetricsCollector {
 }
 
 /**
- * Folds the sampled head-job [member, score] replies into the running oldest
- * due time. Only DUE jobs are backlog: a head legitimately scheduled in the
- * future (delayed stage, monitor timers hours out) is not late work.
- *
- * A head score below the plausible-epoch floor is dropped for the same reason
- * the eligible probe drops one: `nowMs - 0` is not an age. It is not counted
- * here - the counter is raised at staging, where the value still exists and the
- * producer is still identifiable.
+ * Extracts minimum due time from head-job scores; only counts genuinely due jobs,
+ * skipping future-scheduled and invalid scores (not counted again at staging).
  */
 function minDueMs(
   seed: number | null,
