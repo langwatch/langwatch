@@ -92,6 +92,11 @@ type Tenant struct {
 	// reason to forget where they were going.
 	provisioning     ProvisioningTarget
 	lastProvisioning *ProvisioningOutcome
+	// scaleNote is what the last generate, churn or sync did, kept for the
+	// same reason lastProvisioning is: a form post ends in a redirect, and the
+	// answer to "what did that do?" has to survive it. Its own lock, because
+	// a sync writes it while holding none of the tenant's.
+	scaleNote scaleNote
 	// samlpSubjects makes the tenant mint Auth0-broker-style subjects
 	// (samlp|idpsim-t<n>|<user id>) so the app's SAML-brokered-login handling
 	// can be exercised over plain OIDC, the way Auth0 delivers it.

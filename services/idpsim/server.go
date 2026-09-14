@@ -98,6 +98,9 @@ func (s *Server) routePages(mux *http.ServeMux) {
 	mux.HandleFunc("POST /t/{tenant}/provisioning/delete", s.handleForgetProvisioning)
 	mux.HandleFunc("POST /t/{tenant}/provisioning/push", s.handlePushProvisioning)
 	mux.HandleFunc("POST /t/{tenant}/provisioning/pull", s.handlePullProvisioning)
+	mux.HandleFunc("POST /t/{tenant}/provisioning/sync", s.handleSyncProvisioning)
+	mux.HandleFunc("POST /t/{tenant}/population", s.handlePopulationForm)
+	mux.HandleFunc("POST /t/{tenant}/churn", s.handleChurnForm)
 }
 
 // routeProtocols is what a tenant speaks to an application: OIDC, SAML and
@@ -135,6 +138,11 @@ func (s *Server) routeControl(mux *http.ServeMux) {
 	mux.HandleFunc("PUT /control/t/{tenant}/scim-target", s.handleControlSCIMTarget)
 	mux.HandleFunc("DELETE /control/t/{tenant}/scim-target", s.handleControlSCIMTarget)
 	mux.HandleFunc("POST /control/t/{tenant}/scim-push", s.handleControlSCIMPush)
+	// The large-directory verbs: how many people there are, what happened to
+	// them, and the reconciliation that carries the difference across.
+	mux.HandleFunc("POST /control/t/{tenant}/population", s.handleControlPopulate)
+	mux.HandleFunc("POST /control/t/{tenant}/churn", s.handleControlChurn)
+	mux.HandleFunc("POST /control/t/{tenant}/scim-sync", s.handleControlSCIMSync)
 	mux.HandleFunc("POST /control/t/{tenant}/scim-pull", s.handleControlSCIMPull)
 	mux.HandleFunc("PUT /control/dns/txt", s.handleControlDNS)
 	mux.HandleFunc("DELETE /control/dns/txt", s.handleControlDNS)
