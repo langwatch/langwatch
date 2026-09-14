@@ -610,6 +610,11 @@ const LEGACY_INERT: string[] = [
   "specs/simulation-testing/voice-agents/testing-elevenlabs-convai.feature",
   "specs/simulation-testing/voice-agents/testing-phone-agents.feature",
   "specs/setup/docker-dev-worktree-isolation.feature",
+  // The local mail sink (mailsim) ships spec-first: the service, the haven
+  // lane, the `haven mail` CLI and the seeded addresses are all unbuilt, so
+  // every scenario is @unimplemented on purpose. Remove this entry with the
+  // first binding.
+  "specs/setup/mail-sink.feature",
   "specs/setup/simplified-setup.feature",
   "specs/skills/agent-insight-skills.feature",
   "specs/skills/docs-skills-directory.feature",
