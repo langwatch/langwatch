@@ -2,13 +2,8 @@ import { Config, compileRuntimeConfig, RuntimeConfig, type ConfigValue } from "@
 import { z } from "zod";
 
 /**
- * The RESTRICTED ClickHouse identity a member's own SQL runs as.
- *
- * All five leaves are required together and none defaults to the
- * application's own connection: a partial set means the workbench was meant
- * to run, and half of it would either refuse every statement while looking
- * provisioned or run a member's SQL as the full-access identity. Absent
- * altogether is a deployment with no SQL workbench, which is ordinary.
+ * RESTRICTED ClickHouse identity for member SQL workbench—all five leaves
+ * required together.
  */
 export const analyticsServerConfigDefinition = RuntimeConfig.define({
   langwatchQl: {

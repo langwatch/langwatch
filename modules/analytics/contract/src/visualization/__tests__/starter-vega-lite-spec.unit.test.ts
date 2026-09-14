@@ -1,12 +1,6 @@
 /**
- * The specification a member is given to start from.
- *
- * The one thing it must never be is invalid: a starting point that the chart
- * immediately refuses teaches the member that the editor is broken. So every
- * shape it can produce is run through the real validator here, against the same
- * dataset registry the workbench supplies.
- *
- * Node environment on purpose — see `validateVegaLiteSpec.unit.test.ts`.
+ * Member starter spec—every shape run through validator so a broken editor
+ * never rejects the starting point.
  */
 import { describe, expect, it } from "vitest";
 import {

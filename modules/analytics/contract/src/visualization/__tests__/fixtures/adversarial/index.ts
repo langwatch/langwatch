@@ -1,14 +1,6 @@
 /**
- * One fixture per rejection path, each named for the path it attacks and
- * declaring the rule that must refuse it.
- *
- * `attacks` is not decoration: `adversarialCorpus.unit.test.ts` asserts each
- * fixture really is refused by the rule it names, and `ruleCoverage.unit.test.ts`
- * reads the same field to prove no LangWatchQL rule is left without a test.
- *
- * The 256 KiB specification is deliberately absent — a checked-in file that
- * large is a repository cost with no reading value, so the size ceiling is
- * exercised from a generated specification in `vegaLiteLimits.unit.test.ts`.
+ * One fixture per rejection path, named for the rule it attacks; `attacks`
+ * field drives corpus and coverage tests.
  */
 
 import type { LangWatchQLVegaRuleId } from "../../../visualization-types.ts";

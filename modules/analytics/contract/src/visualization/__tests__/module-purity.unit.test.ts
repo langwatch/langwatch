@@ -1,18 +1,6 @@
 /**
- * Server-import safety.
- *
- * This file declares no jsdom environment, so it runs under plain node with no
- * `window` and no `document`. The static imports at the top are the assertion:
- * if any policy module reached for React, the DOM, or the browser-only Vega
- * runtime, this file would throw before a single test ran.
- *
- * (Do not name the environment pragma in this comment even to say it is absent
- * — vitest reads the pragma out of the first docblock, and would switch this
- * file to the very environment it exists to prove is unnecessary.)
- *
- * The source scan is the second half, because a module can import a browser
- * runtime and still load — until it is asked to do something. The import graph
- * is what the bundler splits on, so it is the import graph that is pinned.
+ * Modules load in Node with no window/document—static imports assert no React,
+ * DOM, or browser Vega.
  */
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -41,15 +29,7 @@ import { LWQL_VEGA_RULE_IDS, VEGA_VALIDATION_ERROR_CODES } from "../visualizatio
 /** `…/visualization/__tests__` → `…/visualization` */
 const MODULE_DIR = fileURLToPath(new URL("..", import.meta.url));
 
-/**
- * A type-only `import`/`export` statement, however it wraps across lines.
- *
- * The lazy body stops at that statement's own `from "…"`, so a value import on
- * a following line is left alone rather than shielded by the type import above
- * it. This is a statement-level strip rather than a lookbehind on the module
- * pattern: a lookbehind cannot span a multiline `import type { … }` without
- * also reaching back across statement boundaries.
- */
+/** Type-only import/export pattern to strip before checking for browser runtimes. */
 const TYPE_ONLY_STATEMENT = /(?:^|\n)\s*(?:import|export)\s+type\b[\s\S]*?from\s+["'][^"']+["']/g;
 
 /**
@@ -170,15 +150,8 @@ describe("the Vega-Lite validator and policy modules", () => {
     describe("when it is shown each import form", () => {
       /** @scenario "Vega dependencies and browser runtime stay behind the lazy boundary" */
       it("catches every value import and admits every type-only one", () => {
-        // The guard exists to keep a browser runtime out of the policy, and a
-        // type-only import brings none — it is erased before anything runs.
-        // That distinction is a lookbehind, which is easy to get subtly wrong,
-        // so both halves are pinned here rather than trusted: a pattern that
-        // stopped catching value imports would disarm the guard without
-        // failing anything, and one that rejected type-only imports would
-        // force `noNetworkVegaLoader.ts` to drop its `Loader` conformance
-        // check — the compile-time link that keeps the deny-everything loader
-        // honest.
+        // Guard catches value imports, admits type-only ones (erased before run).
+        // Lookbehind is error-prone, so both halves are pinned.
         const caught = [
           'import { View } from "vega";',
           'import vegaEmbed from "vega-embed";',

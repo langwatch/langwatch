@@ -1,12 +1,6 @@
 /**
- * The repository-owned loader.
- *
- * Its `@integration` scenario belongs to the chart runtime, which wires the
- * loader into a live Vega view; what is provable here is the contract that
- * scenario depends on — every method refuses, none of them reaches the network,
- * and the refusal never repeats a credential back.
- *
- * Node environment on purpose — see `validateVegaLiteSpec.unit.test.ts`.
+ * Repository loader contract—every method refuses without network access or
+ * credential leaks.
  */
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from "vitest";
 
@@ -51,7 +45,7 @@ describe("the no-network Vega loader", () => {
   // here, including the two below that never otherwise touch `reachedTheNetwork` —
   // which is the point of guarding it here instead of per-test.
   afterEach(() => {
-    // biome-ignore lint/suspicious/noMisplacedAssertion: shared guard for the whole suite, see comment above
+    // biome-ignore lint/suspicious/noMisplacedAssertion: suite-wide guard
     expect(reachedTheNetwork).not.toHaveBeenCalled();
     vi.unstubAllGlobals();
   });

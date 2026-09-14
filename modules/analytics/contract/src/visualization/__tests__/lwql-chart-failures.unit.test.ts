@@ -1,11 +1,6 @@
 /**
- * The two refusals no specification can be checked for in advance.
- *
- * Named here because `ruleCoverage.unit.test.ts` reads this file to prove the
- * rules `render.failure` and `encoding.empty` are covered — a claim that only
- * counts if this file really exercises them.
- *
- * Node environment on purpose — see `validateVegaLiteSpec.unit.test.ts`.
+ * Chart runtime refusals—render.failure and encoding.empty—that can't be
+ * validated in advance.
  */
 import { describe, expect, it } from "vitest";
 

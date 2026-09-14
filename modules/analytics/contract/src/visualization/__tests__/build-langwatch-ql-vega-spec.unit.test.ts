@@ -1,13 +1,6 @@
 /**
- * What the chart runtime is actually handed.
- *
- * The load-bearing claim is that data reaches Vega only by injection: whatever
- * a specification says about `datasets`, what arrives is built here from the
- * registry. The adversarial corpus proves the policy refuses a caller-supplied
- * `datasets` first; this proves the second lock holds even if the first is
- * removed, which is the one that matters when someone loosens the policy.
- *
- * Node environment on purpose — see `validateVegaLiteSpec.unit.test.ts`.
+ * Chart runtime receives injected data only—from registry, never caller
+ * datasets.
  */
 import { describe, expect, it } from "vitest";
 

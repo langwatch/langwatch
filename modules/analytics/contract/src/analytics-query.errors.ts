@@ -1,14 +1,6 @@
 /**
- * The four ClickHouse query refusals a caller can act on.
- *
- * Moved here with the LangWatchQL executor and the read-path translation that
- * raises them: they describe a QUERY's fate — it timed out, it exceeded the
- * memory ceiling, it would have read past the scan ceiling, or the cluster was
- * not reachable — and every door that raises them now runs over the analytics
- * ClickHouse seam. The trace-shaped refusals beside them (a trace that is not
- * there, a range that is too wide, a page too deep) stayed with the trace
- * vertical, because those are facts about a trace read rather than about a
- * statement.
+ * ClickHouse query refusals: timeout, memory, scan ceiling, cluster unavailable—
+ * actionable by callers.
  */
 import { HandledError, remediation } from "@langwatch/handled-error";
 
@@ -50,13 +42,8 @@ export class QueryMemoryExceededError extends HandledError {
 }
 
 /**
- * The query would have read past a scan ceiling (`max_rows_to_read` /
- * `max_bytes_to_read`) and was aborted rather than truncated.
- *
- * Distinct from {@link QueryMemoryExceededError}: a query can sit well inside
- * the memory ceiling and still be refused for the volume it would touch, and
- * the remedy is the same shape but the cause is not. `customer` fault — the
- * ceiling is deliberate and the caller narrows the query to clear it.
+ * Query exceeded scan ceiling (max_rows_to_read / max_bytes_to_read)—
+ * distinct from memory, same remedy.
  */
 export class QueryScanLimitExceededError extends HandledError {
   declare readonly code: "query_scan_limit_exceeded";

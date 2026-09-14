@@ -1,14 +1,6 @@
 /**
- * The chart's appearance, as a function of resolved theme values.
- *
- * The assertions are that every colour, font and size in the configuration
- * came from the tokens handed in — not from a literal written here — because a
- * literal is exactly how a chart drifts away from the application around it.
- * Which tokens the application resolves is the component layer's business and
- * is covered where that resolving happens.
- *
- * Node environment on purpose: this module has to stay free of React, the DOM
- * and Chakra, and a test that could not run without them would not prove it.
+ * Chart appearance from theme tokens—no literals to prevent drift from app
+ * context.
  */
 import { describe, expect, it } from "vitest";
 

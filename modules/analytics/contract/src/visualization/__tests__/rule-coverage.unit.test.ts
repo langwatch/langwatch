@@ -1,13 +1,6 @@
 /**
- * The guard that makes a new LangWatchQL rule impossible to add without a test.
- *
- * A rule is covered either by an adversarial or invalid fixture that declares
- * it — and `adversarial-corpus.unit.test.ts` proves each fixture really is
- * refused by the rule it declares — or by a named test file, which must contain
- * the rule identifier for the claim to count. A map entry pointing at a file
- * that never mentions the rule fails here rather than reading as coverage.
- *
- * Node environment on purpose — see `validate-vega-lite-spec.unit.test.ts`.
+ * Guard: new LangWatchQL rules require tests via fixtures or named test files
+ * containing the rule ID.
  */
 import { readFileSync } from "node:fs";
 import { join } from "node:path";

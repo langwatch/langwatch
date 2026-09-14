@@ -1,30 +1,6 @@
 /**
- * `analytics.lwql-time-window.ts` names no other module, and this is what
- * enforces it.
- *
- * The rule was a paragraph in that file's own docblock, which is exactly as
- * binding as the next person's willingness to read it. The module is loaded by
- * the browser — the schema browser, the time-window editor and the granularity
- * picker all read the vocabulary from it — so a single edge added here is
- * shipped to every member's browser: one import of a policy module pulls the
- * handled errors and the remediation registry along with it, and neither has
- * any business in a bundle.
- *
- * It lives in the contract package for the same reason. It used to sit under
- * `server/analytics/lwql/`, which meant every browser file that needed a
- * parameter name reached into a server path for it — and the two that needed
- * `LWQL_GRANULARITY_STEPS` reached in for a *value*. A contract both sides may
- * legitimately import is what removes the temptation to declare a second copy,
- * which is what `@langwatch/analytics-web` had already done.
- *
- * Deliberately stricter than `src/server/__tests__/frontend-boundary.unit.test.ts`,
- * which follows only value imports because `import type` is erased. Here the
- * contract is *zero* imports, so a type-only edge is a violation too: it is the
- * first step of the drift, and there is nothing this module legitimately needs
- * to name.
- *
- * @see ../analytics.lwql-time-window.ts — the module under guard
- * @see modules/analytics/specs/analytics-lwql-workbench.feature
+ * Ensures `analytics.lwql-time-window.ts` has zero imports—it's loaded by
+ * browsers and must stay bundle-clean.
  */
 
 import { readFileSync } from "node:fs";

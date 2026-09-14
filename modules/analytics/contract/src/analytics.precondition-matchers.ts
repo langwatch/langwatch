@@ -1,19 +1,8 @@
 import type { FilterField } from "./analytics.filter-field.ts";
 
 /**
- * How a filter field is READ off a trace held in memory.
- *
- * The twin of the ClickHouse condition builders: one decides what a field
- * means in SQL, this decides what the same field means against a trace the
- * process already has. Both are keyed by `FilterField`, so a field added to
- * the enum without an entry here fails to compile — the same guarantee the
- * SQL side gets, for the side that runs when there is no query to run.
- *
- * It lives in the contract rather than beside either consumer because both
- * ends need it and they are on opposite sides of the browser boundary: the
- * evaluator's precondition editor resolves fields to preview a rule, and a
- * background process resolves the same fields to confirm a settled match. A
- * second table would let the preview and the confirmation disagree.
+ * Maps FilterFields to trace data—keyed so adding a field without a matcher is
+ * a compile error. Same guarantee as the SQL builders, for the in-memory path.
  */
 
 // ---------------------------------------------------------------------------
@@ -60,13 +49,8 @@ export type PreconditionField = FilterField | "input" | "output";
 // ---------------------------------------------------------------------------
 
 /**
- * Resolves a field value from trace data for precondition evaluation.
- * Returns the resolved value as a string, string array, or null/undefined.
- *
- * @param data - The unified trace data
- * @param value - The precondition value (for context, not used in resolution)
- * @param key - Optional key for nested filters (e.g., metadata key name)
- * @param subkey - Optional subkey for double-nested filters
+ * Resolves a field value from trace data for precondition evaluation; returns
+ * string, string array, or null.
  */
 export type PreconditionFieldMatcher = (
   data: PreconditionTraceData,
@@ -95,7 +79,7 @@ export const PRECONDITION_FIELD_MATCHERS: Record<
   // Trace fields
   "traces.origin": (data) => data.origin ?? null,
   "traces.error": (data) => (data.hasError != null ? (data.hasError ? "true" : "false") : "false"),
-  "traces.name": null, // TraceName is a ClickHouse-only analytics dimension, not available at trace arrival time
+  "traces.name": null, // ClickHouse-only analytics dimension, not in trace data
 
   // Metadata fields
   "metadata.user_id": (data) => data.userId,
@@ -141,7 +125,7 @@ export const PRECONDITION_FIELD_MATCHERS: Record<
     const event = data.events.find((e) => e.event_type === key);
     return event?.metrics.map((m) => m.key) ?? null;
   },
-  "events.metrics.value": null, // numeric range — matched in-memory by LegacyFilterMatchingService, not through this string-based registry
+  "events.metrics.value": null, // numeric range; matched separately
   "events.event_details.key": (data, _value, key) => {
     if (!key || !data.events) return null;
     const event = data.events.find((e) => e.event_type === key);

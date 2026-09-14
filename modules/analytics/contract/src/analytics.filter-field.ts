@@ -1,16 +1,8 @@
 import { z } from "zod";
 
 /**
- * Every field an analytics filter may name.
- *
- * Published here because the ClickHouse filter translator needs it to be
- * EXHAUSTIVE. Its handler table is a `Record<FilterField, …>`, so a field added
- * to this enum without a handler fails to compile — which is the only thing
- * standing between a new filter and a query that silently ignores it.
- *
- * The translator lost that when it moved into the feature package: the type
- * lived in `platform/app/src/server/filters/types.ts`, out of reach, so the
- * table was widened to `Record<string, …>` and the guarantee went with it.
+ * Every field an analytics filter may name; published here so the ClickHouse
+ * translator's handler record stays exhaustive.
  */
 export const filterFieldsEnum = z.enum([
   "topics.topics",

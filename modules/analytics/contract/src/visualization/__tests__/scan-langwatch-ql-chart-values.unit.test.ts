@@ -1,12 +1,6 @@
 /**
- * What the rows look like to a chart, before the chart sees them.
- *
- * The distinction under test is the one the specification insists on: zero,
- * null and missing are values a chart can draw honestly and are left alone,
- * while a value the scales cannot carry is reported rather than quietly turned
- * into a position on an axis.
- *
- * Node environment on purpose — see `validateVegaLiteSpec.unit.test.ts`.
+ * Chart rows before rendering—zero/null/missing pass through, scale-invalid
+ * values reported.
  */
 import { describe, expect, it } from "vitest";
 

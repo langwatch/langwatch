@@ -1,12 +1,6 @@
 /**
- * The adversarial corpus: every fixture must be refused, and refused by the
- * rejection path it was written to attack.
- *
- * "Refused" alone would be satisfied by a validator that refused everything, so
- * the corpus also asserts the rule each fixture claims — and the valid corpus in
- * the same run proves the validator still admits working charts.
- *
- * Node environment on purpose — see `validateVegaLiteSpec.unit.test.ts`.
+ * Adversarial fixtures: each refused by the rejection path it attacks, and
+ * valid corpus proves the validator still admits working charts.
  */
 import { describe, expect, it } from "vitest";
 
