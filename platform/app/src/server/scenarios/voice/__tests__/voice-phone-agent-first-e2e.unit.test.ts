@@ -97,7 +97,6 @@ describe("buildAgentSpeaksFirstScript", () => {
   });
 
   describe('given a phone target with "Agent speaks first" off', () => {
-    /** @scenario "A callee that greets on connect opens the call when Agent speaks first is on" */
     it("keeps the default cast: no agent-first script", () => {
       expect(
         buildAgentSpeaksFirstScript(phoneVoiceData(false)),
