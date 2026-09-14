@@ -253,6 +253,12 @@ const routes: RouteObject[] = [
         ...page(() => import("./pages/governance/costs")),
       },
       {
+        // Dashboards: the natural-language widget board, behind the same
+        // flag as Costs (the page carries its own guard).
+        path: "/governance/dashboards",
+        ...page(() => import("./pages/governance/dashboards")),
+      },
+      {
         path: "/governance/billed",
         ...page(() => import("./pages/governance/billed")),
       },
