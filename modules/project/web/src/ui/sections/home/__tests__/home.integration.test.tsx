@@ -1,17 +1,6 @@
 /**
  * @vitest-environment jsdom
- *
- * Integration test for HomePage's three compositions and, above all, the ORDER
- * they resolve in: the signal-focused home wins outright, the Langy home needs
- * both Langy access and its own rollout, and everything else is the classic
- * home. Langy access alone still switches nothing.
- *
- * Spec: specs/home/signal-focused-home-rollout.feature,
- *       specs/home/langy-home.feature
- *
- * Boundary mocks: the composition resolver and every section component (each
- * section carries its own data fetching; the composition choice is the page's
- * only logic).
+ * Tests HomePage composition resolution order and rollout conditions.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";

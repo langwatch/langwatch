@@ -1,13 +1,5 @@
 /**
- * Which language and framework a project reports, and the icon that says so.
- *
- * Moved with the project settings page. The onboarding page that also renders
- * it is left where it is under the deletes-only ruling — the same shape every
- * family has recorded.
- *
- * `RadioCard` came from that onboarding page and is now a local element, which
- * is the direction the dependency should always have run: a component library
- * importing a page is what made this file unmovable in the first place.
+ * Project language and framework selector with icons; moved from onboarding.
  */
 
 import { Box, Field, HStack, RadioGroup, VStack } from "@chakra-ui/react";

@@ -1,11 +1,6 @@
 /**
- * The shape of Langy's home briefing (spec: specs/home/langy-briefing.feature).
- *
- * These are the PRESENTATION types — what the briefing renders. The container
- * (`useLangyBriefing`) derives them from the project's real signals; where a
- * signal has no source, the container omits that section rather than inventing
- * one. Nothing here carries fake data — every section is optional so the card
- * renders only what the project actually has.
+ * Presentation types for Langy's home briefing; derived from real project
+ * signals; every section is optional.
  */
 
 /** A single plan chip (e.g. "32 scenarios · DE / FR / NL"). */

@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
- *
- * The traces-overview card labels figures with the window they cover, and never draws a curve through too few daily readings. See specs/home/langy-home.feature.
+ * Traces-overview card labels figures with their window; avoids curves with
+ * too few daily readings.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";

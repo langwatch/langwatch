@@ -12,17 +12,8 @@ import { homeApi } from "../../../../../behavior/home-api.ts";
 import { useProjectHomeHost } from "../../../../../model/project-home-host.ts";
 
 /**
- * The setup checklist, receded to a hairline.
- *
- * The first-run home leads with onboarding; a project WITH data does not, so
- * once the reader has activated, the checklist collapses to a single line that
- * never outranks the briefing. It stays one click from the full list — calm on
- * the hundredth visit, still reachable when they want to finish. Renders
- * nothing once every step is done.
- *
- * Deliberately NOT on Langy's skin: onboarding is a plain app-surface control,
- * so it sits below the briefing as a quiet, distinct footer rather than reading
- * as more of Langy. The accent is the app's own brand orange, not Langy's amber.
+ * Setup checklist that collapses to a hairline after first activation.
+ * Renders nothing when all steps are done.
  */
 export function SetupHairline() {
   const navigate = useProjectHomeHost().navigate.bind(useProjectHomeHost());

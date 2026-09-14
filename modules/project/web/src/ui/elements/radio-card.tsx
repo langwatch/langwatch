@@ -1,11 +1,6 @@
 /**
- * A radio option shaped like a card.
- *
- * Moved out of `platform/app/src/pages/onboarding/[team]/project.tsx`, which
- * declared it beside the page that used it and exported it for `TechStack` to
- * import — a component reaching into a PAGE, which is what kept the tech-stack
- * selector from moving anywhere. It is an element here, and the dependency runs
- * the right way round.
+ * A radio option styled as a card; moved from onboarding page to fix
+ * component-importing-page dependency.
  */
 
 import { Box, RadioGroup } from "@chakra-ui/react";

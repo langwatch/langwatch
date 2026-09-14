@@ -529,19 +529,8 @@ export function HomePageBanners({
           hoveredRef.current = false;
         }}
       >
-        {/* The ground: light, not a panel.
-
-            This used to be a bordered card with the shader held at 13% behind a
-            flat gradient of the same colours. Two gradients multiplied down to
-            a whisper do not read as a moving mesh, they read as a tint — the
-            animation was there the whole time and could not be seen. So the
-            card is gone, the flat gradient is now only the fallback for a
-            machine that cannot run the shader, and what is left runs bright
-            enough to actually be light: a bloom behind the field that dissolves
-            into the page long before it reaches any text.
-
-            It bleeds past its own box on purpose. The hero is not an object on
-            the home, it is where the home is lit from. */}
+        {/* Light bloom background; bleeds past box intentionally as the source
+            of illumination for the hero. */}
         <Box
           aria-hidden
           position="absolute"
@@ -587,17 +576,7 @@ export function HomePageBanners({
           )}
         </Box>
 
-        {/* Light mode only: a white bloom over the ground's middle. On a
-            pale page the mesh's colours behind the greeting and the field
-            read as smudge rather than light, so this keeps that zone clean.
-            An ellipse rather than a band on purpose: the colour still leaks
-            past its left and right edges, so the ground reads as light the
-            content stands in front of rather than a curtain dropped over
-            it. Dark keeps the full field: the same colours read as depth
-            there. Covers the ground's own bleed box so it tracks exactly.
-            Anything of the page's own chrome the bleed reaches (the demo
-            row above the hero) stacks itself above this — the order is
-            colour, then bloom, then every element. */}
+        {/* Light mode white bloom; keeps the greeting zone clean and readable. */}
         <Box
           aria-hidden
           position="absolute"
@@ -627,17 +606,7 @@ export function HomePageBanners({
                 important thing on a page whose job is to take a question, and it
                 was previously the first line in the block with the only coloured
                 link in it — so the eye landed on this and not on the field. */}
-            {/* ONE measure, held for every slide.
-                Sized to its own content the block was honest per slide and
-                awful across them: each rotation re-measured the headline, so
-                the rule and the whole ticker jumped wider and narrower every
-                nine seconds — the announcement moving is the one thing more
-                distracting than the announcement. A constant is the only width
-                that cannot pop, so the headline truncates into it instead
-                (min and max are the same thing here on purpose). Narrower than
-                the field, because a rule the full width of the hero reads as a
-                divider closing the block rather than punctuation under a
-                line. */}
+            {/* Fixed width prevents ticker jump on each rotation. */}
             {slide ? (
               <VStack gap="7px" width="min(520px, 100%)" align="stretch">
                 {/* The line. One target: the arrow is the affordance, so the

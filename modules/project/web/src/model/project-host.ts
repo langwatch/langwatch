@@ -1,11 +1,6 @@
 /**
  * What the project-settings screen asks of the application it is mounted in.
- *
- * ONE PORT FOR ONE ADDRESS that edits TWO things — the organization and the
- * project inside it — which is why the port answers both and the screen decides
- * which forms to render. Everything the platform page read off
- * `useOrganizationTeamProject`, `useLiteMemberGuard`, `useFeatureFlag`,
- * `useDrawer` and the toaster arrives through these methods.
+ * Answers both organization and project; the screen decides which forms to render.
  */
 
 import { createContext, useContext, type ReactNode } from "react";
@@ -13,13 +8,7 @@ import { createContext, useContext, type ReactNode } from "react";
 import type { OrganizationIntent } from "./prisma-types.ts";
 
 /**
- * The organization this page edits.
- *
- * The fields are exactly the form's: the name, the four object-storage
- * settings, the two per-organization switches, the support contact and the
- * primary use that decides where `/` lands. `platform/app` typed this
- * `FullyLoadedOrganization`, a Prisma row shape from a server repository, and
- * a browser package may not name one.
+ * The organization this page edits; fields match the form's inputs.
  */
 export type ProjectHostOrganization = {
   id: string;

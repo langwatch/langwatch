@@ -6,13 +6,8 @@ import { LEGAL_LINKS } from "../../../../model/legal-links.ts";
 import { Link } from "../../../../ui/elements/app-link.tsx";
 
 /**
- * LearningResources
- * A quiet footer row of pointers out of the product: documentation and video
- * tutorials. Deliberately whisper-weight — the home page is for the returning
- * user's own data, and docs belong in a footer, not in banner-sized cards
- * competing with it (spec: specs/home/learning-resources.feature). The demo
- * ask lives in the page header, not here. `trailing` hosts dev-only chrome
- * (the briefing mock switcher) at the footer's far end.
+ * Quiet footer row of documentation and tutorial links; intentionally
+ * whisper-weight to not compete with the home's main content.
  */
 export function LearningResources({ trailing }: { trailing?: ReactNode }) {
   return (

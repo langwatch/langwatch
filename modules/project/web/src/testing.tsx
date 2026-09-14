@@ -1,14 +1,7 @@
 /**
- * What this package's suites mount the project settings screen inside.
- *
- * The host port is an abstract class, so a test constructs one rather than
- * mocking a module: the fake below RECORDS what the screen asked the
- * application to do — the overlays it opened and the notices it raised — and
- * answers the grants, the plan role and the flags the page turns on, which is
- * exactly the surface the real adapter answers.
- *
- * Not exported from the package. A test imports it relatively; nothing outside
- * this package has any business constructing a host.
+ * Test utilities for mounting the project settings screen inside a host port.
+ * The fake host records what the screen asks the application to do and answers
+ * grants, plan role, and flags.
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

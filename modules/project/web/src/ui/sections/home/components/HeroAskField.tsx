@@ -3,23 +3,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { CommandPalette, useCommandBar } from "@langwatch/navigation-web/surfaces/command-bar";
 
 /**
- * THE FIELD IS THE COMMAND PALETTE. Not a copy of it, not a second box that
- * happens to look similar: the same component the Cmd+K bar renders, mounted
- * inline at hero size. So it navigates, it jumps to a trace by id, it searches
- * — and Tab, or the last row of its results, hands what you typed to Langy.
- * One field, one grammar, two doors. Pressing Cmd+K on a page that mounts this
- * puts the caret here instead of raising a second identical bar over the top.
- *
- * NOTHING HERE CHANGES HEIGHT as the field is used. Its results are an overlay,
- * so opening them never pushes whatever sits beneath down the page.
- *
- * Shared by the project home and the governance overview, which is why the
- * field's own state lives here and not in either hero: what someone
- * half-typed in one should not be sitting in the other, and neither should
- * share a session with the raised Cmd+K bar.
- *
- * Spec: specs/home/langy-home.feature,
- * specs/ai-governance/dashboard/governance-overview-hero.feature
+ * The command palette mounted inline; shared by home and governance overview.
+ * Results overlay without changing height. Pressing Cmd+K focuses here instead
+ * of raising a second bar.
  */
 export function HeroAskField({ placeholder }: { placeholder: string }) {
   const { registerInlinePalette } = useCommandBar();
