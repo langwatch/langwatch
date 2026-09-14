@@ -71,8 +71,7 @@ export function lwqlTenantCapability({ secret }: { secret: string }): string {
   // digest MUST stay sha256-hex to match `lwql_api_key_tenant_map.KeyHash`
   // (see ./provisioning/accessModel.ts). A slow KDF or a salt would break the
   // lookup — the file header carries the full rationale.
-  // codeql[js/insufficient-password-hash]
-  return createHash("sha256").update(secret).digest("hex");
+  return createHash("sha256").update(secret).digest("hex"); // codeql[js/insufficient-password-hash] key-map lookup token, not a password
 }
 
 /**

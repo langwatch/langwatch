@@ -521,8 +521,11 @@ describe("the saved workbench chart router", () => {
             select: { lwqlKey: true },
           });
           expect(call.projects).toHaveLength(1);
-          expect(call.projects[0].id).toBe(PROJECT);
-          expect(call.projects[0].lwqlKey).toBe(project.lwqlKey);
+          const first = call.projects[0];
+          expect(first).toBeDefined();
+          if (!first) throw new Error("call.projects[0] is undefined");
+          expect(first.id).toBe(PROJECT);
+          expect(first.lwqlKey).toBe(project.lwqlKey);
         });
       });
     });
