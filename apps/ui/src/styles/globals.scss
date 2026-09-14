@@ -7,7 +7,30 @@
  * by each feature stylesheet that happens to want it. `swap` because a heading
  * that is invisible until a font arrives is worse than a heading in the
  * fallback serif for one frame.
+ *
+ * Every vendored cut is declared, not only the two the heading recipe asks for
+ * by default: a `<Heading fontWeight="semibold">` with no 700 face in the
+ * document gets a synthesised bold smeared out of Medium. The other cuts are
+ * also declared by `modules/langy`'s panel stylesheet, which made them appear
+ * present in development — that file rides a lazily-loaded chunk, so a page
+ * that never mounts Langy would not have had them in a production build.
  */
+@font-face {
+  font-family: "Sentient";
+  src: url("/fonts/Sentient-Extralight.woff2") format("woff2");
+  font-weight: 200;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Sentient";
+  src: url("/fonts/Sentient-Light.woff2") format("woff2");
+  font-weight: 300;
+  font-style: normal;
+  font-display: swap;
+}
+
 @font-face {
   font-family: "Sentient";
   src: url("/fonts/Sentient-Regular.woff2") format("woff2");
@@ -20,6 +43,14 @@
   font-family: "Sentient";
   src: url("/fonts/Sentient-Medium.woff2") format("woff2");
   font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Sentient";
+  src: url("/fonts/Sentient-Bold.woff2") format("woff2");
+  font-weight: 700;
   font-style: normal;
   font-display: swap;
 }

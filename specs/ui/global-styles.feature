@@ -15,3 +15,11 @@ Feature: The browser entry loads the shared global stylesheet
     Given the browser entry module apps/ui/src/ui.entrypoint.tsx
     When its import statements are read
     Then it imports ./styles/globals.scss
+
+  @unit
+  Scenario: Every vendored cut of the display face is declared document-wide
+    Given the display face files vendored in apps/ui/public/fonts
+    When the global stylesheet is read
+    Then it declares a face for each of those files
+    And a heading asking for a bold weight is drawn from a real cut rather
+      than a synthesised one

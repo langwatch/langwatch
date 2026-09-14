@@ -93,7 +93,6 @@ export type RotatingColorSet = keyof typeof rotatingColors;
 
 // Bare Chakra palette names extracted from `rotatingColors.colors` so both
 // token pair and palette lookups hash to the same hue.
- */
 const ROTATING_PALETTES = rotatingColors.colors.map((c) => c.background.split(".")[0]!);
 
 export type RotatingPalette = string;
