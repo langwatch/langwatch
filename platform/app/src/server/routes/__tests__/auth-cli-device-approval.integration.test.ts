@@ -166,7 +166,9 @@ describe("CLI device-approval stream", () => {
   afterAll(async () => {
     await resetDeviceApprovalSubscriber().catch(() => {});
     await resetApp();
-    await prisma.project.deleteMany({ where: { id: PROJECT_ID } }).catch(() => {});
+    await prisma.project
+      .deleteMany({ where: { id: PROJECT_ID } })
+      .catch(() => {});
     await prisma.teamUser
       .deleteMany({ where: { userId: USER_ID, teamId: TEAM_ID } })
       .catch(() => {});

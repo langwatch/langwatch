@@ -84,6 +84,7 @@ vi.mock("~/server/app-layer/identity/runtime", () => ({
   sessionClaims: () => ({}),
   sessionCallbackEvidence: () => ({}),
   deploymentIsFederationCapable: () => false,
+  deploymentOffersPasskeys: () => true,
   resolveSignInMethodPolicy: async () => ({}),
   mfaCeremonies: () => ({}),
 }));

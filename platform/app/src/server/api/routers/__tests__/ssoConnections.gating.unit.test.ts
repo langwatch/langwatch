@@ -65,6 +65,7 @@ vi.mock("~/server/app-layer/identity/runtime", () => ({
   BACKUP_CODE_COUNT: 10,
   betterAuthInstance: () => ({ provide: () => undefined }),
   deploymentIsFederationCapable: () => false,
+  deploymentOffersPasskeys: () => true,
   identityBridgeCeremonies: () => ({}),
   identityCeremonies: () => ({}),
   // `betterAuth()` builds its adapter EAGERLY at module load, and this

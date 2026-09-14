@@ -299,7 +299,10 @@ describe("<SecuritySettings/>", () => {
      */
     /** @scenario Email addresses and linked accounts sit under one heading */
     it("leaves the connect buttons where they were when the address field opens", () => {
-      publicEnvRef.current = { NEXTAUTH_PROVIDER: "email", PASSKEYS_ENABLED: true };
+      publicEnvRef.current = {
+        NEXTAUTH_PROVIDER: "email",
+        PASSKEYS_ENABLED: true,
+      };
       renderPage();
 
       const band = screen.getByTestId(
@@ -627,7 +630,10 @@ describe("<SecuritySettings/>", () => {
   describe("when NEXTAUTH_PROVIDER is email", () => {
     /** @scenario Email/credential user sees a dedicated Change Password section with just a button */
     it("renders a dedicated Change Password section with a button (no inline form)", () => {
-      publicEnvRef.current = { NEXTAUTH_PROVIDER: "email", PASSKEYS_ENABLED: true };
+      publicEnvRef.current = {
+        NEXTAUTH_PROVIDER: "email",
+        PASSKEYS_ENABLED: true,
+      };
       renderPage();
       expect(
         screen.getByRole("button", { name: /Change Password/i }),
@@ -638,7 +644,10 @@ describe("<SecuritySettings/>", () => {
 
     describe("when the dialog is opened", () => {
       it("shows Current + New + Confirm Password fields", async () => {
-        publicEnvRef.current = { NEXTAUTH_PROVIDER: "email", PASSKEYS_ENABLED: true };
+        publicEnvRef.current = {
+          NEXTAUTH_PROVIDER: "email",
+          PASSKEYS_ENABLED: true,
+        };
         renderPage();
         await act(async () => {
           fireEvent.click(
