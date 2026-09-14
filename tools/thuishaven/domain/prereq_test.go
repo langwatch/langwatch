@@ -304,6 +304,63 @@ func countKeys(report []PrereqStatus, key string) int {
 	return n
 }
 
+// @scenario "A wrong-version linter is reported outdated, not installed"
+func TestPlanGolangciTellsAWrongVersionFromMissingAndFromPinned(t *testing.T) {
+	cases := []struct {
+		name     string
+		resolved bool
+		pinned   string
+		version  string
+		want     GolangciAction
+	}{
+		{"nothing on PATH", false, "2.11.4", "", GolangciInstall},
+		{"exactly the pinned version", true, "2.11.4", "2.11.4", GolangciReady},
+		{"a v1 binary bit tonight", true, "2.11.4", "1.64.8", GolangciUpgrade},
+		{"present, will not say what it is", true, "2.11.4", "", GolangciUnknownVersion},
+		{"present, Makefile line unparseable", true, "", "1.64.8", GolangciPinUnknown},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if got := PlanGolangci(c.resolved, c.pinned, c.version); got != c.want {
+				t.Errorf("PlanGolangci(%v, %q, %q) = %v, want %v", c.resolved, c.pinned, c.version, got, c.want)
+			}
+		})
+	}
+}
+
+// @scenario "A wrong-version linter is reported outdated, not installed"
+func TestParseGolangciVersionReadsTheMakefilesPin(t *testing.T) {
+	makefile := "GOLANGCI := something\nGOLANGCI_VERSION := v2.11.4\nGO_MOD_TOOLCHAIN := go$(shell ...)\n"
+	if got := ParseGolangciVersion(makefile); got != "2.11.4" {
+		t.Errorf("got %q, want 2.11.4", got)
+	}
+	if got := ParseGolangciVersion("no such line here\n"); got != "" {
+		t.Errorf("a missing line must report empty, not a crash: got %q", got)
+	}
+}
+
+// @scenario "A wrong-version linter is reported outdated, not installed"
+func TestParseGoToolchainReadsTheGoModDirective(t *testing.T) {
+	goMod := "module github.com/langwatch/langwatch\n\ngo 1.26.6\n\nrequire (\n)\n"
+	if got := ParseGoToolchain(goMod); got != "go1.26.6" {
+		t.Errorf("got %q, want go1.26.6", got)
+	}
+	if got := ParseGoToolchain("module foo\n"); got != "" {
+		t.Errorf("a missing go line must report empty, not a crash: got %q", got)
+	}
+}
+
+// @scenario "A wrong-version linter is reported outdated, not installed"
+func TestNormalizeGolangciLintVersionReadsTheBanner(t *testing.T) {
+	banner := `golangci-lint has version v1.64.8 built with go1.27.1 from (unknown, modified: ?, mod sum: "h1:xyz") on (unknown)`
+	if got := NormalizeGolangciLintVersion(banner); got != "1.64.8" {
+		t.Errorf("got %q, want 1.64.8", got)
+	}
+	if got := NormalizeGolangciLintVersion("not a version banner"); got != "" {
+		t.Errorf("an unrecognised banner must report empty, not a crash: got %q", got)
+	}
+}
+
 // presentExcept builds a probe result where every candidate is present apart
 // from the named prerequisites — the "machine that has everything but one"
 // the reporting scenarios are about.

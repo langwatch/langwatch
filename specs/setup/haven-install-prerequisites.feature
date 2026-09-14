@@ -124,6 +124,14 @@ Feature: haven install checks the machine's prerequisites
       When the prerequisites are planned
       Then PostgreSQL is reported installed
 
+    Scenario: A wrong-version linter is reported outdated, not installed
+      Given golangci-lint is on PATH at a version the repo's Makefile does not pin
+      When the prerequisites are planned
+      Then golangci-lint is reported outdated
+      And it names the version found and the version the Makefile pins
+      # a v1.64.8 binary satisfied nothing and refused the repo's v2 config,
+      # so the report has to say so rather than reading as installed
+
   Rule: Only commands that can run on this platform are offered
 
     Scenario: A brew command is not offered where there is no brew

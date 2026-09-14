@@ -233,6 +233,28 @@ var Prereqs = []Prereq{{
 		Install:  "brew install go",
 	}},
 }, {
+	// The trap this entry exists to name: golangci-lint's pinned release
+	// cannot read export data from a Go newer than go.mod's, and a
+	// golangci-lint at any OTHER version satisfies nothing either, however
+	// installed it looks. A v1.64.8 binary on PATH bit exactly that: it read
+	// as installed and refused the repo's v2 config.
+	Key:         "golangci-lint",
+	Name:        "golangci-lint",
+	Summary:     "the Go linter, at the version go-ci runs (`make go-lint`)",
+	Requirement: PrereqOptional,
+	After:       []string{"go"},
+	Detail: "The pinned linter cannot read export data from a Go newer than\n" +
+		"    go.mod's, so haven installs the pinned version itself and `make\n" +
+		"    go-lint` runs it under go.mod's own toolchain, and a newer system Go on\n" +
+		"    its own cannot make this work, and neither can a golangci-lint\n" +
+		"    already on PATH at a different version.",
+	Candidates: []Candidate{{
+		Key:      "golangci-lint",
+		Label:    "golangci-lint",
+		Internal: true,
+		Install:  "GOTOOLCHAIN=<go.mod's go> go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@<pinned>",
+	}},
+}, {
 	Key:         "portless",
 	Name:        "portless",
 	Summary:     "the TLS and hostname proxy every worktree's services are routed through",
@@ -586,4 +608,108 @@ func ReadyLine(report []PrereqStatus) string {
 			strings.Join(outdated, ", "))
 	}
 	return "ready — every required prerequisite is installed"
+}
+
+// GolangciAction is what golangci-lint's probe found, mirroring PlanPortless's
+// shape for a candidate the repo pins in its own Makefile rather than in a
+// domain constant.
+type GolangciAction int
+
+const (
+	// GolangciInstall means no golangci-lint resolved at all.
+	GolangciInstall GolangciAction = iota
+	// GolangciReady means the resolved binary is the pinned version.
+	GolangciReady
+	// GolangciUpgrade means a resolved binary answered a version, and it is
+	// not the one the Makefile pins. This is the case that bites silently: a
+	// wrong-version binary satisfies the "is something on PATH" question and
+	// then refuses the repo's v2 lint config.
+	GolangciUpgrade
+	// GolangciUnknownVersion means a binary resolved but would not say what it
+	// is. Left alone, the way an unversioned portless is, since reinstalling
+	// on every check would not be idempotent, but said out loud.
+	GolangciUnknownVersion
+	// GolangciPinUnknown means the Makefile's GOLANGCI_VERSION line could not
+	// be read or parsed, so there is nothing to compare against. A resolved
+	// binary is reported present with that caveat rather than as satisfied or
+	// missing on a guess.
+	GolangciPinUnknown
+)
+
+// PlanGolangci decides that, given whether a binary resolved, the pinned
+// version read from the Makefile ("" when it could not be read), and the
+// version the binary itself reported ("" when it would not say). Pure, so the
+// decision is testable with no golangci-lint, no Makefile and no go.mod
+// attached.
+func PlanGolangci(resolved bool, pinned, version string) GolangciAction {
+	if !resolved {
+		return GolangciInstall
+	}
+	if pinned == "" {
+		return GolangciPinUnknown
+	}
+	if version == "" {
+		return GolangciUnknownVersion
+	}
+	if version == pinned {
+		return GolangciReady
+	}
+	return GolangciUpgrade
+}
+
+// ParseGolangciVersion pulls the pinned version out of the Makefile's
+// `GOLANGCI_VERSION := vX.Y.Z` line, the one place that version is declared;
+// this reads it rather than copying it. "" when the
+// line is missing or does not have the shape haven expects.
+func ParseGolangciVersion(makefile string) string {
+	for _, line := range strings.Split(makefile, "\n") {
+		line = strings.TrimSpace(line)
+		rest, ok := strings.CutPrefix(line, "GOLANGCI_VERSION")
+		if !ok {
+			continue
+		}
+		rest = strings.TrimSpace(rest)
+		rest, ok = strings.CutPrefix(rest, ":=")
+		if !ok {
+			continue
+		}
+		fields := strings.Fields(rest)
+		if len(fields) == 0 {
+			continue
+		}
+		return strings.TrimPrefix(fields[0], "v")
+	}
+	return ""
+}
+
+// ParseGoToolchain pulls the `go ` directive out of go.mod's text, as the
+// GOTOOLCHAIN value golangci-lint must run under: the pinned linter cannot
+// read export data from a Go newer than go.mod declares. "" when the line is
+// missing.
+func ParseGoToolchain(goMod string) string {
+	for _, line := range strings.Split(goMod, "\n") {
+		fields := strings.Fields(line)
+		if len(fields) == 2 && fields[0] == "go" {
+			return "go" + fields[1]
+		}
+	}
+	return ""
+}
+
+// NormalizeGolangciLintVersion pulls the version out of what `golangci-lint
+// version` printed: "golangci-lint has version v1.64.8 built with go1.27.1
+// from ...". "" when the line does not have that shape, which the probe
+// treats as an unversioned binary rather than a crash.
+func NormalizeGolangciLintVersion(raw string) string {
+	const marker = "has version "
+	idx := strings.Index(raw, marker)
+	if idx < 0 {
+		return ""
+	}
+	rest := raw[idx+len(marker):]
+	fields := strings.Fields(rest)
+	if len(fields) == 0 {
+		return ""
+	}
+	return strings.TrimPrefix(fields[0], "v")
 }

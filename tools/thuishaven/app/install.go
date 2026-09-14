@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
+	"path/filepath"
 	"runtime"
 	"sort"
 	"strings"
@@ -68,6 +70,9 @@ func (o *Orchestrator) probeCandidate(ctx context.Context, c domain.Candidate) d
 	}
 	if c.Key == "haven-path" {
 		return o.probeHavenPath(ctx)
+	}
+	if c.Key == "golangci-lint" {
+		return o.probeGolangciLint(ctx)
 	}
 	if c.FormulaIsAuthority {
 		// haven starts this one with `brew services`, so brew's answer is the
@@ -144,6 +149,88 @@ func (o *Orchestrator) probePortless() domain.Found {
 	default:
 		return domain.Found{Present: true, Detail: version}
 	}
+}
+
+// probeGolangciLint tells a pinned golangci-lint apart from any other one on
+// PATH: the pinned release cannot read export data from a Go newer than
+// go.mod's, so a v1.64.8 binary answering "found" satisfies nothing and
+// refuses the repo's v2 config, so the report has to say outdated, not
+// installed.
+func (o *Orchestrator) probeGolangciLint(ctx context.Context) domain.Found {
+	path := o.prereqTools().BinaryPath("golangci-lint")
+	pinned, _, ok := o.golangciPin()
+	if !ok {
+		pinned = ""
+	}
+	version := ""
+	if path != "" {
+		version = domain.NormalizeGolangciLintVersion(golangciVersionOutput(ctx, path))
+	}
+	switch domain.PlanGolangci(path != "", pinned, version) {
+	case domain.GolangciInstall:
+		return domain.Found{}
+	case domain.GolangciPinUnknown:
+		return domain.Found{Present: true, Detail: "installed, but the repo's pinned version could not be read from the Makefile"}
+	case domain.GolangciUnknownVersion:
+		return domain.Found{Present: true, Detail: "installed, version unknown"}
+	case domain.GolangciUpgrade:
+		return domain.Found{Present: true, Outdated: true, Detail: fmt.Sprintf("v%s, repo pins v%s", version, pinned)}
+	default: // domain.GolangciReady
+		return domain.Found{Present: true, Detail: "v" + version}
+	}
+}
+
+// golangciPin reads the version and toolchain golangci-lint is pinned to,
+// straight from the Makefile and go.mod, never a second copy of either
+// constant in Go code. ok is false when either file is missing or either
+// line does not have the shape haven expects, which the caller treats as
+// unprobeable rather than a crash.
+func (o *Orchestrator) golangciPin() (version, toolchain string, ok bool) {
+	if o.cfg.RepoRoot == "" {
+		return "", "", false
+	}
+	makefile, err := os.ReadFile(filepath.Join(o.cfg.RepoRoot, "Makefile"))
+	if err != nil {
+		return "", "", false
+	}
+	version = domain.ParseGolangciVersion(string(makefile))
+	if version == "" {
+		return "", "", false
+	}
+	goMod, err := os.ReadFile(filepath.Join(o.cfg.RepoRoot, "go.mod"))
+	if err != nil {
+		return "", "", false
+	}
+	toolchain = domain.ParseGoToolchain(string(goMod))
+	if toolchain == "" {
+		return "", "", false
+	}
+	return version, toolchain, true
+}
+
+// golangciVersionOutput runs `golangci-lint version` and returns what it
+// printed, "" if it will not run. Not routed through PrereqTools: the port
+// answers presence and installs, not "run this and read its output", and
+// reading a resolved binary's own version banner takes no input and changes
+// nothing, so running it directly costs nothing the port would have bought.
+func golangciVersionOutput(ctx context.Context, path string) string {
+	out, err := exec.CommandContext(ctx, path, "version").Output()
+	if err != nil {
+		return ""
+	}
+	return string(out)
+}
+
+// installGolangciLint composes the exact GOTOOLCHAIN-pinned `go install` the
+// Makefile's own targets would run, and hands it to the same Install seam
+// every other candidate installs through.
+func (o *Orchestrator) installGolangciLint(ctx context.Context) error {
+	version, toolchain, ok := o.golangciPin()
+	if !ok {
+		return fmt.Errorf("could not read the pinned golangci-lint version from the Makefile and go.mod: is this a langwatch checkout?")
+	}
+	command := fmt.Sprintf("env GOTOOLCHAIN=%s go install github.com/golangci/golangci-lint/v2/cmd/golangci-lint@v%s", toolchain, version)
+	return o.prereqTools().Install(ctx, command)
 }
 
 // InstallPrereqs installs the chosen prerequisites in dependency order,
@@ -258,6 +345,9 @@ func (o *Orchestrator) runPrereqInstall(ctx context.Context, p domain.Prereq, co
 	}
 	if p.Key == "haven-path" {
 		return o.AddHavenPath(o.CheckHavenPath(ctx))
+	}
+	if p.Key == "golangci-lint" {
+		return o.installGolangciLint(ctx)
 	}
 	return o.prereqTools().Install(ctx, command)
 }
