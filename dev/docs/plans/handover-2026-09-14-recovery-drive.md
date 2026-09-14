@@ -6,11 +6,36 @@ below. Every claim here was verified this session, not inherited.
 
 ## What is TRUE right now (verified, not claimed)
 
+- **Sign-in works end to end** (2026-09-14 evening): the auth redirect loop
+  was the tRPC door booting with NO session resolver — nothing ever passed
+  `trpcSession` to `bootApiProcess`, so every procedure 401'd a valid cookie
+  while the REST session endpoint accepted it, and the shell read the 401s
+  as signed-out. Fixed at `e9095a71a9`: the tRPC door defaults its resolver
+  from the same auth peer the REST host uses (`composeApiTrpcSession`),
+  spec scenarios in `verified-session-on-request-context.feature` now bound
+  (@unit, 4 tests). Verified in a real browser: sign-in lands on
+  `/local-dev-project` and stays. The dashboard's OWN queries then 500
+  (analytics.getTimeseries, home.getRecentItems, plan.getActivePlan, langy
+  SSE) — that is queue item 5's deleted-builders class, not auth.
+- `moduleApi` now REFUSES property members at compile time
+  (`OperationsOnly`, `02db04f32c`) — the operations-only proxy defect class
+  is closed at the type level.
+- **The web declaration chain reaches real code** (`362a75c9fe`): queue
+  item 2's circular-ref was already gone (`1f748bb0a6`); the coordinator
+  cleared the three structural stragglers (ui-drawer process.env — now a
+  shell-passed deployment prop per user direction, suite-web
+  PENDING_EVALUATION case, prompt/web stale declaration paths). What
+  remains in web packages is ordinary code debt — the
+  module-web-typecheck-debt lane owns it.
 - **The full stack runs under haven**: UI 200 at
   `https://app.feat-strict-feature-layout-v0.langwatch.localhost:1355/`,
   `/api/auth/session` 200 + no-store (sign-in serves — it was entirely
   unserved before `3e90aaad43`), solo worker AND combined backend reach
   `worker ready` with zero fatals. The stack is UP as of this handover.
+- **A second coordinator session (06d630cd) is live** on this checkout
+  running the mail-sink drive (mailsim-service + haven-mail-lane). It
+  mis-flagged debt-3 as an orphan once — LANES.md rows carry the correction;
+  check spawn times before declaring a lane dead.
 - **Zero unbound REST facts** (`node dev/scripts/find-unbound-rest-facts.mjs`
   prints "Every declared REST fact is bound"; it gates CI ahead of
   typecheck-packages).
@@ -43,10 +68,10 @@ below. Every claim here was verified this session, not inherited.
    `grep -c async_hooks` is still 0, build the bundle, boot, and verify the
    SPA serves through the api's static surface (mounted at `8760a1f575`,
    precedence-tested, but never yet exercised with a real bundle).
-2. **Web typecheck unblock** — pre-existing circular reference in
-   `dev/tsconfig.web-declarations.json` + missing `"composite": true` in
-   `modules/scenario/web/tsconfig.build.json` blocks `typecheck:one` for
-   every web package (verified lane-independent). Small, high-leverage.
+2. **Web typecheck unblock — DONE** (`1f748bb0a6` + `362a75c9fe`). The
+   remaining web-package code errors are the module-web-typecheck-debt
+   lane's (active). The server-side remainder (langy/experiment/prompt) is
+   module-server-typecheck-debt-3's (active).
 3. **feature-shape-baseline-rebuild** — manifest ALREADY WRITTEN at
    `.claude/manifests/feature-shape-baseline-rebuild.md`, held for a settled
    tree; the tree is settled now. Spawn it (sonnet).
