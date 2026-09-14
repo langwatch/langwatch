@@ -23,16 +23,13 @@
  * Spec: specs/governance/governance-cost-screen.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import type {
-  GovernanceCostDayDto,
-  GovernanceCostSummaryDto,
-} from "@ee/governance/services/governanceCost.service";
+import type { GovernanceCostDayDto } from "@ee/governance/services/governanceCost.service";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import userEvent from "@testing-library/user-event";
 import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { costDay } from "./costFixtures";
+import { costDay, costSummaryAnswer } from "./costFixtures";
 
 /**
  * The days a successful read answers with.
@@ -64,17 +61,6 @@ const harness = vi.hoisted(() => ({
    * retrying cannot help.
    */
   summary: {
-    data: undefined as unknown,
-    isError: false,
-    error: null as unknown,
-  },
-  /**
-   * The activity summary, which the adoption headcount is read off. A separate
-   * read from the cost summary above and the same shape of mistake: its figure
-   * arrives as null when the read fails, and null is what the card draws its
-   * "connect a source" copy from.
-   */
-  activitySummary: {
     data: undefined as unknown,
     isError: false,
     error: null as unknown,
@@ -145,12 +131,9 @@ vi.mock("~/utils/api", () => ({
       },
     },
     activityMonitor: {
+      // The adoption card reads this one; it has its own test file.
       summary: {
-        useQuery: () => ({
-          data: harness.activitySummary.data,
-          isError: harness.activitySummary.isError,
-          error: harness.activitySummary.error,
-        }),
+        useQuery: () => ({ data: undefined, isError: false, error: null }),
       },
       spendByDepartment: { useQuery: () => ({ data: undefined }) },
       spendByUser: { useQuery: () => ({ data: undefined }) },
@@ -168,7 +151,7 @@ const renderScreen = () =>
     </ChakraProvider>,
   );
 
-/** Render, then ask for sample data the way the reader does. */
+/** Presses the toggle rather than seeding the stored choice, as a reader does. */
 const renderInSampleMode = async () => {
   const rendered = renderScreen();
   await userEvent
@@ -176,36 +159,6 @@ const renderInSampleMode = async () => {
     .click(screen.getByRole("button", { name: "See sample data" }));
   return rendered;
 };
-
-/** What the summary answers with when it answers. */
-const summaryAnswer = (
-  series: GovernanceCostDayDto[],
-): GovernanceCostSummaryDto => ({
-  unavailableReason: null,
-  providers: [],
-  billed: {
-    amountUsd: 120,
-    cellsWithoutAmount: 0,
-    currenciesWithoutUsdAmount: [],
-    currencyTotals: [
-      { currencyCode: "USD", amount: 120, cellsWithoutAmount: 0 },
-    ],
-  },
-  gateway: {
-    amountUsd: 80.23,
-    cellsWithoutAmount: 0,
-    currenciesWithoutUsdAmount: [],
-    currencyTotals: [
-      { currencyCode: "USD", amount: 80.23, cellsWithoutAmount: 0 },
-    ],
-  },
-  seats: { status: "awaiting_data" },
-  azureBilling: null,
-  series,
-  windowDays: 30,
-  staleSources: null,
-  unpricedWindow: null,
-});
 
 /**
  * The card the token panel lives in, found by its heading.
@@ -224,17 +177,6 @@ const tokenPanel = () => {
   return within(card);
 };
 
-/** The adoption card, which is read off a different summary entirely. */
-const adoptionPanel = () => {
-  const card = screen
-    .getByText("Adoption")
-    .closest<HTMLElement>('[data-testid="cost-panel"]');
-  if (card === null) {
-    throw new Error("the adoption heading stands outside any cost panel");
-  }
-  return within(card);
-};
-
 /** The panel beside it, which has no read behind it in any of these cases. */
 const conversationPanel = () => {
   const card = screen
@@ -248,7 +190,6 @@ const conversationPanel = () => {
 
 beforeEach(() => {
   harness.summary = { data: undefined, isError: false, error: null };
-  harness.activitySummary = { data: undefined, isError: false, error: null };
   // The section keeps one sample choice for the whole sitting in session
   // storage, so a test that presses the toggle would otherwise hand its answer
   // to every test after it.
@@ -309,7 +250,7 @@ describe("the tokens over time panel", () => {
   describe("given the read failed while still holding the series it last returned", () => {
     beforeEach(() => {
       harness.summary = {
-        data: summaryAnswer(TOKEN_DAYS),
+        data: costSummaryAnswer(TOKEN_DAYS),
         isError: true,
         error: { data: { code: "INTERNAL_SERVER_ERROR" } },
       };
@@ -383,74 +324,6 @@ describe("the tokens over time panel", () => {
       expect(
         panel.getByText("How many tokens were spent, period by period."),
       ).toBeInTheDocument();
-    });
-  });
-});
-
-/**
- * The same defect, one panel over and on a different read.
- *
- * The adoption headcount folds the ACTIVITY summary, and that read's failure
- * was not carried at all: the three breakdown reads beside it each had their
- * failure named and this one did not. So a broken read left `activeUsers`
- * null, and the card told a reader whose source was connected and reporting to
- * go and connect a source.
- */
-describe("the adoption card", () => {
-  describe("given the read behind its headcount failed", () => {
-    beforeEach(() => {
-      harness.summary = {
-        data: summaryAnswer(TOKEN_DAYS),
-        isError: false,
-        error: null,
-      };
-      harness.activitySummary = {
-        data: undefined,
-        isError: true,
-        error: { data: { code: "INTERNAL_SERVER_ERROR" } },
-      };
-    });
-
-    /** @scenario "A failed read is never shown as a read that has not happened yet" */
-    it("says it could not be brought up to date rather than asking for a source", () => {
-      renderScreen();
-      const panel = adoptionPanel();
-
-      expect(
-        panel.getByText(/could not be brought up to date/i),
-      ).toBeInTheDocument();
-      // The advice is the harm: this organization's sources are connected and
-      // reporting — the cost lanes beside this card are drawing their figures
-      // — so sending the reader off to add one costs them the real cause.
-      expect(
-        panel.queryByText(
-          "Fills from the activity a connected source reports.",
-        ),
-      ).not.toBeInTheDocument();
-    });
-  });
-
-  describe("given that read simply has not answered yet", () => {
-    beforeEach(() => {
-      harness.summary = {
-        data: summaryAnswer(TOKEN_DAYS),
-        isError: false,
-        error: null,
-      };
-    });
-
-    it("keeps the copy that names what would fill it", () => {
-      renderScreen();
-      const panel = adoptionPanel();
-
-      // The state the failure must not be collapsed into, and the one the
-      // failure used to be reported as.
-      expect(
-        panel.getByText("Fills from the activity a connected source reports."),
-      ).toBeInTheDocument();
-      expect(
-        panel.queryByText(/could not be brought up to date/i),
-      ).not.toBeInTheDocument();
     });
   });
 });

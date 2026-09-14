@@ -1,4 +1,7 @@
-import type { GovernanceCostDayDto } from "@ee/governance/services/governanceCost.service";
+import type {
+  GovernanceCostDayDto,
+  GovernanceCostSummaryDto,
+} from "@ee/governance/services/governanceCost.service";
 
 /**
  * One day of the cost summary's per-day series, typed as the DTO the screen
@@ -30,4 +33,42 @@ export const costDay = (
   billedCurrenciesWithoutUsdAmount: [],
   billedProvisional: false,
   ...day,
+});
+
+/**
+ * A summary read that answered, carrying the per-day series a test varies.
+ *
+ * Same reason as `costDay`, one level up: the summary reaches the screen
+ * through an untyped api mock, so a missing field is not a call-site type
+ * error but a panel folding `undefined` at render time. Every field is stated
+ * here, and the totals are a plausible fully priced window, so a test that
+ * only cares about the series does not have to invent one.
+ */
+export const costSummaryAnswer = (
+  series: GovernanceCostDayDto[],
+): GovernanceCostSummaryDto => ({
+  unavailableReason: null,
+  providers: [],
+  billed: {
+    amountUsd: 120,
+    cellsWithoutAmount: 0,
+    currenciesWithoutUsdAmount: [],
+    currencyTotals: [
+      { currencyCode: "USD", amount: 120, cellsWithoutAmount: 0 },
+    ],
+  },
+  gateway: {
+    amountUsd: 80.23,
+    cellsWithoutAmount: 0,
+    currenciesWithoutUsdAmount: [],
+    currencyTotals: [
+      { currencyCode: "USD", amount: 80.23, cellsWithoutAmount: 0 },
+    ],
+  },
+  seats: { status: "awaiting_data" },
+  azureBilling: null,
+  series,
+  windowDays: 30,
+  staleSources: null,
+  unpricedWindow: null,
 });
