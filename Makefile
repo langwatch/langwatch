@@ -220,7 +220,7 @@ herrgen-check:
 # uses — rule-matching behaviour is version-sensitive. Bump both together.
 AST_GREP_VERSION := 0.42.3
 SEMGREP_VERSION  := 1.164.0
-GOLANGCI_VERSION := v2.11.4
+GOLANGCI_VERSION := v2.13.2
 
 # Resolve the pinned tools without caring how the developer installs Python
 # tools. `uv` is preferred (isolated, no venv juggling); an already-correct

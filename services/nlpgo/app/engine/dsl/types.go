@@ -145,8 +145,6 @@ type NodeDataset struct {
 // EntrySelection is `Optional[str] | int` on the Python side. We carry
 // the raw value and expose typed accessors so callers don't have to
 // switch on `any`.
-//
-//nolint:recvcheck // UnmarshalJSON requires pointer receiver; read-only helpers (MarshalJSON, AsInt, AsString, IsSet) stay value-receiver so callers can use the type by value.
 type EntrySelection struct {
 	raw json.RawMessage
 }

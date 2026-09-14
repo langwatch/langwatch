@@ -461,7 +461,7 @@ var (
 )
 
 // MetricsExportDisabled reports whether metric export was turned off by name.
-// Only an explicit off counts: an unset variable keeps the behaviour every
+// Only an explicit off counts: an unset variable keeps the behavior every
 // deployment has today, where a configured sink is a sink that gets metrics.
 func (o *OTel) MetricsExportDisabled() bool {
 	return metricsOff[strings.ToLower(strings.TrimSpace(o.MetricsEnabled))]

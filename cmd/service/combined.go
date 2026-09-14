@@ -37,7 +37,7 @@ type combinedService struct {
 	Telemetry string
 	// AddrEnv is the variable naming the port this instance binds.
 	AddrEnv string
-	// Run boots the service and returns when its context is cancelled.
+	// Run boots the service and returns when its context is canceled.
 	Run func(ctx context.Context, addr string) error
 }
 

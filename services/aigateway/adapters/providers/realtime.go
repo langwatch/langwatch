@@ -233,7 +233,7 @@ func (r *BifrostRouter) doRealtimeMint(
 	// dialer re-checks every resolved address against the same policy
 	// immediately before connecting, so a name that answers with a public
 	// address and then a private one cannot slip through either.
-	httpResp, err := client.Do(httpReq) //nolint:gosec // vetted by the endpoint policy at dispatch and again at dial time
+	httpResp, err := client.Do(httpReq)
 	if err != nil {
 		return nil, herr.New(ctx, domain.ErrProviderError, herr.M{
 			"reason": "realtime session mint failed: " + err.Error(),

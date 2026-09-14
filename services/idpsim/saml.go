@@ -137,8 +137,15 @@ func (s *Server) readAuthnRequest(w http.ResponseWriter, t *Tenant, r *http.Requ
 		return nil, permissiveSPProvider{}, false
 	}
 	// Pre-read the request's issuer and ACS URL so the permissive registry can
-	// echo them back through Validate's metadata lookup.
+	// echo them back through Validate's metadata lookup. The buffer is
+	// size-bounded first; encoding/xml resolves no external entities, and the
+	// simulator only ever parses its own developer's test traffic.
+	if len(req.RequestBuffer) > 1<<20 {
+		http.Error(w, "SAML request exceeds 1 MiB", http.StatusRequestEntityTooLarge)
+		return nil, permissiveSPProvider{}, false
+	}
 	var pre saml.AuthnRequest
+	//nolint:gosec // G709: bounded above; encoding/xml is XXE-safe and this is a local dev simulator
 	if err := xml.Unmarshal(req.RequestBuffer, &pre); err != nil {
 		http.Error(w, fmt.Sprintf("unparseable SAML request: %v", err), http.StatusBadRequest)
 		return nil, permissiveSPProvider{}, false

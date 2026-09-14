@@ -54,7 +54,7 @@ func hydrateStruct(v reflect.Value, t reflect.Type, prefix string) error {
 			if err := hydrateStruct(field, fieldType.Type, envTag); err != nil {
 				return err
 			}
-		case reflect.Ptr, reflect.Slice:
+		case reflect.Pointer, reflect.Slice:
 			return fmt.Errorf("config.Hydrate: unsupported kind %s for field %s", field.Kind(), fieldType.Name)
 		default:
 			envValue := os.Getenv(envTag)

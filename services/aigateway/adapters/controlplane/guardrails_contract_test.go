@@ -173,25 +173,21 @@ func TestContentForPacksEachDirectionUnderItsOwnKey(t *testing.T) {
 	}
 }
 
-// monorepoRoot and controlPlaneRoot locate the TypeScript side relative to this
-// package. The control plane used to be one application package at a fixed path;
-// the feature extraction deleted it and split its gateway half into
+// monorepoRoot locates the TypeScript side relative to this package. The
+// control plane used to be one application package at a fixed path; the
+// feature extraction deleted it and split its gateway half into
 // <root>/modules/gateway. That is the second such move -- ADR-076 was
 // the first -- and each one broke this file, which is why the layout is derived
 // in exactly one function.
 //
 // The files these tests read now span several packages, so a source read is
-// addressed from the repository root; controlPlaneRoot is only the witness that
-// decides skip-versus-fail.
-var (
-	monorepoRoot     = filepath.Join("..", "..", "..", "..")
-	controlPlaneRoot = controlPlaneRootFor(monorepoRoot)
-)
+// addressed from the repository root.
+var monorepoRoot = filepath.Join("..", "..", "..", "..")
 
 // controlPlaneRootFor derives the control plane's location from a repo root.
-// Both the package-level controlPlaneRoot and controlPlaneVerdict resolve the
-// layout through here, so a future move cannot repoint one and leave the other
-// stale -- which is the drift ADR-076 already caused once.
+// Every caller resolves the layout through here, so a future move cannot
+// repoint one site and leave another stale -- which is the drift ADR-076
+// already caused once.
 func controlPlaneRootFor(root string) string {
 	return filepath.Join(root, "modules", "gateway", "server")
 }

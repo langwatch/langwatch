@@ -471,6 +471,7 @@ func transcriptionsHandler(deps RouterDeps) http.HandlerFunc {
 		}
 		// Memory threshold: files up to 10 MB stay in memory, larger ones
 		// spill to a temp file ParseMultipartForm cleans up on r.Body close.
+		//nolint:gosec // G120: prepareRequestBody already wrapped r.Body in a MaxBytesReader at maxTranscriptionBodyBytes
 		if err := r.ParseMultipartForm(10 << 20); err != nil {
 			if bodyReadErrorCode(err) == domain.ErrPayloadTooLarge {
 				writeError(deps.Logger, w, r.Context(), herr.New(r.Context(), domain.ErrPayloadTooLarge, herr.M{
