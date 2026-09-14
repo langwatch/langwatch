@@ -14,14 +14,19 @@ import { Alert, Box, Button, HStack, Input, Text, VStack } from "@chakra-ui/reac
 import { Play } from "lucide-react";
 import { useState } from "react";
 import { Tooltip } from "@langwatch/design-system/tooltip";
+import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
 import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import { explainAnyError } from "@langwatch/handled-error/presentation";
 import { agentApi } from "../../behavior/agent-api.ts";
+import { OFFLINE_AGENT_TEST_COPY } from "../blocks/connected-agents-section.tsx";
 import { ParameterLineField } from "@langwatch/scenario-web/surfaces/parameter-line-field";
 import { FieldLabel } from "@langwatch/scenario-web/surfaces/dialog-fields";
 import { toLineRunParameters } from "@langwatch/scenario-web/surfaces/parameter-line";
 import { parameterPlaceholder } from "@langwatch/scenario-web/surfaces/parameter-suggestions";
 import type { ScenarioParameterDefinition } from "@langwatch/scenario-contract";
+
+/** The declared-parameter shape `parameterPlaceholder` and `ParameterLineField` take. */
+type DeclaredParameter = Parameters<typeof parameterPlaceholder>[0][number];
 
 /** The message the panel sends when nothing else is typed. */
 export const AGENT_TEST_DEFAULT_MESSAGE = "ping";
@@ -47,7 +52,7 @@ export function AgentTestPanel({
 }: AgentTestPanelProps) {
   const [message, setMessage] = useState(AGENT_TEST_DEFAULT_MESSAGE);
   const [parameterLine, setParameterLine] = useState("");
-  const test = api.agents.testTurn.useMutation();
+  const test = agentApi.agents.testTurn.useMutation();
   const plainParameters = plainParametersOf(parameters);
 
   return (
@@ -110,9 +115,9 @@ export function AgentTestPanel({
           data-testid="agent-test-result"
         >
           <Text fontSize="11.5px" color="fg.muted">
-            {instance
-              ? `${instance.hostname}${
-                  instance.label ? ` (${instance.label})` : ""
+            {test.data.instance
+              ? `${test.data.instance.hostname}${
+                  test.data.instance.label ? ` (${test.data.instance.label})` : ""
                 } answered in ${test.data.durationMs} ms`
               : `Answered in ${test.data.durationMs} ms`}
           </Text>

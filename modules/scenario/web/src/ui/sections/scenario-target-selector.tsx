@@ -13,7 +13,7 @@ import {
 } from "../../behavior/scenarios/use-filtered-scenario-targets.ts";
 
 export type ScenarioTargetSelection = {
-  type: "prompt" | "http" | "code" | "workflow" | "connected";
+  type: "prompt" | "http" | "code" | "workflow" | "connected" | "voice";
   id: string;
 };
 

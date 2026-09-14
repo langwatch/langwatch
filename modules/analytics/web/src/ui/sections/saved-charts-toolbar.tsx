@@ -24,7 +24,7 @@ import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { Dialog } from "@langwatch/design-system/dialog";
 import { Menu } from "@langwatch/design-system/menu";
 
-import type { SavedChartSummary } from "../../behavior/use-saved-workbench-charts.ts";
+import type { SavedChartSummary } from "../../behavior/analytics-api.ts";
 
 export interface SavedChartsToolbarProps {
   readonly charts: readonly SavedChartSummary[];

@@ -38,7 +38,7 @@ import { RemoveBlockButton } from "../../../elements/agent-testing/shared/remove
 import { SmallButton } from "../../../elements/agent-testing/shared/small-button.tsx";
 import { CaseVersionHistoryPopover } from "./case-version-history-popover.tsx";
 import type { TestSuiteEntry } from "../../../../model/agent-testing/cases/test-cases.ts";
-import type { CaseDraft, CaseEditorState } from "./use-case-editor.ts";
+import { strayFieldValues, type CaseDraft, type CaseEditorState } from "./use-case-editor.ts";
 import { Drawer } from "@langwatch/design-system/studio-drawer";
 import { ParameterLineField } from "../run/parameter-line-field.tsx";
 import { parameterPlaceholder } from "../run/parameter-suggestions.ts";

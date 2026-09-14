@@ -14,7 +14,7 @@
 
 import { type Dispatch, type SetStateAction, useCallback, useRef, useState } from "react";
 
-import { analyticsApi } from "./analytics-api.ts";
+import { analyticsApi, type SavedChartSummary } from "./analytics-api.ts";
 
 import type { LangWatchQLParameterValue } from "../model/lwql-request-state.ts";
 
@@ -29,12 +29,6 @@ export interface WorkbenchChartDraft {
    * result shape when such a chart is opened.
    */
   readonly vegaLiteSpec?: Record<string, unknown>;
-}
-
-/** A saved chart as the toolbar lists it. */
-export interface SavedChartSummary {
-  readonly id: string;
-  readonly name: string;
 }
 
 export interface UseSavedWorkbenchCharts {

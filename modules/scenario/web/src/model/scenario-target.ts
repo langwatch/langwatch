@@ -7,7 +7,7 @@
  * without any of them reaching into the picker that draws it.
  */
 export type ScenarioTarget = {
-  type: "prompt" | "http" | "code" | "workflow" | "connected";
+  type: "prompt" | "http" | "code" | "workflow" | "connected" | "voice";
   id: string;
 } | null;
 

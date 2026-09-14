@@ -11,10 +11,11 @@ export {
   VariablesSection,
   type VariablesSectionProps,
 } from "./ui/sections/variables/variables-section.tsx";
-export {
-  PromptTextAreaWithVariables,
-  type PromptTextAreaWithVariablesProps,
-} from "./ui/sections/variables/prompt-textarea/prompt-textarea-with-variables.tsx";
+export { PromptTextAreaWithVariables } from "./ui/sections/variables/prompt-textarea/prompt-textarea-with-variables.tsx";
+export type {
+  PromptTextAreaOnAddMention,
+  PromptTextAreaWithVariablesProps,
+} from "./ui/sections/variables/prompt-textarea/prompt-textarea.types.ts";
 export type { AvailableSource, Variable, FieldMapping } from "./ui/sections/variables/variables-section.tsx";
 export {
   VariableMappingInput,

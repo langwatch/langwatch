@@ -9,6 +9,7 @@ import { createModuleApi, type ContractApiMap } from "@langwatch/api/web";
 
 import type { FilterField } from "../model/analytics-filter-definition.ts";
 import type { FilterParam } from "../model/analytics-filter-params.ts";
+import type { LangWatchQLParameterValue } from "../model/lwql-request-state.ts";
 
 /** The project every analytics procedure is scoped to. */
 type ProjectScope = { projectId: string };
@@ -92,20 +93,38 @@ export type AnalyticsMonitorSummary = {
   enabled: boolean;
 };
 
+/** A saved chart as the workbench toolbar lists it. */
+export type SavedChartSummary = {
+  readonly id: string;
+  readonly name: string;
+};
+
+/** What a saved chart runs: the same shape the workbench writes back. */
+export type SavedChartDefinition = {
+  sql: string;
+  parameters: Readonly<Record<string, LangWatchQLParameterValue>>;
+  vegaLiteSpec?: Record<string, unknown>;
+};
+
+/** A saved chart with its definition, as `getById` answers it. */
+export type SavedChartDetail = SavedChartSummary & {
+  definition: SavedChartDefinition;
+};
+
 type BorrowedProcedures = {
   analytics: {
     /** Stored workbench charts not yet split from analytics. */
     savedWorkbenchCharts: {
       getAll: {
-        query: { input: ProjectScope; output: unknown[] };
+        query: { input: ProjectScope; output: SavedChartSummary[] };
       };
       getById: {
-        query: { input: ProjectScope & { id: string }; output: unknown };
+        query: { input: ProjectScope & { id: string }; output: SavedChartDetail };
       };
       create: {
         mutation: {
           input: ProjectScope & { name: string; definition: unknown };
-          output: unknown;
+          output: SavedChartSummary;
         };
       };
       update: {

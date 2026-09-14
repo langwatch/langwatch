@@ -15,6 +15,7 @@ import {
   type Control,
   Controller,
   type FieldErrors,
+  type Resolver,
   type SubmitErrorHandler,
   type SubmitHandler,
   type UseFormRegister,
@@ -255,6 +256,7 @@ function AdvancedSection({
 }: {
   register: UseFormRegister<ScenarioFormData>;
   errors: FieldErrors<ScenarioFormData>;
+  control: Control<ScenarioFormData>;
 }) {
   const [open, setOpen] = useState(false);
   const ChevronIcon = open ? ChevronDown : ChevronRight;

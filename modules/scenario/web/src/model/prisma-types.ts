@@ -25,6 +25,10 @@ export type Scenario = {
   judgeModel: string | null;
   maxTurns: number | null;
   minTurns: number | null;
+  /** `{ [fieldId]: string | number | boolean }`, or null for none. */
+  fields: JsonValue | null;
+  /** `{ voiceModel, interruptProbability, effects }`, or null. */
+  callerVoice: JsonValue | null;
   testSuiteId: string | null;
   version: number;
   lastUpdatedById: string | null;
