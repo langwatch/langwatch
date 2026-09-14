@@ -40,7 +40,7 @@ Feature: Local mail sink (mailsim)
 
   # --- The stack's own address --------------------------------------------
 
-  @unit @unimplemented
+  @unit
   Scenario: Every stack is assigned an inbox address of its own
     Then the stack has an email address derived from the worktree's slug
     And `haven mail address` prints it, so a signup form or a script can be handed it directly
@@ -52,7 +52,7 @@ Feature: Local mail sink (mailsim)
     # Catch-all on purpose: signup tests can invent user1@, user2@, admin+alias@
     # without registering anything first.
 
-  @unit @unimplemented
+  @unit
   Scenario: Two worktrees' inboxes never mix
     Given two worktrees each running their own stack and mail lane
     When a message is delivered to the first stack's address
@@ -61,14 +61,14 @@ Feature: Local mail sink (mailsim)
 
   # --- The stack sends its own email into the sink -------------------------
 
-  @unit @unimplemented
+  @unit
   Scenario: A stack with the mail lane sends its email into the sink
     Given a developer who has configured no email provider
     When the stack is planned
     Then haven injects SMTP settings pointing the app at the sink
     And an email the app sends, such as a signup verification, lands in the stack's inbox
 
-  @unit @unimplemented
+  @unit
   Scenario: A provider the developer chose explicitly is left alone
     Given a `.env` that names a real email provider
     When the stack is planned
@@ -78,42 +78,42 @@ Feature: Local mail sink (mailsim)
 
   # --- Reading mail from the CLI -------------------------------------------
 
-  @unit @unimplemented
+  @unit
   Scenario: The inbox lists newest first
     Given the inbox holds several messages
     When the developer runs `haven mail list`
     Then the messages are listed newest first with an id, sender, recipient, subject and arrival time
 
-  @unit @unimplemented
+  @unit
   Scenario: One message can be read in full
     When the developer runs `haven mail get` with a message's id
     Then the output carries the headers and the text body
     And the links the message carries are listed on their own,
       so a verification or invite link can be followed without parsing HTML
 
-  @unit @unimplemented
+  @unit
   Scenario: Asking for a message that does not exist is a refusal, not a stack trace
     When the developer runs `haven mail get` with an id the inbox does not hold
     Then the command fails saying the message is not in this stack's inbox
 
-  @unit @unimplemented
+  @unit
   Scenario: A test can wait for a message to arrive
     When the developer runs `haven mail wait` with a recipient or subject filter
     Then the command blocks until a matching message arrives and prints it
     And it exits non-zero after its timeout with nothing matched, so a script can tell the difference
 
-  @unit @unimplemented
+  @unit
   Scenario: The inbox can be emptied
     Given the inbox holds messages
     When the developer runs `haven mail clear`
     Then the inbox reads back empty
 
-  @unit @unimplemented
+  @unit
   Scenario: Every mail command has a machine-readable form
     When any `haven mail` command is run with `--json` or under agent mode
     Then the output is plain and parseable, with no tables, color or spinner
 
-  @unit @unimplemented
+  @unit
   Scenario: Reading mail with no sink running says so
     Given a stack whose mail lane is not running
     When the developer runs any `haven mail` command
@@ -153,7 +153,7 @@ Feature: Local mail sink (mailsim)
 
   # --- Seeding ---------------------------------------------------------------
 
-  @unit @unimplemented
+  @unit
   Scenario: The seeded identity keeps one address everywhere
     When the developer runs `haven db seed` in any worktree
     Then the seeded user's address is the same stable one on every worktree
@@ -175,14 +175,14 @@ Feature: Local mail sink (mailsim)
     Then an invite the app sends any of them lands in the stack's inbox
     And can be read back with `haven mail`
 
-  @unit @unimplemented
+  @unit
   Scenario: Per-stack seed addresses remain available on ask
     Given a developer who sets the seed email domain explicitly
     When the database is seeded
     Then every seeded account's address moves to that domain, local parts unchanged
     And leaving it unset seeds the stable global addresses
 
-  @unit @unimplemented
+  @unit
   Scenario: A database seeded before the address rename reseeds onto the new one
     Given a database whose admin was seeded under the previous default address
     When the developer reseeds
@@ -191,7 +191,7 @@ Feature: Local mail sink (mailsim)
     # reseed updates the existing account in place; duplicating the admin
     # would break every saved login and every open session.
 
-  @unit @unimplemented
+  @unit
   Scenario: Reseeding keeps the seeded addresses stable
     Given a stack seeded once
     When the developer runs `haven db seed` again
@@ -199,18 +199,18 @@ Feature: Local mail sink (mailsim)
 
   # --- haven integration ------------------------------------------------------
 
-  @unit @unimplemented
+  @unit
   Scenario: The mail lane runs by default and can be turned off per worktree
     Given a fresh worktree
     Then haven's default selection runs the mail lane
     And `haven up -mail` turns the lane off for that worktree
 
-  @unit @unimplemented
+  @unit
   Scenario: The sink appears in haven status like any other lane
     When the developer runs `haven status`
     Then the mail lane is listed with its health, its SMTP address and its browser hostname
 
-  @unit @unimplemented
+  @unit
   Scenario: The inbox survives a stack restart
     Given the inbox holds messages
     When the stack is restarted

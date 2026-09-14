@@ -1,3 +1,4 @@
+import { generate } from "@langwatch/ksuid";
 import { useRef } from "react";
 
 /**
@@ -15,7 +16,7 @@ export function useTabSessionId(): string {
     if (cached) {
       ref.current = cached;
     } else {
-      ref.current = crypto.randomUUID();
+      ref.current = generate("presence").toString();
       (window as { __lw_presence_session_id?: string }).__lw_presence_session_id = ref.current;
     }
   }

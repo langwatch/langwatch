@@ -39,7 +39,7 @@ npx vitest run langy.scenario.test.ts --reporter=verbose
 ```
 
 All `LANGY_*` vars default to this repo's local haven seed identity
-(`langy-workspace` slug, `admin@haven.localhost` / `local-dev-project`) — see
+(`langy-workspace` slug, `admin@mail.langwatch.localhost` / `local-dev-project`) — see
 `config.ts`. Override them to point at a different stack.
 
 ## Coverage (42 scenarios)

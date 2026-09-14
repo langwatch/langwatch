@@ -8841,6 +8841,9 @@ importers:
       '@langwatch/design-system':
         specifier: workspace:*
         version: link:../../../packages/design-system
+      '@langwatch/ksuid':
+        specifier: workspace:*
+        version: link:../../../packages/ksuid
       '@langwatch/presence-contract':
         specifier: workspace:*
         version: link:../contract
@@ -8851,6 +8854,9 @@ importers:
         specifier: 'catalog:'
         version: 4.5.7(@types/react@19.2.18)(immer@11.1.8)(react@19.2.8)
     devDependencies:
+      '@langwatch/test-harness':
+        specifier: workspace:*
+        version: link:../../../packages/test-harness
       '@testing-library/jest-dom':
         specifier: 'catalog:'
         version: 7.0.1(@testing-library/dom@10.4.1)(vitest@5.0.0)

@@ -23,7 +23,12 @@
  * Admin login (BetterAuth email + password, bcrypt-hashed — the same
  * mechanism as scripts/seed-local-admin.ts, but a distinct identity so the
  * two seeders never collide on email):
- *   Email:    admin@haven.localhost
+ *   Email:    admin@mail.langwatch.localhost (was admin@haven.localhost;
+ *             SEED_EMAIL_DOMAIN overrides the domain per-stack — see
+ *             seed-identity.ts. The admin User row is upserted by its fixed
+ *             ID, never by email, so reseeding a database that still holds
+ *             the retired address updates that same account in place instead
+ *             of creating a second admin.)
  *   Password: LocalHavenAdmin!2026
  *
  * IDs:
@@ -82,6 +87,11 @@ import { ROLE_KIND } from "@langwatch/role-contract";
 import { AesGcmSecretEncryptionAdapter } from "@langwatch/secret-server";
 import { PrismaDriverAdapterService } from "../src/driver-adapter.ts";
 import { resolveApiKeyPepper } from "./api-key-pepper.ts";
+import {
+  buildAdminUserUpsertArgs,
+  resolveSeedEmailDomain,
+  seedEmailAddress,
+} from "./seed-identity.ts";
 import { seedDemoPlatform } from "./seed-demo-platform.ts";
 
 /** The lane name haven runs this under, and what its structured lines carry. */
@@ -104,7 +114,14 @@ const PROJECT_SLUG = "local-dev-project";
 const PROJECT_NAME = "Local Dev Project";
 
 const ADMIN_USER_ID = "local-dev-admin-user";
-const ADMIN_EMAIL = "admin@haven.localhost";
+const ADMIN_LOCAL_PART = "admin";
+// SEED_EMAIL_DOMAIN is a purely opt-in per-stack override (see
+// seed-identity.ts); unset, every seeded address stays on the one stable
+// global domain.
+const ADMIN_EMAIL = seedEmailAddress({
+  localPart: ADMIN_LOCAL_PART,
+  domainOverride: resolveSeedEmailDomain({ environment: process.env }),
+});
 const ADMIN_PASSWORD = "LocalHavenAdmin!2026";
 const ADMIN_NAME = "Haven Local Admin";
 
@@ -243,17 +260,17 @@ async function main() {
         : { apiKey },
   });
 
-  // Admin user + BetterAuth credential (email/password) login.
-  const user = await prisma.user.upsert({
-    where: { id: ADMIN_USER_ID },
-    create: {
-      id: ADMIN_USER_ID,
+  // Admin user + BetterAuth credential (email/password) login. Upserted by
+  // ADMIN_USER_ID, never by email, so this always finds the SAME account —
+  // even one seeded under the retired admin@haven.localhost default — and
+  // rewrites its email in place rather than ever creating a second admin.
+  const user = await prisma.user.upsert(
+    buildAdminUserUpsertArgs({
+      adminUserId: ADMIN_USER_ID,
       email: ADMIN_EMAIL,
       name: ADMIN_NAME,
-      emailVerified: true,
-    },
-    update: {},
-  });
+    }),
+  );
 
   const hashedPassword = await hashPassword(ADMIN_PASSWORD, 10);
   await prisma.account.upsert({
