@@ -15,6 +15,7 @@ Feature: The identifier-first sign-in router - one auth screen, routed by data
   #   (?local=1)              →    local method picker       break_glass
   #   email → normalize       →    domain in ACTIVE conn?
   #     yes                   →    redirect to the IdP       domain_routed
+  #     no, sole federated    →    redirect to the IdP       account_methods
   #     no, known account     →    account's method picker   account_methods
   #     no, unknown account   →    continue to sign-up       identifier_unknown
   #     lookup not wired      →    default method picker     no_domain_match
@@ -90,6 +91,20 @@ Feature: The identifier-first sign-in router - one auth screen, routed by data
     Then the decision offers the passkey and not the password
     And the methods are ordered strongest first
     And a method this deployment does not offer is never offered
+
+  # Nearly every cloud account today holds exactly the legacy identity
+  # provider, so without this the address step answered with a picker whose
+  # one button restated the question. A sole passkey or password never
+  # redirects: the passkey's ceremony and the password's form are the screen's
+  # to draw, and both need the person still on it.
+  @unit
+  Scenario: An account whose only method is federated redirects straight to it
+    Given "home.net" belongs to no ACTIVE connection
+    And the account for "sam@home.net" holds one federated method and nothing else
+    When "sam@home.net" is submitted to the router
+    Then the decision is a redirect to that method's identity provider
+    And the decision carries the reason code "account_methods"
+    And an account also holding a second method still gets the picker
 
   @unit
   Scenario: A connected domain routes before the account is consulted

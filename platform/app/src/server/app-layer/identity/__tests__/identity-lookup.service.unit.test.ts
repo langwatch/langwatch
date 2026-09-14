@@ -400,8 +400,11 @@ describe("platform operator identity lookup service", () => {
       const nextSignIn = await router(account).route({
         identifier: "sam@acme.com",
       });
+      // The linked connection is the account's one federated method, so the
+      // router hands the next sign-in straight to it rather than drawing a
+      // picker whose single button restates the address just typed.
       expect(nextSignIn).toMatchObject({
-        outcome: "method_picker",
+        outcome: "redirect_to_connection",
         reasonCode: "account_methods",
       });
       expect(nextSignIn.methodSet.map((method) => method.id)).toEqual(["oidc"]);

@@ -173,7 +173,8 @@ export type SignInRoutingOutcome = (typeof SIGNIN_ROUTING_OUTCOMES)[number];
 
 export interface RoutingDecision {
   outcome: SignInRoutingOutcome;
-  /** Present only on `redirect_to_connection`. */
+  /** Present only on `redirect_to_connection`, and absent even there when
+   *  the method is an instance-level provider rather than a connection's. */
   connectionId?: string;
   /** What the surface offers. On a redirect, the one method it redirects to. */
   methodSet: readonly SignInMethod[];
@@ -308,6 +309,7 @@ function redirectOrFall({
  *   domain on a live conn      → redirect             domain_routed
  *   domain on a paused conn    → picker               connection_suspended
  *   no account for the address → sign-up              identifier_unknown
+ *   account, one federated     → redirect             account_methods
  *   account, methods it holds  → picker               account_methods
  *   anything else              → picker               no_domain_match
  *   policy refuses the method  → picker (local)       method_not_*
@@ -383,6 +385,21 @@ export function routeSignIn(input: RoutingInput): RoutingDecision {
   // least offers the ways in that do work.
   if (held.length === 0) {
     return picker(policy.defaultMethods, "no_domain_match");
+  }
+  // One federated method and nothing else is already a routing answer: a
+  // picker with a single button costs a click and tells the person nothing
+  // they did not just type. Only federated — a sole passkey gets its ceremony
+  // from the screen, and a sole password needs the form the picker draws.
+  const sole = held.length === 1 ? held[0] : undefined;
+  if (sole?.kind === "federated") {
+    return {
+      outcome: "redirect_to_connection",
+      ...(sole.connectionId === null
+        ? {}
+        : { connectionId: sole.connectionId }),
+      methodSet: [sole],
+      reasonCode: "account_methods",
+    };
   }
   return picker(held, "account_methods");
 }
