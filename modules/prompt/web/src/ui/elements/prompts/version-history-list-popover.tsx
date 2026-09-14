@@ -11,7 +11,7 @@ import {
   useDisclosure,
   VStack,
 } from "@chakra-ui/react";
-import { createLogger } from "@langwatch/observability";
+import { createLogger } from "@langwatch/observability/browser";
 import { useCallback, useEffect, useState } from "react";
 import { LuChevronRight } from "react-icons/lu";
 import { HistoryIcon } from "@langwatch/model-provider-web/surfaces/history-icon";
