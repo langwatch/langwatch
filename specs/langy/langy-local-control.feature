@@ -118,6 +118,20 @@ Feature: Langy works in a folder shared from the developer's machine
       And no second turn is started
       And the running turn can use the folder from its next tool call
 
+    # On film the terminal connected nine seconds after a turn ended, while
+    # that turn's end was still being folded. The connect turn was refused as
+    # a second turn, no turn was left to pick the folder up, and the
+    # conversation sat with the folder connected and no answer.
+    @integration @unit
+    Scenario: A folder connected as a turn ends is answered once the turn's end is folded
+      Given an approved control request
+      And the turn before still reads as in flight when the CLI connects
+      When that turn's end is folded
+      Then one turn reads that the local folder is connected, under the key the direct start would have used
+      And the same end folded again starts no second turn
+      And a turn that placed a call on the folder before ending is followed by no connect turn
+      And a folder that stopped sharing before the turn ended is owed nothing
+
     @integration
     Scenario: The connection carries what Langy would otherwise probe
       When the CLI connects

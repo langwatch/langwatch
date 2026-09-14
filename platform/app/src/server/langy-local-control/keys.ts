@@ -24,6 +24,17 @@ export function policyKey(conversationId: string): string {
   return `${PREFIX}:policy:${conversationId}`;
 }
 
+/**
+ * The connect turn one folder is owed: the terminal connected while the turn
+ * before still read as in flight, so the turn that says the folder is
+ * connected starts when that turn's end is folded. Cleared by the first call
+ * a turn places on the folder, by the start of the owed turn, and with the
+ * share that owed it.
+ */
+export function owedConnectTurnKey(conversationId: string): string {
+  return `${PREFIX}:connect-owed:${conversationId}`;
+}
+
 /** One control request, from the card that asked to the approval that spends it. */
 export function controlRequestKey(requestId: string): string {
   return `${PREFIX}:request:${requestId}`;

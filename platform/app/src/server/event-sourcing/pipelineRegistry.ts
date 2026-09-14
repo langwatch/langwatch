@@ -120,6 +120,9 @@ import type {
   TopicClusteringOutcomeCommands,
   TopicClusteringRunPort,
 } from "../event-sourcing/pipelines/topic-clustering-processing/process-manager";
+import { createLocalConnectTurnSubscriber } from "../langy-local-control/connect-turn.subscriber";
+import { getLocalControlRuntime } from "../langy-local-control/runtime";
+import { localConnectTurnStarter } from "../langy-local-control/session.core";
 import { publishCancellation } from "../scenarios/cancellation-channel";
 import { SCENARIO_EVALUATIONS_JOB } from "../scenarios/evaluations/constants";
 import {
@@ -1046,6 +1049,11 @@ export class PipelineRegistry {
         },
         conversations: conversationReader,
       });
+    const localConnectTurnSubscriber = createLocalConnectTurnSubscriber({
+      presence: () => getLocalControlRuntime().presence,
+      conversations: conversationReader,
+      turns: localConnectTurnStarter(this.deps.prisma),
+    });
 
     const pipeline = this.deps.eventSourcing.register(
       createLangyConversationProcessingPipeline({
@@ -1061,6 +1069,7 @@ export class PipelineRegistry {
           broadcastSubscriber,
           admissionLifecycleSubscriber,
           guidedOnboardingTurnFailedSubscriber,
+          localConnectTurnSubscriber,
         ],
       }),
     );
