@@ -2,6 +2,7 @@ package mailsim
 
 import (
 	"bytes"
+	"errors"
 	"io"
 	"regexp"
 	"strings"
@@ -33,14 +34,22 @@ func extractLinks(text, html string) []string {
 	return out
 }
 
+// envelope is what the SMTP transaction said, as opposed to what the
+// message's own headers claim.
+type envelope struct {
+	From       string
+	To         []string
+	ReceivedAt time.Time
+}
+
 // parseMessage turns a raw RFC 5322 message plus its SMTP envelope into the
 // message the API and inbox serve back.
-func parseMessage(raw []byte, envelopeFrom string, envelopeTo []string, receivedAt time.Time) *Message {
+func parseMessage(raw []byte, env envelope) *Message {
 	msg := &Message{
 		Summary: Summary{
-			From:       envelopeFrom,
-			To:         envelopeTo,
-			ReceivedAt: receivedAt,
+			From:       env.From,
+			To:         env.To,
+			ReceivedAt: env.ReceivedAt,
 			SizeBytes:  len(raw),
 		},
 		Headers: map[string]string{},
@@ -62,34 +71,40 @@ func parseMessage(raw []byte, envelopeFrom string, envelopeTo []string, received
 
 	for {
 		part, err := reader.NextPart()
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			break
 		}
 		if err != nil && !emessage.IsUnknownCharset(err) {
 			break
 		}
-		body, _ := io.ReadAll(part.Body)
-		switch h := part.Header.(type) {
-		case *mail.InlineHeader:
-			contentType, _, _ := h.ContentType()
-			if strings.HasPrefix(contentType, "text/html") {
-				msg.HTML += string(body)
-			} else {
-				msg.Text += string(body)
-			}
-		case *mail.AttachmentHeader:
-			filename, _ := h.Filename()
-			contentType, _, _ := h.ContentType()
-			msg.Attachments = append(msg.Attachments, AttachmentInfo{
-				Filename:    filename,
-				ContentType: contentType,
-				SizeBytes:   len(body),
-			})
-		}
+		absorbPart(msg, part)
 	}
 
 	msg.Links = extractLinks(msg.Text, msg.HTML)
 	return msg
+}
+
+// absorbPart folds one MIME part into the message: inline text and HTML
+// bodies accumulate, attachments are recorded by name, type and size.
+func absorbPart(msg *Message, part *mail.Part) {
+	body, _ := io.ReadAll(part.Body)
+	switch h := part.Header.(type) {
+	case *mail.InlineHeader:
+		contentType, _, _ := h.ContentType()
+		if strings.HasPrefix(contentType, "text/html") {
+			msg.HTML += string(body)
+		} else {
+			msg.Text += string(body)
+		}
+	case *mail.AttachmentHeader:
+		filename, _ := h.Filename()
+		contentType, _, _ := h.ContentType()
+		msg.Attachments = append(msg.Attachments, AttachmentInfo{
+			Filename:    filename,
+			ContentType: contentType,
+			SizeBytes:   len(body),
+		})
+	}
 }
 
 // headerMap flattens the parsed header into the flat string map the wire

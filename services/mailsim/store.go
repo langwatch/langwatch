@@ -85,13 +85,19 @@ func NewStore(dataDir string) (*Store, error) {
 	if dataDir == "" {
 		return st, nil
 	}
-	if err := os.MkdirAll(dataDir, 0o755); err != nil {
+	if err := os.MkdirAll(dataDir, 0o750); err != nil {
 		return nil, fmt.Errorf("creating mailsim data dir %s: %w", dataDir, err)
 	}
 	entries, err := os.ReadDir(dataDir)
 	if err != nil {
 		return nil, fmt.Errorf("reading mailsim data dir %s: %w", dataDir, err)
 	}
+	st.messages = loadMessages(dataDir, entries)
+	return st, nil
+}
+
+// loadMessages reads every persisted message back, in arrival order.
+func loadMessages(dataDir string, entries []os.DirEntry) []*Message {
 	names := make([]string, 0, len(entries))
 	for _, e := range entries {
 		if !e.IsDir() && strings.HasSuffix(e.Name(), ".json") {
@@ -99,6 +105,7 @@ func NewStore(dataDir string) (*Store, error) {
 		}
 	}
 	sort.Strings(names) // ULID filenames sort in arrival order.
+	messages := make([]*Message, 0, len(names))
 	for _, name := range names {
 		raw, err := os.ReadFile(filepath.Join(dataDir, name))
 		if err != nil {
@@ -108,9 +115,9 @@ func NewStore(dataDir string) (*Store, error) {
 		if err := json.Unmarshal(raw, &msg); err != nil {
 			continue
 		}
-		st.messages = append(st.messages, &msg)
+		messages = append(messages, &msg)
 	}
-	return st, nil
+	return messages
 }
 
 // newID mints a lexically sortable message id.
@@ -154,7 +161,7 @@ func (st *Store) persist(msg *Message) error {
 	}
 	path := filepath.Join(st.dataDir, msg.ID+".json")
 	tmp := path + ".tmp"
-	if err := os.WriteFile(tmp, raw, 0o644); err != nil {
+	if err := os.WriteFile(tmp, raw, 0o600); err != nil {
 		return fmt.Errorf("writing message %s: %w", msg.ID, err)
 	}
 	return os.Rename(tmp, path)
@@ -193,7 +200,9 @@ func (st *Store) Delete(id string) bool {
 		if m.ID == id {
 			st.messages = append(st.messages[:i], st.messages[i+1:]...)
 			if st.dataDir != "" {
-				_ = os.Remove(filepath.Join(st.dataDir, id+".json"))
+				// m.ID, not the caller's id: the store only ever unlinks a
+				// name it minted itself, so a hostile id cannot traverse.
+				_ = os.Remove(filepath.Join(st.dataDir, m.ID+".json"))
 			}
 			return true
 		}

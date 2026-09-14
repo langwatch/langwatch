@@ -266,7 +266,14 @@ lint-rules-test:
 # which is why "run the Go checks before pushing" quietly stopped happening.
 # Always resolve the pinned version rather than trusting PATH.
 GOLANGCI := $(shell if command -v golangci-lint >/dev/null 2>&1 && golangci-lint --version 2>/dev/null | grep -q "$(patsubst v%,%,$(GOLANGCI_VERSION))"; then echo golangci-lint; else echo "go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_VERSION)"; fi)
-GO_LINT_PKGS := ./services/aigateway/... ./services/langyagent/... ./services/nlpgo/... ./pkg/... ./cmd/... ./tools/...
+GO_LINT_PKGS := ./services/aigateway/... ./services/langyagent/... ./services/mailsim/... ./services/nlpgo/... ./pkg/... ./cmd/... ./tools/...
+
+# golangci-lint reads package export data through whatever `go` it finds, and
+# the pinned linter (built with Go 1.25, upstream ships "latest-1") cannot
+# read the format a Go newer than go.mod's emits. CI never sees this because
+# it installs from go-version-file: go.mod; a laptop ahead of the repo does.
+# Pinning GOTOOLCHAIN to go.mod's version makes both environments identical.
+GO_MOD_TOOLCHAIN := go$(shell awk '$$1 == "go" {print $$2; exit}' go.mod)
 
 # golangci-lint saturates cores the same way a whole-tree typecheck does, so it
 # takes a slot from the same machine-wide counter (`haven slot run`) before it
@@ -275,13 +282,13 @@ GO_LINT_PKGS := ./services/aigateway/... ./services/langyagent/... ./services/nl
 # origin/main, not the whole tree, and is not the cost this queue exists for.
 go-lint-slot:
 	@echo "==> golangci-lint $(GOLANGCI_VERSION) (queued through haven slot run)"
-	@$(HAVEN) slot run --label golangci-lint -- $(GOLANGCI) run $(GO_LINT_PKGS)
+	@$(HAVEN) slot run --label golangci-lint -- env GOTOOLCHAIN=$(GO_MOD_TOOLCHAIN) $(GOLANGCI) run $(GO_LINT_PKGS)
 
 go-lint: go-lint-slot
 
 go-lint-changed:
 	@echo "==> golangci-lint $(GOLANGCI_VERSION) (new/changed lines only)"
-	@$(GOLANGCI) run --new-from-merge-base=origin/main $(GO_LINT_PKGS)
+	@env GOTOOLCHAIN=$(GO_MOD_TOOLCHAIN) $(GOLANGCI) run --new-from-merge-base=origin/main $(GO_LINT_PKGS)
 
 # Stop all services
 down:

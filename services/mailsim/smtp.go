@@ -95,7 +95,7 @@ func (s *session) Data(r io.Reader) error {
 			Message:      fmt.Sprintf("message exceeds the %d byte limit", s.maxMessageBytes),
 		}
 	}
-	msg := parseMessage(raw, s.from, s.to, time.Now().UTC())
+	msg := parseMessage(raw, envelope{From: s.from, To: s.to, ReceivedAt: time.Now().UTC()})
 	return s.store.Deliver(msg)
 }
 
