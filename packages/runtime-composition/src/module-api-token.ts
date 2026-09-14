@@ -5,6 +5,21 @@ export abstract class FeatureApiIdentity {
   protected constructor(readonly name: ModuleName) {}
 }
 
+/**
+ * The shape a feature API is allowed to have: every member callable. The
+ * proxy a consumer reaches an API through serves operations only — a plain
+ * property read throws `"exposes operations only"` at request time — so an
+ * interface that declares one is a runtime failure waiting for its first
+ * caller (it reached production four times before this constraint existed;
+ * the fourth broke sign-in). A member here that is not a function maps to
+ * `never`, and the resulting assignability error names it.
+ */
+export type OperationsOnly<Api> = {
+  [Member in keyof Api]: NonNullable<Api[Member]> extends (...args: never[]) => unknown
+    ? Api[Member]
+    : never;
+};
+
 /** Runtime identity for a feature's portable operation interface. */
 export class ModuleApiToken<Api> extends FeatureApiIdentity {
   declare private readonly api: (value: Api) => Api;
@@ -21,6 +36,6 @@ export class ModuleApiToken<Api> extends FeatureApiIdentity {
   }
 }
 
-export function moduleApi<Api>(name: ModuleName): ModuleApiToken<Api> {
+export function moduleApi<Api extends OperationsOnly<Api>>(name: ModuleName): ModuleApiToken<Api> {
   return ModuleApiToken.create<Api>(name);
 }

@@ -62,7 +62,7 @@ export {
   type FeatureEventingRegistration,
   type FeatureEventingSetup,
 } from "./module-eventing.ts";
-export { moduleApi, ModuleApiToken } from "./module-api-token.ts";
+export { moduleApi, ModuleApiToken, type OperationsOnly } from "./module-api-token.ts";
 export { LocalFeatureApis } from "./local-feature-api.ts";
 export {
   type FeatureConfigSchema,
