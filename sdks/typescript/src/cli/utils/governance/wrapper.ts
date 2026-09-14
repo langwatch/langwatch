@@ -815,10 +815,22 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
 	// quiet, because pi has no second path to fall back on.
 	let piCapture: PiCapture | null = null;
 	let piPoll: ReturnType<typeof setInterval> | null = null;
-	// The pass a tick has started, for as long as it is running. Held out here
-	// rather than as a boolean inside the block because the exit sweep below has
-	// to be able to WAIT for it, not merely notice it — see there for why.
-	let piInFlight: Promise<unknown> | null = null;
+	// Two variables for one pass, because the tick and the exit sweep want
+	// different things from it: the tick only needs to know whether one is
+	// running, while the sweep has to be able to WAIT for it - see there for
+	// why.
+	//
+	// The promise is never null, and that is deliberate rather than tidy. Its
+	// only non-null assignment happens inside the tick callback, and
+	// control-flow analysis does not look inside callbacks: declared as
+	// `Promise<unknown> | null`, the compiler would follow the straight line
+	// from here to the sweep, see nothing but the initialiser, and narrow the
+	// variable to `null` - turning the sweep's wait into `await null` with no
+	// diagnostic beyond a lint rule. Starting from a resolved promise means
+	// there is no null to narrow to and the wait keeps its meaning; awaiting it
+	// when no tick has run is a no-op.
+	let piTickRunning = false;
+	let piInFlight: Promise<unknown> = Promise.resolve();
 	if (tool === "pi") {
 		if (modeResult.endpoint && modeResult.ingestionToken) {
 			const capture = createPiCapture({
@@ -845,12 +857,13 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
 				// - but every append after it is skipped until the file happens to
 				// shrink and the cursor resets to zero. It heals itself, silently,
 				// having lost the turns in between.
-				if (piInFlight) return;
+				if (piTickRunning) return;
+				piTickRunning = true;
 				piInFlight = capture
 					.harvest()
 					.catch(() => 0)
 					.finally(() => {
-						piInFlight = null;
+						piTickRunning = false;
 					});
 			}, PI_SESSION_POLL_MS);
 			// Same as codex: the child drives the lifecycle, so the timer must never
@@ -944,8 +957,9 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
 			// Bounded, because everything below is owed to a shell that is
 			// already waiting. See PI_FINAL_SWEEP_DEADLINE_MS. Losing the last
 			// turns is bad; wedging the user's terminal to avoid losing them is
-			// worse, and the report below tells the truth either way - a turn the
-			// sweep never got to post is still counted as pending.
+			// worse. What the deadline costs is reported by `sweepTimedOut`
+			// above, and it has to be, because the pending count alone does not
+			// cover it.
 			//
 			// The deadline timer is deliberately not `unref`'d. If the sweep is
 			// stuck on something that does not itself hold the event loop, an
@@ -956,6 +970,8 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
 			try {
 				await Promise.race([
 					(async () => {
+						// Resolved already when no tick is running, so this is a no-op
+						// in the common case and a real wait in the one that matters.
 						await piInFlight;
 						await piCapture.harvest();
 					})(),
