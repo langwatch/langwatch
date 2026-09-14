@@ -66,7 +66,9 @@ export function SingleSignOnCard({
   canManage: boolean;
 }) {
   const { connection, claims, serviceProvider } = setup;
-  const { start, sending, failure } = useTestSignIn({
+  // The card shows the last failure; the button that causes one owns the rest
+  // of this hook's state (see `SingleSignOnCardActions`).
+  const { failure } = useTestSignIn({
     connectionId: connection.connectionId,
   });
 
@@ -85,42 +87,11 @@ export function SingleSignOnCard({
       chip={connectionStatusChipFor({ state: connection.state })}
       data-testid="single-sign-on-card"
       actions={
-        <>
-          {canManage && (
-            <Button
-              size="sm"
-              variant={failure ? "solid" : "outline"}
-              loading={sending}
-              onClick={() => void start()}
-            >
-              {/* It hands the browser to the identity provider and back, so
-                  it is marked as leaving rather than as acting here. */}
-              {failure ? <RefreshCw size={14} /> : <ExternalLink size={14} />}
-              {failure ? "Try the sign-in again" : "Test sign-in"}
-            </Button>
-          )}
-          {/* Only SAML has a published document to point at. */}
-          {connection.type === "saml" && (
-            <Link href={serviceProvider.metadataUrl} isExternal>
-              <Button size="sm" variant="ghost">
-                <ExternalLink size={14} />
-                Metadata
-              </Button>
-            </Link>
-          )}
-          {/* WHERE THE REST OF IT IS. This card reads; claiming another
-              domain, granting a way back in, changing who it admits and
-              taking it down are the journey, which is a page rather than a
-              mode of this one. */}
-          {canManage && (
-            <Link href="/settings/authentication/provider">
-              <Button size="sm" variant="ghost">
-                <Settings2 size={14} />
-                Edit
-              </Button>
-            </Link>
-          )}
-        </>
+        <SingleSignOnCardActions
+          connection={connection}
+          serviceProvider={serviceProvider}
+          canManage={canManage}
+        />
       }
     >
       {/* Above the details rather than below them: a test sign-in that just
@@ -203,5 +174,64 @@ export function SingleSignOnCard({
         )}
       </OverviewDetail>
     </OverviewCard>
+  );
+}
+
+/**
+ * Testing the connection, and the document only SAML publishes.
+ *
+ * The test button hands the browser to the identity provider and back, so it
+ * is marked as LEAVING rather than as acting here; a failed attempt keeps it
+ * solid, because the step is still the thing to do.
+ */
+function SingleSignOnCardActions({
+  connection,
+  serviceProvider,
+  canManage,
+}: {
+  connection: LiveSetup["connection"];
+  serviceProvider: LiveSetup["serviceProvider"];
+  canManage: boolean;
+}) {
+  const { start, sending, failure } = useTestSignIn({
+    connectionId: connection.connectionId,
+  });
+  return (
+    <>
+      {canManage && (
+        <Button
+          size="sm"
+          variant={failure ? "solid" : "outline"}
+          loading={sending}
+          onClick={() => void start()}
+        >
+          {/* It hands the browser to the identity provider and back, so
+              it is marked as leaving rather than as acting here. */}
+          {failure ? <RefreshCw size={14} /> : <ExternalLink size={14} />}
+          {failure ? "Try the sign-in again" : "Test sign-in"}
+        </Button>
+      )}
+      {/* Only SAML has a published document to point at. */}
+      {connection.type === "saml" && (
+        <Link href={serviceProvider.metadataUrl} isExternal>
+          <Button size="sm" variant="ghost">
+            <ExternalLink size={14} />
+            Metadata
+          </Button>
+        </Link>
+      )}
+      {/* WHERE THE REST OF IT IS. This card reads; claiming another
+          domain, granting a way back in, changing who it admits and
+          taking it down are the journey, which is a page rather than a
+          mode of this one. */}
+      {canManage && (
+        <Link href="/settings/authentication/provider">
+          <Button size="sm" variant="ghost">
+            <Settings2 size={14} />
+            Edit
+          </Button>
+        </Link>
+      )}
+    </>
   );
 }

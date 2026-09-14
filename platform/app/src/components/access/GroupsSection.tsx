@@ -133,17 +133,8 @@ export function GroupsSection({
   const [selectedGroup, setSelectedGroup] = useState<Group | null>(null);
   const [creating, setCreating] = useState(false);
   const [groupToDelete, setGroupToDelete] = useState<Group | null>(null);
-  const queryClient = api.useUtils();
 
-  const deleteGroup = api.group.delete.useMutation({
-    onSuccess: () => {
-      toaster.create({ title: "Group deleted", type: "success" });
-      void queryClient.group.listAll.invalidate();
-      setGroupToDelete(null);
-    },
-    onError: (error) =>
-      showErrorToast({ error, fallbackTitle: "Couldn't delete the group" }),
-  });
+  const deleteGroup = useDeleteGroup(setGroupToDelete);
 
   const groups = api.group.listAll.useQuery(
     { organizationId },
@@ -152,25 +143,7 @@ export function GroupsSection({
 
   if (isPlanLoading) return <Spinner size="sm" />;
 
-  if (!isEnterprise) {
-    return (
-      <VStack gap={6} align="start" width="full">
-        <Alert.Root status="info">
-          <Alert.Indicator />
-          <Alert.Content>
-            <Alert.Title>Enterprise feature</Alert.Title>
-            <Alert.Description>
-              Groups are available on Enterprise plans. Contact sales to
-              upgrade.
-            </Alert.Description>
-          </Alert.Content>
-        </Alert.Root>
-        <Box width="full">
-          <ContactSalesBlock />
-        </Box>
-      </VStack>
-    );
-  }
+  if (!isEnterprise) return <GroupsNeedEnterprise />;
 
   return (
     <>
@@ -242,44 +215,120 @@ export function GroupsSection({
         onClose={() => setCreating(false)}
       />
 
-      <Dialog.Root
-        open={!!groupToDelete}
-        onOpenChange={(event) => {
-          if (!event.open) setGroupToDelete(null);
-        }}
-      >
-        <Dialog.Content bg="bg" maxWidth="440px">
-          <Dialog.Header>
-            <Dialog.Title>Delete group</Dialog.Title>
-          </Dialog.Header>
-          <Dialog.CloseTrigger />
-          <Dialog.Body>
-            <Text fontSize="sm">
-              {groupToDelete?.scimSource
-                ? "Your identity provider will send this group again on its next sync. Delete it anyway?"
-                : `Delete "${groupToDelete?.name}" and all its access rules?`}
-            </Text>
-          </Dialog.Body>
-          <Dialog.Footer>
-            <Button variant="outline" onClick={() => setGroupToDelete(null)}>
-              Cancel
-            </Button>
-            <Button
-              colorPalette="red"
-              loading={deleteGroup.isPending}
-              onClick={() =>
-                groupToDelete &&
-                deleteGroup.mutate({
-                  organizationId,
-                  groupId: groupToDelete.id,
-                })
-              }
-            >
-              Delete
-            </Button>
-          </Dialog.Footer>
-        </Dialog.Content>
-      </Dialog.Root>
+      <DeleteGroupDialog
+        group={groupToDelete}
+        organizationId={organizationId}
+        deleteGroup={deleteGroup}
+        onClose={() => setGroupToDelete(null)}
+      />
     </>
+  );
+}
+
+/**
+ * Deleting a group, and clearing the confirmation that asked for it.
+ *
+ * The list is invalidated rather than patched: a group's disappearance changes
+ * who is in what, and the rows beside it are drawn from the same read.
+ */
+function useDeleteGroup(
+  setGroupToDelete: React.Dispatch<React.SetStateAction<Group | null>>,
+) {
+  const queryClient = api.useUtils();
+  const deleteGroup = api.group.delete.useMutation({
+    onSuccess: () => {
+      toaster.create({ title: "Group deleted", type: "success" });
+      void queryClient.group.listAll.invalidate();
+      setGroupToDelete(null);
+    },
+    onError: (error) =>
+      showErrorToast({ error, fallbackTitle: "Couldn't delete the group" }),
+  });
+
+  return deleteGroup;
+}
+
+/**
+ * What an organization without the plan sees instead of its groups.
+ *
+ * An upsell rather than an error: nothing is broken, and the control simply is
+ * not part of what this organization bought.
+ */
+function GroupsNeedEnterprise() {
+  return (
+    <VStack gap={6} align="start" width="full">
+      <Alert.Root status="info">
+        <Alert.Indicator />
+        <Alert.Content>
+          <Alert.Title>Enterprise feature</Alert.Title>
+          <Alert.Description>
+            Groups are available on Enterprise plans. Contact sales to upgrade.
+          </Alert.Description>
+        </Alert.Content>
+      </Alert.Root>
+      <Box width="full">
+        <ContactSalesBlock />
+      </Box>
+    </VStack>
+  );
+}
+
+/**
+ * The confirmation in front of deleting a group.
+ *
+ * A group the DIRECTORY sends is a different warning: deleting it locally does
+ * not stop the identity provider re-sending it on the next sync, so the dialog
+ * says so rather than implying the deletion is final.
+ */
+function DeleteGroupDialog({
+  group,
+  organizationId,
+  deleteGroup,
+  onClose,
+}: {
+  group: Group | null;
+  organizationId: string;
+  deleteGroup: ReturnType<typeof useDeleteGroup>;
+  onClose: () => void;
+}) {
+  return (
+    <Dialog.Root
+      open={!!group}
+      onOpenChange={(event) => {
+        if (!event.open) onClose();
+      }}
+    >
+      <Dialog.Content bg="bg" maxWidth="440px">
+        <Dialog.Header>
+          <Dialog.Title>Delete group</Dialog.Title>
+        </Dialog.Header>
+        <Dialog.CloseTrigger />
+        <Dialog.Body>
+          <Text fontSize="sm">
+            {group?.scimSource
+              ? "Your identity provider will send this group again on its next sync. Delete it anyway?"
+              : `Delete "${group?.name}" and all its access rules?`}
+          </Text>
+        </Dialog.Body>
+        <Dialog.Footer>
+          <Button variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button
+            colorPalette="red"
+            loading={deleteGroup.isPending}
+            onClick={() =>
+              group &&
+              deleteGroup.mutate({
+                organizationId,
+                groupId: group.id,
+              })
+            }
+          >
+            Delete
+          </Button>
+        </Dialog.Footer>
+      </Dialog.Content>
+    </Dialog.Root>
   );
 }

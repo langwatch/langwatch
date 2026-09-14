@@ -64,6 +64,37 @@ const EMPTY_FORM: RegisterForm = {
 
 type UpdateField = (key: keyof RegisterForm) => (value: string) => void;
 
+/**
+ * The identity-provider half of the form, in the shape the command takes.
+ *
+ * The two protocols carry different evidence: OIDC is an issuer and a client
+ * credential, SAML is an entry point plus whatever the administrator had —
+ * metadata, a certificate, or neither. Empty strings become null so "not
+ * supplied" and "supplied as blank" cannot be confused downstream.
+ */
+function idpFromForm({
+  protocol,
+  form,
+}: {
+  protocol: SsoProtocol;
+  form: RegisterForm;
+}) {
+  return protocol === "oidc"
+    ? ({
+        protocol,
+        issuer: form.issuer,
+        clientId: form.clientId,
+        clientSecret: form.clientSecret,
+      } as const)
+    : ({
+        protocol,
+        entryPoint: form.entryPoint,
+        entityId: form.entityId || null,
+        metadataXml: form.metadataXml || null,
+        certificate: form.certificate || null,
+      } as const);
+}
+
 export function RegisterConnection({
   organizationId,
   serviceProvider,
@@ -98,21 +129,7 @@ export function RegisterConnection({
   };
 
   const submit = () => {
-    const idp =
-      protocol === "oidc"
-        ? ({
-            protocol,
-            issuer: form.issuer,
-            clientId: form.clientId,
-            clientSecret: form.clientSecret,
-          } as const)
-        : ({
-            protocol,
-            entryPoint: form.entryPoint,
-            entityId: form.entityId || null,
-            metadataXml: form.metadataXml || null,
-            certificate: form.certificate || null,
-          } as const);
+    const idp = idpFromForm({ protocol, form });
     const settle = {
       onSuccess: () => void utils.ssoSetup.getSetup.invalidate(),
     };
