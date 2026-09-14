@@ -1768,6 +1768,15 @@ const presentations = {
     describe: () =>
       "Its sessions were revoked on purpose. Reactivate the account first.",
   },
+  cannot_reimpersonate_while_impersonating: {
+    // A deliberate denial: you are already impersonating an account, so the
+    // audit trail has to return to you before it can name you acting as
+    // somebody else. Stopping the current impersonation is the way to start
+    // another, so the copy names that action rather than inviting a retry.
+    title: "Stop impersonating first",
+    describe: () =>
+      "You are already impersonating an account. Stop before impersonating another.",
+  },
   user_to_impersonate_not_found: {
     title: "User not found",
     describe: () => "They may have been removed since this page loaded.",

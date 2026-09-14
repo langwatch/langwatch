@@ -1,6 +1,7 @@
 import { HandledError, NotFoundError } from "@langwatch/handled-error";
 import { CannotImpersonateWithoutSecondFactorError } from "@langwatch/identity";
 import type { PrismaClient } from "~/generated/prisma/client";
+import { resolveSessionPrincipal } from "~/server/app-layer/identity/impersonation-claims";
 import { isAdmin } from "./isAdmin";
 
 /** Impersonation window handed to the UI once a start call succeeds. */
@@ -37,6 +38,28 @@ export class CannotImpersonateAdminError extends HandledError {
       meta: { userId },
     });
     this.name = "CannotImpersonateAdminError";
+  }
+}
+
+/**
+ * Thrown when a session that is ALREADY impersonating tries to start a new
+ * impersonation without stopping the current one first. Hopping straight from
+ * one subject to another would leave the audit trail without the operator ever
+ * returning to themselves between hops — the same washing-out
+ * {@link CannotImpersonateAdminError} exists to prevent, reached a different
+ * way. To impersonate someone new the operator stops the current impersonation
+ * first. Maps to HTTP 403 — the same status as
+ * {@link CannotImpersonateAdminError} — because the action is deliberately
+ * denied, not a system failure.
+ */
+export class CannotReimpersonateWhileImpersonatingError extends HandledError {
+  constructor() {
+    super(
+      "cannot_reimpersonate_while_impersonating",
+      "Stop the current impersonation before starting another",
+      { httpStatus: 403 },
+    );
+    this.name = "CannotReimpersonateWhileImpersonatingError";
   }
 }
 
@@ -181,6 +204,42 @@ export class ImpersonationService {
   }
 
   async start(input: StartImpersonationInput): Promise<void> {
+    /**
+     * The acting session must not already be impersonating somebody.
+     *
+     * Read FIRST, before the target is even looked up, so a re-impersonation
+     * attempt writes no audit entry and touches no session row. An operator
+     * already inside an impersonation who tries to start a fresh one would
+     * hop subject→subject with the trail never returning to them in between —
+     * so it is refused, and stopping the current window is the way to start
+     * another. The claim is resolved through the same pure function the
+     * session read uses (`getServerAuthSession`), so this fires on exactly the
+     * state that surfaces as `session.user.impersonator`: an active,
+     * unexpired, well-formed window whose actor is the session's own user.
+     */
+    const actingSession = await this.prisma.session.findUnique({
+      where: { id: input.sessionId },
+      select: {
+        userId: true,
+        actorUserId: true,
+        subjectUserId: true,
+        impersonationExpiresAt: true,
+      },
+    });
+    if (actingSession) {
+      const principal = resolveSessionPrincipal({
+        claims: {
+          sessionUserId: actingSession.userId,
+          actorUserId: actingSession.actorUserId,
+          subjectUserId: actingSession.subjectUserId,
+          impersonationExpiresAt: actingSession.impersonationExpiresAt,
+        },
+      });
+      if (principal.subject.userId !== principal.actor.userId) {
+        throw new CannotReimpersonateWhileImpersonatingError();
+      }
+    }
+
     /**
      * The target, plus the memberships that decide whether the operator needs
      * a second factor of their own.

@@ -90,6 +90,7 @@ export const APP_ERROR_CODES = [
   "cannot_impersonate_admin",
   "cannot_impersonate_deactivated_user",
   "cannot_impersonate_without_second_factor",
+  "cannot_reimpersonate_while_impersonating",
   "cannot_remove_last_admin",
   "cannot_remove_self",
   "cannot_remove_self_as_last_admin",

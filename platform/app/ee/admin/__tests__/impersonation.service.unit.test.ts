@@ -5,6 +5,7 @@ import {
   type AuditLogFn,
   CannotImpersonateAdminError,
   CannotImpersonateDeactivatedUserError,
+  CannotReimpersonateWhileImpersonatingError,
   ImpersonationService,
   UserToImpersonateNotFoundError,
 } from "../impersonation.service";
@@ -495,6 +496,58 @@ describe("ImpersonationService", () => {
 
         expect(err).toBeInstanceOf(CannotImpersonateAdminError);
         expect(prisma.session.update).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("given the operator is already impersonating somebody", () => {
+      /**
+       * The re-impersonation guard, executed rather than asserted about.
+       *
+       * The acting session already carries an active, well-formed
+       * impersonation window (its own user is the actor, a different person is
+       * the subject, the window has not lapsed) — exactly the state that
+       * surfaces to the app as `session.user.impersonator`. Starting a fresh
+       * impersonation from there would hop straight to a new subject with the
+       * trail never returning to the operator in between, so it is refused and
+       * nothing is opened: no target is even read, no audit entry is written,
+       * and the session row is untouched.
+       */
+      /** @scenario "An operator already impersonating cannot jump straight to another account" */
+      it("refuses a new impersonation and opens no window", async () => {
+        const prisma = makePrisma();
+        prisma.session.findUnique.mockResolvedValue({
+          userId: "user_admin",
+          actorUserId: "user_admin",
+          subjectUserId: "user_existing_subject",
+          impersonationExpiresAt: new Date(Date.now() + 60 * 60 * 1000),
+        });
+        const auditLog = makeAuditLog();
+        const service = ImpersonationService.create(
+          prisma as unknown as PrismaClient,
+          auditLog,
+          resolveIdentityEmail,
+        );
+
+        const err = await service
+          .start({
+            sessionId: "sess_1",
+            impersonatorUserId: "user_admin",
+            userIdToImpersonate: "user_new_target",
+            reason: "Debugging trace #99",
+            req: {},
+          })
+          .catch((e) => e);
+
+        expect(err).toBeInstanceOf(CannotReimpersonateWhileImpersonatingError);
+        expect(err).toMatchObject({
+          code: "cannot_reimpersonate_while_impersonating",
+          httpStatus: 403,
+        });
+        // No window opened, nothing recorded, and the new target was never
+        // even looked up.
+        expect(prisma.session.update).not.toHaveBeenCalled();
+        expect(auditLog.calls).toHaveLength(0);
+        expect(prisma.user.findUnique).not.toHaveBeenCalled();
       });
     });
   });

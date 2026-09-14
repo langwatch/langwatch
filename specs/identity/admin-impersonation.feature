@@ -43,6 +43,19 @@ Feature: Who an administrator may borrow access from
     Then the request is refused
     And no impersonation window is opened
 
+  # Impersonation is meant to be entered and left one subject at a time. An
+  # operator already inside one who jumps straight to a second account leaves
+  # the audit trail hopping subject→subject, never passing back through the
+  # operator between hops — the same washing-out the admin-to-admin refusal
+  # exists to prevent, reached another way. So the way to borrow a new account
+  # is to stop the current impersonation first.
+  @unit
+  Scenario: An operator already impersonating cannot jump straight to another account
+    Given the operator is already impersonating an account
+    When they try to impersonate a different account without stopping first
+    Then the request is refused as not permitted, telling them to stop first
+    And no new impersonation window is opened
+
   @unit
   Scenario: An account that does not exist is not impersonated
     Given the target does not name anybody
