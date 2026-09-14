@@ -12,7 +12,7 @@ import {
   PrismaWebhookEndpointRepository,
   type WebhookEndpointDeps,
 } from "../../repositories/prisma/prisma.webhook-endpoint.repository.ts";
-import { WebhookApp } from "../../app/webhook.app.ts";
+import { WebhookApp, type WebhookAppDependencies } from "../../app/webhook.app.ts";
 import { WebhookId } from "../../app/webhook.app.ts";
 import { WebhookSecret } from "../../app/webhook.app.ts";
 import { webhookEndpointTrpcTransport } from "../webhook-endpoint.trpc.ts";
@@ -106,6 +106,14 @@ function mount(options: { prisma?: ReturnType<typeof buildMockPrisma>; denied?: 
     dispatch: () => {
       throw new Error("The test fire is a REST-only path");
     },
+    endpointStream: {
+      flush: () => {
+        throw new Error("Endpoint stream flush is not exercised by these scenarios");
+      },
+      appendReplay: () => {
+        throw new Error("Replay append is not exercised by these scenarios");
+      },
+    } as unknown as WebhookAppDependencies["endpointStream"],
   });
 
   const trpc = initTRPC.context<WebhookEndpointTrpcTestContext>().create();

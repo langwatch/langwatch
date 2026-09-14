@@ -55,6 +55,13 @@ export interface WebhookApi {
     id: string;
   }): Promise<WebhookEnvelope | null>;
   assertEndpointsEntitled(organizationId: string): Promise<void>;
+  /** Re-delivers one already-emitted envelope through the endpoint's normal delivery path. */
+  appendReplayToEndpointStream(input: {
+    organizationId: string;
+    endpoint: { id: string; enabledEvents: readonly string[] };
+    envelope: WebhookEnvelope;
+    replayId: string;
+  }): Promise<void>;
 }
 
 export const WebhookApi = moduleApi<WebhookApi>("webhook");

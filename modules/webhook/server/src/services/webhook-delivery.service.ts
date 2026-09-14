@@ -11,12 +11,9 @@ import { DispatchError } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
 import { eventMatches, type WebhookEndpointView } from "@langwatch/webhook-contract";
-import {
-  WebhookBatchPlannerService,
-  type PendingEnvelope,
-} from "./webhook-batch-planner.service.ts";
 import { WebhookEnvelopeService, type WebhookSpendEventRow } from "./webhook-envelope.service.ts";
 import type { WebhookDestinationConfig } from "./webhook-destination.service.ts";
+import { WebhookEndpointStreamService } from "./webhook-endpoint-stream.service.ts";
 import { nanoUsdToDecimalString } from "@langwatch/gateway-contract";
 import {
   confirmedDeliverPayload,
@@ -31,7 +28,6 @@ import {
   GATEWAY_SPEND_FAILED_EVENT_TYPE,
   GATEWAY_SPEND_SETTLED_EVENT_TYPE,
   INITIAL_WEBHOOK_DELIVERY_STATE,
-  WEBHOOK_DELIVERY_PROCESS_NAME,
   WEBHOOK_SEND_MAX_ATTEMPTS,
   deliverSchema,
   flushEndpointSchema,
@@ -39,7 +35,6 @@ import {
   type AdmitSpendCommandData,
   type ConfirmSpendCommandData,
   type DeliverPayload,
-  type EndpointStreamState,
   type FailSpendCommandData,
   type FlushEndpointPayload,
   type GatewaySpendProcessingEvent,
@@ -137,9 +132,15 @@ export class WebhookDeliveryService {
 
   private readonly maintenance: WebhookDeliveryMaintenanceService;
 
+  private readonly stream: WebhookEndpointStreamService;
+
   private constructor(private readonly deps: WebhookDeliveryProcessDeps) {
     this.batchSend = WebhookBatchSendService.create(deps);
     this.maintenance = WebhookDeliveryMaintenanceService.create(deps);
+    this.stream = WebhookEndpointStreamService.create({
+      processStore: deps.processStore,
+      ...(deps.now ? { now: deps.now } : {}),
+    });
   }
 
   static create(deps: WebhookDeliveryProcessDeps): WebhookDeliveryService {
@@ -224,13 +225,7 @@ export class WebhookDeliveryService {
     envelope,
     replayId,
   }: WebhookReplayWithDependencies): Promise<void> {
-    await this.flushEndpointStream({
-      organizationId,
-      endpoint,
-      append: envelope,
-      appendSalt: replayId,
-      sourceEventId: `replay:${replayId}:${endpoint.id}:${envelope.id}`,
-    });
+    await this.stream.appendReplay({ organizationId, endpoint, envelope, replayId });
   }
 
   /**
@@ -272,7 +267,7 @@ export class WebhookDeliveryService {
       ) as SendBatchPayload["envelopes"][number];
 
       for (const endpoint of endpoints) {
-        await this.flushEndpointStream({
+        await this.stream.flush({
           organizationId,
           endpoint,
           append: envelope,
@@ -298,7 +293,7 @@ export class WebhookDeliveryService {
         return;
       }
 
-      await this.flushEndpointStream({
+      await this.stream.flush({
         organizationId: payload.organizationId,
         endpoint,
       });
@@ -311,84 +306,6 @@ export class WebhookDeliveryService {
    */
   runWebhookSendBatch(): IntentExecutor<SendBatchPayload> {
     return this.batchSend.run();
-  }
-
-  /**
-   * The coalescing core shared by the deliver and flush executors: append an
-   * envelope (when given) to the endpoint's buffered stream, then ship as
-   * many full-or-due batches as the in-flight cap allows, in one atomic
-   * commit of buffer state + outbox messages.
-   *
-   * Redelivery safety: deliver appends carry an inbox sourceEventId (the
-   * store absorbs duplicates), flushes are revision-guarded, and the batch
-   * message key is a content hash, so any retry re-derives the same key and
-   * the outbox suppresses it.
-   */
-  private async flushEndpointStream({
-    organizationId,
-    endpoint,
-    append,
-    appendSalt,
-    sourceEventId,
-  }: {
-    organizationId: string;
-    endpoint: WebhookEndpointView;
-    append?: SendBatchPayload["envelopes"][number];
-    appendSalt?: string;
-    sourceEventId?: string;
-  }): Promise<void> {
-    const now = (this.deps.now ?? Date.now)();
-    // Endpoints belong to the ORGANIZATION, so the stream does too: one row
-    // per endpoint holds one buffer, one outstanding-send count, and
-    // therefore one max_in_flight, no matter how many of the org's projects
-    // feed it. Keying by project would give an endpoint N of each.
-    const ref = {
-      processName: WEBHOOK_DELIVERY_PROCESS_NAME,
-      projectId: organizationId,
-      processKey: `endpoint:${endpoint.id}`,
-    };
-    const existing = await this.deps.processStore.findByRef<EndpointStreamState>({
-      ref,
-    });
-    const pending: PendingEnvelope[] = existing?.state.pending ? [...existing.state.pending] : [];
-    if (append) {
-      const item: PendingEnvelope = { envelope: append, appendedAtMs: now };
-      if (appendSalt) {
-        item.salt = appendSalt;
-      }
-
-      pending.push(item);
-    }
-
-    const outstanding = (await this.deps.processStore.findMessagesByRef({ ref })).filter(
-      (m) => m.intentType === "sendBatch" && m.status === "pending",
-    ).length;
-
-    const planner = WebhookBatchPlannerService.create({ endpoint });
-    const { messages, remaining, inFlight } = planner.plan({
-      organizationId,
-      pending,
-      outstanding,
-      now,
-    });
-
-    const result = await this.deps.processStore.commit<EndpointStreamState>({
-      ref,
-      tenantId: organizationId,
-      sourceEventId: sourceEventId ?? null,
-      expectedRevision: existing?.revision ?? 0,
-      state: { pending: remaining },
-      nextWakeAt: planner.findNextWakeAt({ remaining, inFlight, now }),
-      messages,
-      now,
-    });
-    if (result.outcome === "revisionConflict") {
-      // A concurrent append or flush won the stream's revision; retry this
-      // intent so nothing is lost (idempotent by inbox id and content key).
-      throw new Error(
-        `webhook stream flush hit a revision conflict on endpoint ${endpoint.id}; retrying`,
-      );
-    }
   }
 
   /** The org's ACTIVE endpoints whose subscription covers this outcome. */

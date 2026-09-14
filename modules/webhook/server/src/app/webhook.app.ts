@@ -16,6 +16,7 @@ import type { WebhookDestinationConfig } from "../services/webhook-destination.s
 import { WebhookEnvelopeService } from "../services/webhook-envelope.service.ts";
 import { WebhookEventsService } from "../services/webhook-events.service.ts";
 import { WebhookHealthService, type WebhookHealthDeps } from "../services/webhook-health.service.ts";
+import { WebhookEndpointStreamService } from "../services/webhook-endpoint-stream.service.ts";
 
 /** The single-envelope batch a test fire sends. */
 function testFireBody(now: Instant): string {
@@ -85,6 +86,13 @@ export interface WebhookAppDependencies {
    * delivery worker performs, not a second HTTP client that only knows URLs.
    */
   dispatch: WebhookTestDispatch;
+  /**
+   * The same coalescing endpoint stream the delivery worker appends live
+   * spend outcomes to, shared over the process's one `processStore` member
+   * so a replay rides the exact live-delivery machinery rather than a
+   * second delivery path of this app's own.
+   */
+  endpointStream: WebhookEndpointStreamService;
 }
 
 /**
@@ -134,6 +142,9 @@ export class WebhookApp implements WebhookApiContract {
       }),
       assertEndpointsEntitled: input.members.assertEndpointsEntitled,
       dispatch: input.members.dispatch,
+      endpointStream: WebhookEndpointStreamService.create({
+        processStore: input.members.processStore,
+      }),
     });
   }
 
@@ -223,6 +234,31 @@ export class WebhookApp implements WebhookApiContract {
     this.requireEvents().getEmittedEvents(input);
   findEmittedEventById: WebhookApiContract["findEmittedEventById"] = (input) =>
     this.requireEvents().findEmittedEventById(input);
+  appendReplayToEndpointStream: WebhookApiContract["appendReplayToEndpointStream"] = async ({
+    organizationId,
+    endpoint,
+    envelope,
+    replayId,
+  }) => {
+    // The caller (the gateway's replay route) names the endpoint by id only;
+    // the stream needs its live delivery controls (batch size, delay,
+    // in-flight cap), so this re-resolves the full deliverable view rather
+    // than trusting the caller's reduced projection.
+    const deliverable = await this.#dependencies.endpoints.findDeliverable({
+      organizationId,
+      endpointId: endpoint.id,
+    });
+    if (!deliverable) {
+      throw new Error(`webhook endpoint ${endpoint.id} is not deliverable for replay`);
+    }
+
+    await this.#dependencies.endpointStream.appendReplay({
+      organizationId,
+      endpoint: deliverable,
+      envelope,
+      replayId,
+    });
+  };
 
   /**
    * Reuses this process's endpoint, event and delivery graph with its
