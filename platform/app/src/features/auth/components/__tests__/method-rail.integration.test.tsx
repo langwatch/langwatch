@@ -84,7 +84,7 @@ describe("the rail of alternative sign-in methods", () => {
       ]);
     });
 
-    /**
+    /*
      * The regression this file exists for. The rail used to fold the cloud's
      * whole social set in whenever `import.meta.env.DEV` was true, which is
      * every development and preview build — so the people most likely to
@@ -93,9 +93,8 @@ describe("the rail of alternative sign-in methods", () => {
      *
      * A test run IS a development build by that measure, which is what makes
      * this assertion bite rather than pass by accident.
-     *
-     * @scenario "The rail beside the address offers exactly what the deployment configured"
      */
+    /** @scenario "The rail beside the address offers exactly what the deployment configured" */
     it("adds nothing of its own on a development build", () => {
       expect(import.meta.env.DEV).toBe(true);
 

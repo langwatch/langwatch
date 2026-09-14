@@ -257,14 +257,13 @@ describe("the instance sign-in method policy", () => {
       ]);
     });
 
-    /**
+    /*
      * better-auth registers Microsoft under `microsoft`; everything outside it
      * — the env value, the Account rows, the callback path Azure has
      * registered, the label — calls the same provider `azure-ad`. Both names
      * reach the policy, and the rail must draw one button.
-     *
-     * @scenario "Every social provider this deployment mounted is offered by name"
      */
+    /** @scenario "Every social provider this deployment mounted is offered by name" */
     it("offers a provider named two ways exactly once", async () => {
       envMock.NEXTAUTH_PROVIDER = "azure-ad";
       socialCredentials("azure-ad");
