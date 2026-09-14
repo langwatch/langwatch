@@ -92,6 +92,26 @@ thing that can create these objects when it does not own the server."
   credential, so unlike every other rendered credential this one cannot be
   hashed and lands in plaintext in `config.d/`.
 
+## Update — #8085: the tenant predicate is a set, single-sourced
+
+As of #8085 the tenant capability carries a *set* of the caller's per-project
+key hashes (comma-joined), and the row-policy predicate is set membership
+(`has(splitByChar(',', getSetting(...)), KeyHash)`) rather than a single-hash
+equality — so one key reaches every project it can read.
+
+Because the same predicate must be identical across all three provisioning
+copies this ADR governs, it is now single-sourced as SQL text with
+`{placeholder}` slots:
+
+- `infra/clickhouse-serverless/internal/render/lwqlTenantPredicate.sql` and
+  `lwqlKeyMapSelfFilter.sql` — embedded by `lwql.go` (`//go:embed`).
+- `accessModel.ts` mirrors them as `LWQL_TENANT_PREDICATE_TEMPLATE` /
+  `LWQL_KEY_MAP_SELF_FILTER_TEMPLATE`, and
+  `provisioning/__tests__/lwqlPredicateParity.unit.test.ts` fails the build if
+  the app constant and the embedded file drift apart.
+- The SaaS `render-config.sh` (langwatch-saas#1233) remains a third copy this
+  repo cannot check; it must be updated to the same set-membership predicate.
+
 ## References
 
 - Issue: https://github.com/langwatch/langwatch-saas/issues/1168 (Design C)

@@ -187,7 +187,12 @@ function registerRun(secured: ReturnType<typeof createProjectApp>): void {
       );
 
       const result = await getLangWatchQLService().execute({
-        project,
+        // The tenant-capability SET the service resolves; a project-scoped
+        // credential is a set of one. The cross-project fan-out for an
+        // organization key — resolving every project the key holds
+        // `analytics:view` on via `resolveLwqlReadableProjects` — mounts on
+        // `createOrgApp` and lands with the route reroute (#8085 Step 5).
+        projects: [project],
         protections,
         sql,
         ...(parameters ? { parameters } : {}),

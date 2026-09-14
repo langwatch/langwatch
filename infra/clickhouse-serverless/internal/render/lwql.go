@@ -6,9 +6,34 @@ import (
 	"encoding/json"
 	"fmt"
 	"path/filepath"
+	"strings"
 
 	"github.com/langwatch/langwatch/infra/clickhouse-serverless/internal/config"
 )
+
+// lwqlTenantPredicateTemplate and lwqlKeyMapSelfFilterTemplate are the tenant
+// row filter and the key map's self-filter, single-sourced across languages
+// (ADR-101). The same two files are mirrored as string constants in the app's
+// accessModel.ts, and a TypeScript parity test fails when either side drifts —
+// so this chart-rendered filter and the row policy the app self-provisions on a
+// BYO server can never diverge into "zero rows" or "over-broad rows".
+//
+//go:embed lwqlTenantPredicate.sql
+var lwqlTenantPredicateTemplate string
+
+//go:embed lwqlKeyMapSelfFilter.sql
+var lwqlKeyMapSelfFilterTemplate string
+
+// renderLWQLPredicate substitutes the {placeholder} slots of a single-sourced
+// predicate template. Every value is a fixed identifier or a validated database
+// name, so it only assembles text and adds no escaping of its own.
+func renderLWQLPredicate(template string, substitutions map[string]string) string {
+	rendered := strings.TrimSpace(template)
+	for name, value := range substitutions {
+		rendered = strings.ReplaceAll(rendered, "{"+name+"}", value)
+	}
+	return rendered
+}
 
 // lwqlCatalogJSON is the manifest that is the single source of truth for the
 // Go side of the LangWatchQL access model. It is embedded rather than read at
@@ -146,22 +171,30 @@ func renderLWQL(input *config.Input, usersD, configD string) error {
 		return fmt.Errorf("lwql: database name is not a plain identifier: %q", db)
 	}
 
-	// One fixed tenant filter for every source table. The tenant is supplied
-	// per query by custom_api_key_hash, never baked in here — nothing is
-	// per-tenant, so this string is identical on every node and every tenant.
-	tenantFilter := fmt.Sprintf(
-		"TenantId IN (SELECT any(TenantId) FROM %s.lwql_api_key_tenant_map "+
-			"WHERE KeyHash = getSetting('custom_api_key_hash') HAVING uniqExact(TenantId) = 1)",
-		db,
-	)
+	// One fixed tenant filter for every source table. The tenant SET is supplied
+	// per query by custom_api_key_hash (a comma-joined set of the caller's
+	// per-project key hashes), never baked in here — nothing is per-tenant, so
+	// this string is identical on every node and every tenant.
+	tenantFilter := renderLWQLPredicate(lwqlTenantPredicateTemplate, map[string]string{
+		"tenantColumn":  "TenantId",
+		"tenantId":      "TenantId",
+		"keyHash":       "KeyHash",
+		"keyMap":        fmt.Sprintf("%s.lwql_api_key_tenant_map", db),
+		"tenantSetting": "custom_api_key_hash",
+	})
+	keyMapSelfFilter := renderLWQLPredicate(lwqlKeyMapSelfFilterTemplate, map[string]string{
+		"keyHash":       "KeyHash",
+		"tenantSetting": "custom_api_key_hash",
+	})
 
 	// Grants: the lwql_* wildcard (reaches the key map and any lwql_-prefixed
 	// object), plus one explicit SELECT per source table and per view.
 	grants := []string{fmt.Sprintf("GRANT SELECT ON %s.lwql_*", db)}
-	// Row filters: the key map keyed directly on the query setting, then the
-	// shared tenant filter on every source table.
+	// Row filters: the key map keyed on set membership of the query setting (it
+	// governs the very subquery the tenant filter runs against, so it must be
+	// the same set test), then the shared tenant filter on every source table.
 	tableFilters := map[string]lwqlRowFilter{
-		"lwql_api_key_tenant_map": {Filter: "KeyHash = getSetting('custom_api_key_hash')"},
+		"lwql_api_key_tenant_map": {Filter: keyMapSelfFilter},
 	}
 	for _, table := range lwqlSourceTables {
 		grants = append(grants, fmt.Sprintf("GRANT SELECT ON %s.%s", db, table))

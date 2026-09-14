@@ -1095,6 +1095,31 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
       When they run a query without naming a project
       Then they get rows from all of those projects
 
+    # The database-side proof of the same behaviour: the tenant capability now
+    # carries a SET of the caller's per-project key hashes, and the row policy
+    # admits every tenant an in-set hash maps to.
+    @integration
+    Scenario: The tenant capability set admits every project the key can read
+      Given the restricted identity carries a key-hash set for tenant-a and tenant-b
+      When it selects from a LangWatchQL table
+      Then rows from tenant-a and tenant-b are both returned
+      And no row of a tenant whose hash is outside the set is returned
+
+    @unit
+    Scenario: The tenant capability is the sorted set of the caller's project key hashes
+      Given the LangWatchQL secrets of the projects a key can read
+      When the tenant capability set is derived
+      Then it is the comma-joined, sorted, deduplicated hash of each secret
+      And an empty project set derives the empty capability that reads zero rows
+
+    @unit
+    Scenario: The readable project set is every project the key grants analytics:view on
+      Given an authenticated API key and the projects in its scope
+      When the readable project set is resolved
+      Then it holds exactly the projects the key grants analytics:view on
+      And a project whose analytics:view permission is withheld is excluded
+      And a project API key resolves to exactly its own project
+
   Rule: Narrow to one project inside the query
 
     @e2e @unimplemented
@@ -1103,6 +1128,13 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
       When they run a query that filters to one project
       Then they get rows from that project only
 
+    @integration
+    Scenario: A key-hash set of one admits exactly that project
+      Given the restricted identity carries a key-hash set holding only tenant-a
+      When it selects from a LangWatchQL table
+      Then every returned row belongs to tenant-a
+      And no row of tenant-b is returned
+
   Rule: Never see a project the key cannot read
 
     @e2e @unimplemented
@@ -1110,6 +1142,19 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
       Given a user with an API key with no access to project X
       When they run a query that names project X
       Then they get no rows from project X
+
+    @integration
+    Scenario: A hash outside the key-hash set never contributes rows
+      Given the restricted identity carries a key-hash set that omits tenant-b
+      When it selects from a LangWatchQL table
+      Then no row of tenant-b is returned
+      And an empty key-hash set returns zero rows
+
+    @unit
+    Scenario: The tenant predicate and the rendered config predicate are the same text
+      Given the single-sourced LangWatchQL tenant predicate template
+      When the application row policy and the rendered ClickHouse config are compared
+      Then both use the same predicate text, so neither can drift into over-broad or empty results
 
   Rule: Discover what I can ask
 

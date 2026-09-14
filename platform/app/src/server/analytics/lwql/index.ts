@@ -8,7 +8,7 @@
  * @see specs/lwql/api.feature
  */
 
-export { lwqlTenantCapability } from "./capability";
+export { lwqlTenantCapability, lwqlTenantCapabilitySet } from "./capability";
 export type { LangWatchQLColumnUnit } from "./catalog/types";
 export { LWQL_COLUMN_UNITS } from "./catalog/types";
 export type { LangWatchQLConnection } from "./connection";
@@ -41,6 +41,7 @@ export {
 } from "./executor";
 export { MAX_LWQL_LENGTH } from "./limits";
 export type {
+  LangWatchQLCaller,
   LangWatchQLQueryResult,
   ValidatedLangWatchQL,
 } from "./lwql.service";

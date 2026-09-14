@@ -205,6 +205,98 @@ describe("given the LangWatchQL analytics setup applied to a ClickHouse 25.10 se
     });
   });
 
+  describe("when the key-hash context carries a set of hashes (#8085)", () => {
+    /**
+     * The multi-project proof the pre-#8085 single-hash predicate could not
+     * make: one capability carrying both tenants' hashes reads the union of
+     * their rows, and a third tenant whose hash is outside the set contributes
+     * nothing. Only tenant-a and tenant-b are seeded, so "no tenant outside the
+     * set" is proven by the distinct set being exactly {a, b} against a control
+     * that both have rows.
+     */
+    /** @scenario "The tenant capability set admits every project the key can read" */
+    it("admits every tenant whose hash is in the set", async () => {
+      const control = await recordSeedControl({
+        harness,
+        table: "traces",
+        tenantColumn: "TenantId",
+      });
+      const bothTenants = await harness.restrictedClient({
+        keyHash: `${harness.tenantA.keyHash},${harness.tenantB.keyHash}`,
+      });
+
+      const rows = await selectRows<{ TenantId: string }>(
+        bothTenants,
+        `SELECT TenantId FROM ${database}.traces`,
+      );
+      const distinct = [...new Set(rows.map((row) => row.TenantId))].sort();
+
+      expect(distinct).toEqual(
+        [harness.tenantA.tenantId, harness.tenantB.tenantId].sort(),
+      );
+      // Exact, not a subset: every seeded row of both tenants comes back, so
+      // the set widened the scope rather than swallowing part of it.
+      expect(rows).toHaveLength(control.tenantA + control.tenantB);
+    });
+
+    /** @scenario "A key-hash set of one admits exactly that project" */
+    it("admits exactly the one tenant when the set holds a single hash", async () => {
+      const control = await recordSeedControl({
+        harness,
+        table: "traces",
+        tenantColumn: "TenantId",
+      });
+      const onlyA = await harness.restrictedClient({
+        keyHash: harness.tenantA.keyHash,
+      });
+
+      const rows = await selectRows<{ TenantId: string }>(
+        onlyA,
+        `SELECT TenantId FROM ${database}.traces`,
+      );
+
+      expect(new Set(rows.map((row) => row.TenantId))).toEqual(
+        new Set([harness.tenantA.tenantId]),
+      );
+      expect(
+        rows,
+        `a set of one returned rows for another tenant while ${control.tenantB} tenant-b rows exist`,
+      ).toHaveLength(control.tenantA);
+    });
+
+    /** @scenario "A hash outside the key-hash set never contributes rows" */
+    it("never returns a tenant whose hash the set omits, and reads nothing for an empty set", async () => {
+      const control = await recordSeedControl({
+        harness,
+        table: "traces",
+        tenantColumn: "TenantId",
+      });
+
+      // tenant-b's hash is deliberately outside the set.
+      const withoutB = await harness.restrictedClient({
+        keyHash: harness.tenantA.keyHash,
+      });
+      const distinct = await selectRows<{ TenantId: string }>(
+        withoutB,
+        `SELECT DISTINCT TenantId FROM ${database}.traces`,
+      );
+      const tenants = distinct.map((row) => row.TenantId);
+      expect(
+        tenants,
+        `a hash outside the set leaked tenant-b rows (of ${control.tenantB} seeded)`,
+      ).not.toContain(harness.tenantB.tenantId);
+      expect(tenants).toEqual([harness.tenantA.tenantId]);
+
+      // An explicit empty set reads zero rows, exactly like the profile default.
+      const emptySet = await harness.restrictedClient({ keyHash: "" });
+      const emptyRows = await selectRows<{ TenantId: string }>(
+        emptySet,
+        `SELECT TenantId FROM ${database}.traces`,
+      );
+      expect(emptyRows).toHaveLength(0);
+    });
+  });
+
   describe("when the query text overrides settings", () => {
     /** @scenario "Overriding the tenant setting in query text cannot reach another tenant's rows without that tenant's valid key hash" */
     it("reaches no foreign rows with a guessed tenant setting", async () => {

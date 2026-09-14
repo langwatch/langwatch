@@ -49,7 +49,7 @@
 
 import { createLogger } from "@langwatch/observability";
 import type { Protections } from "../../traces/protections";
-import { lwqlTenantCapability } from "./capability";
+import { lwqlTenantCapabilitySet } from "./capability";
 import { LWQL_VIEW_CATALOG } from "./catalog/lwqlViews";
 import {
   type LangWatchQLViewDefinition,
@@ -224,7 +224,7 @@ export interface LangWatchQLQueryResult {
   readonly coarsenedFromSeconds?: number;
 }
 
-/** The tenant a query runs for. Only these two fields are ever needed. */
+/** One project a query runs for. Only these two fields are ever needed. */
 export interface LangWatchQLCaller {
   /** Project id. Used for logging; the database resolves the tenant itself. */
   readonly id: string;
@@ -236,7 +236,15 @@ export interface LangWatchQLCaller {
 }
 
 export interface LangWatchQLExecuteInput {
-  readonly project: LangWatchQLCaller;
+  /**
+   * Every project this query may read — one for an in-product surface bound to
+   * the project it is showing, many for an API key that reaches several. Their
+   * secrets become the tenant-capability SET the row policy resolves, so a
+   * query returns the union of these projects' rows and nothing else. An empty
+   * set is a valid scope (a key that can read nothing) and reads zero rows; the
+   * database, not this, decides which rows each project contributes.
+   */
+  readonly projects: readonly LangWatchQLCaller[];
   /** Resolved server-side from the authenticated context. */
   readonly protections: Protections;
   /** The SQL exactly as submitted. */
@@ -501,7 +509,7 @@ export class LangWatchQLService {
    *   is provisioned.
    */
   async execute({
-    project,
+    projects,
     protections,
     sql,
     parameters,
@@ -509,8 +517,10 @@ export class LangWatchQLService {
     granularitySeconds,
     onBudgetOverflow,
   }: LangWatchQLExecuteInput): Promise<LangWatchQLQueryResult> {
+    // Only logging reads this; the database resolves the tenant set itself.
+    const scopeLabel = projects.map((project) => project.id).join(",") || "(none)";
     const validation = this.validate({
-      projectId: project.id,
+      projectId: scopeLabel,
       protections,
       sql,
       ...(parameters ? { parameters } : {}),
@@ -532,7 +542,7 @@ export class LangWatchQLService {
     const { executor } = this.deps;
     if (!executor) {
       logger.error(
-        { projectId: project.id },
+        { projectIds: projects.map((project) => project.id) },
         "LangWatchQL query refused: no restricted identity is provisioned",
       );
       throw new LangWatchQLUnavailableError();
@@ -540,7 +550,7 @@ export class LangWatchQLService {
 
     return await this.executeValidated({
       executor,
-      project,
+      projects,
       sql,
       validation,
       granularity,
@@ -557,13 +567,13 @@ export class LangWatchQLService {
    */
   private async executeValidated({
     executor,
-    project,
+    projects,
     sql,
     validation,
     granularity,
   }: {
     readonly executor: LangWatchQLExecutor;
-    readonly project: LangWatchQLCaller;
+    readonly projects: readonly LangWatchQLCaller[];
     readonly sql: string;
     readonly validation: ValidatedLangWatchQL;
     readonly granularity: LangWatchQLGranularityResolution;
@@ -585,8 +595,8 @@ export class LangWatchQLService {
       ...(Object.keys(executionParameters).length > 0
         ? { parameters: executionParameters }
         : {}),
-      tenantCapability: lwqlTenantCapability({
-        secret: project.lwqlKey,
+      tenantCapability: lwqlTenantCapabilitySet({
+        secrets: projects.map((project) => project.lwqlKey),
       }),
       limits: this.limits,
     });
@@ -608,7 +618,7 @@ export class LangWatchQLService {
 
     logger.info(
       {
-        projectId: project.id,
+        projectIds: projects.map((project) => project.id),
         tables: validation.tables,
         rowsReturned: execution.statistics.rowsReturned,
         rowsRead: execution.statistics.rowsRead,

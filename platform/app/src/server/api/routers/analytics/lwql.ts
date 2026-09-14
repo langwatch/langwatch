@@ -135,7 +135,8 @@ const query = protectedProcedure
     });
 
     return getLangWatchQLService().execute({
-      project,
+      // A workbench run is bound to the one project the surface is showing.
+      projects: [project],
       protections,
       sql: input.sql,
       ...(input.parameters ? { parameters: input.parameters } : {}),

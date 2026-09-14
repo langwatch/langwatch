@@ -391,7 +391,8 @@ export class SavedWorkbenchChartService {
     const chart = await this.getById({ id, projectId });
 
     return this.deps.lwql.execute({
-      project,
+      // A saved chart runs against the one project it lives in.
+      projects: [project],
       protections,
       sql: chart.definition.sql,
       parameters: chart.definition.parameters,

@@ -22,6 +22,7 @@ import {
   applyLangWatchQLResultLimits,
   type LangWatchQLExecutor,
 } from "../executor";
+import { lwqlTenantCapability } from "../capability";
 import { recordingExecutor } from "../executor.testFakes";
 import {
   closeLangWatchQLService,
@@ -119,7 +120,7 @@ describe("given the LangWatchQL service", () => {
         "SELECT   TraceId,\n  count() AS n\nFROM analytics.traces\nGROUP BY TraceId";
 
       await serviceWith(executor).execute({
-        project: PROJECT,
+        projects: [PROJECT],
         protections: FULLY_PERMITTED,
         sql,
       });
@@ -132,7 +133,7 @@ describe("given the LangWatchQL service", () => {
       const executor = recordingExecutor();
 
       await serviceWith(executor).execute({
-        project: PROJECT,
+        projects: [PROJECT],
         protections: FULLY_PERMITTED,
         sql: "SELECT count() FROM analytics.traces",
       });
@@ -163,7 +164,7 @@ describe("given the LangWatchQL service", () => {
       const executor = recordingExecutor();
 
       await serviceWith(executor).execute({
-        project: PROJECT_WITH_API_KEY,
+        projects: [PROJECT_WITH_API_KEY],
         protections: FULLY_PERMITTED,
         sql: "SELECT count() FROM analytics.traces",
       });
@@ -181,9 +182,36 @@ describe("given the LangWatchQL service", () => {
       );
     });
 
+    /**
+     * A key that reaches several projects sends the SET of their capabilities,
+     * so the row policy admits the union of their tenants. One caller, one
+     * setting value, every project's hash inside it.
+     */
+    /** @scenario "The tenant capability is the sorted set of the caller's project key hashes" */
+    it("sends the sorted, comma-joined capability set for a multi-project caller", async () => {
+      const executor = recordingExecutor();
+
+      await serviceWith(executor).execute({
+        projects: [
+          { id: "project-b", lwqlKey: "secret-b" },
+          { id: "project-a", lwqlKey: "secret-a" },
+          // A duplicate secret must not double-count in the set.
+          { id: "project-a-again", lwqlKey: "secret-a" },
+        ],
+        protections: FULLY_PERMITTED,
+        sql: "SELECT count() FROM analytics.traces",
+      });
+
+      const expected = [
+        lwqlTenantCapability({ secret: "secret-a" }),
+        lwqlTenantCapability({ secret: "secret-b" }),
+      ].sort();
+      expect(executor.calls[0]!.tenantCapability.split(",")).toEqual(expected);
+    });
+
     it("returns the executor's typed columns, rows and statistics with no diagnostics", async () => {
       const result = await serviceWith(recordingExecutor()).execute({
-        project: PROJECT,
+        projects: [PROJECT],
         protections: FULLY_PERMITTED,
         sql: BOUNDED_COUNT,
       });
@@ -201,7 +229,7 @@ describe("given the LangWatchQL service", () => {
       const result = await serviceWith(
         recordingExecutor({ truncated: true }),
       ).execute({
-        project: PROJECT,
+        projects: [PROJECT],
         protections: FULLY_PERMITTED,
         sql:
           "SELECT TraceId FROM analytics.traces " +
@@ -224,7 +252,7 @@ describe("given the LangWatchQL service", () => {
       expect(
         await codeOf(() =>
           service.execute({
-            project: PROJECT,
+            projects: [PROJECT],
             protections: FULLY_PERMITTED,
             sql: "INSERT INTO analytics.traces VALUES (1)",
           }),
@@ -246,7 +274,7 @@ describe("given the LangWatchQL service", () => {
         expect(
           await codeOf(() =>
             service.execute({
-              project: PROJECT,
+              projects: [PROJECT],
               protections: FULLY_PERMITTED,
               sql,
             }),
@@ -262,7 +290,7 @@ describe("given the LangWatchQL service", () => {
       expect(
         await codeOf(() =>
           service.execute({
-            project: PROJECT,
+            projects: [PROJECT],
             protections: FULLY_PERMITTED,
             sql: "SELECT FROM WHERE )(",
           }),
@@ -273,7 +301,7 @@ describe("given the LangWatchQL service", () => {
     it("carries every violation in meta so an agent can fix them in one pass", async () => {
       const meta = await metaOf(() =>
         serviceWith(recordingExecutor()).execute({
-          project: PROJECT,
+          projects: [PROJECT],
           protections: FULLY_PERMITTED,
           sql: "SELECT * FROM analytics.nowhere SETTINGS max_threads = 1",
         }),
@@ -295,7 +323,7 @@ describe("given the LangWatchQL service", () => {
       expect(
         await codeOf(() =>
           service.execute({
-            project: PROJECT,
+            projects: [PROJECT],
             protections: WITHOUT_CONTENT,
             sql,
           }),
@@ -306,7 +334,7 @@ describe("given the LangWatchQL service", () => {
       // above is about the gate rather than about the SQL.
       await expect(
         service.execute({
-          project: PROJECT,
+          projects: [PROJECT],
           protections: FULLY_PERMITTED,
           sql,
         }),
@@ -319,7 +347,7 @@ describe("given the LangWatchQL service", () => {
 
       const meta = await metaOf(() =>
         service.execute({
-          project: PROJECT,
+          projects: [PROJECT],
           protections: WITHOUT_CONTENT,
           sql,
         }),
@@ -339,7 +367,7 @@ describe("given the LangWatchQL service", () => {
     it("permits the same wildcard for a fully-permitted caller", async () => {
       await expect(
         serviceWith(recordingExecutor()).execute({
-          project: PROJECT,
+          projects: [PROJECT],
           protections: FULLY_PERMITTED,
           sql: "SELECT * FROM analytics.traces",
         }),
@@ -357,7 +385,7 @@ describe("given the LangWatchQL service", () => {
       ]) {
         expect(
           await codeOf(() =>
-            service.execute({ project: PROJECT, protections: {}, sql }),
+            service.execute({ projects: [PROJECT], protections: {}, sql }),
           ),
           sql,
         ).toBe("lwql_not_permitted");
@@ -385,7 +413,7 @@ describe("given the LangWatchQL service", () => {
       expect(
         await codeOf(() =>
           serviceWithTranscripts(executor).execute({
-            project: PROJECT,
+            projects: [PROJECT],
             protections: WITHOUT_CONTENT,
             sql,
           }),
@@ -396,7 +424,7 @@ describe("given the LangWatchQL service", () => {
           (
             await metaOf(() =>
               serviceWithTranscripts(executor).execute({
-                project: PROJECT,
+                projects: [PROJECT],
                 protections: WITHOUT_CONTENT,
                 sql,
               }),
@@ -415,7 +443,7 @@ describe("given the LangWatchQL service", () => {
 
       await expect(
         serviceWithTranscripts(executor).execute({
-          project: PROJECT,
+          projects: [PROJECT],
           protections: FULLY_PERMITTED,
           sql,
         }),
@@ -437,7 +465,7 @@ describe("given the LangWatchQL service", () => {
       expect(
         await codeOf(() =>
           service.execute({
-            project: PROJECT,
+            projects: [PROJECT],
             protections: FULLY_PERMITTED,
             sql,
             parameters: { name: "checkout" },
@@ -447,7 +475,7 @@ describe("given the LangWatchQL service", () => {
       expect(
         await metaOf(() =>
           service.execute({
-            project: PROJECT,
+            projects: [PROJECT],
             protections: FULLY_PERMITTED,
             sql,
             parameters: { name: "checkout" },
@@ -464,7 +492,7 @@ describe("given the LangWatchQL service", () => {
       const executor = recordingExecutor();
 
       await serviceWith(executor).execute({
-        project: PROJECT,
+        projects: [PROJECT],
         protections: FULLY_PERMITTED,
         sql: "SELECT count() FROM analytics.traces WHERE TraceName = {name:String}",
         parameters: { name: "checkout" },
@@ -488,7 +516,7 @@ describe("given the LangWatchQL service", () => {
       const executor = recordingExecutor();
 
       const result = await serviceWith(executor).execute({
-        project: PROJECT,
+        projects: [PROJECT],
         protections: FULLY_PERMITTED,
         sql: PERIOD_SQL,
         timeWindow: TIME_WINDOW,
@@ -510,7 +538,7 @@ describe("given the LangWatchQL service", () => {
 
       for (const start of ["2026-02-20", "2026-03-20"]) {
         await service.execute({
-          project: PROJECT,
+          projects: [PROJECT],
           protections: FULLY_PERMITTED,
           sql: PERIOD_SQL,
           timeWindow: { ...TIME_WINDOW, start: new Date(`${start}T00:00:00Z`) },
@@ -530,7 +558,7 @@ describe("given the LangWatchQL service", () => {
       const service = serviceWith(executor);
       const run = () =>
         service.execute({
-          project: PROJECT,
+          projects: [PROJECT],
           protections: FULLY_PERMITTED,
           sql: PERIOD_SQL,
           parameters: { dashboard_context_period_start: "2020-01-01 00:00:00" },
@@ -557,7 +585,7 @@ describe("given the LangWatchQL service", () => {
       expect(
         await codeOf(() =>
           service.execute({
-            project: PROJECT,
+            projects: [PROJECT],
             protections: FULLY_PERMITTED,
             sql,
             timeWindow: TIME_WINDOW,
@@ -587,7 +615,7 @@ describe("given the LangWatchQL service", () => {
       expect(
         await codeOf(() =>
           service.execute({
-            project: PROJECT,
+            projects: [PROJECT],
             protections: FULLY_PERMITTED,
             sql: PERIOD_SQL,
           }),
@@ -596,7 +624,7 @@ describe("given the LangWatchQL service", () => {
       expect(
         await metaOf(() =>
           service.execute({
-            project: PROJECT,
+            projects: [PROJECT],
             protections: FULLY_PERMITTED,
             sql: PERIOD_SQL,
           }),
@@ -665,7 +693,7 @@ describe("given the LangWatchQL service", () => {
       const executor = recordingExecutor();
 
       const result = await serviceWith(executor).execute({
-        project: PROJECT,
+        projects: [PROJECT],
         protections: FULLY_PERMITTED,
         sql: BOUNDED_COUNT,
         timeWindow: {
@@ -701,7 +729,7 @@ describe("given the LangWatchQL service", () => {
       const executor = recordingExecutor();
 
       const result = await serviceWith(executor).execute({
-        project: PROJECT,
+        projects: [PROJECT],
         protections: FULLY_PERMITTED,
         sql: GRANULARITY_SQL,
         timeWindow: TIME_WINDOW,
@@ -726,7 +754,7 @@ describe("given the LangWatchQL service", () => {
       const service = serviceWith(executor);
       const run = () =>
         service.execute({
-          project: PROJECT,
+          projects: [PROJECT],
           protections: FULLY_PERMITTED,
           sql: GRANULARITY_SQL,
           timeWindow: TIME_WINDOW,
@@ -761,7 +789,7 @@ describe("given the LangWatchQL service", () => {
       const service = serviceWith(executor);
       const run = () =>
         service.execute({
-          project: PROJECT,
+          projects: [PROJECT],
           protections: FULLY_PERMITTED,
           sql: GRANULARITY_SQL,
           timeWindow: TIME_WINDOW,
@@ -784,7 +812,7 @@ describe("given the LangWatchQL service", () => {
       const executor = recordingExecutor();
 
       const result = await serviceWith(executor).execute({
-        project: PROJECT,
+        projects: [PROJECT],
         protections: FULLY_PERMITTED,
         sql: BOUNDED_COUNT,
         granularitySeconds: 60,
@@ -803,7 +831,7 @@ describe("given the LangWatchQL service", () => {
         expect(
           await codeOf(() =>
             serviceWith(recordingExecutor()).execute({
-              project: PROJECT,
+              projects: [PROJECT],
               protections: FULLY_PERMITTED,
               sql: GRANULARITY_SQL,
               timeWindow: TIME_WINDOW,
@@ -826,7 +854,7 @@ describe("given the LangWatchQL service", () => {
       expect(
         await codeOf(() =>
           serviceWith(null).execute({
-            project: PROJECT,
+            projects: [PROJECT],
             protections: FULLY_PERMITTED,
             sql: "SELECT count() FROM analytics.traces",
           }),
@@ -858,7 +886,7 @@ describe("given the LangWatchQL service", () => {
 
       await expect(
         serviceWith(executor).execute({
-          project: PROJECT_WITHOUT_LWQL_KEY,
+          projects: [PROJECT_WITHOUT_LWQL_KEY],
           protections: FULLY_PERMITTED,
           sql: "SELECT count() FROM analytics.traces",
         }),

@@ -586,8 +586,10 @@ func TestRenderAll_LWQLRendersAccessModel(t *testing.T) {
 		"GRANT SELECT ON langwatch.trace_summaries",
 		"GRANT SELECT ON langwatch.traces",
 		"GRANT SELECT ON langwatch.prompt_versions",
-		"KeyHash = getSetting('custom_api_key_hash')",
+		"splitByChar(',', getSetting('custom_api_key_hash'))",
+		"GROUP BY KeyHash",
 		"HAVING uniqExact(TenantId) = 1",
+		"TenantId IN (SELECT any(TenantId) FROM langwatch.lwql_api_key_tenant_map",
 		"changeable_in_readonly",
 	} {
 		if !strings.Contains(users, want) {
