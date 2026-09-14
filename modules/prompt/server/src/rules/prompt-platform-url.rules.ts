@@ -1,13 +1,7 @@
 /**
- * The platform's own deep link back into the prompt library, built from the
- * app's `publicBaseUrl` config: the same pattern
- * `modules/analytics/server/src/rules/analytics-platform-url.rules.ts` uses,
- * because a REST declaration is a static, module-load-time object with no
- * request-scoped builder to receive — the app composes the link itself from
- * config it already holds.
- *
- * The path is the one the browser answers,
- * `modules/prompt/web/src/model/prompt-routes.ts`'s `/${projectSlug}/prompts`.
+ * The platform's deep link to the prompt library, built from the app's publicBaseUrl
+ * config. REST declarations are static, so links compose from config at module load time.
+ * Path: /${projectSlug}/prompts (from prompt-routes.ts).
  */
 const PROMPTS_PATH = "/prompts";
 

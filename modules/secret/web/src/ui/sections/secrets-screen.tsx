@@ -1,29 +1,8 @@
 /**
- * Settings > Secrets. The project's named credentials, by name only.
- *
- * Moved from `platform/app/src/pages/settings/secrets.tsx`. The settings chrome
- * around it is now `apps/ui`'s `withUiSettingsLayout`, so the `SettingsLayout`
- * wrapper the page carried is gone from the screen and stated in the routes
- * section instead.
- *
- * ## Credential hygiene, which is the point of this page
- *
- * A SECRET'S VALUE NEVER COMES BACK. `secrets.list` answers the contract's
- * `Secret`, whose schema is `.strict()` and whose own docblock reads "Safe
- * metadata. The encrypted value is deliberately absent." A value travels in one
- * direction only, in the create and update dialogs, and both inputs are
- * `type="password"` so it is not shoulder-readable while it is typed. There is
- * no reveal on this page and there never was: a stored secret is replaced, not
- * inspected.
- *
- * ## The page-level policy, unchanged
- *
- * NO PAGE-LEVEL GRANT. The platform page was `SettingsLayout` and nothing else,
- * and it read `secrets:manage` INLINE to decide whether the write controls are
- * live. A reader holding only `secrets:view` still sees which secrets exist —
- * which is what someone debugging a code block needs — and sees no Add button,
- * no row menu, and therefore no dialog. Inventing a page guard here would refuse
- * them a page the product admits today.
+ * Settings > Secrets screen. Moved from platform app. Enforces credential hygiene:
+ * values never returned, only replaced via password inputs. No page-level grant—readers
+ * with secrets:view see which secrets exist but no write controls.
+ * Spec: specs/secrets/secrets-manager.feature
  */
 
 import {

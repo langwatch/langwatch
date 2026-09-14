@@ -5,15 +5,9 @@ const KEY = "0f".repeat(32);
 const OTHER_KEY = "a1".repeat(32);
 
 /**
- * One row as the platform app's own routine wrote it: key {@link KEY}, a fixed
- * IV, and the value below.
- *
- * It is here because the format is not this class's to choose. Rows encrypted
- * long ago sit in customer databases, and a change that round-trips with
- * itself while failing to read them would pass every other test in this file.
- * The identical constants are asserted from the other side in
- * `platform/app/src/utils/__tests__/encryption.unit.test.ts`, which is what
- * keeps the two descriptions of this format one format.
+ * Stored row for backwards compatibility with old customer data. Format and values are
+ * verified against platform/app/src/utils/__tests__/encryption.unit.test.ts to ensure
+ * both sides stay synchronized.
  */
 const STORED_ROW =
   "aabbccddeeff001122334455:72b43a4bc9e43c4de7e3e7ed18f9dbe02327fe68fd:59a8bc427deba94b3e94aa08ce8ab785";

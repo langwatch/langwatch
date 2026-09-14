@@ -1,12 +1,6 @@
 /**
- * The inputs the `roleBinding.*` tRPC surface publishes.
- *
- * They live in the contract rather than beside the router so the wire shape a
- * client is typed against is stated once, in the package both sides may import.
- *
- * The role and scope vocabularies come from the authorization contract, which
- * owns them; restating either here would let a binding accept a tier the
- * decision engine cannot read.
+ * Inputs for the roleBinding.* tRPC surface. Defined in the contract for a single source of truth.
+ * Role and scope vocabularies come from the authz-contract to prevent accepting invalid values.
  */
 import { roleBindingScopeTypeSchema, teamUserRoleSchema } from "@langwatch/authz-contract";
 import { z } from "zod";

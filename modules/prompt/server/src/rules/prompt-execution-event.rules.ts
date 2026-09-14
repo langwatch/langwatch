@@ -1,14 +1,7 @@
 /**
- * Builds the workflow event that runs a prompt from the playground.
- *
- * Lifted verbatim out of the CopilotKit `PromptStudioAdapter` when that runtime
- * was removed. Everything here is pure — form values in, `execute_component`
- * event out — so the transport around it can change without touching the part
- * that has actually been through production.
- *
- * And it has. The `{{input}}` binding below carries three separate fixes, each
- * of which shipped as a user-visible regression first; the comments name them
- * because the next person to "simplify" this will otherwise reintroduce one.
+ * Builds the workflow event for running a prompt from the playground. Extracted from
+ * CopilotKit's PromptStudioAdapter as a pure function. The {{input}} binding has
+ * production fixes documented inline—do not simplify without reading them.
  */
 import {
   type PromptConfigFormValues,
@@ -127,13 +120,8 @@ export function resolvePromptInputs({
 }
 
 /**
- * Builds the node the playground executes.
- *
- * Prompt-span parity: when the form came from a saved prompt, its identity
- * fields ride along so nlpgo emits the `PromptApiService.get` + `Prompt.compile`
- * span pair with the full identity, and the trace drawer's "Open in Prompts"
- * link resolves back to the playground. Ad-hoc prompts omit the keys, matching
- * the python-sdk's "Create new prompt" path.
+ * Builds the node the playground executes. Identity fields enable trace linking for saved
+ * prompts; ad-hoc prompts omit keys to match the python-sdk's "Create new" path.
  */
 function buildNodeData({
   formValues,

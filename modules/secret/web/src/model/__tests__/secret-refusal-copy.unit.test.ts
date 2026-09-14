@@ -1,15 +1,7 @@
 /**
- * Every refusal this feature can raise has words a customer can act on.
- *
- * The guard is exhaustiveness against the CONTRACT rather than against a list
- * kept here: each `HandledError` subclass in `@langwatch/secret-contract`
- * carries its own `code`, and a new one added without copy fails this. That is
- * the local stand-in for the presentation registry's type-level exhaustiveness,
- * which cannot help while none of these codes is listed in
- * `platform/app/src/features/errors/logic/codes.ts` — which is exactly how they
- * came to have no copy at all.
- *
- * Spec: specs/secrets/secrets-manager.feature
+ * Every refusal this feature can raise has customer-facing copy. Tests exhaustiveness
+ * against @langwatch/secret-contract's HandledError subclasses—any new code without copy
+ * will fail. Spec: specs/secrets/secrets-manager.feature
  */
 
 import {

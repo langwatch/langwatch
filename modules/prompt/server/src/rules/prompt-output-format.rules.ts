@@ -79,16 +79,8 @@ export function formatOutputForStreaming(
 const DEFAULT_OUTPUT_IDENTIFIER = "output";
 
 /**
- * Extracts the streamable output value from execution state.
- * Supports both single and multiple output configurations.
- *
- * Single output with identifier "output" (default): displays value as-is.
- * Single output with custom identifier: wraps in JSON object.
- * Multiple outputs: combines all outputs into a single JSON object.
- *
- * @param outputs - The outputs dictionary from execution state
- * @param configs - Array of output configurations
- * @returns Formatted string for streaming, or undefined if not available
+ * Extracts the streamable output value from execution state: single outputs as-is or
+ * JSON-wrapped, or multiple outputs combined into a single JSON object.
  */
 export function extractStreamableOutput(
   outputs: Record<string, unknown> | undefined,

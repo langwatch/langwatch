@@ -1,13 +1,7 @@
 /**
- * What the playground execution door puts on the wire: who it turns away, in
- * which order, and what an accepted run streams back.
- *
- * Authentication, RBAC and the workflow engine are ports because they are the
- * boundaries here - what is under test is that the route asks them, in the
- * right order (origin gate, then session, then project permission), and that
- * an accepted run frames the engine's events as playground stream events.
- *
- * @see specs/prompts/playground-conversation.feature
+ * Tests the playground execution endpoint: authentication, RBAC, and workflow engine
+ * integration. Verifies request order (origin gate, session, project permission) and
+ * that accepted runs stream playground events. Spec: specs/prompts/playground-conversation.feature
  */
 import { bindRestMiddleware, createRestRuntime } from "@langwatch/api/rest";
 import { PROMPT_EXECUTE_ENDPOINT } from "@langwatch/prompt-contract";

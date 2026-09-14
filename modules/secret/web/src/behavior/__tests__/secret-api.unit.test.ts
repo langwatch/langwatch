@@ -1,16 +1,7 @@
 /**
- * The wire boundary: a secret's value goes out and never comes back.
- *
- * A type cannot be asserted at runtime, so what is checked is the CONTRACT
- * SCHEMA the map's list output is declared as. `secretSchema` is `.strict()`,
- * which is the property that makes the guarantee mechanical rather than
- * conventional: a projection that added a value to a list row would fail its own
- * parse before it ever reached a browser.
- *
- * The map itself is hand-written until the router can emit it, so this is where
- * "the shape did not quietly widen" is stated.
- *
- * Spec: specs/secrets/secrets-manager.feature
+ * The wire contract ensures a secret's value never leaks to clients. The `.strict()`
+ * secretSchema enforces this mechanically—any projection that added a value would fail
+ * parsing before reaching a browser. Spec: specs/secrets/secrets-manager.feature
  */
 
 import { secretSchema } from "@langwatch/secret-contract";

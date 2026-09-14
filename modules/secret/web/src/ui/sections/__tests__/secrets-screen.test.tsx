@@ -1,19 +1,8 @@
 /**
  * @vitest-environment jsdom
  *
- * Settings > Secrets: what a reader sees, what a writer may do, and what a
- * refusal says.
- *
- * Moved from `platform/app/src/components/secrets/__tests__/SecretsSettingsPage.integration.test.tsx`,
- * which lived two directories away from the page it drove. The four cases it
- * carried travel; what is added here is the part the platform page did not
- * have — the four refusal codes this feature raises, which reached the customer
- * as "something went wrong on our side" because none of them is listed in the
- * presentation registry.
- *
- * THE CREDENTIAL PROPERTY IS ASSERTED, NOT ASSUMED: nothing rendered on this
- * page is a secret's value, and both inputs that take one are password fields.
- *
+ * Tests the Secrets settings screen. Moved from platform app, adds testing for the four
+ * refusal codes this feature raises. Credentials are password fields, never rendered.
  * Spec: specs/secrets/secrets-manager.feature
  */
 

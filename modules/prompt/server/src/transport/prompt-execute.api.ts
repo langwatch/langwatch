@@ -1,19 +1,7 @@
 /**
- * The prompt playground's execution door: `POST /api/prompt-playground/<version>/prompt.execute`.
- *
- * Replaces the CopilotKit GraphQL runtime that used to sit behind
- * `/api/copilotkit`. That runtime carried graphql-yoga, type-graphql and five
- * langchain packages into every backend process in order to forward text deltas
- * from our own workflow engine — which is all it ever did.
- *
- * The browser posts what the playground actually holds (a prompt form, its
- * variables, the conversation so far) rather than a workflow. Building the
- * workflow server-side keeps the engine's input off the wire, and keeps the
- * `{{input}}` binding rules in one tested place.
- *
- * It is deliberately NOT the `/api/prompts` family: that one is the documented,
- * API-key-authenticated SDK surface, and this is a browser endpoint with no
- * stable contract, kept out of the published OpenAPI document.
+ * The playground's execution door: POST /api/prompt-playground/<version>/prompt.execute. Replaces
+ * CopilotKit's GraphQL runtime with server-side workflow building and {{input}} binding rules;
+ * not the /api/prompts SDK surface, browser-only endpoint.
  */
 import { deferredScope } from "@langwatch/api/access";
 import { defineRestMiddleware, defineRestRouter, MANAGEMENT_API_VERSION } from "@langwatch/api/rest";

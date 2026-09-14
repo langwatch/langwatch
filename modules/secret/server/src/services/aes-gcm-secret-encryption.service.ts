@@ -2,29 +2,11 @@ import { createCipheriv, createDecipheriv, randomBytes } from "node:crypto";
 import type { SecretEncryption } from "../app/secret.app.ts";
 
 /**
- * The at-rest format for a stored secret: AES-256-GCM under a 32-byte key,
- * written as `iv:ciphertext:authTag`, every part hexadecimal.
- *
- * It lives here, beside the service it satisfies, so that a process composing
- * this feature's service brings no cipher of its own. It is a WIRE FORMAT
- * rather than a utility: rows the platform app wrote are read back by the API
- * process, so the failure mode of getting it wrong is a customer credential
- * that will not decrypt, found long after the write.
- *
- * The format is described a second time, in
- * `platform/app/src/utils/encryption.ts`, and that is worth being exact about.
- * That module is a leaf forty others depend on, and the repository's
- * package-boundaries rule allows a feature server package to be imported only
- * by a composition root — so it cannot call this class, and collapsing the two
- * means moving those callers first. Until then neither description is free to
- * drift: both suites decrypt the SAME recorded row, so a change to one of them
- * turns the other red.
- *
- * What does NOT live here is where the key comes from. Each process reads its
- * own environment and hands the key in, which is why this class names no
- * variable: the platform app reads `CREDENTIALS_SECRET` (falling back to
- * `NEXTAUTH_SECRET`) and so does the API executable's validated
- * configuration, and neither fact belongs to the cipher.
+ * The at-rest format for stored secrets: AES-256-GCM under a 32-byte key,
+ * written as `iv:ciphertext:authTag` (hexadecimal). Lives here beside the
+ * service to avoid external cipher dependencies. Format is verified cross-suite
+ * with platform/app/src/utils/encryption.ts to prevent drift. Key source is
+ * caller-provided (not this class's concern).
  */
 export class AesGcmSecretEncryptionAdapter implements SecretEncryption {
   private static readonly ALGORITHM = "aes-256-gcm";
@@ -65,14 +47,9 @@ export class AesGcmSecretEncryptionAdapter implements SecretEncryption {
   }
 
   /**
-   * Reads a value back, or refuses.
-   *
-   * The two refusals say different things and are deliberately kept apart: a
-   * string that is not three hex parts was never written by this cipher, while
-   * a well-formed string that fails its authentication tag was — under a
-   * different key, or after the ciphertext was altered. Neither message
-   * repeats what the caller passed in, because the caller passed in a
-   * customer's credential.
+   * Reads a value back, with separate error messages for invalid format (never written
+   * by this cipher) vs. failed auth tag (wrong key or tampering). Never echoes the input
+   * since it's a customer credential.
    */
   decrypt(value: string): string {
     const [ivHex, encryptedData, authTagHex] = value.split(":");

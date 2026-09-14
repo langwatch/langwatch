@@ -1,12 +1,7 @@
 /**
- * What this package's suites mount the screen inside.
- *
- * The host port is an abstract class, so a test constructs one rather than
- * mocking a module: the fake below RECORDS what the screen asked the application
- * to do, which is exactly the surface the real adapter answers.
- *
- * Not exported from the package. A test imports it relatively; nothing outside
- * this package has any business constructing a host.
+ * Testing harness for mounting the Secrets screen. Uses a concrete host implementation
+ * (not mocks) that records what the screen asks of the application. Internal to this
+ * package only.
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

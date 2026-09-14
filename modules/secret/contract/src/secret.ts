@@ -16,17 +16,9 @@ export const SECRET_NAME_PATTERN = /^[A-Z][A-Z0-9_]*$/;
 export const LANGY_VK_SECRET_NAME = "langy_vk_secret";
 
 /**
- * Secrets hidden from the project-secrets listing and refused by the by-id
- * mutations: the product created them and the product retires them, so a
- * customer editing or deleting one can only break something.
- *
- * It lives in the contract rather than with one composition root because it is
- * part of what the service PROMISES — the names it will not show and will not
- * let a customer write — and every process that composes the service owes the
- * customer the same promise. It used to be a leaf module inside the platform
- * app, which was fine while one process composed the service and became a
- * divergence hazard the moment a second one could: a root that passed a
- * shorter list would expose a product-owned credential through its own door.
+ * Secrets reserved by the product and hidden from project listings. Defined in the contract
+ * so every composition root enforces the same promise: product-owned credentials cannot be
+ * edited or deleted by customers.
  */
 export const RESERVED_PROJECT_SECRET_NAMES: readonly string[] = [LANGY_VK_SECRET_NAME];
 

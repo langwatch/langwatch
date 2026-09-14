@@ -1,11 +1,5 @@
 /**
- * The `{{input}}` binding rules, covered directly.
- *
- * These cases came from `service-adapter.test.ts`, which had to stand up a
- * CopilotKit runtime request, a mock event source and a stubbed
- * `studioBackendPostEvent` to reach the same three lines of logic. Now that the
- * logic is a pure function, the setup is the argument list.
- *
+ * The `{{input}}` binding rules, extracted as pure functions from service-adapter.test.ts.
  * Spec: specs/prompts/playground-conversation.feature
  */
 import { describe, expect, it } from "vitest";

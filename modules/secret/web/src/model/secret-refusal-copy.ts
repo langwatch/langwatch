@@ -1,27 +1,7 @@
 /**
- * What a customer reads when a secret write is refused.
- *
- * THE FOUR CODES THIS FEATURE RAISES HAVE NEVER HAD CUSTOMER-FACING COPY.
- * `secret_already_exists`, `secret_limit_reached`, `secret_name_reserved` and
- * `secret_not_found` are declared as `HandledError` subclasses in
- * `@langwatch/secret-contract`, but none of them is listed in
- * `platform/app/src/features/errors/logic/codes.ts`, so the presentation
- * registry's exhaustiveness never demanded an entry and none was written. The
- * page's `showErrorToast({ error, fallbackTitle })` therefore degraded every one
- * of them to "Couldn't create the secret" plus the generic
- * "something went wrong on our side" line — which is untrue for all four: each
- * one is something the reader can fix in the dialog they are looking at.
- *
- * That is the bug class CLAUDE.md names outright ("Letting a knowable failure
- * surface as a generic unknown error"), and the model-config family's precedent
- * says where the fix goes while the registry harvest is still owed: A CODE-KEYED
- * COPY TABLE BELONGS TO THE FEATURE THAT RAISES THE CODES. So the words live
- * here, the screen resolves them and hands them to the host, and this module
- * dies the day the four codes are added to the registry.
- *
- * A DELIBERATE ADDITION, NAMED. A page move should not have any, and this is
- * one: a customer who hits the fifty-secret ceiling now reads why. It is written
- * down here and in the manifests so somebody can disagree with it.
+ * Customer-facing copy for refusals the four secret error codes raise. These codes were
+ * never added to the presentation registry, so this feature-level override exists. It will
+ * be obsolete when the codes are registered. Spec: specs/secrets/secrets-manager.feature
  */
 
 import { MAX_SECRETS_PER_PROJECT } from "@langwatch/secret-contract";
@@ -52,13 +32,9 @@ const SECRET_REFUSAL_COPY: Readonly<Record<string, SecretRefusalCopy>> = {
 };
 
 /**
- * The code a failure carries, whichever boundary sent it.
- *
- * tRPC nests the handled payload under `data.error`; a REST route sends it flat
- * with the code in `error`. Anything else is an unhandled failure and has no
- * code to read, which is the `undefined` this returns. The same nine lines
- * `@langwatch/gateway-web` and `@langwatch/automation-web` carry, and they die
- * together with the registry harvest.
+ * Extracts the error code from a failure, handling both tRPC (nested under data.error)
+ * and REST (flat error) formats. Returns undefined for unhandled failures. This duplicated
+ * logic lives elsewhere and will be obsolete with the registry harvest.
  */
 export function readSecretRefusalCode(error: unknown): string | undefined {
   const nested = (error as { data?: { error?: { code?: unknown } } } | null)?.data?.error?.code;
