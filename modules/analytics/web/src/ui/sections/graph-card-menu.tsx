@@ -14,9 +14,7 @@ import {
 } from "@langwatch/analytics-contract";
 import { LWQL_WIDGET_DEFAULT_GRANULARITY_SECONDS } from "./langwatch-ql-dashboard-widget.tsx";
 import { useAnalyticsHost } from "../../model/analytics-host.ts";
-// GAP: `dashboardWidgets` (assignDashboard/list) is not yet on `analyticsApi` —
-// the custom-chart-playground router has not been ported. See the handoff.
-import { api } from "~/utils/api";
+import { analyticsApi as api } from "../../behavior/analytics-api.ts";
 
 /**
  * How each offered datapoint step is named in the menu: the noun form, because

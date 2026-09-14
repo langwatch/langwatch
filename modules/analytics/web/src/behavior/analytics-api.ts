@@ -215,6 +215,47 @@ type BorrowedProcedures = {
       };
     };
   };
+  dashboardWidgets: {
+    list: { query: { input: ProjectScope; output: unknown[] } };
+    create: {
+      mutation: {
+        input: ProjectScope & {
+          dashboardId?: string;
+          name: string;
+          code: string;
+          queries: unknown[];
+        };
+        output: unknown;
+      };
+    };
+    update: {
+      mutation: {
+        input: ProjectScope & { id: string; name?: string; code: string; queries: unknown[] };
+        output: { success: true };
+      };
+    };
+    updateLayout: {
+      mutation: {
+        input: ProjectScope & { graphId: string } & Record<string, unknown>;
+        output: { success: true };
+      };
+    };
+    batchUpdateLayouts: {
+      mutation: {
+        input: ProjectScope & { layouts: Array<{ graphId: string } & Record<string, unknown>> };
+        output: { success: true };
+      };
+    };
+    assignDashboard: {
+      mutation: {
+        input: ProjectScope & { id: string; dashboardId: string };
+        output: { success: true };
+      };
+    };
+    delete: {
+      mutation: { input: ProjectScope & { id: string }; output: { success: true } };
+    };
+  };
   traces: {
     getTopicCounts: {
       query: {

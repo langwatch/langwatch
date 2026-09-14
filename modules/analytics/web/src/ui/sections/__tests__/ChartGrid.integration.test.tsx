@@ -26,7 +26,7 @@ import {
   it,
   vi,
 } from "vitest";
-import type { ChartGridPlacement } from "~/server/analytics/chartGrid";
+import type { ChartGridPlacement } from "../../../model/chartGrid.ts";
 import { CHART_GRID_DRAG_HANDLE_CLASS, ChartGrid } from "../ChartGrid";
 
 const Wrapper = ({ children }: { children: ReactNode }) => (

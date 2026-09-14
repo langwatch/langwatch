@@ -25,11 +25,8 @@ import { useAnalyticsHost } from "../../../model/analytics-host.ts";
 import { ReportGrid } from "../report-grid.tsx";
 import { Link } from "../../elements/analytics-link.tsx";
 import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
-// GAP: the custom-chart-playground drawer (`CreateDashboardWidgetDrawer`) and
-// the chart-grid shared unit (`ChartGridPlacement`) are not yet ported — see
-// the web-imports-sweep handoff.
-import { CreateDashboardWidgetDrawer } from "~/features/custom-chart-playground/CreateDashboardWidgetDrawer";
-import type { ChartGridPlacement } from "~/server/analytics/chartGrid";
+import { CreateDashboardWidgetDrawer } from "../CreateDashboardWidgetDrawer.tsx";
+import type { ChartGridPlacement } from "../../../model/chartGrid.ts";
 
 function ReportsContent() {
   const { project, organization } = useOrganizationTeamProject();

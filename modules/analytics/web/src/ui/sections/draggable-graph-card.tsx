@@ -7,16 +7,10 @@ import {
 } from "../../model/chart-kinds.ts";
 import type { LangWatchQLGranularityStep } from "@langwatch/analytics-contract";
 import type { FilterField } from "@langwatch/analytics-contract";
-// GAP: the chart-grid shared unit (`chartGridCardHeightPx`) and the
-// custom-chart-playground widget editor/renderer (`DashboardWidgetFrame`,
-// `DashboardWidgetInPlaceEditor`) are not yet ported — see the
-// web-imports-sweep handoff.
-import { DashboardWidgetFrame } from "~/features/custom-chart-playground/DashboardWidgetFrame";
-import {
-  type DashboardWidgetDraft,
-  DashboardWidgetInPlaceEditor,
-} from "~/features/custom-chart-playground/DashboardWidgetInPlaceEditor";
-import { chartGridCardHeightPx } from "~/server/analytics/chartGrid";
+import { DashboardWidgetFrame } from "./DashboardWidgetFrame.tsx";
+import { DashboardWidgetInPlaceEditor } from "./DashboardWidgetInPlaceEditor.tsx";
+import type { DashboardWidgetDraft } from "../../model/dashboardWidgetDefinition.ts";
+import { chartGridCardHeightPx } from "../../model/chartGrid.ts";
 import { GraphCardHeader } from "./graph-card-header.tsx";
 import { useDraggableGraphCard } from "./useDraggableGraphCard";
 

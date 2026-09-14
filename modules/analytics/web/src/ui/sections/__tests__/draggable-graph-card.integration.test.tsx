@@ -34,7 +34,7 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { LangWatchQLGranularityStep } from "~/server/analytics/lwql/timeWindow";
+import type { LangWatchQLGranularityStep } from "@langwatch/analytics-contract";
 
 vi.mock("~/hooks/useDrawer", () => ({
   useDrawer: () => ({ openDrawer: vi.fn() }),
@@ -118,7 +118,7 @@ vi.mock("~/features/custom-chart-playground/DashboardWidgetFrame", () => ({
 import {
   DASHBOARD_SRCDOC_CHART_KIND,
   WORKBENCH_SQL_CHART_KIND,
-} from "~/server/analytics/chartKinds";
+} from "../../../model/chart-kinds.ts";
 
 import { DraggableGraphCard } from "../draggable-graph-card.tsx";
 

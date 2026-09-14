@@ -29,13 +29,10 @@ import {
   FieldTypeSelect,
   VariableTypeIcon,
 } from "@langwatch/prompt-web/surfaces/variables";
-// GAP: the custom-chart-playground schema (`dashboardWidgetDefinition.ts`,
-// with `DASHBOARD_CONTEXT_PARAMETER_PREFIX` and `RESERVED_PARAMETERS`) is not
-// yet ported — see the web-imports-sweep handoff.
 import {
   DASHBOARD_CONTEXT_PARAMETER_PREFIX,
   type RESERVED_PARAMETERS,
-} from "~/server/analytics/dashboardWidgetDefinition";
+} from "../../model/dashboardWidgetDefinition.ts";
 
 /** Structurally identical to prompt-web's own (unexported) `FieldTypeOption`. */
 type FieldTypeOption = { value: string; label: string };

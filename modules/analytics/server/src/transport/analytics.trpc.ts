@@ -23,13 +23,11 @@ export const analyticsTrpcTransport = defineTrpcRouter(AnalyticsApi, analyticsTr
     const { field, key, subkey } = input;
 
     if (filterFieldRequiresKey(field) && !key) {
-      throw new ValidationError(`Field ${field} requires a key to be defined`, { httpStatus: 400 });
+      throw new ValidationError(`Field ${field} requires a key to be defined`);
     }
 
     if (filterFieldRequiresSubkey(field) && !subkey) {
-      throw new ValidationError(`Field ${field} requires a subkey to be defined`, {
-        httpStatus: 400,
-      });
+      throw new ValidationError(`Field ${field} requires a subkey to be defined`);
     }
 
     // The narrowing rule — a field's own selection must not narrow the values

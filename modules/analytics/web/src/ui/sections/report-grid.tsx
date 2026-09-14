@@ -1,4 +1,4 @@
-import type { ChartGridPlacement } from "~/server/analytics/chartGrid";
+import type { ChartGridPlacement } from "../../model/chartGrid.ts";
 import { ChartGrid } from "./ChartGrid";
 import { DraggableGraphCard, type GraphData } from "./draggable-graph-card.tsx";
 

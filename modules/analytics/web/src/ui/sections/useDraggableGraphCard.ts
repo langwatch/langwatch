@@ -3,12 +3,11 @@ import { usePeriodSelector } from "../elements/period-selector.tsx";
 import { toaster } from "@langwatch/design-system/toaster";
 import { describeError } from "../../model/describe-error.ts";
 import { DASHBOARD_SRCDOC_CHART_KIND } from "../../model/chart-kinds.ts";
-// GAP: the custom-chart-playground widget editor (`DashboardWidgetInPlaceEditor`,
-// `dashboardWidgetDefinitionSchema`) and the `dashboardWidgets` router are not
-// yet ported — see the web-imports-sweep handoff.
-import type { DashboardWidgetDraft } from "~/features/custom-chart-playground/DashboardWidgetInPlaceEditor";
-import { dashboardWidgetDefinitionSchema } from "~/server/analytics/dashboardWidgetDefinition";
-import { api } from "~/utils/api";
+import {
+  dashboardWidgetDefinitionSchema,
+  type DashboardWidgetDraft,
+} from "../../model/dashboardWidgetDefinition.ts";
+import { analyticsApi as api } from "../../behavior/analytics-api.ts";
 import type { GraphData } from "./draggable-graph-card.tsx";
 
 /**
