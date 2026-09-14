@@ -64,9 +64,38 @@ function recordingRestHost(): FeatureRestHost<MountedRest> & { mounted: MountedR
   };
 }
 
+type MountedTrpc = Readonly<{
+  app: unknown;
+  options: Readonly<{ facts?: readonly object[] }> | undefined;
+}>;
+
 /** A process's tRPC root, answering the namespace it was handed. */
-function recordingTrpcHost(): FeatureTrpcHost<Readonly<{ app: unknown }>> {
-  return { mount: (_declaration, app) => ({ app: app() }) };
+function recordingTrpcHost(): FeatureTrpcHost<MountedTrpc> & { mounted: MountedTrpc[] } {
+  const mounted: MountedTrpc[] = [];
+
+  return {
+    mounted,
+    mount: (_declaration, app, options) => {
+      const record = { app: app(), options };
+      mounted.push(record);
+
+      return record;
+    },
+  };
+}
+
+/**
+ * One binding in the shape `bindRestMiddleware` answers with: the middleware a
+ * route declared, and how this process resolves it. The REST door reads a
+ * binding by its `middleware`, which is what tells the two doors apart.
+ */
+function restBinding(read: () => string) {
+  return { middleware: { name: "catalogueSize" }, resolve: () => read() };
+}
+
+/** One binding in the shape `bindTrpcFact` answers with, keyed by its `fact`. */
+function trpcBinding(read: () => string) {
+  return { fact: { name: "catalogueSize" }, resolve: () => read() };
 }
 
 describe("given a feature whose server declares transports", () => {
@@ -135,7 +164,7 @@ describe("given a feature whose server declares transports", () => {
       const server = defineServerModule("dataset")
         .withApp(CatalogueApp)
         .withTransports(catalogueRest)
-        .withTransportFacts(({ app }) => [{ fact: "catalogueSize", read: () => app.read() }]);
+        .withTransportFacts(({ app }) => [restBinding(() => app.read())]);
 
       await createApp({ role: "api", members: memberSourceOf({}) })
         .withTransports({ rest })
@@ -152,7 +181,7 @@ describe("given a feature whose server declares transports", () => {
       const server = defineServerModule("dataset")
         .withApp(CatalogueApp)
         .withTransports(catalogueRest)
-        .withTransportFacts(({ app }) => [{ fact: "catalogueSize", read: () => app.read() }]);
+        .withTransportFacts(({ app }) => [restBinding(() => app.read())]);
 
       await createApp({ role: "api", members: memberSourceOf({}) })
         .withTransports({ rest })
@@ -160,10 +189,34 @@ describe("given a feature whose server declares transports", () => {
         .boot();
 
       const [binding] = (rest.mounted[0]?.options?.facts ?? []) as readonly {
-        read(): string;
+        resolve(): string;
       }[];
 
-      expect(binding?.read()).toBe("one dataset");
+      expect(binding?.resolve()).toBe("one dataset");
+    });
+
+    it("hands each door only the bindings of its own protocol", async () => {
+      const rest = recordingRestHost();
+      const trpc = recordingTrpcHost();
+      const server = defineServerModule("dataset")
+        .withApp(CatalogueApp)
+        .withTransports(catalogueRest, catalogueTrpc)
+        .withTransportFacts(({ app }) => [
+          restBinding(() => app.read()),
+          trpcBinding(() => app.read()),
+        ]);
+
+      await createApp({ role: "api", members: memberSourceOf({}) })
+        .withTransports({ rest, trpc })
+        .withModules([server])
+        .boot();
+
+      const bound = (rest.mounted[0]?.options?.facts ?? []) as readonly object[];
+
+      expect(bound).toHaveLength(1);
+      expect(bound[0]).toHaveProperty("middleware");
+      expect(trpc.mounted[0]?.options?.facts).toHaveLength(1);
+      expect(trpc.mounted[0]?.options?.facts?.[0]).toHaveProperty("fact");
     });
 
     it("binds nothing in a role that serves no doors", async () => {

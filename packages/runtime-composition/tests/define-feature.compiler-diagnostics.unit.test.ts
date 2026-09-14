@@ -265,6 +265,72 @@ describe("defineServerModule compiler diagnostics", () => {
     expectOnlyDiagnostic(source, code);
   });
 
+  const configuredModule = `
+      abstract class Contract { abstract readonly value: string; }
+      class App extends Contract {
+        static readonly contract = Contract;
+        static readonly dependencies = {};
+        static readonly configSchema = { parse: (value: unknown): { suffix: string } => value as { suffix: string } };
+        readonly value = "ok";
+        static create(setup: FeatureSetup<{}, {}, { suffix: string }>): App { return new App(); }
+      }
+      const feature = defineServerModule("annotation").withApp(App).build();`;
+
+  it("accepts a module whose config slice this process stated", () => {
+    expect(
+      diagnosticsFor(`
+      import { createApp } from "__APPLICATION__";
+      import { memberSourceOf } from "__MEMBERS__";
+      import { defineServerModule, type FeatureSetup } from "__INSTALLER__";
+      ${configuredModule}
+      createApp({ role: "api", config: { annotation: { suffix: "!" } }, members: memberSourceOf({}) })
+        .withModules([feature]);
+    `),
+    ).toEqual([]);
+  });
+
+  it("accepts a module installed by a process whose config states no key set at all", () => {
+    expect(
+      diagnosticsFor(`
+      import { createApp } from "__APPLICATION__";
+      import { memberSourceOf } from "__MEMBERS__";
+      import { defineServerModule, type FeatureSetup } from "__INSTALLER__";
+      ${configuredModule}
+      const config: Readonly<Record<string, unknown>> = { annotation: { suffix: "!" } };
+      createApp({ role: "api", config, members: memberSourceOf({}) })
+        .withModules([feature]);
+    `),
+    ).toEqual([]);
+  });
+
+  it("rejects a module whose config slice this process did not state", () => {
+    expectOnlyDiagnostic(
+      `
+      import { createApp } from "__APPLICATION__";
+      import { memberSourceOf } from "__MEMBERS__";
+      import { defineServerModule, type FeatureSetup } from "__INSTALLER__";
+      ${configuredModule}
+      createApp({ role: "api", config: { other: {} }, members: memberSourceOf({}) })
+        .withModules([feature]); // EXPECT
+    `,
+      "TS2345",
+    );
+  });
+
+  it("rejects a module whose config slice does not parse to what its schema answers", () => {
+    expectOnlyDiagnostic(
+      `
+      import { createApp } from "__APPLICATION__";
+      import { memberSourceOf } from "__MEMBERS__";
+      import { defineServerModule, type FeatureSetup } from "__INSTALLER__";
+      ${configuredModule}
+      createApp({ role: "api", config: { annotation: {} }, members: memberSourceOf({}) })
+        .withModules([feature]); // EXPECT
+    `,
+      "TS2345",
+    );
+  });
+
   /** @scenario "A member an installed module names that this process cannot supply" */
   it("rejects a module list whose members lack one a module names", () => {
     expectOnlyDiagnostic(

@@ -302,26 +302,23 @@ export type ModuleConfigFor<Modules extends readonly unknown[]> = {
 };
 
 /**
- * Every module on the list whose slice the config already supplied does not cover.
- *
- * A module whose name is not a literal is skipped rather than refused. The
- * guard identifies a module by its name, so a name widened to `string` is one
- * it cannot identify - and a guard that cannot know must not refuse, or it
- * rejects correct calls while naming no module a reader can act on. The legacy
- * `serverFeature` builder is the only thing that produces such a name;
- * `defineServerModule` carries the literal through `const Name`.
+ * Every module whose slice the supplied config does not cover. A guard that cannot
+ * know must not refuse: a module name widened to `string`, and a config typed as an
+ * open record, state nothing checkable, so each module's schema refuses it at boot.
  */
-type ModulesMissingConfig<Required, Supplied> = {
-  [Name in keyof Required]: string extends Name
-    ? never
-    : number extends Name
-      ? never
-      : Name extends keyof Supplied
-        ? Supplied[Name] extends Required[Name]
+type ModulesMissingConfig<Required, Supplied> = string extends keyof Supplied
+  ? never
+  : {
+      [Name in keyof Required]: string extends Name
+        ? never
+        : number extends Name
           ? never
-          : Name
-        : Name;
-}[keyof Required];
+          : Name extends keyof Supplied
+            ? Supplied[Name] extends Required[Name]
+              ? never
+              : Name
+            : Name;
+    }[keyof Required];
 
 /**
  * What `withModules` asks for from a process that did not state a module's config.

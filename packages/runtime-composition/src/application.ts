@@ -23,6 +23,8 @@ import type {
   InstalledFeatureState,
   FeatureInstallArguments,
   FeatureProvider,
+  ModuleConfigGuard,
+  ModuleConfigRecord,
   ServerFeatureDeclaration,
   ServerRole,
 } from "./feature-installer.ts";
@@ -234,10 +236,14 @@ export type TransportHostSource<Rest, Trpc> =
  * to run a module without its stores is to say so in code, by installing it
  * with `withMemoryRepositories`.
  */
-export interface ApplicationOptions<Members> {
+export interface ApplicationOptions<Members, Config extends ModuleConfigRecord = ModuleConfigRecord> {
   readonly role: ServerRole;
-  /** One slice per module name, for the modules that declared a config. */
-  readonly config?: Readonly<Record<string, unknown>>;
+  /**
+   * One slice per module name, for the modules that declared a config. Written
+   * as a literal, this is the type `withModules` checks the installed list
+   * against, so a module whose slice is missing is refused where it installs.
+   */
+  readonly config?: Config;
   /**
    * Where the members come from, built by `@langwatch/infrastructure`.
    *
@@ -248,14 +254,19 @@ export interface ApplicationOptions<Members> {
 }
 
 /** An application with its members named, collecting declarations. */
-export class ApplicationBuilder<Members, Rest = never, Trpc = never> {
+export class ApplicationBuilder<
+  Members,
+  Rest = never,
+  Trpc = never,
+  Config extends ModuleConfigRecord = ModuleConfigRecord,
+> {
   private readonly state: BuilderState<Rest, Trpc>;
   private readonly role: ServerRole;
   private readonly config: Readonly<Record<string, unknown>>;
   private readonly source: MemberSource<Members>;
   readonly name: string;
 
-  constructor(options: ApplicationOptions<Members>, state?: BuilderState<Rest, Trpc>) {
+  constructor(options: ApplicationOptions<Members, Config>, state?: BuilderState<Rest, Trpc>) {
     this.role = options.role;
     this.config = options.config ?? {};
     this.source = options.members ?? noMembers<Members>();
@@ -275,19 +286,25 @@ export class ApplicationBuilder<Members, Rest = never, Trpc = never> {
    */
   withTransports<NextRest, NextTrpc>(
     hosts: TransportHostSource<NextRest, NextTrpc>,
-  ): ApplicationBuilder<Members, NextRest, NextTrpc> {
-    return new ApplicationBuilder<Members, NextRest, NextTrpc>(
-      { role: this.role, config: this.config, members: this.source },
+  ): ApplicationBuilder<Members, NextRest, NextTrpc, Config> {
+    return new ApplicationBuilder<Members, NextRest, NextTrpc, Config>(
+      { role: this.role, config: this.config as Config, members: this.source },
       { ...this.state, hosts },
     );
   }
 
   /**
-   * Every module this process installs. A module whose Members names a
-   * member this pool lacks is not assignable, so the list fails to compile.
+   * Every module this process installs. A module whose Members names a member
+   * this pool lacks does not compile, and neither does one whose config slice
+   * this process did not state - see {@link ModuleConfigGuard} for the case it
+   * cannot check, which each module's own schema still refuses at boot.
    */
-  withModules(modules: readonly InstallableServerFeature<Members>[]): this {
-    for (const module of modules) this.addFeature(module);
+  withModules<const Modules extends readonly InstallableServerFeature<Members>[]>(
+    modules: Modules & ModuleConfigGuard<Modules, Config>,
+  ): this {
+    for (const module of modules as readonly InstallableServerFeature<Members>[]) {
+      this.addFeature(module);
+    }
     return this;
   }
 
@@ -582,10 +599,10 @@ export class ApplicationBuilder<Members, Rest = never, Trpc = never> {
  * A process, named by its role and holding its config and its one pool.
  * Nothing is constructed until `boot`.
  */
-export function createApp<Members>(
-  options: ApplicationOptions<Members>,
-): ApplicationBuilder<Members> {
-  return new ApplicationBuilder<Members>(options);
+export function createApp<Members, const Config extends ModuleConfigRecord = ModuleConfigRecord>(
+  options: ApplicationOptions<Members, Config>,
+): ApplicationBuilder<Members, never, never, Config> {
+  return new ApplicationBuilder<Members, never, never, Config>(options);
 }
 
 /**
