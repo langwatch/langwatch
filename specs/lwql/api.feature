@@ -1143,6 +1143,22 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
       Then a MULTI_PROJECT_RESULT diagnostic names how many projects contributed
       And a result confined to one project, or one that did not select the project column, carries no such diagnostic
 
+    @unit
+    Scenario: The query docs describe the any-key scope rule and how to narrow to one project
+      Given docs/api-reference/query/overview.mdx
+      When the Authentication section is read
+      Then it states any key reaches every project it holds analytics:view on
+      And it states narrowing to one project is done with WHERE TenantId = '<project id>' inside the statement
+      And it documents the MULTI_PROJECT_RESULT diagnostic
+      And it no longer documents the retired X-Project-Id header or project_scope_required
+
+    @unit
+    Scenario: The OpenAPI descriptions for both query routes name the any-key scope rule
+      Given the generated OpenAPI document for POST /api/v1/query and GET /api/v1/query/schema
+      When each door's description is read
+      Then it names analytics:view and the organization-key rule
+      And it no longer names X-Project-Id or project_scope_required
+
   Rule: Narrow to one project inside the query
 
     @e2e @unimplemented
