@@ -1757,6 +1757,12 @@ importers:
       '@langwatch/redis-client':
         specifier: workspace:*
         version: link:../../packages/redis-client
+      '@langwatch/role-contract':
+        specifier: workspace:*
+        version: link:../../modules/role/contract
+      '@langwatch/role-server':
+        specifier: workspace:*
+        version: link:../../modules/role/server
       '@langwatch/runtime-composition':
         specifier: workspace:*
         version: link:../../packages/runtime-composition
@@ -8574,6 +8580,9 @@ importers:
       '@langwatch/project-contract':
         specifier: workspace:*
         version: link:../../project/contract
+      '@langwatch/redis-client':
+        specifier: workspace:*
+        version: link:../../../packages/redis-client
       '@langwatch/role-contract':
         specifier: workspace:*
         version: link:../../role/contract

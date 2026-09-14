@@ -20,6 +20,7 @@ import type { FeatureSetup } from "@langwatch/runtime-composition";
 import { reads, type MembersRead } from "@langwatch/infrastructure/members";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { IdentityApi } from "@langwatch/identity-contract";
+import { RoleApi } from "@langwatch/role-contract";
 import { z } from "zod";
 import { buildOrganizationInfrastructure } from "./organization-composition.build.ts";
 import { HandledError } from "@langwatch/handled-error";
@@ -193,6 +194,9 @@ const organizationAppConfigSchema = z.object({
   demoProject: z
     .object({ userId: z.string().default(""), projectId: z.string().default("") })
     .default({ userId: "", projectId: "" }),
+  /** This deployment's public origin, for the invite accept link. Empty on a process that
+   * names none, which is what the deleted composition's own absent-config answer was. */
+  baseHost: z.string().default(""),
 });
 export type OrganizationAppConfig = z.infer<typeof organizationAppConfigSchema>;
 
@@ -281,9 +285,11 @@ export class ServerOrganizationApp implements OrganizationApi {
      * to be one number.
      */
     entitlement: EntitlementApi,
+    /** Where custom-role assignability is defined, for the invitation door. */
+    roles: RoleApi,
   };
   static readonly configSchema = organizationAppConfigSchema;
-  static readonly reads = reads("prisma", "encryption", "logger");
+  static readonly reads = reads("prisma", "encryption", "logger", "redis");
   #dependencies: ServerOrganizationAppDependencies;
 
   static create(setup: OrganizationSetup): ServerOrganizationApp {
@@ -291,11 +297,14 @@ export class ServerOrganizationApp implements OrganizationApi {
       prisma: setup.members.prisma,
       encryption: setup.members.encryption,
       logger: setup.members.logger,
+      redis: setup.members.redis,
       config: setup.config,
       dependencies: {
         projects: setup.dependencies.projects,
         identity: setup.dependencies.identity,
         entitlement: setup.dependencies.entitlement,
+        permissions: setup.dependencies.permissions,
+        roles: setup.dependencies.roles,
       },
     });
     const organizations = OrganizationEntityService.create({

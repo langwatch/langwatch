@@ -136,6 +136,8 @@
     "@langwatch/prompt-server": "workspace:*",
     "@langwatch/redaction": "workspace:*",
     "@langwatch/redis-client": "workspace:*",
+    "@langwatch/role-contract": "workspace:*",
+    "@langwatch/role-server": "workspace:*",
     "@langwatch/runtime-composition": "workspace:*",
     "@langwatch/scenario-contract": "workspace:*",
     "@langwatch/scenario-server": "workspace:*",

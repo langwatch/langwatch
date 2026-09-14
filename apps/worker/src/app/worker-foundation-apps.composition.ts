@@ -16,6 +16,7 @@ import { authzServer } from "@langwatch/authz-server";
 import { opsServer } from "@langwatch/ops-server";
 import { organizationServer } from "@langwatch/organization-server";
 import { projectServer } from "@langwatch/project-server";
+import { roleServer } from "@langwatch/role-server";
 import { shareServer } from "@langwatch/share-server";
 import { topicServer } from "@langwatch/topic-server";
 import { userServer } from "@langwatch/user-server";
@@ -163,10 +164,11 @@ export async function createWorkerFoundationApps(options: {
     .withProvided(FeatureFlagApi, options.featureFlags)
     .withModules([
       authzServer,
-      // organization declares dependencies on identity and entitlement; the
+      // organization declares dependencies on identity, entitlement and role; the
       // worker installs the providers rather than leaving them unanswerable.
       identityServer,
       entitlementServer,
+      roleServer,
       organizationServer,
       projectServer,
       apiKeyServer,

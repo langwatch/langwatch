@@ -37,7 +37,7 @@ export const serverModuleMembers = {
   monitor: [],
   notification: [],
   ops: ["clickhouse", "eventing", "logger", "prisma", "redis"],
-  organization: ["encryption", "logger", "prisma"],
+  organization: ["encryption", "logger", "prisma", "redis"],
   "platform-health": [],
   presence: [],
   project: [],

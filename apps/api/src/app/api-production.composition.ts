@@ -121,6 +121,10 @@ function apiModuleConfig(config: ApiConfig): Readonly<Record<string, unknown>> {
         ? { publicBaseUrl: config.infrastructure.execution.publicBaseUrl }
         : {}),
     },
+    /** Scenario deep links (`platformUrl`) build under the same public origin. */
+    ...(config.infrastructure.execution.publicBaseUrl
+      ? { scenario: { publicBaseUrl: config.infrastructure.execution.publicBaseUrl } }
+      : {}),
     github: stated(config.infrastructure.github),
     /** The origin a hosted MCP server advertises is the api's public one. */
     "hosted-mcp": { baseHost: config.infrastructure.execution.publicBaseUrl },
@@ -131,13 +135,14 @@ function apiModuleConfig(config: ApiConfig): Readonly<Record<string, unknown>> {
         .map((email) => email.trim())
         .filter((email) => email.length > 0),
     },
-    // Process name in refusals and demo organization.
+    // Process name in refusals, the demo organization, and the invite accept link's host.
     organization: {
       processName: config.serviceName,
       demoProject: {
         userId: config.authz.demoProjectUserId ?? "",
         projectId: config.authz.demoProjectId ?? "",
       },
+      baseHost: config.infrastructure.execution.publicBaseUrl ?? "",
     },
     /** The operator surface: same ADMIN_EMAILS list, the EXPLAIN account, prod gate. */
     ops: {

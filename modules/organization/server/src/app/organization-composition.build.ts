@@ -1,4 +1,5 @@
-/** Builds OrganizationInfrastructure from prisma, encryption, logger, and config. */
+/** Builds OrganizationInfrastructure from prisma, encryption, logger, redis, and config. */
+import type { AuthzApi } from "@langwatch/authz-contract";
 import { OrganizationCapabilityUnavailableError } from "@langwatch/organization-contract";
 import type { EntitlementApi, Plan, PlanProviderUser } from "@langwatch/entitlement-contract";
 import {
@@ -16,17 +17,30 @@ import type { IdentityApi } from "@langwatch/identity-contract";
 import type { Logger } from "@langwatch/observability";
 import type { OrganizationUserRole, PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectApi } from "@langwatch/project-contract";
+import type { RedisConnection } from "@langwatch/redis-client";
 
 import { isCustomRole } from "../rules/custom-role-naming.rules.ts";
+import type { InviteAssignableRoles } from "../rules/invite-contracts.rules.ts";
+import { resolveInviteDisplayStatus } from "../rules/invite-display-status.rules.ts";
+import { buildInviteAcceptUrl } from "../rules/invite-link.rules.ts";
+import type { OrganizationInviteRepository } from "../repositories/organization-invite.repository.ts";
+import { PrismaOrganizationInviteRepository } from "../repositories/prisma/prisma.organization-invite.repository.ts";
 import { PersonalWorkspaceDiagnosticsAdapter } from "../services/personal-workspace-diagnostics.service.ts";
 import {
   GroupIdentityAdapter,
   PersonalWorkspaceIdentityAdapter,
   TeamIdentityAdapter,
 } from "../services/resource-identifiers.service.ts";
+import { InviteSendThrottleService } from "../services/invite-send-throttle.service.ts";
+import { InviteService } from "../services/invite.service.ts";
 import type {
   OrganizationCeremony,
   OrganizationDirectory,
+  OrganizationInviteRateLimit,
+  OrganizationInviteSeatCensus,
+  OrganizationInvitations,
+  OrganizationInvitesCreated,
+  OrganizationInviteWithOrganization,
   OrganizationPlanGate,
   OrganizationPlanUser,
   OrganizationPromptSeed,
@@ -140,6 +154,195 @@ class EntitlementOrganizationSeatLicense {
     return resource === "members"
       ? this.options.memberships.getMemberCount(organizationId)
       : this.options.memberships.getMembersLiteCount(organizationId);
+  }
+}
+
+/** The seat census an invitation is validated against: the SAME membership counts the seat
+ * licence above reads, narrowed to what {@link InviteService} asks of it. */
+class EntitlementOrganizationInviteSeatCensus implements OrganizationInviteSeatCensus {
+  static create(memberships: UsageMembershipRepository): EntitlementOrganizationInviteSeatCensus {
+    return new EntitlementOrganizationInviteSeatCensus(memberships);
+  }
+
+  private constructor(private readonly memberships: UsageMembershipRepository) {}
+
+  getMemberCount(organizationId: string): Promise<number> {
+    return this.memberships.getMemberCount(organizationId);
+  }
+
+  getMembersLiteCount(organizationId: string): Promise<number> {
+    return this.memberships.getMembersLiteCount(organizationId);
+  }
+
+  isViewOnlyCustomRole(permissions: string[]): boolean {
+    return MemberClassificationService.isViewOnlyCustomRole(permissions);
+  }
+}
+
+/** The process's ONE fixed-window counter, over process Redis, as the invitation throttle
+ * spends it: same shape as the model-provider connection limiter's own Redis adapter. */
+class RedisOrganizationInviteRateLimit implements OrganizationInviteRateLimit {
+  static create(redis: RedisConnection): RedisOrganizationInviteRateLimit {
+    return new RedisOrganizationInviteRateLimit(redis);
+  }
+
+  private constructor(private readonly redis: RedisConnection) {}
+
+  async limit(
+    input: Readonly<{ key: string; windowSeconds: number; max: number }>,
+  ): Promise<Readonly<{ allowed: boolean; resetAt: number }>> {
+    const counter = `organization:invite:rate-limit:${input.key}`;
+    const now = Date.now();
+    const used = await this.redis.incr(counter);
+    if (used === 1) await this.redis.expire(counter, input.windowSeconds);
+    if (used <= input.max) {
+      return { allowed: true, resetAt: now + input.windowSeconds * 1000 };
+    }
+
+    const remaining = await this.redis.ttl(counter);
+    return { allowed: false, resetAt: now + Math.max(remaining, 0) * 1000 };
+  }
+}
+
+/**
+ * The invitations this deployment administers, through the shape the invitation door reads
+ * them. `InviteService`, its repository and its throttle are the deleted composition's own
+ * `InviteService`/`PrismaOrganizationInviteRepository`/`InviteSendThrottleService`, unmoved;
+ * only the wrapper's method names changed, to match the converted door's `OrganizationInvitations`
+ * port rather than the retired tRPC ports type.
+ */
+export class InviteServiceOrganizationInvitations implements OrganizationInvitations {
+  static create(options: {
+    invites: InviteService;
+    repository: OrganizationInviteRepository;
+    throttle: InviteSendThrottleService;
+    baseHost: string;
+    identity: Pick<IdentityApi, "verifiedEmailsOf">;
+    prisma: PrismaClient;
+    logger: Pick<Logger, "warn">;
+  }): InviteServiceOrganizationInvitations {
+    return new InviteServiceOrganizationInvitations(options);
+  }
+
+  private constructor(
+    private readonly options: {
+      invites: InviteService;
+      repository: OrganizationInviteRepository;
+      throttle: InviteSendThrottleService;
+      baseHost: string;
+      identity: Pick<IdentityApi, "verifiedEmailsOf">;
+      prisma: PrismaClient;
+      logger: Pick<Logger, "warn">;
+    },
+  ) {}
+
+  create(input: Parameters<OrganizationInvitations["create"]>[0]): Promise<OrganizationInvitesCreated> {
+    return this.options.invites.createInvites({
+      organizationId: input.organizationId,
+      invites: input.invites.map((invite) => ({
+        email: invite.email,
+        role: invite.role,
+        ...(invite.teamIds === undefined ? {} : { teamIds: invite.teamIds }),
+        ...(invite.teams === undefined ? {} : { teams: invite.teams.map((team) => ({ ...team })) }),
+      })),
+      // The invite form's rule: an invitation naming a team the caller may not reach is
+      // dropped rather than refusing the whole batch, exactly as the deleted composition ran it.
+      validation: "lenient",
+    });
+  }
+
+  async revoke(input: Readonly<{ organizationId: string; inviteId: string }>): Promise<void> {
+    await this.options.invites.revokeInvite(input);
+  }
+
+  assertSendAllowed(input: Readonly<{ inviteId: string }>): Promise<void> {
+    return this.options.throttle.assertInviteSendAllowed(input);
+  }
+
+  resend(
+    input: Readonly<{ organizationId: string; inviteId: string }>,
+  ): ReturnType<InviteService["resendInvite"]> {
+    return this.options.invites.resendInvite(input);
+  }
+
+  list(
+    input: Readonly<{ organizationId: string }>,
+  ): ReturnType<InviteService["listInvites"]> {
+    return this.options.invites.listInvites(input);
+  }
+
+  async findByCode(
+    input: Readonly<{ inviteCode: string }>,
+  ): Promise<OrganizationInviteWithOrganization | null> {
+    const found = await this.options.repository.tryFindInviteByCodeWithOrganization(input);
+    if (found === null || found.organization === null) return null;
+
+    const { organization, ...invite } = found;
+    return { ...invite, organization: { id: organization.id, name: organization.name } };
+  }
+
+  async matchToAcceptor(
+    input: Readonly<{ inviteEmail: string; sessionEmail: string; userId: string }>,
+  ): Promise<Readonly<{ matches: boolean; viaIdentifierId?: string | null }>> {
+    const matchable = await this.options.identity.verifiedEmailsOf({ userId: input.userId });
+    return InviteService.matchInviteToAcceptor({
+      inviteEmail: input.inviteEmail,
+      sessionEmail: input.sessionEmail,
+      matchable,
+    });
+  }
+
+  apply(
+    input: Readonly<{
+      userId: string;
+      invite: OrganizationInviteWithOrganization;
+      viaIdentifierId?: string | null;
+    }>,
+  ): Promise<void> {
+    return this.options.invites.applyInvite(input);
+  }
+
+  findLandingProjectSlug(
+    input: Readonly<{ invite: OrganizationInviteWithOrganization }>,
+  ): Promise<string | null> {
+    return this.options.invites.tryFindLandingProjectSlug(input.invite);
+  }
+
+  acceptUrl(inviteCode: string): string {
+    return buildInviteAcceptUrl(this.options.baseHost, inviteCode);
+  }
+
+  maskAddress(email: string): string {
+    return InviteService.maskInvitedAddress(email);
+  }
+
+  displayStatus(invite: Parameters<OrganizationInvitations["displayStatus"]>[0]): string {
+    // This adapter's own rows carry a Postgres `Date`, never the port's Instant option; narrowed
+    // rather than widening `resolveInviteDisplayStatus` itself for a caller this class has none of.
+    const expiration =
+      invite.expiration === null || invite.expiration instanceof Date
+        ? invite.expiration
+        : new Date(invite.expiration.epochMilliseconds);
+    return resolveInviteDisplayStatus({ status: invite.status, expiration });
+  }
+
+  /** No mail gateway is composed on this process (D11's "absent is supported" state), so the
+   * seat-limit notice has nowhere to send: logged rather than silently dropped. */
+  async notifySeatLimitReached(
+    input: Readonly<{ organizationId: string; limitType: string; current: number; max: number }>,
+  ): Promise<void> {
+    this.options.logger.warn(
+      { organizationId: input.organizationId, limitType: input.limitType },
+      "no mail gateway is composed, so this organization's administrators were not told it reached its seat limit",
+    );
+  }
+
+  async findUserIdByEmail(input: Readonly<{ email: string }>): Promise<string | null> {
+    const user = await this.options.prisma.user.findUnique({
+      where: { email: input.email },
+      select: { id: true },
+    });
+    return user?.id ?? null;
   }
 }
 
@@ -295,16 +498,63 @@ function organizationDirectory(options: {
   };
 }
 
+/**
+ * The invitations this deployment administers: `InviteService` composed from this process's
+ * own reads (prisma, redis) plus the peers `ServerOrganizationApp` already depends on
+ * (entitlement for plans, authz for grants, role for assignability, identity for acceptor
+ * matching). Mail and the workspace-size census stay uncomposed — both are ports over
+ * aggregates this process does not reach cleanly (react-email rendering, another feature's
+ * project count) — and `InviteServiceDependencies` treats their absence as a supported state,
+ * not a refusal: every invitation still gets written and carries its accept URL.
+ */
+function organizationInvitations(input: {
+  prisma: PrismaClient;
+  redis: RedisConnection;
+  logger: Logger;
+  baseHost: string;
+  identity: Pick<IdentityApi, "verifiedEmailsOf">;
+  entitlement: Pick<EntitlementApi, "getActivePlan">;
+  permissions: AuthzApi;
+  roles: InviteAssignableRoles;
+}): OrganizationInvitations {
+  const repository = PrismaOrganizationInviteRepository.create({ database: input.prisma });
+  const throttle = InviteSendThrottleService.create(RedisOrganizationInviteRateLimit.create(input.redis));
+  const invites = InviteService.create({
+    invites: repository,
+    seats: EntitlementOrganizationInviteSeatCensus.create(
+      PrismaUsageMembershipRepository.create(input.prisma),
+    ),
+    plans: input.entitlement,
+    grants: input.permissions,
+    roles: input.roles,
+    throttle,
+    baseHost: input.baseHost,
+  });
+
+  return InviteServiceOrganizationInvitations.create({
+    invites,
+    repository,
+    throttle,
+    baseHost: input.baseHost,
+    identity: input.identity,
+    prisma: input.prisma,
+    logger: input.logger,
+  });
+}
+
 /** What this process hands `ServerOrganizationApp` at boot. */
 export function buildOrganizationInfrastructure(input: {
   prisma: PrismaClient;
   encryption: { encrypt(value: string): string; decrypt(value: string): string };
   logger: Logger;
+  redis: RedisConnection;
   config: OrganizationAppConfig;
   dependencies: {
     projects: ProjectApi;
     identity: Pick<IdentityApi, "verifiedEmailsOf">;
     entitlement: Pick<EntitlementApi, "getActivePlan">;
+    permissions: AuthzApi;
+    roles: InviteAssignableRoles;
   };
 }): OrganizationInfrastructure {
   const { prisma, logger, config, dependencies } = input;
@@ -323,10 +573,18 @@ export function buildOrganizationInfrastructure(input: {
       plans: dependencies.entitlement,
       memberships: PrismaUsageMembershipRepository.create(prisma),
     }),
-    // No invitation service is composed on this process, so the invitation
-    // door refuses by name rather than administering invitations nobody mints.
-    invitations: null,
-    // Likewise the join-request ledger: the join door refuses by name.
+    invitations: organizationInvitations({
+      prisma,
+      redis: input.redis,
+      logger,
+      baseHost: config.baseHost,
+      identity: dependencies.identity,
+      entitlement: dependencies.entitlement,
+      permissions: dependencies.permissions,
+      roles: dependencies.roles,
+    }),
+    // No join-request ledger is composed on this process, so the join door refuses by name;
+    // the invitation door's own join-request touches are silent no-ops when this is null.
     joinRequests: null,
     plans: organizationPlanGate({ plans: dependencies.entitlement }),
     signals: organizationSignals(logger),
