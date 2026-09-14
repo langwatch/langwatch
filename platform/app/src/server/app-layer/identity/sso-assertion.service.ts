@@ -179,21 +179,14 @@ export class SsoAssertionService {
     // who already work there keep signing in.
     const standing = domainStanding({ connection, domain });
     if (standing.live) {
-      const legacyCompatibility =
-        isConfiguredLegacySsoRoute({
-          source: connection.source,
-          providerId: connection.providerId,
-        }) && connection.verifiedDomains.includes(domain);
-      if (standing.proved || legacyCompatibility) return carryOn;
-      if (!standing.lapsed || !accountId) return refuse;
-
-      const alreadyBound = await this.deps.memberships.findBoundMemberIdentity({
-        organizationId: connection.organizationId,
-        connectionId: providerId,
+      return await this.decideForLiveDomain({
+        connection,
+        providerId,
+        standing,
+        domain,
         accountId,
-        email: email ?? "",
+        email,
       });
-      return alreadyBound ? carryOn : refuse;
     }
 
     // A connection nobody is recorded as having registered has no setup
@@ -209,5 +202,53 @@ export class SsoAssertionService {
         email: email ?? "",
       });
     return setupAdministrator ? carryOn : refuse;
+  }
+
+  /**
+   * The answer when the connection already claims this domain.
+   *
+   * A proved domain, or a legacy route whose imported set carried it, goes
+   * straight through. A LAPSED domain is the interesting case (ADR-123): the
+   * people who already work there keep signing in, so an account already bound
+   * to this connection continues, and only an unrecognised one is refused.
+   * Without an `accountId` there is nothing to recognise, so there is nothing
+   * to let through.
+   */
+  private async decideForLiveDomain({
+    connection,
+    providerId,
+    standing,
+    domain,
+    accountId,
+    email,
+  }: {
+    connection: SignInConnection;
+    providerId: string;
+    standing: { proved: boolean; lapsed: boolean };
+    domain: string;
+    accountId: string | undefined;
+    email: string | null | undefined;
+  }): Promise<{ action: "continue" } | { action: "reject"; code: string }> {
+    const refuse = {
+      action: "reject",
+      code: "identity_sign_in_refused",
+    } as const;
+    const carryOn = { action: "continue" } as const;
+
+    const legacyCompatibility =
+      isConfiguredLegacySsoRoute({
+        source: connection.source,
+        providerId: connection.providerId,
+      }) && connection.verifiedDomains.includes(domain);
+    if (standing.proved || legacyCompatibility) return carryOn;
+    if (!standing.lapsed || !accountId) return refuse;
+
+    const alreadyBound = await this.deps.memberships.findBoundMemberIdentity({
+      organizationId: connection.organizationId,
+      connectionId: providerId,
+      accountId,
+      email: email ?? "",
+    });
+    return alreadyBound ? carryOn : refuse;
   }
 }

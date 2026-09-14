@@ -546,61 +546,85 @@ export class BetterAuthDatabaseHooks {
       const domain = extractEmailDomain(user.email);
       if (!domain) return;
 
-      // ASKED ON EVERY SIGN-IN, not only the first.
-      //
-      // The arrival decision refuses a connection that is not yet ACTIVE, and
-      // this hook is the only one that runs on a RETURNING sign-in — the
-      // account row already exists, so `account.create.after` never fires
-      // again. Deciding arrivals only there meant everybody who signed in
-      // during setup was decided once, while the answer was still "not live",
-      // and never again: an account, no membership, no request, and an empty
-      // queue on the administrator's screen. That includes the administrator
-      // who performed the test sign-in activation refuses to go without.
-      //
-      // Idempotent, so asking every time costs a read: it returns early on an
-      // existing membership, and the join guard refuses a duplicate request.
-      const migration = await this.deps.ssoMigration.decideAccountLink(account);
-      if (migration.kind === "reject") return;
-
-      await this.deps.ssoArrival.admit({
-        user: { id: user.id, email: user.email, name: user.name ?? "" },
-        connectionId:
-          migration.kind === "allow_replacement_pair" ||
-          migration.kind === "allow_connection"
-            ? migration.arrivalConnectionId
-            : account.providerId,
-        domain,
-      });
-
-      if (
-        migration.kind === "allow_replacement_pair" ||
-        migration.kind === "allow_connection"
-      ) {
-        await this.deps.accounts.reconcileOAuthAccounts({
-          userId: user.id,
-          keepAccounts: migration.keepAccounts,
-        });
-        return;
-      }
-      if (!user.pendingSsoSetup) return;
-
-      const reconciled = await this.reconcileToConfiguredProvider({
-        user,
-        account,
-        domain,
-      });
-      if (!reconciled) return;
-
-      logger.info(
-        { userId: user.id, providerId: account.providerId },
-        "Cleared pendingSsoSetup after sign-in via the configured SSO provider",
-      );
+      await this.admitAndReconcile({ user, account, domain });
     } catch (err) {
       logger.error(
         { err, userId: account.userId },
         "Failed to reconcile pendingSsoSetup after account update",
       );
     }
+  }
+
+  /**
+   * Admit the arrival, then settle whichever reconciliation it calls for.
+   *
+   * Split out of {@link afterAccountUpdate} so the hook itself is the two
+   * facts it needs and one call: this is the part with branches, and it reads
+   * as the sequence it is rather than as a body nested inside a `try`.
+   */
+  private async admitAndReconcile({
+    user,
+    account,
+    domain,
+  }: {
+    user: {
+      id: string;
+      email: string;
+      name?: string | null;
+      pendingSsoSetup?: boolean | null;
+    };
+    account: { userId: string; providerId: string; accountId: string };
+    domain: string;
+  }): Promise<void> {
+    // ASKED ON EVERY SIGN-IN, not only the first.
+    //
+    // The arrival decision refuses a connection that is not yet ACTIVE, and
+    // this hook is the only one that runs on a RETURNING sign-in — the
+    // account row already exists, so `account.create.after` never fires
+    // again. Deciding arrivals only there meant everybody who signed in
+    // during setup was decided once, while the answer was still "not live",
+    // and never again: an account, no membership, no request, and an empty
+    // queue on the administrator's screen. That includes the administrator
+    // who performed the test sign-in activation refuses to go without.
+    //
+    // Idempotent, so asking every time costs a read: it returns early on an
+    // existing membership, and the join guard refuses a duplicate request.
+    const migration = await this.deps.ssoMigration.decideAccountLink(account);
+    if (migration.kind === "reject") return;
+
+    await this.deps.ssoArrival.admit({
+      user: { id: user.id, email: user.email, name: user.name ?? "" },
+      connectionId:
+        migration.kind === "allow_replacement_pair" ||
+        migration.kind === "allow_connection"
+          ? migration.arrivalConnectionId
+          : account.providerId,
+      domain,
+    });
+
+    if (
+      migration.kind === "allow_replacement_pair" ||
+      migration.kind === "allow_connection"
+    ) {
+      await this.deps.accounts.reconcileOAuthAccounts({
+        userId: user.id,
+        keepAccounts: migration.keepAccounts,
+      });
+      return;
+    }
+    if (!user.pendingSsoSetup) return;
+
+    const reconciled = await this.reconcileToConfiguredProvider({
+      user,
+      account,
+      domain,
+    });
+    if (!reconciled) return;
+
+    logger.info(
+      { userId: user.id, providerId: account.providerId },
+      "Cleared pendingSsoSetup after sign-in via the configured SSO provider",
+    );
   }
 
   /**
