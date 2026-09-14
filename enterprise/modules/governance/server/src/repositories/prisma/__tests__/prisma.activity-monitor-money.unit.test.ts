@@ -1,11 +1,6 @@
 /**
- * Regression: money fields must stay string (USD) or BigInt (nano-USD).
- *
- * `Number()` on a decimal string is lossy past ~15 significant digits,
- * and float accumulation drifts. Every USD amount entering or leaving
- * the governance read path must be a decimal string; intermediate
- * accumulation must go through nano-USD integers.
- *
+ * Regression test: money fields must stay string (USD) or BigInt (nano-USD).
+ * Number() loses precision past 15 digits; float accumulation drifts.
  * Issue: langwatch/langwatch-saas#1090
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";

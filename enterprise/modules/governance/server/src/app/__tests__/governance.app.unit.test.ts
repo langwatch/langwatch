@@ -1,16 +1,7 @@
 /**
- * The governance application's ingestion-template operations: resolving the
- * project's organization, and attributing a write to the caller who asked.
- *
- * Ported from
- * `platform/app/src/app/api/governance/__tests__/governance-audit-surface.integration.test.ts`,
- * whose @audit-uniform contract is that the SAME write reaching us over four
- * surfaces produces four identical records apart from the surface name. That
- * suite drove all four through the process; the rule it was proving lives here,
- * where each door meets one object, so it is proved here instead of four times.
- *
- * Spec: specs/ai-gateway/governance/governance-api-cli-mcp-coverage.feature
- *       (@bdd @governance-api @audit-uniform)
+ * Ingestion-template operations: resolve organization and attribute writes.
+ * Moved from @audit-uniform integration test (proves the rule once at unit level instead of
+ * four times). Spec: specs/ai-gateway/governance/governance-api-cli-mcp-coverage.feature.
  */
 import type { AuthzService } from "@langwatch/authz-contract";
 import {

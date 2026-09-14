@@ -1,11 +1,6 @@
 /**
- * Unit tests for the pure persona resolver.
- *
- * The resolver is a small pure class; integration semantics (Prisma
- * + tRPC + getUsageStats) are exercised via the
- * personaResolver.tRPC.integration.test.ts companion. These unit tests
- * fix the matrix of input combinations to outputs without DB.
- *
+ * Unit tests for the pure persona resolver (input/output matrix without DB).
+ * Integration tests (Prisma, tRPC, getUsageStats) are in personaResolver.tRPC.integration.test.ts.
  * Spec: specs/ai-gateway/governance/persona-home-resolver.feature
  */
 import { describe, expect, it } from "vitest";

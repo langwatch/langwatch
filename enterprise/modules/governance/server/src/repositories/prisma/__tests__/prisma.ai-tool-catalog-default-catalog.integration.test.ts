@@ -1,15 +1,8 @@
 /**
  * @vitest-environment node
  *
- * Zero-touch default catalog provisioning: every org gets the standard
- * AI tool set automatically, so the /me portal never opens on the
- * "Add your first tools" empty state for a fresh signup. The guard is
- * strictly conservative - any existing AiToolEntry row (enabled,
- * disabled, or archived) means an admin owns the catalog and
- * provisioning keeps its hands off.
- *
- * Hits real Postgres through PrismaAiToolCatalogRepository (no mocks).
- *
+ * Every org gets the standard AI tool set automatically (zero-touch default catalog).
+ * Guard is conservative: any existing AiToolEntry means admin owns it. Hits real Postgres.
  * Spec: specs/ai-governance/personal-portal/default-catalog.feature
  */
 import { nanoid } from "nanoid";

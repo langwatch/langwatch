@@ -1,19 +1,8 @@
 /**
  * @vitest-environment node
  *
- * Keeps what we tell customers is billable in step with what the meter bills.
- *
- * The list is read off the real projection definition rather than
- * transcribed, so adding a type to
- * `BillableEventsMeterProjection.build().eventTypes` fails here until the
- * documentation names it. That direction is the one that costs money
- * silently: a customer who plans around the documented list and is charged
- * for something else finds out on an invoice.
- *
- * The short answers are checked by family rather than by event type. They are
- * deliberately not the full list — they exist so someone skimming the pricing
- * page can size their own workload — but "spans" alone understates the bill
- * for anyone running evaluations, experiments or simulations.
+ * Ensures documentation and meter stay in sync on billable events.
+ * Silent billing for undocumented charges is the cost of getting this wrong.
  */
 import { readFileSync } from "node:fs";
 import path from "node:path";

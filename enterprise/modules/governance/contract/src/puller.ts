@@ -57,13 +57,8 @@ export abstract class GovernancePuller<Configuration = unknown> {
 
 export const ANTHROPIC_ADMIN_ADAPTER_ID = "anthropic_admin" as const;
 /**
- * NOT `.strict()`, deliberately.
- *
- * `IngestionPullWorkerService` hands `source.parserConfig` straight to
- * `validateConfig`, and that stored object carries the encrypted `credentials`
- * subtree the worker decrypts on the very next line. A strict schema rejects
- * it — every Anthropic Admin source would fail on every run with
- * `unrecognized_keys: ["credentials"]`.
+ * NOT .strict()—the object carries encrypted credentials that validateConfig handles.
+ * A strict schema would reject them as unrecognized_keys on every run.
  */
 export const anthropicAdminPullConfigSchema = z.object({
   adapter: z.literal(ANTHROPIC_ADMIN_ADAPTER_ID),

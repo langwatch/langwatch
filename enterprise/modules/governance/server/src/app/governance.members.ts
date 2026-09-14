@@ -445,13 +445,8 @@ export type GovernanceHttpResponse = {
   readonly status: number;
   readonly statusText: string;
   /**
-   * Response headers, when the transport carries them.
-   *
-   * Optional, because a dozen in-repo doubles build a response by hand and a
-   * required member would make every one of them state a header set it never
-   * exercises. The reader that matters is the 429 path: absent headers mean no
-   * `Retry-After`, which is the same outcome as a 429 that sent none — the run
-   * still ends by the error path, it just ends without a named wait.
+   * Response headers, when the transport carries them. Optional because test doubles
+   * build responses by hand; the 429 path doesn't use them, so absence = no Retry-After.
    */
   readonly headers?: { get(name: string): string | null };
   json(): Promise<unknown>;

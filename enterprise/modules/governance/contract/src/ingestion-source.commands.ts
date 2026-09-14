@@ -19,20 +19,9 @@ export const governanceIngestionSourceTypeSchema = z.enum(GOVERNANCE_INGESTION_S
 export type GovernanceIngestionSourceType = z.infer<typeof governanceIngestionSourceTypeSchema>;
 
 /**
- * The source types that receive inbound pushes, and therefore the only ones
- * that have an ingest secret at all.
- *
- * A pull-mode or pure-S3 source authenticates OUTBOUND — it dials the vendor
- * with the vendor's own credential and is never dialled back — so an `lw_is_*`
- * secret minted for one was generated, hashed, stored and shown in a modal
- * without ever authenticating anything. `s3_custom` is the exception, because
- * it is told about new objects over the webhook callback path, and that path
- * is authenticated by the ingest secret.
- *
- * The browser's own catalogue carries the same classification as
- * `needsIngestSecret`, because a React bundle may not import this package's
- * server half; `pushSourceTypeParity.unit.test.ts` is what keeps the two in
- * step.
+ * Push sources have ingest secrets (webhook callbacks are authenticated by them).
+ * Pull/S3 sources don't—they auth outbound. The browser catalogue has the same
+ * classification via needsIngestSecret; pushSourceTypeParity.unit.test.ts keeps them in sync.
  */
 const PUSH_SOURCE_TYPES: ReadonlySet<string> = new Set([
   "otel_generic",

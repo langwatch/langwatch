@@ -1,13 +1,5 @@
 /**
- * Where "upgrade" goes, and what the button says when it gets there.
- *
- * A FAMILY-LOCAL COPY of `platform/app/src/hooks/usePlanManagementUrl.ts`,
- * which stays: the command bar, the upgrade modal, `@langwatch/langy-web` and
- * `@langwatch/navigation-web` all still read it, and the deletes-only ruling
- * forbids repointing one of them. What travels is the PURE half — every
- * function below takes its inputs as arguments — because the hook half read
- * `usePublicEnv`, which is a round trip this package answers off its host port
- * instead.
+ * Where upgrade goes; local copy of hook, pure half only (inputs as args).
  */
 
 import { PricingModel } from "./prisma-types.ts";
@@ -21,13 +13,8 @@ export function planManagementUrl(isSaaS: boolean): string {
 }
 
 /**
- * Whether the usage page shows "current / max" for each resource.
- *
- * Free plans always show limits; Enterprise never does; a license always does,
- * because a license IS a hard cap; and beyond that it turns on the pricing
- * model — TIERED has caps to show and SEAT_EVENT bills by usage, so a ceiling
- * would be a fiction. No pricing model at all is a legacy organization, and
- * showing the limits is the safe default there.
+ * Whether to show "current / max" for each resource. Depends on whether the plan has
+ * meaningful caps: Free/License/TIERED show them, Enterprise/SEAT_EVENT don't, legacy default.
  */
 export function shouldShowPlanLimits({
   isFree,

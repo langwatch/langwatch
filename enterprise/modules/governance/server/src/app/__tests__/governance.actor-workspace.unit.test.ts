@@ -1,12 +1,6 @@
 /**
- * Resolving the actor token stamped on a span to the person's own workspace —
- * what the bird's-eye `/governance/users/[id]` page links to.
- *
- * The claim under test is the collapse: three different misses all answer
- * `null`, so a caller learns nothing about who exists on the instance from the
- * shape of the answer, and the two lookups after the token stop as soon as one
- * of them says no.
- *
+ * Resolving actor token to the person's workspace (for the bird's-eye /governance/users/[id] page).
+ * Test verifies failed lookups return null (no info leak) and short-circuit.
  * Spec: specs/ai-gateway/governance/admin-trace-access.feature
  */
 import type { AuthzService } from "@langwatch/authz-contract";

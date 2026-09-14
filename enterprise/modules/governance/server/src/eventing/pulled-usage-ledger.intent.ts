@@ -10,13 +10,8 @@ export const writePulledUsageSchema = z.object({
   team_id: z.string().nullable().default(null),
   model: z.string().default(""),
   /**
-   * What the item is worth in the ledger's own dollars. The process decides
-   * this — see `ledgerAmountNanoUsd` — and an item nobody can state in dollars
-   * never reaches here at all, so this is a number and not a nullable one.
-   *
-   * Signed, because a provider that credits a period reports the credit in the
-   * same field the charge arrived in, and clamping it away would leave the
-   * charge it reverses standing alone in the customer's total.
+   * Item's worth in the ledger's dollars (decided by process; see ledgerAmountNanoUsd).
+   * Not nullable: unanswerable items never reach here. Signed to handle provider credits.
    */
   cost_nano_usd: z.number().int(),
   tokens_input: z.number().int().min(0).default(0),

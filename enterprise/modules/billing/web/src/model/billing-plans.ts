@@ -1,9 +1,4 @@
-/**
- * Shared billing plan constants
- *
- * Pricing is derived from the Stripe catalog (single source of truth).
- * Feature lists and currency helpers used by SubscriptionPage and PlansComparisonPage.
- */
+/** Billing plan constants; pricing from Stripe catalog. */
 
 import {
   Currency,
@@ -25,14 +20,9 @@ export { formatPrice, isAnnualTieredPlan, parseGrowthSeatPlanType, resolveGrowth
 export type { BillingInterval, CurrencyType as Currency };
 
 /**
- * Which Stripe catalogue this build is priced against.
- *
- * Read through a structural type rather than the ambient `ImportMeta` this
- * package used to declare beside its source: the module is compiled by every
- * tsconfig that reaches it, an ambient declaration reaches only the program
- * that names the file it lives in, and a consumer that did not name it failed
- * on this line. `import.meta.env` is a bundler construct and is absent outside
- * one, which the optional chain answers for.
+ * Stripe catalogue this build is priced against. Structural type, not ambient:
+ * this module compiles in every tsconfig, but an ambient declaration reaches only
+ * the program that names its file.
  */
 const buildMode = (import.meta as unknown as { env?: { MODE?: string } }).env?.MODE;
 
@@ -131,13 +121,8 @@ const ENTERPRISE_PLAN_FEATURE_ENTRIES: ReadonlyArray<{
 export const ENTERPRISE_PLAN_FEATURES = ENTERPRISE_PLAN_FEATURE_ENTRIES.map((entry) => entry.label);
 
 /**
- * The Enterprise tier as one customer HOLDS it: the same list, minus anything
- * their contract explicitly withheld.
- *
- * Only an explicit `false` removes a bullet. An entitlement the plan says
- * nothing about is answered by the tier at resolution, so silence here means
- * granted, not withheld, and a plan that never reached the resolver is
- * described by what the tier sells rather than stripped of it.
+ * Enterprise tier as a customer holds it: the full list minus explicit withholds.
+ * Only false removes a feature; missing fields default to granted, not withheld.
  */
 export function buildEnterprisePlanFeatures(
   plan: Pick<PlanInfo, "webhookEndpointsEnabled">,

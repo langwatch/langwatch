@@ -11,15 +11,8 @@ export class SilentSubscriberDiagnostics implements GovernanceSubscriberDiagnost
 }
 
 /**
- * A real `span_received` event, not a `{}` standing in for one.
- *
- * None of the three governance subscribers reads `data` — the KPI one ignores
- * the event entirely (`when(_event, context)`) and the alert one takes only
- * `event.occurredAt`. But `GovernanceTraceEvent` is the eleven-member trace
- * processing union, and an empty `data` is not any of them, so the fixture was
- * describing a shape the pipeline never delivers. It is spelled out now: the
- * span the event carries, and the three sibling fields the ingress contract
- * requires beside it.
+ * Real span_received event, not an empty {}. Though no subscriber reads data,
+ * GovernanceTraceEvent is an 11-member union; empty data doesn't match any.
  */
 export const governanceTraceEvent: GovernanceTraceEvent = {
   id: "event-1",

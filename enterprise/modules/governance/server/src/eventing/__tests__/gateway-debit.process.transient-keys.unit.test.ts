@@ -7,13 +7,8 @@ import {
 import { GatewayDebitProcess } from "../gateway-debit.process.ts";
 
 /**
- * The contract the absent transaction rests on.
- *
- * A transient commit has no inbox marker, so a redelivered event is absorbed by
- * the outbox's `(processName, projectId, messageKey)` uniqueness instead. That
- * only works while every key a transient evolution mints is a pure function of
- * the event: a key built from a clock or a random value cannot be re-derived by
- * the redelivery, so the suppression misses and the side effect happens twice.
+ * Transient commits rely on outbox uniqueness (no inbox marker), which only works
+ * if keys are pure functions of the event. Clock/random keys can't be re-derived.
  */
 
 type Handler = (

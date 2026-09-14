@@ -1,9 +1,5 @@
 /**
- * Cloud-only Subscription Page Component
- *
- * Allows organization administrators to view and manage their subscription plan and users.
- * This component is injected via dependencies for LangWatch Cloud deployments.
- *
+ * Cloud-only Subscription Page; lets org admins manage plans and users.
  * @see specs/licensing/subscription-page.feature
  */
 import {
@@ -187,7 +183,7 @@ export function SubscriptionPage() {
       plannedUsers: allPlannedUsers,
     });
 
-  // Free/license-override: baseline of 1 seat (Math.max with totalFullMembers below ensures actual count is the floor); paid plan: use plan capacity
+  // Free/license-override: baseline 1 seat; paid plan: use capacity
   const effectiveMaxSeats = isDeveloperPlan || isLicenseOverride ? 1 : seatUsageM;
 
   // Manual planned seats only (NOT pending invites — they're already in maxMembers)
@@ -250,7 +246,7 @@ export function SubscriptionPage() {
       );
     }
 
-    // 4. Free plan or license override: auto-fill rows with email go to plannedUsers (for upgrade flow)
+    // Free/license override: auto-fill email rows to plannedUsers
     if ((isDeveloperPlan || isLicenseOverride) && result.inviteEmails.length > 0) {
       const inviteAsPlanned: PlannedUser[] = result.inviteEmails.map((email, i) => ({
         id: `invite-${nowInstant().epochMilliseconds}-${i}`,
@@ -468,7 +464,7 @@ export function SubscriptionPage() {
           contactSalesUrl={isEnterprisePlan && !isLicenseOverride ? CONTACT_SALES_URL : undefined}
         />
 
-        {/* Invoices Block - always shown; listInvoices returns [] when no Stripe customer exists */}
+        {/* Invoices Block—always shown; empty when no Stripe customer */}
         <InvoicesBlock
           organizationId={organization.id}
           onViewAllInStripe={handleManageSubscription}
@@ -496,7 +492,7 @@ export function SubscriptionPage() {
           />
         )}
 
-        {/* Update seats Block - show for Growth seat+usage plan when seats have been added or removed */}
+        {/* Update seats Block—shown when seats change on Growth plan */}
         {isUpgradeSeatsRequired && (
           <UpdateSeatsBlock
             totalFullMembers={billingSeats}
