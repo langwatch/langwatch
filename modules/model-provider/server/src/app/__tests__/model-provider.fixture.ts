@@ -7,7 +7,6 @@
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
-import { ResourceScope } from "@langwatch/runtime-composition";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import {
   CodexAccountService,
@@ -97,7 +96,7 @@ export function createModelProviderTestApp(
     }>;
   }> = {},
 ): ModelProviderApp {
-  return ModelProviderApp.create({
+  return ModelProviderApp.createForTesting({
     repositories: input.repositories ?? MemoryModelProviderRepositories.create(),
     members: createModelProviderTestInfrastructure(input.members ?? {}),
     dependencies: {
@@ -108,8 +107,6 @@ export function createModelProviderTestApp(
         input.dependencies?.permissions ??
         createApiFixture<AuthzApi>({ hasProjectPermission: async () => true }),
     },
-    config: void 0,
-    resources: new ResourceScope(),
   });
 }
 

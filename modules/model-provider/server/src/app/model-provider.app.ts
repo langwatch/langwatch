@@ -75,11 +75,14 @@ import {
 } from "@langwatch/model-provider-contract";
 
 import { AuthzApi } from "@langwatch/authz-contract";
+import { reads, type MembersRead } from "@langwatch/infrastructure/members";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import { ProjectApi } from "@langwatch/project-contract";
 import type { FeatureSetup } from "@langwatch/runtime-composition";
+import { z } from "zod";
 
 import { AiCallFailureService } from "../services/ai-call-failure.service.ts";
+import { buildModelProviderInfrastructure } from "./model-provider-composition.build.ts";
 import { ModelCostRegexSafetyService } from "../services/model-cost-regex-safety.service.ts";
 import { ModelLimitsService } from "../services/model-limits.service.ts";
 import {
@@ -161,10 +164,65 @@ export interface ModelProviderCodexDeviceFlow {
 
 type ModelProviderSetup = FeatureSetup<
   typeof ModelProviderApp.dependencies,
-  ModelProviderInfrastructure,
-  undefined,
+  MembersRead<typeof ModelProviderApp.reads>,
+  ModelProviderAppConfig,
   ModelProviderRepositories
 >;
+
+/**
+ * The address a resolved model executes against when no NLP engine is
+ * configured. Matches the deleted composition's own sentinel.
+ */
+const UNCONFIGURED_EXECUTION_PROXY = "http://nlp-engine-not-configured.invalid";
+
+/**
+ * Config schema. Every field mirrors a value `apps/api`'s own
+ * `ApiModelProviderConfigResolution` already resolves — the hosted flag, the
+ * SSRF fence, and the raw environment a system provider's fallback
+ * credential reads from — so this module reads it as config rather than
+ * rederiving it from a `secrets` member of its own. Defaults answer the
+ * deleted composition's own absent-config answer: never enabled, never
+ * reachable outside its own network, TLS verified.
+ */
+const modelProviderAppConfigSchema = z.object({
+  /**
+   * Whether this is the hosted deployment. System providers — credentials
+   * this deployment supplies rather than the customer — exist only there;
+   * explicit rather than inferred from an environment variable a self-hosted
+   * install could also happen to have set.
+   */
+  isSaas: z.boolean().default(false),
+  egress: z
+    .object({
+      /** Refuse private, loopback and link-local destinations, and names resolving to them. */
+      blockLocal: z.boolean().default(true),
+      /** The literal hostname allowlist that relaxes the local block, and only it. */
+      allowedHosts: z.array(z.string()).default([]),
+      /**
+       * Whether an outbound TLS certificate is verified. Defaults true;
+       * `apps/api`'s own config resolution carries no answer for this yet, so
+       * a deployment that needs it off (a self-signed on-prem endpoint) needs
+       * that field added there first — see the handoff.
+       */
+      verifyTls: z.boolean().default(true),
+    })
+    .default({ blockLocal: true, allowedHosts: [], verifyTls: true }),
+  /**
+   * Where a resolved model is executed, fully formed: nlpgo's
+   * `/go/proxy/v1`. The composition root joins its own NLP address with the
+   * workflow feature's own path — this module never learns nlpgo's address.
+   */
+  executionProxyBaseUrl: z.string().default(UNCONFIGURED_EXECUTION_PROXY),
+  /**
+   * The process environment a system provider's fallback credential is read
+   * from. A map, not named leaves, because which variable carries a
+   * provider's key is the registry's business and whether this process has
+   * it is the deployment's — `apps/api` hands over its own resolved answer
+   * rather than this module reading `process.env` itself (ADR-132).
+   */
+  environment: z.record(z.string(), z.string().optional()).default({}),
+});
+export type ModelProviderAppConfig = z.infer<typeof modelProviderAppConfigSchema>;
 
 /**
  * The two roles a Codex account is licensed for: Langy's own, and the Fast
@@ -180,13 +238,31 @@ export class ModelProviderApp implements ModelProviderApi {
     organizations: OrganizationApi,
     permissions: AuthzApi,
   };
+  static readonly configSchema = modelProviderAppConfigSchema;
+  static readonly reads = reads("redis");
 
   static create({
     repositories,
     dependencies,
     members,
+    config,
   }: ModelProviderSetup): ModelProviderApp {
-    return new ModelProviderApp(repositories, dependencies, members);
+    const infrastructure = buildModelProviderInfrastructure({ members, config, dependencies });
+    return new ModelProviderApp(repositories, dependencies, infrastructure);
+  }
+
+  /**
+   * Bypasses the config-driven build above for a suite that already decided
+   * every answer a deployment would have supplied — no Redis, no secret
+   * resolver, no real egress. Production never calls this; only `create`
+   * does, over the process's own `redis` and `secrets` members.
+   */
+  static createForTesting(setup: {
+    repositories: ModelProviderRepositories;
+    dependencies: ModelProviderSetup["dependencies"];
+    members: ModelProviderInfrastructure;
+  }): ModelProviderApp {
+    return new ModelProviderApp(setup.repositories, setup.dependencies, setup.members);
   }
 
   /** The registry's ceilings, read from the catalogue this package ships. */

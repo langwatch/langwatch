@@ -144,6 +144,20 @@ export async function createWorkerObservabilityApps(
       log: telemetry.logConfig,
       evaluator: {},
       /**
+       * The module's schema needs the key present. `executionProxyBaseUrl`
+       * stays defaulted here: this role redacts and projects, it does not
+       * execute models, so the module's own refuse-by-name default is right.
+       */
+      "model-provider": {
+        isSaas: options.config.deployment.saas,
+        egress: {
+          blockLocal: options.config.infrastructure.modelProvider.blockLocalHttpCalls,
+          allowedHosts: options.config.infrastructure.modelProvider.allowedProxyHosts,
+          verifyTls: true,
+        },
+        environment: options.config.infrastructure.modelProvider.environment,
+      },
+      /**
        * This process is Trace's PROCESSING role, not its producer one: the
        * install phase below registers Trace's complete `trace_processing`
        * definition, so composing the producer registration here as well would
@@ -161,6 +175,8 @@ export async function createWorkerObservabilityApps(
       encryption: resolveWorkerStoredSecretCipher(options.config),
       ...(options.clickhouse ? { clickhouse: options.clickhouse } : {}),
       ...(options.eventing ? { eventing: options.eventing } : {}),
+      // model-provider declares reads("redis") for its custom-key cache.
+      ...(options.redis ? { redis: options.redis } : {}),
     }),
   })
     .withProvided(ProjectApi, foundation.projects)

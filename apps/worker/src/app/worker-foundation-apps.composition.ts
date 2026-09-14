@@ -122,6 +122,11 @@ export async function createWorkerFoundationApps(options: {
         processName: options.config.serviceName,
         demoProject: { userId: "", projectId: options.config.authz.demoProjectId ?? "" },
       },
+      /** Same deployment facts the api hands entitlement; its schema refuses an absent key. */
+      entitlement: {
+        processName: options.config.serviceName,
+        isSaas: options.config.deployment.saas,
+      },
       ops: {
         adminEmails: adminEmails(options.config),
         isProduction: options.config.nodeEnvironment === "production",

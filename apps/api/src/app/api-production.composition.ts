@@ -150,6 +150,23 @@ function apiModuleConfig(config: ApiConfig): Readonly<Record<string, unknown>> {
     },
     /** The api keeps only the shared secret from its langy block; the rest defaults. */
     langy: { internalSecret: config.langyInternalSecret },
+    /** System providers gate on the explicit hosted flag; egress and env come resolved (ADR-132). */
+    "model-provider": {
+      isSaas: config.infrastructure.modelProvider.isSaas,
+      egress: {
+        blockLocal: config.infrastructure.modelProvider.blockLocalHttpCalls,
+        allowedHosts: config.infrastructure.modelProvider.allowedProxyHosts,
+        verifyTls: true,
+      },
+      ...(config.infrastructure.execution.nlpServiceUrl
+        ? {
+            executionProxyBaseUrl: HttpWorkflowNlpRuntimeAdapter.proxyBaseUrl({
+              baseUrl: config.infrastructure.execution.nlpServiceUrl,
+            }),
+          }
+        : {}),
+      environment: config.infrastructure.modelProvider.environment,
+    },
     /** The address a prompt's deep link is built under: this deployment's public one. */
     prompt: { publicBaseUrl: config.infrastructure.execution.publicBaseUrl },
     /** Where a Studio graph runs; absent, workflow's runs refuse by name. */
