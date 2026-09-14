@@ -36,15 +36,7 @@ import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 
-/**
- * The explore surface before there is an engine under it.
- *
- * The controls are real and drive the title and the query line; the chart
- * body is not, and says so. Nothing here runs a query, so the page carries
- * the Preview badge and no control that cannot act.
- *
- * Spec: specs/governance/governance-platform-placeholders.feature
- */
+// Explore surface before engine: real controls, unreal chart body. Preview badge, no inert.
 function AnalyticsPage() {
   const { organization } = useOrganizationTeamProject({
     redirectToOnboarding: false,

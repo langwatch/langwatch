@@ -8,16 +8,8 @@ import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
 import { withPermissionGuard } from "~/components/WithPermissionGuard";
 
 /**
- * The rule registry before there are any rules.
- *
- * A placeholder for the signals that will fire and the alerts that will
- * answer them. Nothing here can create a rule yet, so the page carries the
- * Preview badge and the copy stays in the future tense throughout. The two
- * header buttons are shown disabled for the same reason: they draw the
- * header's shape and name what is coming, and disabled is the one honest
- * way to offer a control with nothing behind it.
- *
- * Spec: specs/governance/governance-platform-placeholders.feature
+ * Rule registry placeholder. Nothing creates rules yet. Preview badge, disabled buttons
+ * (honest way to offer incomplete controls).
  */
 function SignalsPage() {
   return (
@@ -38,24 +30,9 @@ function SignalsPage() {
             </Text>
           </VStack>
           <HStack gap={2} flexShrink={0}>
-            {/* Neither of these buttons has a handler, so both are
-                disabled: enabled and inert reads as broken, disabled reads
-                as not yet built, and the second one is the truth. They stay
-                on the page so the header keeps its shape and the reader can
-                see what is coming.
-                They are weighted anyway, by the page-header rule: one
-                outlined, the rest ghost. New signal takes the outline
-                because the screen is named for signals and that is the
-                control that would become the create action once one exists,
-                not because it does more than its neighbour today. Both were
-                solid orange before the sweep, which read as two competing
-                create actions on a page that has none.
-
-                A parallel copy change on this page says rule creation is
-                still coming. That is consistent with these buttons rather
-                than contradicted by them: they are placeholders. If you do
-                not find such a sentence, it has not landed yet or has been
-                reworded, which changes nothing here. */}
+            {/* Neither button has handler, both disabled (honest: "not yet built").
+                Weighted by page-header rule; New signal takes outline (future create action).
+                Copy says rule creation coming. */}
             <Button size="sm" variant="ghost" disabled>
               <BellPlus size={14} />
               New alert

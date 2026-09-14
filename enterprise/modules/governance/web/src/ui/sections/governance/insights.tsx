@@ -29,15 +29,8 @@ import { LangyMark } from "~/features/langy/components/LangyMark";
 import { useLangyStore } from "~/features/langy/stores/langyStore";
 
 /**
- * The Insights inbox before there is anything in it.
- *
- * A placeholder for the brief Langy will write: one card that says what
- * will land here and offers the two ways in. The Setup drawer's values
- * live in this page's state for the sitting and nowhere else — there is
- * no store behind them yet, and nothing here says otherwise. The page
- * carries the Preview badge and offers no control that cannot act.
- *
- * Spec: specs/governance/governance-platform-placeholders.feature
+ * Insights placeholder before content. Setup drawer state local (no store yet).
+ * Preview badge, no inert controls.
  */
 function InsightsPage() {
   const [setupOpen, setSetupOpen] = useState(false);
@@ -148,26 +141,8 @@ function InboxEmptyBrief({
             A couple of things worth acting on each day, never a feed of
             fifteen. Nothing has been filed here yet.
           </Text>
-          {/* An empty pane's two ways out. Neither is solid, per the rule.
-
-              Set up data takes the house header button, but be clear about
-              what it does today: onSetup opens InsightsSetupDrawer, and that
-              drawer's Save calls back into local useState on this page. There
-              is no mutation behind it and nothing survives a reload. The
-              drawer's model row does read live data over tRPC, which makes it
-              look more finished than it is. So the most prominent action on
-              this empty pane does not yet do what its label promises.
-
-              It keeps the heavier weight regardless, for two reasons:
-              demoting it would leave the pane with no primary way out, which
-              is worse than one that is ahead of its backend; and this is the
-              action that will fill the inbox once the mutation lands. The
-              weight anticipates that rather than describing the present.
-
-              Open Langy is ghost because it only changes what is on screen.
-              That distinction is thinner than it looks right now, since
-              neither button persists anything — it rests on what Set up data
-              is for, not on what it currently achieves. */}
+          {/* Two ways out: Set up data (house button, local state, no mutation yet); Open
+              Langy (ghost, changes screen only). */}
           <HStack gap={2} marginTop={6}>
             <PageLayout.HeaderButton onClick={onSetup}>
               Set up data

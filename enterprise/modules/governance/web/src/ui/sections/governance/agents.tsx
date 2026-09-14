@@ -52,74 +52,11 @@ import { useDrawer } from "~/hooks/useDrawer";
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 
-/**
- * The Agents page: what runs against the organization, as one list.
- *
- * ONE SURFACE, NOT TWO. It carried an Applications tab beside the agents until
- * the product owner asked for it gone. The pane behind it read nothing and
- * listed nothing — it was a fixed empty state waiting for a concept the
- * platform does not model yet — so it was a second tab a reader could press
- * and learn nothing from. With one pane left there is nothing to switch
- * between, so the tab strip went with it and the agents are the page.
- *
- * THE ROWS ARE REAL NOW, from `governanceAgents.list`. It reads two tables at
- * organization scope: agents that registered themselves from code (ADR-128)
- * and agents a connected provider was asked to list. The page used to fetch
- * nothing at all, because the only agents procedure the platform had was
- * project-scoped (`agents.getAll`) and calling one project's agents the
- * organization's would have been a lie told in the house typeface.
- *
- * Real rows carry no spend, no request count and no health, because no read
- * measures those per agent yet. They arrive null and the list draws a dash
- * with the reason on it, which is the same rendering the sample set's
- * never-run agent already proved.
- *
- * SAMPLE MODE IS AN EITHER-OR, never a fallback. With it on the page shows the
- * invented set and says so; with it off the page shows what the read returned,
- * including nothing. A real empty result never quietly fills with samples: a
- * reader cannot act on invented figures, and cannot tell they are invented if
- * they arrived because the real answer was empty. For the same reason the
- * spinner and the failure alert are suppressed while sample mode is on, which
- * is the stance the inventory and people pages already take.
- *
- * THE LIST IS THE DEFAULT AND THE CARDS ARE THE OPTION. An admin arrives
- * asking what is running across the organization, which is a comparison; the
- * card grid answered it a panel at a time. The switch between them is the
- * inventory catalog's control, down to its words — see `AgentsList`.
- *
- * Registering is not a form. ADR-128 makes a connected agent register itself
- * from the process that runs it, and the platform refuses to create one any
- * other way (`agent_register_only`), so the action opens the snippet that
- * actually works rather than fields nothing could persist.
- *
- * The summary strip obeys the same constraint as everything else here. It
- * measures nothing of its own: every figure on it is a fold over the rows
- * below it (`summarizeAgentFleet`), so it cannot become a second, quieter
- * place where invented numbers pass as measured ones, and it cannot drift from
- * the list it summarizes. It is gated on having rows rather than on sample
- * mode — the same gate the filter chips and the layout switch use — so with
- * nothing to summarize it is absent rather than showing four em dashes, and
- * when an organization-wide read lands it lights up unchanged. Absent rather
- * than dashed because the pane below already says in a full sentence that no
- * agent has registered; four empty boxes above that sentence would repeat it
- * without adding to it.
- *
- * Specs: specs/ai-governance/dashboard/agents-page.feature,
- * specs/ai-gateway/governance/governance-home-routing.feature (the address),
- * specs/ai-governance/dashboard/governance-ui-controls.feature (the rulebook)
- */
+// Agents page: organization-wide list with real rows. Sample mode either-or. List/cards layout.
+// Register via snippet (ADR-128). Summary folds from rows.
 
-/**
- * Which layout the reader chose, as part of the address (`?view=`).
- *
- * The default stays out of the address and an unknown value degrades to it
- * rather than to a blank pane — the contract the tab parameter had before the
- * tabs were removed, and the one every other control on this page already
- * follows. The filters, the sort and the register dialog are all in the
- * address here, so leaving the one remaining control in component state would
- * make it the single choice on the page a reader could not share or reload
- * into.
- */
+// Layout part of address (?view=); default hidden, unknown degrades to it. Other controls in
+// address so this must be too.
 function useAgentsLayout() {
   const [searchParams, setSearchParams] = useSearchParams();
   const requested = searchParams.get("view");
@@ -140,27 +77,8 @@ function useAgentsLayout() {
 /** The address that opens the register-agent drawer on arrival. */
 const ADD_AGENT_PARAM = "add";
 
-/**
- * The deep link that arrives asking to register an agent:
- * `/governance/agents?add=1`, which is how the governance home page's "Add
- * agent" pill sends a reader here. A pill that dropped the reader on the page
- * and left them to find the button again would be a worse version of no pill
- * at all.
- *
- * The parameter is a request, not state. It is honoured once, and then cleared
- * from the address on the render after the drawer has landed in it — reading
- * `drawer.open` rather than latching a flag, so the clear cannot run before the
- * open it is waiting for. Same contract, same parameter name and the same
- * shape as the people page's `useAddDepartmentDeepLink`, because it is the
- * same problem: a short href another screen can hold, translated into the
- * drawer address the registry actually routes on.
- *
- * Unlike that one this has no permission gate. The department deep link checks
- * `governance:manage` because the mutation behind its drawer would refuse the
- * reader anyway; there is no mutation behind this one. It shows the snippet a
- * reader runs in their own process, so anyone who can see this page can read
- * it.
- */
+// Deep link ?add=1 opens register drawer, honored once then cleared. Same pattern as
+// people page's useAddDepartmentDeepLink; no permission gate needed.
 function useAddAgentDeepLink() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { openDrawer } = useDrawer();
@@ -239,18 +157,8 @@ function AgentsEmptyState({
   );
 }
 
-/**
- * What the page reads, and what it shows given the reader's sample choice.
- *
- * Gathered here so the page body does not have to be read as a chain: the
- * query depends on the organization, and which rows reach the list depends on
- * the query and on the sample choice.
- *
- * The two never mix. Sample mode substitutes the invented set wholesale; it is
- * never a fallback for a real read that came back empty or failed. An empty
- * organization filling itself with plausible agents would be a page a reader
- * cannot act on and cannot tell apart from one they can.
- */
+// Reads query and displays based on sample choice. Sample mode substitutes wholesale, never
+// fallback for empty/failed reads.
 function useAgentsScreen() {
   const { organization } = useOrganizationTeamProject({
     redirectToOnboarding: false,
@@ -266,54 +174,15 @@ function useAgentsScreen() {
   return {
     sample,
     rows: sample.active ? SAMPLE_AGENT_ROWS : (agents.data ?? []),
-    // Both suppressed under sample mode, for the reason the people page
-    // suppresses its own: reporting that the real read is still running, or
-    // that it failed, beside a screen full of invented figures leaves the
-    // reader unable to act on either half.
-    // `!orgId`, not `!!orgId`, and the inversion is the whole fix.
-    //
-    // The query is disabled until the organization resolves, and a disabled
-    // query reports `isLoading: false`. Requiring an org id here therefore
-    // said "not loading" for the one window in which nothing has been asked
-    // yet, and `agents.data` is undefined then, so the page fell through to
-    // "no agent has registered" — a claim about the organization, made before
-    // the organization was even known.
-    //
-    // A read still in flight has not earned an empty state, and neither has a
-    // read that has not started.
+    // Suppress loading/error under sample mode. Use `!orgId` not `!!orgId` to avoid false
+    // "no agents registered" before org resolves.
     isLoading: !sample.active && (!orgId || agents.isLoading),
     error: sample.active ? null : agents.error,
   };
 }
 
-/**
- * Asking the connected providers what agents they have.
- *
- * ASYNCHRONOUS, and everything below follows from that. The mutation returns
- * when the request has been RECORDED. A pipeline calls the provider after
- * that, and the answer reaches this page only through the next read. So this
- * hook reports what was started and never what was found, and the toast says
- * reloading is how the reader sees a result.
- *
- * `hasAsked` is remembered for the life of the mounted page rather than timed
- * out. A second request arriving while one is in flight is DROPPED by the
- * process manager, not queued, and this page still has no way to learn when
- * the first one settled.
- *
- * The reason for that has moved twice. It is no longer that the outcome is
- * unfolded, and no longer that nothing reads it: `syncSources` now carries the
- * last agents-listing outcome per source, which is what lets the empty pane
- * tell a refusal from an empty tenant. What it does not carry is a way to know
- * that THIS press has settled — the outcome is per source and not per request,
- * so a freshly refused row and a row refused last week look the same from
- * here. Latching on it would clear the button on somebody else's old refusal.
- * A reload is still the thing that actually shows the result, and it clears
- * this too.
- *
- * The sources read is on the view grant and runs for every reader, because the
- * empty pane needs to name the connected providers — and say which of them
- * refused — whether or not the reader may press anything.
- */
+// Asynchronous: mutation returns when request recorded, answer through next read. hasAsked
+// per mount; second request dropped if first in flight.
 function useAgentSync({
   orgId,
   canManage,
@@ -398,15 +267,7 @@ const AGENT_SYNC_UNAVAILABLE_REASONS = {
   no_provider: "No connected provider can list agents.",
 } as const;
 
-/**
- * The agents, and whatever stands in for them.
- *
- * The filter row is deliberately NOT here. It belongs to the page header, one
- * row under the title, so the controls that narrow the content sit outside the
- * content they narrow — the same arrangement the api keys page uses, where the
- * scope filter and the create action share a header row above a table that
- * always renders. See `AgentsPage`.
- */
+// Filter row in header, not here (same as api keys page).
 function AgentsPane({
   rows,
   filters,
@@ -477,54 +338,9 @@ function AgentsPane({
   );
 }
 
-/**
- * WHICH nothing this is — the four-way decision this page exists to get right.
- *
- * A reader looking at an empty agents table is owed an answer to "why", and
- * the four answers demand different things of them:
- *
- *   no connected provider   — nothing can list agents, so writing the
- *                             registration is the only move.
- *   nothing asked yet       — providers are connected and none has answered.
- *                             Nothing is known about what they hold.
- *   every provider answered — they hold no agents. This is the ONLY branch
- *                             allowed to say the organization has none.
- *   a provider refused      — the page cannot say what that provider holds,
- *                             and somebody has to act.
- *
- * A REFUSAL BEATS EVERY OTHER READING, even when another provider answered
- * cleanly. The reader's next move is the same either way — go and fix the
- * refusing connection — and an "everything is fine, you have no agents" pane
- * beside a dead credential is the exact defect this branch was built to end.
- * Agents behind the refusing provider are missing from the list above, so the
- * quieter states would all be overclaiming.
- *
- * `every` rather than `some` for the answered branch, for the same reason. One
- * provider saying "none" while another has never been asked does not make the
- * organization empty; the unasked one could be running a dozen. Only this
- * function sees the whole set, which is why the gate is here and not in the
- * copy.
- *
- * MIXED CAUSES RESOLVE TO THE ONE MOST WORTH ACTING ON. Two providers
- * refusing for different reasons produce one pane, and it has to carry the
- * instruction the reader would regret not seeing: a permission that will keep
- * refusing forever outranks a provider that was briefly unreachable, and a
- * wait outranks a listing our own page limit cut short, which no press can
- * change. The order lives in {@link REFUSAL_CAUSE_RANK}, keyed over the whole
- * cause union so a fourth cause cannot silently fall into somebody else's
- * advice — which is exactly how `incomplete` used to be told "ask again".
- *
- * The copy itself lives in `emptyStates.ts`; what belongs here is the reading
- * of the page's own state, and the press that goes with each one.
- */
-/**
- * Which refusal cause wins the pane when several providers refused.
- *
- * Higher is more worth acting on. A `Record` over the whole union rather
- * than a `some(access)` check, so that adding a cause to
- * `AgentsListingRefusalCause` is a compile error here rather than a silent
- * fall-through into whichever arm the ternary defaulted to.
- */
+// Reads page state to decide empty pane: no provider, nothing asked, every answered (only
+// "org has none"), or refusal (beats other readings). Copy in emptyStates.ts.
+// Higher rank = more actionable refusal cause (access > unreachable > incomplete).
 const REFUSAL_CAUSE_RANK: Record<AgentsListingRefusalCause, number> = {
   // Somebody has to fix something; asking again changes nothing until then.
   access: 3,

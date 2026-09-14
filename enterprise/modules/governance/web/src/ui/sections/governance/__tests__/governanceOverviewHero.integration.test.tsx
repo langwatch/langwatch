@@ -1,16 +1,6 @@
 /**
  * @vitest-environment jsdom
- *
- * The governance overview, driven through the real page: a real permission
- * set goes into `useOrganizationTeamProject`, and the real page decides which
- * ways in it draws, where each one goes, and what it reads.
- *
- * Only the boundaries are mocked - the layout chrome, the feature flag, the
- * plan, the router, the inline palette, and the tRPC client. The tRPC double
- * records every read the page issues, which is what lets the last test say
- * the page reads nothing rather than only that it shows no error.
- *
- * Spec: specs/ai-governance/dashboard/governance-overview-hero.feature
+ * Governance overview with real page and permissions; mocks layout, flags, plan, and tRPC.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
@@ -223,19 +213,8 @@ const wayInHrefs = () =>
  */
 const PACKAGE_ROOT = process.cwd();
 
-/**
- * The tab names a governance page honours, read out of the page's own
- * `X_TABS = [...] as const` tuple — the single list its `isXTab` guard tests
- * against, so what this returns is what that page will actually accept.
- *
- * `null` for a page carrying no such tuple. That is a page with no tab bar,
- * not a page this failed to read, and the caller holds it to a stricter rule
- * than a page with tabs, so the two cases have to be told apart.
- *
- * Read from source rather than imported because these tuples are private to
- * their pages, and exporting three of them so a chip test can see them would
- * widen three modules' surface to serve one assertion.
- */
+// Reads tab names from a page's X_TABS tuple; null if none. Private to pages, so read
+// from source to avoid widening module surfaces.
 async function tabsOfPage(path: string): Promise<string[] | null> {
   const name = path.replace("/governance/", "");
   const candidates = [
@@ -264,16 +243,8 @@ async function tabsOfPage(path: string): Promise<string[] | null> {
   );
 }
 
-/**
- * The measure the project home sets its own ask field to, read out of that
- * hero's source.
- *
- * Read rather than imported because the constant is private to that module,
- * and the governance hero restates the value rather than importing the hero
- * behind it. Restating it is what this reads for: if either side moves, the
- * two fields stop matching and the reader meets a field that resizes as they
- * cross between the two screens.
- */
+// Reads project home's ask field from source (not imported, constant is private) to verify
+// consistency; if they drift, fields resize between screens.
 async function projectHomeAskMeasure(): Promise<string> {
   const path = join(PACKAGE_ROOT, "src/components/home/LangyHomeHero.tsx");
   const source = await readFile(path, "utf8");
@@ -306,16 +277,8 @@ function boxedAncestorWidth(
   throw new Error(`nothing above this element sets a ${property}`);
 }
 
-/**
- * Every accent-coloured value this element resolves to, across the properties
- * a filled treatment reaches for.
- *
- * The design tokens do not resolve to a colour under jsdom, which computes
- * them to their own variable names ("var(--chakra-colors-orange-subtle)").
- * That is enough, and it is the right thing to read: the rule is about which
- * TOKEN a control is dressed in, not which pixels a theme happens to give
- * that token, and the token name is what changes when the treatment does.
- */
+// Returns accent tokens (variable names under jsdom). Tests token consistency, not theme
+// colors; the token name changes when the treatment does.
 function accentTokens(node: HTMLElement): string[] {
   const style = getComputedStyle(node);
   return (

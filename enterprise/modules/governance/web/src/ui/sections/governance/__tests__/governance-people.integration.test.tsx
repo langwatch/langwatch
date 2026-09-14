@@ -1,15 +1,6 @@
 /**
  * @vitest-environment jsdom
- *
- * The People page, and what it deliberately is not.
- *
- * It manages departments and points at the two surfaces where a person or a
- * team is actually assigned to one; it does not list every member with a
- * dropdown beside them, which is what it used to do and what made it unusable
- * at any real headcount. `platform/app/src/components/settings/__tests__/departmentAssignment.integration.test.tsx`
- * pinned that shape while the page lived in the application, and it moves here
- * with the page. The picker and the members-table column stay in `platform/app`
- * with their own two scenarios.
+ * Tests departments and assignment surfaces (not member list with dropdowns).
  */
 
 import { cleanup, screen, within } from "@testing-library/react";

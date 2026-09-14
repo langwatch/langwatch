@@ -1,21 +1,6 @@
 /**
  * @vitest-environment jsdom
- *
- * The Costs page's time chips, and what the page does with them.
- *
- * Three things are under test here and they are all the same thing seen from
- * different sides: the page asks the reads for the window its Time Frame chip
- * names, it draws every chart on the bucket its Time Interval chip names, and
- * when the frame reaches further back than the reads will answer it says so
- * rather than serving a shorter span under a longer label.
- *
- * The fourth is a removal. Group By named the series of one chart while
- * sitting in a row that reads as filtering the page, so the lesson it taught
- * was that a chip here may or may not do anything. It is gone, and this suite
- * is what keeps it gone.
- *
- * Spec: specs/governance/governance-cost-screen.feature
- *       specs/ai-governance/dashboard/governance-ui-controls.feature
+ * Tests Costs page time controls and verifies Group By stays removed.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
@@ -199,16 +184,8 @@ describe("the cost screen's time controls", () => {
       expect(findNativeSelects(container)).toHaveLength(0);
     });
 
-    // The axis ticks themselves are unreachable here — recharts measures a
-    // zero-width container under jsdom and draws no SVG at all, so the tick
-    // text never exists to assert on. The tick format is covered by the unit
-    // test on `formatBucketTick`.
-    //
-    // What this suite can see is the sentence the page writes from the same
-    // interval the charts are folded with. It used to read the lane chart's
-    // heading instead, which spoke for one chart while the scenario is about
-    // every chart on the screen; that chart is gone and the sentence covers
-    // all of them.
+    // Tick text unreachable under jsdom (recharts draws no SVG); verify the page's bucketing
+    // sentence covers all charts.
 
     /** @scenario "Every chart on the screen is ticked by the interval in view" */
     it("says the charts are bucketed by the interval in view, not by days", () => {

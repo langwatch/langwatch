@@ -1,13 +1,6 @@
 /**
  * @vitest-environment jsdom
- *
- * The team detail page, mounted through its real page and guards. What is
- * under test is what the page CLAIMS: it names the breakdowns it does not
- * have instead of describing them as work under way, it offers no control
- * that answers a press with nothing, and it describes its two links in the
- * reader's own words rather than ours.
- *
- * Spec: specs/ai-governance/dashboard/team-detail-page.feature
+ * Team detail page: names missing breakdowns, no inert controls, reader's own link text.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";

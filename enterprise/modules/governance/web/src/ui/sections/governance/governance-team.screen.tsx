@@ -31,17 +31,8 @@ const fmtRelative = (date: TimeInput | null): string => {
 };
 
 /**
- * Per-team governance detail. Reads the same `spendByTeam` rollup
- * the bird's-eye uses, filters in-memory to the requested team id,
- * surfaces the team's headline metrics + a 'see this team in /traces'
- * deep-link. Detail-data depth (per-day spend, per-user breakdown,
- * model mix) defers to a follow-up; this page exists today to honor
- * the bird's-eye click-through invariant.
- *
- * Every control on the page is a link that navigates; the copy names only
- * what the page shows today and marks the rest as not available yet.
- *
- * Spec: specs/ai-governance/dashboard/team-detail-page.feature
+ * Per-team governance detail from spendByTeam rollup. Headline metrics + traces link.
+ * Detail data deferred. Every control navigates; copy marks rest unavailable.
  */
 function GovernanceTeamDetailPage() {
   const router = useGovernanceRouter();

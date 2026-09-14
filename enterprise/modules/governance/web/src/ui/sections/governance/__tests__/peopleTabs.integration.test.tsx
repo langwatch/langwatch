@@ -1,24 +1,7 @@
 /**
  * @vitest-environment jsdom
- *
- * The People page: one table of everyone, two tabs, and the section's shared
- * controls. The selected tab, the department and the sort are all part of the
- * address, so every test mounts the real page in a memory router and asserts
- * against the same address the user sees.
- *
- * Only the boundaries are mocked - layout chrome, the feature flag, the plan,
- * the compat router, the drawer navigation, and the tRPC client, which answers
- * per procedure from the harness and records what each read was asked for. The
- * permission decision is the real one: `hasAnyPermission` runs the same
- * `hasPermissionWithHierarchy` the server uses.
- *
- * The create-department drawer is mounted by `CurrentDrawer` at the app root,
- * not by this page, so what this file can prove about it is that the page asks
- * for it - by the header action and by the deep link. The drawer's own
- * behaviour is `addDepartmentDrawer.integration.test.tsx`.
- *
- * Spec: specs/ai-governance/dashboard/people-tabs.feature
- * Spec: specs/ai-governance/dashboard/governance-ui-controls.feature
+ * People page tabs with real permission logic. Tab, department, and sort affect the address.
+ * Drawer mounted by app root, not the page.
  */
 import { Button, ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import {

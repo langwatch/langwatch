@@ -1,13 +1,6 @@
 /**
  * @vitest-environment jsdom
- *
- * The user detail page, mounted through its real page and guards. What is
- * under test is what the page CLAIMS about the breakdowns it does not have:
- * it says they are not available, rather than describing them as work
- * already scheduled. Same rule, and the same shape of test, as the team
- * detail page beside it.
- *
- * Spec: specs/ai-governance/dashboard/user-detail-page.feature
+ * User detail page: claims about unavailable breakdowns (same rule as team detail page).
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";

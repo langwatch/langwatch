@@ -1,17 +1,7 @@
 /**
  * @vitest-environment jsdom
- *
- * What the People screen does with the two departments a person can carry —
- * the one their provider's directory named, and the one their linked member is
- * assigned to — and the invariants the merged table has to keep: two providers
- * naming one address stay two rows, money nobody can be proven to own is shown
- * once, and an erased person is described by their stand-in and nothing else.
- *
- * The real page renders, with only its boundaries mocked - the layout chrome,
- * the feature flag, the plan, the permission hook and the tRPC client. The
- * department and merge decisions are the page's own.
- *
- * Spec: specs/governance/governance-people-screen.feature
+ * Tests department handling and table invariants: two providers stay separate, shared money
+ * shown once, erased person via stand-in. Real page, mocked boundaries.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, within } from "@testing-library/react";

@@ -4,13 +4,8 @@ import { type ResolvedPlanLimits, resolvePlanDefaults } from "../index.ts";
 import type { LicensePlanLimits } from "../index.ts";
 
 /**
- * Tests for resolvePlanDefaults.
- *
- * Only the enforced levers (member seats, messages volume, webhook endpoints) +
- * plan identity are resolved onto the active plan. Workspace structure
- * (projects, teams) and experimentation resources are OSS/uncapped, so their
- * license fields — even when present in an older signed payload — are ignored
- * and never resolved.
+ * Tests resolvePlanDefaults: only enforced levers (seats, messages, endpoints) + identity.
+ * Workspace/experimentation OSS/uncapped, license fields ignored.
  */
 
 describe("resolvePlanDefaults", () => {

@@ -1,16 +1,7 @@
 /**
  * @vitest-environment jsdom
  *
- * The cost screen, mounted through its real guard stack.
- *
- * Only the boundaries are mocked — the layout chrome, the router, the plan and
- * the tRPC client. The permission decision is NOT: `hasAnyPermission` runs the
- * real `hasPermissionWithHierarchy` over the real built-in role bag, so a
- * `governanceCost:view` missing from that bag fails these tests rather than
- * shipping a screen nobody can open. The feature flag is real too — the tests
- * flip it and assert both directions.
- *
- * Spec: specs/governance/governance-cost-screen.feature
+ * Tests cost screen with real permission and feature flag checks.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import {
@@ -715,15 +706,7 @@ describe("the governance cost screen", () => {
       };
     };
 
-    /**
-     * What the billed lane's (i) says, opened.
-     *
-     * The lane's sentence and whatever the read side added about it moved off
-     * the face of the card and behind the (i) beside its title: three cards
-     * sit in a row and each closed on a paragraph, which set the row's height
-     * by the longest of them. The popover portals out of the card, so it is
-     * found on the document rather than inside the lane.
-     */
+    // Opens the billed lane's info popover, portaled to the document root.
     const billedLaneInfo = () => {
       fireEvent.click(screen.getByTestId("cost-lane-billed-about"));
       const body = document.querySelector<HTMLElement>(
@@ -821,18 +804,8 @@ describe("the governance cost screen", () => {
   });
 
   describe("given a source whose pulls have been failing", () => {
-    /**
-     * THE SCREEN NO LONGER SAYS SO, by decision rather than by regression.
-     * Two warning banners stood above the lanes — this one, and one for days
-     * read while cost recording was off — and both were removed at the
-     * product owner's direction: the screen opens with figures rather than
-     * with caveats about them, and the source pages carry the same fact
-     * beside the source a reader would have to visit to act on it.
-     *
-     * The read still reports it (see the unit scenarios under the summary's
-     * own Rule), so this holds the screen's half: it draws neither banner,
-     * and it does not fall over on a summary that carries one.
-     */
+    // Warning banners were removed by product decision to show figures first; the read still
+    // reports the status. Verify the screen draws no banner and doesn't crash on a summary with it.
     it("draws no warning banner over the lanes", () => {
       harness.query = {
         data: summaryFixture({
@@ -860,18 +833,8 @@ describe("the governance cost screen", () => {
   });
 
   describe("given the section's no-native-select rule", () => {
-    // The rule the section rulebook calls its hardest, checked on this page
-    // rather than on the filter row alone.
-    //
-    // Both states, because they render different controls: with figures the
-    // page draws its charts and their legends, and with nothing read it draws
-    // the empty panels and their links. A rule proved against one of those
-    // says nothing about the other.
-    //
-    // The assertion runs against `document.body`, not the render container.
-    // A chip's menu portals out of the container when it opens, so a native
-    // select inside one would sit outside anything `render` hands back — the
-    // rule is about the page, and the page is the document.
+    // Test both render states (different controls rendered); assert against document.body since
+    // chip menus portal outside the render container.
 
     /** @scenario "No governance page renders a native select" */
     it("contains no native select element, with data and with none", () => {

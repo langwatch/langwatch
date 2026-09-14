@@ -1,13 +1,7 @@
 /**
  * @vitest-environment jsdom
- *
- * The three Platform placeholder screens, mounted through their real pages
- * and guards. What is under test is the small set of promises the screens
- * make: they stay behind the billed-cost flag, they say exactly what they
- * say, Open Langy opens Langy, and the Setup drawer keeps its edits for the
- * sitting without ever claiming to have stored them.
- *
- * Spec: specs/governance/governance-platform-placeholders.feature
+ * Platform placeholder screens: flag guard, correct text, Langy integration, Setup drawer
+ * edits.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import {
@@ -415,33 +409,15 @@ describe("given the Analytics screen", () => {
 });
 
 describe("given a Platform screen a member can press things on", () => {
-  /**
-   * A control is inert when it is offered, looks pressable, and answers a
-   * press with nothing. That is a property of the SOURCE — a `<Button>` with
-   * no `onClick` — so it is read there rather than inferred from a render:
-   * a render can only prove that the controls a test happened to name do
-   * something, and the ones nobody named are exactly the ones that rot.
-   *
-   * A disabled control is not inert: it is offered as not-yet-built and says
-   * so, which is the one honest way to draw a shape that has no backing. So
-   * the scan holds every ENABLED control to a handler. Signals used to be
-   * excluded from the scan entirely while its header was restyled, and its
-   * two actions stayed live and dead behind that exclusion.
-   */
+  // Inert controls have no onClick (property of source, not render). Scan reads source to
+  // catch unnamed controls that rot; renders only show named ones.
   const buttonTagsIn = (file: string) => {
     // Resolved from the package root (vitest's cwd), because under the
     // jsdom environment `import.meta.url` carries the served path, not the
     // filesystem one, and reading it silently misses the file.
     const source = readFileSync(join(process.cwd(), file), "utf-8");
-    // Two element forms, because a control is not always a `<Button>`: the
-    // Insights rail's folders are `<chakra.button>`. Scanning for one form
-    // only is how five of this screen's controls went unchecked.
-    //
-    // The window, rather than a match to the tag's closing ">", is the point:
-    // an arrow handler contains ">" itself (`onClick={() => …}`), so a lazy
-    // match to the first ">" stops inside the very attribute being looked
-    // for. Each element start is taken with the text that follows it, up to
-    // the next element start, and `onClick=` is required somewhere in there.
+    // Two element forms (controls aren't always `<Button>`). Window approach handles ">"
+    // in arrow handlers without false negatives.
     const starts = [
       ...source.matchAll(
         /<(?:Button|chakra\.button|PageLayout\.HeaderButton)\b/g,
@@ -452,19 +428,8 @@ describe("given a Platform screen a member can press things on", () => {
     );
   };
 
-  /**
-   * Read from the opening tag only — `[^>]*` stops at the first ">" — rather
-   * than from the whole window above, so a `disabled` belonging to some later
-   * element cannot excuse this one. An arrow handler's own ">" cuts the read
-   * short, which can only miss a `disabled`, never invent one: a control that
-   * carries both is held to its handler instead, and passes on that.
-   *
-   * Only the `disabled` PROP counts, so it must sit at a prop boundary
-   * (whitespace before it) and must not be spelled `disabled={false}`.
-   * `aria-disabled` and `data-disabled` announce a state without preventing
-   * a click, and a `false` value disables nothing; a control wearing either
-   * with no handler is still a dead control.
-   */
+  // Read opening tag only; only disabled PROP counts, not aria-disabled or data-disabled
+  // or disabled={false}.
   const isDisabled = (tag: string) =>
     /^<[A-Za-z.]+\b[^>]*\sdisabled(?=[\s/>=])(?!\s*=\s*\{\s*false\s*\})/.test(
       tag,
@@ -527,16 +492,8 @@ describe("given a Platform screen a member can press things on", () => {
 
   /** @scenario "Every control the Platform screens offer does something when pressed" */
   it("offers exactly the controls the tests above press", () => {
-    // The render-side half of the same guard: a control added later shows up
-    // here as an unexpected name, so it cannot slip in unnoticed.
-    //
-    // Not all of them are pressed here, and the split is worth naming. "Set
-    // up data" and "Open Langy" are the page's own two controls and each is
-    // pressed with its result asserted by a test in this file. The five
-    // folder names above them come from the Insights rail, and what holds
-    // them is the scan above — extended to the rail's own file — plus this
-    // roster. Pressing them would assert the page's folder-selection state,
-    // which is not what this scenario is about.
+    // Render-side guard: new controls show as unexpected names. "Set up data" and "Open
+    // Langy" pressed with results asserted; folder names held by scan above.
     renderPage(InsightsPage);
     expect(
       screen
