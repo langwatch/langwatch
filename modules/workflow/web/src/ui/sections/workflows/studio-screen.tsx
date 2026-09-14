@@ -3,12 +3,12 @@ import { SearchX } from "lucide-react";
 import { useEffect } from "react";
 import { Link } from "@langwatch/ui-host/link";
 import { HandledErrorState } from "../../elements/studio-host/errors.tsx";
-import { useOrganizationTeamProject } from "../../behavior/studio-host/use-organization-team-project.ts";
+import { useOrganizationTeamProject } from "../../../behavior/studio-host/use-organization-team-project.ts";
 import OptimizationStudio from "../optimization_studio/optimization-studio.tsx";
-import { useLoadWorkflow } from "../../behavior/optimization_studio/use-load-workflow.ts";
-import { _useWorkflowStore, useWorkflowStore } from "../../behavior/use-workflow-store.ts";
+import { useLoadWorkflow } from "../../../behavior/optimization_studio/use-load-workflow.ts";
+import { _useWorkflowStore, useWorkflowStore } from "../../../behavior/use-workflow-store.ts";
 import type { StudioWorkflow } from "@langwatch/workflow-contract";
-import { api } from "../../model/workflow-api-client.ts";
+import { api } from "../../../model/workflow-api-client.ts";
 import { useStudioHostBinding } from "../studio-host/binding.ts";
 
 export default function Studio() {

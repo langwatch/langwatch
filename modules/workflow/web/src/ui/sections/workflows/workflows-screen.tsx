@@ -9,8 +9,8 @@ import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Plus, Workflow } from "lucide-react";
 import type { MouseEvent } from "react";
 
-import { workflowApi } from "../../model/workflow-api.ts";
-import { useWorkflowHost } from "../../model/workflow-host.ts";
+import { workflowApi } from "../../../model/workflow-api.ts";
+import { useWorkflowHost } from "../../../model/workflow-host.ts";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { WorkflowCreateDialogHost } from "../workflow-create-dialog-host.tsx";
 import { WorkflowListCard } from "../workflow-list-card.tsx";

@@ -1,7 +1,7 @@
 import { Alert, Box, Button, Center, Separator, Spinner, Text, VStack } from "@chakra-ui/react";
 import { Link2Off } from "lucide-react";
 import { useMemo } from "react";
-import { Link } from "../blocks/link.tsx";
+import { Link } from "../../blocks/link.tsx";
 import { HandledErrorState } from "../errors/index.ts";
 import { TraceDrawerContent } from "../explorer/trace-drawer/trace-drawer-content.tsx";
 import {
@@ -9,9 +9,9 @@ import {
   useSharedTrace,
 } from "../explorer/context/shared-trace-context.tsx";
 import { TraceViewerProvider } from "../../elements/explorer/context/trace-viewer-context.tsx";
-import { useDrawerStore } from "../../behavior/drawer.store.ts";
+import { useDrawerStore } from "../../../behavior/drawer.store.ts";
 import { useRouter } from "@langwatch/ui-host/use-router";
-import { api } from "../../behavior/trace-api.ts";
+import { api } from "../../../behavior/trace-api.ts";
 
 /** There is no drawer to close on a share page. */
 const noop = () => undefined;
