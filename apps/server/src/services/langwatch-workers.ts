@@ -4,21 +4,7 @@ import { locateWorkerDir, resolvePnpm } from "./node-deps.ts";
 import { servicePaths } from "./paths.ts";
 import { supervise, type SupervisedHandle } from "./spawn.ts";
 
-/**
- * The langwatch worker process, `apps/worker` — the same entry the Helm
- * chart's workers Deployment runs. It runs the background stack the product
- * depends on: topic clustering, the EE ingestion puller, and the scenario
- * processor (simulation execution pool).
- *
- * Without these workers, anything you do in the UI that depends on background
- * processing (topic clustering, governance ingestion pulls, simulations)
- * silently never completes. The npx flow used to spawn only the API server and
- * skip workers entirely; this service closes the gap so npx parity matches a
- * real deployment.
- *
- * Health is inferred from process liveness; if it crashes, supervise()
- * emits the crash event and the user sees it in the log stream.
- */
+// LangWatch worker process. Health inferred from process liveness.
 export async function startLangwatchWorkers(
   ctx: RuntimeContext,
   bus: EventBus,

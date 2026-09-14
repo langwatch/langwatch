@@ -18,16 +18,7 @@ export function predepRegistry({
   version: string;
   development: LocalOrchestratorDevelopmentConfig;
 }): Predep[] {
-  // pnpm comes FIRST so the bundled binary is in place before
-  // ensureLangwatchDeps + runMigrations call resolvePnpm(paths). uv is
-  // fast/cached so its position is mostly irrelevant; everything else
-  // doesn't depend on pnpm.
-  // The assistant's runtime is last: it is the only optional one, and the
-  // only one whose failure leaves a working install behind.
-  // Resolved the same way the runtime resolves them (persisted .env first,
-  // shell on top): a LANGWATCH_ENABLE_LANGY=false line in ~/.langwatch/.env
-  // must stop the assistant runtime from being downloaded, not only from
-  // being started.
+  // pnpm first, assistant runtime last (optional). Feature-gated.
   const features = resolveEffectiveFeatures(paths.envFile);
   return [
     pnpmPredep,

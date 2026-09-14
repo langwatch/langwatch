@@ -1,22 +1,4 @@
-/**
- * The REST surface as the installed declarations state it, composed for
- * description rather than for service.
- *
- * Every route is registered on one Hono app carrying nothing but its OpenAPI
- * block and its validators — no runtime, no door, no handler. The app exists
- * because hono-openapi reads a route's input schemas back off the middleware
- * it attached them to, and that metadata is what turns a zod schema into JSON
- * Schema. Nothing here resolves a member, opens a client or serves a request.
- *
- * ONE ADDRESS PER ROUTE. A dated family answers the same operation at three
- * addresses — `/2026-08-07/x`, `/latest/x` and `/x` — and each is the same
- * call reached through a different version selector. OpenAPI has no way to say
- * that, so publishing all three would give a client generator three names for
- * one operation and treble the document. The published address is the bare
- * one, at its `/api/v1` twin where the family has one (ADR 002 §1), which is
- * the address a client is told to call; the version is negotiated with the
- * `X-API-Version` header the document describes once.
- */
+// REST surface from declarations. Hono app with OpenAPI blocks, no runtime.
 import {
   basePathOf,
   canonicalV1Path,

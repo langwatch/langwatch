@@ -6,21 +6,7 @@ import { Task } from "@langwatch/task";
 import { declaredRestFamilies, type InstalledModule } from "./openapi-document.declarations.ts";
 import { DEFAULT_SCRATCH_PATH, generateOpenApiDocument } from "./openapi-document.generator.ts";
 
-/**
- * The runnable OpenAPI description — `pnpm --filter @langwatch/platform-api
- * task openapi-generate [path]`.
- *
- * It writes to the path the caller names, and to a scratch file under
- * `node_modules/.cache` when the caller names none. It NEVER writes
- * `src/features/discovery/openapi-document.json`: that artifact is frozen, three
- * routes serve it and both SDKs generate clients from it, so replacing it is a
- * decision a person makes with a diff in front of them, not a side effect of
- * running a task.
- *
- * Stays in `apps/api` because this is the process that serves the document.
- * It reads the installed module declarations and nothing else: no database, no
- * ClickHouse, no member of any kind.
- */
+// OpenAPI description generator. Reads module declarations only.
 export class OpenapiGenerateTask extends Task {
   readonly name = "openapi-generate";
   readonly description = "Writes the OpenAPI description every installed declaration publishes.";

@@ -2,18 +2,7 @@ import { execa, type Options as ExecaOptions, type ResultPromise } from "execa";
 import type { Readable } from "node:stream";
 import type { EventBus } from "./event-bus.ts";
 
-/**
- * execa wrapper that captures child stdout/stderr line-by-line and emits
- * them to the EventBus as `log` events instead of dumping straight to the
- * parent's stdio. Using this for installer children (pnpm install, uv sync,
- * prisma migrate, …) prevents character-level interleave when multiple
- * children run in parallel — each line carries its service name and the
- * CLI's animation layer can render bounded per-service panels.
- *
- * Use with parallel install steps. For long-running supervised services
- * (postgres, redis, …) keep using supervise() — its tee infra is already
- * piping to the bus + log files.
- */
+// Capture child stdout/stderr line-by-line to EventBus for parallel install steps.
 export async function execAndPipe(
   bus: EventBus,
   service: string,

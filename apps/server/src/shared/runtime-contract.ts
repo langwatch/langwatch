@@ -14,7 +14,7 @@ export type RuntimeContext = {
   predeps: PredepResult;
   envFile: string;
   version: string;
-  /** Pass-through env from the user shell (OPENAI_API_KEY, …), propagated to children, never persisted. */
+  /** User shell env (OPENAI_API_KEY, …); propagated to children, never persisted. */
   userEnv: Record<string, string>;
   /** Immutable launcher settings projected during CLI composition. */
   orchestrator: LocalOrchestratorConfig;
@@ -26,15 +26,7 @@ export type ServiceHandle = {
   stop(): Promise<void>;
 };
 
-/**
- * Events emitted by the runtime supervisor while installing/starting/running
- * services. The CLI consumes this stream to render the listr2 status grid
- * and to tee log lines to TTY (with stable per-service prefix + color).
- *
- * The stream stays open from the moment `events(ctx)` is called until
- * `stopAll(handles)` resolves. Multiple consumers are not supported: call
- * `events(ctx)` exactly once per CLI run.
- */
+// Runtime supervisor events. Stream stays open until stopAll() resolves.
 export type RuntimeEvent =
   | { type: "starting"; service: string }
   | { type: "healthy"; service: string; durationMs: number }

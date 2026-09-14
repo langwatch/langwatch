@@ -1,14 +1,4 @@
-/**
- * The document's input: every REST family this build installs, read off the
- * module declarations rather than off a mounted process.
- *
- * A declaration is inert — `defineRestRouter(<F>Api)` carries each route's
- * method, path, credential, permission and schemas and nothing else — so
- * reading one opens no client, resolves no member and boots nothing. That is
- * the whole reason the description is generated from here: the previous
- * generator composed the API process with a graph of refusing stand-ins, and
- * a family whose stand-in was wrong silently left the document.
- */
+// Document input: every REST family from module declarations, inert read.
 import type { RestTransportDeclaration } from "@langwatch/api/rest";
 
 /** One installed family's declaration, with the module that declared it. */
@@ -29,15 +19,7 @@ export type InstalledModule = Readonly<{
   }[];
 }>;
 
-/**
- * Every installed module's REST declarations, in install order.
- *
- * A declaration that cannot be read fails the run and NAMES the module. A
- * family missing because its declaration says so — hidden, browser-only, no
- * publishable credential — is a decision the declaration made and is fine; a
- * family missing because nothing could read it is a hole in the document that
- * looks exactly like a deletion to every client generated from it.
- */
+// REST declarations from all installed modules; unreadable declarations fail.
 export function declaredRestFamilies(
   modules: readonly InstalledModule[],
 ): readonly DeclaredRestFamily[] {

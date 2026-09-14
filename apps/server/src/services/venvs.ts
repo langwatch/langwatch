@@ -94,19 +94,7 @@ function resolveVenvSpecs(ctx: RuntimeContext): VenvSpec[] {
       name: "langevals",
       projectDir: join(root, "services", "langevals"),
       lockFile: join(root, "services", "langevals", "uv.lock"),
-      // langevals's evaluator routes (ROUGE Score, exact match, llm-as-judge,
-      // etc.) live in subpackages declared as optional dependencies in
-      // services/langevals/pyproject.toml: langevals-ragas, langevals-openai,
-      // langevals-langevals, langevals-azure, langevals-lingua and
-      // langevals-presidio. Each is a separate `langevals_*`
-      // distribution; server.py auto-registers FastAPI routes for any
-      // `langevals_*` package found via importlib.metadata.distributions().
-      // Without any extras, only langevals + langevals-core get installed
-      // and `/openapi.json` reports just `/healthcheck` and `/` — every
-      // evaluator request 404s, langwatch app's runEvaluation throws
-      // `404 {"detail":"Not Found"}`, and the experiments workbench column
-      // shows 'Internal error' for every row. So the base set always
-      // installs, and only the two opt-in members have to be asked for.
+      // langevals subpackages are optional. Base set always installs.
       extras,
     },
   ];

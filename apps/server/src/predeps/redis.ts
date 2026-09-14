@@ -8,15 +8,7 @@ import embedsVersions from "../../embeds.versions.json" with { type: "json" };
 import { downloadWithProgress } from "./_download.ts";
 import type { Predep } from "./types.ts";
 
-// Embedded redis-server is built from upstream redis.io source against
-// musl/glibc per platform by .github/workflows/embedded-binaries-publish.yml
-// and uploaded to https://embeds.langwatch.ai. The tarball ships only the
-// redis-server binary (we don't need redis-cli for the runtime) plus a
-// .sha256 sidecar.
-//
-// Pinned to 7.4.x (BSD-3-Clause). Redis 8.x switched to AGPLv3 + RSAL —
-// keeping 7.4 sidesteps the licensing implications of redistributing a
-// dual-licensed AGPL/RSAL binary inside a self-hostable tarball.
+// Embedded redis-server. Pinned to 7.4.x (BSD-3-Clause).
 const REDIS_VERSION = embedsVersions.redis.version;
 const EMBEDS_BASE = "https://embeds.langwatch.ai";
 

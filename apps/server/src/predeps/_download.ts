@@ -4,16 +4,7 @@ import { pipeline } from "node:stream/promises";
 import type { PredepTask } from "./types.ts";
 import { nowInstant } from "@langwatch/time";
 
-/**
- * Stream-download a URL to disk while reporting MB / total MB to the
- * listr2 task spinner. Used by every predep that fetches a tarball
- * (postgres, redis, clickhouse, goose, aigateway) so the user sees
- * docker-pull-style progress instead of a static "downloading…" line.
- *
- * Throttled to ~10 updates/sec — listr2's renderer can't keep up with
- * per-chunk updates anyway, and excessive task.output writes flicker
- * the spinner.
- */
+// Download URL to disk with progress reporting. Throttled for spinner updates.
 export async function downloadWithProgress(
   url: string,
   tmp: string,

@@ -68,16 +68,7 @@ export function makeInstallPanelRouter(): InstallPanelRouter {
   } as InstallPanelRouter & { onInstallFinished(fn: () => void): void };
 }
 
-/**
- * Render docker-buildx-style bounded panels for the install phase. One
- * panel per service, each showing the last RING_SIZE lines of its
- * captured stdout/stderr. Resolves when every panel closes (either via
- * a `healthy` event from the service or via `installFinished()` for
- * cached steps that never emit).
- *
- * Must be started BEFORE installServices() — the router buffers any
- * events that arrive before listr2 has subscribed.
- */
+// Render install-phase panels, one per service. Start before installServices().
 export function renderInstallPanels(router: InstallPanelRouter): Promise<void> {
   const tasks = new Listr(
     INSTALL_TASKS.map((spec) => ({

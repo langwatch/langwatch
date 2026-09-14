@@ -13,21 +13,7 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
-/**
- * What the npm artifact's staging filters keep and drop.
- *
- * dev/scripts/pack-npm.sh copies the server distribution list into a staging
- * tree with a set of rsync patterns, and rsync matches a pattern without a slash against
- * EVERY path component. A working-tree artifact named there by its bare name
- * therefore also removes any source file or directory that happens to share
- * the name, anywhere in any shipped tree. That has reached npm twice: once as
- * `--exclude=reports`, which took the ClickHouse migration's own reports
- * directory with it and killed the published server at first boot.
- *
- * The script is run for real against a small fixture repository rather than
- * having its patterns re-read here, so the assertions are about rsync's own
- * matching and not about a second reading of it.
- */
+// Test npm artifact staging filters against fixture repository.
 
 const scriptPath = join(__dirname, "..", "..", "..", "dev", "scripts", "pack-npm.sh");
 

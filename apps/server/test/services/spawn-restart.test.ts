@@ -64,7 +64,7 @@ function exitChild(
   child.emit("exit", code, signal);
 }
 
-/** Fail a spawn the way Node does for ENOENT/EACCES/EPERM: an "error" event, usually with no "exit" follow-up. */
+/** Fail a spawn like Node does for ENOENT/EACCES/EPERM: "error" event. */
 function failToSpawn(child: FakeChild, err: NodeJS.ErrnoException): void {
   child.emit("error", err);
 }

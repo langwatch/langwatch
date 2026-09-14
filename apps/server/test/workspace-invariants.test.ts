@@ -4,16 +4,7 @@ import { dirname, join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { APP_PACKAGE_NAMES, workspaceInstallArgs } from "../src/services/node-deps.ts";
 
-/**
- * The invariants ADR-076 established, asserted against the repo itself.
- *
- * These are cheap to state and expensive to lose: every one of them held at
- * some point during the merge and then quietly broke — a second lockfile
- * reappearing, a member keeping its own overrides (which pnpm ignores, so it
- * reads as an active security pin while doing nothing), the app and the SDK
- * colliding on a package name again. None of that surfaces as a test failure
- * anywhere else; it surfaces as a drifted dependency months later.
- */
+// ADR-076 invariants. Cheap to state, expensive to lose.
 
 const repoRoot = join(__dirname, "..", "..", "..");
 

@@ -60,17 +60,7 @@ async function buildFromCheckout(
   task: { output?: string },
 ): Promise<void> {
   task.output = "building from local checkout (cmd/service)";
-  // `go build ./cmd/service` produces the multi-service entrypoint that
-  // dispatches on its first argument — the same artifact the release
-  // publishes, and the same one three services here invoke as
-  // `<binary> aigateway|nlpgo|langyagent`.
-  //
-  // This used to write a wrapper script that hardcoded `aigateway` as that
-  // first argument, which meant every service booted the gateway: the NLP
-  // engine and the Langy agent each started a second gateway, raced for its
-  // port, and died with "address already in use". The mono-binary answers
-  // `--version` on its own, which was the wrapper's only other reason to
-  // exist, so it is written straight out instead.
+  // Build multi-service entrypoint that dispatches on first argument.
   const out = join(outDir, "aigateway");
   await execa("go", ["build", "-o", out, "./cmd/service"], {
     cwd: repoRoot,
