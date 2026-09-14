@@ -523,6 +523,16 @@ describe("given a pi session launched through the wrapper", () => {
      * Slow on purpose: it measures a ten second deadline, so it costs ten
      * seconds. The neighbouring tests already pay real poll intervals.
      *
+     * There is a precedent for not paying it — `codex-turn-harvest.unit.test.ts`
+     * fakes `setTimeout`/`clearTimeout`/`Date` selectively so real file writes
+     * still run, then advances the clock. It was considered and not taken. That
+     * test advances past one timeout; this one would have to fake the poll
+     * interval as well, and the thing under test is precisely how the deadline
+     * and an in-flight poll pass interleave. Faking both halves of the
+     * interaction being asserted is how a deadline test goes green without
+     * proving a deadline. Ten real seconds, once, is the cheaper mistake to
+     * avoid.
+     *
      * Unbound: no scenario describes a stalled session directory.
      */
     it("gives the shell its prompt back when the final sweep cannot finish", async () => {

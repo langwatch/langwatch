@@ -976,6 +976,10 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
 						await piCapture.harvest();
 					})(),
 					new Promise<void>((resolve) => {
+						// No `.unref()` here, unlike both intervals in this function
+						// and every other deadline timer in the CLI. That is the whole
+						// point, not an oversight - see the paragraph above before
+						// adding one.
 						sweepDeadline = setTimeout(() => {
 							sweepTimedOut = true;
 							resolve();
