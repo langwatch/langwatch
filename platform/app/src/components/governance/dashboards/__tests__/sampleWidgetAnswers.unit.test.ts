@@ -213,6 +213,23 @@ describe("the sample answers behind the governance widgets", () => {
     });
   });
 
+  describe("given a query that orders its rows by what they cost", () => {
+    describe("when the sample answer for it is produced", () => {
+      /** @scenario "A ranked sample answer arrives in the order its query asks for" */
+      it("hands the rows over biggest first, the way the query says it will", async () => {
+        for (const name of ["department", "person", "model_agent"]) {
+          const result = await answer(name);
+          const costs = result.rows.map((row) => Number(row.cost_usd));
+
+          // The chart draws the rows in the order it receives them, so an
+          // answer in some other order paints a ranked panel unranked — and
+          // the query beside it promises ORDER BY cost_usd DESC.
+          expect(costs).toEqual([...costs].sort((a, b) => b - a));
+        }
+      });
+    });
+  });
+
   describe("given a query nothing has been written to answer", () => {
     describe("when an answer for it is asked for", () => {
       /** @scenario "A query with no sample answer is refused, not invented" */

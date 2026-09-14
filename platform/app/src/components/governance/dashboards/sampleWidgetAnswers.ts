@@ -167,7 +167,13 @@ function departmentAnswer(frame: TimeFrame): SampleAnswer {
  * The row nobody is named on is KEPT, under the same wording the Costs page
  * uses for it. Dropping it would be tidier and would report a smaller bill
  * than the one the providers sent, which is the one thing a spend chart must
- * never do.
+ * never do. It is ranked with the rest rather than pinned to the end: it is a
+ * real share of the bill, and parking it last would understate it.
+ *
+ * Sorted biggest first, because the query this answers says `ORDER BY cost_usd
+ * DESC` and the chart draws the rows in the order it receives them. Summing
+ * into a map gives them back in the order the people were first seen, which is
+ * not the same order and looks like an unranked ranked panel.
  */
 function personAnswer(): SampleAnswer {
   const totalByPerson = new Map<string, number>();
@@ -182,10 +188,12 @@ function personAnswer(): SampleAnswer {
 
   return {
     columns: [stringColumn("person"), costColumn()],
-    rows: [...totalByPerson].map(([person, cost]) => ({
-      person,
-      cost_usd: cost,
-    })),
+    rows: [...totalByPerson]
+      .sort(([, a], [, b]) => b - a)
+      .map(([person, cost]) => ({
+        person,
+        cost_usd: cost,
+      })),
   };
 }
 

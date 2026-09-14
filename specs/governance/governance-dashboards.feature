@@ -133,6 +133,15 @@ Feature: Governance dashboards — four cost widgets, sample answers only
     # the reader judges a layout the real figures will never produce.
 
   @unit
+  Scenario: A ranked sample answer arrives in the order its query asks for
+    Given a query that orders its rows by what they cost
+    When the sample answer for it is produced
+    Then the rows arrive biggest first
+    # The chart draws the rows in the order it receives them, so an answer
+    # in any other order paints a ranked panel unranked while the query
+    # beside it promises otherwise.
+
+  @unit
   Scenario: Every widget invents money on one scale
     Given the four widgets describe one organization
     When each is answered over the same time frame
