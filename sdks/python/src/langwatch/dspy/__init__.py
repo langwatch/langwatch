@@ -1,4 +1,5 @@
 from contextlib import contextmanager
+import logging
 import random
 import re
 import time
@@ -12,6 +13,7 @@ from langwatch.utils.utils import safe_get
 from langwatch.telemetry.tracing import LangWatchTrace
 from typing_extensions import TypedDict
 import langwatch
+import httpx
 from langwatch.http_client import create_client
 import json
 from pydantic import BaseModel
@@ -32,8 +34,40 @@ from dspy.primitives.example import Example
 from pydantic.fields import FieldInfo
 from coolname import generate_slug
 from retry import retry
+from tenacity import (
+    retry as tenacity_retry,
+    retry_if_exception,
+    stop_after_attempt,
+    wait_exponential,
+)
 from dspy.evaluate.evaluate import Evaluate
 from dspy.utils.callback import with_callbacks
+
+logger = logging.getLogger("langwatch.dspy")
+
+# Steps that could not be sent stay buffered and ride along with the next
+# step. The cap only matters during a long platform outage, when it bounds
+# how much optimization telemetry accumulates in memory.
+MAX_BUFFERED_STEPS = 50
+
+
+def _is_transient_error(error: BaseException) -> bool:
+    """Network blips and server 5xx responses are retryable; client 4xx
+    responses are real answers and must surface immediately."""
+    if isinstance(error, (httpx.TimeoutException, httpx.ConnectError)):
+        return True
+    return (
+        isinstance(error, httpx.HTTPStatusError)
+        and error.response.status_code >= 500
+    )
+
+
+_retry_on_transient = tenacity_retry(
+    retry=retry_if_exception(_is_transient_error),
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(multiplier=1, min=2, max=10),
+    reraise=True,
+)
 
 
 class SerializableAndPydanticEncoder(json.JSONEncoder):
@@ -375,6 +409,10 @@ class LangWatchDSPy:
         The step carries the examples buffered by the tracked metric since the
         previous step, unless `examples` is given, in which case those are sent
         and the buffer is discarded either way.
+
+        Sending is best effort: a platform or network failure is logged and the
+        step stays buffered for the next attempt, so telemetry can never fail
+        an optimizer trial that already produced a real score.
         """
         step = DSPyStep(
             run_id=self.run_id or "unknown",
@@ -392,9 +430,27 @@ class LangWatchDSPy:
         self.steps_buffer.append(step)
         self.examples_buffer = []
         self.llm_calls_buffer = []
-        self.send_steps()
+        if len(self.steps_buffer) > MAX_BUFFERED_STEPS:
+            dropped = len(self.steps_buffer) - MAX_BUFFERED_STEPS
+            del self.steps_buffer[:dropped]
+            logger.warning(
+                "[LangWatch] Dropped %d oldest unsent step(s) to bound memory "
+                "while the platform is unreachable.",
+                dropped,
+            )
+        try:
+            self.send_steps()
+        except Exception as err:
+            logger.warning(
+                "[LangWatch] Could not log optimizer step %s (%s). The trial "
+                "score is unaffected; %d step(s) stay buffered and will be "
+                "retried with the next step.",
+                index,
+                err,
+                len(self.steps_buffer),
+            )
 
-    @retry(tries=5, delay=1, backoff=2)
+    @_retry_on_transient
     def send_steps(self):
         data_list = json.loads(
             json.dumps(self.steps_buffer, cls=SerializableAndPydanticEncoder)
