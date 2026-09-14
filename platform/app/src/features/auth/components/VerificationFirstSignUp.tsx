@@ -257,8 +257,11 @@ export function VerificationFirstSignUp() {
   const dialFederated = (method: SignInMethod) => {
     report.chose(method.id);
     rememberPendingMethod(method);
+    // The routed address rides along as the OIDC login hint, so the
+    // provider's screen arrives prefilled with the address that routed here.
     void signIn(method.id, {
       callbackUrl: callbackUrl ?? JOIN_BEFORE_CREATE_PATH,
+      loginHint: routedEmail ?? undefined,
     });
   };
 
@@ -468,6 +471,7 @@ export function VerificationFirstSignUp() {
         decision={routing.decision}
         onContinue={dialFederated}
         callbackUrl={callbackUrl ?? JOIN_BEFORE_CREATE_PATH}
+        loginHint={routedEmail ?? undefined}
         title="Create your LangWatch account"
         footer={
           <LogInLink callbackUrl={callbackUrl} label="Or log in instead" />

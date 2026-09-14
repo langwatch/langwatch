@@ -7,11 +7,16 @@ import type {
   IdentityUserGate,
   SignInAccountLookupPort,
 } from "@langwatch/identity-server";
+import { auth0BridgeMethodForSubject } from "~/utils/auth0-bridge";
 
 /** The non-secret legacy answer used while identifier backfill is pending. */
 export interface LegacySignInAccount {
   userId: string;
   methods: AccountSignInMethods;
+  /** The Auth0 subjects among this user's `Account` rows, verbatim, so the
+   *  connection bridge can route each to its own branded button. Empty where
+   *  the user holds none. An opaque identifier, never a secret. */
+  auth0Subjects: readonly string[];
 }
 
 export interface LegacySignInAccountDirectory {
@@ -34,6 +39,10 @@ export class ProjectionSignInAccountLookup implements SignInAccountLookupPort {
     private readonly heads: IdentityHeadsRepository,
     private readonly legacy: LegacySignInAccountDirectory,
     private readonly isLatched: IdentityUserGate,
+    /** Whether the Auth0 connection bridge routes brokered subjects to
+     *  their own branded methods (`utils/auth0-bridge.ts`) — a composition
+     *  decision, handed in so this class never reads the environment. */
+    private readonly auth0BridgeIsActive: boolean = false,
   ) {}
 
   async findAccountMethods({
@@ -67,7 +76,7 @@ export class ProjectionSignInAccountLookup implements SignInAccountLookupPort {
       providerIds: [
         ...new Set(
           live
-            .map((identifier) => identifier.providerId)
+            .map((identifier) => this.routedProviderId(identifier))
             .filter((id): id is string => id !== null),
         ),
       ],
@@ -105,6 +114,53 @@ export class ProjectionSignInAccountLookup implements SignInAccountLookupPort {
       return null;
     }
 
-    return account.methods;
+    return this.bridgedLegacyMethods(account);
+  }
+
+  /**
+   * The rail id an identifier's sign-in belongs to. Verbatim, except an
+   * Auth0-brokered subject the connection bridge names, which is routed to
+   * its own branded button — so an account that only ever signed in with
+   * Google through the broker is answered "Google", and the router's
+   * sole-federated redirect lands them on Google's own screen in one step.
+   * A subject the bridge cannot name keeps the plain method: those sign-ins
+   * belong on Auth0's own screen.
+   */
+  private routedProviderId(identifier: {
+    providerId: string | null;
+    providerAccountId: string | null;
+  }): string | null {
+    if (!this.auth0BridgeIsActive || identifier.providerId !== "auth0") {
+      return identifier.providerId;
+    }
+    if (identifier.providerAccountId === null) return "auth0";
+    return auth0BridgeMethodForSubject(identifier.providerAccountId) ?? "auth0";
+  }
+
+  /** The same routing over the legacy answer, whose subjects ride beside the
+   *  methods because `AccountSignInMethods` deliberately carries kinds only. */
+  private bridgedLegacyMethods(
+    account: LegacySignInAccount,
+  ): AccountSignInMethods {
+    if (
+      !this.auth0BridgeIsActive ||
+      !account.methods.providerIds.includes("auth0")
+    ) {
+      return account.methods;
+    }
+    const routed = account.auth0Subjects.map(
+      (subject) => auth0BridgeMethodForSubject(subject) ?? "auth0",
+    );
+    return {
+      ...account.methods,
+      providerIds: [
+        ...new Set([
+          ...account.methods.providerIds.filter((id) => id !== "auth0"),
+          // A row list with no subjects keeps the plain method: an Auth0
+          // sign-in the bridge cannot place still needs its door.
+          ...(routed.length > 0 ? routed : ["auth0"]),
+        ]),
+      ],
+    };
   }
 }

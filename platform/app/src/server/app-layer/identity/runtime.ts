@@ -55,6 +55,7 @@ import { prismaAdapter } from "better-auth/adapters/prisma";
 import { nanoid } from "nanoid";
 import { env } from "~/env.mjs";
 import type { PrismaClient } from "~/generated/prisma/client";
+import { auth0BridgeActive } from "~/utils/auth0-bridge";
 import { changeAuth0Password } from "../../auth0/passwordService";
 import type { SecondaryStorageDeps } from "../../better-auth/config/secondary-storage";
 import { LastWayInGuard } from "../../better-auth/last-way-in";
@@ -442,6 +443,10 @@ const signInRouterService = new SignInRouterService({
     identityHeads,
     identityUsers,
     isLatched,
+    auth0BridgeActive({
+      isSaas: env.IS_SAAS,
+      authProvider: env.NEXTAUTH_PROVIDER,
+    }),
   ),
 });
 

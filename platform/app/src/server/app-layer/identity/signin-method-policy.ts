@@ -3,6 +3,7 @@ import { platformSSOAllowed, resolveAuthProvider } from "@ee/sso/sso-gate";
 import type { SignInMethod, SignInMethodPolicy } from "@langwatch/identity";
 import type { SignInMethodPolicyPort } from "@langwatch/identity-server";
 import { env } from "~/env.mjs";
+import { AUTH0_BRIDGE_METHODS, auth0BridgeActive } from "~/utils/auth0-bridge";
 
 /**
  * The instance's method-set policy (ADR-117 §4) — the module ADR-027's
@@ -190,7 +191,22 @@ export async function resolveSignInMethodPolicy(): Promise<SignInMethodPolicy> {
   // one it is THE way in and moving it would move the button people reach for.
   // The social set follows in rail order, less whatever it already named. With
   // neither, the local set is what is left — which is email mode, unchanged.
+  //
+  // The ONE exception is the Auth0 connection bridge (`utils/auth0-bridge.ts`):
+  // on SaaS the branded buttons ARE the ways in — they dial the same broker,
+  // pre-scoped to the connection its own screen would have offered — so they
+  // stand ahead of the generic button, which stays for the sign-ins only
+  // Auth0's screen can finish (its database users, enterprise connections).
+  const bridge =
+    federated?.id === "auth0" &&
+    auth0BridgeActive({
+      isSaas: env.IS_SAAS,
+      authProvider: env.NEXTAUTH_PROVIDER,
+    })
+      ? AUTH0_BRIDGE_METHODS.map((method) => federatedMethod(method.methodId))
+      : [];
   const federatedMethods = dedupeById([
+    ...bridge,
     ...(federated ? [federated] : []),
     ...social,
   ]);

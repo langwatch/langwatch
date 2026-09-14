@@ -81,6 +81,7 @@ class FakeLegacyDirectory implements LegacySignInAccountDirectory {
 
 function legacyAccount(
   overrides: Partial<LegacySignInAccount["methods"]> = {},
+  auth0Subjects: readonly string[] = [],
 ): LegacySignInAccount {
   return {
     userId: USER_ID,
@@ -91,6 +92,7 @@ function legacyAccount(
       connectionIds: [],
       ...overrides,
     },
+    auth0Subjects,
   };
 }
 
@@ -99,17 +101,20 @@ function build({
   latched = false,
   projectedHolder = null,
   identifiers = {},
+  auth0Bridge = false,
 }: {
   account?: LegacySignInAccount | null;
   latched?: boolean;
   projectedHolder?: { userId: string; identifierId: string } | null;
   identifiers?: Record<string, IdentifierFact>;
+  auth0Bridge?: boolean;
 } = {}) {
   const isLatched: IdentityUserGate = async () => latched;
   return new ProjectionSignInAccountLookup(
     new FakeHeads(projectedHolder, identifiers),
     new FakeLegacyDirectory(account),
     isLatched,
+    auth0Bridge,
   );
 }
 
@@ -266,6 +271,96 @@ describe("ProjectionSignInAccountLookup legacy fallback", () => {
     await expect(
       lookup.findAccountMethods({ normalizedValue: EMAIL }),
     ).resolves.toBeNull();
+  });
+
+  describe("when the Auth0 connection bridge is active", () => {
+    const AUTH0_GOOGLE: SignInMethod = {
+      id: "auth0-google",
+      kind: "federated",
+      connectionId: null,
+    };
+    const BRIDGE_METHODS = [AUTH0_GOOGLE, AUTH0];
+
+    /** @scenario "An account brokered through a social connection routes to its own button" */
+    it("redirects an unlatched Google-through-Auth0 account to the branded method", async () => {
+      const lookup = build({
+        account: legacyAccount({ providerIds: ["auth0"] }, [
+          "google-oauth2|107698336211125",
+        ]),
+        auth0Bridge: true,
+      });
+
+      const decision = await routeAccount({ lookup, methods: BRIDGE_METHODS });
+
+      expect(decision).toMatchObject({
+        outcome: "redirect_to_connection",
+        methodSet: [AUTH0_GOOGLE],
+        reasonCode: "account_methods",
+      });
+    });
+
+    /** @scenario "An account brokered through a social connection routes to its own button" */
+    it("keeps the broker's own database users on the generic method", async () => {
+      const lookup = build({
+        account: legacyAccount({ providerIds: ["auth0"] }, ["auth0|64f1c9"]),
+        auth0Bridge: true,
+      });
+
+      const decision = await routeAccount({ lookup, methods: BRIDGE_METHODS });
+
+      expect(decision).toMatchObject({
+        outcome: "redirect_to_connection",
+        methodSet: [AUTH0],
+        reasonCode: "account_methods",
+      });
+    });
+
+    it("routes a latched account's brokered subject the same way", async () => {
+      const googleThroughAuth0: IdentifierFact = {
+        identifierId: "identifier_auth0",
+        userId: USER_ID,
+        provider: "oidc",
+        value: EMAIL,
+        domain: "home.net",
+        identifierHash: null,
+        accountId: "account_auth0",
+        providerId: "auth0",
+        issuer: "local:oauth:auth0",
+        providerAccountId: "google-oauth2|107698336211125",
+        connectionId: null,
+        state: "VERIFIED",
+        verifiedAtMs: 1_690_000_000_000,
+        attachedAtMs: 1_690_000_000_000,
+        detachedAtMs: null,
+      };
+      const lookup = build({
+        latched: true,
+        projectedHolder: {
+          userId: USER_ID,
+          identifierId: googleThroughAuth0.identifierId,
+        },
+        identifiers: {
+          [googleThroughAuth0.identifierId]: googleThroughAuth0,
+        },
+        auth0Bridge: true,
+      });
+
+      await expect(
+        lookup.findAccountMethods({ normalizedValue: EMAIL }),
+      ).resolves.toMatchObject({ providerIds: ["auth0-google"] });
+    });
+
+    it("changes nothing while the bridge is inactive", async () => {
+      const lookup = build({
+        account: legacyAccount({ providerIds: ["auth0"] }, [
+          "google-oauth2|107698336211125",
+        ]),
+      });
+
+      await expect(
+        lookup.findAccountMethods({ normalizedValue: EMAIL }),
+      ).resolves.toMatchObject({ providerIds: ["auth0"] });
+    });
   });
 
   it("uses legacy methods when an unlatched account has partial identifier heads", async () => {

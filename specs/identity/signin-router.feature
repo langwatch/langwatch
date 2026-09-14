@@ -220,6 +220,13 @@ Feature: The identifier-first sign-in router - one auth screen, routed by data
     Then the configured provider is the offered method, exactly as before
     And a second method can be added without ending the first
 
+  @unit
+  Scenario: The provider setting answers to its modern name
+    Given a deployment setting AUTH_PROVIDER
+    Then the configured provider applies exactly as the legacy name configured it
+    And a deployment still setting only NEXTAUTH_PROVIDER keeps working and is warned once that the name is deprecated
+    And when both are set the modern name wins
+
   # ── Which social providers the door offers ─────────────────────────────
   #
   # A social button is an offer to dial a provider. An offer the deployment
@@ -255,6 +262,40 @@ Feature: The identifier-first sign-in router - one auth screen, routed by data
     When the sign-in page is requested
     Then both providers are among the offered methods
     And a provider whose credentials are absent is still never offered
+
+  # ── The Auth0 connection bridge (deliberately short-term, D09) ─────────
+  #
+  # SaaS's social sign-ins still broker through Auth0. Until they are native,
+  # the door shows each brokered connection as its own branded button, and
+  # clicking one dials Auth0 pre-scoped to that connection — the person picks
+  # their provider exactly once, on our screen, and Auth0's own picker never
+  # appears. Self-hosted Auth0 deployments are untouched: their tenant's
+  # connections have names no hardcoded bridge may guess, so they keep the
+  # generic hand-off to Auth0's own screen.
+
+  @unit
+  Scenario: SaaS shows the broker's social connections as their own buttons
+    Given a SaaS deployment whose provider is the Auth0 broker
+    When the sign-in page is requested
+    Then Google, GitHub and Microsoft are offered as branded methods ahead of the generic one
+    And dialing a branded method names the connection Auth0's own screen offered
+    And a self-hosted Auth0 deployment is offered only the generic method
+
+  @unit
+  Scenario: An account brokered through a social connection routes to its own button
+    Given the account for "sam@home.net" signed in through the broker's Google connection
+    When "sam@home.net" is submitted to the router on SaaS
+    Then the decision redirects to the branded Google method
+    And an account the broker holds as a database user keeps the generic method
+
+  # What of the ask survives on every deployment: the address was already
+  # typed once, on our screen, and typing it again on the provider's is the
+  # provider's screen failing to be told.
+  @unit
+  Scenario: The address typed on our screen rides along to the identity provider
+    Given an address that routes to a federated method
+    When the hand-off to the provider is dialed
+    Then the address is sent as the sign-in hint so the provider's screen arrives prefilled
 
   # ── The license gate rides along (ADR-027, mechanism amended) ──────────
 

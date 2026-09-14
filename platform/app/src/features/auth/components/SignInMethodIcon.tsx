@@ -31,6 +31,11 @@ const BRAND_ICONS: Record<string, ReactNode> = {
   okta: <SiOkta size={18} />,
   auth0: <SiAuth0 size={18} />,
   keycloak: <SiKeycloak size={18} />,
+  // The Auth0 connection bridge: the mark is the identity the button dials,
+  // never the broker in the middle. In step with `methodLabels.ts`.
+  "auth0-google": <Google />,
+  "auth0-github": <GitHub size={18} />,
+  "auth0-microsoft": <Microsoft />,
 };
 
 export function SignInMethodIcon({ method }: { method: SignInMethod }) {

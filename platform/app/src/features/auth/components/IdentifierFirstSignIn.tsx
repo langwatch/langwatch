@@ -204,7 +204,14 @@ export function IdentifierFirstSignIn() {
   const dialFederated = (method: SignInMethod) => {
     report.chose(method.id);
     rememberPendingMethod(method);
-    void signIn(method.id, { callbackUrl });
+    // The address already typed rides along as the OIDC login hint, so the
+    // provider's own screen arrives prefilled instead of asking again for
+    // the thing this screen just asked. Absent on the cold rail, where
+    // nothing has been typed.
+    void signIn(method.id, {
+      callbackUrl,
+      loginHint: routing.identifier?.trim() ? routing.identifier : undefined,
+    });
   };
 
   const decision = routing.decision;
@@ -318,6 +325,7 @@ export function IdentifierFirstSignIn() {
         decision={decision}
         onContinue={dialFederated}
         callbackUrl={callbackUrl}
+        loginHint={submittedIdentifier ?? undefined}
       />
     );
   }
@@ -624,12 +632,16 @@ export function RoutedToConnection({
   decision,
   onContinue,
   callbackUrl,
+  loginHint,
   title = "Log in to LangWatch",
   footer,
 }: {
   decision: RoutingDecision;
   onContinue: (method: SignInMethod) => void;
   callbackUrl?: string;
+  /** The address that routed here, handed to the provider as the OIDC
+   *  login hint so its screen arrives prefilled. */
+  loginHint?: string;
   /** The card's heading. Sign-up reaches this screen too, and it is not a
    *  log-in until the provider says so. */
   title?: string;
@@ -643,8 +655,8 @@ export function RoutedToConnection({
   useEffect(() => {
     if (!method || dialed.current) return;
     dialed.current = true;
-    void signIn(method.id, { callbackUrl });
-  }, [method, callbackUrl]);
+    void signIn(method.id, { callbackUrl, loginHint });
+  }, [method, callbackUrl, loginHint]);
 
   useEffect(() => {
     const timer = setTimeout(() => setWaitIsVisible(true), HANDOFF_QUIET_MS);

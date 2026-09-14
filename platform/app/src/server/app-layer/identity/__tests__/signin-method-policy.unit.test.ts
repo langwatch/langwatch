@@ -308,6 +308,30 @@ describe("the instance sign-in method policy", () => {
       expect(methodIds(policy.defaultMethods)).not.toContain("gitlab");
     });
 
+    /** @scenario "SaaS shows the broker's social connections as their own buttons" */
+    it("offers the branded bridge methods ahead of the generic one on SaaS", async () => {
+      envMock.IS_SAAS = true;
+
+      const policy = await resolveSignInMethodPolicy();
+
+      expect(methodIds(policy.defaultMethods)).toEqual([
+        "auth0-google",
+        "auth0-github",
+        "auth0-microsoft",
+        "auth0",
+        "passkey",
+      ]);
+    });
+
+    /** @scenario "SaaS shows the broker's social connections as their own buttons" */
+    it("keeps a self-hosted Auth0 deployment on the generic method alone", async () => {
+      envMock.IS_SAAS = false;
+
+      const policy = await resolveSignInMethodPolicy();
+
+      expect(methodIds(policy.defaultMethods)).toEqual(["auth0", "passkey"]);
+    });
+
     /** @scenario "A social provider this deployment never mounted is never offered" */
     it("never offers a provider whose credentials are incomplete", async () => {
       envMock.NEXTAUTH_PROVIDER = "google";
