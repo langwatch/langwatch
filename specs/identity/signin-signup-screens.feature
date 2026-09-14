@@ -208,6 +208,24 @@ Feature: The first-party sign-in and sign-up screens - the auth screen is ours
     When the check-your-email card is shown
     Then no inbox door is offered
 
+  # The door wears the mailbox's own mark. Somebody scanning this card is
+  # looking for the thing they recognize, and that is the logo rather than the
+  # word beside it — the same argument the method rail's brand marks already
+  # make. A provider we hold no mark for still gets its door, wearing a plain
+  # envelope: drawing the wrong company's logo would be worse than drawing
+  # none.
+  @integration
+  Scenario: A recognized mailbox wears its own mark
+    Given I asked for a confirmation link at a gmail.com address
+    When the check-your-email card is shown
+    Then the inbox door carries that provider's mark
+
+  @integration
+  Scenario: A mailbox we hold no mark for still opens, under a plain envelope
+    Given I asked for a confirmation link at an aol.com address
+    When the check-your-email card is shown
+    Then the inbox door carries a plain envelope
+
   # ── Sign-up ────────────────────────────────────────────────────────────
 
   # The address is confirmed before the screen asks for a credential
