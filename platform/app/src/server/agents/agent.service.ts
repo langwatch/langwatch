@@ -262,7 +262,7 @@ export class AgentService {
         ? {
             transport: "phone",
             phoneNumber: input.agentId,
-            agentSpeaksFirst: false,
+            isAgentSpeaksFirst: false,
           }
         : { transport: input.transport, agentId: input.agentId };
     try {

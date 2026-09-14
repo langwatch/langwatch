@@ -42,7 +42,7 @@ export const phoneTransportSchema = z.object({
    * The agent under test greets on connect; the run waits for its opening turn
    * before the simulator speaks.
    */
-  agentSpeaksFirst: z.boolean().default(false),
+  isAgentSpeaksFirst: z.boolean().default(false),
 });
 
 export const voiceAgentConfigSchema = z.discriminatedUnion("transport", [

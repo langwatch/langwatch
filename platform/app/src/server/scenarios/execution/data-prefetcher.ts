@@ -1067,7 +1067,7 @@ export async function resolveVoiceTarget({
         transport: "phone",
         agentId: voiceAgentExternalId(config),
         credential: credential ? { kind: "twilio", ...credential } : null,
-        agentSpeaksFirst: config.agentSpeaksFirst,
+        isAgentSpeaksFirst: config.isAgentSpeaksFirst,
       };
     }
   }

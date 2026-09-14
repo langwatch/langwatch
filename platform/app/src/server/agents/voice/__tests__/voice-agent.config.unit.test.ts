@@ -60,7 +60,7 @@ describe("voiceAgentConfigSchema", () => {
         expect(parsed).toEqual({
           transport: "phone",
           phoneNumber: "+14155550123",
-          agentSpeaksFirst: false,
+          isAgentSpeaksFirst: false,
         });
       });
     });
@@ -101,7 +101,7 @@ describe("voiceAgentExternalId", () => {
         voiceAgentExternalId({
           transport: "phone",
           phoneNumber: "+14155550123",
-          agentSpeaksFirst: false,
+          isAgentSpeaksFirst: false,
         }),
       ).toBe("+14155550123");
     });

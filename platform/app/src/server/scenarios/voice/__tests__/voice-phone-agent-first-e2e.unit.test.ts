@@ -17,11 +17,11 @@
 
 import * as ScenarioRunner from "@langwatch/scenario";
 import { describe, expect, it, vi } from "vitest";
-import { buildAgentSpeaksFirstScript } from "../../execution/agent-first-script";
+import { buildIsAgentSpeaksFirstScript } from "../../execution/agent-first-script";
 import type { TargetAdapterData } from "../../execution/types";
 
 /** A phone voice target's prefetched data, greeting on connect or not. */
-function phoneVoiceData(agentSpeaksFirst: boolean): TargetAdapterData {
+function phoneVoiceData(isAgentSpeaksFirst: boolean): TargetAdapterData {
   return {
     type: "voice",
     agentId: "agent_row_1",
@@ -29,7 +29,7 @@ function phoneVoiceData(agentSpeaksFirst: boolean): TargetAdapterData {
       transport: "phone",
       agentId: "+14155550123",
       credential: null,
-      agentSpeaksFirst,
+      isAgentSpeaksFirst,
     },
     callerEnv: {},
     maxCallSeconds: 300,
@@ -75,11 +75,11 @@ function fakeExecutor() {
   return { calls, executor };
 }
 
-describe("buildAgentSpeaksFirstScript", () => {
+describe("buildIsAgentSpeaksFirstScript", () => {
   describe('given a phone target whose agent greets on connect and "Agent speaks first" is on', () => {
     /** @scenario "A callee that greets on connect opens the call when Agent speaks first is on" */
     it("opens the run with the agent's turn, then proceeds to the simulator/judge loop", async () => {
-      const script = buildAgentSpeaksFirstScript(phoneVoiceData(true));
+      const script = buildIsAgentSpeaksFirstScript(phoneVoiceData(true));
 
       // The run opens with the agent's greeting turn, then hands over.
       expect(script).toBeDefined();
@@ -99,7 +99,7 @@ describe("buildAgentSpeaksFirstScript", () => {
   describe('given a phone target with "Agent speaks first" off', () => {
     it("keeps the default cast: no agent-first script", () => {
       expect(
-        buildAgentSpeaksFirstScript(phoneVoiceData(false)),
+        buildIsAgentSpeaksFirstScript(phoneVoiceData(false)),
       ).toBeUndefined();
     });
   });
@@ -107,7 +107,7 @@ describe("buildAgentSpeaksFirstScript", () => {
   describe("given an ElevenLabs voice target", () => {
     it("never adds an agent-first script (the behavior is phone-only)", () => {
       expect(
-        buildAgentSpeaksFirstScript(elevenLabsVoiceData()),
+        buildIsAgentSpeaksFirstScript(elevenLabsVoiceData()),
       ).toBeUndefined();
     });
   });
@@ -122,7 +122,7 @@ describe("buildAgentSpeaksFirstScript", () => {
         headers: [],
         secrets: {},
       };
-      expect(buildAgentSpeaksFirstScript(httpData)).toBeUndefined();
+      expect(buildIsAgentSpeaksFirstScript(httpData)).toBeUndefined();
     });
   });
 

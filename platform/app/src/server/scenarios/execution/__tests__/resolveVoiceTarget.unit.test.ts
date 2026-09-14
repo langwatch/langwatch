@@ -56,7 +56,7 @@ describe("resolveVoiceTarget", () => {
           config: {
             transport: "phone",
             phoneNumber: "+14155559999",
-            agentSpeaksFirst: false,
+            isAgentSpeaksFirst: false,
           },
         });
         expect(target).toEqual({
@@ -68,7 +68,7 @@ describe("resolveVoiceTarget", () => {
             authToken: "tok-secret",
             fromNumber: "+14155550000",
           },
-          agentSpeaksFirst: false,
+          isAgentSpeaksFirst: false,
         });
       });
     });
@@ -82,14 +82,14 @@ describe("resolveVoiceTarget", () => {
           config: {
             transport: "phone",
             phoneNumber: "+14155559999",
-            agentSpeaksFirst: false,
+            isAgentSpeaksFirst: false,
           },
         });
         expect(target).toEqual({
           transport: "phone",
           agentId: "+14155559999",
           credential: null,
-          agentSpeaksFirst: false,
+          isAgentSpeaksFirst: false,
         });
         expect(getTwilioCredential).not.toHaveBeenCalled();
 
