@@ -11,7 +11,6 @@ import { createLogger } from "@langwatch/observability";
 import { nowInstant, type Instant } from "@langwatch/time";
 import type { WebhookEndpointRuntime } from "../repositories/webhook-endpoint.repository.ts";
 import type { WebhookRepositories } from "../repositories/webhook.repositories.ts";
-import type { WebhookDispatchResult } from "../rules/webhook-delivery-contract.rules.ts";
 import type { WebhookDestinationConfig } from "../services/webhook-destination.service.ts";
 import { WebhookEnvelopeService } from "../services/webhook-envelope.service.ts";
 import { WebhookEventsService } from "../services/webhook-events.service.ts";

@@ -85,7 +85,6 @@ export {
   type SpendUsage,
   type WebhookDeliveryEndpointService,
   type WebhookDeliveryState,
-  type WebhookDispatchResult,
 } from "./rules/webhook-delivery-contract.rules.ts";
 export {
   WebhookBatchPlannerService,
