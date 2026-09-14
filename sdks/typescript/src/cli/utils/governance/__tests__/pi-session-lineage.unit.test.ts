@@ -122,7 +122,7 @@ async function wireForChild(options: {
 
   const wire = JSON.stringify(
     buildPiEventsPayload({
-      events: buildPiTurnEvents(child, await resolvePiLineage(child.header)),
+      events: buildPiTurnEvents({ session: child, lineage: await resolvePiLineage(child.header) }),
       scopeVersion: "0.0.0-test",
     }),
   );
@@ -160,7 +160,7 @@ describe("pi session lineage", () => {
 
     // Absent, not false: the fold's blank means "never reported", and stamping
     // `is_fork: false` on every unsplit session would claim we had checked.
-    const events = buildPiTurnEvents(REAL_SESSION, lineage);
+    const events = buildPiTurnEvents({ session: REAL_SESSION, lineage });
     expect(events.length).toBeGreaterThan(0);
     for (const event of events) {
       expect(event.attributes).not.toHaveProperty("parent_session_id");
@@ -180,7 +180,7 @@ describe("pi session lineage", () => {
     const lineage = await resolvePiLineage(child.header);
     expect(lineage).toEqual({ parentSessionId: PARENT_ID, isFork: true });
 
-    const events = buildPiTurnEvents(child, lineage);
+    const events = buildPiTurnEvents({ session: child, lineage });
     expect(events.length).toBeGreaterThan(0);
     for (const event of events) {
       expect(event.attributes.parent_session_id).toBe(PARENT_ID);
@@ -208,7 +208,7 @@ describe("pi session lineage", () => {
     // server, so a path that reaches it can never be taken back.
     const wire = JSON.stringify(
       buildPiEventsPayload({
-        events: buildPiTurnEvents(child, lineage),
+        events: buildPiTurnEvents({ session: child, lineage }),
         scopeVersion: "0.0.0-test",
       }),
     );
@@ -258,7 +258,7 @@ describe("pi session lineage", () => {
     const lineage = await resolvePiLineage(child.header);
     expect(lineage).toEqual({ parentSessionId: null, isFork: true });
 
-    const events = buildPiTurnEvents(child, lineage);
+    const events = buildPiTurnEvents({ session: child, lineage });
     expect(events.length).toBeGreaterThan(0);
     for (const event of events) {
       expect(event.attributes).not.toHaveProperty("parent_session_id");
@@ -320,7 +320,12 @@ describe("pi session lineage", () => {
       ["a first line past the read window", oversized],
       ["a broken symlink", brokenLink],
       ["a symlink loop", loopA],
-      ["a file with no read permission", unreadable],
+      // Mode bits do not apply to UID 0, which reads the file happily and gets
+      // a real parent id back. The case discriminates for an unprivileged user
+      // only, so under root it is dropped rather than asserted and failed.
+      ...(process.getuid?.() === 0
+        ? []
+        : [["a file with no read permission", unreadable] as [string, string]]),
       ["a path containing a NUL byte", `${join(base, "nul")} .jsonl`],
       ["a path far past the length limit", join(base, "z".repeat(5000))],
       ["a header that is valid JSON but not an object", notAnObject],

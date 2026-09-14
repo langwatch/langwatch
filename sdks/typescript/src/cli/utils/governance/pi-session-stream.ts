@@ -8,8 +8,9 @@
  * the session exactly once: where in each file we have got to, and which rows
  * we have already emitted.
  *
- * Four decisions are load-bearing, each measured against pi's shipped
- * `SessionManager` rather than read from its documentation (ADR-132 §2, §8).
+ * Five decisions are load-bearing, the first four measured against pi's
+ * shipped `SessionManager` rather than read from its documentation
+ * (ADR-132 §2, §8).
  *
  * **The size is re-checked every pass; a remembered offset is never trusted on
  * its own.** A current-version file only ever grows — three runs against one
@@ -47,6 +48,12 @@
  * parser hands it back separately from `rows`, and the fallback key for a row
  * pi wrote without an id is positional, never the session id.
  *
+ * **A pass reads a bounded window, not the whole unread range.** Steady-state
+ * passes are small because pi has appended little, but the first pass on a
+ * resumed session starts at zero and would otherwise size itself to the file.
+ * See {@link MAX_READ_BYTES} — the remainder is not skipped, it is the next
+ * pass's window.
+ *
  * Spec: specs/coding-agent/pi-session-capture.feature
  */
 import { open, stat } from "node:fs/promises";
@@ -64,6 +71,29 @@ const NEWLINE = 0x0a;
  * eight hex characters.
  */
 const KEY_SEPARATOR = " ";
+
+/**
+ * The most one pass will read, and therefore parse, in one go.
+ *
+ * Every pass but the first reads only what pi appended since the last one, so
+ * the size of a pass is normally a turn or two. The first pass on a file is the
+ * exception: it starts at offset zero, and `pi-capture.ts` offers any session
+ * the run touched, so a `pi --session` resume of an old conversation hands this
+ * a whole file. Without a ceiling that pass allocates the file, then a string
+ * of it, then a line array of it — parsing runs on whatever the read returned,
+ * so all three scale together.
+ *
+ * The ceiling costs nothing the module was not already doing: chunk-at-a-time
+ * parsing is the steady state here, and this only makes the first pass behave
+ * like the rest. Nothing is dropped either, because the offset advances by what
+ * was consumed and the remainder is read next pass, in order.
+ *
+ * 8 MiB against a measured 407 KiB for the largest real session on hand, whose
+ * longest single row was 34 KiB. So the cap is two orders of magnitude clear of
+ * a session that exists and 240x clear of a row that exists: in practice it
+ * never engages, and it is here for the resumed session nobody has measured.
+ */
+const MAX_READ_BYTES = 8 * 1024 * 1024;
 
 /** Where one file has got to. One per path, for the life of the stream. */
 interface FileCursor {
@@ -109,7 +139,7 @@ interface FileCursor {
    *
    * Cleared by nothing, for the same reason `lineage` is not.
    */
-  lineageResolved: boolean;
+  isLineageResolved: boolean;
 }
 
 /**
@@ -209,10 +239,16 @@ export interface PiSessionStreamOptions {
    * blank parent, and a rejection here would take the whole pass down with it.
    */
   resolveLineage?: (header: PiSessionHeader) => Promise<PiLineage>;
+  /**
+   * Overridable so a test can cross {@link MAX_READ_BYTES} without writing a
+   * file of that size.
+   */
+  maxBytesPerRead?: number;
 }
 
 export function createPiSessionStream({
   resolveLineage,
+  maxBytesPerRead = MAX_READ_BYTES,
 }: PiSessionStreamOptions = {}): PiSessionStream {
   const cursors = new Map<string, FileCursor>();
   const seen = new Set<string>();
@@ -235,7 +271,7 @@ export function createPiSessionStream({
           header: null,
           rowsConsumed: 0,
           lineage: undefined,
-          lineageResolved: false,
+          isLineageResolved: false,
         };
         cursors.set(path, cursor);
       }
@@ -250,13 +286,26 @@ export function createPiSessionStream({
       }
       if (size === cursor.offset) return [];
 
-      const buffer = await readRange({ path, from: cursor.offset, to: size });
+      // A window, not the whole unread range. See {@link MAX_READ_BYTES}: the
+      // rest of the file is not skipped, it is next pass's window.
+      const windowEnd = Math.min(size, cursor.offset + maxBytesPerRead);
+      let buffer = await readRange({ path, from: cursor.offset, to: windowEnd });
       if (buffer === null || buffer.length === 0) return [];
 
       // Consume up to and including the last newline. Anything after it is a
       // line pi has not finished writing, or one it never will; either way the
       // bytes stay unread so a later pass can see them whole.
-      const lastNewline = buffer.lastIndexOf(NEWLINE);
+      let lastNewline = buffer.lastIndexOf(NEWLINE);
+      if (lastNewline === -1 && windowEnd < size) {
+        // A whole window of one line: pi wrote a row longer than the cap. The
+        // window cannot advance past it, and every later pass would read the
+        // same newline-free bytes and consume nothing — a file stalled for
+        // good, silently. So the ceiling yields to the allocation it exists to
+        // avoid rather than to a lost session.
+        buffer = await readRange({ path, from: cursor.offset, to: size });
+        if (buffer === null || buffer.length === 0) return [];
+        lastNewline = buffer.lastIndexOf(NEWLINE);
+      }
       if (lastNewline === -1) return [];
       const complete = buffer.subarray(0, lastNewline + 1);
       cursor.offset += complete.length;
@@ -277,8 +326,8 @@ export function createPiSessionStream({
       // event carries the lineage attributes, so resolving any later would
       // stamp the first pass's events blank and every pass after it filled —
       // for the same session, on the same run.
-      if (resolveLineage && !cursor.lineageResolved) {
-        cursor.lineageResolved = true;
+      if (resolveLineage && !cursor.isLineageResolved) {
+        cursor.isLineageResolved = true;
         try {
           cursor.lineage = await resolveLineage(header);
         } catch {
@@ -311,14 +360,14 @@ export function createPiSessionStream({
         fresh.push(row);
       }
 
-      return buildPiTurnEvents(
-        {
+      return buildPiTurnEvents({
+        session: {
           ...parsed,
           header,
           rows: fresh,
         },
-        cursor.lineage,
-      );
+        lineage: cursor.lineage,
+      });
     },
   };
 }

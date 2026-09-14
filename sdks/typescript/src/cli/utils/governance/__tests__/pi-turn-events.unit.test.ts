@@ -111,15 +111,15 @@ describe("building pi's turn events", () => {
   describe("given a session of user prompts, a tool call and assistant replies", () => {
     /** @scenario "A captured pi session shows the whole conversation in order" */
     it("emits one event per row, in the order pi wrote them", () => {
-      const events = buildPiTurnEvents(
-        sessionOf([
+      const events = buildPiTurnEvents({
+        session: sessionOf([
           userRow({ id: "aaaa0001", at: "2026-09-13T15:39:23.074Z", text: "one" }),
           assistantRow({ id: "aaaa0002", at: "2026-09-13T15:39:25.000Z" }),
           toolResultRow({ id: "aaaa0003", at: "2026-09-13T15:39:26.000Z" }),
           userRow({ id: "aaaa0004", at: "2026-09-13T15:39:30.000Z", text: "two" }),
           assistantRow({ id: "aaaa0005", at: "2026-09-13T15:39:33.000Z" }),
         ]),
-      );
+      });
 
       expect(events.map((event) => event.name)).toEqual([
         PI_EVENT.USER_PROMPT,
@@ -134,7 +134,7 @@ describe("building pi's turn events", () => {
   describe("given the whole of a real session", () => {
     /** @scenario "A captured pi session shows the whole conversation in order" */
     it("keeps every conversation row, interleaved exactly as the file has them", () => {
-      const events = buildPiTurnEvents(REAL_SESSION);
+      const events = buildPiTurnEvents({ session: REAL_SESSION });
 
       // Derived from the file itself rather than pasted, so the assertion is
       // "the events follow the rows" and not "the events follow a list someone
@@ -163,7 +163,7 @@ describe("building pi's turn events", () => {
       expect(Date.parse(row?.timestamp ?? "")).toBe(1789314244089);
       expect(row?.message?.timestampMs).toBe(1789314238072);
 
-      const events = buildPiTurnEvents(REAL_SESSION);
+      const events = buildPiTurnEvents({ session: REAL_SESSION });
       const index = REAL_SESSION.rows
         .filter((r) => r.type === "message")
         .findIndex((r) => r.id === "10011110");
@@ -175,8 +175,8 @@ describe("building pi's turn events", () => {
   describe("given an assistant turn pi billed at zero", () => {
     /** @scenario "A turn pi charged nothing for is recorded as zero" */
     it("records the zero", () => {
-      const events = buildPiTurnEvents(
-        sessionOf([
+      const events = buildPiTurnEvents({
+        session: sessionOf([
           assistantRow({
             id: "aaaa0001",
             at: "2026-09-13T15:39:25.000Z",
@@ -190,14 +190,14 @@ describe("building pi's turn events", () => {
             },
           }),
         ]),
-      );
+      });
 
       expect(attributesOf(events[0])).toMatchObject({ cost_usd: 0 });
     });
 
     /** @scenario "A turn pi charged nothing for is recorded as zero" */
     it("records the zero on the five such turns of a real session", () => {
-      const events = buildPiTurnEvents(REAL_SESSION);
+      const events = buildPiTurnEvents({ session: REAL_SESSION });
       const zeroes = events.filter(
         (event) => event.attributes.cost_usd === 0,
       );
@@ -218,9 +218,9 @@ describe("building pi's turn events", () => {
       // Not a shape the measured session contains — all 43 of its assistant
       // rows report a cost — so the row is built here from the real one with
       // `usage` removed, which is what a turn that died before billing leaves.
-      const events = buildPiTurnEvents(
-        sessionOf([assistantRow({ id: "aaaa0001", at: "2026-09-13T15:39:25.000Z" })]),
-      );
+      const events = buildPiTurnEvents({
+        session: sessionOf([assistantRow({ id: "aaaa0001", at: "2026-09-13T15:39:25.000Z" })]),
+      });
 
       expect(events).toHaveLength(1);
       expect(attributesOf(events[0])).not.toHaveProperty("cost_usd");
@@ -237,7 +237,7 @@ describe("building pi's turn events", () => {
     /** @scenario "The record names pi even though another provider answered" */
     it("names pi in the identity fields and anthropic only as the provider", () => {
       const payload = buildPiEventsPayload({
-        events: buildPiTurnEvents(REAL_SESSION),
+        events: buildPiTurnEvents({ session: REAL_SESSION }),
         scopeVersion: "0.0.0-test",
       });
 
@@ -275,7 +275,7 @@ describe("building pi's turn events", () => {
   describe("given a batch of pi events", () => {
     it("builds a logs body and no spans", () => {
       const payload = buildPiEventsPayload({
-        events: buildPiTurnEvents(REAL_SESSION),
+        events: buildPiTurnEvents({ session: REAL_SESSION }),
         scopeVersion: "0.0.0-test",
       });
 
@@ -288,7 +288,7 @@ describe("building pi's turn events", () => {
 
     it("spells a cost as a double and a token count as an integer", () => {
       const payload = buildPiEventsPayload({
-        events: buildPiTurnEvents(REAL_SESSION),
+        events: buildPiTurnEvents({ session: REAL_SESSION }),
         scopeVersion: "0.0.0-test",
       });
       const records = payload.resourceLogs[0]?.scopeLogs[0]?.logRecords ?? [];
@@ -328,7 +328,7 @@ describe("building pi's turn events", () => {
       );
 
       expect(headerless.rows).toHaveLength(1);
-      expect(buildPiTurnEvents(headerless)).toEqual([]);
+      expect(buildPiTurnEvents({ session: headerless })).toEqual([]);
     });
   });
 });

@@ -46,15 +46,26 @@ import { join } from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+// Type-only aliases for the modules the factories below spread. `vi.mock` is
+// hoisted above the imports, but these are erased at compile time, so naming
+// them up here costs the factories nothing and keeps the annotations out of
+// `typeof import(...)` form, which the SDK's lint config forbids.
+import type * as claudePluginMod from "../claude-plugin";
+import type * as cliLocationMod from "../cli-location";
+import type * as configMod from "../config";
+import type * as shellRcMod from "../shell-rc";
+import type * as wrapperModeMod from "../wrapper-mode";
+import type * as wrapperPathChoiceMod from "../wrapper-path-choice";
+
 vi.mock("../../spinner", () => ({
   createSpinner: () => ({ start: vi.fn(), stop: vi.fn() }),
 }));
 vi.mock("../cli-location", async (actual) => ({
-  ...(await actual<typeof import("../cli-location")>()),
+  ...(await actual<typeof cliLocationMod>()),
   recordCliLocation: vi.fn(),
 }));
 vi.mock("../config", async (actual) => ({
-  ...(await actual<typeof import("../config")>()),
+  ...(await actual<typeof configMod>()),
   loadConfig: () => ({
     gateway_url: "http://gateway.invalid",
     control_plane_url: "http://control-plane.invalid",
@@ -63,19 +74,19 @@ vi.mock("../config", async (actual) => ({
   saveConfig: vi.fn(),
 }));
 vi.mock("../claude-plugin", async (actual) => ({
-  ...(await actual<typeof import("../claude-plugin")>()),
+  ...(await actual<typeof claudePluginMod>()),
   updateLangwatchClaudePlugin: () => ({ action: "skipped" }),
 }));
 vi.mock("../shell-rc", async (actual) => ({
-  ...(await actual<typeof import("../shell-rc")>()),
-  maybeOfferIngestionShellRcPersist: async () => {},
+  ...(await actual<typeof shellRcMod>()),
+  maybeOfferIngestionShellRcPersist: async () => undefined,
 }));
 vi.mock("../wrapper-path-choice", async (actual) => ({
-  ...(await actual<typeof import("../wrapper-path-choice")>()),
+  ...(await actual<typeof wrapperPathChoiceMod>()),
   resolveWrapperPath: async () => ({ mode: "ingestion", prompted: false }),
 }));
 vi.mock("../wrapper-mode", async (actual) => ({
-  ...(await actual<typeof import("../wrapper-mode")>()),
+  ...(await actual<typeof wrapperModeMod>()),
   resolveWrapperMode: async () => modeResult,
 }));
 
@@ -369,7 +380,7 @@ describe("running pi through the wrapper", () => {
 
       // And capture did try: the turns the live endpoint received are exactly
       // the ones reported undelivered here.
-      const reported = unreachable.stderr.match(UNDELIVERED);
+      const reported = UNDELIVERED.exec(unreachable.stderr);
       expect(reported).not.toBeNull();
       expect(Number(reported![1])).toBe(delivered);
     });

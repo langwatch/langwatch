@@ -104,11 +104,27 @@ export function buildOtelEnvBlock(
 			// filtering is also the wrong answer here: the exposed token is
 			// itself the problem, independent of which spans get accepted.
 			//
-			// Returning {} means the wrapper hands pi's child nothing. Capture
-			// is unaffected — the endpoint and token stay in the mode result
-			// (wrapper-mode.ts:600-601) for the post-exit transcript POST, and
-			// telemetryEnvVarNames is only ever called with "claude" and
-			// "copilot", so no logout or refresh sweep depends on this key set.
+			// Returning {} means the wrapper injects nothing of OURS: vars is
+			// empty and ingestionClears("pi") (wrapper-mode.ts) is empty too,
+			// so wrapper.ts:715-719 hands pi's child the inherited env
+			// untouched and buildShellReapply emits no export line.
+			//
+			// What it deliberately does NOT do is scrub an
+			// OTEL_EXPORTER_OTLP_* pair the developer exported in their own
+			// shell — from `langwatch instrument claude`, say. That is not
+			// this wrapper's exposure to widen: nothing in the CLI writes
+			// those into its own process env, so if they are present every
+			// process that shell starts already carries them, `langwatch pi`
+			// or not. Unsetting them would instead silently break the
+			// developer's own instrumented processes inside the session.
+			// ingestionClears exists for vars that change what the TOOL does
+			// (copilot's BYOK pair, the file exporter); pi reads none.
+			//
+			// Capture is unaffected — the endpoint and token stay in the mode
+			// result (wrapper-mode.ts:600-601) for the post-exit transcript
+			// POST, and telemetryEnvVarNames is only ever called with "claude"
+			// and "copilot", so no logout or refresh sweep depends on this key
+			// set.
 			return {};
 		case "claude":
 			// Three further OTel unlock knobs found in the claude-code 2.x

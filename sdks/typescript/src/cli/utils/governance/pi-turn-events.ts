@@ -338,10 +338,13 @@ function lineageAttributesFor(
  * once per session and the caller passes the answer in. Omitting it stamps no
  * lineage at all, which is the honest reading: nothing was looked up.
  */
-export function buildPiTurnEvents(
-  session: PiSession,
-  lineage?: PiLineage,
-): PiTurnEvent[] {
+export function buildPiTurnEvents({
+  session,
+  lineage,
+}: {
+  session: PiSession;
+  lineage?: PiLineage;
+}): PiTurnEvent[] {
   const sessionId = session.header?.sessionId;
   if (!sessionId) return [];
   const lineageAttributes = lineageAttributesFor(lineage);

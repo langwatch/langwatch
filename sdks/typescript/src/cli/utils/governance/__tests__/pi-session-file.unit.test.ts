@@ -152,7 +152,7 @@ describe("parsePiSessionFile", () => {
       const session = parsePiSessionFile(content);
 
       expect(session.skippedLines).toBe(0);
-      expect(session.tornTail).toBe(false);
+      expect(session.hasTornTail).toBe(false);
     });
   });
 
@@ -195,7 +195,7 @@ describe("parsePiSessionFile", () => {
       const session = parsePiSessionFile(torn);
 
       expect(session.skippedLines).toBe(1);
-      expect(session.tornTail).toBe(true);
+      expect(session.hasTornTail).toBe(true);
     });
 
     it("does not call the tail torn when a later line parses", () => {
@@ -207,7 +207,7 @@ describe("parsePiSessionFile", () => {
 
       const session = parsePiSessionFile(recovered);
 
-      expect(session.tornTail).toBe(false);
+      expect(session.hasTornTail).toBe(false);
       expect(session.skippedLines).toBe(1);
       expect(session.rows.map((row) => row.id)).toEqual([
         "row-1",
@@ -238,14 +238,14 @@ describe("parsePiSessionFile", () => {
     });
 
     it("flags the version as one this build does not know", () => {
-      expect(parsePiSessionFile(future).versionIsKnown).toBe(false);
+      expect(parsePiSessionFile(future).isVersionKnown).toBe(false);
     });
 
     it("flags every version this build does know", () => {
       for (const version of KNOWN_SESSION_VERSIONS) {
         const content = `{"type":"session","version":${version},"id":"s","cwd":"/tmp"}`;
 
-        expect(parsePiSessionFile(content).versionIsKnown).toBe(true);
+        expect(parsePiSessionFile(content).isVersionKnown).toBe(true);
       }
     });
 
@@ -253,7 +253,7 @@ describe("parsePiSessionFile", () => {
       const session = parsePiSessionFile(`{"type":"session","id":"s"}`);
 
       expect(session.header?.version).toBeNull();
-      expect(session.versionIsKnown).toBe(false);
+      expect(session.isVersionKnown).toBe(false);
     });
   });
 
@@ -397,7 +397,7 @@ describe("parsePiSessionFile", () => {
 
       expect(session.rows.map((row) => row.id)).toEqual(["row-1", "row-2"]);
       expect(session.skippedLines).toBe(1);
-      expect(session.tornTail).toBe(false);
+      expect(session.hasTornTail).toBe(false);
     });
 
     it("skips valid JSON that is not an entry", () => {
@@ -432,7 +432,7 @@ describe("parsePiSessionFile", () => {
       const session = parsePiSessionFile(content);
 
       expect(session.header).toBeNull();
-      expect(session.versionIsKnown).toBe(false);
+      expect(session.isVersionKnown).toBe(false);
       expect(session.rows).toHaveLength(1);
     });
   });
@@ -497,7 +497,7 @@ describe("readPiSessionFile", () => {
       const session = await readPiSessionFile(path);
 
       expect(session?.header?.version).toBe(3);
-      expect(session?.versionIsKnown).toBe(true);
+      expect(session?.isVersionKnown).toBe(true);
       expect(session?.header?.sessionId).toBeTruthy();
     });
 
@@ -506,7 +506,7 @@ describe("readPiSessionFile", () => {
 
       expect(session?.rows).toHaveLength(131);
       expect(session?.skippedLines).toBe(0);
-      expect(session?.tornTail).toBe(false);
+      expect(session?.hasTornTail).toBe(false);
     });
 
     it("finds a parent on every row but the first", async () => {

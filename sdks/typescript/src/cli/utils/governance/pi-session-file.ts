@@ -17,9 +17,9 @@
  * still running, or one a SIGKILL cut short, can end in half a line. That is an
  * ordinary state, not corruption: the bytes before it are intact and complete.
  * We drop the unparseable line, keep everything before it, and say so on
- * {@link PiSession.tornTail} rather than raising — a capture path is not worth
- * an exit code, and the alternative is losing a whole session to its last
- * fifty bytes.
+ * {@link PiSession.hasTornTail} rather than raising — a capture path is not
+ * worth an exit code, and the alternative is losing a whole session to its
+ * last fifty bytes.
  *
  * **An absent number is not zero.** Only an explicit `cost.total` of `0` is
  * zero. A turn whose cost pi never wrote — because it errored before billing,
@@ -176,12 +176,12 @@ export interface PiSession {
    * died mid-write. Rung 11's tailing loop uses this to avoid advancing its
    * offset past bytes that are not yet a complete row.
    */
-  readonly tornTail: boolean;
+  readonly hasTornTail: boolean;
   /**
    * The header's version is one of {@link KNOWN_SESSION_VERSIONS}. False for a
    * version this build predates, and for a header that carries none.
    */
-  readonly versionIsKnown: boolean;
+  readonly isVersionKnown: boolean;
 }
 
 /** An empty session: no header, no rows, nothing wrong. */
@@ -189,8 +189,8 @@ const EMPTY_SESSION: PiSession = {
   header: null,
   rows: [],
   skippedLines: 0,
-  tornTail: false,
-  versionIsKnown: false,
+  hasTornTail: false,
+  isVersionKnown: false,
 };
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -295,7 +295,7 @@ export function parsePiSessionFile(content: string): PiSession {
   let sawHeader = false;
   const rows: PiRow[] = [];
   let skippedLines = 0;
-  let tornTail = false;
+  let hasTornTail = false;
 
   for (const line of lines) {
     const trimmed = line.trim();
@@ -308,10 +308,10 @@ export function parsePiSessionFile(content: string): PiSession {
       skippedLines++;
       // Overwritten by any later line that does parse, so this ends up true
       // only when the torn line really is the last one in the file.
-      tornTail = true;
+      hasTornTail = true;
       continue;
     }
-    tornTail = false;
+    hasTornTail = false;
 
     const entry = asRecord(parsed);
     const type = entry === null ? null : asString(entry.type);
@@ -341,8 +341,8 @@ export function parsePiSessionFile(content: string): PiSession {
     header,
     rows,
     skippedLines,
-    tornTail,
-    versionIsKnown: version !== null && KNOWN_SESSION_VERSIONS.includes(version),
+    hasTornTail,
+    isVersionKnown: version !== null && KNOWN_SESSION_VERSIONS.includes(version),
   };
 }
 

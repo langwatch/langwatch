@@ -65,6 +65,24 @@ const CODEX_IO_POLL_MS = 2_500;
  */
 const PI_SESSION_POLL_MS = 2_500;
 
+/**
+ * How long the exit path will wait for the final capture sweep before giving
+ * up on it.
+ *
+ * By the time the sweep runs, pi has exited and the user's shell is blocked on
+ * this process for its prompt. The post inside the sweep is bounded - the
+ * transport gives it five seconds - but the reader's `stat` and `read` are
+ * not, and an `fs` promise against a stalled network home directory never
+ * settles and cannot be cancelled once libuv holds it. Unbounded, a wedged
+ * mount would hold the terminal open forever over a capture that is
+ * explicitly allowed to fail.
+ *
+ * Ten seconds is the legitimate worst case rather than a guess: a tick's post
+ * with up to five seconds left to time out, then the sweep's own post with
+ * five of its own. Anything past that is not slow, it is stuck.
+ */
+const PI_FINAL_SWEEP_DEADLINE_MS = 10_000;
+
 /** Single-quote a string for safe interpolation into a `sh -c` command. */
 const shellQuote = (s: string): string => `'${s.replace(/'/g, "'\\''")}'`;
 
@@ -797,6 +815,10 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
 	// quiet, because pi has no second path to fall back on.
 	let piCapture: PiCapture | null = null;
 	let piPoll: ReturnType<typeof setInterval> | null = null;
+	// The pass a tick has started, for as long as it is running. Held out here
+	// rather than as a boolean inside the block because the exit sweep below has
+	// to be able to WAIT for it, not merely notice it — see there for why.
+	let piInFlight: Promise<unknown> | null = null;
 	if (tool === "pi") {
 		if (modeResult.endpoint && modeResult.ingestionToken) {
 			const capture = createPiCapture({
@@ -812,7 +834,6 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
 				token: modeResult.ingestionToken,
 			});
 			piCapture = capture;
-			let inFlight = false;
 			piPoll = setInterval(() => {
 				// Skip a tick while the previous pass is still running - and NOT for
 				// the reason the codex block gives. A codex harvest is stateless and
@@ -824,13 +845,12 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
 				// - but every append after it is skipped until the file happens to
 				// shrink and the cursor resets to zero. It heals itself, silently,
 				// having lost the turns in between.
-				if (inFlight) return;
-				inFlight = true;
-				void capture
+				if (piInFlight) return;
+				piInFlight = capture
 					.harvest()
 					.catch(() => 0)
 					.finally(() => {
-						inFlight = false;
+						piInFlight = null;
 					});
 			}, PI_SESSION_POLL_MS);
 			// Same as codex: the child drives the lifecycle, so the timer must never
@@ -901,8 +921,54 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
 	// try is here anyway - a coding session must never fail on capture.
 	if (piPoll) clearInterval(piPoll);
 	if (piCapture) {
+		// Abandoning the sweep has to be said out loud. A turn the deadline
+		// interrupts is already off the pending list and on the wire, so it is
+		// counted as neither pending nor dropped - the loss report below is
+		// blind to it and would print nothing at all. Silence there is the same
+		// undercount the report exists to prevent, arriving through a different
+		// door.
+		let sweepTimedOut = false;
 		try {
-			await piCapture.harvest();
+			// `clearInterval` stops future ticks; it does not stop the pass a tick
+			// already started, and one may have begun up to a poll interval ago
+			// with a post that has five seconds to time out. Everything below
+			// this line assumes that pass is finished. The sweep shares the
+			// reader's cursors with it, so two passes inside `stream.read` on the
+			// same file both advance the same offset over the same bytes and
+			// re-key the same rows past the seen-set - duplicate turns, on a fold
+			// whose sums commute and cannot collapse them. And the report that
+			// follows reads counters the running pass has not written yet, so it
+			// would announce a clean exit and then `process.exit` out from under
+			// the post still carrying those turns. Silence about a real loss, at
+			// the exact moment the loss is the user's last turns.
+			// Bounded, because everything below is owed to a shell that is
+			// already waiting. See PI_FINAL_SWEEP_DEADLINE_MS. Losing the last
+			// turns is bad; wedging the user's terminal to avoid losing them is
+			// worse, and the report below tells the truth either way - a turn the
+			// sweep never got to post is still counted as pending.
+			//
+			// The deadline timer is deliberately not `unref`'d. If the sweep is
+			// stuck on something that does not itself hold the event loop, an
+			// unreferenced timer would let node fall off the end and exit 0 on
+			// its own, skipping both the report and the `process.exit(exitCode)`
+			// below - handing the shell a success it did not earn.
+			let sweepDeadline: ReturnType<typeof setTimeout> | undefined;
+			try {
+				await Promise.race([
+					(async () => {
+						await piInFlight;
+						await piCapture.harvest();
+					})(),
+					new Promise<void>((resolve) => {
+						sweepDeadline = setTimeout(() => {
+							sweepTimedOut = true;
+							resolve();
+						}, PI_FINAL_SWEEP_DEADLINE_MS);
+					}),
+				]);
+			} finally {
+				if (sweepDeadline) clearTimeout(sweepDeadline);
+			}
 		} catch {
 			/* capture is non-essential; never block exit on it */
 		}
@@ -912,6 +978,17 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
 		// Turns discarded on overflow count too, and separately: those were lost
 		// mid-session rather than at exit, so a user reading only the pending
 		// figure would think a long outage cost them one pass.
+		if (sweepTimedOut) {
+			process.stderr.write(
+				`${lwTag()} pi session capture did not finish in ` +
+					`${Math.round(PI_FINAL_SWEEP_DEADLINE_MS / 1_000)}s and was ` +
+					`abandoned so this shell could exit; the last turns of this ` +
+					`session may not have been recorded.\n`,
+			);
+		}
+		// Reported independently of the line above, and both can be true: the
+		// deadline says the sweep was cut short, this says what was still held
+		// when it was.
 		const undelivered = piCapture.pendingCount() + piCapture.droppedCount();
 		if (undelivered > 0) {
 			process.stderr.write(

@@ -205,8 +205,8 @@ has simply never seen an agent that fills them.
 **Revised at v10 — this paragraph said the reverse.** It read: "the streamer
 must be absent when the run is not in the no-virtual-key mode", and the heading
 above said the rung was gated on that mode. Both were written when we believed
-pi honours a base-URL swap, so that a key-holder would be captured server-side
-instead. pi does not honour it, so there is no server-side capture to fall back
+pi honors a base-URL swap, so that a key-holder would be captured server-side
+instead. pi does not honor it, so there is no server-side capture to fall back
 to: gating on the mode would have switched capture off for exactly the customers
 who pay, silently. The no-double-trace rule still holds — it is just no longer
 reachable through pi, because pi can only ever be captured one way.

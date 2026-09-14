@@ -38,15 +38,15 @@ import {
   type PiTurnEvent,
 } from "../../../../../../../../../sdks/typescript/src/cli/utils/governance/pi-turn-events";
 import {
-  applyLogToCodingAgentSession,
-  createInitCodingAgentSession,
-  type CodingAgentSessionData,
-} from "../coding-agent-session.derivation";
-import {
   detectCodingAgent,
   liftCodingAgentLogFacts,
   normalizeEventName,
 } from "../coding-agent-normalization";
+import {
+  applyLogToCodingAgentSession,
+  type CodingAgentSessionData,
+  createInitCodingAgentSession,
+} from "../coding-agent-session.derivation";
 
 const SESSION_ID = "00000000-0000-4000-8000-0000000000c0";
 

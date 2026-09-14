@@ -102,7 +102,7 @@ vi.mock("../shell-rc", async (importOriginal) => ({
   SHELL_FUNCTION_TOOLS: [] as string[],
   maybeOfferIngestionShellRcPersist: async () => undefined,
 }));
-vi.mock("../spinner", () => ({
+vi.mock("../../spinner", () => ({
   createSpinner: () => ({ start: () => undefined, stop: () => undefined }),
 }));
 

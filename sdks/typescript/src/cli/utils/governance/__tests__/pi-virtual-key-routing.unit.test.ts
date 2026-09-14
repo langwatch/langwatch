@@ -36,7 +36,7 @@ import * as path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import * as cliApi from "../cli-api";
-import * as configMod from "../config";
+import type * as configMod from "../config";
 import type { GovernanceConfig } from "../config";
 import { resolveWrapperMode } from "../wrapper-mode";
 import { resolveWrapperPath } from "../wrapper-path-choice";
