@@ -8,6 +8,7 @@ import {
 import { ClickHouseStoredObjectsRepository } from "@langwatch/stored-object-server/composition/stored-objects";
 import { AuditLogApi } from "@langwatch/audit-log-contract";
 import { EnterpriseWorkerAuditLog } from "@langwatch/enterprise-worker";
+import { createActivatedLicenseSource } from "@langwatch/enterprise-licensing-server";
 import { dataRetentionServer } from "@langwatch/data-retention-server";
 import { apiKeyServer } from "@langwatch/api-key-server";
 import { authServer } from "@langwatch/auth-server";
@@ -21,7 +22,7 @@ import { userServer } from "@langwatch/user-server";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { ClickHouseClient } from "@clickhouse/client";
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
-import type { PlanProvider } from "@langwatch/entitlement-contract";
+import { ActivatedLicenseSource, type PlanProvider } from "@langwatch/entitlement-contract";
 import type { AuthzGrantsCommandDispatcher } from "@langwatch/authz-server";
 import type { PrismaConnection } from "@langwatch/prisma-client";
 import { entitlementServer } from "@langwatch/entitlement-server";
@@ -108,6 +109,19 @@ export async function createWorkerFoundationApps(options: {
   const auditLog = await EnterpriseWorkerAuditLog.create({ prisma: options.connection.client });
   options.resources.own("worker audit log", () => auditLog.stop());
 
+  // The licence leg of plan resolution: `EntitlementApp` declares this as a
+  // mandatory dependency, so this process must supply it, through the SAME
+  // one factory (and the SAME public key) the standalone gateway-spend plan
+  // provider gives the licence leg in `worker-plan-provider.composition.ts`
+  // — so both graphs agree on whether a deployment is licensed.
+  const licenseSource = createActivatedLicenseSource({
+    prisma: options.connection.client,
+    ...(options.config.deployment.licensePublicKey
+      ? { licensePublicKey: options.config.deployment.licensePublicKey }
+      : {}),
+    isSaas: options.config.deployment.saas,
+  });
+
   const runtime = await createApp({
     role: "worker",
     config: {
@@ -145,6 +159,7 @@ export async function createWorkerFoundationApps(options: {
   })
     .withTransports(workerClosedDoors())
     .withProvided(AuditLogApi, auditLog.auditLog())
+    .withProvided(ActivatedLicenseSource, licenseSource)
     .withProvided(FeatureFlagApi, options.featureFlags)
     .withModules([
       authzServer,

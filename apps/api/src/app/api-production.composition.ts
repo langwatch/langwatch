@@ -11,7 +11,7 @@ import {
 import { IdempotencyLedger, type IdempotentRunner } from "@langwatch/api/rest";
 import type { MountableRestApp } from "@langwatch/api/rest";
 import { auditLogNullServer } from "@langwatch/audit-log-null";
-import { createLogger } from "@langwatch/observability";
+import { createLogger, type Logger } from "@langwatch/observability";
 import { serverModules } from "@langwatch/installed-modules/server";
 import {
   createApp,
@@ -27,6 +27,12 @@ import {
   tryCreateApiStaticSurface,
 } from "../app-static/app-static.surface.ts";
 import { AuthApi } from "@langwatch/auth-contract";
+import {
+  ActivatedLicenseSource,
+  createAbsentLicenseSource,
+  type EntitlementSource,
+} from "@langwatch/entitlement-contract";
+import { createActivatedLicenseSource } from "@langwatch/enterprise-api";
 import {
   composeApiTrpcSession,
   type ApiBrowserSessionTransport,
@@ -150,7 +156,7 @@ function apiModuleConfig(config: ApiConfig): Readonly<Record<string, unknown>> {
     },
     /** The api keeps only the shared secret from its langy block; the rest defaults. */
     langy: { internalSecret: config.langyInternalSecret },
-    /** System providers gate on the explicit hosted flag; egress and env come resolved (ADR-132). */
+    /** System providers gate on explicit hosted flag; env values are resolved. */
     "model-provider": {
       isSaas: config.infrastructure.modelProvider.isSaas,
       egress: {
@@ -226,6 +232,21 @@ function apiIdempotencyLedger(options: {
     receipts: options.members.read("prisma"),
     cipher: options.members.read("encryption"),
   }).run;
+}
+
+/**
+ * The licence source for a process that opened no database: the core
+ * `createAbsentLicenseSource` default, named once, with the same
+ * consequence line the deleted `api-usage.composition.ts` wrote its own
+ * absences to.
+ */
+function absentLicenseSource(logger: Logger, processName: string): EntitlementSource {
+  logger.warn(
+    { source: "licence" },
+    `${processName} composed no licence source because it opened no database: an activated licence is not read here, so a licensed deployment resolves the same baseline an unlicensed one does and the Enterprise tier its contract names is withheld.`,
+  );
+
+  return createAbsentLicenseSource();
 }
 
 // API's parsed config. Absent datastores refuse at boot.
@@ -399,6 +420,20 @@ export async function bootApiProcess(options: {
 
   const idempotency = apiIdempotencyLedger({ config: processConfig, members });
 
+  // The licence leg of plan resolution: `EntitlementApp` declares this as a
+  // mandatory dependency, so a process that opened no database still names
+  // a source — the core one that always answers unlicensed — rather than
+  // leaving the whole process unable to boot.
+  const licenseSource = processConfig.database?.url
+    ? createActivatedLicenseSource({
+        prisma: members.read("prisma"),
+        ...(config.infrastructure.licensing.publicKey
+          ? { licensePublicKey: config.infrastructure.licensing.publicKey }
+          : {}),
+        isSaas: config.infrastructure.modelProvider.isSaas,
+      })
+    : absentLicenseSource(createLogger(config.serviceName), config.serviceName);
+
   const nlpServiceUrl = config.infrastructure.execution.nlpServiceUrl;
   const executionProxyBaseUrl = nlpServiceUrl
     ? HttpWorkflowNlpRuntimeAdapter.proxyBaseUrl({ baseUrl: nlpServiceUrl })
@@ -411,6 +446,7 @@ export async function bootApiProcess(options: {
   })
     .withModules(serverModules)
     .withModules(coreAuditLog)
+    .withProvided(ActivatedLicenseSource, licenseSource)
     .withService({
       name: "api eventing producer",
       start: () => void 0,

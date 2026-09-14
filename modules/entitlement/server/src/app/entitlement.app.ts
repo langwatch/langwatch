@@ -1,4 +1,5 @@
 import {
+  ActivatedLicenseSource,
   EntitlementApi,
   type AuthorizationContextResolver,
   type BaselinePlanSource,
@@ -30,13 +31,8 @@ import { EntitlementService } from "../services/entitlement.service.ts";
 import { UsageStatsService } from "../services/usage-stats.service.ts";
 
 /**
- * One plan an organization can buy for itself, as the ladder lists it.
- *
- * Annual and monthly variants of one tier are the same rung: an organization
- * already on Accelerate is not offered Accelerate Annual as its next step, and
- * an organization below Accelerate is offered the tier and not a billing
- * period. Collapsing them is the adapter's job, because which types are
- * variants of which is the catalogue's own fact.
+ * One plan on the purchase ladder. Annual and monthly variants of one tier
+ * are collapsed to the same rung.
  */
 export interface CataloguePlan {
   /** The tier, monthly and annual variants collapsed onto one. */
@@ -61,17 +57,9 @@ export interface CataloguePlan {
 }
 
 /**
- * The plans an organization may buy without talking to anybody.
- *
- * Deliberately only the self-serve ones. A tier sold by a person — enterprise
- * in either of its pricings — is absent from this list on purpose, and its
- * absence is what tells the next-step policy that an organization on it is
- * account-managed. There is no flag to forget to set.
- *
- * Infrastructure rather than a constant because the ladder is billing's, and
- * the organization's pricing model decides which rungs are on it. No module
- * implements this: every process that wants a next-step answer supplies its
- * own catalogue (billing's plan limits, or a deployment-specific ladder).
+ * Self-serve plans only; enterprise tiers absent by design so account-managed
+ * organizations are identified by absence alone. Infrastructure, not constant,
+ * because pricing model decides which rungs appear.
  */
 export interface PlanCatalogueReader {
   listSelfServePlans(input: {
@@ -118,12 +106,29 @@ type EntitlementSetup = FeatureSetup<
 /** What `dependencies` resolves to, for the direct-injection testing seam. */
 type EntitlementDependencies = EntitlementSetup["dependencies"];
 
+/**
+ * What the constructor actually reads off `dependencies`: the caller
+ * directory alone. `license` is consumed once, by `create`, to build this
+ * app's {@link EntitlementInfrastructure} — the constructor never reads it
+ * off `dependencies` directly, so a hand-built test app does not need to
+ * supply a license source it has no use for.
+ */
+type EntitlementCallerLookup = Pick<EntitlementDependencies, "users">;
+
 /** What a plan allows, and what has been used and spent against it. */
 export class EntitlementApp implements EntitlementApiContract {
   static readonly contract = EntitlementApi;
-  static readonly dependencies = { users: UserApi };
+  /**
+   * `license` is mandatory in every role: a process that installs
+   * `entitlementServer` without a `withProvided(ActivatedLicenseSource, ...)`
+   * line refuses to boot (`MissingProviderError`) instead of silently
+   * resolving the baseline plan for a licensed deployment. See
+   * `ActivatedLicenseSource` for why the token is a peer-API shape.
+   */
+  static readonly dependencies = { users: UserApi, license: ActivatedLicenseSource };
   static readonly configSchema = entitlementAppConfigSchema;
-  /** The logger its absence report writes to. The literal call is what the members generator reads. */
+  /** The logger for absence report. The literal call is what the members
+   * generator reads. */
   static readonly reads = reads("logger");
 
   #plans: EntitlementService;
@@ -135,7 +140,7 @@ export class EntitlementApp implements EntitlementApiContract {
   private constructor(
     repositories: EntitlementRepositories,
     members: EntitlementInfrastructure,
-    dependencies: EntitlementSetup["dependencies"],
+    dependencies: EntitlementCallerLookup,
   ) {
     this.#plans = EntitlementService.create(members);
     this.#usage = UsageStatsService.create({
@@ -149,7 +154,11 @@ export class EntitlementApp implements EntitlementApiContract {
   }
 
   static create({ repositories, members, dependencies, config }: EntitlementSetup): EntitlementApp {
-    const infrastructure = buildEntitlementInfrastructure({ logger: members.logger, config });
+    const infrastructure = buildEntitlementInfrastructure({
+      logger: members.logger,
+      config,
+      license: dependencies.license,
+    });
 
     return new EntitlementApp(repositories, infrastructure, dependencies);
   }
@@ -164,7 +173,7 @@ export class EntitlementApp implements EntitlementApiContract {
   static createForTesting(setup: {
     repositories: EntitlementRepositories;
     members: EntitlementInfrastructure;
-    dependencies: EntitlementDependencies;
+    dependencies: EntitlementCallerLookup;
   }): EntitlementApp {
     return new EntitlementApp(setup.repositories, setup.members, setup.dependencies);
   }

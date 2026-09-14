@@ -131,3 +131,18 @@ export {
   ssoConfigurationSchema,
   type SsoConfiguration,
 } from "@langwatch/enterprise-sso-contract";
+
+/**
+ * The signed-license leg of plan resolution: the one entry point
+ * `EntitlementApp`'s declared `ActivatedLicenseSource` dependency is
+ * answered with on a real boot. Reached through this composition for the
+ * same reason the governance/SCIM/audit-log/SSO families are — an API-role
+ * process may depend on the Enterprise API composition and on no Enterprise
+ * feature server below it. Deliberately only the one factory: it builds the
+ * repository and the signature verifier internally, so no composition file
+ * anywhere names either of them.
+ */
+export {
+  createActivatedLicenseSource,
+  type ActivatedLicenseSourceOptions,
+} from "@langwatch/enterprise-licensing-server";

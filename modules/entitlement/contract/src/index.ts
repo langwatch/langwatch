@@ -1,5 +1,6 @@
 export type { MoneyByCurrency, Plan, PlanInfo, PlanSource } from "./plan.ts";
 export { EntitlementApi } from "./entitlement.api.ts";
+export { ActivatedLicenseSource, createAbsentLicenseSource } from "./license-source.ts";
 export type {
   BaselinePlanSource,
   AuthorizationContextResolver,

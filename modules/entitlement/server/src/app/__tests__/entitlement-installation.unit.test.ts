@@ -1,10 +1,17 @@
 import {
+  ActivatedLicenseSource,
   EntitlementApi,
+  type EntitlementSource,
   type ListOrganizationSpendInput,
   type Plan,
   type ProjectSpendRollup,
 } from "@langwatch/entitlement-contract";
-import { createApp, membersFrom, withMemoryRepositories } from "@langwatch/runtime-composition";
+import {
+  createApp,
+  membersFrom,
+  MissingProviderError,
+  withMemoryRepositories,
+} from "@langwatch/runtime-composition";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { createTestLogger } from "@langwatch/test-harness";
 import { UserApi } from "@langwatch/user-contract";
@@ -17,6 +24,7 @@ import { MemoryUsageMembershipRepository } from "../../repositories/memory/memor
 import {
   createEntitlementTestApp,
   createEntitlementTestUsers,
+  fixedEntitlementSource,
   TestUsageWarnings,
 } from "./entitlement.fixture.ts";
 
@@ -70,11 +78,13 @@ class RecordingSpendRepository implements OrganizationSpendRepository {
 describe("entitlement app installation", () => {
   /**
    * @scenario "The core baseline works without enterprise sources"
-   * `EntitlementApp` declares `reads("logger")` and no license/subscription
-   * dependency at all, so a plain boot — no Enterprise packages composed —
-   * still resolves a plan instead of crashing on an undefined baseline
-   * (the measured defect: `entitlement.service.ts:70`, "Cannot use 'in'
-   * operator to search for 'resolve' in undefined").
+   * `EntitlementApp` declares `reads("logger")` and no subscription
+   * dependency at all, and its declared `license` dependency is answered
+   * here with a source that never grants — so a plain boot, with no
+   * Enterprise billing composed and no active license, still resolves a
+   * plan instead of crashing on an undefined baseline (the measured defect:
+   * `entitlement.service.ts:70`, "Cannot use 'in' operator to search for
+   * 'resolve' in undefined").
    */
   it.each(["api", "worker"] as const)(
     "installs a working capability in the %s role, with no enterprise sources composed",
@@ -86,6 +96,7 @@ describe("entitlement app installation", () => {
         members: membersFrom({ logger }),
       })
         .withProvided(UserApi, createEntitlementTestUsers())
+        .withProvided(ActivatedLicenseSource, fixedEntitlementSource(null))
         .withModules([withMemoryRepositories(entitlementServer)])
         .boot();
 
@@ -124,6 +135,153 @@ describe("entitlement app installation", () => {
       }
     },
   );
+
+  describe("given the activated license source a process composition root provided", () => {
+/**
+ * Tests what EntitlementApp does once told "licensed" or "not licensed".
+ * The licensing service handles the other three "not licensed" causes.
+ */
+    async function bootWithLicense(source: EntitlementSource) {
+      const { logger } = createTestLogger();
+      const runtime = await createApp({
+        role: "api",
+        config: { entitlement: { isSaas: true, processName: "test" } },
+        members: membersFrom({ logger }),
+      })
+        .withProvided(UserApi, createEntitlementTestUsers())
+        .withProvided(ActivatedLicenseSource, source)
+        .withModules([withMemoryRepositories(entitlementServer)])
+        .boot();
+
+      return runtime;
+    }
+
+    /** @scenario "A valid signed unexpired Enterprise license resolves the Enterprise plan" */
+    it("resolves ENTERPRISE for a valid, unexpired, correctly signed license", async () => {
+      const runtime = await bootWithLicense(
+        fixedEntitlementSource({
+          planSource: "free",
+          type: "ENTERPRISE",
+          name: "Enterprise",
+          free: false,
+          maxMembers: 100,
+          maxMembersLite: 100,
+          maxMessagesPerMonth: 1_000_000,
+          canPublish: true,
+          prices: { USD: 0, EUR: 0 },
+        }),
+      );
+
+      try {
+        const app = runtime.service(EntitlementApi);
+
+        await expect(
+          app.getActivePlan({ organizationId: "organization-1" }),
+        ).resolves.toMatchObject({ type: "ENTERPRISE", planSource: "license" });
+      } finally {
+        await runtime.stop();
+      }
+    });
+
+    /** @scenario "An absent license resolves the baseline plan" */
+    it("resolves the baseline when no license key is stored for the organization", async () => {
+      // Licensing's own absent reading (`LicensePlanSourceService.getActivePlan`)
+      // answers a free `PlanInfo`, never `null`, for "no key stored" — the
+      // source contract also allows `null`, and either degrades identically
+      // here.
+      const runtime = await bootWithLicense(fixedEntitlementSource(null));
+
+      try {
+        const app = runtime.service(EntitlementApi);
+
+        await expect(
+          app.getActivePlan({ organizationId: "organization-1" }),
+        ).resolves.toMatchObject({ type: "FREE", planSource: "free" });
+      } finally {
+        await runtime.stop();
+      }
+    });
+
+    /** @scenario "A license with an invalid signature resolves the baseline plan" */
+    it("resolves the baseline when the stored license fails signature verification", async () => {
+      // Stands in for `LicenseCryptography.validateLicense` answering
+      // `{ valid: false }`: Licensing maps that to the same free `PlanInfo`
+      // an absent key answers with, so `tryResolvePaidPlan` treats it as
+      // unlicensed identically.
+      const runtime = await bootWithLicense(
+        fixedEntitlementSource({
+          planSource: "free",
+          type: "OPEN_SOURCE",
+          name: "Open Source",
+          free: true,
+          maxMembers: 5,
+          maxMembersLite: 5,
+          maxMessagesPerMonth: 1_000,
+          canPublish: true,
+          prices: { USD: 0, EUR: 0 },
+        }),
+      );
+
+      try {
+        const app = runtime.service(EntitlementApi);
+
+        await expect(
+          app.getActivePlan({ organizationId: "organization-1" }),
+        ).resolves.toMatchObject({ planSource: "free" });
+      } finally {
+        await runtime.stop();
+      }
+    });
+
+    /** @scenario "An expired license resolves the baseline plan" */
+    it("resolves the baseline when the stored license's term has lapsed", async () => {
+      // Stands in for the Cloud reading's signature-AND-term check lapsing:
+      // `LicensePlanSourceService.getActivePlan` answers the same free
+      // `PlanInfo` an invalid signature does, so this seam sees one shape
+      // for every "not licensed" cause.
+      const runtime = await bootWithLicense(
+        fixedEntitlementSource({
+          planSource: "free",
+          type: "OPEN_SOURCE",
+          name: "Open Source",
+          free: true,
+          maxMembers: 5,
+          maxMembersLite: 5,
+          maxMessagesPerMonth: 1_000,
+          canPublish: true,
+          prices: { USD: 0, EUR: 0 },
+        }),
+      );
+
+      try {
+        const app = runtime.service(EntitlementApi);
+
+        await expect(
+          app.getActivePlan({ organizationId: "organization-1" }),
+        ).resolves.toMatchObject({ planSource: "free" });
+      } finally {
+        await runtime.stop();
+      }
+    });
+  });
+
+  describe("given a process that installs entitlement without providing a license source", () => {
+    /** @scenario "A process that forgets to supply a license source refuses to boot" */
+    it("refuses to boot rather than silently resolving every organization as unlicensed", async () => {
+      const { logger } = createTestLogger();
+
+      await expect(
+        createApp({
+          role: "api",
+          config: { entitlement: { isSaas: true, processName: "test" } },
+          members: membersFrom({ logger }),
+        })
+          .withProvided(UserApi, createEntitlementTestUsers())
+          .withModules([withMemoryRepositories(entitlementServer)])
+          .boot(),
+      ).rejects.toThrow(MissingProviderError);
+    });
+  });
 
   describe("given a plan resolved for the operator behind a request", () => {
     /** @scenario "An impersonating operator is resolved through the user directory" */

@@ -1,34 +1,10 @@
 /**
- * Builds the {@link EntitlementInfrastructure} this module used to receive
- * hand-composed (`apps/api/src/app/api-usage.composition.ts`, deleted by
- * b383462d96). `EntitlementApp.create` now builds it itself from the one
- * member it reads — `logger` — and its own config.
- *
- * The core baseline is a real {@link Plan}, adapted from `@langwatch/plans`'s
- * own catalogue data (`BASELINES`, `quotedLimitsOfPlan`): it never needed the
- * Enterprise packages the deleted composition reached for, and building it
- * here is what stops every plan resolution crashing on an undefined baseline
- * (`entitlement.service.ts:70`, the measured defect this build file exists to
- * fix). Every organization now always resolves at least the free (cloud) or
- * open-source (self-hosted) baseline before any paid source is consulted.
- *
- * License, subscription and the approaching-limit mail all *do* need the
- * Enterprise licensing/billing implementations the deleted composition
- * imported (`@langwatch/enterprise-licensing-server`,
- * `@langwatch/enterprise-billing-server`) — and this module installs at CORE
- * tier, so it may not import them. All three refuse by name, through the
- * same report the deleted composition wrote its own absences to
- * (`LoggedApiEntitlementAbsence`; the three consequence strings below are
- * ported verbatim). The month's ClickHouse billable-volume counter is the
- * same shape of absence and for the same reason — the deleted composition
- * built it from `BillableEventsQueryService` /
- * `ClickHouseBillingAdapter`, both in `@langwatch/enterprise-billing-server`
- * — so it is a fourth, new absence this module's own tier introduces: the
- * deleted composition never had to state it, because it always ran at an
- * Enterprise-capable application root that could reach ClickHouse billing
- * directly.
+ * Builds {@link EntitlementInfrastructure}. Moved from deleted
+ * api-usage.composition.ts; handles absences for subscription, mail, and usage
+ * counting on core-tier deployments that cannot compose Enterprise features.
  */
 import type { Plan, SendUsageLimitWarningInput, UsageLimitWarning } from "@langwatch/entitlement-contract";
+import type { EntitlementSource } from "@langwatch/entitlement-contract";
 import { HandledError } from "@langwatch/handled-error";
 import type { Logger } from "@langwatch/observability";
 import { BASELINES, quotedLimitsOfPlan, type Plan as CataloguePlan } from "@langwatch/plans";
@@ -37,7 +13,7 @@ import type { EntitlementAppConfig, EntitlementInfrastructure } from "./entitlem
 
 /** Which plan source this deployment could not compose, said once at composition. */
 export abstract class EntitlementAbsenceReport {
-  abstract absent(source: "licence" | "subscription" | "usage-counter" | "usage-mail"): void;
+  abstract absent(source: "subscription" | "usage-counter" | "usage-mail"): void;
 }
 
 /** Writes each absent source to the process log, with what it costs. */
@@ -50,15 +26,14 @@ export class LoggedEntitlementAbsence extends EntitlementAbsenceReport {
     super();
   }
 
-  absent(source: "licence" | "subscription" | "usage-counter" | "usage-mail"): void {
+  absent(source: "subscription" | "usage-counter" | "usage-mail"): void {
     this.logger.warn({ source }, ENTITLEMENT_CONSEQUENCE[source]);
   }
 }
 
-/** The `licence`, `subscription` and `usage-mail` strings are ported verbatim from the deleted `apps/api/src/app/api-usage.composition.ts`. */
+/** The `subscription` and `usage-mail` strings are ported verbatim from the
+ * deleted `apps/api/src/app/api-usage.composition.ts`. */
 const ENTITLEMENT_CONSEQUENCE = {
-  licence:
-    "API process composed no licence source because it opened no database: an activated licence is not read here, so a licensed deployment resolves the same baseline an unlicensed one does and the Enterprise tier its contract names is withheld.",
   subscription:
     "API process composed no subscription source on a HOSTED deployment: every organization resolves the free baseline, including ones that are paying.",
   "usage-counter":
@@ -92,7 +67,8 @@ class AbsentUsageCounter implements UsageCounter {
   }
 }
 
-/** The approaching-limit mail was asked for on a deployment with no Enterprise billing gateway composed. */
+/** The approaching-limit mail on a deployment with no Enterprise billing
+ * gateway composed. */
 class EntitlementNotifierUnavailableError extends HandledError {
   declare readonly code: "service_unavailable";
 
@@ -148,19 +124,21 @@ function coreBaseline(isSaas: boolean): Plan {
 export function buildEntitlementInfrastructure(input: {
   logger: Logger;
   config: EntitlementAppConfig;
+  /** The activated license source the process composition root supplied. */
+  license: EntitlementSource;
   /** Overridable for tests; defaults to the process logger. */
   report?: EntitlementAbsenceReport;
 }): EntitlementInfrastructure {
   const report = input.report ?? LoggedEntitlementAbsence.create(input.logger);
 
-  // Ported from the deleted composition: licence absence is reported on every
-  // deployment shape, subscription absence only on a hosted one — a
-  // self-hosted deployment never had a subscription to miss.
-  report.absent("licence");
+  // Ported from the deleted composition: subscription absence is reported
+  // only on a hosted deployment — a self-hosted deployment never had a
+  // subscription to miss.
   if (input.config.isSaas) report.absent("subscription");
 
   return {
     baseline: coreBaseline(input.config.isSaas),
+    license: input.license,
     counter: AbsentUsageCounter.create(report),
     warnings: AbsentUsageWarning.create(report, input.config.processName),
   };
