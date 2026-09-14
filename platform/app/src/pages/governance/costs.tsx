@@ -350,7 +350,9 @@ function CostsPage() {
             summaryDays={summary.data?.series ?? null}
             hasSummaryFailure={summary.isError && !isRefusedRead(summary.error)}
             providerDays={providerDays.data?.rows ?? null}
-            hasProviderDaysFailure={providerDays.isError}
+            hasProviderDaysFailure={
+              providerDays.isError && !isRefusedRead(providerDays.error)
+            }
           />
         </SampleSaidOnce>
       </VStack>

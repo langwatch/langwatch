@@ -1671,7 +1671,22 @@ Feature: One cost screen, three honest lanes
       # exist. The failure marker is for failures; a decline keeps the empty
       # copy, the same line the billed-spend-by-person panel draws.
 
+    @integration
+    Scenario: A declined day-split read leaves its panels saying what would fill them
+      Given a reader whose day-split cost read is declined
+      And a reader who has turned the invented panels off
+      When the cost screen is drawn
+      Then neither provider chart says it could not be brought up to date
+      # Both charts are folded from that one read, so a refusal marks both or
+      # neither, and the advice the marker carries cannot work against one.
+
   Rule: A read that genuinely broke still reports the failure
+
+    @integration
+    Scenario: A failed day-split read still marks its panels unrefreshed
+      Given a day-split cost read that fails with a server fault
+      When the cost screen is drawn
+      Then a provider chart says it could not be brought up to date
 
     @integration
     Scenario: A failed read still reports the failure

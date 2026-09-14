@@ -23,7 +23,10 @@
  * Spec: specs/governance/governance-cost-screen.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import type { GovernanceCostDayDto } from "@ee/governance/services/governanceCost.service";
+import type {
+  GovernanceCostDayDto,
+  GovernanceCostSummaryDto,
+} from "@ee/governance/services/governanceCost.service";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 import userEvent from "@testing-library/user-event";
@@ -175,7 +178,9 @@ const renderInSampleMode = async () => {
 };
 
 /** What the summary answers with when it answers. */
-const summaryAnswer = (series: GovernanceCostDayDto[]) => ({
+const summaryAnswer = (
+  series: GovernanceCostDayDto[],
+): GovernanceCostSummaryDto => ({
   unavailableReason: null,
   providers: [],
   billed: {
@@ -195,8 +200,11 @@ const summaryAnswer = (series: GovernanceCostDayDto[]) => ({
     ],
   },
   seats: { status: "awaiting_data" },
+  azureBilling: null,
   series,
   windowDays: 30,
+  staleSources: null,
+  unpricedWindow: null,
 });
 
 /**
