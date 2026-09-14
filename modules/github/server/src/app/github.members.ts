@@ -1,4 +1,5 @@
 import type { GithubInstallStatePayload, GithubPullRequestEvent } from "@langwatch/github-contract";
+import type { Instant } from "@langwatch/time";
 export interface GithubInfrastructure {  githubBranchDemand: GithubBranchDemand;
   githubBranchMaintenance: GithubBranchMaintenance;
   githubHost: GithubHost;

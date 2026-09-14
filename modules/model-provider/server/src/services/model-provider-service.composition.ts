@@ -1,5 +1,5 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { ModelProviderService as ModelProviderServiceContract } from "@langwatch/model-provider-contract";
+import type { ModelProviderApi as ModelProviderServiceContract } from "@langwatch/model-provider-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";

@@ -41,6 +41,6 @@ export type ApiResponseModelProvider = z.infer<typeof apiResponseModelProviderSc
  * Zod schema for the full model-providers response.
  * A record mapping provider keys to their configuration.
  */
-export const apiResponseModelProvidersSchema = z.record(z.string(), apiResponseModelProviderSchema);
+export const apiResponseModelProvidersSchema = z.object({}).catchall(apiResponseModelProviderSchema);
 
 export type ApiResponseModelProviders = z.infer<typeof apiResponseModelProvidersSchema>;

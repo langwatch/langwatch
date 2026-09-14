@@ -36,7 +36,7 @@ type GithubServiceDependencies = {
   host: GithubHost;
   installState: GithubInstallState;
   installResponse: GithubInstallResponse;
-  pullRequestEvents: GithubPullRequestEvent;
+  pullRequestEvents: GithubPullRequestEventParser;
 };
 
 /**
@@ -68,7 +68,7 @@ export class GithubFeatureService implements GithubApi {
     private readonly host: GithubHost,
     private readonly installState: GithubInstallState,
     private readonly installResponse: GithubInstallResponse,
-    private readonly pullRequestEvents: GithubPullRequestEvent,
+    private readonly pullRequestEvents: GithubPullRequestEventParser,
   ) {
     this.connection = GithubConnectionService.create({
       installations,

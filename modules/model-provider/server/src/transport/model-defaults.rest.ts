@@ -51,9 +51,6 @@ export const modelDefaultsRestCredential = defineRestMiddleware(
     .nullable(),
 );
 
-/** The roles the snapshot publishes, in the order it has always published them. */
-const SNAPSHOT_ROLES = ["DEFAULT", "FAST", "EMBEDDINGS"] as const;
-
 export const modelDefaultsRest = defineRestRouter(ModelProviderApi)
   .withNamespace("model-defaults")
   .withVersion(MANAGEMENT_API_VERSION)
@@ -82,9 +79,11 @@ export const modelDefaultsRest = defineRestRouter(ModelProviderApi)
         organizationId: snapshot.organizationId,
         organizationName: snapshot.organizationName,
       },
-      effective: Object.fromEntries(
-        SNAPSHOT_ROLES.map((role) => [role, snapshot.effective[role] ?? null]),
-      ),
+      effective: {
+        DEFAULT: snapshot.effective.DEFAULT ?? null,
+        FAST: snapshot.effective.FAST ?? null,
+        EMBEDDINGS: snapshot.effective.EMBEDDINGS ?? null,
+      },
       configs: snapshot.configs.map((config) => ({
         id: config.id,
         config: config.config,
@@ -131,7 +130,7 @@ export const modelDefaultsRest = defineRestRouter(ModelProviderApi)
   .withDocs({
     description:
       "Update a config's JSON payload and/or its scope attachments. Sending `scopes: []` deletes the config.",
-    responses: { ...baseResponses, 204: { description: "Updated" } },
+    responses: { ...baseResponses, 204: { description: "Updated", content: {} } },
   })
   .handle(async ({ app, input, scope }, credential) => {
     const author = requireKeyOwner(credential);
@@ -155,7 +154,7 @@ export const modelDefaultsRest = defineRestRouter(ModelProviderApi)
   .withMiddleware(modelDefaultsRestCredential)
   .withDocs({
     description: "Delete a default-model config. Scope attachments cascade.",
-    responses: { ...baseResponses, 204: { description: "Deleted" } },
+    responses: { ...baseResponses, 204: { description: "Deleted", content: {} } },
   })
   .handle(async ({ app, input, scope }, credential) => {
     const author = requireKeyOwner(credential);

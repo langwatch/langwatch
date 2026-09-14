@@ -72,7 +72,7 @@ export interface TraceExportRestMembers<
    * Both the parsed shape and the shape a caller SENDS are carried, because
    * they can differ, and the validator types the 422 body off the sent shape.
    */
-  requestSchema: z.ZodType<TRequest, TRequestRaw>;
+  requestSchema(): z.ZodType<TRequest, TRequestRaw>;
   /** The live session behind this request, or null when there is none. */
   resolveSession(request: Request): Promise<TSession | null>;
   /** Whether that session holds `permission` on the project. */
@@ -208,7 +208,7 @@ export const traceExportRest = defineRestRouter(TraceExportApi)
       return jsonAnswer({ error: "Invalid JSON body" }, 400);
     }
 
-    const parsed = app.requestSchema.safeParse(parsedBody);
+    const parsed = app.requestSchema().safeParse(parsedBody);
     if (!parsed.success) {
       throw requestValidationErrorFrom({ target: "json", error: parsed.error, input: parsedBody });
     }

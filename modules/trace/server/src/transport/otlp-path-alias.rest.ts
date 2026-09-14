@@ -23,7 +23,7 @@ import { moduleApi } from "@langwatch/runtime-composition";
  * family mounts no aliases either.
  */
 export interface OtlpPathAliasApp {
-  canonical: MountableRestApp;
+  canonical(): MountableRestApp;
 }
 
 export const OtlpPathAliasApi = moduleApi<OtlpPathAliasApp>("trace");
@@ -54,7 +54,7 @@ async function forward(app: OtlpPathAliasApp, request: Request): Promise<RestRaw
   const forwarded = new Request(url.toString(), request);
   stampCorrectedPath({ headers: forwarded.headers, originalPath });
 
-  return app.canonical.fetch(forwarded);
+  return app.canonical().fetch(forwarded);
 }
 
 const router = defineRestRouter(OtlpPathAliasApi)

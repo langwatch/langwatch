@@ -14,6 +14,7 @@ import {
   type AccessPolicy,
   type CredentialClass,
 } from "@langwatch/api";
+import type { Credential } from "@langwatch/api/access";
 import { registerRoutePolicy } from "@langwatch/api/rest";
 import { getConfig, initConfig, runWithConfig, tryGetConfig } from "@langwatch/mcp-server/config";
 import { createMcpServer } from "@langwatch/mcp-server/create-mcp-server";
@@ -229,6 +230,7 @@ export function hostedMcpRoutePolicies(): ReadonlyArray<{
   policy: AccessPolicy;
   family: string;
   credentialClass: CredentialClass;
+  credential: Credential;
 }> {
   return ROUTE_VERBS.flatMap((route) =>
     [...route.methods, "OPTIONS"].map((method) => {
@@ -236,12 +238,14 @@ export function hostedMcpRoutePolicies(): ReadonlyArray<{
         method === "OPTIONS"
           ? publicEndpoint(`CORS preflight for ${route.path}; answers headers only, reads nothing`)
           : route.policy;
+      const isPublic = policy.kind === "public";
       return {
         method,
         path: route.path,
         policy,
         family: HOSTED_MCP_FAMILY,
-        credentialClass: policy.kind === "public" ? "none" : "project_api_key",
+        credentialClass: isPublic ? "none" : "project_api_key",
+        credential: isPublic ? "public" : "project",
       };
     }),
   );

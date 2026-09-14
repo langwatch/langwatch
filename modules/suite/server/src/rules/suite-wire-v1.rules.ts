@@ -260,6 +260,8 @@ export const runPlanWireSchema = z.object({
   platformUrl: z.string().url().describe("Where to open this run plan in the LangWatch platform."),
 });
 
+export type RunPlanWire = z.infer<typeof runPlanWireSchema>;
+
 /** What a run answers with, whichever way the run was started. */
 export const runPlanRunResultSchema = z.object({
   scheduled: z.boolean().describe("True once the runs are queued."),
@@ -322,6 +324,8 @@ export const testSuiteWireSchema = z.object({
     .url()
     .describe("Where to open this test suite in the LangWatch platform."),
 });
+
+export type TestSuiteWire = z.infer<typeof testSuiteWireSchema>;
 
 /** One test suite with the scenarios filed in it, named. */
 export const testSuiteDetailWireSchema = testSuiteWireSchema.extend({

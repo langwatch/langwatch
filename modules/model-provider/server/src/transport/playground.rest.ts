@@ -14,7 +14,7 @@ import {
   type RestRawResult,
 } from "@langwatch/api/rest";
 import { ModelProviderApi } from "@langwatch/model-provider-contract";
-import { streamText } from "ai";
+import { streamText, type ModelMessage } from "ai";
 import { z } from "zod";
 
 import { getProjectModelProviders } from "../rules/legacy-model-provider.rules.ts";
@@ -206,7 +206,7 @@ async function stream({
     const result = streamText({
       model: vercelProvider(model),
       system: systemPrompt?.trim() ? systemPrompt : undefined,
-      messages: messages as Parameters<typeof streamText>[0]["messages"],
+      messages: messages as ModelMessage[],
       maxRetries: hasCustomKeys ? 1 : 3,
     });
     const response = result.toTextStreamResponse();

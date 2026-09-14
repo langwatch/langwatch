@@ -351,7 +351,7 @@ export const prepareEnvKeys = ({
  * here reads it and naming the type would put an enterprise dependency on this package for a parameter with no body.
  */
 export const prepareLitellmParams = async (
-  service: ModelProviderApi,
+  service: Pick<ModelProviderApi, "prepareExecution">,
   _managedProviders: unknown,
   {
     model,

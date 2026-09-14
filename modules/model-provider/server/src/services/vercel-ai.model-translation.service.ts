@@ -28,7 +28,7 @@ export class VercelAiModelTranslationAdapter extends ModelTranslation {
     model: string;
     modelProviders: Pick<
       ModelProviderApi,
-      "resolveModelForFeature" | "findAlternateModel" | "getExecutionProviders"
+      "resolveModelForFeature" | "findAlternateModel" | "getExecutionProviders" | "prepareExecution"
     >;
   }): Promise<string> {
     const model = await ModelProviderExecutionHandleService.getVercelAIModel({
