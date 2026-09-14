@@ -144,8 +144,30 @@
     // is recorded in that file (rule|file, with a measured date); add a file
     // there to exempt it, or fix it and delete its line.
     // ------------------------------------------------------------------
+    // A component is held to 20 rather than 15, because JSX scores higher for
+    // the same reading effort: every `&&` guard and ternary in a tree counts
+    // as a branch, though it renders flat beside what it produces.
+    //
+    // Measured 2026-09-14 over 11,611 scored functions in modules, apps/ui and
+    // packages/design-system. Both file kinds have a median of 4, so this is a
+    // tail effect, not a shift: .ts reaches p95 at 12 and p99 at 18, while .tsx
+    // reaches 14 and 24. At one shared max of 15, 1.40% of .ts functions
+    // report against 1.96% of .tsx -- the same line catching half again as
+    // much of the component tree. Parity lands at 19; 20 is the round number
+    // beside it and leaves .tsx a hair looser, at 1.29%.
+    //
+    // This is a threshold, not an exemption: the 35 components still above 20
+    // are genuinely complex and stay reported.
+    {
+      "files": ["**/*.tsx"],
+      "rules": {
+        "langwatch/cognitive-complexity": ["error", { "max": 20 }]
+      }
+    },
     // Test files are held to 40 -- a table-driven suite branches more than a
     // service method -- and the 23 that sit above it are registered below.
+    // This entry follows the .tsx one on purpose: later entries win, so a
+    // component test keeps 40 rather than dropping to the component limit.
     {
       "files": ["**/__tests__/**", "**/*.test.ts", "**/*.test.tsx"],
       "rules": {
