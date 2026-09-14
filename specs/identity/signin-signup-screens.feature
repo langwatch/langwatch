@@ -173,6 +173,16 @@ Feature: The first-party sign-in and sign-up screens - the auth screen is ours
     Then the glyph is on screen and does not move
     And every word of the waiting state is still there
 
+  # Stillness includes the cost of asking. Machines that render without a
+  # GPU take whole seconds to answer "could you run a shader?", and a door
+  # asked to hold still was stalling on that very question on every visit.
+  @integration
+  Scenario: A door asked to hold still never warms up a graphics engine
+    Given less motion has been asked for
+    When I arrive at the sign-in screen
+    Then the ground is the still colour field
+    And no graphics engine is started to draw it
+
   # ── Sign-up ────────────────────────────────────────────────────────────
 
   # The address is confirmed before the screen asks for a credential
