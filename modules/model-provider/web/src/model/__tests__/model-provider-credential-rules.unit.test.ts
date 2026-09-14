@@ -1,13 +1,5 @@
-/**
- * The credential-requiredness rule the model-provider drawer renders from,
- * tested against the REAL registry schemas (no registry mock, unlike the
- * sibling modelProviderHelpers.unit.test.ts) — the whole point of deriving
- * requiredness from the schema is that the two cannot drift apart, so a
- * test that invents its own schemas would prove nothing about the drawer.
- *
- * Covers @integration scenarios from
- * specs/model-providers/provider-configuration.feature.
- */
+// Tests credential rules against real schema (not mocked) to prevent drift
+// between schema and requiredness logic
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import { getSchemaShape, modelProviders } from "@langwatch/model-provider-contract";

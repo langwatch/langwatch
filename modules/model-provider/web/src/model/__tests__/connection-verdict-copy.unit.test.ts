@@ -1,18 +1,6 @@
-/**
- * @vitest-environment node
- *
- * A refused credential is explained in OUR words, resolved from the refusal's
- * stable code, and never in the provider's.
- *
- * The reason this is a test rather than a reading of the table: a
- * rejected-credential body is exactly where a credential turns up — Gemini
- * quotes the request back, key included — so "we render nothing that arrived
- * with the refusal" is a security property, not a style preference. The refusal
- * payload below carries a `message` field holding an upstream sentence with a
- * key in it; nothing this module returns may contain any of it.
- *
- * Spec: specs/model-providers/credential-validation.feature
- */
+// @vitest-environment node
+// Security: refused credentials explained in our words only, never upstream text
+// (which may leak secrets like API keys)
 
 import { describe, expect, it } from "vitest";
 import {

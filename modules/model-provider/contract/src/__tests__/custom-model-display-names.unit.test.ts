@@ -1,17 +1,5 @@
-/**
- * Unit tests for the custom-model display-name resolver.
- *
- * Binds the two `@unit` scenarios in
- * specs/model-providers/custom-model-display-name.feature. The
- * `@integration` scenarios in the same file are bound against the
- * components that consume this resolver (ProviderModelSelector,
- * ModelChip, useModelSelectionOptions, etc.) — see their own test files.
- *
- * The malformed-entry cases below are not hypothetical: `customModels`
- * is a JSON column and `toLegacyCompatibleCustomModels` returns an
- * unchecked cast (customModel.schema.ts), so blank, whitespace-only and
- * field-missing entries can reach the resolver from a hand-edited row.
- */
+// Binds unit scenarios; handles malformed entries (JSON column with unchecked cast
+// can produce invalid data)
 import { describe, expect, it } from "vitest";
 import {
   toLegacyCompatibleCustomModels,

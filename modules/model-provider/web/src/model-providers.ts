@@ -1,21 +1,5 @@
-/**
- * The Model Provider settings family, as the browser application mounts it.
- *
- * ADR-004 makes a screen an owner-only export named after the frontend feature
- * that composes it, so the whole family is one entry. What it exposes for each
- * page is a LOADER rather than a component, because between them the two screens
- * drag sixteen provider marks, a cascade table and a confirm dialog behind them,
- * and none of that belongs in the chunk that renders the rest of the
- * application.
- *
- * TWO SCREENS, TWO ADDRESSES: `/settings/model-providers` and
- * `/settings/model-costs`.
- *
- * WHAT THE OWNING FRONTEND FEATURE HAS TO MOUNT is two things: the tRPC Provider
- * this package's hooks run on, and the host port that answers for the scope, the
- * reader's grants, the scopes they can see, the address, the two notices, and
- * the three `platform/app` drawers these screens address rather than mount.
- */
+// Per ADR-004, exports screen loaders (not components) for two addresses:
+// /settings/model-providers and /settings/model-costs
 
 import type { ComponentType } from "react";
 
