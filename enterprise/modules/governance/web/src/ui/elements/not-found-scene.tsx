@@ -1,15 +1,4 @@
-/**
- * The address that is not a page.
- *
- * `platform/app`'s `NotFoundScene` is 486 lines of canvas art over a 439-line
- * renderer, and it reads `process.env.NODE_ENV` to offer its parameter sliders —
- * an import a feature-web package may not make at all. So what travels is the
- * message and the way out, and the art stays behind until the scene itself
- * moves with the shell that owns 404 for every route rather than for this one.
- *
- * Reached when a governance page is behind a flag that is off: the address
- * exists in the route table, and this deployment does not serve it.
- */
+/** Simplified 404 scene for governance pages behind feature flags. */
 
 import { Button, Center, Heading, Stack, Text } from "@chakra-ui/react";
 import { useGovernanceHost } from "../../model/governance-host.ts";

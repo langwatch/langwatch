@@ -1,23 +1,4 @@
-/**
- * What the governance screens ask of the application they are mounted in.
- *
- * A screen may not import `@langwatch/ui`, the router, a toast singleton or the
- * session client: those are the imports ADR-004 seals off from a feature-web
- * package, and reaching for any of them is also what would make these screens
- * untestable outside a running application. They ask this port instead, and the
- * frontend feature that owns them — `apps/ui/src/features/governance` — answers
- * it by adapting the browser capabilities the application already resolves.
- *
- * It lives in `model` because it is a package-wide portable value: types plus
- * the React context they travel in, depending on nothing but React. Every layer
- * above may read it, which is the point — a chip deep in a table needs the same
- * navigate the screen does.
- *
- * The port is deliberately narrow. It answers four questions the browser owns
- * (who is here, where they are, what they may do, what is switched on), moves
- * the address bar, reads it, tells the user how an action turned out, and says
- * which plan the organization is on. Anything wider belongs to the screens.
- */
+/** Port providing governance screens with auth, routing, toasts, and plan context. */
 
 import { createContext, useContext } from "react";
 

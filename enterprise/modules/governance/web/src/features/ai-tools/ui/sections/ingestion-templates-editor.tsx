@@ -18,20 +18,7 @@ import { Drawer } from "@langwatch/design-system/drawer";
 import { Link } from "../../../../ui/elements/governance-link.tsx";
 import { useGovernanceToaster, useShowErrorToast } from "../../../../behavior/governance-feedback.ts";
 import { api } from "../../../../behavior/governance-api.ts";
-/**
- * Admin Ingestion Templates editor — second tab on
- * /governance/tool-catalog. Per
- * `specs/ai-gateway/governance/template-ottl-authoring.feature`:
- *
- *   - Platform-published rows render read-only with a 'View OTTL'
- *     button + a 'Clone to customise' affordance.
- *   - Org-authored rows render editable with 'Edit OTTL' (opens drawer
- *     containing the OttlEditor wired to validateOttl) + 'Archive'.
- *   - Admins can also author a brand-new template via 'New template'.
- *
- * The OttlEditor reuses the same validation pipeline as IngestionSource
- * authoring (proxies to gateway pkg/ottl). No new validation surface.
- */
+/** Admin ingestion templates editor; read/edit states per template-ottl-authoring.feature. */
 type EditorState =
   | { kind: "view"; templateId: string; slug: string }
   | { kind: "edit"; templateId: string; slug: string; sourceType: string }

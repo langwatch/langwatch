@@ -1,18 +1,7 @@
 /**
  * @vitest-environment jsdom
  *
- * The breakdown panels under the cost lanes, mounted through the real page.
- *
- * Two things are under test, and both are about what the screen is allowed to
- * claim. First, the panels have to survive a real answer: the activity reads
- * hand back a wrapper object, not a list, and a panel that maps over the
- * wrapper throws the instant real data arrives — which no test caught, because
- * every existing mock answers `undefined`. Second, a panel that has not heard
- * back must not print a figure: "0 users" and "nothing in this window" are both
- * measurements, and neither has been made while a read is still in flight or
- * was never permitted to run.
- *
- * Spec: specs/governance/governance-cost-screen.feature
+ * Tests cost breakdown panels handle real answers and loading states correctly.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import {
@@ -50,20 +39,7 @@ const harness = vi.hoisted(() => ({
     isError: false,
     refetch: undefined as unknown,
   },
-  /**
-   * The cost summary's lanes: whether any source is reporting a figure.
-   *
-   * Configurable because this is the screen's signal for whether anything is
-   * connected at all, and the adoption headcount cannot state its own absence
-   * — see the "count that cannot state its own absence" section of the spec.
-   *
-   * Lanes rather than `unavailableReason`, because the organization the defect
-   * was reported on has neither structural reason set: it has a cost store and
-   * a governance project, and simply nothing flowing through them. Keying the
-   * fixture on the reason alone would have reproduced a case the live screen
-   * was not in. Defaults to reporting, which is what every test here assumed
-   * before it was a variable.
-   */
+  /** Cost summary lanes; defaults to reporting. */
   lanesReport: true,
   /**
    * The billed lane's per-provider window totals, as the summary read answers
@@ -598,19 +574,7 @@ describe("the cost breakdown panels", () => {
 
   describe("given the window answers with days but nothing spent on any of them", () => {
     it("says the window is empty rather than drawing bare axes", () => {
-      // The read answered and the window holds nothing. That is a FINDING and
-      // the panel is allowed to say so — but it must say it in words, because
-      // a time chart handed an answer with no series to plot draws an axis
-      // with nothing above it, which reads as a chart that broke rather than
-      // as a quarter nobody spent in.
-      //
-      // The panel under this name used to chart spend by team off the metered
-      // trace store, and the case was a window of 365 empty buckets from a
-      // read that answers a row per day whether or not anything was spent.
-      // That read is gone. The billed rollup this now folds only ever answers
-      // days it holds cells for, so the same case arrives as no rows at all —
-      // and the assertion below is unchanged, which is the point of moving it
-      // rather than deleting it.
+      // Panel shows empty state, not bare axes, when window has nothing spent.
       harness.activity.summary = {
         activeUsersThisWindow: 4,
         newUsersThisWindow: 1,
@@ -689,16 +653,7 @@ describe("the cost breakdown panels", () => {
       };
     });
 
-    /**
-     * The panel keeps its place in the grid and says whose spend it is.
-     *
-     * WHAT IT DRAWS IS NOT CHECKED HERE. It is a chart now, and a chart draws
-     * nothing under a renderer with no layout: its container measures zero
-     * and recharts declines to plot into it. The arithmetic behind the bars —
-     * the split per period, the span each bar covers — is checked directly in
-     * `src/components/governance/costs/__tests__/providerPeriods.unit.test.ts`,
-     * where it can be.
-     */
+    /** Panel renders under heading beside its lane. */
     it("renders under its own heading beside the lane it splits", () => {
       renderScreen();
 

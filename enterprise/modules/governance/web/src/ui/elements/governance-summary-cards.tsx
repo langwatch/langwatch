@@ -1,27 +1,4 @@
-/**
- * The other resume shape: several small cards rather than one strip.
- *
- * A strip is for figures that are peers — four counts of four different
- * things, each one line long. Cards are for a summary whose parts have
- * different shapes: a headline count with a trend under it, a short list of
- * statuses, a ranking. Both answer "what is in here", so both live beside each
- * other, and a page picks the one that fits what it has to say rather than
- * inventing a third.
- *
- * Composable on purpose. The row takes cards, a card takes anything, and the
- * two list rows below are supplied because every caller was otherwise going to
- * hand-roll a coloured dot and a right-aligned percentage. Nothing here
- * queries, totals or knows what a figure means.
- *
- * Spec: specs/ai-governance/dashboard/governance-summary-strip.feature
- *
- * Ported from `platform/app/src/components/governance/summary/GovernanceSummaryCards.tsx`.
- * The status palette (`DOT`) is inlined below rather than imported from
- * `@langwatch/langy-web` — that would be a new cross-feature edge from
- * `enterprise-governance-web` into `langy-web`, which `boundary-edge-baseline`
- * refuses to grow. The three values are copied from
- * `modules/langy/web/src/model/asaplangy-tokens.ts` (`DOT`).
- */
+/** Summary cards for varied-shape summaries; composable, non-querying. */
 
 import { Box, HStack, Text, VStack } from "@chakra-ui/react";
 import type { PropsWithChildren, ReactNode } from "react";
@@ -103,15 +80,7 @@ export function GovernanceSummaryCard({
   );
 }
 
-/**
- * One line of a card's status list: a dot, a count, and what those items are
- * doing.
- *
- * The dot repeats what the words already say rather than replacing them. A
- * list that reported health in colour alone would report nothing at all to a
- * reader who cannot separate the two, so the dot is marked decorative and the
- * sentence carries the meaning.
- */
+/** Status row with decorative dot; label carries the meaning for accessibility. */
 export function GovernanceSummaryStatusRow({
   tone,
   value,

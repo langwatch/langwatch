@@ -1,20 +1,7 @@
 /**
  * @vitest-environment jsdom
  *
- * Where the Agents page's summary strip sits, and when it is not there at all.
- *
- * What the strip SAYS is decided by `summarizeAgentFleet` and asserted without
- * rendering in
- * `components/governance/agents/__tests__/agentSummary.unit.test.ts`. This file
- * asserts only what a rendering test can: that the four cards are above the tab
- * bar and below the sample banner, that no filter chip is above them, and that
- * a page with nothing to summarize shows no strip rather than a strip of em
- * dashes.
- *
- * The page issues no query — there is no organization-wide agent read — so the
- * only lever here is the reader's sample choice in session storage.
- *
- * Spec: specs/ai-governance/dashboard/agents-page.feature
+ * Tests for agents page summary strip positioning and empty state.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, within } from "@testing-library/react";

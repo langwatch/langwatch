@@ -1,27 +1,7 @@
 /**
  * @vitest-environment jsdom
  *
- * What the Agents page holds: the sample agents that fill an empty page, the
- * two layouts they can be drawn in and the switch between them, the register
- * action that opens the connect-from-code flow rather than a form, and the
- * three chips that filter and sort through the address.
- *
- * THE LIST IS THE DEFAULT, so `renderAgentsAt` lands on it and the tests about
- * the CARD ask for the grid by address (`renderAgentsInGrid`). Naming the
- * layout at each render is deliberate: a test that asserted on cards without
- * saying which layout it wanted would start passing or failing for a reason
- * it never stated.
- *
- * The page issues no query — there is no organization-wide agent read — so
- * everything here is driven from the address and from session storage, which
- * is where the reader's sample choice lives.
- *
- * REGISTERING IS A DRAWER NOW, and a drawer is mounted by `CurrentDrawer` at
- * the app root rather than by this page. So the register tests here assert
- * the request — which drawer the page asks for, and what it leaves in the
- * address — and never the snippet, which belongs to the drawer's own test.
- *
- * Spec: specs/ai-governance/dashboard/agents-page.feature
+ * Tests for agents page UI; layouts, register drawer, address-driven filters.
  */
 import { Badge, Button, ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import {
@@ -190,16 +170,7 @@ function renderAgentsWithReferences(entry = "/governance/agents") {
   );
 }
 
-/**
- * Opens a filter chip by its label and picks one of its options.
- *
- * The chip is found among the page's buttons rather than by its text alone.
- * "Ownership" names two things on this page — the chip that narrows the agents,
- * and the summary card above them that counts owned against unclaimed — and a
- * bare text query cannot tell a control from a heading. Only one of the two is
- * pressable, which is the distinction the reader makes too. "Source" is now a
- * third: the list heads a column with it.
- */
+/** Opens filter chip by role and text to distinguish from heading. */
 async function pickFilter(chipLabel: string, option: string) {
   const user = userEvent.setup();
   const chip = screen

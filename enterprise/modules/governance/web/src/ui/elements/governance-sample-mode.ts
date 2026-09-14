@@ -1,27 +1,9 @@
-/**
- * One explicit sample choice for the whole governance module.
- * Defaults to the organization's own data, including empty and loading states.
- * Pages replace their displayed datasets while samples are enabled.
- *
- * Ported from `platform/app/src/components/governance/sample/sampleMode.ts`.
- * Not itself in the manifest's port list, but every screen that renders
- * `SampleDataToggle`/`SampleDataBanner` (`./sample-data-controls.tsx`) needs
- * this hook to make them do anything, so it travels with them.
- */
+/** Governance module's shared sample-mode choice with session storage state. */
 import { useCallback, useSyncExternalStore } from "react";
 
 // ---- The one shared choice ----------------------------------------------
 
-/**
- * Where the section's single answer is kept.
- *
- * Session storage, not local: opting in is a decision about this sitting, not
- * a preference that follows you back tomorrow — the same line the trace
- * explorer draws for its sample traces.
- *
- * One key, no page suffix. The suffix is what used to make each page ask
- * again.
- */
+/** Session storage key for sample-mode choice; per-session, not persistent. */
 export const SAMPLE_CHOICE_KEY = "governance.sample";
 
 /**
@@ -68,15 +50,7 @@ export function writeSampleChoice(optIn: boolean | null): void {
   for (const notify of [...listeners]) notify();
 }
 
-/**
- * Subscribe to the shared choice.
- *
- * Two toggles are on screen at once more often than it looks — a page header's
- * and a panel's own "see what this will look like" — and one moving while the
- * other stays put is the bug this exists to prevent. Navigation between
- * governance pages remounts everything, so storage carries the choice there;
- * this carries it between whatever is mounted right now.
- */
+/** Subscribe to the shared choice; keeps multiple toggles in sync. */
 export function subscribeToSampleChoice(listener: () => void): () => void {
   listeners.add(listener);
   return () => listeners.delete(listener);

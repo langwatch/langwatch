@@ -1,26 +1,7 @@
 /**
  * @vitest-environment jsdom
  *
- * What sample mode fills in on the Costs page, and what it takes away.
- *
- * The sibling suite `costSampleMode` covers WHEN the invented panels appear —
- * the section-wide rule about empty screens and explicit choices. This one is
- * about what the screen looks like once they have, and the two claims it makes
- * are stronger than "some extra panels rendered":
- *
- *   1. NO FAILURE IS DRAWN. A reader who asked to see what a filled-in Costs
- *      page looks like is not answered by a red alert across the top of it,
- *      and "could not be loaded" is only another way of saying the screen has
- *      nothing on it. Every real alert returns the moment the toggle goes off.
- *   2. NOTHING INVENTED IS UNLABELLED. Suppressing the failure is only safe
- *      because the banner says nothing on the page is real. It says it once,
- *      for the whole screen, and the per-panel badges stand down under it
- *      rather than repeating it sixteen times — so the assertion that they are
- *      absent is only sound while the assertion that the banner is present
- *      holds, and the two are made in the same test on purpose.
- *
- * Spec: specs/governance/governance-cost-screen.feature
- *       specs/ai-governance/dashboard/governance-ui-controls.feature
+ * Tests sample mode on Costs page; no failures drawn, all sample panels labeled.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, within } from "@testing-library/react";
@@ -395,16 +376,7 @@ describe("the cost screen in sample mode", () => {
     });
   });
 
-  /**
-   * The one read that answers in days rather than in figures.
-   *
-   * `spendOverTime` emits a bucket per day across the window whether or not
-   * anything was spent, so an empty window arrives as hundreds of buckets of
-   * nothing. Every emptiness test on the page is a length check, so this read
-   * alone looked answered-and-full while its neighbours looked empty — and
-   * "Cost over time" sat saying it had nothing in the middle of a
-   * screen of invented figures.
-   */
+  /** Over-time read emits days vs figures; unique in empty-window behavior. */
   describe("given the over-time read answered days but no figures", () => {
     beforeEach(() => {
       harness.overTimeAnswersEmptyDays = true;
@@ -429,16 +401,7 @@ describe("the cost screen in sample mode", () => {
     });
   });
 
-  /**
-   * The other half of the suppression, asserted on the mark itself.
-   *
-   * The page cannot reach this state today — a panel is only ever invented
-   * while sample mode is on, and sample mode is what raises the banner — so
-   * there is no screen to drive it through. That is exactly why it is worth
-   * pinning: the day someone renders an invented panel on a measured page,
-   * this is the guarantee that stops it going out unmarked, and nothing on
-   * the page would notice if it quietly stopped holding.
-   */
+  /** Guarantees invented panel is marked even without banner. */
   describe("given an invented panel with no banner above it", () => {
     /** @scenario "The sample mark returns wherever no banner speaks for it" */
     it("marks it, because nothing else on the screen would", () => {

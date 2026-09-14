@@ -1,17 +1,4 @@
-/**
- * One region of a page the viewer does not hold the permission for.
- *
- * Harvested from `platform/app/src/components/PermissionRequiredNotice.tsx`.
- * The structure and the tone are unchanged; what could not come with it is the
- * copy source. The platform component reads the `insufficient_permissions`
- * entry out of the client presentation registry, and that registry is a
- * `platform/app` module of ~90 entries whose harvest is its own slice. The two
- * lines it produced for this code are stated here instead, so the panel still
- * reads the way a server refusal for the same code reads.
- *
- * Not an error state: nothing failed, so the tone is muted and there is no
- * error id to quote. A query that fails anyway still renders the error alert.
- */
+/** Permission required notice with muted tone; not an error state. */
 
 import { Box, HStack, Stack, Text } from "@chakra-ui/react";
 import { Lock } from "lucide-react";

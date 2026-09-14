@@ -1,33 +1,7 @@
 /**
  * @vitest-environment jsdom
  *
- * The agents page's address contract. It was a tabbed shell — Agents and
- * Applications — and is not any more: the Applications pane read nothing and
- * listed nothing, so it went, and with one pane left the tab strip went with
- * it. What sits in the address now is which layout the fleet is drawn in
- * (?view=), under the contract the tab parameter had. These tests mount the
- * real page inside a memory router so the assertions run against the address
- * the user sees: the default is never written to the URL, and an unknown
- * value degrades to the default instead of a blank pane. The page reads the
- * organization's agents through `governanceAgents.list`, and this file also
- * holds what it does with the three answers that are not a list: none, not
- * yet, and a failure.
- *
- * Most of these run with sample mode turned off, because the empty pane is
- * what the page shows without it. Sample mode now fills an empty governance
- * page by default (the section-wide rule in
- * specs/ai-governance/dashboard/governance-ui-controls.feature), so the
- * page's own sentence is only on screen once the reader has said no to the
- * sample rows. The unknown-layout case is the exception and turns sample mode
- * back on for itself: a page with nothing on it has no layout to fall back
- * to, so the assertion would pass without proving anything. Sample mode has
- * its own suite next door.
- *
- * Only the boundaries are mocked: layout chrome, feature flag, and the tRPC
- * client (which records every query the page would issue).
- *
- * Specs: specs/ai-gateway/governance/governance-home-routing.feature,
- * specs/ai-governance/dashboard/agents-page.feature
+ * Tests for agents page address routing; layout (?view=) parameter and three query answer states.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
@@ -260,19 +234,7 @@ describe("the agents page address contract", () => {
       expect(screen.getByRole("heading", { name: "Agents" })).toBeVisible();
     });
 
-    /**
-     * The window before any read has started, which the loading branch missed.
-     *
-     * Every governance read is disabled until the organization resolves, and a
-     * disabled query reports `isLoading: false`. The page therefore had an
-     * un-asked read and no loading flag, fell through to the empty state, and
-     * told the reader no agent had registered — a claim about an organization
-     * it had not identified yet.
-     *
-     * `queryResults` is deliberately left alone here. The point is that the
-     * reads were never issued, so overriding their results would describe a
-     * different situation than the one that was broken.
-     */
+    /** Page waits for organization resolution instead of claiming empty with unresolved org. */
     it("waits rather than claiming an unresolved organization has no agents", () => {
       harness.organization = undefined;
       renderAgentsAt(["/governance/agents"]);

@@ -1,22 +1,7 @@
 /**
  * @vitest-environment jsdom
  *
- * The sample panels' visibility, mounted through the real page.
- *
- * Seven of the panels on this screen are invented — nothing in the platform
- * measures agents, seats, forecasts, tokens or questions yet. They exist to
- * show the shape of the screen to an organization that has nothing on it. The
- * moment that organization has real cost figures, invented ones sitting beside
- * them stop being an illustration and start being a hazard: two panels, same
- * typography, same money format, and only a small badge separating what was
- * measured from what was made up.
- *
- * So the rule under test is the one the trace explorer already applies to
- * sample traces — samples fill an empty screen and get out of the way once
- * there is something real to look at, and an explicit choice by the reader
- * beats both.
- *
- * Spec: specs/governance/governance-cost-screen.feature
+ * Tests sample panels visibility; fill empty screens, vanish when real data arrives.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
@@ -98,16 +83,7 @@ vi.mock("~/utils/api", () => ({
 
 import CostsPage from "../costs";
 
-/**
- * An invented FIGURE. If this is on screen, samples are on.
- *
- * It used to be a panel title — "Tokens over time" — which worked only while
- * the invented panels were the only ones bearing those titles. They are drawn
- * in both modes now, empty outside sample mode, so a title says nothing about
- * which mode the screen is in. What still does is the invented content: no
- * real organization has an agent by this name, so it appears when and only
- * when the screen is showing made-up money.
- */
+/** Invented figure constant to test sample mode visibility. */
 const A_SAMPLE_FIGURE = "support-copilot";
 
 const screenTree = () => (

@@ -1,23 +1,4 @@
-/**
- * The AI Governance experience, as the browser application mounts it.
- *
- * ADR-004 makes a screen an owner-only export named after the frontend feature
- * that composes it, so the whole section is one entry. What it exposes is a
- * loader per page rather than eleven components: the section is eight thousand
- * lines and the inventory page alone is three thousand, and a barrel of
- * components would put all of it in one chunk the moment any address under
- * /governance is opened. A loader keeps the split the application already had.
- *
- * The keys are this package's names for its own pages. Which URL each answers
- * is `apps/ui`'s to decide — the route table names a page key, the frontend
- * feature maps that key onto one of these, and neither half learns the other's
- * vocabulary.
- *
- * `governanceApi` and `GovernanceHostProvider` are the two things the owning
- * frontend feature has to mount around them: the tRPC Provider the screens'
- * hooks run on, and the port that answers for the session, the address, the
- * plan and the toasts.
- */
+/** AI governance screens as loaders, keyed by page name; mount with GovernanceHostProvider. */
 
 import type { ComponentType } from "react";
 

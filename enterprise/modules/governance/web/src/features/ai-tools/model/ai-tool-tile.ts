@@ -1,14 +1,4 @@
-/**
- * AI Tools Portal - tile type contract.
- *
- * Mirrors Sergey's `AiToolEntry` Prisma model (Phase 7 backend). See:
- *   .claude/AI-TOOLS-PORTAL-LANE-B-UI.md
- *   <Sergey's Phase 7 architecture sketch in #langwatch-ai-gateway>
- *
- * Lane-B holds this shape locally as the source of truth for components
- * until Sergey's `api.aiTools.list` lands; B9 swaps the import to the
- * generated tRPC type.
- */
+/** Temporary local tile type; mirrors the backend AI tools model until tRPC type lands. */
 
 export type AiToolTileType = "coding_assistant" | "model_provider" | "external_tool";
 

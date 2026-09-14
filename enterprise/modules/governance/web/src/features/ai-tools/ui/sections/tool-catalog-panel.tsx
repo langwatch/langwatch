@@ -8,23 +8,7 @@ import { AiToolEntryDrawer } from "./ai-tool-entry-drawer.tsx";
 import { IngestionTemplatesEditor } from "./ingestion-templates-editor.tsx";
 import { ToolCatalogEditor } from "./tool-catalog-editor.tsx";
 import { useGovernanceScope } from "../../../../behavior/governance-session.ts";
-/**
- * The two inner tabs of the Catalog pane, per the
- * `ingestion-templates-catalog.feature` @admin-readonly scenario:
- *   - Tool Tiles: AiToolEntry catalog (drag-reorder + add/edit). Coding-
- *     assistant tiles also carry the CLI path policy (gateway / OTLP
- *     direct), which used to live in a separate "CLI Paths" tab.
- *   - Ingestion Templates: READ-ONLY catalog of platform-published
- *     IngestionTemplate rows. Admin sees what's shipped + 'View OTTL' for
- *     transparency. No edit/disable/fork v1; admin authoring lands v2.
- *
- * The tile drawer lives with the panel, not here — this component only
- * reports which tile was asked for. That does not make the strip cheaper:
- * opening the drawer sets state on the panel, and the strip re-renders
- * with it (measured: one render before, two after). What it does buy is
- * that the strip is only ever re-rendered, never remounted, so the
- * selected tab and any open template drawer survive.
- */
+/** Two-tab catalog pane: Tool Tiles (editable) and Ingestion Templates (read-only). */
 function CatalogTabs({
   organizationId,
   onAddTile,
@@ -76,33 +60,7 @@ function CatalogTabs({
   );
 }
 
-/**
- * The tool-catalog editor body — the tile editor and the ingestion-template
- * catalog, gating on the catalog's own grant, owning the tile drawer's state,
- * and delegating the tab strip to `CatalogTabs`.
- *
- * NOT MOUNTED ANYWHERE TODAY, and what is left for it to own has narrowed.
- * The Inventory page's Catalog pane lists the same registry again and opens
- * the same `AiToolEntryDrawer` to register and edit an entry, so this
- * composition is no longer the only way to reach a tile.
- *
- * This file itself owns the read-only ingestion-template catalog, the grant
- * check and the tab strip, and nothing else. The two ARRANGING jobs the
- * Inventory pane deliberately does not offer — drag-to-reorder, which sets the
- * order the personal portal renders in, and the starter-pack import — are
- * wired in `ToolCatalogEditor`, which this panel mounts and which is where
- * every `aiTools` mutation on this route lives. An inventory is read, not
- * arranged, which is why that composition stayed here.
- *
- * Kept rather than deleted until it is given a home of its own (Settings, or
- * the AI Gateway, where the tile's gateway-versus-direct choice actually
- * bites). See specs/ai-governance/dashboard/inventory-catalog.feature.
- *
- * Both tabs read through `aiTools:manage`, the catalog's own grant. The
- * hosting page opens on `governance:view`, so a delegated viewer reaches
- * the pane and is told which grant the catalog needs — the notice renders
- * inside the pane, with the inventory tab strip still in place.
- */
+/** Catalog pane with tile editor, ingestion templates, and aiTools:manage grant check. */
 export function ToolCatalogPanel() {
   const { organization, hasAnyPermission } = useGovernanceScope();
   const canManageCatalog = hasAnyPermission("aiTools:manage");

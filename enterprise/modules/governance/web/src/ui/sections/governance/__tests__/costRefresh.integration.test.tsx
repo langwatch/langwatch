@@ -1,19 +1,7 @@
 /**
  * @vitest-environment jsdom
  *
- * Bringing the cost screen up to date, and refusing to do it unasked.
- *
- * The figures on this screen go stale the moment a pull lands, and nothing on
- * the page ever said so or offered to look again. Refreshing has to bring the
- * collection state with it: a figure brought up to date beside a warning that
- * is not is a worse screen than one where both are old together.
- *
- * The reads are mocked at the tRPC seam and every call is RECORDED — which
- * procedure, with which arguments, under which options — because the two
- * things under test here are exactly that: which reads a refresh re-issues,
- * and which reads the screen issues again on its own.
- *
- * Spec: specs/governance/governance-cost-screen.feature
+ * Tests cost screen refresh and collection state updates.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import {
@@ -204,16 +192,7 @@ const renderScreen = () =>
     </ChakraProvider>,
   );
 
-/**
- * Every read this screen is allowed to issue, by name.
- *
- * Named rather than counted, because a count breaks on the next read the
- * screen legitimately gains and says nothing about which one went missing.
- * The model panel is `governanceCost.spendByModel`, not a second grouping of
- * `spendOverTime`: it reads the billed rollup, which is where the money this
- * deployment has actually lands. Being on a different router is not a reason
- * for the refresh control to skip it.
- */
+/** Named list of all screen reads; named not counted. */
 const READS_ON_THE_SCREEN = [
   "activityMonitor.spendByDepartment",
   "activityMonitor.spendByUser",

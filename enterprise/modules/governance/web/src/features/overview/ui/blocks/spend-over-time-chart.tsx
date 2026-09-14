@@ -34,16 +34,7 @@ const GROUP_LABEL: Record<GroupBy, string> = {
   model: "model",
 };
 
-/**
- * Stacked-area chart showing daily spend bucketed by group (team /
- * user / model). Answers the admin's "how is AI usage trending across
- * the org" question at a glance. Each series carries a stable hash-
- * derived color (see `getHexColorForString`) so the same team paints
- * the same hue across every governance surface.
- *
- * Empty state is honest: when `buckets` is empty (no events in
- * window) we render the empty-state copy, not a fake-flat-line chart.
- */
+/** Stacked-area chart showing daily spend by group; each series has stable hash-derived color. */
 export function SpendOverTimeChart({
   buckets,
   groupBy,

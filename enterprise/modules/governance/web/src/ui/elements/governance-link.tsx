@@ -1,15 +1,4 @@
-/**
- * A link, inside a package that may not import a router.
- *
- * `~/components/ui/link` renders its internal href through the application's
- * `NextLink`, which is `react-router`'s Link underneath — an import ADR-004
- * seals off from a feature-web package. So this one keeps the anchor, which is
- * what makes a link a link (open in a new tab, copy the address, middle-click),
- * and hands an ordinary left-click to the host's navigate so the page still
- * changes without a full reload.
- *
- * The prop shape is the platform component's, so no call site changed.
- */
+/** Link using anchor tag with navigate handler; works without importing router. */
 
 import { Link as ChakraLink } from "@chakra-ui/react";
 import type { ComponentProps, MouseEvent } from "react";

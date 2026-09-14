@@ -8,16 +8,7 @@ import {
   Wrench,
 } from "lucide-react";
 
-/**
- * Default lucide presets for internal-tool tiles. The drawer surfaces
- * these as a horizontal picker before the Upload button — most admins
- * pick a built-in glyph; only the rare bespoke tool needs a custom
- * upload (rchaves bug-bash spec: "we could offer them a few default
- * options to chose from before uploading their own").
- *
- * Stored as `preset:tool:<key>` on AiToolEntry.iconAsset and resolved
- * back to the lucide ReactNode in TileIcon.
- */
+/** Default lucide presets for internal-tool tiles; stored as `preset:tool:<key>`. */
 export const TOOL_KINDS = ["wrench", "globe", "book", "message", "box", "sparkles"] as const;
 
 export type ToolKind = (typeof TOOL_KINDS)[number];

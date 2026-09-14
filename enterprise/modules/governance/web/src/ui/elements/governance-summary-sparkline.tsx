@@ -1,27 +1,4 @@
-/**
- * The shape of a series, at a glance, with no axes and no numbers.
- *
- * WHY THIS DRAWS ITS OWN POLYLINE rather than reaching for a chart library.
- * The section already has a cost sparkline elsewhere, and it formats every
- * value as money and labels it "Spend" — hovering a fleet-size line with it
- * would tell the reader they had spent fourteen dollars on fourteen agents. It
- * also names its gradient with a fixed element id, which stops being unique
- * the moment two of them share a page. Rather than widen that chart into a
- * general one, this draws the one thing a summary card needs, as a polyline.
- *
- * THE COLOUR IS A CHART COLOUR. `fg.*` is a token for READING TEXT: at light
- * theme it resolves near black, which is how a monochrome sparkline reads as
- * a black mark on grey rather than a picture that belongs to a coloured
- * product. The default here is `blue.solid`, what the section gives a
- * single-series mark that has no name to hash into the chart palette.
- *
- * QUIET IS A MATTER OF WEIGHT, NOT OF HUE. A 1.5px stroke is already a
- * footnote to the figure above it; draining the colour buys restraint that
- * the thinness gives for free. Callers may pass another palette colour when a
- * card's mark stands for a named series, but not to make it quieter.
- *
- * Ported from `platform/app/src/components/governance/summary/GovernanceSummarySparkline.tsx`.
- */
+/** Sparkline showing series shape with no axes or numbers; drawn as polyline. */
 
 import { Box } from "@chakra-ui/react";
 

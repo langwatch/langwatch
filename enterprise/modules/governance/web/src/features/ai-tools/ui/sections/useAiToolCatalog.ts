@@ -7,21 +7,7 @@ import {
 } from "../../../../behavior/governance-feedback.ts";
 import { api } from "../../../../behavior/governance-api.ts";
 
-/**
- * The organization's AI tool registry, read and edited.
- *
- * Two surfaces drive the same registry — the catalog editor and the Inventory
- * page's Catalog pane — and both need the same admin list, the same
- * publish/unpublish, and the same permanent delete behind a confirmation. They
- * had one copy of that wiring between them until the Catalog pane came back;
- * a second copy is exactly the divergence that leaves one surface invalidating
- * a cache the other one reads.
- *
- * Reordering and the starter-pack import stay with the editor: they are that
- * screen's own job, and neither has a second caller to share them with.
- *
- * Spec: specs/ai-governance/dashboard/inventory-catalog.feature
- */
+/** Shared hook for AI tool registry; used by catalog editor and Inventory pane. */
 export function useAiToolCatalog({
   organizationId,
   enabled = true,

@@ -1,26 +1,4 @@
-/**
- * The resume strip a governance page pins above its tabs.
- *
- * ONE STRIP, MANY PAGES. The inventory, the people list and the agents fleet
- * each open with the same question — how much of this is there, and how much
- * of it needs me — and each was about to answer it with its own row of
- * numbers. The section already carries the scar of that: the shared empty
- * state exists because the same requirement landed on two governance pages in
- * one round and produced two divergent components. So the shape is built once
- * here and the three pages import it.
- *
- * WHAT IT HOLDS AND WHAT IT REFUSES TO HOLD. Every figure arrives as a prop,
- * already measured and already formatted by whoever measured it. This
- * component runs no query, sums nothing and rounds nothing. That is not
- * modesty about layout code, it is the section's rule about numbers: a figure
- * the read side could not total arrives as null and is drawn as an em dash,
- * and a strip that quietly substituted a zero for that would report an
- * unmeasured organization as an empty one.
- *
- * Spec: specs/ai-governance/dashboard/governance-summary-strip.feature
- *
- * Ported from `platform/app/src/components/governance/summary/GovernanceSummaryBar.tsx`.
- */
+/** Summary strip showing pre-formatted figures; holds no queries or sums. */
 
 import { Box, HStack, SimpleGrid, Text, VStack } from "@chakra-ui/react";
 import type { ReactNode } from "react";
@@ -51,18 +29,7 @@ export interface GovernanceSummaryBarItem {
   hint?: ReactNode;
 }
 
-/**
- * A row of figures on one card, evenly spread and centred.
- *
- * Even spread rather than left packing, because the strip is read as a set of
- * peers: four figures bunched at the left of a widescreen card invite the
- * reader to treat the first as the headline and the rest as footnotes, and
- * these are four answers to four different questions.
- *
- * It wraps to two columns and then to one rather than scrolling sideways. A
- * figure that has scrolled off the edge of a summary is a figure the summary
- * did not give anyone.
- */
+/** Row of evenly-spread figures that wraps to columns, not scroll. */
 export function GovernanceSummaryBar({
   items,
   testId,

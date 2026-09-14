@@ -1,19 +1,7 @@
 /**
  * @vitest-environment jsdom
  *
- * What the department chip says, against what the screen actually filtered.
- *
- * The department options are built from the response, so changing the time
- * frame can drop the department the reader picked. When that happens the chip
- * has no name to show and falls back to "All departments" — and the selection
- * itself is a separate piece of state that nothing resets. The two disagree,
- * and the reader is shown an empty panel labelled as every department's spend.
- *
- * These tests hold the label and the filtered rows to the same story, whichever
- * side the fix moves.
- *
- * Issue: #7767
- * Spec: specs/governance/governance-cost-screen.feature
+ * Tests department chip consistency with actual screen filtering.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";

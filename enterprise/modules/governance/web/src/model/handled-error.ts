@@ -1,16 +1,4 @@
-/**
- * The handled-error payload, as much of it as this family reads.
- *
- * `platform/app/src/features/errors/logic/readHandledError.ts` validates the
- * whole envelope from both boundaries and hands back nine fields. One screen
- * asks it one question — whether the failure that came back is a 404, so the
- * ingestion-source page can tell "no such source" apart from "we could not
- * reach the server" — and that question is what travels here.
- *
- * The full reader belongs with the presentation registry it feeds, and both
- * move together in a later slice. Trusts nothing: a misconfigured or older
- * server must not be able to crash a render by omitting a field.
- */
+/** Read handled-error payload to extract code and status for local error handling. */
 
 export type GovernanceHandledError = {
   code: string;

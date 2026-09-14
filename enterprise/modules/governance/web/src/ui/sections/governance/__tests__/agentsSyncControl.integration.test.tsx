@@ -1,27 +1,7 @@
 /**
  * @vitest-environment jsdom
  *
- * The agents page's sync control, and the two empty states it changes.
- *
- * WHAT THIS FILE IS REALLY ABOUT is a control that cannot report its own
- * result. Pressing it records a request; a pipeline calls the provider later
- * and the answer reaches the page only through the next read. Every assertion
- * here is about the page saying what it STARTED and never what it found, and
- * about no unpressable state being silent about why.
- *
- * The other half is the empty table, and it now has FOUR readings rather than
- * two: no provider connected, none asked yet, every provider answered with
- * none, and a provider that refused. The last pair is what this file guards
- * hardest. A refusal and an empty tenant look identical on a page showing no
- * agents and demand opposite things of the reader — one means nothing is
- * wrong, the other means a credential is dead — so the assertions below are
- * written to fail if the two panes ever converge, not merely to check that
- * each exists.
- *
- * Only the boundaries are mocked: layout chrome, feature flag, toasts, and the
- * tRPC client.
- *
- * Spec: specs/ai-governance/dashboard/agents-page.feature
+ * Tests for agents sync control and empty state distinctions (refusal vs empty).
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, within } from "@testing-library/react";

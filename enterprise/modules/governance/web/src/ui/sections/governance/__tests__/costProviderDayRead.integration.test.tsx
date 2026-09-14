@@ -1,23 +1,7 @@
 /**
  * @vitest-environment jsdom
  *
- * What the cost-by-provider panel shows when its read does not answer.
- *
- * The panel renders nothing at all on an empty row list, which is right for a
- * window nobody spent in and wrong for a read that failed: a missing panel
- * sitting between filled neighbours reads as "no spend" rather than as "we
- * could not load this". So the failure has to be carried into the panel
- * separately from the rows, and shown as the unrefreshed marker every other
- * panel on this screen uses.
- *
- * The third case below is the one that earns the guard. On a refetch failure
- * the rows from the last successful read are still in hand, so a failure and
- * a drawable list are simultaneously true — and the branch that draws real
- * figures has to stand down anyway. A version of the page that leans on the
- * row list being empty whenever the read failed passes the first two cases and
- * fails this one, which is exactly the simplification worth catching.
- *
- * Spec: specs/governance/governance-cost-screen.feature
+ * Tests cost-by-provider panel failure states and stale data handling.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, within } from "@testing-library/react";
