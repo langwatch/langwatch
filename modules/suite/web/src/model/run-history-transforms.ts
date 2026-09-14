@@ -55,6 +55,9 @@ function categorizeRunStatus(
     case ScenarioRunStatus.IN_PROGRESS:
     case ScenarioRunStatus.PENDING:
     case ScenarioRunStatus.RUNNING:
+    // The verdict can still change when the evaluator results land, so a
+    // history rollup counts the run as still going, matching the polling set.
+    case ScenarioRunStatus.PENDING_EVALUATION:
       return "in_progress";
     case ScenarioRunStatus.QUEUED:
       return "queued";

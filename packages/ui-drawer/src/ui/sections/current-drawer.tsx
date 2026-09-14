@@ -53,9 +53,21 @@ export type CurrentDrawerProps = {
   drawers: UiDrawerRegistry;
   marginTop?: number;
   restriction?: CurrentDrawerRestriction;
+  /**
+   * Whether this is a development build, as the host's injected page config
+   * reads it — this package cannot ask (`ui-host` depends on it), so the
+   * shell that mounts the drawer answers. Absent means production: the
+   * duplicate-drawer warning stays off.
+   */
+  isDevelopment?: boolean;
 };
 
-export function CurrentDrawer({ drawers, marginTop, restriction }: CurrentDrawerProps) {
+export function CurrentDrawer({
+  drawers,
+  marginTop,
+  restriction,
+  isDevelopment = false,
+}: CurrentDrawerProps) {
   const router = useDrawerRouter();
   // Re-render when complexProps changes without a URL change (e.g. reload
   // re-hydration of a comparison editor's context) so the getComplexProps()
@@ -105,7 +117,7 @@ export function CurrentDrawer({ drawers, marginTop, restriction }: CurrentDrawer
 
   // Dev warning: detect duplicate drawer rendering via DOM check
   useEffect(() => {
-    if (!drawerType || process.env.NODE_ENV !== "development") return;
+    if (!drawerType || !isDevelopment) return;
 
     // Check after render settles
     const timer = setTimeout(() => {
@@ -122,7 +134,7 @@ export function CurrentDrawer({ drawers, marginTop, restriction }: CurrentDrawer
     }, 100);
 
     return () => clearTimeout(timer);
-  }, [drawerType]);
+  }, [drawerType, isDevelopment]);
 
   // Get props from multiple sources:
   // 1. URL query params (serializable props)

@@ -6,6 +6,7 @@
 
 import { NavigationShell, useNavigationTracking } from "@langwatch/navigation-web/chrome";
 import { CurrentDrawer } from "@langwatch/ui-drawer";
+import { useUiDeployment } from "@langwatch/ui-host/capabilities";
 import { installedUiDrawers } from "../../../installed-ui-features";
 import { NavigationHostSection } from "../../../navigation";
 import { UiTraceDrawerMount } from "../../../traces";
@@ -13,10 +14,11 @@ import { useUiOrgQueryParamSelection } from "../../../../behavior/ui-scope-org-p
 import { UiRouteOutlet, useUiMatchedPageKey } from "../../../../ui/sections/ui-route-objects";
 
 export default function UiAppChrome() {
+  const deployment = useUiDeployment();
   return (
     <NavigationHostSection commandBar>
       <UiAppChromeBody />
-      <CurrentDrawer drawers={installedUiDrawers} />
+      <CurrentDrawer drawers={installedUiDrawers} isDevelopment={deployment.isDevelopment} />
       <UiTraceDrawerMount />
     </NavigationHostSection>
   );
