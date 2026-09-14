@@ -1,16 +1,7 @@
 /**
  * @vitest-environment node
- *
- * The local control socket end to end: two app replicas over one Redis, a
- * real `ws` client standing in for `langwatch langy --share-control`, a call
- * dispatched from the replica that does NOT hold the socket, and the same
- * moves again over the long-poll transport. Real Redis and a real session key
- * minted through the approve flow; the API-key directory that issues and
- * resolves it is a stand-in, because this process composes no Langy session
- * key minting of its own. The conversation read and the turn start are faked.
- *
- * @see specs/langy/langy-local-control.feature
- * @see specs/langy/langy-local-permissions.feature
+ * Local control socket end-to-end across two replicas sharing one real Redis.
+ * @see specs/langy/langy-local-control.feature, specs/langy/langy-local-permissions.feature
  */
 
 import { createServer, type Server } from "node:http";

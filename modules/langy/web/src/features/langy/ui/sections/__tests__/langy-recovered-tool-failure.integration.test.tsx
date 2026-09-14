@@ -1,13 +1,8 @@
 /**
  * @vitest-environment jsdom
  *
- * A failed step the turn then recovered from.
- *
- * A filmed run left three red "Running a command failed" cards standing for
- * three self-corrected probes — a flag the command did not take, then the same
- * command without it — beside a reply that had gone on to open a pull request.
- * The reader had to decide about each one.
- *
+ * A failed step the turn then recovered from: a self-corrected probe still renders its own
+ * "Running a command failed" card rather than being hidden by the reply that followed it.
  * @see specs/langy/langy-card-taxonomy.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

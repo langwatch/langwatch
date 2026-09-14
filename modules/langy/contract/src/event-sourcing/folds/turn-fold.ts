@@ -70,7 +70,10 @@ export type LangyTurnToolCall = LangyJsonObject & {
   wait?: LangyTurnWait;
 };
 
-/** The card one tool call put in front of the developer: a permission ask or a question, ridden on the call it belongs to. */
+/**
+ * Card a tool call puts before developer: permission ask or question, ridden
+ * on the call.
+ */
 /** One card the developer's machine put up, as the durable record holds it. */
 export type LangyLocalRecordWait = LangyTurnWait & {
   /** The turn that raised it, so the panel keeps them in turn order. */

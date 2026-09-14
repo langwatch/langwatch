@@ -1,11 +1,6 @@
 /**
  * @vitest-environment node
- *
- * The title generator's two answers. A filmed run lost four of six conversation
- * titles to transient model failures, and nothing ever tried again: the
- * generator swallowed every error and the process treats one request per
- * conversation as final. Failures that a retry can fix must reach the outbox.
- *
+ * A retry-fixable generation failure must reach the outbox, not vanish silently.
  * @see specs/langy/langy-conversation-title.feature
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";

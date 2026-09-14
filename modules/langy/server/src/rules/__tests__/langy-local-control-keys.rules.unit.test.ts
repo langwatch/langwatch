@@ -1,11 +1,6 @@
 /**
- * The Redis key family of local control.
- *
- * Two properties are worth a test rather than a reading: every key carries the
- * shape version, so a later layout cannot read this one's keys, and every key
- * that belongs to one conversation names it, so a folder shared with one chat
- * can never be reached through another.
- *
+ * Redis key family for local control: every key embeds the shape version and
+ * its conversation id, so stale layouts and other chats can't cross-read.
  * @see specs/langy/langy-local-control.feature
  */
 import { describe, expect, it } from "vitest";

@@ -204,9 +204,7 @@ export function useProjectedProgress({
 }
 
 /**
- * Granular streaming state, driven by the event-sourcing turn vocabulary: - `status` (from `status_reported`, e.g. "Analysing 1,204 traces") drives a quiet status row: a brand dot + the line
- * itself. - `metrics` (from metric events) drives a compact statcard whose numbers roll up from 0. - `progress` (from `progress_reported`, 0..1 or 0..100) drives a thin mesh-gradient bar plus
- * a monospace percent (with an optional "· segment 7 / 11" when the turn reports segment framing).
+ * Renders streaming state: status row, metrics statcard, or progress bar from turn events.
  */
 export function StreamingStatusLine({
   status,

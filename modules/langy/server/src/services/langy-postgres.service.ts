@@ -91,7 +91,7 @@ export type LangyServiceCompositionOptions = {
   runtime?: LangyConversationRuntime;
   relay?: LangyRelayCompositionOptions;
   feedbackPromptRedis?: LangyFeedbackPromptRedis | null;
-  /** The block-salvage counter. Absent composes `NullLangyBlockMetricsAdapter`: nothing published. */
+  /** Block-salvage counter; absent composes NullLangyBlockMetricsAdapter (nothing published). */
   blockMetrics?: LangyBlockMetrics;
 };
 

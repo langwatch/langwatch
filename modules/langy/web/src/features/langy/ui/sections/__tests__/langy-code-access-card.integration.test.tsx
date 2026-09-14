@@ -1,17 +1,10 @@
 /**
  * @vitest-environment jsdom
  *
- * The code access card (ADR-129, specs/langy/langy-code-access.feature) — the
- * one question Langy asks before it changes the customer's own program, and
- * the four states the answer puts it in.
- *
- * Every state is read from `langy.getLocalWorkspace`, so the fixtures here are
- * that query's answers rather than tool payloads: the folder can connect after
- * the turn ends and the remembered choice can be cleared elsewhere, and the
- * card has to be right in both cases.
- *
- * Boundary mocks: the tRPC hooks the card calls, and the GitHub connect popup
- * the install path opens.
+ * The code access card's four states (ADR-129). Fixtures are `langy.getLocalWorkspace`
+ * answers, not tool payloads, since the folder can connect and the remembered choice can
+ * clear elsewhere. Boundary mocks: the card's tRPC hooks and the GitHub connect popup.
+ * @see specs/langy/langy-code-access.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";

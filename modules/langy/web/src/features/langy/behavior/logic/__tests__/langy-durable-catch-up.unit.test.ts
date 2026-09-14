@@ -1,7 +1,8 @@
 /**
- * The durable catch-up shared by the freshness signal and the history poll: bring the local turn fold to a target cursor by fetching and folding the event tail.
- * @see specs/langy/langy-frontend-realtime.feature
- *      "A tab whose live stream dropped still converges on the turn"
+ * The durable catch-up shared by the freshness signal and the history poll: bring the local
+ * turn fold to a target cursor by fetching and folding the event tail.
+ * @see specs/langy/langy-frontend-realtime.feature "A tab whose live stream dropped still
+ *      converges on the turn"
  */
 import { LANGY_CONVERSATION_EVENT_TYPES } from "@langwatch/langy-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";

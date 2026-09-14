@@ -1,19 +1,8 @@
 /**
- * The browser's LOCAL turn projection (ADR-059 §2/§3) — the whole
- * snapshot-then-tail state machine in one pure module, mirroring how
- * `turnPhase.ts` holds the whole send/stop machine.
- *
- * The client seeds it from the conversation snapshot (the projection's cursor
- * plus, when a turn is in flight, its id), then folds the durable event tail
- * through the SAME `foldLangyConversationTurn` reducer the server projection
- * runs. Gaplessness and idempotence both come from the cursor: an event at or
- * before the local cursor has already been folded (drop it), anything after
- * advances it. Replaying a tail is therefore always safe — which is what makes
- * the local state debuggable by re-running the reducer over a recorded tail.
- *
- * Only the CURRENT turn keeps a document here: a tail event for a NEW turn
- * replaces the document (past turns are rendered from message history, not
- * from this projection).
+ * Browser's LOCAL turn projection: snapshot-then-tail in one pure module.
+ * Same `foldLangyConversationTurn` reducer as server. Gapless/idempotent via
+ * cursor (drop old events, advance on new). Only current turn stored. See
+ * ADR-059 §2/§3.
  */
 import { compareLangyEventCursors, type LangyEventCursor } from "./contracts/cursor.ts";
 import type { LangyConversationTurnWireEvent } from "./contracts/turn-wire.ts";
@@ -39,14 +28,8 @@ export const initialLangyTurnProjection: LangyTurnProjectionState = {
 };
 
 /**
- * Adopt a conversation snapshot: the projection's cursor, and — when the
- * snapshot says a turn is in flight — which turn, so a refresh mid-turn knows
- * what to reattach to before any tail arrives. Resets the folded document:
- * the snapshot's rendered state (messages, status) supersedes it.
- *
- * NEVER regresses: a re-fetched snapshot at or behind the local fold's cursor
- * (the live tail beat the query) is a no-op — the local fold is the fresher
- * truth and rewinding it would replay-flicker the turn.
+ * Seeds projection from snapshot: cursor + current turn id. Never regresses
+ * (live tail beats query is no-op). Snapshot rendered state supersedes fold.
  */
 export function seedLangyTurnProjection(
   state: LangyTurnProjectionState,

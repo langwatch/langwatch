@@ -1,8 +1,5 @@
-/**
- * LangyTurnRelayAdapter is the successor to runTurn's streaming role and a SECURITY boundary: it verifies
- * each pushed frame, pins it to the connection's turn, dedups replays, and fans it to the live
- * buffer + the durable event log.
- */
+/** LangyTurnRelayAdapter succeeds runTurn's streaming role as a SECURITY boundary: verifies
+ * frames, pins to turn, dedups replays, and fans to live buffer + durable event log. */
 import { describe, expect, it, vi } from "vitest";
 
 import { mintRunToken, signFrame } from "@langwatch/langy-server/streaming/langy-frame-auth";

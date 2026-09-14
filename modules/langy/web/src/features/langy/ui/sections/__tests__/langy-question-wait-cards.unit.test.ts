@@ -1,12 +1,6 @@
 /**
- * A question card built from the WAIT, not from the transcript (ADR-129).
- *
- * A tab that adopted a running turn reads no live stream, and the `question`
- * tool part only reaches its message list when the turn ends. The card was
- * therefore off screen for the whole wait, while the composer asked the reader
- * to answer it, and then came back after the turn with both options empty
- * because the answer had gone to the wait rather than into the transcript.
- *
+ * A question card built from the WAIT, not from the transcript (ADR-129): an adopted tab reads
+ * no live stream, so the card must come from the wait or it's off screen until the turn ends.
  * @see specs/langy/langy-choice-questions.feature
  */
 import type { LangyTurnToolCall } from "@langwatch/langy-contract";

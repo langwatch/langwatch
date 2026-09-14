@@ -98,15 +98,7 @@ function tryReadPartInput(part: unknown): unknown {
 }
 
 /**
- * Parse a `todowrite` input into a normalised item list, shape-tolerant of the two ways
- * the todos can arrive (`{ todos: [...] }` or a bare array) and of a status the tool
- * never promised.
- */
-/**
- * Every status word that means one of the four the tool promised. `todowrite` documents
- * `pending | in_progress | completed | cancelled` and the status crosses the wire as a free
- * string, so a model that writes "done" or "in-progress" used to land every step on `pending`.
- * Kept identical to `normalizeTodoStatus` in the worker's own `todowrite` tool.
+ * Status word mapping: normalize various status strings to the four promised ones.
  */
 const PLAN_STATUS_BY_WORD: Record<string, LangyPlanItemStatus> = {
   pending: "pending",
@@ -139,15 +131,7 @@ export function normalisePlanStatus(status: unknown): LangyPlanItemStatus {
 }
 
 /**
- * The fresher of the two snapshots.
- *
- * The override is the live store's copy of the plan, and it is not always the
- * newer one: if the stream dropped, or this tab adopted the turn late, it can
- * still hold the all-pending list from the first `todowrite` call while the
- * message's own parts already carry the finished steps. `todowrite` rewrites
- * the whole list every call and a step never un-finishes, so more completed
- * steps can only come from a later snapshot, which makes the completed count
- * the one comparison that cannot invent progress.
+ * Fresher snapshot: override may be stale; completed count comparison cannot invent progress.
  */
 function fresherSnapshot({
   override,

@@ -15,28 +15,9 @@ export interface LangyMaintenancePipelineDeps {
   sessionKeyReap: LangySessionKeyReapDeps;
 }
 
-/**
- * Langy credential maintenance, in its own pipeline for the same reason
- * blob_maintenance is in its own: reaping orphaned session keys is neither a
- * conversation concern nor a queue concern, and mounting a sweep where it does
- * not belong is how ownership blurs.
- *
- * WHY THIS EXISTS AT ALL: the reaper was written, tested and routed for cron,
- * and then never scheduled — the chart ships `cronjobs.jobs: {}` on purpose,
- * because every first-party sweep moved onto this worker path. So the backstop
- * its own docstring calls "THE GUARANTEE" had no caller. That cron route is now
- * deleted rather than left as a second way in. (It also threw on every invocation until the
- * tenancy guard learned that a reserved key name is platform-owned; the two
- * defects hid each other, since nothing was calling the endpoint that 500s.)
- *
- * The pipeline carries no events and no commands. A process manager with no
- * event handlers registers no subscriber, so this costs nothing beyond the
- * scheduled wake it exists for.
- *
- * Exactly-once per tick is inherited, not implemented here: the wake commits at
- * the revision it was scheduled at, so when several workers race the same tick
- * one commit wins and the losers stand down.
- */
+/** Langy credential maintenance in its own pipeline (like blob_maintenance): reaping orphaned
+ * session keys is neither a conversation nor queue concern. No events, no commands—costs only the
+ * scheduled wake. Exactly-once per tick inherited: wake commits at scheduled revision. */
 export class EventingLangyMaintenanceAdapter {
   static create(deps: LangyMaintenancePipelineDeps): EventingLangyMaintenanceAdapter {
     return new EventingLangyMaintenanceAdapter(deps);

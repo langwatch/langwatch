@@ -1,13 +1,6 @@
-/**
- * Langy streaming + liveness configuration (ADR-044).
- *
- * Mirrors `scenario.constants.ts`: all magic values for the token buffer,
- * heartbeat, and reconcile timing extracted to named constants.
- *
- * The durability split (ADR-044 part 3): TOKENS live only in the short-lived
- * Redis stream keyed per (conversation, turn); milestones and the final answer
- * are durable events on the aggregate. Nothing here touches the event log.
- */
+/** Langy streaming + liveness configuration (ADR-044). Mirrors scenario.constants.ts.
+ * Durability split: tokens in Redis per (conversation, turn); milestones and answers
+ * are durable aggregate events. Nothing here touches the event log. */
 
 /** Redis keyspace for Langy streaming + liveness (ADR-006 hash tags). */
 export const LANGY_STREAM = {

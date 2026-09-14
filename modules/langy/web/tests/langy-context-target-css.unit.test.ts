@@ -1,5 +1,6 @@
 /**
- * The armed ring's colour is modulated by an animated REGISTERED custom property (`@property` + var() references inside keyframes).
+ * The armed ring's colour is modulated by an animated REGISTERED custom property (`@property` +
+ * var() references inside keyframes).
  * Spec: specs/langy/langy-context-awareness.feature
  *   "Everything armed twinkles rather than pulsing in formation"
  */

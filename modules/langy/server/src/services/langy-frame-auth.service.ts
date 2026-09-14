@@ -5,35 +5,10 @@ import type {
   LangyFrameSigned,
 } from "../app/langy.members.ts";
 
-/**
- * Langy authenticated frame contract. This module IS the contract's home; the
- * wire vectors are pinned by specs/langy/langy-frame-auth.vectors.json.
- *
- * Every frame the worker streams back to the control plane carries a per-frame
- * HMAC proving BOTH who it is and that it really is who it says. The Go worker
- * SIGNS; this module (in the Hono relay) VERIFIES. The wire contract is pinned
- * cross-language by specs/langy/langy-frame-auth.vectors.json — a Go test and
- * the test beside this file both reproduce those MACs, so the two languages can
- * never silently diverge.
- *
- * Key (`runToken`): a 32-byte per-conversation secret minted at
- * `conversation_started`, stored server-only (never in a client-facing
- * projection — see the PendingHandoffToken precedent), injected into the worker
- * at spawn, and NEVER sent back on the wire. The HMAC proves possession without
- * ever re-transmitting it.
- *
- * Construction (unambiguous by length-prefixing — an attacker cannot shift a
- * byte across a field boundary to forge a colliding tuple):
- *
- *   signingInput = concat, over [projectId, userId, conversationId, turnId,
- *                  frameNonce, payload] in that fixed order, of
- *                  uint32BE(utf8ByteLength(field)) ‖ utf8(field)
- *   mac          = hex( HMAC-SHA256( key = hexDecode(runToken), signingInput ) )
- *
- * Replay is closed OUTSIDE this module (the relay checks `turnId` against the
- * in-flight turn and dedups `frameNonce` via a shared Redis SET); this module is
- * only the crypto: sign, verify, mint, and generate a nonce.
- */
+/** Langy authenticated frame contract (specs/langy/langy-frame-auth.vectors.json).
+ * Per-frame HMAC proves identity (Go worker signs, Hono relay verifies). Key (runToken) is
+ * 32-byte per-conversation secret, server-only, never on wire. Construction: length-prefixed
+ * concat of [projectId, userId, conversationId, turnId, frameNonce, payload] via HMAC-SHA256. */
 
 /** The fixed field order the signing input concatenates. Order is part of the contract. */
 const SIGNED_FIELDS: Array<keyof LangyFrameSigned> = [

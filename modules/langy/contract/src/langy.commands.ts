@@ -119,7 +119,10 @@ function isLangwatchProgram(token: string): boolean {
   );
 }
 
-/** True when the token at `index` is RUN, not merely mentioned: starts the command, follows a separator, or follows only env assignments/runners. */
+/**
+ * True when token at `index` starts command (follows separator or only env
+ * assignments/runners, not merely mentioned).
+ */
 function isInCommandPosition(tokens: string[], index: number): boolean {
   for (let i = index - 1; i >= 0; i--) {
     const previous = tokens[i]!;

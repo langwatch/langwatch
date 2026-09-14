@@ -1,15 +1,6 @@
 /**
  * @vitest-environment node
- *
- * A command that runs on the developer's machine for longer than the turn
- * stall window, against the real liveness subscriber and a real Redis.
- *
- * A local call writes nothing on the turn while it runs, so a command that
- * took four minutes used to end with the subscriber failing the turn and the
- * developer losing the answer. The worker's long-poll is what keeps the turn
- * alive now, and this is the test that a call held past the stall window is
- * still a live turn.
- *
+ * Long-poll keeps a turn alive past the stall window during a long local call.
  * @see specs/langy/langy-local-control.feature
  */
 

@@ -2,19 +2,9 @@
  * @vitest-environment jsdom
  *
  * Where the permission cards sit in the column (ADR-129,
- * specs/langy/langy-local-permissions.feature).
- *
- * Every card of the conversation was drawn below the whole transcript, so a
- * finished run ended on a settled permission card: the panel scrolled to the
- * bottom and the last thing on screen was a command, with the answer that
- * closed the turn above it and off screen. A settled turn's cards belong
- * inside it, before the message that closed it; a card raised by a turn that
- * is still running stays at the live edge, beside the working line, because
- * that is where the answer it wants is given.
- *
- * Boundary mocks only: the project context, `~/utils/api` (the shared inert
- * router plus this file's own history and local-record reads) and
- * `@ai-sdk/react`. The panel, the cards and the fold are real.
+ * specs/langy/langy-local-permissions.feature): a settled turn's card stays inside it, above the
+ * message that closed it; a still-running turn's card stays at the live edge, beside the working
+ * line.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";

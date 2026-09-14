@@ -1,9 +1,5 @@
 /**
- * The user wait, the one primitive behind the permission card and the question
- * card, over the in-memory store. The durable events and the live entries are
- * both recorded by stand-ins, so what each move writes is visible without a
- * pipeline and without Redis.
- *
+ * User wait, the primitive behind permission/question cards, tested over in-memory stand-ins.
  * @see specs/langy/langy-local-permissions.feature
  * @see specs/langy/langy-choice-questions.feature
  */

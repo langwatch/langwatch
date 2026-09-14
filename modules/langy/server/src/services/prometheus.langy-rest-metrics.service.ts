@@ -1,12 +1,5 @@
-/**
- * The counters Langy's internal control-plane doors publish, on the process's
- * one Prometheus registry.
- *
- * A metric registry is process-wide state, so every counter here is looked up
- * before it is created: two installs of this module in one process (or a
- * re-install in a test) must reach the SAME counter, or one deployment would
- * report two different rates for the same event.
- */
+/** Counters Langy's internal control-plane doors publish on the process's Prometheus registry.
+ * Every counter is looked up before creation so multiple installs reach the SAME counter. */
 import { Counter, register } from "prom-client";
 
 import type {

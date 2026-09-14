@@ -24,7 +24,7 @@ export function connectMessage(): string {
   return LANGY_LOCAL_CONNECT_NOTICE;
 }
 
-/** The line the transcript carries when the folder goes away — folder NAME, not path (already on the card). */
+/** The line the transcript carries when the folder goes away—folder NAME, not path. */
 export function disconnectMessage(
   workspace: { name: string; root: string },
   hostname: string,

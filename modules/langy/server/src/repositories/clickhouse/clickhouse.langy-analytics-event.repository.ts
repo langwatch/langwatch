@@ -94,20 +94,9 @@ function validateBatch(records: LangyAnalyticsEventRecord[]): string | null {
   return tenantId;
 }
 
-/**
- * Content-free, event-grain Langy analytics, written to ClickHouse.
- *
- * The table name, the column spelling, the async-insert settings and the
- * one-tenant-per-batch guard are a WIRE FORMAT with a table nothing here
- * compiles against: a column written under another name is accepted by
- * ClickHouse and fills the real one with its default, and no reader can tell a
- * defaulted value from a written one. They are pinned by literal in this
- * adapter's own test rather than derived from a schema only one side reads.
- *
- * `wait_for_async_insert` differs between the two entry points on purpose: a
- * single append is a projection write whose caller is holding a fold open, and
- * a batch is a bulk flush the runtime already sequences.
- */
+/** Event-grain Langy analytics to ClickHouse. Wire format (table name, columns, async settings,
+ * one-tenant guard) is literal in tests, not schema-derived. `wait_for_async_insert` differs
+ * between entry points: single appends (projection writes) vs batches (bulk flushes). */
 export class LangyAnalyticsEventClickHouseRepository extends LangyAnalyticsEventSink {
   static create(
     resolveClient: LangyAnalyticsClickHouseClientResolver,

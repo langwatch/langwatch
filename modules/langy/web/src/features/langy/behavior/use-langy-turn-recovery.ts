@@ -161,21 +161,10 @@ export function useLangyTurnRecovery({
       onRetryRef.current();
     }, policy.delayMs(attempt));
 
-    // NO CLEANUP, on purpose. An armed timer belongs to the FAILURE (identified
-    // by kind + `errorId`), not to this effect instance, and every way a retry
-    // can legitimately be cancelled already clears it by hand: the failure
-    // clearing or the hook being disabled (the first branch), a NEW failure
-    // arriving — including the same Error reclassified — or one that turns out
-    // to be terminal (both above), late-arriving side-effect evidence (the
-    // callback's own re-read), `reset()` when the conversation changes, and the
-    // unmount effect below.
-    //
-    // Returning `clearTimer` here instead is what wedged the panel: React runs
-    // the previous cleanup on ANY dep change, so a re-render killed the pending
-    // timer and then hit the same-failure short-circuit above, which re-arms
-    // nothing. `pending` stayed set forever — `isRecovering` permanently true,
-    // the retry never fired, and the error card stayed suppressed behind a
-    // recovering line that could only be escaped by sending a new message.
+    // NO CLEANUP, on purpose: an armed timer belongs to the FAILURE, not this effect instance,
+    // and every legitimate cancellation path already clears it by hand. Returning `clearTimer`
+    // here is what wedged the panel before: a re-render killed the pending timer, the
+    // same-failure short-circuit above then re-armed nothing, and `isRecovering` stuck true.
   }, [errorKind, errorId, enabled, clearTimer]);
 
   // Unmount must never leave a timer holding a stale `regenerate`.

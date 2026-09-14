@@ -1,14 +1,5 @@
-/**
- * `/api/internal/langy` — the control plane between the two halves of one
- * deployment: the Go agent's outbound calls back to the app, and the worker's
- * inbound frame stream.
- *
- * Every route answers behind `internalSecret`, so the deployment's own shared
- * bearer is checked by the DOOR, ahead of any handler; a route whose author
- * forgets a check still ships authenticated. The paths are literal and carry no
- * `/api/v1` twin because the agent dials these exact addresses, and a control
- * plane between two halves of one deployment has no dated contract to negotiate.
- */
+/** /api/internal/langy: control plane between Go agent and worker. Every route checks
+ * internalSecret via DOOR before handlers run. Paths are literal (no /api/v1 twin). */
 import { anyAuthenticated } from "@langwatch/api/access";
 import {
   defineRestMiddleware,

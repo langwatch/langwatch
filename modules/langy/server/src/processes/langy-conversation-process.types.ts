@@ -1,15 +1,7 @@
 import { z } from "zod";
 
-/**
- * Langy conversation process manager (ADR-049 §4) — typed contracts for the
- * pilot adapter over the generic event-sourcing/process-manager core.
- *
- * The process is keyed by (LANGY_CONVERSATION_PROCESS_NAME, projectId,
- * conversationId). Its state holds only identities, statuses, and flags —
- * never prompts, message parts, tool output, credentials, run tokens, or
- * handoff tokens (those stay in the Langy domain tables and the short-lived
- * Redis transport).
- */
+/** Typed contracts for the Langy conversation process manager (ADR-049 §4). State holds
+ * identities, statuses, and flags only; sensitive data stays in domain tables or Redis. */
 export const LANGY_CONVERSATION_PROCESS_NAME = "langyConversation";
 
 /** Worker dispatch budget used by both the worker adapter and process lease. */

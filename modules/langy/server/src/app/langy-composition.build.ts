@@ -1,15 +1,7 @@
 /**
- * `LangyApp`'s own infrastructure, built from the two process members it
- * reads (`prisma`, `redis`) and this module's own classes — porting the
- * deleted hand composition's construction (`git show
- * b383462d96^:apps/api/src/features/langy/langy.composition.ts`) into the
- * module's own vocabulary. Every piece here was either a constant refusing
- * stub in that composition (no external input to hand it) or built purely
- * from `redis`, so none of it needs a dependency token.
- *
- * `commands` and `broadcast` are NOT built here: both are shared, externally
- * supplied collaborators (the agent-pipeline dispatcher and the presence
- * broadcast fabric), and `LangyApp` takes them as dependency tokens instead.
+ * LangyApp infrastructure: built from prisma/redis and own classes. Pieces
+ * either stubs or redis-only (no token needed). commands/broadcast supplied
+ * externally (taken as dependency tokens).
  */
 import { renderLangyTurnContext } from "@langwatch/langy-contract";
 import type { LangyServerConfig } from "@langwatch/langy-contract";

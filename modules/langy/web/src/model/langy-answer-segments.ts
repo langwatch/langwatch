@@ -1,7 +1,5 @@
 /**
- * Split an assistant message's parts into the ordered render sequence the block channel needs (ADR-060 §1): prose
- * stays prose, a stamped `langy-card` part renders as its card WHERE THE BLOCK SAT in the reply's flow, and a
- * `langy-card-failed` part renders as the disclosure.
+ * Split message parts into render sequence: prose, cards, disclosures (ADR-060 §1).
  */
 import {
   LANGY_CARD_FAILED_PART_TYPE,

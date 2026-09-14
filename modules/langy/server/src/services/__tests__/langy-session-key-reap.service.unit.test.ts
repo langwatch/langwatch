@@ -1,12 +1,6 @@
 /**
- * The session-key sweep's policy, separated from the query it runs.
- *
- * Three things belong to this layer and nowhere else: which name the sweep is
- * allowed to match, that the clock is read once, and that a sweep which retired
- * nothing says nothing. The first is the safety property — the sweep holds no
- * organization, so the reserved name is the only thing between it and every
- * customer key in the product.
- *
+ * Session-key sweep policy, separated from the query it runs: the reserved
+ * name is the only thing between the sweep and every customer key.
  * Spec: modules/langy/specs/langy-session-key-maintenance.feature
  */
 import { LANGY_SESSION_API_KEY_NAME } from "@langwatch/api-key-contract";

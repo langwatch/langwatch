@@ -71,15 +71,8 @@ export abstract class LangyConversationRepository {
     conversationId: string;
   }): Promise<string | null>;
 
-  /**
-   * True when a turn projection row exists for this exact
-   * (projectId, conversationId, turnId) triple — i.e. the turn was really
-   * accepted under this conversation in this project. The durable
-   * result-ingest uses it to reject a forged or mismatched triple before
-   * writing (the relay proves the same thing with an HMAC; this path has only
-   * the bearer). A turn row exists the moment `acceptTurn` is projected, long
-   * before any result arrives.
-   */
+  /** Checks if a turn projection row exists for the (projectId, conversationId, turnId) triple.
+   * Result-ingest rejects forged or mismatched triples before writing (the relay uses HMAC). */
   abstract turnExists(params: {
     projectId: string;
     conversationId: string;

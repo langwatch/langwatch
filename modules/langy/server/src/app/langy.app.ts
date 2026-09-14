@@ -104,15 +104,9 @@ type LangySetup = FeatureSetup<
 export class LangyApp implements LangyApiContract {
   static readonly contract: typeof LangyApi = LangyApi;
   /**
-   * `presence` is the SAME per-tenant fabric presence publishes on, reached
-   * through its module API rather than a second fabric of Langy's own.
-   *
-   * `featureFlags` is this deployment's rollout store. Langy's own application
-   * never asks it anything — the public REST doors do, for the per-project
-   * rollout gate and the identity bridge (`LangyRestCallerService`) — and it is
-   * declared HERE so a process that composed no flag store refuses at boot
-   * naming it, rather than mounting a turn surface that answers every project
-   * as dark.
+   * presence: same per-tenant fabric. featureFlags: deployment rollout store
+   * (used by REST doors not Langy app). Declared here so process boots refusing
+   * without it.
    */
   static readonly dependencies = {
     presence: PresenceApi,

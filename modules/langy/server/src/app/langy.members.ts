@@ -188,38 +188,16 @@ export interface LangyNavigateResourceLocator {
   }): Promise<string | null>;
 }
 
-/**
- * The session-key lifecycle counter, as the feature reports into it.
- *
- * Minting, revoking and reaping are three moments in one credential's life and
- * they are counted as one series with an operation label, so a dashboard can
- * read minted-minus-revoked as the live population without joining two metrics.
- *
- * It is a port because the two processes that run these operations export
- * differently: the App writes into its own `prom-client` registry, and a worker
- * composed from packages pushes over OTLP. Both write the same series name.
- */
+/** Counts minted/revoked/reaped as one series with operation labels so dashboards read
+ * minted-minus-revoked without joining (a port because App and worker export differently). */
 export interface LangySessionKeyMetrics {
   record(input: { operation: "minted" | "revoked" | "reaped"; count?: number }): void;
 }
 
-/**
- * The one question the title generator asks of the deployment's model gateway.
- *
- * A port rather than the gateway itself, because WHICH model a project's title
- * call runs on is the deployment's cascade — the project's execution providers,
- * the feature key's resolution, the alternate when the resolved provider is
- * disabled and the execution parameters the proxy is handed. Langy owns the
- * prompt and the shape of a title; it owns none of that.
- *
- * The two-step resolution is the ADAPTER's, not this package's. A process
- * resolves the feature key first, and falls back to the named model only when
- * the cascade says nothing is configured for that key — and "nothing is
- * configured" is a typed refusal from the model-provider contract, which a
- * feature package that never depends on it cannot distinguish from a real
- * failure. Handing the fallback down as an argument is what keeps the
- * distinction where the type lives.
- */
+/** A port because WHICH model runs on is the deployment's cascade (providers, feature keys,
+ * disabled-provider alternates), not Langy's. The adapter resolves the feature key and falls
+ * back to the named model only when the cascade says nothing—keeping the distinction where
+ * the type lives. */
 export interface LangyTitleModelResolver {
   /**
    * The handle a title call runs on.
@@ -442,15 +420,8 @@ export abstract class LangyTurnContextRenderer {
 /** The rollout flag `LangyUiActionSurface.resolve` evaluates. */
 export const LANGY_UI_ACTIONS_FLAG = "release_langy_ui_actions" as const;
 
-/**
- * Answers whether the live UI-action channel is open for this turn.
- *
- * The turn block advertises `langwatch ui actions` only while the dispatch
- * route would answer it; with the flag off that route is a dark 404, and an
- * agent sent there spends the turn on a surface that behaves as if it were
- * never deployed. Never throws: a flag-store blip must not stop the turn, and
- * must fail toward the closed channel — see the adapter for that contract.
- */
+/** Answers whether the live UI-action channel is open; fails closed to never stop turns.
+ * The turn block advertises the channel only while dispatch would answer it. */
 export abstract class LangyUiActionSurface {
   abstract resolve(input: {
     userId: string;
@@ -499,17 +470,9 @@ export abstract class LangyFeedbackPromptRedis {
 /** Command dispatchers injected from the event-sourcing pipeline registry. */
 type Dispatch<T> = (data: T & CommandEnvelope) => Promise<void>;
 
-/**
- * All sixteen conversation writes, as the process's agent-pipeline dispatcher
- * produces them. A dependency token rather than a process member: the
- * pipeline is shared with the `scenario` feature, so the composition root
- * that builds it today keeps owning it (`composedAgentPipelines.langyConversations`
- * in the deleted hand composition) — this class only names the shape Langy
- * takes it in. Declared with `abstract` PROPERTIES rather than methods, like
- * {@link LangyHarness}: method parameters are bivariant, and a dispatcher
- * built with the wrong envelope shape would still compile under a method
- * signature. A property is contravariant, so it cannot.
- */
+/** All sixteen conversation writes from the agent-pipeline dispatcher. A dependency token
+ * (shared with scenario feature). Declared as abstract PROPERTIES not methods (like LangyHarness)
+ * to make contravariance catch shape mismatches at compile time. */
 export abstract class LangyConversationCommands {
   abstract createConversation: Dispatch<LangyConversationStartedEventData>;
   abstract forkConversation: Dispatch<LangyConversationForkedEventData>;

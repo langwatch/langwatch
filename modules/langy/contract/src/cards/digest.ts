@@ -1,28 +1,5 @@
 /**
- * The result DIGEST — the compact reference a CLI result is remembered by.
- *
- * The chat stream is a control channel, not a data plane: a `langwatch
- * <resource> <verb>` tool call should not have to carry 25 full traces to the
- * browser for the card to be honest. What the durable tool part stores instead
- * is this digest — which resource and verb ran, the query it ran with, the ids
- * it surfaced and how many there were — and the card hydrates FRESH data through
- * the product's own API with the viewer's session. The raw output stays the
- * agent's context (and the card's fallback), never the card's source of truth
- * when a reference will do.
- *
- * Four strategies, weakest-wins:
- *
- *   id-ref     the result names entities — store their ids, hydrate by id.
- *   query-ref  the result is an aggregate (analytics) — store the query,
- *              the card re-runs it.
- *   reduced    the result parses but names nothing fetchable — render the
- *              stored structure.
- *   text       the output is opaque — render it as text.
- *
- * ONE extractor covers every resource by convention (the id/collection/count
- * spellings the card schemas already know); a resource that spells its id
- * unusually rides a one-line `ref` hint on its `CARDS_BY_RESOURCE` row rather
- * than a bespoke extractor.
+ * Result DIGEST: compact reference for the card to hydrate fresh data via API.
  */
 import * as z from "zod";
 import { parseCliJson } from "./cli-json.ts";
@@ -156,16 +133,7 @@ function documentOf(output: unknown): unknown | null {
 }
 
 /**
- * Extract the digest for one settled CLI call.
- *
- * `args` is the command's already-parsed flags (the envelope's parser owns that
- * grammar); this function only carries them as the digest's `query`. `output`
- * is the call's stdout — as a string (possibly still noisy) or the document.
- *
- * Never throws and never guesses: an output it cannot read is a `text` digest,
- * a parsed result that names nothing fetchable is `reduced`, and only real ids
- * make an `id-ref`. `analytics`-style aggregates are `query-ref` regardless of
- * shape, because their truth is the query, not the rows it rolled up.
+ * Extract digest for one CLI call: unreadable→text, unfetchable→reduced, analytics→query-ref.
  */
 export function extractDigest({
   resource,

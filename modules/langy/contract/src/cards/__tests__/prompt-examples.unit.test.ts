@@ -1,11 +1,5 @@
 /**
- * The derived-card shapes Langy's prompt documents must be shapes the panel can
- * actually render. The prompt is the only place the model learns this JSON, so
- * an example that fails the contract teaches every turn to emit a card that
- * degrades to the failed-card disclosure.
- *
- * This reads the shipped prompt rather than a copy of it, so the two cannot
- * drift: editing an example in AGENTS.md is what this test grades.
+ * Tests that derived-card shapes in AGENTS.md match what the panel can render.
  */
 import fs from "fs";
 import path from "path";
@@ -14,10 +8,7 @@ import { describe, expect, it } from "vitest";
 import { DERIVED_SAFE_CARD_KINDS, langyDerivedCardSchema } from "../derived-safe.ts";
 
 /**
- * Found by walking up to the workspace root rather than by counting `../`.
- * The count was wrong from the move that put this file under `cards/`, and a
- * path that cannot be read makes this suite fail to load — which reads as a
- * broken test rather than as the unguarded prompt it actually was.
+ * Path lookup walks to workspace root (file move made counted ../ stale).
  */
 function repoRoot(): string {
   let dir = path.dirname(fileURLToPath(import.meta.url));

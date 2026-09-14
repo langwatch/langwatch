@@ -3,14 +3,7 @@
  *
  * @see specs/langy/langy-session-key.feature
  *
- * The policy's whole value is its DEFAULT. A rule that answers "granted"
- * for anything it has not heard of would quietly widen Langy's reach every time
- * the platform grows a resource family or an action. The policy is wide on
- * purpose now — full CRUD on tenant data, by owner decision — but WIDE and
- * FAIL-OPEN are different properties, and these tests are about the second:
- * the answer for things the policy has NEVER heard of, and the three
- * boundaries the owner drew (secrets unreadable, the auth scope read-only,
- * disclosure/rotation withheld).
+ * Tests verify the DEFAULT disposition (fail-closed) and three owner-drawn boundaries.
  */
 import { assert, describe, expect, it } from "vitest";
 

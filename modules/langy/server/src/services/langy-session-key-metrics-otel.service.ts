@@ -1,15 +1,8 @@
 import { counter, type CounterHandle } from "@langwatch/observability/metrics";
 import { type LangySessionKeyMetrics } from "../app/langy.members.ts";
 
-/**
- * The series name, pinned because two processes write it.
- *
- * The App writes it through its own `prom-client` registry and a worker
- * composed from packages writes it over OTLP. They are the same lifecycle
- * counter and they carry the same name and the same `op` label on purpose:
- * an operator reading "how many Langy session keys were reaped" must not have
- * to know which process ran the sweep.
- */
+/** Series name pinned because two processes write it: App via prom-client, worker via OTLP.
+ * Same lifecycle counter, name, and op label so operators don't know which process swept. */
 export const LANGY_SESSION_KEYS_METRIC_NAME = "langwatch_langy_session_keys_total";
 
 /** Langy session-key lifecycle counts, pushed over OTLP. */

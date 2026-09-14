@@ -1,16 +1,7 @@
 /**
  * @vitest-environment node
  *
- * Streaming headlines for a CLI capability, and specifically whether a verb
- * answers with one thing or many.
- *
- * This module kept its own `COLLECTION_VERBS` set, justified by a rule about
- * not importing UI composition into a server transport. The rule is real; the
- * contract is not UI, and both sides depend on it. The copy had drifted — it
- * held `results` and lacked `tag` and `types` — so the server and the browser
- * pluralised different verbs for the same result. These cases are written
- * against `CLI_COLLECTION_VERBS` rather than against today's members, so the
- * two cannot part again.
+ * Locks verb pluralisation to `CLI_COLLECTION_VERBS` so server and browser can't drift again.
  */
 import { CLI_COLLECTION_VERBS } from "@langwatch/langy-contract";
 import { describe, expect, it } from "vitest";

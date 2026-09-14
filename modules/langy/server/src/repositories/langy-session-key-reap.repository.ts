@@ -1,13 +1,5 @@
-/**
- * The one write the fleet-wide session-key sweep performs.
- *
- * Separate from `LangySessionKeyRepository` because the sweep holds no project
- * and no organization: minting reads a project's scope and revoking reads one
- * key by id, and a process that only sweeps would have to compose both to reach
- * this single bounded `updateMany`. Every session-key repository can answer it —
- * `LangySessionKeyRepository` extends this one — so nothing is duplicated by
- * naming the narrow half on its own.
- */
+/** The one write the fleet-wide session-key sweep performs. Separate from LangySessionKeyRepository
+ * because the sweep holds no project/organization; named narrowly to avoid duplication. */
 
 import type { Instant } from "@langwatch/time";
 export abstract class LangySessionKeyReapRepository {

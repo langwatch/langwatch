@@ -1,18 +1,5 @@
 /**
- * The generic pieces every LangWatch CLI result is built from.
- *
- * Almost every read the CLI performs is "a collection plus a way of counting it"
- * — and the platform, having grown over time, counts it two different ways:
- * traces come back with `pagination.totalHits`, everything paged comes back with
- * `pagination.total` + `page` + `totalPages`. Rather than make every card learn
- * both dialects, they are reconciled once, here, into a single `total`.
- *
- * Everything is a LOOSE object on purpose. These schemas describe the fields a
- * card needs, not the full API response, and a CLI result must survive the round
- * trip with its unknown fields intact — the card shows a summary, but the agent
- * reading the JSON may well want the rest.
- *
- * This package and its consumers share the repository-wide Zod 4 contract.
+ * Reconciles pagination dialects once; loose schemas preserve unknown API fields.
  */
 import * as z from "zod";
 
@@ -76,19 +63,7 @@ export const truncatedAwayCount = (row: unknown): number =>
 export const isTruncationMarker = (row: unknown): boolean => truncatedAwayCount(row) > 0;
 
 /**
- * The one true total behind a result: what the query matched, which is NOT the
- * same as how many rows came back. This is the number the stat card rolls up, so
- * getting it right is the difference between "1,204 traces" and "25 traces".
- *
- * A stated total always wins over a counted one, and there are two places one
- * can be stated: the pagination envelope, and the reduction marker itself. A
- * result that states neither is counted, and the count has to include the rows
- * the reduction removed: their marker is the only record left that they
- * existed, so dropping it turns "41 prompts" into "12 prompts" beside an answer
- * that says 41.
- *
- * Pass the rows as the document holds them, markers included. A marker counts
- * as the rows it stands for, never as one row of its own.
+ * Resolve true total: stated wins over counted, including reduction markers.
  */
 export const resolveTotal = ({
   pagination,
@@ -119,23 +94,13 @@ export const textValueSchema = z
   .pipe(z.string());
 
 /**
- * A row in a collection, tolerating the in-band truncation marker.
- *
- * Oversized tool outputs are structure-reduced upstream (the worker caps long
- * arrays and appends a plain string like "… 40 more items truncated" INSIDE the
- * array). A schema that insisted every element is a row would reject exactly
- * the results big enough to have needed reducing — so every collection accepts
- * a string element and readers skip it.
+ * Row or truncation marker: oversized outputs have in-band "… N more" strings in the array.
  */
 export const rowOrTruncationMarker = <Row extends z.ZodType>(row: Row) =>
   z.union([row, z.string()]);
 
 /**
- * Build a collection card: `{ <key>: rows[], pagination }`.
- *
- * The key differs per endpoint (`traces`, `data`, `records`, …) and the row shape
- * differs per resource, but the shape around them never does — so it is declared
- * once and specialised, rather than copy-pasted per card.
+ * Build a collection card: key differs per endpoint/resource, shape is declared once.
  */
 export const collectionSchema = <Key extends string, Row extends z.ZodType>({
   key,

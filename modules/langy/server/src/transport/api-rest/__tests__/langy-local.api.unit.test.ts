@@ -1,13 +1,6 @@
 /**
- * The permission the local surface DECLARES, enforced on the key that calls it.
- *
- * The door resolves its own credential, so the framework chain never runs its
- * declared `langy:create`. It used to resolve the key, bridge to the owning
- * user and go straight to the conversation, which let a key narrowed below
- * that permission reach local control on the strength of its holder's Langy
- * access. Driven through the real route, because the missing call was in the
- * route's own authorization step.
- *
+ * Local surface's declared permission is enforced on the calling key: the
+ * door resolves its own credential rather than the framework's `langy:create`.
  * @see specs/langy/langy-local-control.feature
  */
 import { createAppRestSecurity, type AppRestSecurity } from "@langwatch/api/rest";

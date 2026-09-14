@@ -1,5 +1,6 @@
 /**
- * The panel header rail: one line, the actions cluster, Minimise always last, and history as a PLACE that swaps the panel body for the recents list and hands it back.
+ * The panel header rail: one line, the actions cluster, Minimise always last, and history as a
+ * PLACE that swaps the panel body for the recents list and hands it back.
  * @vitest-environment jsdom
  * Spec: specs/langy/langy-panel-header.feature
  */

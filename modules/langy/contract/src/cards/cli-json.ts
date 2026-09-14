@@ -1,15 +1,5 @@
 /**
- * Lifting the CLI's JSON document out of its stdout.
- *
- * Every LangWatch CLI read takes `--format json`, but the document does not
- * arrive alone: the CLI writes a spinner and a "use `langwatch trace get <id>`"
- * hint around it, and the shell tool merges stderr into the same string.
- * A card wants the document, not the console.
- *
- * So we take the first balanced `{…}` / `[…]` that parses, rather than assuming
- * the whole output is JSON. Shared here (rather than in the app) because both
- * ends of the contract need it: the server envelope reduces stdout with it, and
- * the digest extractor reads live/legacy outputs that still carry the noise.
+ * Extracts the first balanced JSON object from CLI stdout (which includes spinner/hints).
  */
 
 /** Give up scanning a huge stdout after this many `{`/`[` candidates. */
@@ -66,13 +56,7 @@ function findBalancedEnd({ text, start }: { text: string; start: number }): numb
 }
 
 /**
- * Whether the bracket at `start` opens its own line, with nothing at all
- * before it. A spinner ends its frame with `\r` rather than `\n`, so both
- * count as the start of a line. Indentation disqualifies: the CLI prints the
- * outer document unindented, so a bracket behind whitespace is a nested value
- * of a pretty-printed document — a TAIL-truncated output (pi's bash tool keeps
- * the last lines of a big result) can leave such an item fully balanced, and a
- * nested value must never be promoted to the whole command's result.
+ * Bracket at line start (\\r or \\n, unindented) indicates document start, not nested.
  */
 function startsAtDocumentBoundary({ text, start }: { text: string; start: number }): boolean {
   if (start === 0) return true;
@@ -104,13 +88,7 @@ function opensJsonContent({ text, start }: { text: string; start: number }): boo
 }
 
 /**
- * Whether a JSON value begins at `at`.
- *
- * A scalar counts only when what follows it is what a document would put
- * there. The first character is not enough, and neither is the whole word: a
- * log line reads `[null pointer while reading the cache` or `[2026-08-22
- * fetching traces`, and both open with the spelling of a JSON value. In a
- * document a scalar is followed by a comma or the closing bracket.
+ * JSON value at position: scalar must be followed by comma or closing bracket (not log text).
  */
 function opensJsonValue({ text, at }: { text: string; at: number }): boolean {
   const char = text[at]!;
@@ -192,17 +170,7 @@ export function parseCliJson(output: string): unknown | null {
   for (let i = 0; i < output.length; i++) {
     const char = output[i]!;
     if (char !== "{" && char !== "[") continue;
-    // A DOCUMENT OPENS ITS OWN LINE. A BRACKET INSIDE PROSE IS PROSE.
-    //
-    // Without this the scan reached into sentences. `langwatch trace search
-    // --start now-1d` names a flag the command does not have, so the CLI
-    // printed `error: unknown option '--start'` followed by its usage, and that
-    // usage documents `--jq` with the example `.traces[].traceId`. The `[]` in
-    // it parses as an empty array, so a REJECTED command became the JSON
-    // document `[]`. The agent read that as "no traces in the last day" and
-    // reported it as a count. Every `--help` did the same. When nothing here is
-    // a document, the command's own output is what stays (see the null
-    // contract above).
+    // Document starts at line boundary, not in prose (prevents help text from parsing as JSON).
     if (!startsAtDocumentBoundary({ text: output, start: i })) continue;
     if (++candidates > MAX_CANDIDATES) break;
 

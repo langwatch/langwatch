@@ -1,10 +1,8 @@
 /**
  * @vitest-environment jsdom
  *
- * The steps card reads a turn, and a turn ends. It used to say "working on it"
- * for the life of the transcript, so a pull request opened eight minutes ago
- * still read as work in progress after a reload.
- *
+ * The steps card must read the turn's own end, not just the transcript, or a PR opened
+ * minutes ago still reads as work in progress after a reload.
  * @see specs/langy/langy-github-prs.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

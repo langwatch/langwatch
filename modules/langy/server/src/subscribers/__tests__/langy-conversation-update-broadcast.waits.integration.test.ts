@@ -1,15 +1,6 @@
 /**
- * The freshness signal for a permission card, over the real projection.
- *
- * A tab that did not start the turn has no live stream, so the only thing that
- * moves its cards is this signal. The subscriber publishes it once the
- * conversation projection has reached the event, and the projection used to
- * skip both card events: the signal was retried until it was dropped, and a
- * card answered in the terminal kept its buttons until the command finished.
- *
- * The projection and the subscriber are both the real ones here, because the
- * bug was in the pair and neither half is wrong on its own.
- *
+ * Freshness signal for a permission card; real projection + subscriber catch
+ * the bug where a skipped card event left buttons stuck after the turn ended.
  * @see specs/langy/langy-local-permissions.feature
  */
 import {

@@ -1,12 +1,8 @@
 /**
  * @vitest-environment jsdom
  *
- * The history read is scoped to the conversation it was asked for.
- * `keepPreviousData` smooths the switch between two conversations, and it used
- * to keep answering after New chat had switched away from both — so the fresh,
- * empty chat reported the previous conversation's messages, its in-flight turn
- * and its failure.
- *
+ * The history read is scoped to the conversation it was asked for — `keepPreviousData` used to
+ * keep answering after New chat switched away from both, leaking the old conversation's state.
  * @see specs/langy/langy-navigation-persistence.feature
  */
 import { renderHook } from "@testing-library/react";

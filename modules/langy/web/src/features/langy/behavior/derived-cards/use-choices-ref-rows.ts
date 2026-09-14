@@ -1,7 +1,7 @@
 /**
- * Hydrate a choices card's entity refs AS THE VIEWER (ADR-060 §6), through the same hydrator registry every
- * capability card resolves references with (`CAPABILITY_HYDRATORS`) — so an option row always shows what the
- * viewer is allowed to see today, never what the model asserted.
+ * Hydrate a choices card's entity refs AS THE VIEWER (ADR-060 §6), through the same hydrator
+ * registry every capability card uses (`CAPABILITY_HYDRATORS`) — so an option row always shows
+ * what the viewer is allowed to see today, never what the model asserted.
  */
 
 import type { LangyDerivedChoicesCard } from "@langwatch/langy-contract";

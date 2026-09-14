@@ -1,10 +1,8 @@
 /**
  * @vitest-environment jsdom
  *
- * The follow-along link the command line prints. It was printed on every share
- * and every permission ask and nothing read it, so it opened the project home
- * on whatever conversation the panel already had.
- *
+ * The follow-along link the command line prints must open the conversation it names, not
+ * whatever the panel already had.
  * @see specs/langy/langy-local-control.feature
  */
 import { renderHook, waitFor } from "@testing-library/react";

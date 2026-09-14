@@ -1,5 +1,6 @@
 /**
- * Agent-driven navigation, at the panel: a `navigate` entry on the live turn stream must move the browser through the SPA router (never a full reload), and only when the turn actually asked to navigate.
+ * Agent-driven navigation, at the panel: a `navigate` entry on the live turn stream must move
+ * the browser through the SPA router (never a full reload), only when the turn asked to navigate.
  * @vitest-environment jsdom
  * @see specs/langy/langy-agent-driven-navigation.feature
  */

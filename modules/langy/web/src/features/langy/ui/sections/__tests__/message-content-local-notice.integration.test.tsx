@@ -1,15 +1,8 @@
 /**
  * @vitest-environment jsdom
  *
- * The shared folder disconnecting writes a line into the transcript, and that
- * line is a NOTICE: the platform wrote it, not the developer. It is recorded
- * with the `system` role, so the panel must both keep it (the engine drops
- * every other role) and draw it as a plain line rather than as a message from
- * the reader (ADR-129).
- *
- * Boundary mocks match MessageContentInterrupted.integration.test.tsx: the
- * derived-card renderers load the router, project hook, tRPC client and
- * recharts transitively.
+ * A shared-folder disconnect writes a `system`-role NOTICE (ADR-129): the panel must keep it
+ * (the engine drops every other role) and draw it as a plain line, not as a reader message.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";

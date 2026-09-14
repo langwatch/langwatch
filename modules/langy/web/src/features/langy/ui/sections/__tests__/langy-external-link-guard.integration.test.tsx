@@ -1,6 +1,6 @@
 /**
- * Links inside the Langy panel, clicked for real: the panel root's guard, the dialog it opens, and the answer's
- * own markdown links rendered exactly as the panel renders them.
+ * Links inside the Langy panel, clicked for real: the panel root's guard, the dialog it
+ * opens, and the answer's own markdown links rendered exactly as the panel renders them.
  * @vitest-environment jsdom
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

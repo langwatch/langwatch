@@ -1,41 +1,8 @@
 /**
- * The card schemas: what each kind of card looks like once it has been read as
- * structure rather than as text. ONE vocabulary, for every card the panel can
- * draw — whoever wrote it.
- *
- * There is one schema per CARD, not one per command — because the panel has one
- * card per shape, and ~90 CLI commands collapse into a handful of shapes. A
- * `dataset list` and an `evaluator list` are the same card with different nouns;
- * pretending otherwise would mean ninety schemas that drift ninety ways. The long
- * tail therefore lands on the generic resource cards, which is the reuse that
- * makes this contract maintainable rather than a second copy of the API.
- *
- * ── TWO CHANNELS, ONE VOCABULARY ───────────────────────────────────────────
- *
- * A card arrives by one of two channels, and the difference is PROVENANCE, not
- * type:
- *
- *   - MEASURED — the CLI actually ran. The kind is stamped once, server-side,
- *     from the command and the payload's shape (ADR-079). The acceptance
- *     schemas below read those payloads.
- *   - DERIVED — Langy wrote the JSON itself, inline in a ```langy-card fence
- *     (ADR-060). `derived-safe.ts` builds those schemas, from the shapes
- *     declared here, over a CLOSED subset of {@link CARD_KINDS}.
- *
- * The two channels used to keep separate copies of the same shapes, and the
- * copies said so in their own headers. They are one declaration now: the unit
- * vocabulary, the point and comparison fields, the table cell type are stated
- * HERE and nowhere else. What each channel still states for itself is its
- * TOLERANCE, because that is the one thing they legitimately disagree about —
- * a measured payload must survive the round trip with its unknown fields
- * intact (`looseObject`: the card shows a summary, the agent reading the same
- * JSON wants the rest), a model-emitted one must not smuggle anything past
- * validation (`object`, plus non-empty bars).
- *
- * Every measured schema is deliberately permissive about fields it does not
- * name: a card needs a handful of fields to draw a row, and the agent reading
- * the same JSON needs everything else. Parsing must never be lossy, and a CLI
- * that grows a field must never break a card.
+ * One vocabulary for every card shape: ~90 CLI commands collapse into handful
+ * of shapes. Measured (CLI-generated, stamped server-side) and Derived (Langy
+ * JSON inline) channels use the same vocabulary but differ in tolerance: measured
+ * preserves unknown fields, derived validates strictly. See ADR-079 and ADR-060.
  */
 import * as z from "zod";
 import {
@@ -187,30 +154,9 @@ export const choicesCardFields = {
 } as const;
 
 /**
- * A plotted answer: one or more named series over time, optionally with a
- * period-over-period comparison.
- *
- * The card the panel had no way to draw. "Compare trace cost this week to last"
- * is two numbers and a direction, which the metrics card renders as two large
- * decimals — technically the answer, and useless for the question actually
- * asked, which is about a TREND. A trend needs a shape.
- *
- * Deliberately NOT derived from a tool payload by sniffing it. The platform
- * returns traces, spans and buckets; which of their fields is worth plotting,
- * against what baseline, and what the axis means are judgements about the
- * QUESTION, not facts about the response. So the COMMAND that knows the
- * question shapes this payload — `analytics query` knows the metric, the
- * aggregation and the window it was asked for, and emits `series` itself (see
- * `timeseriesShape.ts` in the CLI) — and the registry only recognises the
- * shape once it is there (`timeseriesProbeSchema`).
- *
- * ADR-079 §5 also sketches a `langwatch present` command for an agent to emit
- * a card directly. That command does not exist; nothing emits this card except
- * a command that shaped its own answer.
- *
- * `graph` is an opaque passthrough: when the agent supplies a graph definition
- * the card can offer to save it to a dashboard, and when it does not the card
- * still draws, minus that action. The panel never invents one.
+ * Plotted timeseries: named series over time with optional comparison. Not
+ * derived from payload shape—the command that knows the question shapes this
+ * payload (see `timeseriesShape.ts` in CLI and `timeseriesProbeSchema`).
  */
 export const timeseriesCardSchema = z.looseObject({
   series: z
@@ -229,14 +175,8 @@ export const timeseriesCardSchema = z.looseObject({
 });
 
 /**
- * The EVIDENCE that a payload is a timeseries — see `spendProbeSchema` for why
- * this is not the card's acceptance schema.
- *
- * The bar is TWO points in a named series. Two, because one point is a reading
- * and not a trend, and an axis drawn under a single value dresses it up as a
- * shape. Named, because an unnamed array of `{t, v}` is a shape half the
- * product could produce by accident, and this probe outranks spend — it has to
- * earn that.
+ * Evidence of timeseries: named series with ≥2 points (one reading is not a
+ * trend). See `spendProbeSchema` for why probe ≠ acceptance schema.
  */
 export const timeseriesProbeSchema = z.looseObject({
   series: z
@@ -304,29 +244,8 @@ const isNamedValue = (value: unknown): boolean =>
   (typeof value === "number" && Number.isFinite(value));
 
 /**
- * Does this payload NAME something that now exists?
- *
- * The question a `create` card's copy stakes everything on. "Created and ready
- * to use", with a link through to the thing, is a claim about the world; a
- * result carrying no id, no name and no rows cannot support it. A create that
- * never happened — refused upstream, or re-run without its arguments — returns
- * exactly that nothing, and the card used to render the claim anyway, complete
- * with a deep link to a resource that was never made.
- *
- * Deliberately asked of CREATES only. An update or a delete is named by the
- * command's own arguments, so an empty 200 body is a normal, honest "done";
- * a create's identity can only come back from the server, so its absence is
- * the whole story.
- *
- * Evidence, not vibes: an id/name, or a non-empty collection of rows. A bare
- * `{ ok: true }` names nothing and does not pass — the card would have nothing
- * to title itself with or link to, which is precisely the state this guards.
- *
- * A LOCAL scaffold is the other lie a name can tell. `prompt create` writes a
- * file on disk and exits 0 with `{ name, path, dependency: "file:..." }` — a
- * true result about a file, and nothing about the platform. Its name must not
- * carry the platform claim; only a server-minted id can. So a payload that
- * declares a `file:` dependency passes on an id, never on a name alone.
+ * Guards create results: must return id, name, or rows. Local file scaffolds
+ * (file:...) only pass on server-minted ids, not names alone.
  */
 export const namesCreatedResource = (payload: unknown): boolean => {
   if (Array.isArray(payload)) return payload.length > 0;
@@ -360,28 +279,14 @@ export const createdResourceCardSchema = resourceCardSchema.refine(namesCreatedR
 });
 
 /**
- * `virtual-keys get|list`, `gateway-budgets list`, and ANY result whose rows
- * carry cost — the spend card.
- *
- * Cost is a DIMENSION, not a resource: it lives on a virtual key, on a budget,
- * on one trace and on a whole filtered set of them. A card keyed only to the
- * resources named "spend-ish" would catch the first two and miss the two users
- * actually ask about, which is why this one is reached by shape as well as name.
- *
- * The discriminator is a NAMED cost field. "Has numbers" would promote every
- * list in the product.
+ * Spend card: cost is a dimension on keys, budgets, traces, filtered sets.
+ * Discriminator is a named cost field (not just "has numbers").
  */
 export const spendCardSchema = resourceCardSchema;
 
 /**
- * The EVIDENCE that a payload is about spend — strictly narrower than what the
- * card can draw.
- *
- * These two must not be the same schema, and conflating them is a real bug I
- * shipped once: a card's ACCEPTANCE schema says "I can render this", and must be
- * permissive or a deliberate `byVerb` binding breaks the moment a real payload
- * omits a field. A card's PROBE says "this payload proves it is mine", and must
- * be strict or it promotes everything. Acceptance is a floor; evidence is a bar.
+ * Probe (evidence) ≠ acceptance: acceptance permissive (floor), probe strict
+ * (bar). See `spendCardSchema` for permissive version.
  */
 export const spendProbeSchema = z.union([
   // A rolled-up total, however this endpoint spells it.
@@ -456,23 +361,9 @@ export const CARD_KINDS = [
 export type CardKind = (typeof CARD_KINDS)[number];
 
 /**
- * What a card KIND fundamentally claims. The security-relevant property of
- * this whole module, and the reason it is a declaration rather than a guess.
- *
- *   - `resource` — the card asserts that RECORDS EXIST: these traces were
- *     matched, this run produced these results, this dataset was created. The
- *     claim is only true because something went and looked. Only a measured
- *     result may make it.
- *   - `presentation` — the card presents VALUES IT WAS HANDED, and claims
- *     nothing about where they came from: a chart of supplied points, a table
- *     of supplied cells, a question with supplied options. Either channel may
- *     produce one honestly.
- *
- * `satisfies Record<CardKind, CardShape>` makes this EXHAUSTIVE: adding a kind
- * to {@link CARD_KINDS} without classifying it here is a type error at this
- * declaration. You cannot add a card kind without saying, in as many words,
- * whether it asserts records — which is precisely the question `derived-safe.ts`
- * then answers with a compile-time gate.
+ * Security-relevant classification: resource (asserts records exist—measured
+ * only) vs presentation (presents handed values—either channel). Exhaustive via
+ * `satisfies Record<CardKind, CardShape>`. See `derived-safe.ts` gate.
  */
 export type CardShape = "resource" | "presentation";
 

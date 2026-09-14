@@ -1,14 +1,6 @@
-/**
- * The one authorization chain behind every key-authed Langy request.
- *
- * Shared by the turn routes in `routes/langy-api.ts` and the health probe in
- * `routes/health-checks.ts`, so a monitor and a client are refused, darkened
- * and bridged to an actor by the same code in the same order: credential,
- * surface flag, `langy:create` ceiling, cohort, actor session.
- *
- * Transport-free apart from a header reader, mirroring the health probes'
- * own `authenticateProject`: the caller decides how a refusal is serialised.
- */
+/** The authorization chain shared by turn routes and health probes. Refuses, darkens, and
+ * bridges to actor in one order: credential, surface flag, langy:create ceiling, cohort, session.
+ * Transport-free except header reader (caller decides refusal serialization). */
 
 import {
   enforceApiKeyCeiling,
@@ -27,23 +19,12 @@ import { resolveLangyKeyIdentity } from "./langyApiKeyIdentity";
 
 const tokenResolver = TokenResolver.create(prisma);
 
-/**
- * Names, for the route registry, what a handler-managed Langy route does
- * with the key before any handler code runs.
- */
+/** Names for route registry: what a handler-managed route does with the key before handlers run. */
 export const LANGY_API_KEY_AUTH_REASON =
   "project API key resolved in-handler via TokenResolver + enforceApiKeyCeiling, then bridged to an owning user by resolveLangyKeyIdentity";
 
-/**
- * Authenticate, open the flag, enforce the ceiling, and bridge to an actor.
- *
- * Throws on every refusal EXCEPT the dark surface, which returns `{ dark: true }`
- * for the caller to answer — see the flag check below for why that one cannot
- * throw. `enforceApiKeyCeiling` already throws a `HandledError`
- * (`ApiKeyPermissionDeniedError`), so the ceiling denial needs no translation
- * here at all — catching it only to re-serialise it was how the code, the
- * permission in `meta` and the tips got dropped.
- */
+/** Authenticate, open flag, enforce ceiling, and bridge to actor. Throws on all refusals EXCEPT
+ * dark surface (returns { dark: true }). enforceApiKeyCeiling already throws HandledError. */
 export async function authorizeLangyApiKey(c: {
   req: { header(name: string): string | undefined };
 }) {
@@ -56,21 +37,8 @@ export async function authorizeLangyApiKey(c: {
   });
   if (!resolved) throw new LangyApiCredentialInvalidError();
 
-  // Dark surface ⇒ 404, not 403: rollback should look like the route was never
-  // deployed, so a client retries nothing and no one reads a denial as a
-  // permissions bug.
-  //
-  // This sits BEFORE the ceiling on purpose. Behind it, a key without
-  // `langy:create` got a 403 while the flag was off — a refusal no unmounted
-  // route can produce, which told the caller the surface was there.
-  //
-  // It also cannot THROW, unlike every other refusal in this function. Anything
-  // thrown here reaches the app's `onError` and comes back as a JSON envelope;
-  // a path that was never mounted falls to Hono's default handler and comes
-  // back as plain-text `404 Not Found`. Content-Type and body would differ,
-  // and that difference is the leak this 404 exists to prevent. So the caller
-  // answers with `c.notFound()`, which IS that default handler — no router in
-  // the chain overrides it.
+  // Dark surface → 404 (not 403): rollback looks like route never deployed. Before ceiling
+  // check to prevent leaking its existence. Cannot throw; returns { dark: true } to caller.
   const surfaceOpen = await featureFlagService.isEnabled(
     "release_langy_api_key_turns_enabled",
     {

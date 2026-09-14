@@ -1,15 +1,5 @@
-/**
- * The one write the sweep performs, and the clauses that bound it.
- *
- * It runs cross-tenant, so every clause is load-bearing: the name is what keeps
- * it off customer keys, `revokedAt: null` is what stops it rewriting rows it
- * already retired, and `expiresAt: { not: null }` is what keeps a key created
- * without an expiry out of a `lte` comparison. The last case pins the App's
- * wider repository to this same query — two copies of this predicate is how a
- * widened sweep gets shipped by only half the fleet.
- *
- * Spec: modules/langy/specs/langy-session-key-maintenance.feature
- */
+/** The cross-tenant sweep write and its load-bearing clauses: name (off customer keys),
+ * revokedAt: null (no rewrites), and expiresAt not null (keys without expiry). */
 import { describe, expect, it, vi } from "vitest";
 
 import type { LangyDatabase } from "../langy-database.mapper.ts";

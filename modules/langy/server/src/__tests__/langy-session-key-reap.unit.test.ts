@@ -108,14 +108,8 @@ describe("langySessionKeyReap process", () => {
 });
 
 /**
- * The names two graphs register, pinned to literals.
- *
- * The App's legacy registry still holds a frozen copy of this pipeline and the
- * packaged worker now builds its own. A drifted pipeline or process name is a
- * routing key on `event-sourcing/jobs` that only one of the two consumers ever
- * stages, and a drifted metric name splits one lifecycle counter across two
- * series. Both failures look like a sweep that is simply quiet, so these
- * literals may only change in a commit that changes the twin as well.
+ * Graph/process/metric names: pinned to literals. Drifted names cause quiet
+ * routing/counter splits. Must change twin together.
  */
 describe("the Langy maintenance pipeline's frozen twin", () => {
   describe("given the legacy registry holds a copy of it", () => {

@@ -1,16 +1,5 @@
 /**
- * The prompt-injection defence for untrusted text.
- *
- * Every value that reaches a system block through a composer chip or a
- * conversation memory entry — a resource name somebody chose, a label an
- * upstream system wrote, text the model itself produced — goes through here
- * first. The threat is a value that stops looking like a value: a newline
- * lets it open what reads as a new instruction, and a backtick lets it close
- * the block it is quoted in.
- *
- * So the cases below are written as the attempt rather than the mechanism.
- * The cap is part of the defence too: unbounded text pushes the real
- * instructions out of the window.
+ * Sanitizes untrusted text to prevent prompt injection via newlines or backticks.
  */
 
 import { describe, expect, it } from "vitest";

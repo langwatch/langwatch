@@ -1,12 +1,7 @@
 /**
- * The advice a wrapped page failure gives the agent.
- *
- * `langy_ui_handler_failed` carries whatever code the page reported, and its
- * own tip is "read meta.errorCode for the page's own failure reason". Following
- * that advice used to end at a name. When the inner code has advice of its own,
- * the wrapper gives that instead, so the agent reads a next step.
- *
  * @see specs/langy/langy-ui-actions.feature
+ *
+ * Tests that wrapper failures forward inner error advice when available.
  */
 import { describe, expect, it } from "vitest";
 

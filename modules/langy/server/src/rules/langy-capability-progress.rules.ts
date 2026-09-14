@@ -1,15 +1,6 @@
-/**
- * Server-side wording for a capability while its result is still streaming.
- *
- * Deliberately separate from the browser CARD REGISTRY: the relay is a server
- * transport and must not import UI composition. That rule does not reach the
- * contract, which both sides already depend on — so which verbs answer with a
- * collection comes from `CLI_COLLECTION_VERBS` rather than a second copy. The
- * copy had drifted: it held `results` and lacked `tag` and `types`, so the
- * server and the browser pluralised different verbs for the same CLI result.
- *
- * The settled card remains responsible for richer presentation.
- */
+/** Server-side wording for streaming capabilities, separate from browser CARD REGISTRY.
+ * Relay is server transport and must not import UI composition. CLI_COLLECTION_VERBS keeps
+ * server and browser in sync; the settled card handles richer presentation. */
 import { CLI_COLLECTION_VERBS } from "@langwatch/langy-contract";
 
 const NOUNS: Record<string, { singular: string; plural: string }> = {

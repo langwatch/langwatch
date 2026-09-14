@@ -1,13 +1,7 @@
-/**
- * The vocabulary one local-control session is defined by: the credential behind a socket, the
- * session it resolves to, the outcomes of authenticating and registering, and the narrow
- * collaborator shapes the core is given rather than reaching for. Shape only.
- */
-/**
- * What a shared folder MEANS to the platform, independent of the transport
- * (ADR-129). WebSocket and long-poll both call this for auth, presence,
- * subscription, turn start, and frame translation; transports own only clocks.
- */
+/** Vocabulary for one local-control session: credential, session, auth/register outcomes,
+ * and collaborator shapes the core receives. Shape only. What a shared folder means to the
+ * platform, independent of transport (ADR-129)—WebSocket and long-poll call for auth,
+ * presence, subscription, turn start, and frame translation; transports own only clocks. */
 
 import type {
   LangyLocalWorkspaceConnectedEventData,
@@ -72,7 +66,7 @@ export type RegisterOutcome =
       ok: true;
       session: ControlSession;
       reply: PlatformFrame;
-      /** Calls the command line says it's still running — marked handed over so a reconnect's pending-calls scan doesn't start a second copy. */
+      /** Calls the command line says are running—handed over so reconnect doesn't restart them. */
       inFlightCallIds: string[];
     }
   | { ok: false; code: LocalControlRefusedCode; message: string };

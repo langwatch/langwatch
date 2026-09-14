@@ -1,6 +1,6 @@
 /**
- * The plan fold — a message's `todowrite` tool parts → the checklist the panel renders, plus the other tool calls
- * attributed to the step that was running when each one appeared.
+ * The plan fold — a message's `todowrite` tool parts → the checklist the panel renders, plus
+ * the other tool calls attributed to the step that was running when each one appeared.
  * @vitest-environment node
  */
 import { describe, expect, it } from "vitest";

@@ -1,5 +1,7 @@
 /**
- * The declarative card renders every catalog-described result from its body widget — rows, facts, stats, diff, text — plus the honest failure state: output that cannot be read renders as "couldn't read this result", never as a confident wrong empty state.
+ * The declarative card renders every catalog-described result from its body widget — rows, facts,
+ * stats, diff, text — plus the honest failure state: unreadable output renders as "couldn't read
+ * this result", never as a confident wrong empty state.
  * @vitest-environment jsdom
  * @see specs/langy/langy-capability-cards.feature
  */

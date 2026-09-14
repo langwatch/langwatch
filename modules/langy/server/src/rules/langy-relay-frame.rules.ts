@@ -1,16 +1,6 @@
-/**
- * The wire shapes the Langy relay ingests (see `langyTurnRelay.ts`).
- *
- * The worker streams one ndjson line per frame. Each line is a
- * `LangyFrameEnvelope`: the authenticated identity + nonce + an opaque `payload`
- * string + its HMAC. The relay verifies the envelope (langyFrameAuth), then
- * parses `payload` into a `LangyRelayFrame` — the typed, EXTENSIBLE union of
- * everything the worker can emit: token deltas, status/progress, tool-call
- * lifecycle, heartbeats, UI cards, and the two terminals (final / error).
- *
- * Splitting the two schemas keeps the security boundary crisp: the envelope is
- * verified as bytes BEFORE its payload is trusted or parsed.
- */
+/** Wire shapes the Langy relay ingests (langyTurnRelay.ts). Each line is a LangyFrameEnvelope
+ * (identity + nonce + opaque payload + HMAC). Relay verifies envelope, parses payload into
+ * typed LangyRelayFrame. Two schemas split the security boundary crisply. */
 import {
   type HandledError,
   type HerrEnvelope,
@@ -34,15 +24,8 @@ export const langyFrameEnvelopeSchema = z.object({
 });
 export type LangyFrameEnvelope = z.infer<typeof langyFrameEnvelopeSchema>;
 
-/**
- * The Go pkg/herr wire envelope, validated and DESERIALIZED AT THE BOUNDARY:
- * herr and HandledError are the SAME model (type ⇄ kind, meta, trace ids,
- * recursive reasons), so the schema transforms the envelope straight into a
- * real HandledError — downstream code only ever sees a HandledError and never
- * thinks about the wire dialect. herr guarantees the envelope carries only
- * our own services' known codes/copy; unknown causes arrive pre-collapsed to
- * type "unknown".
- */
+/** Go pkg/herr wire envelope, deserialized at boundary: herr and HandledError are the same
+ * model, so schema transforms envelope into HandledError. Guarantees only known codes/copy. */
 const herrEnvelopeWireSchema: z.ZodType<HerrEnvelope> = z.lazy(() =>
   z.object({
     type: z.string(),
@@ -89,20 +72,8 @@ const TOOL_CALL_ID_SIGNATURE_SHAPE = /^[A-Za-z0-9_-]+$/;
  */
 const TOOL_CALL_ID_MAX_LENGTH = 256;
 
-/**
- * Strip a model provider's round-trip payload off a tool call id.
- *
- * The blob is not identity — it is state the provider requires back on the
- * next request, and the agent runtime has no other field to put it in. Left
- * alone it rode into the durable event data and, because the tool commands
- * compose their idempotency key out of the id, into the process manager's
- * inbox key, where it was long enough to exceed Postgres's btree index limit
- * and park the conversation's queue group for good
- * (specs/langy/langy-tool-call-identity.feature).
- *
- * Normalising HERE rather than at each use is what makes start and end frames,
- * live cards, durable events and the final's tool list agree on one id.
- */
+/** Strip a model provider's round-trip payload from tool call ids. Normalize here to keep
+ * start/end/cards/events aligned (specs/langy/langy-tool-call-identity.feature). */
 export function normalizeToolCallId(id: string): string {
   const separator = id.indexOf(TOOL_CALL_ID_SIGNATURE_SEPARATOR);
   if (separator <= 0) return id;
@@ -165,19 +136,9 @@ const langyRelayFrameVariants = [
    * no content; it only advances the turn's freshness.
    */
   z.object({ type: z.literal("heartbeat") }),
-  /**
-   * A FULL SNAPSHOT of the agent's plan (its todo list), derived by the manager
-   * from a settled `todowrite` tool part and mirrored as the panel's live
-   * checklist. Snapshot-typed and idempotent under frameNonce dedup — the whole
-   * list rides each frame, last-snapshot-wins, no patching. `status` is kept as
-   * a permissive string (the client tolerates an unknown value as pending). Both
-   * a live buffer entry AND a durable `plan_updated` event.
-   *
-   * Plan items are MODEL-AUTHORED text, so the relay caps count and length here
-   * (defence in depth — the manager already caps to 30 items / 200 chars, so a
-   * legitimate frame never approaches these bounds; a frame that does is a buggy
-   * or hostile source and is REJECTED as an invalid payload, not truncated).
-   */
+  /** Full snapshot of agent's plan (todo list) from settled todowrite tool part.
+   * Snapshot-typed, idempotent under frameNonce. Both live buffer and durable plan_updated event.
+   * Model-authored text, capped by relay (defence in depth). */
   z.object({
     type: z.literal("plan"),
     items: z

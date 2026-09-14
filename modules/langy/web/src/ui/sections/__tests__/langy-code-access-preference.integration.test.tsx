@@ -1,11 +1,8 @@
 /**
  * @vitest-environment jsdom
  *
- * The remembered answer to "how should Langy reach my code" shows on the Integrations screen
- * (it fills that screen's slot) and can be taken back there. The choice is made in the chat, so
- * the line only exists once one is stored: a settings page that offers to change a choice
- * nobody made is noise.
- *
+ * The remembered code-access choice shows on the Integrations screen only once one is stored —
+ * a settings page offering to change a choice nobody made is noise.
  * @see specs/langy/langy-code-access.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

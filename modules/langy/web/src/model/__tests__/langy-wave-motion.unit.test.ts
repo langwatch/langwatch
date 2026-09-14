@@ -1,5 +1,6 @@
 /**
- * The fold moves with LANGY'S BEHAVIOUR, never the cursor — and its motion is a quiet status channel, not a spectacle.
+ * The fold moves with LANGY'S BEHAVIOUR, never the cursor — its motion is a quiet status
+ * channel, not a spectacle.
  * @vitest-environment node
  * Spec: specs/langy/langy-panel-fold-motion.feature
  */

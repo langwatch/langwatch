@@ -1,7 +1,8 @@
 /**
- * SPA-safe link behaviour for Langy: every internal target must ride the SPA router so the persistent Langy panel
- * is never torn down by a full page load (specs/langy/langy-navigation-persistence.feature,
- * specs/langy/langy-agent-driven-navigation.feature).
+ * SPA-safe link behaviour for Langy: every internal target must ride the SPA router so the
+ * persistent panel is never torn down by a full page load.
+ * @see specs/langy/langy-navigation-persistence.feature
+ * @see specs/langy/langy-agent-driven-navigation.feature
  */
 import type { MouseEvent } from "react";
 

@@ -5,74 +5,16 @@ import {
 } from "@langwatch/authz-contract";
 
 /**
- * WHY THIS FILE EXISTS
- *
- * `LANGY_CANDIDATE_PERMISSIONS` is an enumeration, and an enumeration cannot
- * tell you why something is absent. `experiments:view` was missing because
- * nobody thought of it; `cost:view` was missing because someone decided
- * against it. In the list those two look identical — a line that isn't there.
- *
- * That ambiguity is not a documentation problem, it is the defect itself, and
- * it produced the same production 403 three times: `project:view`
- * (`langwatch agent list` refused), `scenarios:create` against a route asking
- * `scenarios:manage`, and `experiments:view` (`langwatch experiment list`
- * refused). Each was found by a user, diagnosed by hand, and fixed by adding a
- * line and a comment explaining the oversight.
- *
- * So this file states the RULE the enumeration was always an expression of.
- * `classifyForLangy` decides, for any permission in the system, whether Langy
- * should be able to hold it — and `langy-permission-coverage` reconciles that
- * verdict against two independent facts: what the route registry actually
- * demands, and what the candidate list actually grants.
- *
- * THE DEFAULT INVERTED (owner decision, 2026-08-21)
- *
- * This file used to be an ALLOWLIST of eleven families, and it argued the
- * inversion was unsafe: with a blocklist, "a resource family invented next
- * quarter is delegable the moment it exists, before anyone has assessed it."
- * That argument was right about new families and wrong about existing ones —
- * it was being used to justify keeping Langy refused on twenty-four families
- * somebody HAD assessed, which is how an assistant ends up unable to do the
- * job it was built for.
- *
- * The owner's rule is now: Langy may do everything except manage the auth
- * scope. Reading the auth scope is fine; secrets are not readable at all.
- *
- * The safety argument the old allowlist was carrying is carried better, and
- * has been all along, by the session-key mint: the session key is the
- * INTERSECTION of this policy with the permissions the requesting human
- * actually holds. Langy cannot exceed the person who asked, whatever this file
- * says. Widening the policy widens the CEILING, not anyone's actual access —
- * a user who cannot delete a dataset by hand still cannot ask Langy to.
- *
- * What the old file was genuinely protecting — that a family invented later is
- * not silently swept in — is kept, and kept without keeping the refusals: every
- * family in the permission registry is classified into exactly one of the three
- * buckets below, and `langy-permission-coverage` FAILS when one is missing. A
- * new family is therefore refused until a human classifies it (fail-closed, as
- * before) but it cannot sit quietly refused for a quarter, because CI goes red
- * the moment it is added. The decision is forced either way; only the default
- * for the families that exist today has changed.
- *
- * WHERE THE VOCABULARY COMES FROM
- *
- * The universe this file partitions is `AUTHZ_RESOURCES` — the ADR-092
- * permission registry in `@langwatch/authz-contract`, which is the canonical
- * declaration (`Permission` in rbac.ts is a bare alias of `AuthzPermission`).
- * The app-local `~/utils/rbacVocabulary` copy this policy used to read is not
- * reachable from a package, and the registry is a superset of it, so reading
- * the registry both keeps the layering honest and makes the partition total
- * over the wider list.
+ * Partition of authz permissions into three buckets: full access (ceiling),
+ * auth-scope read-only, and fully excluded. `classifyForLangy` decides per
+ * permission; `langy-permission-coverage` enforces totality. See ADR-092 for
+ * registry, ADR-021 for scope fence.
  */
 
 /**
- * Verdict for a single permission. Non-granted verdicts always carry their
- * reason. `excluded` means the POLICY refuses it; `unreachable` means the
- * policy would grant it but the grain cannot exist on a project-scoped
- * binding (the ADR-021 scope fence refuses org-exclusive permissions below
- * the org tier), so the minted key never carries it. The distinction matters
- * to the customer-facing denial: "widen your own role" is useless advice for
- * either, and the reason string says which wall was hit.
+ * Verdict for permission: granted, excluded (policy refuses), or unreachable
+ * (scope fence refuses org-exclusive at project tier). Reason string says
+ * which wall was hit (ADR-021).
  */
 export type LangyPermissionVerdict =
   | { readonly disposition: "granted" }
@@ -80,15 +22,8 @@ export type LangyPermissionVerdict =
   | { readonly disposition: "unreachable"; readonly reason: string };
 
 /**
- * The actions Langy may hold, subject to the family buckets below.
- *
- * `delete` and `manage` are deliberately present: they are destructive, but
- * they destroy only what the requesting human could already destroy by hand,
- * so the ceiling bounds them. `attach`/`detach` are here because they only
- * mean anything on `gatewayGuardrails`, and re-policing a gateway key is the
- * day job of anyone driving the gateway — the same ceiling argument as
- * `virtualKeys` below: Langy can only re-police keys for a caller who could
- * do it by hand.
+ * Delegable actions: destructive (delete/manage) bounded by ceiling, and
+ * guardrail actions (attach/detach) bounded by caller's own access.
  */
 const DELEGABLE_ACTIONS = new Set([
   "view",
@@ -101,17 +36,9 @@ const DELEGABLE_ACTIONS = new Set([
 ]);
 
 /**
- * Actions Langy may never hold, on any family, whatever that family's bucket.
- * These are the axes the user-permission ceiling does NOT contain, which is
- * the only reason anything is listed here at all. Keyed by action so a new
- * one added to the registry surfaces here as an explicit decision.
- *
- * An action absent from BOTH this map and `DELEGABLE_ACTIONS` is refused (the
- * generic branch in `classifyForLangy`) and fails the coverage test's totality
- * check — the same fail-closed-but-noisy treatment new families get. The
- * allowlist is what makes that fail-closed; do not reduce this to "everything
- * not excluded is allowed", or an action invented next quarter is delegated
- * the moment it exists.
+ * Excluded actions: not in user ceiling. Keyed by action so new ones surface
+ * explicitly. Absence from both this and DELEGABLE_ACTIONS fails totality check
+ * (fail-closed, not fail-open).
  */
 const ACTION_EXCLUSIONS: Record<string, string> = {
   // Disclosure, not access. A share link is readable by people who hold no
@@ -136,39 +63,9 @@ const ACTION_EXCLUSIONS: Record<string, string> = {
 };
 
 /**
- * Families where not even a read is delegable.
- *
- * `secrets` is the owner's stated carve-out: reading a stored credential IS
- * obtaining it. There is no weaker grain — `secrets:view` is the whole
- * compromise, so the read/manage split the rest of this file turns on has
- * nothing to bite on.
- *
- * `agentCache` is the same carve-out one step removed. An agent under test
- * writes what it produced during a run there, and what it produces is normally
- * the session it logged in with. The entry is encrypted at rest and a read
- * hands back the plaintext, so a read of the cache is a read of whatever
- * credential the agent put in it. Every route in the family asks for
- * `agentCache:manage`, so there is no weaker grain to hold either.
- *
- * `langy`, `ops` and `featureFlags` are not part of the "everything" the owner
- * widened, because none of them is tenant data:
- *
- * - `langy:create` is the ceiling gate on `POST /api/langy` itself. A session
- *   key that carries it can start Langy turns, and each turn mints another key
- *   that can do the same — the intersection ceiling bounds AUTHORITY, not
- *   AMPLIFICATION, so nothing else in the system stops that recursion. And
- *   `langy:delete` archives Langy's own conversations, which is the `auditLog`
- *   argument over again: an assistant that can edit the record of what it did
- *   is an assistant whose record proves nothing. Langy's conversations are
- *   managed by the app, not by its tools.
- * - `ops` gates LangWatch-staff platform surgery (feature flags, ClickHouse
- *   TTL, blob deletion). It is unreachable through an API key today only
- *   because no REST route demands it; that is a transport coincidence, not a
- *   policy, so the policy says no.
- * - `featureFlags` decides which projects and organizations a platform
- *   rollout experiment enrols. Same argument as `ops`: it is LangWatch's
- *   release machinery seen from inside a tenant, not a capability over the
- *   tenant's own data.
+ * Fully excluded families: secrets (reading = obtaining), agentCache (stores
+ * sessions), langy (recursive authority), ops (platform surgery), featureFlags
+ * (release machinery, not tenant data).
  */
 const FULLY_EXCLUDED_FAMILIES: Record<string, string> = {
   secrets: "reading a stored credential is obtaining it; there is no safe read",
@@ -185,33 +82,9 @@ const FULLY_EXCLUDED_FAMILIES: Record<string, string> = {
 };
 
 /**
- * The AUTH SCOPE: readable, never writable.
- *
- * "Auth scope" is not a family name in the registry, so it is enumerated here.
- * A family belongs on this list when writing it changes WHO CAN DO WHAT, or
- * changes a credential — as opposed to changing the tenant's data, which is
- * what everything else in the system does. Langy explaining your org's roles
- * is useful and safe; Langy editing them is the one thing the owner asked to
- * keep out of its hands.
- *
- * Note this is stricter than `:manage` alone: the whole write surface is
- * withheld, not just the manage grain. `:manage` implies `:delete` AND
- * `:rotate` through the hierarchy, so a family whose writes are credential
- * operations cannot be half-granted — handing over `:update` on
- * `gatewayProviders` to withhold `:manage` would be a distinction the route
- * layer is under no obligation to respect.
- *
- * `virtualKeys` is deliberately NOT here (owner decision, 2026-08-21): virtual
- * keys are gateway credentials, but issuing them is the day job of anyone
- * driving the gateway, and the ceiling bounds it — Langy can only mint keys
- * for a caller who could mint them by hand. `:rotate` is excluded via
- * `ACTION_EXCLUSIONS`, and because `:manage` implies `:rotate` through the
- * hierarchy (`hasPermissionWithHierarchy`), the ONLY way to make that
- * exclusion true of the credential rather than merely of this file's text is
- * to withhold `virtualKeys:manage` too — which `GRAIN_EXCLUSIONS` below does.
- * The cost is real and accepted: Langy cannot create ORG- or TEAM-scoped
- * virtual keys or widen a key's scopes (the two REST surfaces demanding
- * `virtualKeys:manage`); project-scoped mint, update, and delete all remain.
+ * Auth-scope families: readable, never writable (changes who can do what).
+ * Stricter than manage alone (hierarchy implies rotate). virtualKeys excluded
+ * via GRAIN_EXCLUSIONS because manage implies rotate. See ADR-021 scope fence.
  */
 const AUTH_SCOPE_FAMILIES: Record<string, string> = {
   organization: "org membership and role administration IS the auth scope",
@@ -232,27 +105,10 @@ const AUTH_SCOPE_FAMILIES: Record<string, string> = {
 };
 
 /**
- * Everything else: full CRUD, including `delete` and `manage`.
- *
- * Enumerated rather than derived by subtraction, so that a family added to the
- * registry lands in NO bucket and `langy-permission-coverage` fails. That
- * failure is the entire remaining safety property of this file — see the
- * header. Do not replace this with `Object.keys(AUTHZ_RESOURCES).filter(...)`;
- * doing so is precisely the fail-open the old allowlist was built to prevent.
- *
- * SEVEN OF THESE ARE INERT AT PROJECT SCOPE and their presence here is a
- * classification, not an access grant: `governance`, `anomalyRules`,
- * `aiTools`, `activityMonitor`, `gatewaySpend`, `governanceCost`, and
- * `ingestionSources` are declared organization-only in the registry, so
- * `langyCandidatePermissions` drops every grain of them and the minted key
- * holds nothing. The scope fence was built for ADR-021 scope escalation, not
- * for Langy — several of these families were previously excluded here with
- * their own reasons
- * (`activityMonitor` was "cross-principal activity surveillance"). If the
- * session key ever gains an ORGANIZATION-scoped binding, these six widen
- * instantly from a change in a different file: RE-DECIDE each of them
- * explicitly before making that change. The coverage test pins the exact
- * inventory so the tripwire at least has a bell on it.
+ * Full access families: CRUD + delete/manage. Enumerated to fail CI when
+ * unclassified families added (fail-closed). Seven are inert at project scope
+ * (governance, anomalyRules, aiTools, activityMonitor, gatewaySpend,
+ * governanceCost, ingestionSources).
  */
 const FULL_ACCESS_FAMILIES = new Set([
   "analytics",
@@ -284,14 +140,8 @@ const FULL_ACCESS_FAMILIES = new Set([
 ]);
 
 /**
- * Single grains withheld even though their family and action are both
- * otherwise delegable. Smallest hammer in the file — use it only when the
- * permission HIERARCHY makes a coarser grain imply an excluded one.
- *
- * `virtualKeys:manage` is here because `:manage` implies `:rotate`: granting
- * it would make the `rotate` exclusion above a statement about this file's
- * text rather than about the credential. See the `virtualKeys` note on
- * `AUTH_SCOPE_FAMILIES` for the accepted cost.
+ * Grain-level exclusions: withheld when permission hierarchy makes coarser
+ * grain imply an excluded one. E.g., virtualKeys:manage (manage implies rotate).
  */
 const GRAIN_EXCLUSIONS: Record<string, string> = {
   "virtualKeys:manage":
@@ -372,30 +222,9 @@ function onlyAnOrgScopedBindingCanGrant(permission: string): boolean {
 }
 
 /**
- * The candidate list, DERIVED from the rule rather than hand-maintained
- * alongside it.
- *
- * This file used to insist the rule "deliberately does NOT generate the list",
- * on the grounds that generating it would grant a brand-new family the moment
- * it appeared. That hazard is now closed at the other end: the family and
- * action partitions are total and CI-enforced, so a new family or action
- * reaches this function only after a human has classified it. With the hazard
- * gone, the cost of hand-maintenance is all that is left — and that cost was
- * three production 403s, each one a line nobody remembered to add. Deriving
- * removes that entire class of defect rather than continuing to catch it.
- *
- * PROJECT SCOPE IS THE SECOND FILTER, and it is not cosmetic. The session key
- * is minted with a single PROJECT-scoped binding, and the ADR-021 scope fence
- * refuses org-exclusive permissions on any binding below the org tier. Listing
- * `governance:manage` here would therefore not widen Langy by one capability —
- * it would just put nine families of dead entries in front of the permission
- * batch on every turn and invite the next reader to conclude Langy has access
- * it has never had. The classification above still records the honest verdict
- * for those families; this list records what a project-scoped key can actually
- * carry.
- *
- * Deterministic order (families and actions as the registry declares them) so
- * the minted key's permission array is stable across turns.
+ * Candidate list: derived from rule (CI-enforced totality beats hand-maintenance
+ * defects). Filtered by PROJECT scope: org-exclusive permissions refused at
+ * project tier (ADR-021). Deterministic order for stable minted key.
  */
 export function langyCandidatePermissions(): AuthzPermission[] {
   const candidates: AuthzPermission[] = [];
@@ -424,13 +253,8 @@ export function splitPermission(permission: string): {
 }
 
 /**
- * The grain-level exclusions `classifyForLangy` consults after the action and
- * fully-excluded-family checks: single withheld grains (`GRAIN_EXCLUSIONS`)
- * and actions that only mean anything on one family. The candidate derivation
- * walks the family × action cross product, so the pair is well-formed whether
- * or not the grain means anything — `analytics:attach` is a well-typed string
- * describing nothing. `attach`/`detach` are the only actions narrow enough to
- * pin precisely: they police guardrails and mean nothing anywhere else.
+ * Grain exclusion reason: grain-level (GRAIN_EXCLUSIONS) or action-only
+ * (attach/detach on gatewayGuardrails). Returns reason or undefined.
  */
 function grainExclusionReason(family: string, action: string): string | undefined {
   const grainExcluded = GRAIN_EXCLUSIONS[`${family}:${action}`];
@@ -442,14 +266,9 @@ function grainExclusionReason(family: string, action: string): string | undefine
 }
 
 /**
- * Should Langy be able to hold this permission on the caller's behalf?
- *
- * Fail-closed on anything unrecognised, and "anything" is meant literally: an
- * excluded action, an unclassified family, and a string that is not
- * `resource:action` at all each come back `excluded` with a reason. The rule
- * can therefore only ever be too strict, and being too strict shows up as a
- * reviewer having to classify a family — never as a silently over-broad
- * credential.
+ * Classify permission: granted, excluded (policy), or unreachable (scope).
+ * Fail-closed: too strict shows as reviewer needing to classify, not silently
+ * over-broad credential.
  */
 export function classifyForLangy(permission: AuthzPermission | string): LangyPermissionVerdict {
   const { family, action } = splitPermission(permission);

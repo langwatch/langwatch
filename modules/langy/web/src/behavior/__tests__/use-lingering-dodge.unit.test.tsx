@@ -1,5 +1,6 @@
 /**
- * The dodge-release cadence of the floating Langy surfaces: engage the moment a drawer arrives, let go only a beat after it has left.
+ * The dodge-release cadence of the floating Langy surfaces: engage the moment a drawer
+ * arrives, let go only a beat after it has left.
  * @vitest-environment jsdom
  * Spec: specs/langy/langy-panel-layout.feature
  */

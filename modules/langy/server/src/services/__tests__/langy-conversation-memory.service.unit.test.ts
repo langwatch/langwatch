@@ -1,17 +1,7 @@
 /**
- * The resource memory a Langy turn carries, so "run it" resolves to an id.
- *
- * Every rule here is about not offering the model a referent that is not one.
- * A tool call that errored created nothing; a digest naming no id refers to
- * nothing; the same resource touched twice is the thing as it now stands, not
- * as it was. Getting any of those wrong hands the agent an id it will then
- * confidently act on.
- *
- * The rendered block is a prompt-injection surface: a resource `name` is
- * whatever a user, an upstream system, or the agent itself called the thing,
- * echoed back into a SYSTEM block. So the block has to say it is data, and the
- * ids in it have to be marked unverified — our say-so is not proof the thing
- * still exists.
+ * Resource memory so "run it" resolves to an id; errored/duplicate/stale
+ * resources must not look like valid referents, and names are untrusted
+ * prompt-injection surface, marked unverified in the rendered SYSTEM block.
  */
 
 import { describe, expect, it } from "vitest";
@@ -200,11 +190,9 @@ describe("LangyConversationMemoryService.tryRender", () => {
 });
 
 /**
- * Ported from platform/app/src/server/app-layer/langy/__tests__/langyConversationMemory.unit.test.ts
- * (origin/main), adapted from the free-function API
- * (`extractLangyConversationMemory` / `renderLangyConversationMemory` /
- * `renderLangyConversationTranscript`) to `LangyConversationMemoryService`'s
- * static methods. See specs/langy/langy-conversation-memory.feature.
+ * Ported from `langyConversationMemory.unit.test.ts` (origin/main), adapted to
+ * `LangyConversationMemoryService`'s static methods.
+ * @see specs/langy/langy-conversation-memory.feature
  */
 describe("LangyConversationMemoryService — ported scenarios", () => {
   /** An assistant message carrying one settled CLI tool part. */

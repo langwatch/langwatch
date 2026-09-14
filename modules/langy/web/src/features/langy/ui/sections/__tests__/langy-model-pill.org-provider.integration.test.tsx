@@ -1,12 +1,8 @@
 /**
  * @vitest-environment jsdom
  *
- * The composer's picker against the real `useModelSelectionOptions` hook and a
- * mocked tRPC boundary: a provider row stored at ORGANIZATION scope, and no
- * row for the project itself. The project's provider list carries the
- * organization row (ADR-021), so the picker must offer its models.
- *
- * @see specs/langy/langy-model-selection.feature
+ * A provider row at ORGANIZATION scope, none at project scope (ADR-021): the picker must
+ * still offer its models. @see specs/langy/langy-model-selection.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";

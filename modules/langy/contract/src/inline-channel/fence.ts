@@ -1,19 +1,7 @@
 /**
- * The ```langy-card fence grammar (ADR-060 §1) — ONE scanner, shared by the
- * relay (which extracts fences from the settled assistant text to stamp
- * typed parts) and the client preview (which spots a forming fence in the
- * live token stream). Both sides split text through this module, so they
- * cannot disagree about where a card starts and ends.
- *
- * Grammar: a line that is only a code fence (three or more backticks) tagged
- * exactly `langy-card` opens a card; the next line that is only a closing
- * fence (three or more backticks, no tag) closes it. Scanning is
- * CommonMark-shaped about nesting: any OTHER fenced code block (```json,
- * ```markdown …) is opaque text, so a langy-card fence the model merely
- * quotes inside a code example never becomes a card. A fence still open at
- * the end of the text is reported unclosed — the preview treats that as a
- * forming card; the relay treats it as a truncated one and lets salvage
- * decide.
+ * langy-card fence scanner (ADR-060 §1): opens on ```langy-card, closes on
+ * untagged fence. Other fenced blocks opaque (nested). Relay and preview share
+ * this module so scanning is never ambiguous.
  */
 
 /** The fence info tag that marks a card Langy wrote. */
@@ -30,15 +18,8 @@ export type LangyCardFenceSegment =
     };
 
 /**
- * True when the text could open a card block, for callers that want to skip
- * the line scan on the common fence-less stream. Conservative by
- * construction: every opening the grammar accepts spells the tag out, so
- * testing for the tag alone can say yes too often but never no too often.
- *
- * It belongs here rather than at the call site. A caller that writes its own
- * substring test writes the fence and the tag together, misses the openings
- * that put a space or an indent in between, and renders a card's JSON to the
- * reader as a code block.
+ * Conservative check for tag presence. Avoids line scan on fence-less streams.
+ * Belongs here not at call site (tag test alone misses space/indent variants).
  */
 export function mightContainLangyCardFence(text: string): boolean {
   return text.includes(LANGY_CARD_FENCE_TAG);

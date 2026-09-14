@@ -3,8 +3,8 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { useLangyStore } from "../behavior/langy.store.ts";
 
 /**
- * Minimise-to-peek is a MINIMISE, not a close: `isOpen: false` sinks the panel to its edge peek with everything underneath intact, and
- * opening from the peek (click, Enter, or the Cmd/Ctrl+I toggle) brings the same surface back.
+ * Minimise-to-peek is a MINIMISE, not a close: `isOpen: false` sinks the panel to its edge
+ * peek with everything underneath intact, and opening from the peek brings it back.
  * Spec: specs/langy/langy-peek-dock.feature
  */
 describe("Langy minimise-to-peek store transitions", () => {

@@ -1,20 +1,5 @@
 /**
- * Which card reads which CLI command — the registry that turns
- * `langwatch <resource> <verb>` into a schema.
- *
- * The resource's DEFAULT card covers its whole verb set, and only the verbs that
- * genuinely render differently are named. That is what keeps ~90 commands down to
- * a page of declarations: `dataset list`, `dataset get` and `dataset delete` all
- * read as the dataset resource, and only `trace get` needs to say it is a single
- * trace rather than a list of them.
- *
- * The verb GRAMMAR — create writes, delete destroys, run produces a run — is
- * classified once, so a new command inherits the right card without being listed
- * at all. A resource this registry has never heard of resolves to the generic
- * resource card rather than to nothing, because a card with fewer details still
- * beats a wall of console text.
- *
- * The resource list is the CLI's own, per `feature-map.json`.
+ * Registry: which card reads which CLI command; unknown →generic.
  */
 import type * as z from "zod";
 import {
@@ -27,50 +12,12 @@ import {
 } from "./schemas.ts";
 
 /**
- * ── SHAPE-DRIVEN PROMOTION ─────────────────────────────────────────────────
- *
- * `cardKindFor` picks a card from the command's NAME alone. That is right most
- * of the time and wrong in a specific, recurring way: a result can arrive full
- * of summable cost or a chartable series and still render as a generic table
- * because of what the command happened to be called. So the name stays a PRIOR
- * and the shape may PROMOTE.
- *
- * Rules that keep it honest, in order of how easily they are lost:
- *
- *  1. PROMOTE ONLY — never demote, never override a deliberate `byVerb`
- *     binding. Eligibility is decided by HOW the card was chosen, not by how
- *     generic it is: a resource's DEFAULT read card (`read:`) is a prior and
- *     may be promoted; a `byVerb` binding is a decision and may not. See
- *     `PROMOTABLE_FROM`.
- *  2. ELIGIBILITY THEN RANK, never first-match. An if-chain encodes its
- *     priority in source order, where nobody can see or test it. (Every
- *     serious visualisation-recommendation system ranks: Mackinlay's *Show Me*,
- *     UW's *Draco*.)
- *  3. TIES BREAK EXPLICITLY — two probes may not share a specificity, asserted
- *     by `promotion.test.ts`.
- *  4. PROBES MUST DISCRIMINATE, and a probe schema is NOT a card's render
- *     schema. Acceptance is a floor ("I can draw this"); evidence is a bar
- *     ("this payload proves it is mine"). Conflating them breaks a deliberate
- *     binding the moment a real payload omits a field.
- *
- * ADR: dev/docs/adr/079-card-selection-is-deterministic.md
+ * Shape-driven promotion: promote defaults only, rank by eligibility, ties explicit.
+ * See dev/docs/adr/079-card-selection-is-deterministic.md.
  */
 
 /**
- * The cards a result may be promoted FROM.
- *
- * The test is rule 1, not "is it generic": a card is promotable when it was
- * chosen by a resource DEFAULT rather than by a deliberate `byVerb` binding. So
- * the generic read qualifies, and so does `metrics` — the default the whole
- * `analytics` resource rides, which nothing ever chose for a specific verb.
- *
- * `metrics` matters because `analytics query` is the ONE command that answers
- * with a chartable series, and while it was excluded the timeseries card could
- * not be reached by any command in the product: "compare trace cost this week
- * to last" resolved to `metrics` and rendered the trend as two large decimals.
- *
- * A write card states what just happened and a bespoke `byVerb` read card was
- * chosen deliberately; neither is an invitation to guess again.
+ * Promotable from: DEFAULT cards only (not byVerb); metrics matters for analytics.
  */
 const PROMOTABLE_FROM: ReadonlySet<MeasuredCardKind> = new Set<MeasuredCardKind>([
   "resourceRead",
@@ -254,18 +201,7 @@ export const CLI_COLLECTION_VERBS: ReadonlySet<string> = new Set([
 ]);
 
 /**
- * CLI verbs whose result rows are SUB-entities of the resource, not the
- * resource itself — `dataset records` returns records, `prompt versions`
- * returns versions, `ingest tail` returns events. Their ids must never be
- * resolved as if they named the parent resource (a record id looked up as a
- * dataset would read as "dataset gone", which is a lie), so id-reference
- * hydration skips these and the card renders the stored structure instead.
- *
- * `types` is the same lie in its most misleading form: `evaluator types`
- * answers with the CATALOG an evaluator may be built from, and every row
- * carries a `slug` the convention would happily read as an evaluator id. Left
- * hydrating, a complete catalog resolves to nothing in the project and draws
- * as "no evaluators" — the empty-state card that command exists to prevent.
+ * CLI sub-resource verbs: rows are sub-entities (records, versions, events), not parent IDs.
  */
 export const CLI_SUBRESOURCE_VERBS: ReadonlySet<string> = new Set([
   "records",
@@ -376,15 +312,7 @@ export type ParsedCliResult =
   | { ok: false; kind: MeasuredCardKind; reason: string };
 
 /**
- * Read a CLI command's `--format json` output into its card.
- *
- * Accepts the document either parsed or as the JSON string the tool envelope
- * recorded it as, because the panel receives it as a string and the CLI holds it
- * as an object, and neither should have to care which.
- *
- * A result that does not match its card fails SOFTLY: the caller gets `ok:false`
- * and can fall back to raw output. A drifted response must degrade to "no card
- * detail", never to a wrong card and never to a crash.
+ * Parse CLI JSON into its card; soft failures (ok: false) fall back to raw output.
  */
 export const parseCliResult = ({
   resource,
@@ -397,14 +325,7 @@ export const parseCliResult = ({
 }): ParsedCliResult => parseCardResult({ kind: cardKindFor({ resource, verb }), output });
 
 /**
- * Read a result into the schema of a card that has ALREADY been decided.
- *
- * The panel's entry point. By the time anything renders, the card was chosen
- * once at the command boundary from the name and the payload together, and the
- * choice travels on the envelope — so re-deriving a kind from the command's
- * name at render time is a second decision that can disagree with the first.
- * It did: a promoted result parsed against the card its name would have earned
- * rather than the card it was stamped with. See ADR-079 §1.
+ * Parse result into pre-decided card schema; re-deriving kind at render can mismatch (ADR-079).
  */
 export const parseCardResult = ({
   kind,

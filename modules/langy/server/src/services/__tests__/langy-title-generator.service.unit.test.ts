@@ -1,12 +1,7 @@
 /**
  * @vitest-environment node
- *
- * The title generator, as it behaves once the model has answered.
- *
- * It moved out of the retired application whole, and everything worth pinning
- * is about what it does with an answer rather than how it got one: the
- * transcript it builds, the shapes it strips off a title, and the one thing it
- * must never do, which is fail the turn that asked for a title.
+ * Title generator behavior once the model answers: transcript, stripped
+ * shapes, and never failing the turn that asked for a title.
  */
 import { LANGY_TITLE_GENERATION } from "@langwatch/langy-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";

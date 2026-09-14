@@ -1,11 +1,8 @@
 /**
  * @vitest-environment jsdom
  *
- * The scenario card reads the scenario, not its serialised form. A
- * `scenario get` returns a structured document, and the card used to summarise
- * it by stringifying it — so the reader got `{` and `"id": "scenario_0002Yw…",`
- * where the scenario's own name and status belong.
- *
+ * The scenario card reads the structured `scenario get` document, not its stringified form —
+ * it used to show raw JSON where the scenario's own name and status belong.
  * @see specs/langy/langy-capability-cards.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

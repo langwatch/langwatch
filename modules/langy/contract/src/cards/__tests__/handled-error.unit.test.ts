@@ -308,13 +308,8 @@ describe("parseHandledError, given dialect 4 (the canonical envelope)", () => {
 });
 
 /**
- * The remediation channel (ADR-045). The platform spells it `tips`/`docsUrl`;
- * the CLI had only ever read `suggestions`/`docUrl`, names the platform never
- * emits, so every one of the centrally-authored tips in
- * `server/app-layer/error-remediation.ts` was dropped on the floor and the CLI
- * fell back to its own handful of generic codes.
- * `specs/features/domain-error-contract.feature` names the CLI as a consumer
- * that must be able to self-diagnose from these.
+ * Remediation channel test: platform emits tips/docsUrl; CLI must parse them.
+ * See ADR-045 and specs/features/domain-error-contract.feature.
  */
 describe("parseHandledError, given dialect 4 (the canonical nested envelope)", () => {
   it("reads code, sentence, trace and meta from under the `error` object", () => {
@@ -643,16 +638,7 @@ describe("handledErrorFromThrown", () => {
 });
 
 /**
- * The shape `fetch` ACTUALLY throws when the transport fails: a
- * `TypeError("fetch failed")` whose `cause` is the libuv system error. Its own
- * enumerable keys are `{ errno, code, syscall, address, port }`, so it carries a
- * top-level `code` — `ECONNREFUSED`, `ENOTFOUND`, a TLS cert code — that is not
- * a discriminant the platform ever chose.
- *
- * A hand-rolled `new Error("fetch failed")` with no `cause` cannot stand in for
- * this: it is the `cause` that carries the `code`, and the `code` is the whole
- * hazard. Read as a domain error, a dead socket renders as though the USER had
- * done something wrong, and the local address and port ride along in `meta`.
+ * Fetch failures: the cause has the system error code, not the thrown TypeError.
  */
 const systemError = ({
   message,
@@ -830,13 +816,7 @@ describe("parseHandledError, given a bare `code` with nothing else", () => {
 });
 
 /**
- * The one thing a machine caller needs beyond "what went wrong": whether there
- * is anything left to try.
- *
- * The agent used to infer this from the code and got it wrong in the expensive
- * direction — it re-ran a create that had been refused on a PLAN LIMIT with a
- * different set of flags, which could never have worked, and put a second card
- * in the user's transcript for a resource that was never made.
+ * Tests whether a failure is terminal: whether there's anything left to try.
  */
 describe("isTerminalFailure", () => {
   const failure = ({ status, code }: { status: number; code: string }) =>

@@ -1,5 +1,6 @@
 /**
- * Agent-driven page control, at the panel: a `ui` entry on the live turn stream reaches the page's own handler through a claim, and the rollout flag is what closes that channel.
+ * Agent-driven page control, at the panel: a `ui` entry on the live turn stream reaches the
+ * page's own handler through a claim, and the rollout flag is what closes that channel.
  * @vitest-environment jsdom
  * @see specs/langy/langy-ui-actions.feature
  */

@@ -20,13 +20,8 @@ export const LANGY_RESOURCE_KINDS = [
 export type LangyResourceKind = (typeof LANGY_RESOURCE_KINDS)[number];
 
 /**
- * The chip kinds whose page carries a server-side UI-action manifest, so an
- * agent on that page can drive it live (`PAGE_ACTION_MANIFESTS`, app side).
- *
- * Kept here rather than next to the manifests because it is the TURN's
- * question — "does what the user is looking at accept live actions?" — and the
- * turn block is the only thing that asks it. The manifests themselves, with
- * their payload schemas and permissions, stay in the app.
+ * Chip kinds with server-side UI-action manifest. Kept here (turn's question)
+ * not next to manifests (app-side with schemas/permissions).
  */
 export const LANGY_UI_ACTION_CHIP_KINDS = [
   "experiment",
@@ -159,20 +154,9 @@ function describeSkill(skill: LangySkillContext): string | null {
 }
 
 /**
- * Render the turn's attached context as a system block, or null when there is
- * nothing to say.
- *
- * Framed as a description of the user's screen and explicitly marked
- * non-instructional, so a label reading "ignore previous instructions" is what
- * it actually is: the name of something on a page, quoted back to the model.
- *
- * `isUiActionSurfaceOpen` is `release_langy_ui_actions`, resolved by the
- * caller. It is a REQUIRED argument rather than a default, because the two ends
- * must agree: with the flag off the dispatch route answers a dark 404
- * (`routes/langy-ui-actions.ts`), so advertising the commands anyway sends the
- * agent to a surface that behaves as if it were never deployed. Kept out of
- * `LangyTurnContext` because that type is the CLIENT's wire payload, and this
- * is a server-resolved fact the client must not be able to state.
+ * Render context as system block (description of user's screen, not
+ * instructional). isUiActionSurfaceOpen is required arg (server-resolved,
+ * not client payload).
  */
 export function renderLangyTurnContext({
   context,

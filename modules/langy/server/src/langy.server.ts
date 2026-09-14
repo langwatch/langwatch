@@ -22,17 +22,8 @@ export const langyServer = defineServerModule("langy")
   .withRepositories(langyRepositories)
   .withApp(LangyApp)
   .withTransports(langyTurnsRest, setupSkillsTrpcTransport)
-  /**
-   * What the public turn surface and the internal control plane reach that
-   * Langy's own application does not own, resolved once per install from the
-   * peers the App declared and the members it reads.
-   *
-   * `langyInternalRest` is not in `withTransports` yet, so the three facts
-   * below bind nothing this process currently mounts. They are bound anyway:
-   * the family's mount is a boot refusal until they are, and every value here
-   * is this module's to state, so leaving them unbound would only move the
-   * same three lines into whichever process lists the family next.
-   */
+  /** Binds internal facts that langyInternalRest doesn't mount yet; the family's mount
+   * refuses boot until they're bound, and moving them would only shift the same lines later. */
   .withTransportFacts(({ dependencies, members }) => {
     // Rollout gate then identity bridge, in that order - the chain both public
     // Langy families share. `actors` is the same user directory the deleted

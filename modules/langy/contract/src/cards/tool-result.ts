@@ -1,10 +1,5 @@
 /**
- * The value Langy transports for a successful CLI call.
- *
- * This is deliberately a discriminated union rather than an untagged JSON
- * document. The command boundary validates the payload once, then the event
- * log, Redis live edge and browser can carry the same typed value without each
- * layer guessing whether `{ value: "..." }` is traces, analytics, or neither.
+ * Langy CLI result value: discriminated union so all layers carry same typed value.
  */
 import * as z from "zod";
 import {
@@ -25,13 +20,7 @@ import {
 import { CARD_PROBES, cardKindFor, promoteCard } from "./registry.ts";
 
 /**
- * The card's own verdict on whether the thing it describes actually happened.
- *
- * Absent means settled — which is what every stored result already means, so
- * this is additive and old turns keep rendering exactly as before. `unconfirmed`
- * is set only where the payload cannot substantiate the card's claim (today:
- * a `create` whose result names no created resource), and it is what stops the
- * panel from reaching a success render on nothing at all.
+ * Card outcome: absent (settled), unconfirmed (payload doesn't substantiate claim).
  */
 export const CLI_CARD_OUTCOMES = ["unconfirmed"] as const;
 

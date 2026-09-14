@@ -1,7 +1,5 @@
-/**
- * LangyTurnRelayAdapter — the control-plane consumer of one worker→relay frame stream the successor to
- * `runTurn`'s streaming role. One instance per pushed connection (one turn).
- */
+/** LangyTurnRelayAdapter: control-plane consumer of worker→relay frame stream, successor to
+ * runTurn's streaming role. One instance per pushed connection (one turn). */
 import {
   type CliResultDigest,
   type CliToolResult,

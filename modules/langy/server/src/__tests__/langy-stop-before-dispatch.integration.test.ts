@@ -1,14 +1,7 @@
 /**
- * A stop that lands before the worker is running the turn.
- *
- * The turn is admitted, and its handoff stashed, seconds before any worker
- * touches it: the fast-path dispatch is fire-and-forget and the process outbox
- * re-drives the same handoff on its own schedule. So the stop has to reach the
- * WORK as well as the record, or the answer the user stopped is generated
- * anyway. Driven against a real Redis, because the marker and the handoff it
- * guards are two keys with one lifetime.
- *
- * @see specs/langy/langy-stop-and-resume.feature
+ * Stop before worker runs turn: must reach WORK and record or answer generates
+ * anyway. Uses real Redis (marker+handoff two keys one lifetime). See
+ * specs/langy/langy-stop-and-resume.feature.
  */
 import type { Redis } from "ioredis";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";

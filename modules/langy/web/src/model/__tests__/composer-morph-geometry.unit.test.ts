@@ -1,5 +1,7 @@
 /**
- * The geometry the home page's send depends on, and in particular the one hazard that would silently ruin it: measuring the panel's composer while the panel is still closed, and so landing the travelling copy wherever the closed transform happens to have put it.
+ * The geometry the home page's send depends on, and the one hazard that would silently ruin it:
+ * measuring the panel's composer while the panel is still closed, landing the travelling copy
+ * wherever the closed transform happens to have put it.
  * @vitest-environment jsdom
  * Spec: specs/home/langy-home-morph.feature
  */

@@ -1,5 +1,6 @@
 /**
- * The composer takes no queue: while a turn is in flight Enter sends nothing, and the draft waits in the field until the turn ends.
+ * The composer takes no queue: while a turn is in flight Enter sends nothing, and the draft
+ * waits in the field until the turn ends.
  * @vitest-environment jsdom
  * @see specs/langy/langy-composer-feedback-and-cards.feature
  */

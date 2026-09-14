@@ -207,21 +207,7 @@ export class LangyTurnTailService {
     }
   }
 
-  /**
-   * The live entries of one turn: the buffered prefix, then the live edge, until
-   * the turn ends or the reader goes away.
-   *
-   * There is no deadline on the turn itself. The tail used to carry
-   * `AbortSignal.timeout` on the manager's request budget, which capped every
-   * live stream at two minutes. A turn that ran longer went deaf half-way
-   * through — the panel kept the last thing it had heard on screen while the
-   * agent worked on, and every UI action after the cap found nobody listening and
-   * ran on the backend, so the whole second half of a loop arrived as one refetch
-   * at the end. The wedged turn that deadline protected against is handled where
-   * it can be recognised: the settlement watcher gives the tail up when the turn
-   * stops beating, which is the real symptom.
-   *
-   * `release` runs when the tail ends for any reason, including the reader
-   * walking away mid-turn. It is what gives the blocking Redis connection back.
-   */
+  /** Live entries of one turn: buffered prefix, then live edge until turn ends or reader leaves.
+   * No deadline on turn itself (settlement watcher gives tail up when turn stops beating).
+   * release() runs when tail ends for any reason, including reader mid-turn departure. */
 }

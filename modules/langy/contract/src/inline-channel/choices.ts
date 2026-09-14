@@ -1,15 +1,6 @@
 /**
- * The choices contract (ADR-060 §6) — the selection payload and the pure
- * lock-state derivation.
- *
- * A selection is an event and a message: the typed part binds by
- * `{ blockId, optionIds }` so adjacent questions can never misroute, and the
- * plain-text rendering rides beside it for the model to read.
- *
- * Whether a question is still answerable is EVENT ORDER and nothing else: a
- * choices card is open iff nothing follows it in the conversation. No
- * timers, no wall-clock state — the same derivation replays identically in
- * time travel, which is what makes the card's state honest forever.
+ * Choices contract (ADR-060 §6): selection payload and lock-state derivation.
+ * Answerable iff no later entry (event order only, no timers). See ADR-060.
  */
 import * as z from "zod";
 
@@ -34,16 +25,8 @@ export const langyChoiceSelectionSchema = z
 export type LangyChoiceSelection = z.infer<typeof langyChoiceSelectionSchema>;
 
 /**
- * One entry in the conversation's ordered timeline, as the caller flattens
- * it from the fold / message list:
- *
- *   - `question`  — a choices card appearing in an assistant message.
- *   - `selection` — a recorded answer part (a user message carrying the
- *                   typed selection).
- *   - `message`   — any other conversational exchange (an ordinary user
- *                   message, a later assistant answer).
- *
- * Order is the conversation's own event order. Nothing else is read.
+ * Timeline entry: question (choices card), selection (answer), or message
+ * (other exchange). Ordered by conversation event order.
  */
 export type LangyChoicesTimelineEntry =
   | { kind: "question"; blockId: string }
@@ -65,17 +48,8 @@ export type LangyChoicesLockState =
   | { status: "superseded" };
 
 /**
- * Derive a choices card's lock state from the ordered timeline.
- *
- *   - A recorded selection for the card, anywhere after it, marks it
- *     answered — an answered question shows its outcome forever, including
- *     through time travel.
- *   - Otherwise anything at all after the question supersedes it: a question
- *     is answerable only while it is the conversation's latest exchange.
- *   - Otherwise it is open.
- *
- * When the same blockId appears more than once (a replayed or re-emitted
- * question), the LAST occurrence is the question being asked.
+ * Lock state from timeline: answered (has selection) > superseded (later
+ * entry) > open. Last blockId occurrence is the question being asked.
  */
 export function deriveLangyChoicesLockState({
   blockId,

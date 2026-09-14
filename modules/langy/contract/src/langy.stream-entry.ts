@@ -23,7 +23,7 @@ export const langyStreamEntrySchema = z.discriminatedUnion("type", [
     batchDurationMs: z.number().optional(),
   }),
   z.object({ type: z.literal("milestone"), kind: z.string(), detail: z.string().optional() }),
-  /** Full plan snapshot, mirrored live. Ephemeral — the durable `plan_updated` event is separate. */
+  /** Full plan snapshot, mirrored live. Ephemeral; durable `plan_updated` event separate. */
   z.object({
     type: z.literal("plan"),
     items: z.array(z.object({ content: z.string(), status: z.string() })),

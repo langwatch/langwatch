@@ -1,6 +1,7 @@
 /**
- * The block channel, rendered (ADR-060 / specs/langy/langy-derived-cards .feature + langy-derived-stats-presentation.feature): the copy this browser streamed for itself draws its fences as cards because nothing ever
- * stamped it; a streamed question is answerable because the timeline reads the same fences the panel draws; a loosely written opening fence still previews; and a stats card keeps every reading in the card.
+ * The block channel, rendered (ADR-060): self-streamed copy still draws card fences, a
+ * streamed question still matches the timeline's fences, and a loose fence still previews.
+ * @see specs/langy/langy-derived-cards.feature, langy-derived-stats-presentation.feature
  * @vitest-environment jsdom
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

@@ -1,11 +1,7 @@
 /**
- * The gate that reads a conversation's model and answers whether it may run
- * with Langy's permission checks skipped (ADR-129).
- *
- * Binds the @unit scenarios of
- * specs/settings/model-provider-skip-permissions.feature that are about the
- * GATE. The provider defaults are bound in
- * src/server/modelProviders/__tests__/langySkipPermissions.unit.test.ts.
+ * Gate reading a conversation's model to skip Langy's permission checks (ADR-129).
+ * Binds specs/settings/model-provider-skip-permissions.feature's @unit gate scenarios;
+ * provider defaults are bound in modelProviders/__tests__/langySkipPermissions.unit.test.ts.
  */
 import { describe, expect, it, vi } from "vitest";
 

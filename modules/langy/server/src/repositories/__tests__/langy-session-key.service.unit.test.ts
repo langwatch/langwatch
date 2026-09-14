@@ -151,14 +151,8 @@ describe("LangySessionKeyService", () => {
     expect(granted.filter((p) => p.startsWith("langy:") || p.startsWith("ops:"))).toEqual([]);
   });
 
-  // Ported from platform/app/src/server/app-layer/langy/__tests__/langySessionKey.integration.test.ts
-  // (origin/main)'s "reaches the destructive grains the caller's role grants" /
-  // "is refused the delete its owner does not hold", adapted from a real-DB
-  // caller-role fixture to this file's fake-authz `mint` harness: the
-  // permission a minted key carries is exactly the intersection of what the
-  // caller holds and the candidate ceiling — no DB round trip is needed to
-  // prove that intersection either includes or excludes a destructive grain.
-  // See specs/langy/langy-session-key.feature.
+  // Ported from langySessionKey.integration.test.ts; adapted from real-DB to fake-authz harness.
+  // Permission intersects caller's role with candidate ceiling; no DB round trip needed.
   /** @scenario Langy can delete my work, because I can */
   it("mints a key carrying a destructive grain the caller holds", async () => {
     const repository = new SessionKeyRepository();

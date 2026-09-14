@@ -1,5 +1,6 @@
 /**
- * A new chat exists to be written in: starting one hands the composer keyboard focus so the reader can type at once, without a second gesture.
+ * A new chat exists to be written in: starting one hands the composer keyboard focus so the
+ * reader can type at once, without a second gesture.
  * @vitest-environment jsdom
  * Spec: specs/langy/langy-navigation-persistence.feature
  */

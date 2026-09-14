@@ -1,14 +1,6 @@
 /**
  * @vitest-environment node
- *
- * A call that waits on a permission card outlives the card, not the command.
- *
- * The envelope used to live for the command's own time limit plus a minute,
- * while the card was allowed ten minutes. A thirty second command whose ask
- * stayed open ninety seconds lost its envelope, the worker's poll answered
- * "not found" three times, and the model was told the shared folder had gone
- * away while the command line was still connected.
- *
+ * The envelope now outlives the command's time limit for as long as its permission ask stays open.
  * @see specs/langy/langy-local-control.feature
  */
 

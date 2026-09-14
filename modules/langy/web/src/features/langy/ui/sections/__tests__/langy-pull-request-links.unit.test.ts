@@ -1,11 +1,8 @@
 /**
  * @vitest-environment node
  *
- * "Opened pull request #1" is how Langy names a pull request, and the panel had
- * the number and no way through to it. The URL comes from the turn's tool
- * calls, never from the reply — a number Langy merely mentioned stays plain.
- *
- * @see specs/langy/langy-github-prs.feature
+ * The URL comes from the turn's tool calls, never from the reply — a number Langy merely
+ * mentioned stays plain. @see specs/langy/langy-github-prs.feature
  */
 import { describe, expect, it } from "vitest";
 import {

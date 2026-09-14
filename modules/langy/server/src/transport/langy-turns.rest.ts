@@ -1,15 +1,6 @@
-/**
- * `/api/langy/conversations` - the public turn surface a project API key
- * reaches. Released CLI builds and scenario HTTP agents post these exact
- * paths, so the family publishes them literally, with the `/api/v1` twin it
- * has always answered under and no dated namespace.
- *
- * Refusal order is the door's own: credential (401), then the API-key ceiling
- * on `langy:create` (403) - the SAME ceiling the browser's turn-start
- * procedure requires, so a key cannot start a turn its owner could not start
- * by hand - then the per-project rollout (a dark 404), then the identity
- * bridge, then the composed Langy application.
- */
+/** /api/langy/conversations: public turn surface for CLI/HTTP agents. Published literally
+ * with /api/v1 twin. Refusal order: credential (401), API-key langy:create ceiling (403),
+ * per-project rollout flag, identity bridge, then application. */
 import {
   defineRestMiddleware,
   defineRestRouter,

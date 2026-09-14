@@ -1,18 +1,7 @@
 /**
- * Progressive preview (ADR-060 §7) — the client-side reducer that lets
- * a card draw itself while its fence is still streaming.
- *
- * Feed it the raw text buffer between the fence open and the current stream
- * end, as often as chunks arrive. It repairs the partial JSON and validates
- * it through the SAME salvage + schema the relay will stamp with, and keeps
- * the latest VALIDATING parsed card — never a non-validating guess: until a
- * prefix validates there is no preview, and a chunk that breaks validation
- * mid-flight keeps the last good card on screen rather than flickering.
- *
- * Previews are a live-stream affair. At settle the relay's stamped part is
- * the truth: reconciliation is by blockId, and the settled part always wins
- * (`reconcileLangyDerivedCardPreviews`) — the same server-clock rule the text
- * merge already follows.
+ * Progressive preview (ADR-060 §7): client preview while fence streams.
+ * Validates through same salvage as relay, keeps only latest valid card.
+ * At settle, relay's part wins (reconciliation by blockId). See ADR-060.
  */
 import { salvageLangyDerivedCard } from "./salvage.ts";
 import type { LangyDerivedCard } from "../cards/derived-safe.ts";

@@ -1,16 +1,7 @@
 /**
- * `LangyApp`'s own producer-only registration of the `langy_conversation_processing`
- * pipeline, and the {@link LangyConversationCommands} dispatcher this module builds
- * over it — porting the deleted hand composition's LANGY third (`git show
- * b383462d96^:apps/api/src/app/api-agent-pipelines.composition.ts`) into the
- * module's own vocabulary. Registering here — inside the module that reads
- * `eventing` — rather than in a process composition root is the whole point of
- * the App declaring `reads(...)`.
- *
- * A process with no `eventing` member refuses AT BOOT, naming "eventing":
- * `LangyApp.reads` makes that member a hard dependency, so the deleted
- * composition's per-write "no queue" refusal (`unqueuedLangyConversationCommands`)
- * is not ported — there is no route to construct this class without one.
+ * LangyApp eventing: producer-only registration of langy_conversation_processing
+ * pipeline and dispatcher. App.reads(eventing) makes it hard dependency (boots
+ * refusing without it).
  */
 import type { EventSourcing } from "@langwatch/eventing";
 import { RedisLangyConversationProducerRepository } from "../repositories/redis/redis.langy-conversation-producer.repository.ts";

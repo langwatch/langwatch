@@ -3,15 +3,8 @@ import { compareLangyEventCursors, cursorHasReachedEvent } from "@langwatch/lang
 import { describe, expect, it } from "vitest";
 
 /**
- * ADR-059's time-base contract, pinned.
- *
- * A cursor persisted next to a Postgres projection (`cursorFor`) must be valid
- * against a tail read from ClickHouse — which orders `(EventTimestamp,
- * EventId)`, and `recordToEvent` maps `EventTimestamp` onto `event.createdAt`.
- * So the WHOLE chain hangs on: cursor.acceptedAt IS event.createdAt, and the
- * framework's comparator agrees with the shared package comparator the browser
- * folds with (`@langwatch/langy`). If either half drifts, client catch-up
- * silently skips or re-folds events — this file is what fails instead.
+ * ADR-059's time-base contract: a Postgres cursor must stay valid against a
+ * ClickHouse tail ordered by (EventTimestamp, EventId); this pins that chain.
  */
 
 function event(overrides: Partial<Event>): Event {

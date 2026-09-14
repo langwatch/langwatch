@@ -1,11 +1,6 @@
 /**
  * @vitest-environment node
- *
- * Recent chats showed three title styles at once: "Instrument Traces With
- * LangWatch", "Instrument Traces with LangWatch" and the raw first message
- * "instrument my traces with langwatch". One normaliser now decides the style,
- * whether the title came from the cheap model or from the first message.
- *
+ * One normaliser decides title style, from the cheap model or the raw message.
  * @see specs/langy/langy-conversation-title.feature
  */
 import { LANGY_TITLE_GENERATION } from "@langwatch/langy-contract";

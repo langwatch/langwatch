@@ -290,11 +290,8 @@ export class LangyConversationTurnService {
     });
   }
 
-  /**
-   * Ingests a turn result posted directly over HTTP — the independent,
-   * at-least-once path used when the relay's NDJSON stream dropped.
-   * Idempotent on `turnId`; also verifies the turn triple was really accepted, since this route has no HMAC, only the shared bearer.
-   */
+  /** Ingest turn result via HTTP (independent, at-least-once path when relay's stream dropped).
+   * Idempotent on turnId; verifies turn triple accepted (no HMAC, shared bearer only). */
   async turnExists({
     projectId,
     conversationId,
@@ -361,11 +358,8 @@ export class LangyConversationTurnService {
     });
   }
 
-  /**
-   * The turn's own account of what happened, folded off its live stream. Read
-   * here since two paths finalize a turn (relay + agent HTTP post) and
-   * whichever lands first wins. Best effort: a failed read still records what it can rather than failing an otherwise-complete finalize.
-   */
+  /** Turn's own account folded off live stream. Read here since both relay and HTTP post paths
+   * finalize (first wins). Best effort: failed read still records what it can. */
 
   /**
    * The pending shutdown-handoff for a conversation, or null (ADR-048). Read
@@ -428,11 +422,8 @@ export class LangyConversationTurnService {
     });
   }
 
-  /**
-   * Finalizes an agent response (`agent_responded` carries the whole answer).
-   * messageId is DERIVED from turnId, never minted fresh: finalize has two
-   * independent writers (relay + durable POST), and a fresh KSUID per call made the reply render twice after reload.
-   */
+  /** Finalize agent response (agent_responded carries whole answer). messageId is DERIVED from
+   * turnId, never fresh: finalize has two independent writers (relay + POST). */
   async finalizeTurn({
     projectId,
     conversationId,

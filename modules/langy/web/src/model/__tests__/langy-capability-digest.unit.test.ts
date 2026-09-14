@@ -1,7 +1,7 @@
 /**
- * The client side of the digest: reading a command's identity + flags off a tool call from the START frame, and
- * resolving the digest for a settled one — recorded when the durable part carries a valid one, recomputed via the
- * shared extractor otherwise (live frames, old turns).
+ * The client side of the digest: reading a command's identity + flags off a tool call from the
+ * START frame, and resolving the digest for a settled one — recorded when the durable part
+ * carries a valid one, recomputed via the shared extractor otherwise (live frames, old turns).
  */
 import { describe, expect, it } from "vitest";
 import { commandOfToolCall, digestOfToolCall } from "../langy-capability-digest.ts";

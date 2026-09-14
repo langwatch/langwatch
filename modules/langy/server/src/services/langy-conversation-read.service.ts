@@ -354,9 +354,6 @@ export class LangyConversationReadService {
     };
   }
 
-  /**
-   * Resolves the conversation id for a chat turn without writing (the
-   * aggregate is created by the first `message_recorded`). With
-   * `adoptUnknownId`, an unknown id is ADOPTED rather than minted, so a scenario run's fixed `threadId` gets one stable conversation across turns.
-   */
+  /** Resolve conversation id for a chat turn without writing (created by first message_recorded).
+   * adoptUnknownId: unknown id ADOPTED rather than minted, for scenario run stability. */
 }

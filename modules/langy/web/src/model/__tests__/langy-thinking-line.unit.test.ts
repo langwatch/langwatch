@@ -328,14 +328,8 @@ describe("langyThinkingLine", () => {
   });
 
   /**
-   * The escalation used to run off the time since the line MOUNTED, so it
-   * measured turn length. A turn that had answered a permission card and was
-   * running a local command, with output arriving in the terminal, was told
-   * "Langy still has not answered. It may be stuck." while nothing was wrong.
-   *
-   * The caller restarts its clock whenever this key changes, so what the
-   * ladder measures is silence. These pin what counts as the turn making
-   * progress.
+   * The escalation used to run off time since the line MOUNTED, measuring turn length rather
+   * than silence. The caller restarts its clock on this key so the ladder measures silence.
    */
   describe("given the turn's own account of what it has produced", () => {
     const RUNNING_CALL = [{ toolCallId: "call-1", status: "running" }];

@@ -1,13 +1,8 @@
 /**
  * @vitest-environment jsdom
  *
- * The permission card (ADR-129, specs/langy/langy-local-permissions.feature).
- * The command line decides what needs asking; this card is how the answer gets
- * back, so what it has to prove is that it names the machine, the folder and
- * the exact command, that the three answers reach the right mutation, and that
- * a settled card says what happened instead of offering the buttons again.
- *
- * Boundary mocks: the two tRPC mutations the card calls.
+ * The permission card (ADR-129, specs/langy/langy-local-permissions.feature): proves the answer
+ * reaches the right mutation and a settled card never re-offers the buttons.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";

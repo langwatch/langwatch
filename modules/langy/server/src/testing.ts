@@ -1,15 +1,7 @@
 /** Test-only concrete capability access for feature characterization suites. */
 
-/**
- * The Prisma repositories, for suites that assert against a real database.
- *
- * They are reachable only from here on purpose. No feature package exports
- * `./repositories/*`: a repository is an implementation of a port, and letting
- * application code import one directly is how the port stops being the seam.
- * A characterization suite is the one caller with a reason — a projection
- * asserted against an in-memory double asserts the double — so the access is
- * named as test-only here rather than opened to everyone.
- */
+/** Prisma repositories for test-only suites that assert against real databases. Reachable
+ * only here to keep the port seam: repositories are implementation, not public API. */
 export { PrismaLangyConversationRepository } from "./repositories/prisma/prisma.langy-conversation.repository.ts";
 export { PrismaLangyConversationProjectionRepository } from "./repositories/prisma/prisma.langy-conversation-projection.repository.ts";
 export { PrismaLangyConversationTurnProjectionRepository } from "./repositories/prisma/prisma.langy-conversation-turn-projection.repository.ts";
