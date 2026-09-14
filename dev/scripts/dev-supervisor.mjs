@@ -75,10 +75,13 @@
  * above (a restart IS a takedown-and-respawn) instead of adding a second
  * script.
  *
- * It watches its own directory tree plus `../../packages` (every workspace
- * package apps/api and apps/worker are allowed to import — architecture-enforcer
- * already forbids either from importing a `web`/`apps/ui` package, so this is
- * a safe superset with nothing to keep in sync by hand) via `fs.watch`
+ * It watches its own directory tree plus `../../packages`, `../../modules`
+ * and `../../enterprise` (every workspace package apps/api and apps/worker
+ * are allowed to import — architecture-enforcer already forbids either from
+ * importing a `web`/`apps/ui` package, so this is a safe superset with
+ * nothing to keep in sync by hand; modules/ joined when packages/features
+ * moved there, after a week of auth fixes silently never restarting the
+ * backend) via `fs.watch`
  * (native, recursive on macOS/Windows; degrades to unwatched with a warning
  * where recursive watch is unsupported, same "never a gate" rule as above).
  * Changes are coalesced into one restart after a quiet window with no new
@@ -89,7 +92,7 @@
  * apps/worker/src/platform/lifecycle/worker.signals.ts) is asked to finish,
  * not cut off.
  *
- *   LANGWATCH_DEV_WATCH_DIRS=a,b        dirs to watch, relative to cwd (default: src,../../packages)
+ *   LANGWATCH_DEV_WATCH_DIRS=a,b        dirs to watch, relative to cwd (default: src,../../packages,../../modules,../../enterprise)
  *   LANGWATCH_DEV_WATCH_DEBOUNCE_MS=N   quiet window before restarting (default: 400)
  *
  *   node dev/scripts/dev-supervisor.mjs --watch -- <command> [args...]
@@ -168,7 +171,7 @@ const DEFAULT_WATCH_DEBOUNCE_MS = 750;
 /** Default watch roots, relative to cwd: the package's own source, plus every
  * workspace package (architecture-enforcer already forbids api/worker code from
  * reaching a web/ui package, so this needs no per-app allowlist). */
-const DEFAULT_WATCH_DIRS = ["src", "../../packages"];
+const DEFAULT_WATCH_DIRS = ["src", "../../packages", "../../modules", "../../enterprise"];
 /** Never worth a restart: tests, build output, generated code, watcher noise. */
 const WATCH_IGNORE_PATTERNS = [
   /(^|\/)__tests__(\/|$)/,
