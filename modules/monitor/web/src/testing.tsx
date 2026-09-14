@@ -1,18 +1,6 @@
 /**
- * What this package's suites mount the online evaluations screen inside.
- *
- * The host port is an abstract class, so a test constructs one rather than
- * mocking a module: the fake below RECORDS what the screen asked the
- * application to do — the overlay it wanted, where it navigated, the notices it
- * reported — which is exactly the surface the real adapter answers.
- *
- * The time zone is FIXED rather than read from the machine, which is the whole
- * reason it is on the port: a monitor's week is cut into buckets by it, and a
- * suite that inherits the runner's zone asserts something different in Amsterdam
- * than in CI.
- *
- * Not exported from the package. A test imports it relatively; nothing outside
- * this package has any business constructing a host.
+ * Test fixture: a fake host adapter that records what the screen asked; time
+ * zone is fixed for deterministic assertions.
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

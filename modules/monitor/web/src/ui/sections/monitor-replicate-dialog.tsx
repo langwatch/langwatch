@@ -1,18 +1,6 @@
 /**
- * Replicating an online evaluation into another project.
- *
- * A NARROWED FAMILY-LOCAL COPY of
- * `platform/app/src/components/ui/ReplicateToProjectDialog.tsx` (plus the
- * `CopyMonitorDialog` that wrapped it), which the evaluator and workflow copy
- * dialogs also render, so the platform module stays.
- *
- * Works for every monitor: evaluator-backed ones bring their evaluator (and its
- * workflow) along through `monitors.copy`, legacy wizard ones carry their
- * inline settings — which is the platform docblock's claim, kept, because it is
- * the reason this action is offered on every row rather than some.
- *
- * A CLOSED TARGET IS LISTED AND GREYED rather than hidden, which is the platform
- * dialog's behaviour.
+ * Replicates an online evaluation into another project; works for evaluator-backed
+ * and legacy wizard monitors.
  */
 
 import { Button, createListCollection, Field, Text, VStack } from "@chakra-ui/react";

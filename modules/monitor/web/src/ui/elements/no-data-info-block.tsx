@@ -1,11 +1,5 @@
 /**
- * The empty state a list shows before anything has been configured.
- *
- * A FAMILY-LOCAL COPY of `platform/app/src/components/NoDataInfoBlock.tsx`,
- * which the workflows page, the annotation scores settings and the experiments
- * list also render. The coding-agent, dataset and annotation web packages each
- * already carry their own; this is the fourth, for the same reason and with the
- * same shape.
+ * Empty state component; a family-local copy like other web packages.
  */
 
 import { Center, EmptyState, Icon, VStack } from "@chakra-ui/react";

@@ -30,13 +30,8 @@ const monitorPreconditionSchema = z
   })
   .strict();
 /**
- * The precondition shape a monitor persists.
- *
- * Exported because a process that composes no trace-filter registry parses
- * against this and nothing narrower: which RULES a given FIELD accepts is the
- * registry's answer, and it now lives in a browser package no server module
- * may value-import. Parsing the shape here is what the wire has always
- * required; the field/rule cross-check returns with the registry.
+ * Exported to support wire parsing in browser packages that can't import the
+ * trace-filter registry.
  */
 export const monitorPreconditionsSchema = z.union([
   z.array(monitorPreconditionSchema),
@@ -140,21 +135,9 @@ export const monitorUpdateInputSchema = z
 export type MonitorUpdateInput = z.infer<typeof monitorUpdateInputSchema>;
 
 /**
- * The monitor an experiment is published as.
- *
- * Keyed by the experiment rather than by a monitor id: `Monitor.experimentId`
- * is unique, so publishing the same experiment twice replaces the row it
- * already owns instead of leaving one monitor behind per save. The slug is the
- * experiment's own and arrives with the input rather than being derived here —
- * the published monitor is that experiment under another name.
- *
- * The three JSON fields arrive unknown because that is what they are: they are
- * read back out of the experiment's stored workbench state, which no schema
- * guards on the way in, and they land in `Json` columns exactly as they arrive.
- * Narrowing them here would turn an experiment that publishes today into one
- * that throws. `mappings` is the single exception — the `{}` shape it can hold
- * crashes the evaluator paths that read it back, so the service canonicalises
- * it the same way `create` and `update` already do.
+ * Experiment-published monitor. JSON fields preserve workbench state for
+ * backward compatibility; only mappings is canonicalized to prevent evaluator
+ * crashes.
  */
 export const monitorExperimentUpsertInputSchema = z
   .object({

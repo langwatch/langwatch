@@ -1,23 +1,6 @@
 /**
- * What the online evaluation screens ask of the application they are mounted in.
- *
- * A screen may not import `@langwatch/ui`, the router, a toast singleton or the
- * session client: those are the imports ADR-004 seals off from a feature-web
- * package. It asks this port instead, and the frontend feature that owns it —
- * `apps/ui/src/features/monitor` — answers it by adapting the browser
- * capabilities the application resolves.
- *
- * THE FIFTEENTH HOST PORT OF THE SAME SHAPE, and the second this family
- * declares. It is NOT shared with `@langwatch/evaluator-web`'s: a web package
- * may not import another web package, so two families that both moved in this
- * slice still declare two ports. Recorded rather than worked around, because
- * the fix is promoting the shape and that is not a page move's to make.
- *
- * `openOverlay` is here for the same reason it is on the evaluator port. THREE
- * of this screen's actions — creating an online evaluation, editing one, and
- * setting up a guardrail — are `platform/app` drawers with openers outside this
- * family, so they do not travel. The screen writes the ADDRESS and the
- * application decides what it means.
+ * The host port for online evaluation screens; sealed from @langwatch/ui per
+ * ADR-004.
  */
 
 import { createContext, useContext } from "react";

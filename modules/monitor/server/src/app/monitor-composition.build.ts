@@ -1,25 +1,6 @@
 /**
- * Builds the {@link MonitorAppInfrastructure} this module used to receive
- * hand-composed (`apps/api/src/features/monitor/monitor.composition.ts`,
- * deleted by b383462d96). `MonitorApp.create` now builds it itself from its
- * `evaluators` and `evaluation` peers — no process member is read at all.
- *
- * The trend read no longer touches ClickHouse itself: the deleted
- * composition built a private `MonitorPerformanceAdapter` over a routed
- * ClickHouse client (`@langwatch/evaluation-server`'s internal repository,
- * reached from outside its package), but `EvaluationApi` has since grown
- * `getMonitorPerformance` as a public peer capability — the SAME read, over
- * the SAME repository, on the process's own Evaluation application. Calling
- * it directly retires the vendor-client emulation this module would
- * otherwise need to stand in for evaluation-server's per-tenant resolver
- * shape.
- *
- * Every other branch here is the deleted composition's own, kept verbatim,
- * including the workflow-replication refusal: the pre-deletion production
- * root (`api-production.composition.ts` at b383462d96^, `installMonitor`)
- * already composed no evaluator-workflow replication and passed
- * `unreplicatedEvaluatorWorkflows()` as the `workflowReplication` peer, so a
- * monitor copy already refused that half by name before this module existed.
+ * Builds MonitorAppInfrastructure. The performance trend read calls EvaluationApi
+ * instead of private ClickHouse access.
  */
 import { AnalyticsComparisonWindowService } from "@langwatch/analytics-server";
 import type { EvaluationApi, MonitorPerformanceQuery } from "@langwatch/evaluation-contract";

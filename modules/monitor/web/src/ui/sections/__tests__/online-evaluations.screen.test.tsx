@@ -1,20 +1,7 @@
 /**
  * @vitest-environment jsdom
  *
- * The online evaluations page: what a reader sees about live scoring, and which
- * of the three actions goes where.
- *
- * THE PLATFORM PAGE HAD ONE SUITE AND IT COVERED THE TABLE ONLY
- * (`OnlineEvaluationsTable.integration.test.tsx`). Nothing mounted the page, so
- * nothing asserted the two decisions the page actually makes: which edit
- * destination a monitor gets, and what the performance read is asked for.
- *
- * THE EDIT BRANCH IS THE ONE WORTH PINNING. A monitor authored in the retired
- * evaluation wizard keeps its configuration in the experiments workbench; open
- * the drawer on one and the reader gets a form that cannot represent it, saves,
- * and silently loses what the workbench held.
- *
- * Spec: specs/evaluations/evaluation-pages.feature
+ * Tests the online evaluations page: live scoring actions and edit destinations.
  */
 
 import { cleanup, screen, waitFor, within } from "@testing-library/react";

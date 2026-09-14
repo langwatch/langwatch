@@ -1,12 +1,5 @@
 /**
- * The server half of `monitors.*`: a permission and a handler per procedure.
- *
- * What a monitor is, whether its check can run, what a partial update means and
- * what copying one does to two projects are all the application's. This decides
- * only which standing the caller needs.
- *
- * Specs: specs/monitors/replicate-monitor-to-project.feature,
- * specs/monitors/online-evaluation-preconditions.feature.
+ * The server half of monitors.*: permissions and handlers per procedure.
  */
 import { defineTrpcRouter } from "@langwatch/api/trpc";
 import { MonitorApi, monitorTrpc } from "@langwatch/monitor-contract";

@@ -1,15 +1,6 @@
 /**
- * How the monitor an experiment is published as gets written.
- *
- * "Save as monitor" is an upsert keyed by the experiment rather than by the
- * monitor: `Monitor.experimentId` is unique, so a second press has to reach the
- * row the first press created instead of adding another beside it. Both
- * branches carry the identical configuration — a field present on one and not
- * the other is a field that silently drifts on republish — and the generated id
- * belongs to the create branch alone.
- *
- * The client is a fake that records what it was asked, since the claim is about
- * the statement issued rather than about what Postgres does with it.
+ * Tests the experiment-published monitor upsert: keyed by experimentId to
+ * replace on republish.
  */
 
 import { describe, expect, it } from "vitest";

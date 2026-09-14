@@ -1,15 +1,6 @@
 /**
- * The monitor feature's application: what both of its doors call.
- *
- * A monitor is answered over two transports — the wizard's tRPC procedures and
- * the `/api/monitors` REST family. They ask different questions in different
- * shapes, but every rule about a monitor lives here once: what a missing
- * monitor means, what an unmentioned field on a partial update means, whether a
- * check is runnable at all, and what copying one does to two projects.
- *
- * Transport-specific shaping stays in the doors: which fields go on the wire,
- * which status a refusal renders as. What a monitor IS, and what a write does
- * to one, is here.
+ * The monitor feature's application layer; all business rules for monitors
+ * live here.
  */
 import { AuthzApi, type AuthzPermission } from "@langwatch/authz-contract";
 import {
@@ -60,13 +51,8 @@ import { buildMonitorInfrastructure } from "./monitor-composition.build.ts";
 const PERFORMANCE_PERIOD_MS = 7 * 24 * 60 * 60 * 1000;
 
 /**
- * Copying the evaluator behind a monitor, and the workflow behind that, into
- * another project.
- *
- * Owned by the Evaluator feature and supplied by the process; a monitor copy
- * needs it because an evaluator-backed monitor would otherwise dangle a
- * cross-project reference. The actor is named because the copied workflow's
- * first saved version is recorded against whoever asked for the copy.
+ * Copies an evaluator and its workflow into another project; owned by the
+ * Evaluator feature.
  */
 export interface MonitorReplicationReader {
   copyEvaluatorToProject(
@@ -107,9 +93,9 @@ export class MonitorApp implements MonitorApi {
   static readonly contract = MonitorApi;
   static readonly dependencies = {
     permissions: AuthzApi,
-    /** The one evaluator service on this process, for the evaluator port and the copy replication. */
+    /** Evaluator service for the port and copy replication. */
     evaluators: EvaluatorApi,
-    /** The seven-day trend, through the ONE evaluation application that already owns the read. */
+    /** Seven-day trend, read through the evaluation application. */
     evaluation: EvaluationApi,
   };
   static readonly reads = reads();
@@ -190,15 +176,8 @@ export class MonitorApp implements MonitorApi {
   }
 
   /**
-   * Refuses a check that cannot run, by name.
-   *
-   * A monitor names the evaluator it runs, and a built-in evaluator's settings
-   * have to match the schema that evaluator declares. Workflow, code and custom
-   * evaluators carry their settings elsewhere, so only their type is checked.
-   *
-   * Here rather than in a door because it is a statement about the monitor, not
-   * about the request that arrived: a monitor whose `checkType` names nothing
-   * runnable is a monitor that will never fire, however it was created.
+   * Refuses checks that cannot run. Built-in evaluators validated against their
+   * schema; others just check type.
    */
   async assertCheckRunnable(input: MonitorRunnableCheckInput): Promise<void> {
     const { checkType, parameters } = input;
@@ -322,19 +301,8 @@ export class MonitorApp implements MonitorApi {
   }
 
   /**
-   * Replicates a monitor into another project, carrying its evaluator with it.
-   *
-   * An evaluator-backed monitor keeps its settings (and, for a workflow
-   * evaluator, the backing workflow) on a separate record scoped to the source
-   * project, so the evaluator is copied first and the replica points at the
-   * copy. A legacy wizard monitor has no evaluator — its settings live inline,
-   * so replicating the monitor is the whole job.
-   *
-   * When the monitor insert then fails, the evaluator and the workflow this copy
-   * created are rolled back. That rollback is the reason this lives on the
-   * application: it is a statement about what the two projects hold, and a
-   * second door writing its own copy of it would be a second chance to leave an
-   * orphan behind.
+   * Replicates a monitor with its evaluator into another project; rolls back
+   * both if the insert fails.
    */
   async copy(input: MonitorCopyInput): Promise<Monitor> {
     const { monitorId, sourceProjectId, targetProjectId, actor } = input;
@@ -452,15 +420,8 @@ export class MonitorApp implements MonitorApi {
 }
 
 /**
- * The evaluator behind a monitor, as this feature reads it.
- *
- * A PORT rather than the `EvaluatorApi` peer token, and only until that token
- * grows the read: a monitor may only name an evaluator its own project holds,
- * and `EvaluatorApi` publishes `getAll`, `create`, `update` and `archive` but
- * no lookup by id. The process supplies its own canonical evaluator service
- * here, so the check is the same one it always was.
- *
- * @see modules/evaluator/contract/src/evaluator.api.ts
+ * The evaluator behind a monitor, as this feature reads it. A PORT until
+ * EvaluatorApi grows a lookup-by-id capability.
  */
 export interface MonitorEvaluator {
   /** Refuses by the evaluator feature's own error when the project has none. */

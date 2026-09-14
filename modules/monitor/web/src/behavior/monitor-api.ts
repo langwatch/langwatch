@@ -1,22 +1,6 @@
 /**
- * The procedures this package calls, and the hooks that call them.
- *
- * The `monitors` half is READ OFF THE CONTRACT: `@langwatch/monitor-contract`
- * declares every procedure once, and `ContractApiMap` turns that declaration
- * into the shape these hooks are typed against, so the browser restates none
- * of it. The two borrowed namespaces below are still written by hand, because
- * their own contracts have not moved yet.
- *
- * THE SEGMENT NAMES ARE LOAD-BEARING. `monitors` and `experiments` are mount
- * points on the root router and tRPC hashes that path into the React Query
- * cache key; spell either differently and these hooks quietly stop sharing a
- * cache with the `api.monitors.*` call sites that have NOT moved — the online
- * evaluation drawer and the guardrails drawer among them, which is exactly how
- * the list refreshes after a drawer save.
- *
- * THIS MODULE IS THE ONE GOVERNED-CLOSURE EXCEPTION IN THE PACKAGE. ADR-004
- * seals a screen's closure off from `@langwatch/api/web`, and the
- * import below is the only one in the package.
+ * Procedures and hooks. Monitors read from contract; segment names are
+ * cache-key load-bearing per ADR-004.
  */
 
 import { createModuleApi, type ContractApiMap } from "@langwatch/api/web";
@@ -37,13 +21,8 @@ export type MonitorExperimentRow = {
 type BorrowedProcedures = {
   organization: {
     /**
-     * The organization graph the application shell already holds.
-     *
-     * Asked by the FRONTEND FEATURE rather than by the screen — the screen is
-     * handed the project and the replication targets through its host port —
-     * and declared here because that feature runs on this package's transport.
-     * Same input the shell asks with, so under tRPC's path-plus-input cache key
-     * it is the same entry: the graph is fetched once for the document.
+     * The organization graph the shell holds, fetched once for the document per
+     * cache key.
      */
     getAll: {
       query: {

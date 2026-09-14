@@ -1,20 +1,7 @@
 /**
  * @vitest-environment node
  *
- * The monitor application: the rules that moved off the two doors onto it.
- *
- * Four of them, and three were written twice before:
- *
- *   - what an unmentioned field on a partial update means. The REST family
- *     spelled the merge out for itself and the wizard spelled it out again,
- *     and the two copies had already begun to disagree;
- *   - the read-then-refuse pair a toggle and a delete perform, so a door
- *     answers "no such monitor" rather than reporting a write nobody made;
- *   - whether a check can run at all, refused by a code both doors render;
- *   - standing in the project a monitor is copied FROM, which the declared
- *     check on the procedure cannot cover.
- *
- * Over the memory repository. Nothing here speaks HTTP or tRPC.
+ * Tests the monitor application layer over the memory repository.
  */
 import type { AuthzApi } from "@langwatch/authz-contract";
 import {

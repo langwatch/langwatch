@@ -1,21 +1,6 @@
 /**
- * A monitor's last seven days, as a sparkline and a trend.
- *
- * MOVED OUT OF `@langwatch/evaluator-web`, which published it under the name it
- * still has — `online-evaluation-performance-preview` — for a table that lived
- * in `platform/app`. Its only consumer was that table, and the table is in this
- * package now, so the module followed its consumer. The gateway family did the
- * same with `RoutingPolicyRowActions`.
- *
- * THE TYPE IS THE PRODUCER'S. `OnlineEvaluationPerformance` was restated here
- * field for field while it was ALSO declared in `@langwatch/evaluation-contract`
- * and `MonitorApp.getPerformanceForProject` was annotated with it. The producer
- * is packaged, so the S7 ruling allows the real fix rather than a third
- * declaration: this module names the contract's type.
- *
- * AN UNAVAILABLE TREND HAS AN EXPLICIT NEUTRAL STATE, which is not decoration.
- * A sparkline that quietly renders flat when the read FAILED is a monitor
- * reporting "no change" about data it never had.
+ * Monitor's seven-day sparkline and trend. Moved from evaluator-web; uses the
+ * type from evaluation-contract, not a duplicate.
  */
 
 import { Box, HStack, Skeleton, Text, VStack } from "@chakra-ui/react";

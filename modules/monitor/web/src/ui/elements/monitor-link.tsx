@@ -1,17 +1,6 @@
 /**
- * A link inside a governed screen.
- *
- * THE SEVENTH COPY OF A DOZEN LINES OF POLICY — user-web, gateway-web,
- * governance-web, organization-web and analytics-web all carry the same one,
- * and `platform/app`'s `utils/compat/next-link` has seventy-odd importers a
- * deletes-only pass may not repoint. Seven is well past the point at which a
- * surface publishing twelve lines is cheaper than the next copy; recorded here
- * rather than built, because a page move does not own the Design System's
- * boundary.
- *
- * Navigation goes through the host so the application decides how a route
- * change happens, but the anchor is a real `<a href>`: a middle click, a
- * "copy link address" and a screen reader's link list all need one.
+ * Link inside governed screens; navigates through host but uses real anchors
+ * for compatibility.
  */
 
 import { chakra } from "@chakra-ui/react";

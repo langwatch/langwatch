@@ -1,18 +1,6 @@
 /**
- * The configuration table: one row per online evaluation or guardrail.
- *
- * MOVED, not copied — `platform/app`'s `components/evaluations/OnlineEvaluationsTable`
- * had exactly one importer, the page in this package now.
- *
- * Two substitutions on the way across, both of them the standing ones:
- * `@langwatch/design-system/list-table` replaces `~/components/ui/ListTable`
- * (which the experiments list still renders), and `ui/elements/monitor-link`
- * replaces `~/utils/compat/next-link`.
- *
- * THE LANGY CONTEXT TARGET DID NOT TRAVEL. `@langwatch/langy-web` is ungoverned
- * and every consumer compiles its source, which needs an `es2023` library and a
- * stylesheet declaration this package would have had to adopt globally — the
- * me, automations and analytics families' refusal, recorded again.
+ * Configuration table: one row per evaluation/guardrail. Moved from platform/app
+ * with substitutions for design-system and link components.
  */
 
 import { Badge, Box, HStack, IconButton, Table, Text, VStack } from "@chakra-ui/react";
