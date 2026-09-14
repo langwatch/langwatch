@@ -10,42 +10,8 @@ import {
 } from "typescript/unstable/ast";
 
 /**
- * Static scan for the colour a chart mark is painted in.
- *
- * A mark is a drawn thing — a line, an area, a bar, a swatch. The rules it
- * answers to live in `specs/ai-governance/dashboard/governance-ui-controls.feature`.
- * This module only finds the colours and says where they came from; the tests
- * decide which ones are allowed.
- *
- * **Why this parses instead of matching text.** The first version of this
- * check was a regular expression, and every one of these defeated it, each
- * found by an adversarial reader rather than by the author:
- *
- *   - `stroke={SOME_CONST}`, where the constant is declared elsewhere in the
- *     file and holds the forbidden value;
- *   - `fill={flag ? ALLOWED : FORBIDDEN}`, where only one branch offends;
- *   - an attribute spelling nobody enumerated — `bgColor`, `trackColor`,
- *     `background`, `colorPalette` all mean the same thing to different
- *     components;
- *   - the same colour written as a design token rather than as the CSS
- *     variable the token compiles to, which is a different string for an
- *     identical pixel;
- *   - a multi-line attribute, where a line-oriented reader saw the name on one
- *     line and the value on another and joined neither.
- *
- * A parser is immune to all five by construction, because it is reading the
- * shape of the code rather than the shape of the text. That is the point of
- * spending a compiler session on it.
- *
- * **What it still cannot do, said out loud.** It resolves an identifier only
- * to a declaration in the SAME file. A value imported from another module, a
- * property read off an object, a template string, a function call — none of
- * these have a static answer here, and every one is reported as
- * `kind: "unresolved"` rather than quietly treated as clean. A caller that
- * ignores the unresolved list has a guard with a hole in it, and the hole is
- * visible in the return value rather than buried in a regex.
- *
- * Built on `tsAst`, which owns the one compiler session. See ADR-099.
+ * Static scan for mark colours: parser-based (not regex). Handles
+ * constants/ternaries/spellings. Same-file resolution. See ADR-099.
  */
 
 /** An attribute or property whose value paints a mark. */
@@ -61,23 +27,8 @@ export const MARK_ROLES = new Set([
 ]);
 
 /**
- * A constant whose NAME says it holds a mark colour — `CHART_SPARK_STROKE`,
- * `PROJECTION_INK`, `seriesFill`.
- *
- * This exists because leaving it out made the whole scan worthless in a way no
- * amount of reading would have shown. A falsification sweep put eight forbidden
- * values on `CHART_SPARK_STROKE`, the single most important mark colour in the
- * section, and all eight passed: a top-level `export const` is neither a JSX
- * attribute nor a property assignment, so nothing looked at it. The scan was
- * reading everywhere except the place the rule is about.
- *
- * Only the words that mean DRAWING are here. A bare `...Color` suffix was tried
- * and removed: `trendColor` on the teams screen holds the colour of a trend
- * arrow's TEXT, where a muted grey for "no baseline yet" is correct and a green
- * for a downward trend is required by
- * `specs/ai-gateway/governance/birds-eye-dashboard-v2.feature`. Reading it as a
- * mark reported a settled rule as a defect. "Colour" is the generic word and
- * covers text; stroke, fill and ink are the words for painting a shape.
+ * Mark name pattern: stroke/fill/ink suffix (not bare Color). Catches
+ * top-level exports the scan originally missed.
  */
 const MARK_NAME = /(?:^|_|[a-z])(?:stroke|fill|ink)s?$/i;
 

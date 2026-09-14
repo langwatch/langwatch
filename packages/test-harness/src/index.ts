@@ -1,5 +1,6 @@
 /**
- * `@langwatch/test-harness` — the harness every process shares: lane assignment, shard weighting, static-scan compiler access, and datastore wiring. A file lands in COMPONENT when it declares `@vitest-environment jsdom` and names no datastore, DATASTORE otherwise; both configs call {@link laneForSource} so the lanes stay exact complements.
+ * Test harness: lane assignment, shard weighting, compiler, datastore wiring.
+ * See {@link laneForSource} for COMPONENT vs DATASTORE lane split.
  */
 export { cleanupTestRows, requireAssigned, type CleanupEntry } from "./cleanup-test-rows.ts";
 export {

@@ -1,43 +1,13 @@
 /**
- * Splits the `.integration.test.*` files into the two lanes CI runs them in.
- *
- * The suffix is a statement about test LEVEL — renders a component, mocks its
- * boundaries — and CLAUDE.md is right that such a test is not a unit test. But
- * CI had been reading the suffix as a request for INFRASTRUCTURE, and so booted
- * Postgres, ClickHouse and Redis, ran Prisma migrations, installed goose,
- * replayed the ClickHouse schema and set up Helm before running files that
- * render React into jsdom and never open a socket. Measured on the six shards:
- * 540 of 1017 files declared jsdom and named no datastore at all.
- *
- * So the lane is decided by what a file NEEDS, not by what it is called:
- *
- *   component lane — jsdom, names no datastore. No service containers, no
- *                    migrations, files run concurrently with a shared module
- *                    registry, exactly like the unit lane.
- *   datastore lane — everything else. Containers, migrations, serial files.
- *
- * BOTH configs call this one function, so the two lanes are a total and
- * disjoint partition by construction. A file cannot be dropped from the run or
- * picked up twice, which is the failure mode a hand-maintained list would have.
- *
- * The rule is deliberately conservative and the default is the datastore lane:
- * a file only leaves it by positively declaring jsdom and mentioning no
- * datastore. A misjudgement therefore costs time, never correctness — and a new
- * test lands in the safe lane without anyone having to remember a convention.
+ * Split integration tests by needs: jsdom+no-datastore (component) vs datastore.
+ * BOTH configs call one function for disjoint partition by construction.
  */
 import fs from "node:fs";
 import path from "node:path";
 
 /**
- * Names that mean a file expects a real datastore, a real queue, or the
- * integration harness that provisions them.
- *
- * A shallow read of the file's own source, not of its import graph. That is
- * sound in the direction that matters: a file reaching a datastore only
- * transitively — through a helper it imports — cannot pass in the component
- * lane, because there is no datastore to reach. It fails loudly on the first CI
- * run rather than passing for the wrong reason, and moving it back is a
- * one-line change to the file, not to this rule.
+ * Datastore markers via shallow file read (not imports): transitive reaches
+ * fail loudly, forcing one-line fix.
  */
 const DATASTORE_MARKERS = [
   "prisma",
@@ -168,14 +138,8 @@ export function partitionIntegrationFiles({
 }
 
 /**
- * Characters picomatch reads as pattern syntax rather than as themselves.
- *
- * This is not hypothetical tidiness. Twelve of the app's integration tests live
- * under `src/pages/[project]/`, and handed to a glob engine unescaped,
- * `[project]` is a CHARACTER CLASS matching one of p/r/o/j/e/c/t — so it does
- * not match the directory literally named `[project]`, and those twelve files
- * would be selected by neither lane. They would simply stop running, and both
- * lanes would report a clean pass over the files that remained.
+ * Glob metacharacters: twelve tests under `[project]/` fail silently if
+ * unescaped (char class, not literal).
  */
 const GLOB_METACHARACTERS = /[\\*?[\]{}()!+@|]/g;
 

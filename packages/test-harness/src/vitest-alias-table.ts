@@ -21,16 +21,7 @@ import {
 } from "typescript/unstable/ast";
 import { parseSourceText } from "./ts-ast.ts";
 
-/**
- * Reading the module-alias tables the vitest configs declare.
- *
- * The tables are read out of the configs themselves rather than copied, so a
- * table that gains or renames an entry travels with the config instead of
- * going stale in a second place. Used by `mockSpecifierScan` to resolve a
- * mock specifier the way the runner would.
- *
- * Spec: specs/setup/test-mock-specifier-resolution.feature
- */
+// Read module-alias tables live from vitest configs to track changes.
 
 /** One entry of a vitest config's module-alias table. */
 export type ModuleAlias = {
@@ -38,15 +29,7 @@ export type ModuleAlias = {
   find: string;
   /** The absolute path it expands to. */
   replacement: string;
-  /**
-   * Whether the entry claims only the bare specifier, never a subpath under
-   * it. An anchored regular-expression `find` is how a config says that, and
-   * it says it for a reason: mapping a package name to one file by prefix
-   * turns `@langwatch/observability/metrics` into
-   * `…/observability/src/index.ts/metrics`, which is an `ENOTDIR` rather than
-   * a module. Absent, the entry matches vite's ordinary rule — the exact
-   * specifier, or a prefix ending at a path boundary.
-   */
+  /** Whether entry claims only bare specifier; regex with anchors prevents subpath issues. */
   exact?: boolean;
 };
 
@@ -117,16 +100,7 @@ function urlSpecifierOf(node: NewExpression): string | undefined {
   return specifier.text;
 }
 
-/**
- * The path a `new URL(…, import.meta.url)` resolves to, whether the config
- * unwraps it with `fileURLToPath` or reads `.pathname` off it.
- *
- * `import.meta.url` is the config file, and a relative URL resolves against
- * the file's directory, which is the config's own directory. A trailing
- * separator is kept for the same reason `join` keeps one: it is what makes an
- * entry expand to a directory rather than glue the rest of the specifier onto
- * the directory's name.
- */
+// Resolve import.meta.url from vitest configs; preserves trailing separators.
 function urlCallValue({
   node,
   configDir,
@@ -141,15 +115,7 @@ function urlCallValue({
   return expanded.endsWith("/") ? expanded : `${expanded}/`;
 }
 
-/**
- * The exact specifier an anchored regular-expression `find` names, or
- * undefined for any pattern that is not one literal specifier.
- *
- * `/^@langwatch\/eventing$/` is a package name spelled as a regex, which is
- * how a config asks for an exact match. Anything with a character class, a
- * quantifier, an alternation or a flag is a real pattern, cannot be reduced to
- * a prefix, and is refused rather than guessed at.
- */
+// Extract exact specifier from anchored regex; undefined for real patterns.
 function anchoredExactFindOf(node: Expression): string | undefined {
   if (!isRegularExpressionLiteral(node)) return undefined;
   const text = node.text;
@@ -329,15 +295,8 @@ function readAliasTable({
   throw new Error(`${fileName}: alias table is neither an object nor an array literal`);
 }
 
-/**
- * The module-alias table one vitest config declares, in either shape vite
- * accepts: `alias: { "~/": ... }` or `alias: [{ find, replacement }]`.
- *
- * Throws on anything it cannot read rather than skipping it. A dropped alias
- * is the worse failure of the two available: the specifiers relying on it
- * stop looking like paths, get taken for package names, and are skipped, so
- * the scanner goes quiet about exactly the files it was meant to check.
- */
+// Parse module-alias table from vitest config (object or array form);
+// throws on errors to detect dropped aliases.
 export function parseVitestConfigAliases({
   fileName,
   sourceText,

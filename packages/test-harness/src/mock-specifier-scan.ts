@@ -12,20 +12,8 @@ import {
 import type { ModuleAlias } from "./vitest-alias-table.ts";
 
 /**
- * Static scan for `vi.mock` specifiers that name no module.
- *
- * `vi.mock("<specifier>")` does not fail when the specifier resolves to
- * nothing. Vitest registers a mock for a module id that is never requested,
- * the real module loads instead, and the suite goes green while asserting
- * against the thing it meant to replace. A path copied out of the module
- * under test into its `__tests__/` subdirectory is off by one directory
- * level and lands exactly there.
- *
- * Enforced from `__tests__/mockSpecifierScan.unit.test.ts`, which pins the
- * rule on snippets and then runs it over every tracked test file, so the
- * check rides the ordinary unit shards.
- *
- * Spec: specs/setup/test-mock-specifier-resolution.feature
+ * Static scan for vi.mock specifiers that name no module. Enforced by unit
+ * test over tracked files. See specs/setup/test-mock-specifier-resolution.feature
  */
 
 /** One `vi.mock` / `vi.doMock` / `vi.unmock` / `vi.doUnmock` call site. */
@@ -90,14 +78,8 @@ function isMockCall({ node }: { node: CallExpression }): boolean {
 }
 
 /**
- * Whether a file could hold a mock call at all, as a cheap substring test so
- * a walk parses only the files that might matter.
- *
- * Derived from `MOCK_METHODS` rather than spelled out separately: the method
- * names share no common case-sensitive substring, since `vi.doMock` carries
- * no lowercase "mock". A filter written by hand drifts from the set it is
- * meant to mirror, and the drift is invisible, because the file it wrongly
- * skips is reported clean.
+ * Pre-filter for mock calls: derived from MOCK_METHODS to avoid drift and
+ * skip unnecessary parses.
  */
 export function mightContainMockCall({ sourceText }: { sourceText: string }): boolean {
   for (const method of MOCK_METHODS) {
@@ -107,13 +89,8 @@ export function mightContainMockCall({ sourceText }: { sourceText: string }): bo
 }
 
 /**
- * Every module named by a mock call in one file. Pure: takes a parsed file,
- * returns call sites, so the rule itself is unit-testable.
- *
- * Parsing is the caller's, not this function's, because it is no longer free:
- * TypeScript 7 parses in the compiler process, and a whole-tree scan that asked
- * per file paid a round trip per file. The callers that walk the tree parse
- * every file in one exchange (`parseSourceTexts`) and hand the results here.
+ * Scans for mock specifiers: pure function. Caller handles parsing (TS7
+ * round trip per file).
  */
 export function scanSourceForMockSpecifiers({
   source,

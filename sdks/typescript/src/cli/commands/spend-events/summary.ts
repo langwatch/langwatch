@@ -66,15 +66,7 @@ const GROUP_LABELS: Record<string, string> = {
   request_type: "request types",
 };
 
-/**
- * What the row count after the walk is a count OF.
- *
- * A dimension's own noun is only true when the walk has one dimension and no
- * time bucket. Add a second dimension or an hour column and each row is a
- * combination, so calling twelve model-by-hour rows "12 models" states
- * something the data does not say, on a surface whose whole job is being
- * exactly right about counts.
- */
+// Determine correct noun for row count; single dimension yields its own noun.
 export function summaryCountNoun({
   groupBy,
   bucket,

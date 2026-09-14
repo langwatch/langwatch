@@ -1,48 +1,8 @@
 import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
 
 /**
- * Guarded teardown for integration tests that write to the shared local
- * database.
- *
- * Prisma drops `undefined` from a where clause rather than matching
- * nothing, so `deleteMany({ where: { id: teamId } })` with `teamId`
- * unassigned is `deleteMany({})`: every row in the table. Test ids are
- * typically `let` variables assigned inside `beforeAll`, which TypeScript
- * cannot verify across the callback boundary, so the value is undefined
- * exactly when setup already failed, and the hand-rolled teardown turns a
- * broken setup into a destructive sweep across every other suite and
- * worktree (#6219).
- *
- * This helper makes that collapse structurally impossible:
- *
- *   - a filter value that is undefined, an empty string, an empty object,
- *     or an empty list means the entry no longer identifies anything, so
- *     the entry deletes NOTHING and the problem is reported by model and
- *     field;
- *   - entries that are still fully identified are cleaned, so a partially
- *     failed setup still gets its partial cleanup;
- *   - after everything cleanable is cleaned, any refusal or delete failure
- *     is thrown as one loud error. Nothing is ever swallowed: the blanket
- *     `.catch(() => {})` habit is what kept the sweep invisible and hid
- *     real tenancy-guard errors besides.
- *
- * `null` stays allowed: Prisma keeps `null` in the filter (matches SQL
- * NULL), so `{ archivedAt: null }` is a real, intentional predicate.
- *
- * Entries run sequentially in the order given, so callers order them
- * child-before-parent exactly as they ordered the raw deletes.
- *
- * Spec: specs/setup/test-teardown-safety.feature
- *
- * ```ts
- * afterAll(() =>
- *   cleanupTestRows(prisma, [
- *     ["modelProvider", { organizationId: orgId }],
- *     ["team", { id: { in: teamIds } }],
- *     ["user", { email: `x-${ns}@example.com` }],
- *   ]),
- * );
- * ```
+ * Guards deleteMany() teardown against destructive sweeps: validates filter
+ * values, runs child-before-parent. See specs/setup/test-teardown-safety.feature
  */
 
 type DeleteManyDelegate = {
@@ -192,14 +152,8 @@ function sanitizeWhere(where: unknown, label: string): SanitizeResult {
 }
 
 /**
- * Loud anchor for the few teardowns that must collect ids BEFORE deleting
- * (tenancy guards on models like ProjectSecret demand literal
- * `projectId.in` filters, so a `findMany` prelude gathers them). That
- * prelude has the same collapse as the deletes: `findMany({ where: {
- * teamId: undefined } })` is `findMany({})`, every row in the table, which
- * would then feed everyone's ids into the cleanup. Anchoring the prelude
- * on `requireAssigned({ value: teamId, name: "teamId" })` makes a broken
- * setup throw before any query runs.
+ * Guard for pre-delete findMany: refuse unassigned values to avoid
+ * table-wide queries.
  */
 export function requireAssigned<T>({
   value,

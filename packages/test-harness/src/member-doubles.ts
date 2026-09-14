@@ -1,17 +1,6 @@
 /**
- * Honest doubles for the members a process hands its modules.
- *
- * Each is a VALUE a caller passes - `createApp({ members: { clock: frozenAt(…) } })`
- * - and never a second builder. There is no `createTestInfrastructure`, because
- * a test that assembles its own pool assembles a pool production does not have,
- * and the two drift apart in exactly the places nobody looks.
- *
- * The member shapes are described here rather than imported, the way
- * `test-audit-sink.ts` describes the audit row: the harness is a
- * dependency of nearly every package, and a dependency on the package that
- * opens Postgres, ClickHouse, Redis and S3 would put that graph on the boot
- * path of every suite that only wanted a lane. Structural typing still checks
- * these against the real members where they are handed in.
+ * Member doubles: values passed by caller. Shapes described here (not
+ * imported) to avoid heavy boot dependencies.
  */
 
 /** Now, as a module reads it. */

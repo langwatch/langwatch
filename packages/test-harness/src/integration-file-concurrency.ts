@@ -1,22 +1,6 @@
 /**
- * Whether the integration suite runs its files concurrently, and the two
- * mechanisms that keep the answer from drifting.
- *
- * Concurrency is a correctness question for this suite rather than a speed
- * knob. Its fixtures share one ClickHouse database and one Redis instance:
- * groupQueue keys a queue by name alone, so two files building the same pipeline
- * consume each other's jobs, and the suites that replay goose migrations
- * rebuild shared rollup tables in place, so a file reading such a table while
- * another replays sees it mid-swap: a column that briefly does not exist, or
- * an aggregate that reads as zero until the migration's reconciliation lands.
- *
- * Vitest implements `fileParallelism: false` by clamping the worker count to
- * one and nothing else, and it applies `VITEST_MAX_WORKERS` *after* that clamp.
- * An exported worker count therefore restores concurrent files while the config
- * still reads `fileParallelism: false` and the reporter still prints one run,
- * which is a silent way to lose the property above. So the override is
- * withdrawn at config load, and a worker slot above the first fails loudly if
- * one ever appears regardless.
+ * Integration files must run serial (shared ClickHouse/Redis). Guard against
+ * fileParallelism: false being defeated by worker count override.
  */
 
 /** Whether the suite was explicitly asked to run its files concurrently. */

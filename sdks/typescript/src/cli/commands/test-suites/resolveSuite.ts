@@ -15,16 +15,7 @@ export class SuiteReferenceError extends Error {
   }
 }
 
-/**
- * Finds the test suite a reference names.
- *
- * An id is tried first, then an exact name, then a name compared without case.
- * A name two suites share is refused with both ids, because picking one for
- * the caller would file the scenario somewhere they did not ask for.
- *
- * @see specs/features/test-suite-cli.feature
- * @see specs/features/scenario-cli.feature
- */
+// Resolve test suite by id or name; rejects ambiguous names.
 export async function resolveSuiteReference({
   reference,
   service,

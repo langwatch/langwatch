@@ -27,24 +27,8 @@ import {
   NodeFlags,
 } from "typescript/unstable/ast";
 
-/**
- * Static scan for the deleteMany collapse (#6219) in test files.
- *
- * The dangerous form is a `deleteMany` whose filter references a
- * reassignable variable: `let orgId: string` assigned inside `beforeAll`
- * is `undefined` whenever setup threw first, Prisma drops `undefined`
- * from the where clause, and the delete matches every row in the table.
- * TypeScript cannot flag it, because definite-assignment analysis stops
- * at the callback boundary. Module-level `const` ids (ksuids generated at
- * import time) cannot be undefined and pass.
- *
- * Enforced from `__tests__/teardownScan.unit.test.ts`, which pins the rule
- * on snippets and then runs it over every test file under `src`, `ee`, and
- * `packages`, so the check rides the ordinary unit shards instead of a
- * gate nobody notices has stopped checking (#6169).
- *
- * Spec: specs/setup/test-teardown-safety.feature
- */
+// Scan for deleteMany with reassignable filters that could be undefined
+// (TypeScript cannot detect this); module-level const ids are safe.
 
 export type TeardownViolation = {
   /** 1-based line of the offending deleteMany call. */
@@ -95,23 +79,8 @@ function lineOf(source: SourceFile, node: Node): number {
   return source.getLineAndCharacterOfPosition(node.getStart(source)).line + 1;
 }
 
-/**
- * The model a `deleteMany` call names, or undefined when the call reaches no
- * table at all.
- *
- * Prisma always reaches a model through the client — `prisma.team`,
- * `ctx.prisma.team`, `tx.team`, `database().customGraph` — so the receiver of
- * a delegate call is itself a property access. A receiver that is a bare
- * identifier has no model segment, which makes it the unit under test's own
- * method rather than a table: the product ships a `deleteMany` tRPC procedure
- * and a `deleteMany` repository method, and their unit suites call both
- * against fakes that never see a database.
- *
- * The limit this accepts is `const team = prisma.team` followed by
- * `team.deleteMany(...)`, which reads as a bare identifier here. No test in
- * the tree is written that way, and the alternative — reporting the product's
- * own API as a teardown hazard — teaches contributors to ignore the check.
- */
+// Model that deleteMany targets; bare identifiers have no model segment
+// and are skipped to avoid false positives on internal deleteMany methods.
 function modelDelegateNameOf(callee: PropertyAccessExpression): string | undefined {
   const owner = unwrapExpression(callee.expression);
   if (isIdentifier(owner)) return undefined;

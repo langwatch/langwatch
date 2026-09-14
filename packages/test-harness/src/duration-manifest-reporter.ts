@@ -1,32 +1,6 @@
 /**
- * Records how long each test file took, so the shard sequencer can weigh by
- * measured cost instead of by file size.
- *
- * Written by a scheduled full-suite run on main rather than by every CI run,
- * for the reason in shardWeights.ts: the shards must all read the SAME weights
- * or they disagree about the split, and the only artifact they are all
- * guaranteed to share is the one that came out of the checkout. A run that
- * writes the manifest and a run that reads it are therefore deliberately
- * different runs.
- *
- * WRITES A DELTA, NOT A MANIFEST, and to its own file. Each shard emits only
- * the files IT measured, and the aggregation overlays every shard's delta onto
- * the committed manifest.
- *
- * The obvious alternative — have each shard merge its measurements over the
- * committed manifest and emit the whole thing — is wrong in a way that is easy
- * to miss. Every shard's artifact would then carry the full baseline, so for a
- * file measured by shard A, A's artifact holds the NEW value while every other
- * shard's holds the OLD one. A `jq -s add` lets the last artifact win, so
- * whether the fresh measurement survives comes down to the order `find` happened
- * to list the artifacts in. Deltas do not overlap — the lanes partition the
- * files and a lane's shards partition its own — so their union is
- * order-independent, and the baseline is applied once, underneath.
- *
- * Its own file, because a manifest is a COMMITTED artifact: writing a partial
- * one over `vitest.durations.json` would silently delete the weights for every
- * file this run did not execute, which is exactly what a developer running one
- * lane locally would do.
+ * Duration manifest for shard sequencer: each shard emits delta (not full),
+ * overlaid onto committed baseline. Order-independent. See shardWeights.ts.
  */
 import { writeFileSync } from "node:fs";
 import path from "node:path";
@@ -42,15 +16,8 @@ export interface DurationManifestReporterOptions {
 }
 
 /**
- * Where the manifest lives when nobody says otherwise.
- *
- * Both halves matter. CI adds this reporter as a bare
- * `--reporter=./src/test-utils/durationManifestReporter.ts`, and vitest
- * constructs a reporter named that way with NO arguments — so a required option
- * here would throw on a path that only runs on a dispatched refresh, which is
- * the least-exercised path there is. And the sequencer resolves the manifest
- * against the app root, so a default that lands anywhere else would be written
- * faithfully and never read.
+ * Default delta path: must work with no CI args and resolve for sequencer
+ * from app root.
  */
 const DEFAULT_DELTA = "vitest.durations.delta.json";
 

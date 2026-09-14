@@ -1,35 +1,6 @@
 /**
- * End-to-end test for BUG B3 — eval-v3's TargetCell missing trace_id.
- *
- *   [test]
- *     │ POST /go/studio/execute (SSE) with an execute_component event
- *     │ carrying a known trace_id
- *     ▼
- *   [real nlpgo subprocess (prebuilt binary, _nlpgoSubprocess.ts)]
- *     │ Server-Sent Events stream
- *     ▼
- *   [test parses `component_state_change` frames]
- *
- * Asserts (against the SSE frames nlpgo actually emits):
- *   Every `component_state_change` event carries
- *   `payload.execution_state.trace_id` === the inbound trace_id.
- *
- * Why this is the right proof: eval-v3's TargetCell reads the per-row
- * trace id EXCLUSIVELY from `execution_state.trace_id`
- * (resultMapper.ts:306). The eval-v3 orchestrator generates the
- * trace_id and sends it INTO nlpgo as the request trace_id; nlpgo must
- * echo it back inside execution_state or the cell's `traceId` resolves
- * to undefined and the "View trace" link never renders — exactly the
- * 2026-05-15 dogfood symptom. Python's start/end/error component events
- * all set ExecutionState.trace_id (langwatch_nlp/studio/types/events.py
- * :216,250,269); the Go port had dropped that field, carrying the id
- * only on the (for this event type, unused) outer envelope.
- *
- * Unlike the traceparent-roundtrip test this needs no ClickHouse / Redis
- * / OTLP pipeline — the regression is purely in what nlpgo streams back,
- * so we assert directly on the wire frames. Gate is therefore just `go`.
- *
- * Subprocess boot + SSE parsing are shared via _nlpgoSubprocess.ts.
+ * E2E test for BUG B3: eval-v3 TargetCell missing trace_id from execution_state.
+ * Nlpgo's Go port dropped this field; Python version includes it. Asserts directly on SSE frames.
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 

@@ -5,19 +5,8 @@ import { guardOrganizationId } from "./organization-guard.ts";
 import { PrismaQueryGuard, type PrismaQueryContext, type PrismaQueryExecutor } from "./connection.ts";
 
 /**
- * The tenancy policy every LangWatch process composes its client with.
- *
- * {@link PrismaQueryGuard} is the port that makes an unguarded client
- * unconstructable; this is the one implementation of it, and it lives beside
- * the schema its model classification is a projection of. The three guards run
- * in the order they were registered as Prisma middleware, because that order
- * is behaviour: mass-delete refuses an unbounded `deleteMany` before either
- * tenancy guard inspects a WHERE clause that would never run, and the project
- * guard hands the organization guard the arguments it narrowed.
- *
- * It composes no timing and reads no environment. A process that wants its
- * slow queries reported decorates this guard at its own composition root,
- * which is where the budget it reports against is configured.
+ * Tenancy policy implementation: composes mass-delete, project, and org guards in order.
+ * Timing and environment reads are handled at the composition root.
  */
 export class PrismaTenancyGuardService extends PrismaQueryGuard {
   private constructor() {

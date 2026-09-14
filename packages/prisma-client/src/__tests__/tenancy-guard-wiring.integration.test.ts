@@ -1,16 +1,6 @@
 /**
  * @vitest-environment node
- *
- * specs/server/prisma-driver-adapter.feature — the tenancy guard chain
- * (enMasse -> projectId -> organizationId, plus the raw-SQL guard) is unit
- * tested against the guard functions directly (multi-tenancy-guard.test.ts,
- * mass-delete-guard.test.ts). What nothing else covers is the WIRING: that
- * every guard is actually present on a client composed through
- * PrismaTenancyGuardService + PrismaConnectionService, and that
- * guardEnMasse's argument rewrite (the only guard that mutates args rather
- * than just validating) survives the connection's query-extension plumbing.
- * Each test here drives a real query through a real composed client against
- * the real test database.
+ * Integration tests for tenancy guard wiring through the composed Prisma client.
  */
 
 import { randomUUID } from "node:crypto";

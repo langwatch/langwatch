@@ -1,15 +1,6 @@
 /**
- * The mock-specifier rule and its enforcement.
- *
- * The snippet cases pin the rule itself, so it cannot regress to finding
- * nothing; the last cases run it over every tracked test file, which is
- * what actually keeps a mock that names no module out. Both ride the
- * ordinary unit shards, so there is no gate that can quietly stop checking.
- *
- * The alias-table reader this resolves against is covered separately, in
- * `vitestAliasTable.unit.test.ts`.
- *
- * Spec: specs/setup/test-mock-specifier-resolution.feature
+ * Mock-specifier rule enforcement: prevents unqualified mock imports. Runs over all test files
+ * to catch undetected violations. Spec: specs/setup/test-mock-specifier-resolution.feature
  */
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
@@ -375,18 +366,8 @@ describe("resolving a mock specifier", () => {
 describe("every tracked test file", () => {
   let result: ReturnType<typeof scanTrackedTestFiles>;
 
-  // In `beforeAll` rather than the describe body: the walk shells out to git
-  // and reads the whole tree, and both it and the alias reader can throw. In
-  // the body those throws abort collection and surface as a file-level error
-  // with no test name attached.
-  //
-  // The explicit timeout is not slack for a slow machine. Parsing moved into
-  // the compiler process with TypeScript 7, so this walk is one exchange
-  // carrying every candidate file's text, and it takes appreciably longer than
-  // vitest's 10s default for a hook — around 15s for the tree as it stands.
-  // Batched it is 20x cheaper per file than asking file by file, which does not
-  // finish at all (ADR-099); the remaining cost is the price of the native
-  // compiler having no in-process parser to lend.
+  // In beforeAll to prevent file-level errors from throws. Explicit 120s timeout needed
+  // because TypeScript 7's compiler walk parses every candidate file's text.
   beforeAll(() => {
     result = scanTrackedTestFiles();
   }, 120_000);

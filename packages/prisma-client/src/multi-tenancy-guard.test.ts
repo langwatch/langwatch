@@ -5,15 +5,8 @@ import { guardProjectId, PROJECT_TENANCY_REGIMES, SCOPED_MODEL_NAMES } from "./m
 import { ORG_BEARING_MODEL_NAMES } from "./organization-guard.ts";
 
 /**
- * Regression tests for the multitenancy guard — specifically its exempt
- * list. The guard rejects any findMany/findFirst without a projectId in
- * the WHERE clause, which is correct for project-scoped models but
- * catastrophic for org-scoped ones (silently throws inside every tx,
- * rolling back the whole mutation).
- *
- * Lane B iter 32 (commit 88a66af6d) added 4 org-scoped gateway models
- * to the exempt list after the bug surfaced on the live budgets page.
- * These tests lock that in.
+ * Regression tests for multitenancy guard's exempt list. Org-scoped models need exemption
+ * to prevent silent transaction rollbacks.
  */
 
 async function runGuard(params: GuardParams): Promise<unknown> {
@@ -412,16 +405,8 @@ describe("guardProjectId — org-scoped VirtualKey still guarded", () => {
 });
 
 /**
- * Regression tests for SCOPED_MODELS — the stricter alternative to
- * EXEMPT_MODELS. These tables don't have a projectId column to
- * constrain on, but EVERY query must still carry a tenancy predicate
- * (row id, scope, or parent FK). A bare `findMany({})` must throw.
- *
- * Root cause: rchaves on 2026-05-18 dogfood pointed out that putting
- * ModelProvider + ModelDefaultConfig in EXEMPT_MODELS lets a
- * programmer accidentally write a cross-tenant query and have it
- * silently pass. The fix is per-model predicate enforcement, not a
- * full bypass.
+ * Regression tests for SCOPED_MODELS: stricter enforcement of tenancy predicates for models
+ * without a projectId column, preventing accidental cross-tenant queries.
  */
 describe("guardProjectId — SCOPED_MODELS (ModelProvider family)", () => {
   describe("ModelProvider.findMany without any tenancy predicate", () => {
@@ -987,14 +972,8 @@ describe("guardProjectId — raw queries (queryRaw / executeRaw)", () => {
 });
 
 /**
- * Regime partition (mirrors dbOrganizationIdProtection's). Every Prisma model
- * WITHOUT a projectId column must be classified into exactly one regime, so a
- * new model cannot silently slip in - or out of - the projectId guard:
- *   - GLOBAL_MODELS / RELATIONAL_PARENT_SCOPED: hand-listed, no tenant column;
- *   - SCOPED_MODELS: projectId-less but validated by row id / scope / parent FK;
- *   - org-bearing: derived from ORG_BEARING_MODEL_NAMES (the org guard registry).
- * Org-bearing models must NEVER be hand-listed here - the org guard is the
- * single source of truth for "this model is org-scoped, not project-scoped".
+ * Regime partition ensuring every projectId-less model is classified into exactly one regime
+ * to prevent silent gaps in tenancy enforcement.
  */
 describe("project-tenancy regime partition", () => {
   const { GLOBAL_MODELS, RELATIONAL_PARENT_SCOPED, LICENSE_COUNTED_PROJECT_MODELS } =

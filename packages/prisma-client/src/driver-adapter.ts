@@ -16,17 +16,8 @@ export abstract class PrismaDriverAdapterFactory {
 }
 
 /**
- * The classic Rust engine read the search-path schema from the connection
- * URL's `?schema=` parameter. The pg driver ignores unknown URL params, so a
- * deployment whose DATABASE_URL carries `?schema=` (dev and prod both do)
- * would silently query `public` while `prisma migrate` kept writing to the
- * named schema. Parse it out and hand it to the adapter explicitly.
- *
- * The engine's pool-tuning URL params need the same treatment: node-postgres
- * ignores `connection_limit` and `pool_timeout`, and its defaults differ from
- * the engine's (max 10 connections vs `cpus * 2 + 1`, wait-forever vs a 10s
- * acquisition timeout). A deployment that tuned its pool through the URL must
- * keep getting what the URL says, so both map onto the pg Pool config.
+ * Parses schema and pool-tuning parameters that pg driver ignores, applying them explicitly
+ * to match Rust engine behavior.
  */
 export class PrismaDriverAdapterService extends PrismaDriverAdapterFactory {
   private constructor() {

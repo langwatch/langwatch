@@ -1,17 +1,7 @@
 /**
  * @vitest-environment node
- *
- * Acceptance for the guarded teardown (#6219), against real Postgres.
- *
- * The property under test: a suite whose beforeAll threw before assigning
- * its ids must be provably unable to delete rows it did not create. The
- * "bystander" organization below stands in for every other suite and
- * worktree sharing the local test database.
- *
- * Requires LANGWATCH_TEST_DATABASE_URL. Skips cleanly without it so the
- * suite stays runnable on a box with no database.
- *
- * Spec: specs/setup/test-teardown-safety.feature
+ * Acceptance test for guarded teardown; early suite failure cannot delete rows it didn't
+ * create. Requires LANGWATCH_TEST_DATABASE_URL; see specs/setup/test-teardown-safety.feature
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { nanoid } from "nanoid";

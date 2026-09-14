@@ -4,41 +4,8 @@ import { basename, join } from "node:path";
 import type { SourceFile } from "typescript/unstable/ast";
 import { API } from "typescript/unstable/sync";
 
-/**
- * Getting a parsed `SourceFile` out of TypeScript 7.
- *
- * TypeScript 7 is the native compiler, and it did not bring the old
- * `ts.createSourceFile(fileName, text, target)` with it. The JS package's root
- * export is a version constant; the compiler lives behind
- * `typescript/unstable/*`, where parsing is a request to the Go binary rather
- * than work done in this process. Nothing parses a string in-process any more,
- * so the static scans that used to call `createSourceFile` need a session.
- *
- * That session is what this module owns, and owning it in one place is the
- * point: the API spawns a `tsgo` child, so a scan that opened its own would pay
- * for a process per call.
- *
- * Two details are load-bearing, and both were found by the tests rather than
- * reasoned out:
- *
- *   - **Every parse happens under a temporary directory**, never under a path
- *     inside the repo. Opening a file makes the Go side search its ancestors
- *     for a tsconfig that claims it, and a synthetic path under `platform/app`
- *     is claimed by the app's — so parsing one snippet loaded the whole
- *     52 MB project and took longer than a test timeout. Nothing above the
- *     temporary directory is a tsconfig, so each file lands in an inferred
- *     project of its own, which is all a syntactic scan needs.
- *
- *   - **Each parse gets a name no earlier parse used.** The session caches
- *     source files by path, so re-parsing a name returned the first text and a
- *     scan pinning a rule across several snippets judged all of them by the
- *     first.
- *
- * The scans built on this: `mockSpecifierScan`, `teardownScan`,
- * `vitestAliasTable`, and the ClickHouse `replicatedEngineGuard` test. All four
- * take the file's real directory as its own argument, so none of them needs the
- * parsed file to sit where the original does. See ADR-099.
- */
+// Owns the TypeScript 7 parsing session to avoid overhead; parses in temp
+// directory to avoid loading the full project, and each parse uses a unique name.
 
 /**
  * Text for the files this module invents, keyed by the path it invented. The
@@ -124,15 +91,8 @@ function sourceFileFrom({
   return sourceFile;
 }
 
-/**
- * The parsed form of source text, under a name that keeps the original's
- * extension — which is what decides the script kind, and so whether JSX and
- * type annotations parse at all.
- *
- * One call is one round trip to the compiler. Scanning a whole tree file by
- * file through here pays that per file; `parseSourceTexts` is the same work in
- * one trip and is what the tree-wide scans use.
- */
+// Parse one source file; extension determines script kind (JSX, types, etc.).
+// For tree-wide scans, use parseSourceTexts for efficiency.
 export function parseSourceText({
   fileName,
   sourceText,

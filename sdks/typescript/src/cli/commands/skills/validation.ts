@@ -7,16 +7,7 @@
  */
 import { commandValidationError } from "../../utils/errorOutput";
 
-/**
- * Throw a validation failure as a real Error that still carries the domain
- * brand — eslint's only-throw-error demands an Error instance, while
- * `handledErrorFromThrown` recognises the failure by the brand on the thrown
- * value itself (it reads those fields before unwrapping anything).
- *
- * Call it as `return throwValidationError(...)`: a bare call compiles but
- * TypeScript's control-flow analysis does not treat it as exiting the block,
- * so narrowing after it is lost.
- */
+// Throw validation errors as branded Error instances for proper error handling.
 export const throwValidationError = (
   message: string,
   meta: Record<string, unknown> = {},

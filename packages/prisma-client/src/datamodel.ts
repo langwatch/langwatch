@@ -7,16 +7,8 @@ export interface PrismaDatamodelModel {
 
 
 /**
- * Prisma 7's generated client no longer exposes `Prisma.dmmf`, so the tenancy
- * partition tests read the datamodel straight from this package's own
- * `prisma/schema.prisma`: every `model` block's field names, relation fields
- * included, exactly as `dmmf.datamodel.models[].fields` used to report them.
- *
- * The schema is resolved from this module rather than from the working
- * directory, because the two partition suites that read it no longer share
- * one: the project-tenancy partition runs inside this package, and the
- * organization-tenancy partition runs from `platform/app`, where the
- * repositories it drives the guard with live.
+ * Parses Prisma's datamodel from schema.prisma after Prisma 7 removed dmmf exposure.
+ * Located here so both partition suites that use it find the same schema.
  */
 export function parsePrismaDatamodel(): PrismaDatamodelModel[] {
   const schema = readFileSync(new URL("../prisma/schema.prisma", import.meta.url), "utf8");

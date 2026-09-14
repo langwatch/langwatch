@@ -85,15 +85,7 @@ export const renderSkillFileResults = ({
 const isTableOutput = (options: RawOutputFlags): boolean =>
   resolveOutputOptions({ ...options }).format === "table";
 
-/**
- * Whether it is safe to PROMPT.
- *
- * Interactive confirmation is for humans at a terminal ONLY. A TTY stdin does
- * not make prompting safe: with `-o json`/`--jq`/`--agent` (or agent env vars)
- * the caller is a machine — a prompt blocks it like a hang, and the
- * pre-confirmation preview would corrupt the structured document it is about
- * to read. Machine callers get a -y/--yes error instead, always.
- */
+// Safe to prompt only on TTY with table format, never with structured output.
 export const isInteractiveConsole = (options: RawOutputFlags): boolean => {
   const resolved = resolveOutputOptions({ ...options });
   return process.stdin.isTTY === true && resolved.format === "table" && !resolved.agent;
@@ -118,18 +110,7 @@ export const announceRoot = (root: string, options: RawOutputFlags): void => {
   if (isTableOutput(options)) console.log(chalk.gray(`Install root: ${root}`));
 };
 
-/**
- * The `--force` gate: the same confirmation `uninstall` demands, applied to
- * the strictly MORE destructive act of truncating a file.
- *
- * `uninstall` refuses non-interactively without -y before removing a file it
- * has already proven it owns; `--force` used to overwrite files it has proven
- * it does NOT own, with no prompt and no TTY check at all. This closes that,
- * and only that: clobbers here are files carrying content we did not write, so
- * forcing over our own installs stays frictionless.
- *
- * Returns whether to proceed; throws (never prompts) for machine callers.
- */
+// Gate --force to demand confirmation for non-managed files; our own stay frictionless.
 export const confirmForcedOverwrite = async (
   clobbers: ForcedClobber[],
   {

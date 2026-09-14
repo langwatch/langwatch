@@ -1,13 +1,6 @@
 /**
- * The teardown-safety rule and its enforcement.
- *
- * The snippet cases pin the rule itself, so it cannot regress to finding
- * nothing; the last case runs it over every test file under `src`, `ee`,
- * and `packages`, which is what actually keeps the dangerous form out.
- * Both ride the ordinary unit shards, so there is no gate that can
- * quietly stop checking (#6169).
- *
- * Spec: specs/setup/test-teardown-safety.feature
+ * Teardown safety rule: snippet cases test the rule itself, full scan tests
+ * all files. No gate can quietly skip checking (#6169).
  */
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";
@@ -28,24 +21,8 @@ const PACKAGE_ROOT = resolve(__dirname, "../..");
 const REPO_ROOT = resolve(PACKAGE_ROOT, "../..");
 
 /**
- * Every root holding test files this rule covers, as name -> directory.
- *
- * `packages/` is at the workspace root, not under the app: ADR-076 folded the
- * six install roots into one workspace and moved it there. Resolving a bare
- * "packages" against the app finds nothing.
- */
-/**
- * Every tree with test files in it.
- *
- * `ee/` was a root until the enterprise code moved under `packages/`, which
- * the packages root already walks; `platform/app/src` was one until the
- * monolith was deleted, and `apps/` took its place — the applications hold
- * tests now, and a scan that named neither would report no offenders forever.
- * A root that no longer exists does not narrow the scan — it fails the case
- * that names it, and while it failed there the packages root's own findings
- * were never asserted at all. That is why an entry is removed rather than left
- * in as a harmless leftover, and why removing one surfaces violations that
- * were always present: an aborted guard reports no offenders forever.
+ * Test roots: `packages` is at workspace root (ADR-076). Remove entries for
+ * absent directories; an absent guard reports no offenders forever.
  */
 const TEST_ROOTS: Record<string, string> = Object.fromEntries(
   (

@@ -22,7 +22,7 @@ export interface ModuleVitestConfigOptions {
   exclude?: string[];
   /** Overrides the default of `false`. Set `true` when a suite mocks modules. */
   isolate?: boolean;
-  /** Overrides the fast-mode default (`false`). Set `true` for a suite that breaks with CSS processing off. */
+  /** Overrides fast-mode default; set `true` for suites needing CSS processing. */
   css?: boolean;
   setupFiles?: string[];
   testTimeout?: number;

@@ -1,23 +1,6 @@
 /**
- * Isolated ClickHouse endpoints for suites that assert per-organization
- * ClickHouse routing.
- *
- * Those suites need two or more endpoints whose data cannot leak into one
- * another, so they can prove that a row written for a private-ClickHouse org
- * lands on that org's endpoint and nowhere else. Two backends provide that:
- *
- *   - Native: one database per endpoint on the always-on local ClickHouse
- *     (LANGWATCH_TEST_CLICKHOUSE_URL), so a laptop runs the suite with no
- *     docker at all. Isolation is by database, the same shape haven gives each
- *     worktree, and it exercises exactly what the suites assert: a distinct URL
- *     resolves to a distinct client that cannot see the other's rows.
- *   - Containers: one ClickHouse container per endpoint. Used in CI, and
- *     locally whenever the native server is not configured.
- *
- * Databases and tables are created if absent and never dropped. The suites key
- * their rows on ids that are unique per run, so leftovers are invisible to
- * them, and leaving the schema in place keeps concurrent runs from pulling it
- * out from under each other.
+ * Isolated endpoints for routing tests: native (databases per endpoint) or
+ * containers. Schemas persist across runs.
  */
 import { createClient } from "@clickhouse/client";
 import { ClickHouseContainer, type StartedClickHouseContainer } from "@testcontainers/clickhouse";
@@ -31,16 +14,8 @@ import { customAlphabet } from "nanoid";
 export const TEST_CLICKHOUSE_IMAGE = "clickhouse/clickhouse-server:25.10.2.65";
 
 /**
- * Low-footprint tuning copied into every test container's config.d — the same
- * shape haven applies to the ClickHouse it manages (tools/thuishaven/
- * domain/clickhouse.go): a hard memory ceiling, the optional caches zeroed,
- * background pools sized for a container that serves one test run instead of a
- * dedicated server, and the noisy self-telemetry tables off. A stock container
- * idles at whole cores writing metric logs and scheduling merges it will never
- * need. `system.query_log` stays on — trace-list's ClickHouse repository
- * integration test asserts against it. The 1 GiB memory ceiling is a backstop
- * against a runaway query, comfortably above any suite's working set; the idle
- * win comes from the caches, logs and pools, not the cap.
+ * Test container tuning: memory cap, caches off, pools for container. Same
+ * as haven applies (tools/thuishaven/domain/clickhouse.go).
  */
 export const TEST_CLICKHOUSE_TUNING = {
   target: "/etc/clickhouse-server/config.d/zz-langwatch-test-tuning.xml",
@@ -97,20 +72,8 @@ export interface TestClickHouseEndpoint {
 }
 
 /**
- * A random organization id for a suite that routes it with a
- * `CLICKHOUSE_URL__<label>__<orgId>` variable.
- *
- * The id lands inside the variable NAME, where `__` separates the label from
- * the organization and the organization is read as the last such segment. Plain
- * `nanoid` draws from an alphabet that contains `_`, so about one id in 800
- * carries a `__` of its own; the name then splits in the wrong place, the route
- * registers under a fragment of the id, and the organization silently falls
- * back to the shared client. The alphabet here has no `_`, so the name a suite
- * writes is the name the parser reads back.
- *
- * `name` is held to the same rule, and refused rather than repaired: a suite
- * that asks for a namespace the variable cannot carry has a mistake to fix in
- * the line it wrote, and a quietly rewritten namespace would hide it.
+ * Random org id with alphabet excluding `_` (parser needs exact name match in
+ * env var name).
  */
 const routableIdSuffix = customAlphabet("0123456789abcdefghijklmnopqrstuvwxyz", 6);
 

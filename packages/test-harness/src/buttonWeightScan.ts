@@ -14,21 +14,8 @@ import { markColourSites } from "./markColourScan.ts";
 import { parseSourceTexts } from "./ts-ast.ts";
 
 /**
- * Finding pressable controls that are FILLED with the brand accent.
- *
- * Lives here rather than in the suite that first needed it, next to the
- * `markColourSites` and `parseSourceTexts` it is built on. The suite that
- * points it at the governance tree is one caller; the rule it implements —
- * "a filled brand-orange control is a page action, and page actions are
- * outline" — is not specific to that tree, and the next section to adopt the
- * ruling should not have to copy 200 lines to enforce it.
- *
- * WHAT IT CANNOT SEE, stated so nobody trusts it further than it reaches: the
- * fill has to arrive through a `colorPalette` attribute `markColourSites` can
- * read. A house control that fills itself from a boolean of its own — the
- * `prominent` prop on `HeroLeadPill` is the one in the tree today — is
- * invisible to this scan however loud it renders. Widening it means teaching
- * `markColourScan` about that prop, not adding a tag here.
+ * Finds filled brand controls via `colorPalette` attribute (not prop-based
+ * fills like `prominent`). Reusable, colocated with markColourSites.
  */
 
 /** The brand accent, in the spellings a `colorPalette` is written in. */
@@ -39,29 +26,14 @@ export const BRAND_ORANGE =
 const UNFILLED = new Set(["ghost", "subtle", "outline", "plain", "surface"]);
 
 /**
- * A tag whose last segment names something a reader presses — `Button`,
- * `IconButton`, `PageLayout.HeaderButton`, and the pill and chip spellings the
- * home surfaces use for the same job.
- *
- * Matching the last segment rather than the whole text is what makes a
- * namespaced house button readable; matching a suffix rather than an
- * enumerated list is what makes the next wrapper readable without editing this
- * file. `Pill` and `Chip` are here because `HeroLeadPill` and `AskChip` are
- * pressable controls sitting in a scanned file — a scan indifferent to which
- * file the next control lands in should not be picky about what it is called.
+ * Button tag pattern: match by suffix (`Button`, `Pill`, `Chip`) for
+ * namespaced components and future wrappers.
  */
 const BUTTON_TAG = /(?:^|\.)[A-Za-z0-9_]*(?:Button|Pill|Chip)$/;
 
 /**
- * A tag whose last segment ends in `Footer` — `Drawer.Footer`,
- * `Dialog.Footer`, `ModalFooter`.
- *
- * A drawer footer's submit stays solid orange, which the rule says out loud
- * rather than leaving to be rediscovered: it is the app-wide convention
- * outside governance too, a drawer is the only thing on screen when it is
- * open, and the fill is how every drawer in this product says which of the two
- * buttons commits. Anything under one of these tags is out of this scan's
- * reach.
+ * Footer tag pattern: drawer footer buttons stay solid orange by app
+ * convention (out of scope).
  */
 const FOOTER_TAG = /(?:^|\.)[A-Za-z0-9_]*Footer$/;
 
@@ -72,15 +44,8 @@ export interface ButtonWeightSite {
 }
 
 /**
- * The string values one expression can produce, and whether all of them were
- * legible. A ternary yields BOTH branches, because a button that is filled down
- * one path is filled.
- *
- * Deliberately narrower than the resolver in `markColourScan`, which reaches
- * same-file constants but is private to that module and keyed to colour roles.
- * Every `variant` in this section is written inline or as a ternary of
- * literals; anything else lands in `resolved: false`, which this scan treats as
- * filled rather than as clean.
+ * String values from expression: ternary yields both branches. Unresolved
+ * treated as filled.
  */
 function stringsOf(expression: Expression): {
   values: string[];
@@ -174,13 +139,8 @@ function isFilled({
 }
 
 /**
- * The lines each FILLED button-like element's opening tag occupies, skipping
- * anything inside a drawer footer.
- *
- * The footer is skipped by carrying a flag down the walk rather than by
- * looking upwards from the button. The parsed nodes here have no usable parent
- * link, and a line-distance guess — "is there a Footer tag above this one" —
- * would excuse every button in a file that closes with a drawer.
+ * Filled button spans on lines: skips drawer footer via flag (nodes lack
+ * parent links).
  */
 function filledButtonSpans(
   source: SourceFile,

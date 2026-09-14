@@ -1,15 +1,4 @@
-/**
- * The audit sink a transport test reads its rows back from.
- *
- * A route declares `.withAudit("<action>")` and the REST runtime writes the
- * row, so the assertion belongs on the sink rather than on the app: a test that
- * hand-rolls `{ record: vi.fn() }` asserts on a call, not on a trail, and it
- * passes when the runtime writes nothing at all.
- *
- * The row shape is the runtime's own (`RestAuditRow` in `@langwatch/api/rest`),
- * described here rather than imported: the test harness is a dependency of
- * every package, and naming the REST runtime would put it on all their graphs.
- */
+// Audit sink for transport tests; assertions belong on the sink, not the app.
 
 /** One row a finished route left: who, what, where, on what, and how it ended. */
 export type TestAuditRow = Readonly<{

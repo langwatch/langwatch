@@ -1,28 +1,6 @@
 /**
- * The oversized-payload round trip, end to end over everything but AWS.
- *
- *   [NlpInvokeTransportAdapter — the real staging decision]
- *     │ envelope past the threshold, so the body is parked and the
- *     │ X-Payload-S3-URL header replaces it
- *     ▼
- *   [fake object store on loopback — an in-memory driver behind the port]
- *     │
- *     │ [fake Lambda transport: the envelope becomes an HTTP request]
- *     ▼
- *   [real nlpgo subprocess]
- *     │ readStudioRequestBody sees the header and GETs the parked body
- *     ▼
- *   [engine executes the workflow and answers with the full input]
- *
- * The two hops this does NOT exercise are AWS's: the Lambda transport and S3's
- * own storage. What our code decides — the staging threshold, the header, the
- * URL it emits, the discard afterwards — runs here for real.
- *
- * The engine's guard admits the loopback origin only because
- * `NLPGO_TEST_ONLY_STAGED_PAYLOAD_ORIGIN` names that exact origin, and a
- * deployed environment ignores the variable outright.
- *
- * @see specs/nlp-go/lambda-invoke-payload-staging.feature
+ * Round trip test of payload staging: threshold, header, URL, discard (skips
+ * Lambda and S3). See specs/nlp-go/lambda-invoke-payload-staging.feature
  */
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";

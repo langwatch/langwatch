@@ -1,19 +1,5 @@
 /**
- * Rate limiter for warnings that describe a recurring condition.
- *
- * Work that is slow is usually slow on every call, so a warning per call
- * buries every other line in the log. That is what got the ClickHouse
- * slow-query warning removed in #6114, and it is the reason this exists rather
- * than a bare threshold comparison at each call site.
- *
- * One identity warns at most once per interval. The calls that go unwarned are
- * counted, and the next warning that gets through reports the count, so the
- * log understates how often a condition happened but never hides that it did.
- *
- * Lives in the observability package rather than in one application: both
- * callers sit below any application layer — the Prisma client's slow-query
- * warning, and the tRPC call logger.
- *
+ * Rate limiter for recurring warning conditions; prevents log spam by counting suppressed calls.
  * @see specs/observability/slow-work-warnings.feature
  */
 

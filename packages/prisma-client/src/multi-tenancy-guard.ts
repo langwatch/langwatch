@@ -56,15 +56,8 @@ const GLOBAL_MODELS = [
   // and claimed BEFORE any user is known to hold it, which is the whole
   // point - it is what decides who gets to.
   "IdentifierReservation",
-  // Credential tables, per-user in exactly the sense `Account` is. A passkey
-  // and a TOTP enrollment belong to a person, not to a project — and the
-  // ceremonies that read them are keyed by credential id BEFORE any user is
-  // known (a discoverable passkey names its own account, which is what makes
-  // it a way IN), so there is no tenancy column a query could carry.
-  //
-  // Listing them here is what makes passkeys work at all: without it the
-  // guard rejected every `findMany` the plugin issues, and the whole feature
-  // answered 500.
+  // Credential tables (passkey, TOTP) are per-user, not per-project.
+  // Exempting them from tenancy checks is what makes passkeys work.
   "Passkey",
   "TwoFactor",
   // The MFA aggregate's projection is keyed `tenantId = userId` (D06), so it
@@ -123,27 +116,8 @@ const LICENSE_COUNTED_PROJECT_MODELS = [
 ] as const;
 
 /**
- * Models that don't have a projectId column to constrain on, but ARE
- * tenancy-sensitive - every query MUST carry an equivalent tenancy
- * predicate (a row id, a scope predicate, or a parent foreign key
- * that itself transitively carries scope). The default guard above
- * would fail any of these queries because the where clause has no
- * `projectId`, so without this map they end up in EXEMPT_MODELS -
- * which silently lets a programmer write
- * `prisma.modelDefaultConfig.findMany({})` and walk every tenant's
- * defaults. That is the failure mode rchaves flagged on 2026-05-18;
- * SCOPED_MODELS is the structural fix.
- *
- * The rule for every entry here:
- *   - read/update/delete queries must filter by EITHER a row id, a
- *     scope predicate (scopeType + scopeId), or the parent foreign
- *     key (for joins). Bare `findMany()` without a tenancy clause
- *     throws.
- *   - create / createMany must include the same on every record.
- *
- * For ModelProvider, the legacy `projectId` column is still a valid
- * tenancy clause too (one-release compat - old call sites keep
- * working until the sweep PR drops the column).
+ * Models without projectId but requiring tenancy predicates (row id, scope, or parent FK).
+ * Without this map, queries could silently walk all tenants.
  */
 type ScopedModelConfig = {
   /**
@@ -807,13 +781,8 @@ export const PROJECT_TENANCY_REGIMES = {
 } as const;
 
 /**
- * Org-scoped models are exempt from the projectId requirement (an org-scoped
- * model is, by definition, not project-scoped), EXCEPT the ones guardProjectId
- * validates itself through SCOPED_MODELS - those keep their stricter check.
- * Derived from the org guard's registry so the org/project classification lives
- * in exactly one place: a model becomes projectId-exempt automatically once it
- * is declared org-bearing there, and the partition test forbids hand-listing an
- * org-bearing model in GLOBAL_MODELS / RELATIONAL_PARENT_SCOPED here.
+ * Org-scoped models are exempt from projectId checks. Derived from org guard registry
+ * to keep classification in one place.
  */
 const ORG_DERIVED_EXEMPT = ORG_BEARING_MODEL_NAMES.filter(
   (name) => !Object.hasOwn(SCOPED_MODELS, name),
@@ -896,16 +865,8 @@ const _guardProjectId = ({ params }: { params: GuardParams }) => {
     return;
   }
 
-  // Gateway auth resolver: findByHashedSecret is the hot-path lookup
-  // that converts an opaque `vk-lw-*` bearer token into a
-  // VirtualKey row. The hashedSecret itself is a cryptographic
-  // identifier unique across the platform (HMAC-SHA256 with a
-  // per-deployment pepper), so projectId/organizationId cannot be
-  // known to the caller - the VK row IS what teaches them. The OR
-  // clause here is always shape
-  //   { OR: [{ hashedSecret }, { previousHashedSecret, previousSecretValidUntil }] }
-  // matching virtualKey.repository.ts:findByHashedSecret. Narrow
-  // exemption matches the ShareLink pattern above.
+  // Gateway auth resolver: hashedSecret is cryptographically unique across the platform, so
+  // VK row teaches the projectId rather than requiring it in the where clause.
   if (
     action === "findFirst" &&
     model === "VirtualKey" &&

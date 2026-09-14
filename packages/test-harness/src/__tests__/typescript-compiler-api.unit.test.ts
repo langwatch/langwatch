@@ -1,21 +1,6 @@
 /**
- * The compiler the repo builds against, and how its API may be reached.
- *
- * TypeScript 7's root export is a version constant: `import ts from
- * "typescript"` gives you `{ version }`, so `ts.createSourceFile(...)` is not a
- * type error at the call site of an untyped import — it is `undefined is not a
- * function` at runtime, in whatever ran the scan. The API lives behind
- * `typescript/unstable/*`, and this pins that nothing drifts back.
- *
- * The version sweep is here rather than in a lint rule because the exemptions
- * are the interesting part: three packages drive the old programmatic compiler
- * API, so they are held on 6 deliberately and must not be swept forward by a
- * well-meaning bulk bump. The exemption is what the root-import scan reads too
- * — on 6 the root export IS the compiler, so a value import of it there is the
- * supported way to reach the API rather than the runtime failure it is on 7.
- *
- * Spec: specs/setup/typescript-7.feature
- * ADR: dev/docs/adr/099-typescript-7-is-the-compiler.md
+ * TypeScript 7 API lives behind `typescript/unstable/*` (not root export).
+ * Exemptions for packages on TS 6 tracked here. See ADR-099.
  */
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
@@ -29,38 +14,14 @@ const PACKAGE_ROOT = resolve(__dirname, "../..");
 const REPO_ROOT = resolve(PACKAGE_ROOT, "../..");
 
 /**
- * Packages held on TypeScript 6, for two reasons rather than one.
- *
- * `sdks/typescript` and `mcp/typescript` publish bundled `.d.ts` through
- * `tsup`'s `dts: true`, which drives the programmatic compiler API that
- * TypeScript 7 does not expose. They move when a `.d.ts` bundler speaks the
- * 7 API.
- *
- * `packages/architecture-enforcer` drives that API directly, and far more of it:
- * 19 rule modules and ~726 call sites, including `createProgram`,
- * `createPrinter`, `createScanner`, `preProcessFile`, `parseJsonText`,
- * `readConfigFile` and `sys`, none of which `typescript/unstable/*` offers.
- * It is also the wrong shape for the ADR-099 seam: the seam parses through a
- * `tsgo` child, which is a round trip per file, and this is a synchronous CLI
- * walking 8,700 modules on every `pnpm lint`. Parsing in process against 6,
- * with a cache keyed on path + mtime + size, is the deliberate call recorded
- * in `dev/docs/plans/strict-feature-layout.md`. It moves
- * when the unstable API grows a program, a printer and a scanner, or when the
- * rules are restructured to parse the whole tree in one exchange.
+ * Packages on TypeScript 6: sdks/typescript, mcp/typescript (tsup `dts`),
+ * architecture-enforcer (programmatic API, sync CLI).
  */
 const HELD_ON_SIX = new Set(["sdks/typescript", "mcp/typescript", "packages/architecture-enforcer"]);
 
 /**
- * Where the workspace's own package manifests live, relative to the root.
- *
- * `packages/` is walked at any depth: a feature package's manifest is three
- * levels down (`modules/<feature>/<surface>/package.json`), so a
- * single-segment alternation saw the flat packages and none of the 149 feature
- * and enterprise ones. `apps/` replaced the `platform/` alternation when the
- * monolith was deleted; without it the three applications were unscanned and
- * the canary below had nothing left to find. `sdks/` stays single-segment on
- * purpose — its `examples/` are standalone sample projects, not workspace
- * packages this repo builds.
+ * Manifest pattern: `packages/` at any depth (modules), `apps/` (replaced
+ * platform/), `sdks/` single-segment (examples are sample projects).
  */
 const MANIFEST_PATTERN =
   /^(package\.json|(apps|plugins|sdks|mcp|skills)\/[^/]+\/package\.json|packages\/(?:[^/]+\/)+package\.json|skills\/package\.json)$/;

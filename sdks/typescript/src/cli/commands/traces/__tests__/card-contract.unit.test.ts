@@ -1,13 +1,4 @@
-/**
- * The CLI's `--format json` output IS the Langy panel's input. This pins the two
- * together: the document the command actually prints is parsed with the very
- * schema the app parses it with (`@langwatch/langy-contract/cards`), so a change to either
- * side that breaks the other fails here rather than in the panel.
- *
- * This is the only place the CLI imports the card schemas — they cost ~28ms of
- * zod to load and no command needs them at runtime, so they stay out of the hot
- * path and earn their keep as a contract test instead.
- */
+// Contract test pinning CLI JSON output schema to Langy panel expectations.
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
   cardKindFor,

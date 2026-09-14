@@ -1,33 +1,5 @@
-/**
- * State shared between the vitest reporter pipeline and the CI hard-floor
- * timers (see src/test-unit-global-setup.ts and the integration globalSetup).
- *
- * The hard-floor breaks a vitest finalize wedge by force-exiting the shard,
- * and a bare process.exit(0) erases two things the shard already knew:
- *
- *   1. Test failures printed before the wedge. This reporter records "this
- *      shard saw a failure" the moment each result streams in, well before
- *      the finalize path the wedge lives in.
- *   2. Test files that started and never reported a result. A file that
- *      starves the event loop, an infinite render loop or a synchronous spin,
- *      never trips vitest's own testTimeout and so leaves no failed test
- *      behind: the shard reports one file fewer than it ran and looks green
- *      while a real bug sits unrun. This reporter holds every file vitest
- *      hands to a worker until its result comes back, so the floor can name
- *      whatever is still in flight instead of exiting 0 over it.
- *
- * It also keeps the running totals behind those names. A shard that selected,
- * started and reported the same number of files was wedged after finishing its
- * work; one that started fewer files than it selected was cut off part way
- * through, which is a slow shard rather than a hung one and wants a different
- * answer from whoever reads the log.
- *
- * The state lives on globalThis under a string key: the reporter is loaded
- * from the CI CLI (--reporter=./src/test-utils/...) while the globalSetup is
- * loaded by the config, and the two may get separate module instances; the
- * global key makes the handoff instance-proof. Both run in vitest's main
- * process, so no IPC is needed.
- */
+// State shared between vitest reporter and CI hard-floor timers to detect
+// test failures and in-flight files that would otherwise be hidden by a wedge.
 
 const FAILURE_FLAG = "__langwatchShardSawTestFailure";
 const MODULE_TALLY = "__langwatchShardTestModuleTally";
@@ -65,17 +37,7 @@ function moduleTally(): ModuleTally {
   return carrier[MODULE_TALLY];
 }
 
-/**
- * How many files this shard was given, which only the sequencer knows.
- *
- * The reporter is handed the whole suite's file list, before the sequencer
- * splits it, so its own `selected` is the same number on all four shards.
- * Comparing a shard's progress against that says "still had files to start"
- * on every sharded run, whatever the shard was doing.
- *
- * Recorded rather than read back later because the sequencer runs once, in the
- * same process, and nothing else is in a position to say.
- */
+// Count of files assigned to this shard; used to detect partial runs.
 export function recordShardSelection(count: number): void {
   moduleTally().shardSelected = count;
 }
@@ -94,15 +56,7 @@ export function resetShardState(): void {
   delete carrier[MODULE_TALLY];
 }
 
-/**
- * How much of the shard's file list actually made it through, and the absolute
- * paths of the files vitest started and never reported a result for, sorted.
- *
- * `unreportedFiles` is empty once a run reaches onTestRunEnd: at that point
- * vitest has declared the run over, and its own accounting rather than this
- * one decides the outcome. The counts are totals for the whole run and stay
- * put, so the floor can still say how far the shard got.
- */
+// Progress through file list and files that started but never reported results.
 export function shardModuleTally(): {
   selected: number;
   shardSelected: number | null;
@@ -133,15 +87,7 @@ interface ReportedTestModule {
 }
 
 export default class ShardFailureReporter {
-  /**
-   * The file list this shard was handed, before any of it runs.
-   *
-   * Every count goes back to zero, not just `selected`: the carrier is a
-   * global and a second run in the same process shares it, so totals left by
-   * the first would accumulate under a fresh `selected` and print lines like
-   * "1 selected, 3 started" while hiding the `started < selected` slow-shard
-   * diagnostic behind them.
-   */
+  // Initialize counts for this shard; reset totals to avoid accumulation.
   onTestRunStart(specifications: readonly unknown[]): void {
     const tally = moduleTally();
     tally.selected = specifications.length;
@@ -152,15 +98,7 @@ export default class ShardFailureReporter {
     // the two run in an order vitest does not promise.
   }
 
-  /**
-   * Fires per file, right before the worker imports it, so the in-flight set
-   * holds what is genuinely running (bounded by the worker count) rather than
-   * the whole shard. Entering at queue time rather than at onTestModuleStart
-   * is what catches a file that hangs during import, before any test runs.
-   *
-   * A file already in flight is ignored, so the counter and the set agree on
-   * how many files are open.
-   */
+  // Track files starting; catching imports that hang before any test runs.
   onTestModuleQueued(testModule: ReportedTestModule): void {
     const tally = moduleTally();
     if (tally.inFlight.has(testModule.moduleId)) return;

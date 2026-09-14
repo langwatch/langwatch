@@ -1,14 +1,6 @@
 /**
- * The parse seam every static scan sits on.
- *
- * TypeScript 7 parses in the Go binary, not in this process, so "parse this
- * string" became "serve this string to a compiler session through a virtual
- * filesystem". The two things that can silently go wrong with that are covered
- * here: text with no file behind it failing to load at all, and — the quieter
- * one — a name reused with new text being answered from the session's cache,
- * which would make a scan judge every snippet by the first one it saw.
- *
- * Spec: specs/setup/typescript-7.feature
+ * TypeScript parse seam for static scans: tests missing files and cache-reuse
+ * failure modes.
  */
 
 import type { Node } from "typescript/unstable/ast";

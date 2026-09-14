@@ -2,53 +2,19 @@ import { HIDDEN_SYSTEM_KEY_NAMES } from "@langwatch/api-key-contract";
 import type { GuardMiddleware, GuardParams } from "./guard-middleware.ts";
 
 /**
- * Organization-tenancy guard: the org-level mirror of guardProjectId.
- *
- * Every model in ORG_SCOPED_MODELS carries an explicit `organizationId` column
- * and is tenancy-sensitive. Each query MUST constrain to a single organization
- * via an `organizationId` predicate, a row id (or a composite unique key that
- * embeds organizationId), or a model-specific bounded key (a globally-unique
- * secret column, or a parent foreign key that itself belongs to exactly one
- * org). A bare `findMany()` throws instead of returning every tenant's rows.
- *
- * Single-organization invariant (ADR-021): scoping is always within ONE org.
- * No query may target two organizations at once, so if more than one distinct
- * `organizationId` literal appears anywhere in the WHERE tree (typically across
- * OR branches) the query is rejected. The middleware has no auth context and
- * cannot verify the org belongs to the caller (that is the tRPC layer's job),
- * but it can and does reject a WHERE that spans two organizations, which closes
- * the documented `{ OR: [{ projectId }, { organizationId: "other" }] }` gap.
+ * Organization-tenancy guard: enforces single-organization scoping with organizationId predicates.
+ * See ADR-021: blocks queries spanning multiple organizations.
  */
 
 type OrgScopedModelConfig = {
   /**
-   * Actions admitted with NO single-organization predicate at all — the narrow
-   * case of a table whose rows are platform bookkeeping rather than tenant
-   * data, and whose reads are across-organizations by design.
-   *
-   * This is deliberately separate from `extraBound`, which can only ever
-   * narrow a WHERE clause that exists: the guard rejects a missing or
-   * non-object `where` before any bound is consulted, so a bare `findMany()`
-   * is unreachable from there no matter what the bound says. A model that
-   * genuinely has no predicate to offer has to say so here, by action, where
-   * it reads as the exemption it is.
-   *
-   * Grant this to READ actions only, and only to a model carrying no customer
-   * data. It is the widest thing in this file.
+   * Actions admitted with no single-organization predicate. Use only for read-only platform
+   * bookkeeping, not customer data.
    */
   platformScopeActions?: readonly string[];
   /**
-   * Extra single-org-bounding predicates beyond organizationId / row id /
-   * composite-org key. Used for parent foreign keys and globally-unique
-   * secret columns that each resolve to exactly one organization.
-   *
-   * Receives the ACTION as well as the clause, because a bound that exists to
-   * admit one specific platform query should be granted to that query's action
-   * only. A predicate that is sound to write with is not automatically sound to
-   * read every matching row with, and the default set of actions an ApiKey
-   * bound would otherwise unlock is `findMany` / `updateMany` / `deleteMany`
-   * alike. Bounds that genuinely resolve a single row for any action (a parent
-   * FK, a globally-unique secret) simply ignore the argument.
+   * Extra single-org-bounding predicates beyond organizationId (parent FKs,
+   * globally-unique secrets). Grants access based on action (read vs write).
    */
   extraBound?: (args: { clause: unknown; action: string }) => boolean;
 };
@@ -102,31 +68,8 @@ const isElapsedExpiryBound = (value: unknown): boolean => {
 };
 
 /**
- * The shape of the platform's own maintenance sweep over system-managed keys:
- * a reserved NAME, `revokedAt: null`, **and** an elapsed-expiry bound. Those
- * are the three clauses `reapExpiredLangySessionApiKeys` writes and the only
- * ones this admits; the ApiKey entry below additionally grants it for the one
- * action that sweep performs, `updateMany`.
- *
- * The name alone would already be sound for tenancy — no customer row can carry
- * one — but sound is not narrow, and this predicate is the only bound the
- * ApiKey model requires. Each remaining clause is load-bearing:
- *
- *   - `revokedAt: null` is "revoke what has not been revoked". Without it the
- *     hatch reaches every such key that ever existed, which no sweep needs and
- *     an exfiltration would want.
- *   - `expiresAt: { not: null, lte: <now> }` is "…whose lifetime has elapsed".
- *     Without it the hatch reaches every LIVE session key in every
- *     organization — the exact set the sweep never touches, and the one worth
- *     stealing.
- *
- * The literal matching is deliberate: the sweep writes literals, and accepting
- * `{ not: ... }`-style matchers or extra operators would give back the width
- * just removed. A sweep that legitimately changes shape must change this
- * predicate with it, and `dbOrganizationIdProtection.unit.test.ts` drives the
- * real reaper through the real middleware so that drift fails there rather than
- * silently widening the hatch. The reserved-name list is a tenancy boundary
- * either way — see the note on `HIDDEN_SYSTEM_KEY_NAMES` before adding to it.
+ * Maintenance sweep for system-managed keys: matches reserved name, revokedAt: null,
+ * and elapsed-expiry bound. Literal matching prevents scope creep.
  */
 const isSystemManagedKeySweep = (clause: unknown): boolean => {
   if (!clause || typeof clause !== "object") return false;
@@ -139,25 +82,8 @@ const isSystemManagedKeySweep = (clause: unknown): boolean => {
 };
 
 /**
- * The shape of the branch-recheck sweep: a branch that resolved to no pull
- * request (`notFoundAt: { not: null }`), whose backoff has elapsed
- * (`recheckAfter: { lte: <now> }`), and that a reader has asked about recently
- * (`lastRequestedAt: { gt: <cutoff> }`). Exactly those three clauses and
- * nothing else.
- *
- * Each one is load-bearing, and the literal matching is deliberate for the same
- * reason it is on the ApiKey sweep:
- *
- *   - `notFoundAt: { not: null }` is "branches with no pull request". Without
- *     it the hatch reaches every mapped branch in every organization, which is
- *     the set that carries the pull-request names worth reading.
- *   - `recheckAfter: { lte: <now> }` is "…whose backoff has elapsed". Without
- *     it the hatch reaches branches the sweep is deliberately not asking about.
- *   - `lastRequestedAt: { gt: <cutoff> }` is "…that anyone still cares about".
- *     Without it the sweep walks branches abandoned months ago, which is both
- *     the wrong behavior and a much wider read.
- *
- * A sweep that legitimately changes shape must change this predicate with it.
+ * Branch-recheck sweep shape: branches with no PR, backoff elapsed, and recent requests.
+ * Literal matching prevents accessing stale branches.
  */
 const isBranchRecheckSweep = (clause: unknown): boolean => {
   if (!clause || typeof clause !== "object") return false;
@@ -265,26 +191,8 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
       hasInlineScope(clause),
   },
   ApiKey: {
-    // lookupId is the globally-unique public half of an API token; the auth
-    // path resolves a bearer token to its single owning org through it.
-    //
-    // The platform's own sweep over system-managed keys is the other bounded
-    // predicate. Those names are reserved: `ApiKeyService.create` refuses them
-    // unless the caller is system-managed, and renaming a key into one is
-    // blocked, so no customer can own a row a name-bounded query would reach.
-    // That makes such a query platform-owned by construction — which is what
-    // the expired-Langy-session sweep is. Without it the sweep, whose whole job
-    // is to be cross-tenant, was rejected by this guard on every run and had
-    // never revoked a key.
-    //
-    // It is granted on the sweep's TERMS, not the sweep's name: the full
-    // predicate (see isSystemManagedKeySweep) and `updateMany`, the single
-    // action `reapExpiredLangySessionApiKeys` performs. Action-gating is what
-    // stops the same shape being replayed as a cross-tenant `findMany` that
-    // reads every organization's keys, or a `deleteMany` that removes them —
-    // neither of which is a sweep, and both of which this bound would otherwise
-    // have authorised. A new platform maintenance query does not inherit the
-    // hatch; it is a deliberate widening here, with its own shape and action.
+    // lookupId is globally-unique public token half. System-managed key sweep exemption is bounded
+    // by predicate and action (updateMany only) to prevent reads or deletes of all tenant keys.
     extraBound: ({ clause, action }) =>
       typeof clauseField(clause, "lookupId") === "string" ||
       (action === "updateMany" && isSystemManagedKeySweep(clause)),
@@ -307,16 +215,8 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
   // by row id. No shape wants more than one tenant's history, so a bare
   // findMany over everyone's links is exactly what the guard should refuse.
   DepartmentMembershipHistory: {},
-  // Which governance tenants an organization has ever written rows under.
-  //
-  // Two shapes need more than organizationId. `tenantId` is a project id —
-  // globally unique, so it resolves to exactly one organization, which is the
-  // whole reason this table exists: it translates a tenant back to its owner
-  // AFTER the project has been archived, when the live resolver has gone blind
-  // to it. And the fold's suppression snapshot loads the tenant→organization map
-  // for the whole process in one pass, which is across-organizations by design
-  // and has no predicate to offer. Granted on `findMany` only, and the rows are
-  // two opaque ids and two timestamps — platform bookkeeping, no customer data.
+  // Governance tenants an org has written rows under. tenantId resolves to exactly one
+  // organization; same snapshot read pattern as other audit tables below.
   GovernanceTenantHistory: {
     platformScopeActions: ["findMany"],
     extraBound: ({ clause }) =>
@@ -358,28 +258,8 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
         typeof clauseField(clause, "organizationId") === "string"),
   },
   Role: {},
-  // Which organizations the in-place migration runner processes on cloud
-  // (specs/migration/authz-grants-rollout.feature, the enrollment scenarios).
-  // The runner's per-pass read and the ops listing are platform-scope by
-  // design - the same posture as the ops rollup over
-  // SystemMigrationTenantState - so READS are admitted unbounded.
-  //
-  // They used to be admitted only alongside a `stage` string, back when
-  // enrollment was one row per (organization, stage) and every read named the
-  // stage it was about. Enrollment is now per MIGRATION, and all three reads
-  // span migrations as well as organizations: the ops listing shows every
-  // enrollment, the pass reads the whole table once to probe per (tenant,
-  // migration) in memory, and the rollout gauge groups by migration name.
-  // There is no narrowing predicate left to require, and going on requiring
-  // the departed column meant the guard refused every one of them.
-  //
-  // Reads only, and the action gate is what keeps that honest. Writes stay
-  // bounded to one organization: enroll carries organizationId in its data,
-  // withdraw names the compound (organizationId, migrationName) key, the
-  // organization purge deletes by organizationId, and a migration-wide bulk
-  // write - which would withdraw every organization at once - has no admitted
-  // shape. The rows themselves are operator bookkeeping: an organization id, a
-  // migration name, and who enrolled it.
+  // Platform-scope migration runner reads (admission, pass, gauge). Writes stay bounded by
+  // organizationId or compound (organizationId, migrationName) key.
   SystemMigrationEnrollment: {
     platformScopeActions: ["findMany", "groupBy"],
   },
@@ -411,27 +291,15 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
   // has a repository by that name.
   GithubPullRequest: {},
   GithubBranchPullRequestCheck: {
-    // The branch-recheck sweep is the one read in this feature that cannot
-    // name an organization, for the same structural reason the expired-key
-    // sweep above cannot: it runs on a timer with no request context, and its
-    // whole job is to find the due branches wherever they are.
-    //
-    // Granted on the sweep's TERMS, not its name: the full predicate (see
-    // isBranchRecheckSweep) and `findMany`, the single action
-    // `findRecheckDue` performs. Action-gating is what stops the same shape
-    // being replayed as an `updateMany` that rewrites every organization's
-    // bookkeeping, or a `deleteMany` that erases it. The rows it reaches are
-    // bookkeeping only: a repository name, a branch name and timestamps.
+    // Branch-recheck sweep: cross-tenant timer-driven read bounded by predicate and
+    // action (findMany). Action-gating prevents replayed writes on bookkeeping.
     extraBound: ({ clause, action }) => action === "findMany" && isBranchRecheckSweep(clause),
   },
 };
 
 /**
- * Models that carry an organizationId column but are deliberately NOT guarded
- * here, each for a concrete reason. The partition test
- * (dbOrganizationIdProtection.unit.test.ts) asserts every org-bearing model is
- * either guarded above or listed here, so a newly-added org-scoped model
- * cannot silently slip past tenancy enforcement.
+ * Org-bearing models not guarded here; each deliberately exempt for a concrete reason.
+ * The partition test verifies no newly-added org-scoped model slips past tenancy enforcement.
  */
 export const ORG_TENANCY_EXEMPT: readonly string[] = [
   // Governed by guardProjectId's SCOPED_MODELS instead: these are accessed by

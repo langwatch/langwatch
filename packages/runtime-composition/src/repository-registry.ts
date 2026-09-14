@@ -1,20 +1,6 @@
 /**
- * The two tiers every module's repositories come in, and the one word a
- * process says to choose between them.
- *
- * The words are `"live"` and `"memory"`, and they say what a process chooses:
- * whether live stores are reached at all. No module ever chooses between
- * Postgres and ClickHouse — each repository has exactly one live store,
- * already stated by the folder it sits in and by what its factory requires.
- * Naming the tier after a database was broken rather than merely misnamed: one
- * string was looked up for the whole process, so presence (Redis) and
- * coding-agent (ClickHouse) refused with `No "postgres" repository
- * implementation exists`, and trace had to call its nine-ClickHouse-repository
- * tier "postgres" to fit.
- *
- * {@link defineRepositories} demands both keys in the type, so a live tier with
- * no memory twin is a compile error in the module file rather than a process
- * that boots and answers empty lists.
+ * Repository tiers: "live" (reaches actual stores) vs "memory" (in-memory only).
+ * Both tiers required for each module to prevent silent empty-list bugs.
  */
 import { snapshotRepositories } from "./repository-ownership.ts";
 import type { Tier } from "./tiers.ts";

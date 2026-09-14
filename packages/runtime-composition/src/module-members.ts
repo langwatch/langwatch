@@ -1,14 +1,6 @@
 /**
- * What a module says it reads, and the refusal a process gets when it cannot
- * supply it.
- *
- * A module states its members in one line on its App (`static readonly reads =
- * reads("clock", "logger")`). Boot builds exactly the union of every installed
- * module's declaration and the chosen repository tier's own requirements,
- * eagerly, in the order the member source names — so a process that cannot
- * supply one refuses before it serves a request, naming the module that asked
- * and the member it asked for, rather than throwing on the first call that
- * reaches it.
+ * What a module reads and the refusal a process gets when it cannot supply it.
+ * Boot builds the union of every module's member declaration, failing eagerly.
  */
 
 /** Where a process's members come from. Built by `@langwatch/infrastructure`. */

@@ -1,22 +1,6 @@
 /**
- * Shared subprocess harness for nlpgo end-to-end integration tests.
- *
- * Boots the REAL nlpgo Go binary as a child process so a test can drive
- * it over HTTP/SSE exactly as Studio does, then asserts on what nlpgo
- * actually streams back. This is the lightweight sibling of the heavier
- * ClickHouse-backed traceparent-roundtrip.integration.test.ts — same
- * prebuilt-binary boot strategy, but no event-sourcing pipeline: use it
- * when the behaviour under test is observable on the SSE wire alone.
- *
- * Not a test file (underscore prefix + no `.test.ts` suffix) so vitest
- * does not pick it up as a suite.
- *
- * Cost amortization: `go run ./cmd/service` recompiles on every call,
- * which on CI's cold module cache blows any reasonable health-poll
- * budget. We `go build` ONCE per test process into a cached path under
- * the repo's .vitest-tmp/ and exec it directly — the compiled
- * binary boots in ~1s. The cached artifact is shared across every test
- * that calls ensureNlpgoBinary() within the same CI job.
+ * nlpgo subprocess harness: real binary as child for HTTP/SSE tests. Cached
+ * binary (go build once per job).
  */
 import { type ChildProcess, execFileSync, execSync, spawn } from "node:child_process";
 import fs from "node:fs";
@@ -52,17 +36,7 @@ export function hasGo(): boolean {
 }
 
 /**
- * Builds the nlpgo binary once and caches it on disk, rebuilding only when a
- * build input under services/nlpgo / cmd/service / pkg differs in CONTENT from
- * the sources the cached binary was compiled from. Returns the absolute binary
- * path.
- *
- * Content rather than modification time, because mtimes make the cache
- * unhittable on CI: git records none, so actions/checkout stamps every source
- * with the current run's time while the binary actions/cache restored carries
- * the time it was built in an earlier run. An mtime comparison therefore found
- * every source newer than the binary and rebuilt on every run — ~90s a shard
- * for a cache that was restoring correctly the whole time. See
+ * Builds and caches nlpgo binary by content (not mtime which breaks CI). See
  * specs/ci/nlpgo-test-binary-reuse.feature.
  */
 export function ensureNlpgoBinary(timeoutMs = 600_000): string {
@@ -141,16 +115,8 @@ async function waitForNlpgoHealth(port: number, timeoutMs: number): Promise<void
 }
 
 /**
- * Builds (cached) + spawns nlpgo on the given port and resolves once
- * /healthz answers. The caller MUST `await sub.stop()` in afterAll.
- *
- * Picks a port from the nlpgo subprocess test range (55610/55611/55612
- * /55613/55620 — see CLAUDE.md); pass a unique one per test file so
- * parallel suites don't collide.
- *
- * `env` is merged over the defaults (NLPGO_CHILD_BYPASS=true so no Python
- * uvicorn child is spawned, SERVER_ADDR bound to the port). Pass e.g.
- * LANGWATCH_ENDPOINT when the workflow under test calls back out.
+ * Start nlpgo subprocess: builds (cached), spawns, health-checks. Caller must
+ * stop() in afterAll.
  */
 export async function startNlpgoSubprocess(opts: {
   port: number;

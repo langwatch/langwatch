@@ -2,21 +2,8 @@ import { createLogger, createWarnThrottle } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 
 /**
- * Warns when a Postgres operation takes longer than its budget.
- *
- * A query that succeeds slowly leaves the same record as one that succeeds
- * instantly, so it stays invisible until someone reports that a screen feels
- * broken. This raises that one case to a warning: the work completed and the
- * answer was correct, so it is not an error, but the rate of it is worth
- * watching.
- *
- * The throttle is the substantive part. ClickHouse had a per-query warning and
- * it was removed in #6114 for flooding the logs, because a query that has
- * become slow is slow on every call and there is no useful signal in the
- * fiftieth identical line. Each (model, operation) pair warns at most once per
- * interval and the next warning states how many calls it stood for, so a
- * permanently slow query costs one line a minute instead of one per call.
- *
+ * Warns when Postgres operations exceed budget. Throttled to prevent log spam from
+ * repeatedly slow queries.
  * @see specs/observability/slow-work-warnings.feature
  */
 
@@ -28,15 +15,8 @@ const DEFAULT_THROTTLE_MS = 60_000;
 const RAW_ACTIONS = new Set(["queryRaw", "executeRaw"]);
 
 /**
- * Reads the budget out of a deployment's environment bag. Zero or negative
- * turns the warning off entirely, which is the escape hatch for a deployment
- * that decides the lines are not worth it; an unset or unparseable value keeps
- * the default.
- *
- * The bag is an ARGUMENT rather than an ambient environment read, because this
- * package constructs nothing from the environment: a process resolves its own
- * configuration and hands the budget down. `import-side-effects.test.ts` holds
- * the package to that, by reading these sources.
+ * Reads the slow-query budget from environment. Takes it as an argument (not ambient read)
+ * so the package constructs nothing from environment; the caller resolves config and passes it.
  */
 export function resolveSlowQueryBudgetMs(env: {
   POSTGRES_SLOW_QUERY_MS?: string | undefined;

@@ -1,20 +1,6 @@
 /**
- * Decides whether a cached nlpgo test binary can be reused.
- *
- * The question is "was this binary built from these sources", and the only
- * answer that survives CI is the sources' content. Modification times do not:
- * git stores no mtimes, so actions/checkout writes every file with the time of
- * the current run, while a binary restored by actions/cache carries the time it
- * was compiled in an earlier one. Comparing the two makes every source look
- * newer than every cached binary, so an mtime check rebuilds on every CI run no
- * matter how well the cache is keyed — which is what it did, at ~90s a shard.
- *
- * So the build writes a stamp beside the binary holding the digest of the
- * sources it compiled, and a later run reuses the binary only when today's
- * digest matches that stamp.
- *
- * Not a test file (underscore prefix + no `.test.ts` suffix) so vitest does not
- * pick it up as a suite.
+ * Reuse cached nlpgo binary by comparing source digest (not mtime, which
+ * drifts in CI).
  */
 import { createHash } from "node:crypto";
 import fs from "node:fs";

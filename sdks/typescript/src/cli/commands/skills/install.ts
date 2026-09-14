@@ -1,15 +1,4 @@
-/**
- * `langwatch skills install [names...] [--all] [--dir] [--dry-run] [--force] [-y]`
- * — write bundle skills to <root>/skills/<slug>/SKILL.md (recipes nested
- * under recipes/<slug>/), default root ~/.agents. Differing existing files
- * are left alone unless --force; every file action is reported as structured
- * data via printResult.
- *
- * `--force` truncates whatever is at the target path, so it goes through the
- * same confirmation `uninstall` demands whenever the content it would destroy
- * is not ours: refused non-interactively without -y, prompted on a TTY. See
- * `confirmForcedOverwrite`.
- */
+// Install bundle skills to ~/.agents/skills/; --force overwrites with confirmation.
 import { printResult, type RawOutputFlags } from "../../utils/output";
 import {
   installSkill,

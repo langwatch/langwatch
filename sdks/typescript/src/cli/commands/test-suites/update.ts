@@ -24,16 +24,7 @@ export interface UpdateTestSuiteOptions {
   evaluatorsJson?: string;
 }
 
-/**
- * Edits a test suite: any of its name, its fields and its evaluators.
- *
- * A field list or an evaluator list given here replaces the one the suite
- * holds, so the command line says the whole of what the suite declares. A
- * flag left out keeps what the suite has. The mappings of an `--evaluator`
- * are inferred against the field list the suite ends up with.
- *
- * @see specs/features/test-suite-cli.feature
- */
+// Edit test suite name, fields, or evaluators; omitted flags keep existing values.
 export const updateTestSuiteCommand = async (
   reference: string,
   options: UpdateTestSuiteOptions = {},

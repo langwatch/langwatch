@@ -21,19 +21,8 @@ export const safeWordUpdate = "UPDATE_ALL";
 export const UPDATE_ALL = { id: safeWordUpdate };
 
 /**
- * If you have found yourself here after a hard lesson:
- *
- * These middleware specifically do NOT guard in the case of a nested find, update, delete.
- * These middleware also don't protect in the case of an undefined variable being passed in alongside a specific condition.
- *
- * Ex: {
- *    id, // undefined
- *    otherAttr: null
- * }
- *
- * The above where clause will delete/modify/find all regardless of undefined status of variable appId.
- *
- * The !! best !! guard here is proper type adherence - do not bang, do not coerce.
+ * Limitations: does not guard nested operations or undefined variables in where clauses.
+ * Type adherence is the best defense.
  */
 const _guardEnMasse = ({
   params,
