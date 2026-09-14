@@ -33,11 +33,11 @@ import type {
 } from "@langwatch/trace-contract";
 import { TraceService } from "@langwatch/trace-contract";
 import { vi } from "vitest";
-import {
+import type {
   EvaluationCostRecorder,
   EvaluationExecutionReceipt,
   EvaluationMonitorLookup,
-  type ExecuteEvaluationCommandDeps,
+  ExecuteEvaluationCommandDeps,
 } from "../../app/evaluation.members.ts";
 
 export function buildExecuteCommand(

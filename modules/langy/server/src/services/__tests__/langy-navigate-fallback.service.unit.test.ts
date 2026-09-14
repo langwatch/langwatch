@@ -3,7 +3,7 @@
  * @see specs/langy/langy-agent-driven-navigation.feature
  */
 import { describe, expect, it } from "vitest";
-import { LangyNavigateProject } from "../../app/langy.members.ts";
+import type { LangyNavigateProject } from "../../app/langy.members.ts";
 import type { LangyNavigateResourceLocator } from "../../app/langy.members.ts";
 import type { LangyNavigateResourceKind } from "../../rules/langy-navigate-resources.rules.ts";
 import { LangyNavigateFallbackService } from "../langy-navigate-fallback.service.ts";

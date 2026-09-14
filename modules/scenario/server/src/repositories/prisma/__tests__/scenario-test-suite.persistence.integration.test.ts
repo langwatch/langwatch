@@ -12,9 +12,9 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { cleanupTestRows } from "@langwatch/test-harness";
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
-import { ScenarioClock } from "../../../app/scenario.app.ts";
-import { ScenarioTestSuiteId, ScenarioId } from "../../../app/scenario.app.ts";
-import { ScenarioSecretCipher } from "../../../app/scenario.app.ts";
+import type { ScenarioClock } from "../../../app/scenario.app.ts";
+import type { ScenarioTestSuiteId, ScenarioId } from "../../../app/scenario.app.ts";
+import type { ScenarioSecretCipher } from "../../../app/scenario.app.ts";
 
 class AllowTestQueries extends PrismaQueryGuard {
   execute(_context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {

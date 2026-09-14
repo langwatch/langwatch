@@ -16,8 +16,8 @@ import {
 import { describe, expect, it } from "vitest";
 
 import {
-  IngestionKeyIssuer,
-  IngestionKeyRepository,
+  type IngestionKeyIssuer,
+  type IngestionKeyRepository,
   type StoredIngestionKey,
   type StoredIngestionKeyOwnership,
 } from "../../app/governance.members.ts";

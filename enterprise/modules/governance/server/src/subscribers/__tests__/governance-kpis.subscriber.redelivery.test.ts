@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import {
+import type {
   GovernanceKpiContributionWriter,
-  type GovernanceKpiContribution,
+  GovernanceKpiContribution,
 } from "../../app/governance.members.ts";
 import { GovernanceKpisSubscriber } from "../governance-kpis.subscriber.ts";
 import {

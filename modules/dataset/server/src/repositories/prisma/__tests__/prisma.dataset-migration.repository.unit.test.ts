@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { PrismaDatasetMigrationRepository } from "../prisma.dataset-migration.repository.ts";
 import { AzureDatasetStorageAdapter } from "../../../services/azure.dataset-storage.service.ts";
 import {
-  DatasetAzureConfigResolver,
+  type DatasetAzureConfigResolver,
   DatasetStorageResolver,
   type DatasetBlobDriver,
   type DatasetStorage,

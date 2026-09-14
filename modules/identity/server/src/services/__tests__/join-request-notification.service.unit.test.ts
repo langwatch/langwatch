@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import { JoinRequestAudience } from "../../repositories/join-request-audience.repository.ts";
-import { JoinRequestMail } from "../../app/identity.members.ts";
+import type { JoinRequestMail } from "../../app/identity.members.ts";
 import { JoinRequestNotificationService } from "../join-request-notification.service.ts";
 
 /**

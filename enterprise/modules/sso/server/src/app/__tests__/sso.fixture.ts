@@ -9,8 +9,7 @@ import type { UserApi, UserProfile } from "@langwatch/user-contract";
 import { vi } from "vitest";
 
 import { SsoApp, type SsoInfrastructure } from "../sso.app.ts";
-import { SsoConnectionLedger } from "../sso.members.ts";
-import { SsoGateLogger } from "../sso.members.ts";
+import type { SsoConnectionLedger, SsoGateLogger } from "../sso.members.ts";
 
 /** The one operator on the staff list, exactly as `ADMIN_EMAILS` decides it. */
 export const SSO_TEST_STAFF_EMAIL = "olive@langwatch.ai";

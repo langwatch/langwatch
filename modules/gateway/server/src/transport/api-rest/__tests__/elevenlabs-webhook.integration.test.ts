@@ -21,8 +21,7 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { createApp } from "@langwatch/runtime-composition";
 
 import { ModelCatalogGatewaySpendRatingAdapter } from "../../../adapters/model-catalog.gateway-spend-rating.adapter.ts";
-import { GatewayModelProviderCredentials } from "../../../app/gateway.members.ts";
-import { GatewaySpendConfirmation } from "../../../app/gateway.members.ts";
+import type { GatewayModelProviderCredentials, GatewaySpendConfirmation } from "../../../app/gateway.members.ts";
 import type { ConfirmSpendCommandData } from "../../../processes/gateway-spend-commands.process.ts";
 import { ELEVENLABS_WEBHOOK_SECRET_KEY } from "../../../services/gateway-elevenlabs-credential.service.ts";
 import {

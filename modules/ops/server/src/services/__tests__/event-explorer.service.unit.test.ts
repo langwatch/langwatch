@@ -4,10 +4,10 @@ import type {
   EventExplorerRepository,
   RawEventRow,
 } from "../../repositories/observe/event-explorer.repository.ts";
-import {
+import type {
   OpsEventingIntrospection,
-  type OpsDejaViewProjection,
-  type OpsProjectionMetadata,
+  OpsDejaViewProjection,
+  OpsProjectionMetadata,
 } from "../../app/ops.app.ts";
 
 const DEFAULT_DEJA_VIEW: OpsDejaViewProjection[] = [

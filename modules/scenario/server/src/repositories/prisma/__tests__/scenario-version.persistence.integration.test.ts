@@ -17,9 +17,9 @@ import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { ScenarioService } from "../../../services/scenario.service.ts";
 import { PrismaScenarioRepository } from "../scenario.repository.ts";
-import { ScenarioClock } from "../../../app/scenario.app.ts";
-import { ScenarioTestSuiteId, ScenarioId } from "../../../app/scenario.app.ts";
-import { ScenarioSecretCipher } from "../../../app/scenario.app.ts";
+import type { ScenarioClock } from "../../../app/scenario.app.ts";
+import type { ScenarioTestSuiteId, ScenarioId } from "../../../app/scenario.app.ts";
+import type { ScenarioSecretCipher } from "../../../app/scenario.app.ts";
 
 class AllowTestQueries extends PrismaQueryGuard {
   execute(context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {

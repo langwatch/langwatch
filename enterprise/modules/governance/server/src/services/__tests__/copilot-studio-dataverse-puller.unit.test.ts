@@ -14,7 +14,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { GovernanceHttpClient } from "../../app/governance.members.ts";
+import type { GovernanceHttpClient } from "../../app/governance.members.ts";
 
 interface FetchCall {
   url: string;

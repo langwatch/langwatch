@@ -1,7 +1,7 @@
 import type { SystemMigration } from "@langwatch/system-migrations";
 import { describe, expect, it } from "vitest";
-import {
-  type OrganizationDataplane,
+import type {
+  OrganizationDataplane,
   OrganizationDataplaneResolver,
 } from "../../app/ops.app.ts";
 import { SystemMigrationCohortService } from "../system-migration-cohort.service.ts";

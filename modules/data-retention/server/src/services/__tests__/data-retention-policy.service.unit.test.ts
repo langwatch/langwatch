@@ -8,9 +8,9 @@ import {
   type RetentionOrganizationDirectory,
   type RetentionProjectLineage,
 } from "../../app/data-retention.app.ts";
-import {
+import type {
   DataRetentionPlanResolver,
-  type DataRetentionPlan,
+  DataRetentionPlan,
 } from "../../app/data-retention.members.ts";
 import { createDataRetentionTestAuthz } from "../../app/__tests__/data-retention.fixture.ts";
 import { DataRetentionPolicyService } from "../data-retention-policy.service.ts";

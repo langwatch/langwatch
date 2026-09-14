@@ -13,8 +13,8 @@ import type {
 import { EvaluatorNotFoundError, type EvaluatorApi } from "@langwatch/evaluator-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 
-import { MonitorEvaluator } from "../monitor.app.ts";
-import { MonitorPerformance } from "../monitor.app.ts";
+import type { MonitorEvaluator } from "../monitor.app.ts";
+import type { MonitorPerformance } from "../monitor.app.ts";
 import { MemoryMonitorRepository } from "../../repositories/memory/memory.monitor.repository.ts";
 import type { MonitorRepositories } from "../../repositories/monitor.repositories.ts";
 import { MonitorApp, type MonitorReplicationReader } from "../monitor.app.ts";

@@ -5,9 +5,9 @@ import { ManagerExplorerService } from "../manager-explorer.service.ts";
 import { MemoryProcessAuditRepository } from "../../repositories/memory/memory.process-audit.repository.ts";
 import { MemoryOpsStore } from "../../repositories/memory/memory.ops.store.ts";
 import { MemoryProcessOpsRepository } from "../../repositories/memory/memory.process-ops.repository.ts";
-import {
+import type {
   OpsEventingIntrospection,
-  type OpsProcessManagerMetadata,
+  OpsProcessManagerMetadata,
 } from "../../app/ops.app.ts";
 
 const metadataMock = vi.fn<() => OpsProcessManagerMetadata[]>(() => []);

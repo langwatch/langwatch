@@ -2,8 +2,8 @@ import type { LanguageModel } from "ai";
 import { describe, expect, it, vi } from "vitest";
 
 import {
-  WorkflowAiCall,
-  WorkflowCommitMessageModel,
+  type WorkflowAiCall,
+  type WorkflowCommitMessageModel,
   type WorkflowAiCallFeature,
 } from "../../app/workflow.app.ts";
 import { WorkflowCommitMessageService } from "../workflow-commit-message.service.ts";

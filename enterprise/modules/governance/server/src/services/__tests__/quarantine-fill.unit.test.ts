@@ -3,7 +3,7 @@ import {
   QUARANTINE_DEFAULT_WINDOW_SECONDS,
 } from "@langwatch/enterprise-governance-contract";
 import { describe, expect, it, vi } from "vitest";
-import {
+import type {
   QuarantineTenantResolver,
   QuarantineTraceActivityReader,
 } from "../../app/governance.members.ts";

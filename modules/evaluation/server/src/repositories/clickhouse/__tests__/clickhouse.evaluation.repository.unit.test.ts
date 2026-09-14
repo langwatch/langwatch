@@ -5,7 +5,7 @@ import type {
   EvaluationClickHouseInsert,
   EvaluationClickHouseQuery,
 } from "../evaluation-clickhouse-client.ts";
-import { EvaluationRetentionFloor } from "../../../app/evaluation.members.ts";
+import type { EvaluationRetentionFloor } from "../../../app/evaluation.members.ts";
 import type { EvaluationRunData } from "@langwatch/evaluation-contract";
 
 const run: EvaluationRunData = {

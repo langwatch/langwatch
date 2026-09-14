@@ -18,9 +18,7 @@ import { cleanupTestRows } from "@langwatch/test-harness";
 import { randomUUID } from "node:crypto";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
-import { ScenarioClock } from "../../app/scenario.app.ts";
-import { ScenarioTestSuiteId, ScenarioId } from "../../app/scenario.app.ts";
-import { ScenarioSecretCipher } from "../../app/scenario.app.ts";
+import type { ScenarioClock, ScenarioTestSuiteId, ScenarioId, ScenarioSecretCipher } from "../../app/scenario.app.ts";
 import { DEFAULT_SUITE_NAME, DEFAULT_SUITE_SLUG } from "../../rules/default-suite.rules.ts";
 
 class AllowTestQueries extends PrismaQueryGuard {

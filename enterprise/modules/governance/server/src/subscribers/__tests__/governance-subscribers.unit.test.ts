@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { GovernanceKpisSubscriber } from "../governance-kpis.subscriber.ts";
 import { GovernanceOcsfSubscriber } from "../governance-ocsf.subscriber.ts";
-import {
+import type {
   GovernanceKpiContributionWriter,
   GovernanceOcsfEventWriter,
   GovernanceSubscriberDiagnosticsSink,
@@ -9,9 +9,9 @@ import {
   TraceAlertOriginGuard,
   TraceAlertTriggerMatchChannel,
   TraceAlertTriggerReader,
-  type GovernanceKpiContribution,
-  type GovernanceOcsfEvent,
-  type TraceAlertTrigger,
+  GovernanceKpiContribution,
+  GovernanceOcsfEvent,
+  TraceAlertTrigger,
 } from "../../app/governance.members.ts";
 import { TraceAlertTriggerMatchSubscriber } from "../trace-alert-trigger-match.subscriber.ts";
 import {

@@ -21,7 +21,7 @@ import { PrismaProcessStore } from "@langwatch/eventing/server";
 import { ManagerExplorerService } from "../services/manager-explorer.service.ts";
 import { PrismaProcessAuditRepository } from "../repositories/prisma/prisma.process-audit.repository.ts";
 import { ProcessOpsPrismaRepository } from "../repositories/prisma/prisma.process-ops.repository.ts";
-import { OpsEventingIntrospection } from "../app/ops.app.ts";
+import type { OpsEventingIntrospection } from "../app/ops.app.ts";
 
 /** The audit log this suite records on: the same rows, written straight to Postgres. */
 class PrismaAuditLogTestSink implements AuditLogApi {

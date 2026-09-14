@@ -18,7 +18,7 @@ import type { InternalProject, InternalProjectQuery } from "@langwatch/project-c
 import { cleanupTestRows } from "@langwatch/test-harness";
 
 import type { GovernanceDiagnosticsSink } from "../app/governance.members.ts";
-import { GovernanceEncryptor } from "../app/governance.members.ts";
+import type { GovernanceEncryptor } from "../app/governance.members.ts";
 import type {
   IngestionSourceEntitlements,
   IngestionSourceLifecycleChannel,

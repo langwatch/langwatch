@@ -31,9 +31,9 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { ScenarioService } from "../services/scenario.service.ts";
 import { PrismaScenarioRepository } from "../repositories/prisma/scenario.repository.ts";
-import { ScenarioClock } from "../app/scenario.app.ts";
-import { ScenarioId, ScenarioTestSuiteId } from "../app/scenario.app.ts";
-import { ScenarioSecretCipher } from "../app/scenario.app.ts";
+import type { ScenarioClock } from "../app/scenario.app.ts";
+import type { ScenarioId, ScenarioTestSuiteId } from "../app/scenario.app.ts";
+import type { ScenarioSecretCipher } from "../app/scenario.app.ts";
 
 class AllowTestQueries extends PrismaQueryGuard {
   execute(context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {

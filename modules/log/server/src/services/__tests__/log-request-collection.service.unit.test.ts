@@ -9,7 +9,7 @@ import {
 } from "../log-request-collection.service.ts";
 import type { LogRedaction } from "../../app/log.members.ts";
 import { createLogTestService } from "./log.fixture.ts";
-import { LogTraceIoExtractor, type LogTraceIo } from "../../app/log.members.ts";
+import type { LogTraceIoExtractor, LogTraceIo } from "../../app/log.members.ts";
 import type { LogRecordReceivedEventData } from "@langwatch/trace-contract";
 
 /**

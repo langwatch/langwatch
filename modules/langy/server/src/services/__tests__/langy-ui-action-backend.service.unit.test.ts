@@ -9,7 +9,7 @@ import {
   type LangyBackendRunResult,
   type LangyBackendSaveResult,
   type LangyBackendStateRead,
-  LangyUiActionBackend,
+  type LangyUiActionBackend,
 } from "../../app/langy.members.ts";
 import type { LangyUiActionDefinition } from "../../app/langy.members.ts";
 import { LangyUiActionBackendService } from "../langy-ui-action-backend.service.ts";

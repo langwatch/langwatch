@@ -14,9 +14,7 @@ import { SimulationService } from "@langwatch/scenario-contract";
 import { ScenarioRunStatus } from "@langwatch/scenario-contract";
 import { ScenarioRepository } from "../../repositories/scenario.repository.ts";
 import { ScenarioService } from "../scenario.service.ts";
-import { ScenarioClock } from "../../app/scenario.app.ts";
-import { ScenarioTestSuiteId, ScenarioId } from "../../app/scenario.app.ts";
-import { ScenarioSecretCipher } from "../../app/scenario.app.ts";
+import type { ScenarioClock, ScenarioTestSuiteId, ScenarioId, ScenarioSecretCipher } from "../../app/scenario.app.ts";
 
 class CancellationTestSecretCipher implements ScenarioSecretCipher {
   encrypt(value: string): string {

@@ -25,7 +25,7 @@ import {
 import {
   GATEWAY_SPEND_ADMITTED_EVENT_TYPE,
   GATEWAY_SPEND_CONFIRMED_EVENT_TYPE,
-  GatewayBudgetLedger,
+  type GatewayBudgetLedger,
   type GatewayBudgetCrossingCandidate,
   type GatewayBudgetDebitRow,
   type GatewayResolvedBudget,

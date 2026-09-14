@@ -20,7 +20,7 @@ import type {
   WorkflowSignals,
   WorkflowStudioRuns,
 } from "../workflow.app.ts";
-import {
+import type {
   WorkflowAgentMapping,
   WorkflowStudioDsl,
 } from "../../app/workflow.app.ts";

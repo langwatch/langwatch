@@ -3,9 +3,7 @@ import { SimulationService } from "@langwatch/scenario-contract";
 import { describe, expect, it } from "vitest";
 import { ScenarioRepository } from "../scenario.repository.ts";
 import { ScenarioService } from "../../services/scenario.service.ts";
-import { ScenarioClock } from "../../app/scenario.app.ts";
-import { ScenarioTestSuiteId, ScenarioId } from "../../app/scenario.app.ts";
-import { ScenarioSecretCipher } from "../../app/scenario.app.ts";
+import type { ScenarioClock, ScenarioTestSuiteId, ScenarioId, ScenarioSecretCipher } from "../../app/scenario.app.ts";
 import { MemoryScenarioRepository } from "../memory/memory.scenario.repository.ts";
 
 const simulations = Object.create(SimulationService.prototype) as SimulationService;

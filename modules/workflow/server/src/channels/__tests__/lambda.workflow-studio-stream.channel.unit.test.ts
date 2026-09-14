@@ -5,13 +5,13 @@
  * @see modules/workflow/specs/studio-lambda-stream.feature
  */
 import { describe, expect, it } from "vitest";
-import { NlpLambdaFunctionReader } from "../../app/workflow.app.ts";
-import {
+import type { NlpLambdaFunctionReader } from "../../app/workflow.app.ts";
+import type {
   NlpLambdaStreamInvoke,
-  type NlpLambdaStreamChunk,
+  NlpLambdaStreamChunk,
 } from "../../app/workflow.app.ts";
 import {
-  NlpPayloadStaging,
+  type NlpPayloadStaging,
   STAGED_PAYLOAD_HEADER,
   type StagedNlpPayload,
 } from "../../app/workflow.app.ts";

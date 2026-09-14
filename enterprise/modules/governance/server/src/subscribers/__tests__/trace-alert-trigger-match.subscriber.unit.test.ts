@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
-import {
+import type {
   TraceAlertMetricsSink,
   TraceAlertOriginGuard,
   TraceAlertTriggerMatchChannel,
   TraceAlertTriggerReader,
-  type TraceAlertTrigger,
+  TraceAlertTrigger,
 } from "../../app/governance.members.ts";
 import { TraceAlertTriggerMatchSubscriber } from "../trace-alert-trigger-match.subscriber.ts";
 import {

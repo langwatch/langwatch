@@ -13,7 +13,7 @@ import {
   type OrganizationTeam,
 } from "@langwatch/organization-contract";
 import { describe, expect, it, vi } from "vitest";
-import {
+import type {
   GroupIdentity,
   PersonalWorkspaceIdentity,
   TeamIdentity,

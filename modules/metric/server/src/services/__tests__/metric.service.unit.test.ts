@@ -1,8 +1,8 @@
 import type { MetricDataPointPreparation } from "@langwatch/metric-contract";
 import { describe, expect, it } from "vitest";
-import {
+import type {
   MetricPreparation,
-  type MetricPreparationInput,
+  MetricPreparationInput,
 } from "../../app/metric.members.ts";
 import { MetricService } from "../metric.service.ts";
 

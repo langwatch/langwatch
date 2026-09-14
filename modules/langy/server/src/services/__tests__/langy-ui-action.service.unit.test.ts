@@ -11,9 +11,9 @@ import {
   type UiActionRedis,
   uiActionKeys,
 } from "../langy-ui-action.service.ts";
-import {
+import type {
   LangyUiActionCatalog,
-  type LangyUiActionDefinition,
+  LangyUiActionDefinition,
 } from "../../app/langy.members.ts";
 
 const duplicateTargetSchema = z.object({ targetId: z.string() });

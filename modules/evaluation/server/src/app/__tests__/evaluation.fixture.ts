@@ -10,7 +10,7 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TraceApi } from "@langwatch/trace-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 
-import {
+import type {
   EvaluationCustomEvaluators,
   EvaluationInstallEnvironment,
   EvaluationReport,
@@ -18,7 +18,7 @@ import {
   EvaluationRunAnalytics,
   EvaluationWarmupProbe,
 } from "../../app/evaluation.members.ts";
-import {
+import type {
   EvaluationExecution,
   EvaluationInputsResolution,
   EvaluationRetentionFloor,

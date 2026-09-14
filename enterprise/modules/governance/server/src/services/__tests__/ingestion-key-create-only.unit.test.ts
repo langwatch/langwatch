@@ -4,10 +4,10 @@
  */
 import { describe, expect, it } from "vitest";
 
-import {
+import type {
   IngestionKeyIssuer,
   IngestionKeyRepository,
-  type StoredIngestionKey,
+  StoredIngestionKey,
 } from "../../app/governance.members.ts";
 import { TestOrganizationService } from "../../__tests__/support/test-organization-service.ts";
 import { IngestionKeyService } from "../ingestion-source-key.service.ts";

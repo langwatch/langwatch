@@ -1,7 +1,7 @@
 import { createHmac } from "node:crypto";
 import { describe, expect, it } from "vitest";
 import {
-  AnomalyAlertHttpClient,
+  type AnomalyAlertHttpClient,
   type AnomalyAlertHttpResponse,
 } from "../../app/governance.members.ts";
 import { AnomalyAlertDispatcherService } from "../anomaly-alert-dispatcher.service.ts";

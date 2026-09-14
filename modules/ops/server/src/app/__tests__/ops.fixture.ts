@@ -14,7 +14,7 @@ import type { UserApi } from "@langwatch/user-contract";
 import { OpsApp, type OpsAppInfrastructure, type OpsCapability } from "../ops.app.ts";
 import { MemoryOpsRepositories } from "../../repositories/memory/memory.ops.repositories.ts";
 import type { OpsRepositories } from "../../repositories/ops.repositories.ts";
-import { OpsEventingIntrospection } from "../ops.app.ts";
+import type { OpsEventingIntrospection } from "../ops.app.ts";
 
 /** The staff address every fixture operator is measured against. */
 export const OPS_STAFF_ADDRESS = "staff@langwatch.ai";

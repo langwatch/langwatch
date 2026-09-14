@@ -22,8 +22,7 @@ vi.mock("../../services/child-process-spawn.service.ts", () => ({
 }));
 
 import { NodeScenarioChildProcessAdapter } from "../node-scenario-child-process.service.ts";
-import { CancellationSubscriber } from "../../app/scenario.app.ts";
-import { ScenarioProcessorServiceMetrics } from "../../app/scenario.app.ts";
+import type { CancellationSubscriber, ScenarioProcessorServiceMetrics } from "../../app/scenario.app.ts";
 import { ScenarioExecutionPoolService } from "../scenario-execution-pool.service.ts";
 import type { ExecutionJobData } from "../scenario-execution-pool.service.ts";
 import { ScenarioProcessorService } from "../scenario-processor.service.ts";

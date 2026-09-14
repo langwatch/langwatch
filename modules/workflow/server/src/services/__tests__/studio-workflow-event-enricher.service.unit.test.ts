@@ -5,8 +5,8 @@ import {
   type StudioClientEvent,
 } from "@langwatch/workflow-contract";
 import {
-  WorkflowLlmParameters,
-  WorkflowProjectEnvironment,
+  type WorkflowLlmParameters,
+  type WorkflowProjectEnvironment,
   type WorkflowLlmParameterResolution,
 } from "../../app/workflow.app.ts";
 import { StudioWorkflowEventEnricherService } from "../studio-workflow-event-enricher.service.ts";

@@ -5,8 +5,8 @@ import {
   type StudioClientEvent,
 } from "@langwatch/workflow-contract";
 import {
-  WorkflowId,
-  WorkflowNlpRuntime,
+  type WorkflowId,
+  type WorkflowNlpRuntime,
   type WorkflowNlpDispatchInput,
   type WorkflowNlpDispatchResponse,
 } from "../../app/workflow.app.ts";

@@ -5,10 +5,10 @@
 import { describe, expect, it, vi } from "vitest";
 import type { PlanInfo } from "@langwatch/entitlement-contract";
 import { USAGE_UNKNOWN } from "../../app/entitlement.members.ts";
-import { UsageOrganization } from "../../app/entitlement.members.ts";
-import {
+import type { UsageOrganization } from "../../app/entitlement.members.ts";
+import type {
   UsageVolumeCounter,
-  type ProjectUsageCounts,
+  ProjectUsageCounts,
 } from "../../app/entitlement.members.ts";
 import { UsageService } from "../usage-enforcement.service.ts";
 

@@ -26,10 +26,10 @@ import type {
   OrganizationInviteRepository,
   WriteInviteInput,
 } from "../../../repositories/organization-invite.repository.ts";
-import {
+import type {
   OrganizationInviteMail,
   OrganizationInviteSeatCensus,
-  type OrganizationInviteRateLimit,
+  OrganizationInviteRateLimit,
 } from "../../../app/organization.members.ts";
 import { InviteSendThrottleService } from "../../invite-send-throttle.service.ts";
 import type { InviteServiceDependencies } from "../../../rules/invite-contracts.rules.ts";

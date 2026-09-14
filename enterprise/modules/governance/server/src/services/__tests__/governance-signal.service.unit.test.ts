@@ -20,7 +20,7 @@ import type {
   GatewayBudgetWindow,
 } from "../../app/governance.members.ts";
 import {
-  GovernanceSignalChannel,
+  type GovernanceSignalChannel,
   type GovernanceResolvedBudgetCrossing,
 } from "../../app/governance.members.ts";
 import { GovernanceSignalService } from "../governance-signal.service.ts";

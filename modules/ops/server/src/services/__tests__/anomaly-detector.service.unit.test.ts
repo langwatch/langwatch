@@ -2,7 +2,7 @@ import type { Anomaly } from "@langwatch/ops-contract";
 import type { FeatureFlagApi, FeatureFlagTarget } from "@langwatch/feature-flag-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
-import { AnomalyHardTierAlert } from "../../app/ops.app.ts";
+import type { AnomalyHardTierAlert } from "../../app/ops.app.ts";
 import {
   AnomalyRateTrackerRepository,
   AnomalyStateRepository,

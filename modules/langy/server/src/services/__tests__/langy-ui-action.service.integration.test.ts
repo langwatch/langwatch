@@ -7,9 +7,9 @@ import Redis from "ioredis";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { z } from "zod";
 import { LangyUiActionService, type UiActionRedis, uiActionKeys } from "../langy-ui-action.service.ts";
-import {
+import type {
   LangyUiActionCatalog,
-  type LangyUiActionDefinition,
+  LangyUiActionDefinition,
 } from "../../app/langy.members.ts";
 import { testRedisUrl } from "../../__tests__/support/test-redis-url.ts";
 

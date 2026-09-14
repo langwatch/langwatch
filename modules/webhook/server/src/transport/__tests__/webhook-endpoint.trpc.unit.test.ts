@@ -13,8 +13,8 @@ import {
   type WebhookEndpointDeps,
 } from "../../repositories/prisma/prisma.webhook-endpoint.repository.ts";
 import { WebhookApp, type WebhookAppDependencies } from "../../app/webhook.app.ts";
-import { WebhookId } from "../../app/webhook.app.ts";
-import { WebhookSecret } from "../../app/webhook.app.ts";
+import type { WebhookId } from "../../app/webhook.app.ts";
+import type { WebhookSecret } from "../../app/webhook.app.ts";
 import { webhookEndpointTrpcTransport } from "../webhook-endpoint.trpc.ts";
 import {
   webhookEndpointTrpcTestPorts,

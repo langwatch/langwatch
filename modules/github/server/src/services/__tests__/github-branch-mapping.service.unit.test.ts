@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { GithubInstallationLookup } from "../github-installation-access.service.ts";
-import {
+import type {
   GithubAppTokenCache,
-  type GithubPullRequestSummary,
+  GithubPullRequestSummary,
 } from "../../app/github.app.ts";
-import { GithubHost } from "../../app/github.members.ts";
+import type { GithubHost } from "../../app/github.members.ts";
 import { GithubPullRequestsRepository } from "../../repositories/github-pull-requests.repository.ts";
 import type {
   GithubBranchCheckRow,

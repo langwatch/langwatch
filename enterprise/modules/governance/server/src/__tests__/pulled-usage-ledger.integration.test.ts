@@ -30,9 +30,9 @@ import {
   PulledUsageLedgerIntent,
   type WritePulledUsagePayload,
 } from "../intents/pulled-usage-ledger.intent.ts";
-import {
+import type {
   PulledUsageLedgerRepository,
-  type PulledUsageLedgerRow,
+  PulledUsageLedgerRow,
 } from "../app/governance.members.ts";
 
 class AllowTestQueries extends PrismaQueryGuard {

@@ -11,7 +11,7 @@ import type { ScenarioApi } from "@langwatch/scenario-contract";
 import { ResourceScope } from "@langwatch/runtime-composition";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 
-import { SuiteExecution } from "../suite.app.ts";
+import type { SuiteExecution } from "../suite.app.ts";
 import { MemorySuiteDatabase } from "../../repositories/memory/memory.suite.database.ts";
 import { MemorySuiteRepository } from "../../repositories/memory/memory.suite.repository.ts";
 import type { SuiteRepositories } from "../../repositories/suite.repositories.ts";

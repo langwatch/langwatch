@@ -12,7 +12,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
-  LangevalsPayloadStaging,
+  type LangevalsPayloadStaging,
   STAGED_PAYLOAD_HEADER,
   type StagedLangevalsPayload,
 } from "../../app/topic.members.ts";

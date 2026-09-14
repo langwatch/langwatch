@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
-  CodingAgentCallerScopeDirectory,
-  CodingAgentScopePermissions,
+  type CodingAgentCallerScopeDirectory,
+  type CodingAgentScopePermissions,
   type CodingAgentScopeProject,
 } from "../../app/coding-agent.members.ts";
 import { CodingAgentCallerScopeService } from "../coding-agent-caller-scope.service.ts";

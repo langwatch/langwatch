@@ -36,8 +36,8 @@ import { fromDate } from "@langwatch/time";
 
 import { SuiteApp } from "../../app/suite.app.ts";
 import {
-  SuiteRunCommands,
-  SuiteRunId,
+  type SuiteRunCommands,
+  type SuiteRunId,
   type QueueSimulationRunCommandData,
 } from "../../app/suite.app.ts";
 import { MemorySuiteDatabase } from "../../repositories/memory/memory.suite.database.ts";

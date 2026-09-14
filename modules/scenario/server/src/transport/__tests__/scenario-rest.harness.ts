@@ -3,9 +3,7 @@ import { EventEmitter } from "node:events";
 import type { AgentTestService } from "../../services/agent-test.service.ts";
 import type { ResultAtomsService } from "../../services/result-atoms.service.ts";
 import type { RunConfigurationsService } from "../../services/run-configurations.service.ts";
-import { ScenarioClock } from "../../app/scenario.app.ts";
-import { ScenarioId, ScenarioTestSuiteId } from "../../app/scenario.app.ts";
-import { ScenarioSecretCipher } from "../../app/scenario.app.ts";
+import type { ScenarioClock, ScenarioId, ScenarioTestSuiteId, ScenarioSecretCipher } from "../../app/scenario.app.ts";
 import { MemoryScenarioRepositories } from "../../repositories/memory/memory.scenario.repositories.ts";
 import { ScenarioApp } from "../../app/scenario.app.ts";
 import {

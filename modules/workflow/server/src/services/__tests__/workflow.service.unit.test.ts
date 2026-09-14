@@ -6,9 +6,9 @@ import {
   type RunWorkflowCommand,
 } from "@langwatch/workflow-contract";
 import {
-  WorkflowDslMigration,
-  WorkflowExecution,
-  WorkflowId,
+  type WorkflowDslMigration,
+  type WorkflowExecution,
+  type WorkflowId,
   type WorkflowExecutionInput,
 } from "../../app/workflow.app.ts";
 import type {

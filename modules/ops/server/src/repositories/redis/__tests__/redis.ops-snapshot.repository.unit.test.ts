@@ -4,7 +4,7 @@ import {
   SNAPSHOT_LEASE_KEY,
   RedisOpsSnapshotRepository,
 } from "../redis.ops-snapshot.repository.ts";
-import { OpsSnapshotRedis } from "../../../app/ops.app.ts";
+import type { OpsSnapshotRedis } from "../../../app/ops.app.ts";
 import {
   type LiveSnapshot,
   tryParseDetailSnapshot,

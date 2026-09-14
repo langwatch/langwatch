@@ -5,7 +5,7 @@ import {
   type WorkflowVersion,
 } from "@langwatch/workflow-contract";
 import { describe, expect, it } from "vitest";
-import { WorkflowAgentMapping, WorkflowStudioDsl } from "../../app/workflow.app.ts";
+import type { WorkflowAgentMapping, WorkflowStudioDsl } from "../../app/workflow.app.ts";
 import { WorkflowStudioVersionService } from "../workflow-studio-version.service.ts";
 
 const graph = (name: string): StudioWorkflow =>

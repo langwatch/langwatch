@@ -7,9 +7,9 @@ import { ResourceScope } from "@langwatch/runtime-composition";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { UserApi, UserProfile } from "@langwatch/user-contract";
 import { vi } from "vitest";
-import {
+import type {
   DataRetentionPlanResolver,
-  type DataRetentionPlan,
+  DataRetentionPlan,
 } from "../data-retention.members.ts";
 import type { DataRetentionRepositories } from "../../repositories/data-retention.repositories.ts";
 import { MemoryDataRetentionRepositories } from "../../repositories/memory/memory.data-retention.repositories.ts";

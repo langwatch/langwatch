@@ -10,16 +10,16 @@ import type {
   PulledUsageObservedEventData,
   PullResult,
 } from "@langwatch/enterprise-governance-contract";
-import { GovernanceEncryptor } from "../../app/governance.members.ts";
+import type { GovernanceEncryptor } from "../../app/governance.members.ts";
 import {
-  GovernanceOcsfEventSink,
-  GovernanceTraceIngestionClient,
+  type GovernanceOcsfEventSink,
+  type GovernanceTraceIngestionClient,
   type GovernanceTraceRequest,
   type GovernanceOcsfEventInput,
-  IngestionPullDiagnosticsSink,
-  IngestionPullSourceReader,
-  PulledUsageDispatcher,
-  PulledUsageEntitlements,
+  type IngestionPullDiagnosticsSink,
+  type IngestionPullSourceReader,
+  type PulledUsageDispatcher,
+  type PulledUsageEntitlements,
 } from "../../app/governance.members.ts";
 import { IngestionCredentialsService } from "../ingestion-credentials.service.ts";
 import {

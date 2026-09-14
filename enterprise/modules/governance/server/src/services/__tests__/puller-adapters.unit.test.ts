@@ -2,8 +2,11 @@ import { describe, expect, it, vi } from "vitest";
 
 import { HttpPollingPullerAdapter } from "../http-poller.service.ts";
 import { S3PollingPullerAdapter } from "../s3-puller.service.ts";
-import { GovernanceHttpClient, type GovernanceHttpResponse } from "../../app/governance.members.ts";
-import { GovernanceObjectStore } from "../../app/governance.members.ts";
+import type {
+  GovernanceHttpClient,
+  GovernanceHttpResponse,
+  GovernanceObjectStore,
+} from "../../app/governance.members.ts";
 
 const httpConfig = {
   adapter: "http_polling",

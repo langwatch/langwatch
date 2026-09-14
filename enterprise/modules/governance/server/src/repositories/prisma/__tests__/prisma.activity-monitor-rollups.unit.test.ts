@@ -1,8 +1,8 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import {
+import type {
   GovernanceClickHouseClient,
-  type GovernanceClickHouseResult,
+  GovernanceClickHouseResult,
   GovernanceClickHouseResolver,
 } from "../../../app/governance.members.ts";
 import {

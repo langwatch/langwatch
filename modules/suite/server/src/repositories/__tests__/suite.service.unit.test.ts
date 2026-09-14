@@ -25,7 +25,7 @@ import {
 import { fromDate } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
-import { SuiteExecution } from "../../app/suite.app.ts";
+import type { SuiteExecution } from "../../app/suite.app.ts";
 import { SuiteRepository } from "../suite.repository.ts";
 import { MemorySuiteRunRepository } from "../memory/memory.suite-run.repository.ts";
 import { SuiteService, type SuiteServiceOptions } from "../../services/suite.service.ts";

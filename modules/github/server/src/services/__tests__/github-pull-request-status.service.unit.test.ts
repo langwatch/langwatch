@@ -9,12 +9,12 @@ import {
   MAX_STATUS_REFS,
 } from "../github-pull-request-status.service.ts";
 import { GithubRateLimitedError } from "../../app/github.app.ts";
-import {
+import type {
   GithubAppTokenCache,
-  type GithubInstallationDetails,
-  type GithubInstallationToken,
-  type GithubPullRequestSummary,
-  type MintInstallationTokenInput,
+  GithubInstallationDetails,
+  GithubInstallationToken,
+  GithubPullRequestSummary,
+  MintInstallationTokenInput,
 } from "../../app/github.app.ts";
 import { GithubRedis } from "../../repositories/redis/github-redis.connection.ts";
 import { NullGithubInstallationsRepository } from "../../repositories/github-installations.repository.ts";

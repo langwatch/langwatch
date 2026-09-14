@@ -25,7 +25,7 @@ import { describe, expect, it, vi } from "vitest";
 import { IngestionPullEventingAdapter } from "../ingestion-pull-eventing.service.ts";
 import { PulledUsageEventingAdapter } from "../pulled-usage-eventing.service.ts";
 import {
-  GatewayBudgetLedger,
+  type GatewayBudgetLedger,
   type GatewayBudgetCrossingCandidate,
   type GatewayBudgetDebitRow,
   type GatewayResolvedBudget,

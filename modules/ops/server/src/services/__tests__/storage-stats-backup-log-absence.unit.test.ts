@@ -17,7 +17,7 @@ vi.mock("@langwatch/observability", () => ({
   }),
 }));
 
-import { StorageStatsMetrics } from "../../app/ops.app.ts";
+import type { StorageStatsMetrics } from "../../app/ops.app.ts";
 import {
   StorageStatsCollectionService,
   type StorageStatsClickHouseClient,

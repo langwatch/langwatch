@@ -15,7 +15,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ZodError } from "zod";
 import { AnthropicAdminPullerAdapter } from "../anthropic-admin-puller.service.ts";
 import {
-  GovernanceHttpClient,
+  type GovernanceHttpClient,
   type GovernanceHttpResponse,
 } from "../../app/governance.members.ts";
 import { PulledUsagePricingService } from "../pulled-usage-pricing.service.ts";
