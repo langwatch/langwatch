@@ -1,15 +1,8 @@
 import { nowInstant } from "@langwatch/time";
 import { readableDate } from "./display-formatters.ts";
 /**
- * How long ago something happened, for the personal pages.
- *
- * The ladder gets coarser as the gap widens, because that is the precision a
- * reader can use: seconds matter for a device that just checked in, days do
- * not. Past a month the relative form stops meaning anything, so it hands over
- * to the date itself.
- *
- * Absence is a real answer here rather than a missing value: a key that was
- * issued and never used says "Never", which is the fact the reader wants.
+ * Relative time since an event, coarsening with distance.
+ * Returns "Never" if the timestamp is absent.
  */
 export function formatRelativeTime(ms: number | null | undefined): string {
   if (!ms) return "Never";

@@ -4,18 +4,7 @@ import { Eye } from "lucide-react";
 import { useLiteMemberGuard } from "../../behavior/personal-workspace-session.ts";
 
 /**
- * Why a Lite Member's own workspace does not keep anything they add to it.
- *
- * A member's organization role caps what any of their role bindings can do
- * (the server's own binding resolution), and that includes the
- * admin binding on the workspace provisioned for them. So reads work, writes do
- * not, and the workspace itself is left alone: it is still theirs, and it starts
- * taking writes again the moment they have full access.
- *
- * Saying so is the whole point of this. Without it the page looks broken rather
- * than restricted, because everything renders and only the save fails.
- *
- * Spec: specs/ai-gateway/governance/personal-workspace-integrity.feature
+ * View-only notice for Lite Members (organization role caps writes).
  */
 export function PersonalWorkspaceViewOnlyNotice() {
   const { isLiteMember } = useLiteMemberGuard();

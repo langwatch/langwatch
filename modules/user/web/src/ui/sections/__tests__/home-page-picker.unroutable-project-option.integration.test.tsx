@@ -1,13 +1,7 @@
 /**
  * @vitest-environment jsdom
  *
- * The picker's "Project home" option must name the same project the resolver
- * would actually route to. `homePagePickerState.firstProjectSlug` is an
- * UNFILTERED query and can name a personal workspace; `governance.resolveHome`
- * excludes those outright (ADR-038 v6). Offering the unfiltered slug would pin
- * a destination "Auto" could never reach.
- *
- * Spec: specs/ai-gateway/governance/persona-home-content.feature
+ * Home page picker routing parity test (filtered vs. unfiltered project lists).
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";

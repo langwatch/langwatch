@@ -91,18 +91,8 @@ export function isRemovableMethod({
 }
 
 /**
- * Whether a passkey lives on a key somebody carries rather than on a device
- * they own.
- *
- * Read off TRANSPORTS rather than `deviceType`, which is the tempting field and
- * the wrong one: `deviceType` says whether the credential syncs, and a platform
- * authenticator that does not sync is still on the person's laptop, not on a
- * key in their pocket. `usb`, `nfc` and `ble` are how a roaming authenticator
- * is reached, and nothing else is reached that way.
- *
- * It stays a heuristic — transports are a hint the authenticator supplies — so
- * it decides only which HEADING a card sits under, never anything that would
- * matter if it were wrong.
+ * Whether a passkey lives on a portable key (usb, nfc, ble)
+ * rather than a synced device authenticator.
  */
 export function isSecurityKey(passkey: { transports?: string | null }): boolean {
   const transports = passkey.transports ?? "";

@@ -38,14 +38,8 @@ interface Props {
   iconAsset?: string | null;
   iconKey?: string | null;
   /**
-   * Whether the org has at least one ModelProvider row configured for
-   * this tile's `providerKey` at any scope visible to the calling user.
-   * When false, we replace the issue form with an actionable
-   * "Provider not configured" hint instead of letting the user mint a
-   * VK that 502s on first curl with `provider_error`. Computed once at
-   * the portal level and threaded through (one query per portal load,
-   * not per tile). Defaults to `true` so the form still renders if the
-   * preflight query is in-flight or fails open.
+   * Whether a ModelProvider is configured for this provider key.
+   * Defaults to true; shows "not configured" hint when false.
    */
   providerConfigured?: boolean;
 }

@@ -1,11 +1,5 @@
 /**
  * Row inside an expanded run showing a scenario x target pair result.
- *
- * Displays: [status_icon] [target: scenario_name (#N)] [passed/failed (met/total)] [duration] [cancel?]
- *
- * When the run is in a cancellable state (PENDING, IN_PROGRESS, STALLED),
- * a cancel button appears at the end of the row.
- *
  * @see specs/features/suites/cancel-queued-running-jobs.feature
  */
 

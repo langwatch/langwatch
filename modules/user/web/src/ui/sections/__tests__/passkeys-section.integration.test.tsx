@@ -1,19 +1,7 @@
 /**
  * @vitest-environment jsdom
  *
- * Creating, seeing, naming and removing passkeys.
- *
- * `specs/identity/passkeys.feature` carried five settings-facing scenarios and
- * every one of them was tagged `@unimplemented`: the section shipped with no
- * render test at all. These are those scenarios, plus the two the ceremonies
- * turn on — a deployment that never mounted the plugin makes no offer, and a
- * dismissed device prompt says nothing rather than telling somebody off for a
- * decision.
- *
- * WHAT AN OUTCOME MEANS is pinned in `apps/ui/tests/ui-passkeys.unit.test.ts`,
- * where the wire is. What the reader is TOLD about it is here.
- *
- * Spec: specs/identity/passkeys.feature
+ * Passkeys section integration tests (create, name, remove, outcomes).
  */
 
 import { cleanup, screen, waitFor } from "@testing-library/react";

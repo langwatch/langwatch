@@ -1,23 +1,5 @@
 /**
- * Creating, seeing and removing passkeys, in the one place somebody goes
- * looking for them (Passkey Central: "Create, view and manage passkeys in
- * account settings").
- *
- * Moved from `platform/app/src/components/me/PasskeysSection.tsx`. Every word
- * of copy, both headings and the empty-state hero travel unchanged; what
- * changed is where the ceremonies live. `authClient.passkey.*` is `better-auth`
- * in a screen's closure, which ADR-004 seals off, so the four calls are host
- * methods and the wire is `apps/ui/src/behavior/ui-passkeys.ts`.
- *
- * ONE BEHAVIOURAL DIFFERENCE, NAMED. `authClient.useListPasskeys()` was a
- * reactive hook the plugin re-ran after each of its own writes; a port method
- * cannot be, so the list is re-read here after every ceremony that changes it.
- * The reader sees the same thing; the refresh is explicit rather than implied.
- *
- * It sits ABOVE the password section on purpose. The order of a settings page
- * is an argument about what an account should be secured with, and putting the
- * thing we would rather people used underneath the thing we would rather they
- * stopped using makes the opposite one.
+ * Passkeys section: create, view, and manage passkeys in account settings.
  */
 
 import {

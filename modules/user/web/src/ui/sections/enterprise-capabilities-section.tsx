@@ -1,21 +1,6 @@
 /**
- * What an Enterprise license unlocks on a self-hosted deployment, licensed or
- * not.
- *
- * Moved from `platform/app/src/components/settings/EnterpriseCapabilitiesSection.tsx`
- * with its copy and its reasoning intact. Hiding a paid feature entirely makes
- * it look missing rather than purchasable, and leaves an operator with no
- * in-product route to the setup guide at all.
- *
- * Cloud renders nothing: there these are provisioned by LangWatch as part of
- * the plan, so the section would be noise on a page about sign-in methods. The
- * leading separator belongs to the section for that reason, so Cloud does not
- * get a divider with nothing under it.
- *
- * IT ADDRESSES TWO ENTERPRISE PROCEDURES AND IMPORTS NO ENTERPRISE PACKAGE.
- * `license.getSsoGateStatus` and `limits.getUsage` are strings in a procedure
- * map; a core web package may not DEPEND on an enterprise one, and it never
- * does — the gateway family's map addresses `routingPolicy` the same way.
+ * Enterprise capabilities section (features, SSO, usage limits).
+ * Cloud only; self-hosted shows capabilities and setup guide.
  */
 
 import {
@@ -131,15 +116,7 @@ function CapabilityRow({
 }
 
 /**
- * The states an operator cannot diagnose from the page alone: an identity
- * provider is configured, everybody is signing in by email anyway, and the
- * reason is either a license the deployment does not hold or a provider that
- * never started. The gate logs both at startup, but nobody reads server logs to
- * explain a login screen, and email mode looks identical to a deployment that
- * never wanted single sign-on.
- *
- * Each cause is fixed somewhere else, so each gets its own remedy rather than
- * one message covering both.
+ * SSO configured but not in use — diagnose license vs. provider startup issues.
  */
 function SsoConfiguredButNotInUseNotice() {
   const ssoGate = api.license.getSsoGateStatus.useQuery({}, { refetchOnWindowFocus: false });

@@ -8,21 +8,7 @@ import { Link } from "../elements/personal-link.tsx";
 
 /**
  * Empty-state install affordance for the LangWatch CLI.
- *
- * Renders a copy-pasteable `npm install -g langwatch && langwatch login`
- * snippet on cloud, and a `LANGWATCH_ENDPOINT=<host> npm install -g …`
- * variant on self-hosted (auto-detects via `usePublicEnv().BASE_HOST`).
- *
- * Drop into any zero-content surface — /me empty-state, the devices
- * inventory's empty-state, governance setup checklist — instead of a bare "Run
- * `langwatch login` in your terminal" sentence that assumes the user
- * already has the CLI installed.
- *
- * Pairs with:
- *   - docs/integration/cli.mdx (canonical install + login guide)
- *   - sdks/typescript/src/cli (CLI itself)
- *
- * Spec: specs/ai-governance/cli-onboarding/install-cli-card.feature
+ * Renders copy-pasteable install + login snippet (cloud and self-hosted variants).
  */
 export function InstallCliCard({
   /**

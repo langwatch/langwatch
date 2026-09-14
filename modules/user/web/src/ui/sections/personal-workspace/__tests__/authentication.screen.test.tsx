@@ -1,17 +1,7 @@
 /**
  * @vitest-environment jsdom
  *
- * Settings > Authentication: which sign-in methods a reader is shown, what they
- * may do to them, and what a rejected password change says.
- *
- * Moved from `platform/app/src/pages/settings/__tests__/authentication.integration.test.tsx`,
- * whose nine bound scenarios all travel. What is added is the property the
- * platform suite never stated: EVERY PASSWORD INPUT ON THIS PAGE IS A PASSWORD
- * INPUT. A credential typed into a text field is one over-the-shoulder glance
- * and one screen recording away from being somebody else's, and nothing on the
- * page said so.
- *
- * Spec: specs/settings/change-password-auth0.feature
+ * Authentication settings: sign-in methods, password changes, and validation.
  */
 
 import { cleanup, screen, waitFor, within } from "@testing-library/react";

@@ -1,13 +1,6 @@
 /**
  * Client-side avatar image processing: take a user-selected image file,
- * center-crop it to a square, downscale to a small fixed size, and re-encode
- * to a compact data URL ready to POST to `user.setAvatar`.
- *
- * Doing the crop/resize in the browser keeps the uploaded payload tiny (a few
- * KB) regardless of the source photo's resolution, so the server never has to
- * process a full-resolution image and the stored object stays small.
- *
- * Spec: specs/settings/user-avatar.feature
+ * center-crop to square, downscale to fixed size, and encode to data URL.
  */
 
 import { HandledError } from "@langwatch/handled-error";
@@ -24,18 +17,7 @@ export const AVATAR_OUTPUT_SIZE = 256;
 export const AVATAR_MAX_SOURCE_BYTES = 8 * 1024 * 1024;
 
 /**
- * The avatar processing failures, as handled errors.
- *
- * These never cross a network boundary — the whole crop/resize runs in the
- * browser — but they are handled errors all the same, because the reason this
- * codebase types a failure is the same either way: the cause is known, the
- * user can act on it, and the words they read belong in the code-keyed
- * registry rather than at the throw site (ADR-045).
- *
- * Three codes, because they ask for three different things: pick a real image,
- * pick a smaller one, or try elsewhere. `message` stays server-style — short,
- * for a log line — and never reaches the screen; `presentation.ts` owns the
- * copy.
+ * Avatar processing failures. Message is for logs; the registry owns customer-facing copy.
  */
 export abstract class AvatarImageError extends HandledError {}
 
@@ -68,16 +50,8 @@ export class AvatarImageTooLargeError extends AvatarImageError {
 }
 
 /**
- * The browser's canvas could not process or encode the image. Not the file's
- * fault and not something a different file reliably fixes, so it gets its own
- * code and its own advice.
- *
- * `fault: "customer"` — not because anyone did anything wrong, but because
- * `fault` names who can act, and it is what decides whether a failure logs as
- * routine or pages someone. This whole function runs inside the visitor's own
- * browser; a canvas that will not hand back a 2d context is that browser's
- * quirk, and no deploy of ours changes it. Booking it as `platform` filed a
- * browser quirk as a platform incident.
+ * Browser canvas could not process the image. Marked as customer fault
+ * because it's a browser quirk, not a platform bug.
  */
 export class AvatarImageProcessingFailedError extends AvatarImageError {
   declare readonly code: "avatar_image_processing_failed";

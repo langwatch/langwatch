@@ -1,20 +1,7 @@
 /**
  * @vitest-environment jsdom
  *
- * The profile-settings control a photo is chosen, previewed and saved through,
- * and the one element every avatar surface renders that photo with.
- *
- * These are the settings-facing half of `specs/settings/user-avatar-upload.feature`.
- * The server half — what the bytes become, and which purpose and owner kind they
- * are stamped with — is pinned in `@langwatch/user-server` and `apps/api`; what
- * the reader SEES is pinned here.
- *
- * `processAvatarImage` is doubled because the real one crops on a `<canvas>`,
- * which jsdom does not implement. What the control owes the reader is that the
- * processed result is shown BEFORE anything is saved, and that is a fact about
- * the control rather than about the crop.
- *
- * Spec: specs/settings/user-avatar-upload.feature
+ * Avatar upload control integration tests.
  */
 
 import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
@@ -104,15 +91,7 @@ describe("given a signed-in user on their profile settings", () => {
 });
 
 /**
- * The single fallback chain every person-avatar surface shares.
- *
- * The four surfaces the spec's Examples name — the header account menu, the
- * organization members list, a prompt version's author and a trace annotation's
- * author — do not each implement a photo. They render this element, directly or
- * through the `RandomColorAvatar` wrapper above it, and pass the person's
- * `image` field down. So what decides whether an uploaded photo appears on any
- * of them is the behaviour pinned here: image when there is one, initials when
- * there is not.
+ * UserAvatar tests: fallback chain of image -> initials -> silhouette.
  */
 describe("given the element every person-avatar surface renders", () => {
   describe("when the person has uploaded a photo", () => {

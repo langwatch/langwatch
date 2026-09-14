@@ -12,39 +12,8 @@ import {
 } from "./ingestion-template-install-drawer.tsx";
 
 /**
- * /me Trace Ingest section, the tile-grid for the IngestionTemplate
- * catalog.
- *
- * Tile metadata comes from `api.ingestionTemplates.list` (server is the
- * source of truth: admin can disable / org-author / archive). The
- * platform ships NO default templates, so the whole section renders only
- * when the org has at least one template of its own. A heading over an
- * empty grid would read as a broken section on every fresh org's /me.
- *
- * Install fires `api.ingestionKey.install` mutation. The plaintext
- * sk-lw- token is shown ONCE in the drawer and stored in component state
- * for the session — the ingestion-keys list query tells us which sources
- * are connected (drives green-check), but the token doesn't survive page
- * reload (matches "shown once" UX).
- *
- * raw_otlp_advanced is rendered as a SEPARATE static tile (no
- * IngestionTemplate row, no install). It deep-links to
- * /me/configure#otlp, the BYO-OTLP fallback discovery card. It renders
- * only alongside real templates; the personal OTLP endpoint stays
- * reachable via /me/configure regardless.
- *
- * The platform's coding assistants (claude_code, codex, cursor, gemini,
- * opencode) never appear in this grid because they are not seeded as
- * ingestion templates at all — the `langwatch <tool>` command owns their
- * setup and the receiver converts their OTLP logs into canonical gen_ai
- * spans. Their entry points live on the AiToolsPortal "$ langwatch
- * <tool>" tiles. The grid simply renders whatever
- * `api.ingestionTemplates.list` returns (org-authored templates) plus
- * the raw_otlp_advanced discovery card, with no slug filter.
- *
- * Per the no-leak invariant in catalog.feature: this component MUST
- * NOT render under /[project] chrome — only on /me. Embedding lives on
- * /me/index.tsx.
+ * Trace ingest section: grid of organization-authored ingestion templates
+ * plus raw OTLP discovery card.
  */
 const FALLBACK_ICON = <Bot size={20} />;
 
@@ -107,15 +76,8 @@ export function TraceIngestSection() {
   /** Connected ingestion keys, keyed by the source they were minted for. */
   const keyBySourceType = new Map(keys.map((k) => [k.sourceType, k]));
 
-  // No templates, no section: the platform ships no defaults, so most
-  // orgs have nothing to install here. Rendering nothing (not even
-  // load skeletons) while the list is in flight keeps /me from flashing
-  // a section that then disappears, and only a SUCCESSFUL empty list
-  // hides the section for good. A failed list is NOT an empty catalog:
-  // it falls through to the normal render (heading, grid, raw-OTLP
-  // fallback card) rather than silently hiding the section. Installed
-  // sources keep ingesting regardless: the receiver keys on the
-  // IngestionSource, not on a listed template.
+  // Hide section when list is loading or when no templates exist.
+  // Query errors show section (not empty catalog).
   if (!templatesQuery.isSuccess && !templatesQuery.isError) return null;
   if (templatesQuery.isSuccess && templates.length === 0) return null;
   const openTemplate = openSlug ? (templates.find((t) => t.slug === openSlug) ?? null) : null;

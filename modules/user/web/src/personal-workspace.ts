@@ -1,5 +1,6 @@
 /**
- * The personal workspace (ADR-004: one owner-only export per composing feature). A loader per page, not a barrel, so no chunk pulls in all seven addresses. Two are project-scoped (`/:project/sessions`, `/:project/pull-requests`) but kept here since their bodies were this family's own tables; the owning feature mounts TWO tRPC Providers — this package's and `@langwatch/coding-agent-web`'s.
+ * The personal workspace screen loaders. Loaders per page, not a barrel,
+ * so no chunk pulls in all screens. See ADR-004.
  */
 
 import type { ComponentType } from "react";

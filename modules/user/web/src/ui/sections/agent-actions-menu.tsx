@@ -1,15 +1,5 @@
 /**
- * The hand-this-to-an-agent menu the personal usage header carries.
- *
- * Three routes: hand the question to the assistant, copy a prompt for the
- * reader's own coding agent, or read the guide. The assistant entry is offered
- * only where the application answers that this reader can reach one — whether
- * they may, which release the deployment is on and which project is open are
- * the host's facts, so the menu asks rather than deciding.
- *
- * The skill-body fetch did not travel from `platform/app`, and that one costs
- * nothing here: it only ever ran for a caller that named a `skill`, and this
- * surface names none — it copies its own prompt.
+ * Actions menu for the personal usage header (hand to agent, copy prompt, read guide).
  */
 
 import { Box, Button, chakra, HStack, Text } from "@chakra-ui/react";

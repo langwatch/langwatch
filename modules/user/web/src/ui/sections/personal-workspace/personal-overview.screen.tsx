@@ -396,13 +396,7 @@ function SectionCard({
 }
 
 /**
- * Breach and warning banners, derived from the overview items - the same
- * source as the budgets list - so a banner can say exactly WHICH budget
- * is binding ("monthly personal budget" vs "monthly organization budget")
- * instead of a collapsed unlabeled number. Items arrive most-binding
- * first; the first breached/warning one wins. The legacy personalBudget
- * state contributes only the contact affordances (request-increase URL,
- * admin email) on the red banner.
+ * Budget state banners (breach/warning) from overview items (most-binding first).
  */
 function BudgetStateBanners({
   budgetOverview,

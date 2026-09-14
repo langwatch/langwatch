@@ -1,26 +1,6 @@
 /**
- * Changing, or setting for the first time, the password this account signs in
- * with.
- *
- * Moved from `platform/app/src/components/settings/ChangePasswordDialog.tsx`
- * with its rules intact and one import replaced: `applyHandledErrorToForm` and
- * `FormServerError` were `platform/app`'s, and the reading they do arrives here
- * as `model/handled-error.ts` — a rejection that names a field lands ON that
- * field, and one that does not is said above the form. A toast the reader has
- * already looked away from is not where a rejected submit belongs.
- *
- * THE RULES COME FROM `@langwatch/identity-contract`, which both mutations
- * behind this dialog read too, so the form cannot accept what the server
- * refuses. Asked as a refinement rather than restated as a `min(8)` for the
- * reason the platform file records: restating them is how they drift, and this
- * dialog HAD drifted — it enforced eight characters of its own while the front
- * door enforced the shared policy, so it accepted a password over the 72-byte
- * bcrypt limit and one made entirely of spaces.
- *
- * EVERY PASSWORD INPUT IS `type="password"`. Three of them, and the property is
- * asserted in `change-password-dialog.test.tsx` rather than assumed: a
- * credential typed into a text input is one over-the-shoulder glance and one
- * screen recording away from being somebody else's.
+ * Password change dialog (current + new password validation).
+ * Rules from identity-contract; field errors on fields.
  */
 
 import { Button, Field, HStack, Input, Stack, Text } from "@chakra-ui/react";

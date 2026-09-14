@@ -13,27 +13,8 @@ export function buildEnvSnippet(slug: string, endpoint: string, token: string): 
   const base = `export OTEL_EXPORTER_OTLP_ENDPOINT="${endpoint}"
 export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer ${token}"`;
   if (slug === "claude_code") {
-    // Every claude-code OTel unlock knob, all ON, so a session arrives
-    // whole rather than as counters:
-    //   ENHANCED_TELEMETRY_BETA  gates span tracing itself. Claude Code
-    //                      defaults it off, and without it the exporter
-    //                      emits no spans at all, so there is no tool
-    //                      call tree, no latencies and no subagent
-    //                      branches, and TOOL_CONTENT below goes dead
-    //                      with them. Experimental, hence the name.
-    //   USER_PROMPTS       lifts user prompt text onto user_prompt
-    //   TOOL_DETAILS       lifts tool metadata onto tool_decision/result
-    //   TOOL_CONTENT       lifts tool_input (Bash command, Edit diff,
-    //                      file paths) onto tool_decision/result so
-    //                      the trace shows WHAT the tool did
-    //   RAW_API_BODIES     emits api_request_body + api_response_body
-    //                      events carrying the FULL JSON of every API
-    //                      call: system prompts, rolling message
-    //                      history, assistant response text +
-    //                      reasoning, tool_use blocks. Only OTel
-    //                      surface that carries assistant text. The
-    //                      langwatch receiver caps oversized bodies
-    //                      to keep the CH merge ceiling safe.
+    // Claude Code OTel trace flags: enable span tracing + full session details
+    // (prompts, tool calls, API bodies).
     return [
       `export CLAUDE_CODE_ENABLE_TELEMETRY=1`,
       `export CLAUDE_CODE_ENHANCED_TELEMETRY_BETA=1`,
@@ -104,13 +85,7 @@ export type IngestionTemplateMeta = {
   displayName: string;
   description?: string | null;
   /**
-   * Discriminator for what extra credential metadata the drawer captures
-   * from the user, mirrors `IngestionTemplate.credentialSchema`:
-   *   null              → otlp_token-only (auto-issue, no input form)
-   *   "static_api_key"  → drawer captures the user's upstream tool API key
-   *   "agent_id"        → drawer captures an agent identifier
-   * v1 ships only otlp_token-only templates; static_api_key + agent_id
-   * forms ship in v1.1.
+   * Credential schema discriminator: null (token-only), "static_api_key", or "agent_id".
    */
   credentialSchema: string | null;
 };
@@ -123,24 +98,7 @@ export type IngestionBindingResult = {
 };
 
 /**
- * Install drawer for an IngestionTemplate tile on /me Trace Ingest.
- *
- * v1 supports otlp_token-only templates (credentialSchema=null): the
- * drawer auto-issues on open via the parent's onInstall callback, then
- * shows the endpoint + sk-lw- token + a copy-paste env-var snippet. The
- * token is plaintext-shown ONCE — once the drawer closes, the user can
- * never see the secret again.
- *
- * For credentialSchema="static_api_key" or "agent_id" (v1.1), the drawer
- * shows an input form first; install fires after submit. v1 does NOT
- * exercise this path because the 4 v1 catalog tiles all have
- * credentialSchema=null per `ingestion-templates-catalog.feature`
- * Background block.
- *
- * Hard-cut rotation v1: the drawer copy says "Old token no longer
- * accepted" on rotation. Grace-period drawer copy is deferred to v2.
- *
- * Spec: specs/ai-gateway/governance/ingest-api-key-lifecycle.feature
+ * Install drawer for ingestion template tiles (auto-issue token, show env-var snippet).
  */
 export function IngestionTemplateInstallDrawer({
   open,
@@ -199,17 +157,9 @@ export function IngestionTemplateInstallDrawer({
   const renderedToken = showSecret ? (installResult?.token ?? "") : SECRET_MASK;
   const copyToken = installResult?.token ?? "";
 
-  // Claude Code only emits OTLP when CLAUDE_CODE_ENABLE_TELEMETRY=1 plus
-  // the OTEL_LOGS_EXPORTER + OTEL_METRICS_EXPORTER + OTEL_EXPORTER_OTLP_PROTOCOL
-  // trio. Without those, Claude Code silently does nothing even with a valid
-  // endpoint + token. OTEL_TRACES_EXPORTER=otlp is recommended too so any
-  // spans Claude Code does instrument propagate to LangWatch and any logs or
-  // metrics emitted inside a span get correlated; standalone records still
-  // arrive context-less and the receiver synthesizes a stable trace id per
-  // service.instance.id so each session surfaces as one named trace. Other
-  // ingestion sources (cursor, claude_cowork, raw OTLP) need only the
-  // endpoint + bearer header, they enable telemetry through their own
-  // configuration.
+  // Claude Code requires CLAUDE_CODE_ENABLE_TELEMETRY + OTEL_LOGS_EXPORTER +
+  // OTEL_METRICS_EXPORTER + OTEL_EXPORTER_OTLP_PROTOCOL. Other sources need
+  // only endpoint + bearer token.
   const envVarsSnippet = installResult
     ? buildEnvSnippet(template.slug, installResult.endpoint, renderedToken)
     : "";

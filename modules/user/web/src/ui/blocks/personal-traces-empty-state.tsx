@@ -1,14 +1,5 @@
 /**
- * PersonalTracesEmptyState — the /me "Recent activity" empty state.
- *
- * Keeps the project traces page's centred hero shape (inlined below, since
- * the shell itself lives in `platform/app`) so the two no-data states share a
- * visual language, but pitches the tools a personal user already has on /me — a
- * coding assistant, an ingestion key, an API key — instead of the
- * generic agent / MCP / SDK integration guide the project pane shows.
- * Personal users send traces through their tiles, not by hand-wiring an
- * SDK, so the two in-page offers scroll up to the matching section and
- * the third deep-links to the project's API-keys settings.
+ * Empty state for /me "Recent activity", with personal-user-specific trace sources.
  */
 import { Box, chakra, Flex, Icon, SimpleGrid, Text, VStack } from "@chakra-ui/react";
 import { Bot, KeyRound, Webhook } from "lucide-react";

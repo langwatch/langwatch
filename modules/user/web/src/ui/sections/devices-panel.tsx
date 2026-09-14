@@ -13,14 +13,7 @@ import { formatRelativeTime } from "../../model/relative-time.ts";
 import { InstallCliCard } from "../blocks/install-cli-card.tsx";
 
 /**
- * Where the CLI is signed in, and the way to take a device's access away.
- *
- * Lives beside the personal virtual keys on the configure page: a key and a
- * signed-in device are the two things that can talk to LangWatch as this
- * person, so revoking one is the same errand as revoking the other and they
- * belong within a tab of each other rather than a navigation apart.
- *
- * Spec: specs/ai-gateway/governance/sessions-and-devices.feature.
+ * Signed-in CLI devices panel (revoke access).
  */
 export function DevicesPanel() {
   // `organizationId` falls back to a placeholder while the organization is

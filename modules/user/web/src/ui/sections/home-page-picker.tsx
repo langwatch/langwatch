@@ -19,13 +19,7 @@ interface PickerOption {
 }
 
 /**
- * Default-landing-page picker for /me/configure. Persists `User.lastHomePath`
- * via api.user.setLastHomePath. Persona-aware: only surfaces destinations
- * the resolver would otherwise consider for this user — Persona-1 sees
- * Auto + Personal home; Persona-3 sees Auto + Project home; etc.
- *
- * Spec: specs/ai-gateway/governance/persona-home-content.feature
- *       (Customization — User pin)
+ * Default landing page picker (persona-aware; persists to User.lastHomePath).
  */
 export function HomePagePicker({ organizationId }: Props) {
   const showErrorToast = useShowErrorToast();

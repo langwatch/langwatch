@@ -1,22 +1,5 @@
 /**
- * Per-user sign-in methods.
- *
- * Moved from `platform/app/src/components/me/SignInMethodsSection.tsx`, whose
- * shape and copy travel unchanged. Two practical shapes cover almost every
- * account:
- *
- *   - Email/password (better-auth credentials, or Auth0 username-password):
- *     just a Change Password button.
- *   - One SSO/OAuth method (Google / GitHub / Microsoft via Auth0, or
- *     org-enforced single sign-on): the method is shown with no link or unlink
- *     affordance, because enforced single sign-on may not be routed around.
- *
- * The rare case — no single sign-on, several linked providers, ad-hoc linking —
- * still works and is deliberately not the primary surface.
- *
- * NOTHING ON THIS SECTION IS A CREDENTIAL. `getLinkedAccounts` answers the
- * provider and the account id AT the provider; `hasPassword` answers a boolean.
- * The one place a password is typed is the dialog, and it goes one way.
+ * Per-user sign-in methods (email/password or linked SSO providers).
  */
 
 import { Box, Button, HStack, IconButton, Spacer, Spinner, Text, VStack } from "@chakra-ui/react";

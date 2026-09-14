@@ -157,14 +157,7 @@ function AvatarPhotoDialog({
 }
 
 /**
- * Profile-settings control for the user's avatar. Clicking the photo opens a
- * dialog where the current photo is shown large (view) and can be replaced
- * (change) — the format/size constraints live in the adjacent info tooltip.
- * The photo flows to every avatar surface via `User.image`.
- *
- * `organizationId` scopes the personal-workspace the photo is stored under.
- *
- * Spec: specs/settings/user-avatar.feature
+ * Avatar upload control for profile settings.
  */
 export function AvatarUploadControl({ organizationId }: { organizationId: string }) {
   const host = usePersonalWorkspaceHost();

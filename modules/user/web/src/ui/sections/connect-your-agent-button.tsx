@@ -4,18 +4,8 @@ import { docsUrl } from "@langwatch/config/docs-url";
 import { AgentActionsMenu } from "./agent-actions-menu.tsx";
 
 /**
- * "Connect your agent" on the /me usage home
- * (spec: specs/ai-governance/personal-portal/connect-your-agent-button.feature).
- *
- * The mirror image of `SetupWithAgentButton`: that one lives on empty states
- * and sets a feature up; this one appears only once usage EXISTS and hands an
- * agent the reader's own usage to explore. Same menu anatomy (copy-a-prompt,
- * Langy, docs), different job.
- *
- * The gate is `Project.firstMessage` on the personal project, the same
- * first-traces signal the authorize page's post-login watch polls
- * (`pages/cli/FirstTraceRedirect.tsx`). Before the first trace there is
- * nothing to explore, so the button stays out of the header entirely.
+ * "Connect your agent" on /me usage home.
+ * Appears only after first traces exist.
  */
 
 /** Docs path for the guide the menu links; page lives in docs/coding-agents. */

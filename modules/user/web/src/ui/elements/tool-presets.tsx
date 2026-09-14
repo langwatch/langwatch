@@ -1,15 +1,6 @@
 /**
- * The built-in glyphs an internal-tool tile can wear.
- *
- * `platform/app` resolved these through `@langwatch/enterprise-governance-web`,
- * where the drawer that PICKS one lives. The portal only READS them, and a core
- * package reaching into an enterprise one to name six lucide icons is a worse
- * trade than six lucide icons: the contract already carries everything about a
- * tile that has meaning on the wire, and this is the part that has none.
- *
- * The stored form is what binds the two copies together — `preset:tool:<key>`
- * on `AiToolEntry.iconAsset` — so a key added on the authoring side and not
- * here renders the type's default glyph rather than a broken tile.
+ * Built-in preset icons for internal tool tiles.
+ * Storage key format: `preset:tool:<key>`.
  */
 
 import {
