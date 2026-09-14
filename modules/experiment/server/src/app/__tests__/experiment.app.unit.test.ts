@@ -2,7 +2,6 @@
  * The experiment application: the rules that moved off its two doors onto it.
  * @vitest-environment node
  */
-import type { WorkflowService } from "@langwatch/workflow-server";
 import { credentialPrincipalOfToken } from "@langwatch/api/rest";
 import type { ResolvedApiKeyCredential } from "@langwatch/api-key-contract";
 import type { AgentApi } from "@langwatch/agent-contract";
@@ -13,10 +12,9 @@ import { readFile } from "node:fs/promises";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { ExperimentFindOrCreateService } from "../../services/experiment-find-or-create.service.ts";
 import type { ExperimentService } from "../../services/experiment.service.ts";
-import { WorkflowNotFoundError } from "@langwatch/workflow-contract";
-import { ResourceScope } from "@langwatch/runtime-composition";
+import { WorkflowNotFoundError, type WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it, vi } from "vitest";
-import { ExperimentApp, type ExperimentAppDependencies } from "../experiment.app.ts";
+import { ExperimentApp } from "../experiment.app.ts";
 import type { ExperimentV3RunLoop } from "../experiment-workbench.members.ts";
 import type { ExperimentV3RestApi } from "../../transport/experiment-v3.rest.ts";
 import type { ExperimentWorkflowDsl } from "../../services/experiment-execution-data.service.ts";
@@ -90,7 +88,7 @@ function harness({
   workflows = {},
 }: {
   experiments?: Partial<ExperimentService>;
-  workflows?: Partial<WorkflowService>;
+  workflows?: Partial<WorkflowApi>;
 } = {}) {
   const experimentService = createApiFixture<ExperimentService>({
     findById: vi.fn(async () => experiment),
@@ -119,9 +117,26 @@ function harness({
     ...experiments,
   });
 
-  const workflowService = createApiFixture<WorkflowService>({
-    getById: vi.fn(async () => ({ id: "workflow-1" })),
-    archive: vi.fn(async () => undefined),
+  const workflowRow = {
+    id: "workflow-1",
+    projectId: "project-1",
+    name: "Workflow",
+    icon: null,
+    description: null,
+    latestVersionId: null,
+    currentVersionId: null,
+    publishedId: null,
+    publishedById: null,
+    copiedFromWorkflowId: null,
+    isEvaluator: false,
+    isComponent: false,
+    archivedAt: null,
+    createdAt: NOW,
+    updatedAt: NOW,
+  };
+  const workflowService = createApiFixture<WorkflowApi>({
+    getById: vi.fn(async () => workflowRow),
+    archive: vi.fn(async () => workflowRow),
     ...workflows,
   });
 
@@ -168,26 +183,21 @@ function harness({
     workbenchPermissions,
     workbenchObserver,
     runLoop,
-    app: ExperimentApp.create({
-      dependencies: {},
-      members: {
-        experiments: experimentService,
-        runLookup,
-        workflows: workflowService,
-        workflowAuthoring,
-        dataset: createApiFixture<DatasetApi>(),
-        monitors,
-        broadcast,
-        permissions,
-        people,
-        modelCosts,
-        slugify: (value: string) => value,
-        workbenchPermissions,
-        runLoop,
-        workbenchObserver,
-      },
-      config: undefined,
-      resources: new ResourceScope(),
+    app: ExperimentApp.createForTesting({
+      experiments: experimentService,
+      runLookup,
+      workflows: workflowService,
+      workflowAuthoring,
+      dataset: createApiFixture<DatasetApi>(),
+      monitors,
+      broadcast,
+      permissions,
+      people,
+      modelCosts,
+      slugify: (value: string) => value,
+      workbenchPermissions,
+      runLoop,
+      workbenchObserver,
     }),
   };
 }

@@ -1,8 +1,13 @@
 /**
  * The experiment feature's application: what both of its doors call.
  */
-import type { WorkflowService } from "@langwatch/workflow-server";
-import type { Dataset, DatasetApi } from "@langwatch/dataset-contract";
+import { AgentApi } from "@langwatch/agent-contract";
+import { AuthzApi, type AuthzPermission } from "@langwatch/authz-contract";
+import { DatasetApi, type Dataset } from "@langwatch/dataset-contract";
+import { EvaluatorApi } from "@langwatch/evaluator-contract";
+import { MonitorApi } from "@langwatch/monitor-contract";
+import { PromptApi } from "@langwatch/prompt-contract";
+import { reads, type MembersRead } from "@langwatch/infrastructure/members";
 import {
   ExperimentApi,
   type ExperimentCaller,
@@ -50,7 +55,6 @@ import {
 } from "@langwatch/experiment-contract";
 import type { ModelCostRate } from "@langwatch/model-provider-contract";
 import type { FeatureSetup } from "@langwatch/runtime-composition";
-import type { AuthzPermission } from "@langwatch/authz-contract";
 import type {
   ExperimentV3RestSession,
   ExperimentV3RunLoop,
@@ -59,10 +63,16 @@ import type {
 } from "#app/experiment-workbench.members";
 import { on } from "node:events";
 import type { ExperimentService } from "../services/experiment.service.ts";
-import type { ExperimentFindOrCreateService } from "../services/experiment-find-or-create.service.ts";
-import { WorkflowNotFoundError, type StudioWorkflow, type WorkflowWithVersion } from "@langwatch/workflow-contract";
+import { ExperimentFindOrCreateService } from "../services/experiment-find-or-create.service.ts";
+import {
+  WorkflowApi,
+  WorkflowNotFoundError,
+  type StudioWorkflow,
+  type WorkflowWithVersion,
+} from "@langwatch/workflow-contract";
 import { createBlankWorkbenchState } from "../rules/experiment-blank-workbench-state.rules.ts";
 import { workbenchActorFrom } from "../rules/experiment-workbench-actor.rules.ts";
+import { buildExperimentInfrastructure } from "./experiment-composition.build.ts";
 
 /**
  * The project-scoped signal fan-out an editor tab follows. Declared as the two
@@ -147,7 +157,7 @@ export interface ExperimentAppDependencies {
   experiments: ExperimentService;
   /** The ONE find-or-create rule this deployment resolves an SDK slug through. */
   runLookup: ExperimentFindOrCreateService;
-  workflows: WorkflowService;
+  workflows: WorkflowApi;
   workflowAuthoring: ExperimentWorkflowAuthoring;
   dataset: DatasetApi;
   monitors: ExperimentMonitorCascade;
@@ -173,14 +183,45 @@ export interface ExperimentAppDependencies {
 /** An experiment nobody has run yet. Defaulted here so no door decides it. */
 const NO_RUNS: ExperimentRunAggregate = { runsCount: 0, lastRunAt: null };
 
+type ExperimentSetup = FeatureSetup<
+  typeof ExperimentApp.dependencies,
+  MembersRead<typeof ExperimentApp.reads>,
+  undefined
+>;
+
 export class ExperimentApp implements ExperimentApi {
   static readonly contract = ExperimentApi;
-  static readonly dependencies = {} as const;
+  static readonly dependencies = {
+    workflows: WorkflowApi,
+    dataset: DatasetApi,
+    monitors: MonitorApi,
+    agents: AgentApi,
+    evaluators: EvaluatorApi,
+    prompts: PromptApi,
+    permissions: AuthzApi,
+  };
+  static readonly reads = reads("prisma", "clickhouse", "logger");
 
-  static create(
-    setup: FeatureSetup<Readonly<Record<never, never>>, ExperimentAppDependencies, undefined>,
-  ): ExperimentApp {
-    return new ExperimentApp(setup.members);
+  static create(setup: ExperimentSetup): ExperimentApp {
+    const built = buildExperimentInfrastructure({
+      prisma: setup.members.prisma,
+      clickhouse: setup.members.clickhouse,
+      logger: setup.members.logger,
+      dependencies: setup.dependencies,
+    });
+    return new ExperimentApp({
+      ...built,
+      runLookup: ExperimentFindOrCreateService.create(built.experiments),
+    });
+  }
+
+  /**
+   * Every member named directly, for a suite that composes its own fakes
+   * rather than driving the reads/dependencies this App builds them from —
+   * the process root never calls this, since a real one is always booted.
+   */
+  static createForTesting(dependencies: ExperimentAppDependencies): ExperimentApp {
+    return new ExperimentApp(dependencies);
   }
 
   #dependencies: ExperimentAppDependencies;

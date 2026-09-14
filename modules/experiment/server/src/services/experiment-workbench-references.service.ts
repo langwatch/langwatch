@@ -2,12 +2,11 @@
  * Whether everything a workbench state points at still exists.
  */
 
-import type { WorkflowService } from "@langwatch/workflow-server";
 import type { AgentApi } from "@langwatch/agent-contract";
 import type { DatasetApi } from "@langwatch/dataset-contract";
 import { EvaluatorNotFoundError, type EvaluatorApi } from "@langwatch/evaluator-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
-import { WorkflowNotFoundError } from "@langwatch/workflow-contract";
+import { WorkflowNotFoundError, type WorkflowApi } from "@langwatch/workflow-contract";
 import {
   collectWorkbenchReferences,
   WorkbenchMissingReferenceError,
@@ -18,7 +17,7 @@ export type ExperimentWorkbenchReferenceServices = {
   prompts: PromptApi;
   agents: AgentApi;
   evaluators: EvaluatorApi;
-  workflows: WorkflowService;
+  workflows: WorkflowApi;
   dataset: DatasetApi;
 };
 

@@ -4,11 +4,10 @@ import {
   credentialPrincipalOfToken,
   projectCredentialOfRequest,
 } from "@langwatch/api/rest";
-import { ExperimentApi } from "@langwatch/experiment-contract";
-import { defineServerModule, type FeatureSetup } from "@langwatch/runtime-composition";
+import { defineServerModule } from "@langwatch/runtime-composition";
 import { ExperimentApp, type ExperimentAppDependencies } from "#app/experiment.app";
-import { dspyStepsCaller, experimentDspyStepsRest } from "./transport/experiment-dspy-steps.rest.ts";
-import { experimentInitCaller, experimentInitRest } from "./transport/experiment-init.rest.ts";
+import { experimentDspyStepsRest } from "./transport/experiment-dspy-steps.rest.ts";
+import { experimentInitRest } from "./transport/experiment-init.rest.ts";
 import { experimentRest, experimentRestCredential } from "./transport/experiment.rest.ts";
 import { experimentV3Rest, experimentWorkbenchCredential } from "./transport/experiment-v3.rest.ts";
 import {
@@ -20,13 +19,7 @@ import { experimentTrpcTransport } from "./transport/experiment.trpc.ts";
 export type { ExperimentAppDependencies };
 
 export const experimentServer = defineServerModule("experiment")
-  .withApp({
-    contract: ExperimentApi,
-    dependencies: {},
-    create: (
-      setup: FeatureSetup<Readonly<Record<never, never>>, ExperimentAppDependencies, undefined>,
-    ) => ExperimentApp.create(setup),
-  })
+  .withApp(ExperimentApp)
   .withTransports(
     experimentRest,
     experimentInitRest,
@@ -39,22 +32,15 @@ export const experimentServer = defineServerModule("experiment")
     experimentWorkbenchRunRest,
     experimentTrpcTransport,
   )
-  // All three families answer behind the project door, so the project it
-  // resolved is the project every one of them writes against: re-resolving the
-  // key here would ask the key store a second question per request and could
-  // answer differently from the door that admitted the request.
+  // This family answers behind the project door, so re-resolving the key here
+  // would ask a second question that could answer differently from the door
+  // that admitted the request. `experimentInitCaller` and `dspyStepsCaller`
+  // are bound by the host instead: both families are PUBLIC-door, where
+  // `projectCredentialOfRequest` always throws.
   .withTransportFacts(() => [
     bindRestMiddleware(experimentRestCredential, (context) =>
       credentialPrincipalOfToken(projectCredentialOfRequest(context.req.raw)),
     ),
-    bindRestMiddleware(experimentInitCaller, (context) => {
-      const project = projectCredentialOfRequest(context.req.raw).project;
-
-      return { projectId: project.id, projectSlug: project.slug };
-    }),
-    bindRestMiddleware(dspyStepsCaller, (context) => ({
-      projectId: projectCredentialOfRequest(context.req.raw).project.id,
-    })),
     // The workbench family reads the key's PERSON, not the whole principal: a
     // legacy project key stands for nobody, and an api key stands for the
     // person it was issued to.

@@ -34,6 +34,7 @@
     "@langwatch/api": "workspace:*",
     "@langwatch/api-key-contract": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
+    "@langwatch/clickhouse-client": "workspace:*",
     "@langwatch/config": "workspace:*",
     "@langwatch/dataset-contract": "workspace:*",
     "@langwatch/evaluation-contract": "workspace:*",
@@ -41,8 +42,10 @@
     "@langwatch/eventing": "workspace:*",
     "@langwatch/experiment-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
+    "@langwatch/infrastructure": "workspace:*",
     "@langwatch/ksuid": "workspace:*",
     "@langwatch/model-provider-contract": "workspace:*",
+    "@langwatch/monitor-contract": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",
     "@langwatch/prompt-contract": "workspace:*",
@@ -52,6 +55,7 @@
     "@langwatch/time": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
     "@langwatch/workflow-contract": "workspace:*",
+    "@clickhouse/client": "catalog:",
     "@opentelemetry/api": "catalog:",
     "@trpc/server": "catalog:",
     "hono": "catalog:",
@@ -62,8 +66,6 @@
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@clickhouse/client": "catalog:",
-    "@langwatch/clickhouse-client": "workspace:*",
     "@langwatch/test-harness": "workspace:*",
     "typescript": "catalog:",
     "vitest": "catalog:"
