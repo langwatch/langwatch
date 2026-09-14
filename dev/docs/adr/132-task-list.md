@@ -21,7 +21,7 @@ leaving `@unit` or `@integration` in place.
 
 - [x] 1.1 `governance/tool-env.ts` — added the `pi` case so the gateway path stops throwing 501. **Reversed by 23.6: the case is deleted and must stay deleted.** It set a base URL pi ignores and an `OPENAI_API_KEY` pi does send — to the real vendor, which echoes it back in the 401 body. The 501 this atom removed was the system refusing to do something it could not do; the atom read it as a gap and filled it. Left ticked with the reversal attached: the sequence 1.1 → 23.6 is the record of the whole misreading.
 - [x] 1.2 `governance/otel-env-block.ts` — add `pi: "pi"` to `SOURCE_TYPE_BY_TOOL`
-- [x] 1.3 `governance/otel-env-block.ts` — confirm the no-branch fallback in `buildOtelEnvBlock` gives pi endpoint and headers only, and add no pi branch if it does
+- [x] 1.3 `governance/otel-env-block.ts` — **reversed by v9: the atom had it backwards.** It said to confirm the no-branch fallback gives pi endpoint and headers only, and to add no pi branch if it does. Being in the slug table must not mean pi's child gets an env block: the fallback hands a live ingest token to every process in the session, and pi cannot use it anyway - its shipped package contains no `OTEL_` string at all. The change is `case "pi": return {}`. Left ticked with the reversal attached, the same way 1.1 is - this line is where the wrong rule was written down.
 - [x] 1.4 `__tests__/wrapper-mode.unit.test.ts` — test that pi resolves in the gateway mode without throwing
 - [x] 1.5 `__tests__/wrapper-mode.unit.test.ts` — test that pi resolves in the no-virtual-key mode without throwing
 - [x] 1.6 `__tests__/wrapper-mode.unit.test.ts` — bind both with `@scenario "pi is accepted as a tool that can be launched"`
@@ -62,7 +62,7 @@ the path wrongly on one lane. It does not. Every catalog model's address is
 fixed in pi's own build, so a base-URL override is accepted and ignored on
 *every* lane, not mis-joined on one. There is no doubled segment because there
 is no swap. The anthropic-lane asymmetry described above is real in langy's own
-worker, which is where it was measured; reading it as pi's behaviour was the
+worker, which is where it was measured; reading it as pi's behavior was the
 mistake, and it is the same stale belief that had to be corrected in three other
 places today. Left standing with the correction attached rather than rewritten
 clean: this paragraph is where the misreading is legible.
@@ -75,7 +75,7 @@ part that must not be lost:
 
 > Do not implement this by writing a generated `models.json` into the user's pi
 > install. pi resolves that file for every session, so it would repoint runs the
-> user never launched through LangWatch at our gateway — changing the behaviour
+> user never launched through LangWatch at our gateway — changing the behavior
 > of a tool we were only asked to observe, on sessions outside our scope.
 >
 > ADR-132's "write nothing to the user's machine" invariant is load-bearing
@@ -91,7 +91,7 @@ the ones we did not. Rung 17's read-only test is what keeps that closed.
 ## Rung 2 — a governable policy entry in both copies of the tool list
 
 - [x] 2.1 `governance/platform-tool-policy.ts` — add `pi` to `PlatformToolSlug`
-- [x] 2.2 `governance/platform-tool-policy.ts` — add the pi entry to `PLATFORM_TOOL_POLICIES`. **The reason written here was false and rung 23 reversed the values.** This atom said "both paths allowed; pi honours a base-URL swap". pi does not: every catalog model's address is fixed in pi's own build, so the swap is accepted and ignored. Because the two capture paths are mutually exclusive in the launcher, allowing the dead one also skipped the live one — the result was not a degraded gateway run but total silent capture loss for exactly the customers holding keys, plus the user's virtual key sent to the real vendor endpoint. Now `{ allowVk: false, allowOtelDirect: true }`, forced at both server sites and the tile override. Left ticked with the correction attached rather than rewritten clean: this line is where the defect entered, and a record that hides its own wrong turn teaches nothing.
+- [x] 2.2 `governance/platform-tool-policy.ts` — add the pi entry to `PLATFORM_TOOL_POLICIES`. **The reason written here was false and rung 23 reversed the values.** This atom said "both paths allowed; pi honors a base-URL swap". pi does not: every catalog model's address is fixed in pi's own build, so the swap is accepted and ignored. Because the two capture paths are mutually exclusive in the launcher, allowing the dead one also skipped the live one — the result was not a degraded gateway run but total silent capture loss for exactly the customers holding keys, plus the user's virtual key sent to the real vendor endpoint. Now `{ allowVk: false, allowOtelDirect: true }`, forced at both server sites and the tile override. Left ticked with the correction attached rather than rewritten clean: this line is where the defect entered, and a record that hides its own wrong turn teaches nothing.
 - [x] 2.3 new `ee/governance/services/__tests__/platformToolPolicy.drift.unit.test.ts` — read both copies from disk and assert they name the same tools
 - [x] 2.4 run the drift test and **watch it fail** — red, naming `only in the launcher: pi`
 - [x] 2.5 `ee/governance/services/platformToolPolicy.service.ts` — add pi to `PLATFORM_TOOL_SLUGS`
@@ -237,7 +237,7 @@ that finishes capture, and the code carries comments saying so.
 - [x] 6.3 move the spool drain into it
 - [x] 6.4 move the refusal handling into it — templated on the tool name
 - [x] 6.5 move the transport post into it
-- [x] 6.6 move the batcher into it, timer behaviour and early return intact
+- [x] 6.6 move the batcher into it, timer behavior and early return intact
 - [x] 6.7 the modification-time window is neutral and moved; the codex filename test stayed behind as a passed-in predicate
 - [x] 6.8 leave the codex body builder, trace-id handling and service naming behind — 730 lines down to 603
 - [x] 6.9 update every import site — **zero needed it**; all six pieces were private to the module
@@ -379,7 +379,7 @@ METRIC contribution moves them — pi sends none, so they stay at a literal zero
 A test asserting that would contradict the scenario's own words.
 
 The blankness is real, and it is `SessionView.tsx:522` and `:547` declining to
-render a zero stat. That behaviour is agent-agnostic and predates pi: a test of
+render a zero stat. That behavior is agent-agnostic and predates pi: a test of
 it passes with every line of the pi capture deleted, which is the same vacuity
 rung 9 already rejected at the builder.
 
@@ -541,7 +541,7 @@ Neither pair is vacuous; neither is redundant either.
 rewritten smaller, two files sharing row ids, and a row whose id equals a
 session id are all states a healthy captured session never reaches, so there is
 no real file to take them from. The tenth and eleventh are the real 132-row
-session (sanitised, `__tests__/fixtures/pi-session-real-shape.jsonl`), cut at
+session (sanitized, `__tests__/fixtures/pi-session-real-shape.jsonl`), cut at
 three arbitrary byte offsets and asserted equal to one read of the whole file —
 which is what caught the 2-event loss in the last break.
 
@@ -748,7 +748,7 @@ M4 rest on — but the leak guarantee needed a test of its own.
 **Which tests are synthetic.** Four of five. No real session on this machine has
 a `parentSession` field — all five files under `~/.pi/agent/sessions/` are roots,
 version 3, checked — so every split, deleted-parent and leak case is constructed.
-Only the no-parent test uses the real 132-row session (sanitised,
+Only the no-parent test uses the real 132-row session (sanitized,
 `__tests__/fixtures/pi-session-real-shape.jsonl`). The resume test is synthetic in
 its file but real in its mechanism: three appends to one file through
 `createPiSessionStream`, which is how a resumed pi run actually behaves.
@@ -778,7 +778,7 @@ M8's green column is the finding: before that test existed, deleting the read-si
 catch reddened **nothing**. The never-throws contract someone else now relies on
 was held by no test at all.
 
-M9 fixed a real defect rather than pinning existing behaviour. Never-throwing is
+M9 fixed a real defect rather than pinning existing behavior. Never-throwing is
 not never-hanging: measured, a plain `open(2)` on a FIFO parent path returned
 nothing and threw nothing after three seconds, and the probe process then would
 not exit at all, because the blocked open wedges one of libuv's four threadpool
@@ -1013,7 +1013,7 @@ before the edit. Two agents falsifying one file at once needs a lock, not care.
 
 - [x] 18.1 `me/tiles/assistantIcons.ts:19` — pi in `ASSISTANT_KINDS`
 - [x] 18.2 same file `:78-87` — pi preset
-- [x] 18.3 icon settled: **no asset added.** No pi mark exists in `public/images/external-icons/` and we hold no licence to redistribute one. `iconUrl: null` is an already-supported state (`AssistantPreset.iconUrl: string | null`); `TileIcon.tsx:37` and `AiToolEntryDrawer.tsx:614` both fall through to the neutral `<Bot />` glyph. Reason recorded in a comment at the preset.
+- [x] 18.3 icon settled: **no asset added.** No pi mark exists in `public/images/external-icons/` and we hold no license to redistribute one. `iconUrl: null` is an already-supported state (`AssistantPreset.iconUrl: string | null`); `TileIcon.tsx:37` and `AiToolEntryDrawer.tsx:614` both fall through to the neutral `<Bot />` glyph. Reason recorded in a comment at the preset.
 - [x] 18.4 `ee/governance/services/aiToolEntry.service.ts:83` — pi in `SUPPORTED_ASSISTANT_KINDS`
 - [x] 18.5 same file `:106-109` — `pi: "pi"` in `ASSISTANT_KIND_TO_TOOL_SLUG`
 - [x] 18.6 `me/tiles/__tests__/assistantIcons.unit.test.ts` binds `@scenario "The tool tile offers pi"`

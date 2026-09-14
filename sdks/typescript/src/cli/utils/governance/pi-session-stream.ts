@@ -246,6 +246,95 @@ export interface PiSessionStreamOptions {
   maxBytesPerRead?: number;
 }
 
+/**
+ * The next run of whole lines from `path`, advancing `cursor.offset` past
+ * exactly the bytes it returns. `null` when there is nothing to consume.
+ *
+ * Everything that reasons in bytes lives here - the replaced-file reset, the
+ * window, the torn tail and the long-row fallback - so that `read` above it
+ * can reason in rows. The cursor is mutated rather than returned because the
+ * offset and the bytes have to move together or not at all: a caller that
+ * advanced one without the other would re-send or skip a turn.
+ */
+async function readCompleteLines({
+  path,
+  size,
+  cursor,
+  maxBytesPerRead,
+}: {
+  path: string;
+  size: number;
+  cursor: FileCursor;
+  maxBytesPerRead: number;
+}): Promise<string | null> {
+  // Smaller than what we have already consumed means the file was replaced
+  // under us, not appended to. Start again from the top; the seen-set is
+  // what stops the replay being sent twice.
+  if (size < cursor.offset) {
+    cursor.offset = 0;
+    cursor.header = null;
+    cursor.rowsConsumed = 0;
+  }
+  if (size === cursor.offset) return null;
+
+  // A window, not the whole unread range. See {@link MAX_READ_BYTES}: the
+  // rest of the file is not skipped, it is next pass's window.
+  const windowEnd = Math.min(size, cursor.offset + maxBytesPerRead);
+  let buffer = await readRange({ path, from: cursor.offset, to: windowEnd });
+  if (buffer === null || buffer.length === 0) return null;
+
+  // Consume up to and including the last newline. Anything after it is a
+  // line pi has not finished writing, or one it never will; either way the
+  // bytes stay unread so a later pass can see them whole.
+  let lastNewline = buffer.lastIndexOf(NEWLINE);
+  if (lastNewline === -1 && windowEnd < size) {
+    // A whole window of one line: pi wrote a row longer than the cap. The
+    // window cannot advance past it, and every later pass would read the
+    // same newline-free bytes and consume nothing — a file stalled for
+    // good, silently. So the ceiling yields to the allocation it exists to
+    // avoid rather than to a lost session.
+    buffer = await readRange({ path, from: cursor.offset, to: size });
+    if (buffer === null || buffer.length === 0) return null;
+    lastNewline = buffer.lastIndexOf(NEWLINE);
+  }
+  if (lastNewline === -1) return null;
+
+  const complete = buffer.subarray(0, lastNewline + 1);
+  cursor.offset += complete.length;
+  return complete.toString("utf8");
+}
+
+/**
+ * The rows of this chunk that have not been recorded already, marking each one
+ * seen as it goes.
+ *
+ * The row counter advances across skipped rows as well as kept ones, because
+ * position is part of the key: a resumed file replays its earlier content
+ * verbatim, and position is the only thing that tells the replay apart from
+ * the original.
+ */
+function freshRows({
+  sessionId,
+  rows,
+  cursor,
+  seen,
+}: {
+  sessionId: string;
+  rows: readonly PiRow[];
+  cursor: FileCursor;
+  seen: Set<string>;
+}): PiRow[] {
+  const fresh: PiRow[] = [];
+  for (const row of rows) {
+    const key = rowKey({ sessionId, row, position: cursor.rowsConsumed });
+    cursor.rowsConsumed++;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    fresh.push(row);
+  }
+  return fresh;
+}
+
 export function createPiSessionStream({
   resolveLineage,
   maxBytesPerRead = MAX_READ_BYTES,
@@ -276,41 +365,15 @@ export function createPiSessionStream({
         cursors.set(path, cursor);
       }
 
-      // Smaller than what we have already consumed means the file was replaced
-      // under us, not appended to. Start again from the top; the seen-set is
-      // what stops the replay being sent twice.
-      if (size < cursor.offset) {
-        cursor.offset = 0;
-        cursor.header = null;
-        cursor.rowsConsumed = 0;
-      }
-      if (size === cursor.offset) return [];
+      const chunk = await readCompleteLines({
+        path,
+        size,
+        cursor,
+        maxBytesPerRead,
+      });
+      if (chunk === null) return [];
 
-      // A window, not the whole unread range. See {@link MAX_READ_BYTES}: the
-      // rest of the file is not skipped, it is next pass's window.
-      const windowEnd = Math.min(size, cursor.offset + maxBytesPerRead);
-      let buffer = await readRange({ path, from: cursor.offset, to: windowEnd });
-      if (buffer === null || buffer.length === 0) return [];
-
-      // Consume up to and including the last newline. Anything after it is a
-      // line pi has not finished writing, or one it never will; either way the
-      // bytes stay unread so a later pass can see them whole.
-      let lastNewline = buffer.lastIndexOf(NEWLINE);
-      if (lastNewline === -1 && windowEnd < size) {
-        // A whole window of one line: pi wrote a row longer than the cap. The
-        // window cannot advance past it, and every later pass would read the
-        // same newline-free bytes and consume nothing — a file stalled for
-        // good, silently. So the ceiling yields to the allocation it exists to
-        // avoid rather than to a lost session.
-        buffer = await readRange({ path, from: cursor.offset, to: size });
-        if (buffer === null || buffer.length === 0) return [];
-        lastNewline = buffer.lastIndexOf(NEWLINE);
-      }
-      if (lastNewline === -1) return [];
-      const complete = buffer.subarray(0, lastNewline + 1);
-      cursor.offset += complete.length;
-
-      const parsed = parsePiSessionFile(complete.toString("utf8"));
+      const parsed = parsePiSessionFile(chunk);
       cursor.header ??= parsed.header;
 
       const header = cursor.header;
@@ -351,20 +414,11 @@ export function createPiSessionStream({
         }
       }
 
-      const fresh: PiRow[] = [];
-      for (const row of parsed.rows) {
-        const key = rowKey({ sessionId, row, position: cursor.rowsConsumed });
-        cursor.rowsConsumed++;
-        if (seen.has(key)) continue;
-        seen.add(key);
-        fresh.push(row);
-      }
-
       return buildPiTurnEvents({
         session: {
           ...parsed,
           header,
-          rows: fresh,
+          rows: freshRows({ sessionId, rows: parsed.rows, cursor, seen }),
         },
         lineage: cursor.lineage,
       });
