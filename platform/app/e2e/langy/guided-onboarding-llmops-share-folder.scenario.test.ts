@@ -44,7 +44,7 @@ import {
   waitForPathDone,
 } from "./guided-onboarding-fixture";
 import { makeLangyAdapter } from "./langy-agent";
-import { LANGY_CORE_RULE_CRITERIA } from "./langy-rules";
+import { LANGY_GUIDED_PATH_CRITERIA } from "./langy-rules";
 import {
   assertToolsPresent,
   type CliTerminal,
@@ -157,7 +157,7 @@ describe("Langy sets up the llmops path through the shared folder", () => {
                   `Langy closes with, word for word: "${GUIDED_LINES.allReady}"`,
                   "While the folder is connected Langy never hands the user a command to run by hand; it does the work itself.",
                   ...GUIDED_TONE_CRITERIA,
-                  ...LANGY_CORE_RULE_CRITERIA,
+                  ...LANGY_GUIDED_PATH_CRITERIA,
                 ],
               }),
             ],

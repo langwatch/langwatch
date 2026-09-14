@@ -33,7 +33,7 @@ import {
   seedGuidedOrganization,
 } from "./guided-onboarding-fixture";
 import { makeLangyAdapter } from "./langy-agent";
-import { LANGY_CORE_RULE_CRITERIA } from "./langy-rules";
+import { LANGY_GUIDED_PATH_CRITERIA } from "./langy-rules";
 import {
   assertToolsPresent,
   type CliTerminal,
@@ -148,7 +148,7 @@ describe("Langy walks the install ladder down to a rung that works", () => {
                   "Langy installs the LangWatch package into the project and says so. A reply that leaves the package uninstalled fails this criterion.",
                   "Langy never tells the developer that the folder has no package manager, that Python is missing, or that they need to install a package manager themselves. The interpreter on PATH could install the whole time.",
                   "Langy does not ask the developer to run the install by hand while the folder is connected; it does the work itself.",
-                  ...LANGY_CORE_RULE_CRITERIA,
+                  ...LANGY_GUIDED_PATH_CRITERIA,
                 ],
               }),
             ],

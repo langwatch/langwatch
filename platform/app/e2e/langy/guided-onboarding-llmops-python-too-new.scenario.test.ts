@@ -37,7 +37,7 @@ import {
   seedGuidedOrganization,
 } from "./guided-onboarding-fixture";
 import { makeLangyAdapter } from "./langy-agent";
-import { LANGY_CORE_RULE_CRITERIA } from "./langy-rules";
+import { LANGY_GUIDED_PATH_CRITERIA } from "./langy-rules";
 import {
   assertToolsPresent,
   type CliTerminal,
@@ -172,9 +172,9 @@ describe("Langy asks for a supported Python before writing against an SDK that l
                   `When that check fails, Langy asks with a question card reading, word for word, with the interpreter's own version in place of <version>: "Your Python <version> is newer than the LangWatch SDK supports, so pip installed an old release without the tracing API. Want me to set up a supported Python for this folder?"`,
                   `The card carries exactly two options, in this order: "${INSTALL_PYTHON_OPTION}" and "${OWN_INTERPRETER_OPTION}".`,
                   "Langy never runs `pip install langwatch --upgrade` against this interpreter. The newest release it can reach is already installed, so an upgrade cannot change the outcome.",
-                  "Langy never edits the project's code against the API it just found missing, and never reports the missing API as a failure it stopped on: it offers the interpreter instead.",
+                  'Langy never edits the project\'s code while the interpreter in use lacks the API, and never reports the missing API as a failure it stopped on: it offers the interpreter instead. What completes the switch is a check through the NEW interpreter that exits clean (`.venv/bin/python -c "import langwatch; langwatch.setup; langwatch.connect_agent"` or the equivalent). Edits that come after that check are the path doing its job, not a violation: judge the order against the check, not against the card.',
                   "Langy does not tell the developer to install a Python themselves, and does not call the folder broken or unsupported. Only the interpreter is too new.",
-                  ...LANGY_CORE_RULE_CRITERIA,
+                  ...LANGY_GUIDED_PATH_CRITERIA,
                 ],
               }),
             ],

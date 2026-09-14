@@ -42,7 +42,7 @@ import {
   waitForPathDone,
 } from "./guided-onboarding-fixture";
 import { makeLangyAdapter } from "./langy-agent";
-import { LANGY_CORE_RULE_CRITERIA } from "./langy-rules";
+import { LANGY_GUIDED_PATH_CRITERIA } from "./langy-rules";
 import {
   assertToolsPresent,
   type CliTerminal,
@@ -149,7 +149,7 @@ describe("Langy talks the scenario through first, and a failing run keeps the su
                   "Langy creates the suite with a few more scenarios, runs it, points at the run so the developer can replay the conversation, and closes the path.",
                   `Langy closes with, word for word: "${GUIDED_LINES.allReady}"`,
                   ...GUIDED_TONE_CRITERIA,
-                  ...LANGY_CORE_RULE_CRITERIA,
+                  ...LANGY_GUIDED_PATH_CRITERIA,
                 ],
               }),
             ],

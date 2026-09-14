@@ -29,7 +29,7 @@ import {
   seedGuidedOrganization,
 } from "./guided-onboarding-fixture";
 import { makeLangyAdapter } from "./langy-agent";
-import { LANGY_CORE_RULE_CRITERIA } from "./langy-rules";
+import { LANGY_GUIDED_PATH_CRITERIA } from "./langy-rules";
 import {
   assertToolsPresent,
   type CliTerminal,
@@ -139,7 +139,7 @@ describe("Langy asks before making a repository in a folder that has none", () =
                   "Nothing is branched, committed or checked out before the developer answers the card.",
                   "Once the developer picks the option that creates the repository, Langy makes it and carries on with the tracing work rather than asking again.",
                   `Because the folder it created has no remote, Langy says the no-remote line, "${GUIDED_LINES.noRemoteStart} <the branch> holds the commit.", and never claims a pull request it did not open.`,
-                  ...LANGY_CORE_RULE_CRITERIA,
+                  ...LANGY_GUIDED_PATH_CRITERIA,
                 ],
               }),
             ],
