@@ -354,3 +354,109 @@ describe("given a session file pi created but never filled with turns", () => {
     });
   });
 });
+
+/**
+ * A turn is sent once across runs, not once per run.
+ *
+ * The reader's seen-set is memory and dies with the process, so a RESUMED
+ * session is offered from its first row again on the next `langwatch pi`, and
+ * the file's modification time has moved, so the file-level window admits it.
+ * Nothing downstream removes the repeat: the session fold runs with
+ * `refoldOnOutOfOrder: false` because its accumulators commute, and commuting
+ * sums ADD a re-sent turn rather than collapsing it, so cost and call count
+ * inflate once per run that touches the session.
+ *
+ * This drives two separate captures — which is what two runs are — against one
+ * growing file. A single capture's in-memory dedup cannot pass it.
+ */
+describe("given a session captured by an earlier run", () => {
+  const T1 = "2026-09-14T10:00:01.000Z";
+  const T2 = "2026-09-14T10:00:02.000Z";
+  const T3 = "2026-09-14T11:00:03.000Z";
+  const T4 = "2026-09-14T11:00:04.000Z";
+
+  function rowAt(rowId: string, iso: string): string {
+    return `${JSON.stringify({
+      type: "message",
+      id: rowId,
+      parentId: null,
+      timestamp: iso,
+      message: {
+        role: "assistant",
+        content: [{ type: "text", text: "hi" }],
+        timestamp: Date.parse(iso),
+        model: "openai/gpt-5-mini",
+      },
+    })}\n`;
+  }
+
+  /** Each turn has its own second, so the entry clock identifies it. */
+  function stampsSent(bodies: string[]): string[] {
+    return bodies.flatMap((body) => {
+      const parsed = JSON.parse(body) as {
+        resourceLogs: {
+          scopeLogs: { logRecords: { timeUnixNano: string }[] }[];
+        }[];
+      };
+      return parsed.resourceLogs.flatMap((resource) =>
+        resource.scopeLogs.flatMap((scope) =>
+          scope.logRecords.map((record) => record.timeUnixNano),
+        ),
+      );
+    });
+  }
+
+  /** @scenario "Resuming a session does not charge its earlier turns again" */
+  it("does not send that run's turns again when the session is resumed", async () => {
+    const file = join(dir, "resumed.jsonl");
+    await writeFile(
+      file,
+      `${JSON.stringify({
+        type: "session",
+        id: SESSION_ID,
+        version: 3,
+        createdAt: "2026-09-14T10:00:00.000Z",
+      })}\n${rowAt("aaaaaaaa", T1)}${rowAt("bbbbbbbb", T2)}`,
+      "utf8",
+    );
+
+    const bodies: string[] = [];
+    const fetchImpl = vi.fn(async (_url: unknown, init?: { body?: string }) => {
+      if (init?.body) bodies.push(init.body);
+      return { ok: true, status: 200 } as Response;
+    }) as unknown as typeof fetch;
+
+    const run1 = createPiCapture({
+      sinceMs: Date.parse(T1) - 1_000,
+      sessionsDir: dir,
+      logsEndpoint: LOGS_ENDPOINT,
+      token: "sk-lw-test",
+      fetchImpl,
+    });
+    expect(await run1.harvest()).toBe(2);
+
+    // The user resumes. pi appends to the same file, and a NEW process reads
+    // it: no memory of the first run, and a modification time that has moved.
+    await appendFile(
+      file,
+      `${rowAt("cccccccc", T3)}${rowAt("dddddddd", T4)}`,
+      "utf8",
+    );
+
+    const run2 = createPiCapture({
+      sinceMs: Date.parse(T3) - 1_000,
+      sessionsDir: dir,
+      logsEndpoint: LOGS_ENDPOINT,
+      token: "sk-lw-test",
+      fetchImpl,
+    });
+    expect(await run2.harvest()).toBe(2);
+
+    // Four turns exist and four were sent. Without a row-level window the
+    // second run re-sends the first two and this is six, with two stamps
+    // appearing twice — the shape the fold turns into doubled cost.
+    const sent = stampsSent(bodies);
+    expect(sent).toHaveLength(4);
+    expect(new Set(sent).size).toBe(4);
+  });
+});

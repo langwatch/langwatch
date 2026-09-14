@@ -51,11 +51,11 @@
  *
  * Spec: specs/coding-agent/pi-session-capture.feature
  */
-import { readdir, stat } from "node:fs/promises";
-import { join } from "node:path";
-
 import { LANGWATCH_SDK_VERSION } from "@/internal/constants";
-import { postOtlpBody } from "./agent-rollout-transport";
+import {
+  findFilesModifiedSince,
+  postOtlpBody,
+} from "./agent-rollout-transport";
 import { lwTag } from "./brand";
 import { createPiSessionStream } from "./pi-session-stream";
 import { resolvePiLineage } from "./pi-session-lineage";
@@ -100,9 +100,10 @@ export interface PiCapture {
 /**
  * The session files worth offering the reader on this pass.
  *
- * Sorted by name so a run with several sessions posts them in a stable order
- * rather than in whatever order the filesystem enumerates. An unreadable
- * directory yields nothing: pi creates it on its first write, so "not there
+ * The mtime window and the unreadable-directory rule are the shared walker's,
+ * not a second copy of them: pi states its own flat layout and its own name
+ * filter and takes the rest. An unreadable directory yields nothing, which is
+ * what pi needs — it creates the directory on its first write, so "not there
  * yet" is the ordinary state at the start of every fresh session.
  */
 async function sessionFilesTouchedSince({
@@ -112,26 +113,20 @@ async function sessionFilesTouchedSince({
   dir: string;
   sinceMs: number;
 }): Promise<string[]> {
-  let names: string[];
-  try {
-    names = await readdir(dir);
-  } catch {
-    return [];
-  }
-  const touched: string[] = [];
-  for (const name of names.sort()) {
-    if (!name.endsWith(SESSION_FILE_SUFFIX)) continue;
-    const path = join(dir, name);
-    try {
-      const info = await stat(path);
-      if (!info.isFile()) continue;
-      if (info.mtimeMs >= sinceMs) touched.push(path);
-    } catch {
-      // Vanished between the listing and the stat, or not ours to read.
-      // Either way there is nothing to capture and nothing to report.
-    }
-  }
-  return touched;
+  const touched = await findFilesModifiedSince({
+    root: dir,
+    // pi keeps its sessions in one flat directory, so the walk must not
+    // descend. `maxDepth: 0` states that layout here, which is the whole
+    // point of the shared walker taking it as an argument.
+    maxDepth: 0,
+    sinceMs,
+    matchesName: (name) => name.endsWith(SESSION_FILE_SUFFIX),
+  });
+  // The shared walker yields newest-name-first, which is what a caller
+  // searching for one recent session wants. This caller posts all of them, in
+  // the order they were created, so it re-sorts ascending rather than reading
+  // a run's sessions backwards.
+  return touched.sort();
 }
 
 /**
@@ -188,7 +183,26 @@ export function createPiCapture({
       pending = [];
       for (const path of paths) {
         try {
-          batch.push(...(await stream.read(path)));
+          // Only turns this run produced. The reader's seen-set lives in
+          // memory and dies with the process, so a RESUMED session is offered
+          // from its first row again on the next run — the file's modification
+          // time moved, and the new process has no memory of what an earlier
+          // one already sent. Nothing downstream removes the repeat: the
+          // session fold sets `refoldOnOutOfOrder: false` because its
+          // accumulators commute, and sums commute without deduplicating, so a
+          // re-sent turn is ADDED to the cost and the call count rather than
+          // collapsing into the turn already there. Filtering on the entry
+          // clock is what makes the file-level "only what this run touched"
+          // rule true row by row, and it needs nothing kept on disk.
+          //
+          // The accepted cost: a turn written before this run started is never
+          // captured, so turns a crashed wrapped run never posted are not
+          // recovered by resuming it. That loss is this module's existing
+          // position on a crash, not a new one.
+          const fresh = await stream.read(path);
+          for (const event of fresh) {
+            if (event.timeUnixMs >= sinceMs) batch.push(event);
+          }
         } catch {
           // The reader is documented not to throw; if a future change makes it,
           // one unreadable session must not cost the others their pass.

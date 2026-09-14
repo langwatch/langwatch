@@ -31,7 +31,14 @@
  *
  * Feature: specs/coding-agent/pi-session-capture.feature
  */
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
 import { createServer, type Server } from "node:http";
 import type { AddressInfo, Socket } from "node:net";
 import { tmpdir } from "node:os";
@@ -216,11 +223,37 @@ async function runPi({
   mkdirSync(binDir, { recursive: true });
   mkdirSync(sessionsDir, { recursive: true });
 
+  // The recorded session is a real one from an earlier day, and capture keeps
+  // only turns at or after the run's start — the row-level window that stops a
+  // resumed session from being billed twice. Replayed verbatim, every row would
+  // be correctly discarded as another run's work and this test would assert on
+  // an empty wire. Rebasing the entry clock onto this run is what makes the
+  // fixture mean "pi wrote this while we were watching", which is the thing
+  // being tested; the row contents are untouched.
+  const rebased = join(runDir, "session-now.jsonl");
+  const rebaseFrom = Date.now();
+  writeFileSync(
+    rebased,
+    readFileSync(FIXTURE, "utf8")
+      .split("\n")
+      .map((line, index) => {
+        if (line.trim() === "") return line;
+        const row = JSON.parse(line) as { timestamp?: string };
+        if (typeof row.timestamp !== "string") return line;
+        return JSON.stringify({
+          ...row,
+          timestamp: new Date(rebaseFrom + index).toISOString(),
+        });
+      })
+      .join("\n"),
+    "utf8",
+  );
+
   // pi writes its session file and leaves, the way a short session does: the
   // file lands between the run's start stamp and the final sweep.
   writeFileSync(
     join(binDir, "pi"),
-    `#!/bin/sh\ncp '${FIXTURE}' '${join(sessionsDir, "session.jsonl")}'\nprintf 'ran\\n' > '${marker}'\nexit ${piExitCode}\n`,
+    `#!/bin/sh\ncp '${rebased}' '${join(sessionsDir, "session.jsonl")}'\nprintf 'ran\\n' > '${marker}'\nexit ${piExitCode}\n`,
     { mode: 0o755 },
   );
   process.env.PATH = `${binDir}:${originalPath ?? ""}`;

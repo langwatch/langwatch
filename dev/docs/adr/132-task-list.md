@@ -1268,3 +1268,81 @@ Both runs are required, and the second is the one that matters here.
 - [ ] V10 the reorder guard fails when pi is moved off the end of the registry, checked by moving it
 - [ ] V11 the drift test fails when one copy of the tool list is edited, checked by editing it
 - [ ] V12 nothing outside pull request #8139 and branch `worktree-shiny-zooming-kahn`
+
+### A binding annotation can bind nothing, silently
+
+Found in the ruthless review, by the convention refuter, and confirmed by
+falsification rather than by reading.
+
+A `@scenario` annotation only binds when it CLOSES its own comment — either the
+one-line `/** @scenario "..." */` form, or as the last line of a block with the
+`*/` on that same line. Left on its own line inside a longer block, with the
+`*/` on the next line, it binds nothing and the checker reports nothing.
+
+The mechanism is documented in the checker itself, at
+`platform/app/scripts/check-feature-parity.ts:1151`: `isFollowedByTestCall`
+walks forward from the end of the match and cannot leave a comment it starts
+inside. An annotation on its own line leaves the walk pointing at the `*` of
+the closing delimiter, which is not whitespace, not a block comment and not a
+line comment, so the walk falls through to the test-call match and fails.
+
+Why this is worse than an ordinary mistake: the failure is silent in both
+directions. The annotation is not counted as a binding, and it is also not
+reported as an unknown or malformed annotation. A green parity run is
+therefore not evidence that a given test binds a given scenario. The scenario
+may be bound by something weaker elsewhere, and the test the author wrote
+specifically to catch a gap is credited to nothing.
+
+Proof, not assertion. Corrupting the title of the offending annotation to a
+string matching no scenario left the run at exit 0 with no diagnostic. After
+moving the `*/` onto the annotation's line, the same corruption failed the run
+with `1 unknown annotation(s)` naming it. Same corruption, opposite outcome —
+that is the difference between a parsed annotation and an invisible one.
+
+One instance existed in this change, at
+`pi-wrapper-capture.unit.test.ts`, on the wrapper-level lineage test. It is
+fixed, and the reason is recorded in the comment so it is not reformatted back.
+
+**71 more exist elsewhere in the repository** and are out of scope here: they
+predate this change and sit in directories this ADR does not own. Worth a
+ticket of its own, together with the obvious guard — the checker knows the
+annotation text matched and knows the walk failed, so it could say so instead
+of dropping it.
+
+### Resume billed every earlier turn again — fixed, ADR v11
+
+A refuter sent to kill this claim confirmed it instead, and the lead reproduced
+it in the real path before writing the fix.
+
+The reader's seen-set is memory and dies with the process. A resumed session's
+file has a modification time that moved, so the file-level window admits it, and
+the fresh process starts at row zero — so run N re-sent every turn the session
+had ever held. Nothing downstream removes the repeat. The near-miss:
+`recordId` is a content hash and both commands stamp
+`idempotencyKey: tenantId:recordId`, so a re-read would collapse it — but the
+session fold sets `refoldOnOutOfOrder: false` (`codingAgentSession.foldProjection.ts:282`)
+because its accumulators commute, so it never re-reads, and `dropAlreadyApplied`
+filters on `event.id`, not the key. Sums commute; they do not de-duplicate.
+
+Measured: two captures against one growing file gave `costUsd 1.43 / modelCalls 6`
+through the real reducer where the truth was `1.10 / 4`. Unbounded — once per run
+touching the session, inflating upward, which reads as real spend.
+
+Fix: capture keeps only turns at or after the run's start, filtering on pi's
+entry clock, which every emitted event already carries (a row without a usable
+one is dropped at `pi-turn-events.ts:353`, so the filter has no fallback to get
+wrong). Nothing on disk, so the "memory, not storage" decision stands. The
+rejected alternative was persisting the cursor per session, which works and
+contradicts that decision for a problem the clock already answers.
+
+Accepted cost: a turn written before the run started is never captured, so a
+crashed wrapped run's unposted tail is not recovered by resuming. That is this
+module's existing position on a crash.
+
+- [x] Filter in `pi-capture.ts` `harvest()`, with the reasoning in the comment
+- [x] Spec scenario "Resuming a session does not charge its earlier turns again"
+- [x] Bound and falsified — neutered, run two sends four turns where two are new
+- [x] Three test files carried fixtures frozen at a fixed past instant while the
+      wrapper's window starts at `now`; rows are now stamped when written, and
+      the real 132-row fixture is rebased onto the run in the integration test
+- [x] 1003 tests green across 69 files, parity 35/35, `tsc --noEmit` clean

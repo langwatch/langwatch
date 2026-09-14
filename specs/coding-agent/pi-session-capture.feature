@@ -179,6 +179,17 @@ Feature: pi session capture
     When the session is captured after each run
     Then one session is recorded, not three
 
+  # Keeping one session is not the same as keeping one copy of its turns. The
+  # reader's memory of what it has already sent dies with the run, and the
+  # server adds each turn it receives rather than replacing it, so a resumed
+  # session that was offered from its first row again would bill every earlier
+  # turn a second time.
+  @unit
+  Scenario: Resuming a session does not charge its earlier turns again
+    Given a pi session whose turns an earlier run already recorded
+    When the user resumes it, two more turns are added, and it is captured again
+    Then only the two new turns are recorded
+
   # --- Only capturing what we launched, and only once -----------------------
 
   @unit
