@@ -10,15 +10,8 @@ import {
 import { FoldProjectionExecutor } from "../foldProjectionExecutor.ts";
 import type { ProjectionStoreContext } from "../projectionStoreContext.ts";
 
-/**
- * Streaming store-miss re-fold: for an order-insensitive fold
- * (`refoldOnOutOfOrder: false`) with a paginated loader, the executor pages the
- * aggregate's history via `eventLoaderUpToPaged` and folds page-by-page — so a
- * hot trace's 100k+ events never land in memory whole. This guards the
- * behaviour that prevents a ClickHouse OOM on a store miss for a huge trace.
- *
- * See specs/trace-processing/hot-trace-fold-amplification.feature.
- */
+// Pages aggregates page-by-page to prevent ClickHouse OOM on store miss for
+// huge traces; see specs/trace-processing/hot-trace-fold-amplification.feature.
 describe("FoldProjectionExecutor streaming store-miss re-fold", () => {
   const tenantId = createTestTenantId();
 

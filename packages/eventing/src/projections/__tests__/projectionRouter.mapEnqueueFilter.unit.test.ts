@@ -1,7 +1,7 @@
 /**
  * @vitest-environment node
- *
- * The enqueue-time map-projection contract (ADR-069 invariant 4): `filter` returning false mints no job; one that raises ADMITS the event, since fan-out is never replayed.
+ * Enqueue-time map-projection contract (ADR-069 invariant 4): `filter` false
+ * mints no job; one that raises admits the event since fan-out is never replayed.
  */
 import { register } from "prom-client";
 import { describe, expect, it, vi } from "vitest";

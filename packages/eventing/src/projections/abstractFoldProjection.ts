@@ -34,18 +34,8 @@ type AllTimestampKeys =
 type HandlerName<EventTypeStr extends string> =
   `handle${DotSnakeToPascal<StripPrefix<EventTypeStr>>}`;
 
-/**
- * Derives required handler methods from an array of Zod event schemas.
- *
- * Given schemas for events with types `"lw.suite_run.started"` and
- * `"lw.suite_run.item_completed"`, produces:
- * ```
- * {
- *   handleSuiteRunStarted(event: SuiteRunStartedEvent, state: State): State;
- *   handleSuiteRunItemCompleted(event: SuiteRunItemCompletedEvent, state: State): State;
- * }
- * ```
- */
+// Derives required handler methods from Zod event schemas; keys are `handle`
+// plus PascalCased event name minus the `"lw."` prefix.
 export type FoldEventHandlers<
   Schemas extends readonly AnyEventSchema[],
   State,
@@ -64,36 +54,8 @@ export type FoldEventHandlers<
 // Abstract base class
 // ---------------------------------------------------------------------------
 
-/**
- * Abstract base class for type-safe fold projections.
- *
- * Structurally satisfies `FoldProjectionDefinition` so instances can be passed
- * directly to `.withClickHouseFoldProjection()` without an adapter.
- *
- * **Usage:**
- * ```typescript
- * const myEvents = [FooEventSchema, BarEventSchema] as const;
- *
- * class MyProjection
- *   extends AbstractFoldProjection<MyState, typeof myEvents>
- *   implements FoldEventHandlers<typeof myEvents, MyState>
- * {
- *   protected readonly events = myEvents;
- *   protected initState() { return { ... }; }
- *
- *   // Handler names derived from event type strings — miss one → compile error
- *   handleFoo(event: FooEvent, state: MyState): MyState { ... }
- *   handleBar(event: BarEvent, state: MyState): MyState { ... }
- * }
- * ```
- *
- * **Timestamp management:**
- * - `initState()` returns state WITHOUT timestamp fields (type-enforced)
- * - `init()` adds timestamps automatically
- * - `apply()` auto-sets monotonic updatedAt: `Math.max(Date.now(), prev + 1)`
- *
- * For camelCase timestamps, pass `'createdAt'` and `'updatedAt'` as CK/UK.
- */
+// Type-safe fold projection base; structurally satisfies FoldProjectionDefinition
+// so instances pass directly to `.withClickHouseFoldProjection()` without adapter.
 export abstract class AbstractFoldProjection<
   State extends Record<CK | UK | LEOAK, number>,
   Schemas extends readonly AnyEventSchema[],

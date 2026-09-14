@@ -1,19 +1,7 @@
 /**
  * @vitest-environment node
- *
- * Dispatching with no router discards the events outright — nothing is thrown,
- * so no layer above will ever report the loss. That makes this the last place
- * it can be reported, which makes it an error however routine the code path
- * feels.
- *
- * It sat at warning instead, and the record blamed "before initialize()". In
- * prod it is overwhelmingly the opposite end: dispatches still in flight when
- * SIGTERM lands and `close()` has already cleared the router. 55 dropped
- * batches over the 48h to 2026-08-17, every one of them on a rolling deploy,
- * none of them alerted and all of them pointing at a boot race that was not
- * happening.
- *
- * Spec: specs/observability/retryable-failure-log-level.feature
+ * Dropped dispatches log as error since this is the last place to report loss.
+ * See specs/observability/retryable-failure-log-level.feature.
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Event } from "../../domain/types.ts";

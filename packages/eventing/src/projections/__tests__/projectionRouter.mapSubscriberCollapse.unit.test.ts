@@ -24,17 +24,8 @@ import {
 import type { SubscriberDispatchDefinition } from "../../subscribers/subscriber.types.ts";
 import { ProjectionRouter } from "../projectionRouter.ts";
 
-/**
- * The map batch path used to dispatch one event at a time, so the per-subscriber
- * collapse never saw more than one event and could not fire. A drained batch
- * therefore staged a job per event for subscribers keyed on the aggregate, and
- * the queue squashed all but the last — after every one of those sends had
- * already been serialized, gzipped and written.
- *
- * A map differs from a fold in one way that matters here: it produces a
- * separate record per event rather than one accumulated state for the batch,
- * so a survivor has to keep the record its own event produced.
- */
+// Maps produce a separate record per event, not one state per batch, so
+// collapse must keep the survivor's record produced by its own event.
 describe("ProjectionRouter map-subscriber dispatch over a coalesced batch", () => {
   const tenantId = createTestTenantId();
 

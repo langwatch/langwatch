@@ -1,18 +1,5 @@
-/**
- * The continuation flag must survive every link of the runtime chain, because
- * any single link dropping it silently re-enables the double-apply it exists
- * to prevent (#6578): a bisected sub-batch's fold commit would REPLACE the
- * applied-event-id set instead of extending it, and the redelivery after a
- * failed later sub-batch re-applies the committed prefix.
- *
- * The links, each pinned separately (a chain test through the full runtime
- * would boot pipelines this unit lane cannot):
- * - shared-queue wrapper → registry entry: eventSourcing.deliveryForwarding
- * - registry entry → read context: THIS FILE (queue manager)
- * - read context → executor commit: THIS FILE (projection router)
- * - executor commit semantics + real store: foldRedeliveryIdempotency
- *   (integration, drives the real GroupQueue bisection end to end)
- */
+// Continuation flag must survive the runtime chain to prevent double-apply
+// (#6578); each link is pinned separately to catch drops early.
 import { describe, expect, it, vi } from "vitest";
 import type { Event } from "../../domain/types.ts";
 import type { JobDelivery } from "../../queues/index.ts";

@@ -33,15 +33,8 @@ interface CounterState {
 const WIDTH_MS = 60_000;
 const OCCURRED_AT = 1_700_000_000_000;
 
-/**
- * `trustAbsentMiss` is the executor half of the always-write contract: the
- * store always writes a row, so an ABSENT read proves the aggregate is new and
- * neither the unwindowed fallback read nor the `event_log` re-fold can find
- * anything — measured pre-change at ~290/min fallback scans with 0 recoveries
- * in 30 days and ~180/min re-folds at 93% zero yield. These tests pin the
- * skip to exactly the `absent` miss kind: `undecodable` keeps the full rescue
- * machinery, because there a complete row EXISTS.
- */
+// `trustAbsentMiss` skips rescue machinery for ABSENT reads because the store
+// always writes; `undecodable` keeps full machinery since the row exists.
 function makeFold({
   trustAbsentMiss = true,
   refoldable = false,

@@ -44,35 +44,8 @@ export type MapEventHandlers<
 // Abstract base class
 // ---------------------------------------------------------------------------
 
-/**
- * Abstract base class for type-safe map projections.
- *
- * Structurally satisfies `MapProjectionDefinition` so instances can be passed
- * directly to `.withClickHouseMapProjection()` without an adapter.
- *
- * **Usage:**
- * ```typescript
- * const events = [canonicalLogRecordReceivedEventSchema] as const;
- *
- * class CanonicalLogStorageMapProjection
- *   extends AbstractMapProjection<CanonicalLogRecord, typeof events>
- *   implements MapEventHandlers<typeof events, CanonicalLogRecord>
- * {
- *   readonly name = "canonicalLogStorage";
- *   readonly store: AppendStore<CanonicalLogRecord>;
- *   protected readonly events = events;
- *
- *   constructor(deps: { store: AppendStore<CanonicalLogRecord> }) {
- *     super();
- *     this.store = deps.store;
- *   }
- *
- *   mapLogRecordReceived(event: CanonicalLogRecordReceivedEvent): CanonicalLogRecord {
- *     return event.data;
- *   }
- * }
- * ```
- */
+// Type-safe map projection base; structurally satisfies MapProjectionDefinition
+// so instances pass directly to `.withClickHouseMapProjection()` without adapter.
 export abstract class AbstractMapProjection<Record, Schemas extends readonly AnyEventSchema[]> {
   abstract readonly name: string;
   abstract readonly store: AppendStore<Record>;

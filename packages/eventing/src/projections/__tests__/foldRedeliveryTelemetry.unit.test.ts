@@ -25,18 +25,8 @@ import {
 } from "../../services/__tests__/testHelpers.ts";
 import { FoldProjectionExecutor } from "../foldProjectionExecutor.ts";
 
-/**
- * Blast radius of a blind re-apply.
- *
- * The applied-event-id set is what stops a redelivery being folded twice, and
- * it lives in the cache entry — so an eviction between attempts takes it. When
- * that happens the executor cannot tell a redelivery from a fresh event and
- * folds the batch on top of state that already contains it.
- *
- * `es_fold_dedup_unavailable_total` already counts that this happened; these pin
- * the measure of how much each occurrence re-applies, which on a coalesced batch
- * is the difference between one double-counted span and five hundred.
- */
+// When cache eviction causes blind re-apply (applied-event-id set lost), measure
+// how much is re-applied; `es_fold_dedup_unavailable_total` counts occurrence.
 describe("fold redelivery telemetry", () => {
   const tenantId = createTestTenantId();
 

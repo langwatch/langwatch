@@ -1,17 +1,5 @@
-/**
- * The state lane's coalescing chain, pinned link by link. A state projection
- * that declares `options.coalesceMaxBatch` must actually get the queue's
- * batch path — the declaration alone is dead code if either link drops it,
- * and dropping it reproduces the 2026-08-20 production symptom (a genesis
- * import's few hundred facts draining one queue dispatch each, overrunning
- * the convergence budget and parking the organization on every pass).
- *
- * - router → queue manager: `initializeStateProjectionQueues` forwards the
- *   projection's declared limit (not the default 1) and passes a batch
- *   callback at all.
- * - queue manager → registry: the entry carries the limit and registers
- *   `processBatch`, which is the condition the GroupQueue keys batching on.
- */
+// State projections' `coalesceMaxBatch` must reach the queue's batch path;
+// declaration alone is dead code if any link drops it.
 import { describe, expect, it, vi } from "vitest";
 import type { Event } from "../../domain/types.ts";
 import { TEST_CONSTANTS } from "../../services/__tests__/testHelpers.ts";

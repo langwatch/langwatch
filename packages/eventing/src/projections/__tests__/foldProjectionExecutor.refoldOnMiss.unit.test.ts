@@ -290,16 +290,8 @@ describe("FoldProjectionExecutor refoldOnStoreMiss", () => {
   });
 });
 
-/**
- * The ADR-066 transitional net has to be observable.
- *
- * `refoldOnStoreMiss` survives on three folds solely to rebuild aggregates whose
- * committed row predates their read-back columns, and its deletion condition is
- * "it stopped firing". Without a counter that is an assumption; worse, a
- * transitional refold and a regression to the pre-ADR-066 steady state (every
- * cache miss walking `event_log` — the 2026-07-23 `TOO_MANY_PARTS` outage) are
- * indistinguishable from the outside.
- */
+// ADR-066 transitional net must be observable to distinguish refolds from
+// regressions and confirm the deletion condition.
 describe("FoldProjectionExecutor refoldOnStoreMiss instrumentation", () => {
   const tenantId = createTestTenantId();
   const context: ProjectionStoreContext = {

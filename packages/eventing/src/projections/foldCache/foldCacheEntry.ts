@@ -1,20 +1,6 @@
 import { safeParseErrText } from "../../parseErrorText.ts";
-/**
- * Wire shape of a cached fold state.
- *
- * The entry carries more than the state because releasing it safely needs two
- * extra facts:
- *
- * - `u` — the state's own `UpdatedAt`, carried for debugging. Nothing reads it
- *   back today: it was the comparison key for a durability-confirmation
- *   processor that is no longer part of the design.
- * - `e` — the ids of the events folded into this state. A queue redelivery
- *   re-applies the same events on top of state that already contains them, so
- *   the executor uses this set to recognise and skip them.
- *
- * Field names are single letters because this is written on every fold step
- * for every aggregate; for a 40k-span trace the key is rewritten ~80 times.
- */
+// Wire shape of a cached fold state with event ids for dedup and timestamp
+// for debugging; single-letter fields minimize writes on every fold step.
 export interface FoldCacheEntry<State> {
   /** Schema marker. Absent on entries written before the applied-set existed. */
   v: 1;
