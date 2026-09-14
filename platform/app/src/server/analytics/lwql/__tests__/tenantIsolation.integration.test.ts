@@ -297,6 +297,115 @@ describe("given the LangWatchQL analytics setup applied to a ClickHouse 25.10 se
     });
   });
 
+  describe("when a JOIN across two datasets runs under a key-hash set (#8085)", () => {
+    /**
+     * The join test above (`scopes both sides of a JOIN`) only ever runs
+     * under a single-tenant context, so it cannot tell a per-table row
+     * policy from a set-aware one: both would look identical against one
+     * hash. This proves the join-key ("joinKeys" in `../catalog/lwqlViews.ts`
+     * — `TraceId`, the key `traces` and `spans` share) stays bounded by the
+     * *set* the caller's capability carries, on BOTH sides of the join at
+     * once. Only tenant-a and tenant-b are seeded, so "never a third
+     * tenant's rows" is proven the same way the single-table set proof does
+     * it above: the distinct tenant set on each side of the join is exactly
+     * `{a, b}`, not a superset that would include a tenant this suite never
+     * seeded.
+     */
+    /** @scenario "A join across two datasets stays inside the key's project set" */
+    it("keeps both sides of the join inside a two-tenant key-hash set, and out of a third tenant's rows", async () => {
+      const tracesControl = await recordSeedControl({
+        harness,
+        table: "traces",
+        tenantColumn: "TenantId",
+      });
+      const spansControl = await recordSeedControl({
+        harness,
+        table: "spans",
+        tenantColumn: "TenantId",
+      });
+      const bothTenants = await harness.restrictedClient({
+        keyHash: `${harness.tenantA.keyHash},${harness.tenantB.keyHash}`,
+      });
+
+      const rows = await selectRows<{
+        traceTenant: string;
+        spanTenant: string;
+      }>(
+        bothTenants,
+        `SELECT t.TenantId AS traceTenant, s.TenantId AS spanTenant ` +
+          `FROM ${database}.traces AS t ` +
+          `INNER JOIN ${database}.spans AS s ON s.TraceId = t.TraceId`,
+      );
+
+      const traceTenants = [...new Set(rows.map((row) => row.traceTenant))].sort();
+      const spanTenants = [...new Set(rows.map((row) => row.spanTenant))].sort();
+      const expectedTenants = [
+        harness.tenantA.tenantId,
+        harness.tenantB.tenantId,
+      ].sort();
+
+      // Exact, not a subset: a set narrower than {a, b} would mean the join
+      // dropped a tenant the set admits; a set wider would mean a tenant
+      // outside the set (a third tenant, or an unauthorized fourth) leaked
+      // through the join.
+      expect(
+        traceTenants,
+        "JOIN left side did not stay inside the two-tenant key-hash set",
+      ).toEqual(expectedTenants);
+      expect(
+        spanTenants,
+        "JOIN right side did not stay inside the two-tenant key-hash set",
+      ).toEqual(expectedTenants);
+      // Union, not intersection-then-some: every row either side seeded for
+      // both tenants comes back joined, so the set widened the join rather
+      // than partially swallowing it.
+      expect(rows).toHaveLength(
+        Math.min(tracesControl.tenantA, spansControl.tenantA) +
+          Math.min(tracesControl.tenantB, spansControl.tenantB),
+      );
+    });
+
+    /** @scenario "A join across two datasets stays inside the key's project set" */
+    it("narrows both sides of the join to exactly one tenant when the set holds a single hash", async () => {
+      await recordSeedControl({
+        harness,
+        table: "traces",
+        tenantColumn: "TenantId",
+      });
+      await recordSeedControl({
+        harness,
+        table: "spans",
+        tenantColumn: "TenantId",
+      });
+      const onlyA = await harness.restrictedClient({
+        keyHash: harness.tenantA.keyHash,
+      });
+
+      const rows = await selectRows<{
+        traceTenant: string;
+        spanTenant: string;
+      }>(
+        onlyA,
+        `SELECT t.TenantId AS traceTenant, s.TenantId AS spanTenant ` +
+          `FROM ${database}.traces AS t ` +
+          `INNER JOIN ${database}.spans AS s ON s.TraceId = t.TraceId`,
+      );
+
+      expect(
+        rows.length,
+        "a single-hash set returned nothing to check on the joined read",
+      ).toBeGreaterThan(0);
+      expect(
+        new Set(rows.map((row) => row.traceTenant)),
+        "JOIN left side leaked past a single-tenant key-hash set",
+      ).toEqual(new Set([harness.tenantA.tenantId]));
+      expect(
+        new Set(rows.map((row) => row.spanTenant)),
+        "JOIN right side leaked past a single-tenant key-hash set",
+      ).toEqual(new Set([harness.tenantA.tenantId]));
+    });
+  });
+
   describe("when the query text overrides settings", () => {
     /** @scenario "Overriding the tenant setting in query text cannot reach another tenant's rows without that tenant's valid key hash" */
     it("reaches no foreign rows with a guessed tenant setting", async () => {

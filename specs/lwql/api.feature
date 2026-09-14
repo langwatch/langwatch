@@ -1181,6 +1181,17 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
       Then no row of tenant-b is returned
       And an empty key-hash set returns zero rows
 
+    # The join-key proof: a per-table row policy scoping each side in
+    # isolation is not the same claim as the JOIN's combined result staying
+    # inside the set, since a join is two reads that could disagree.
+    @integration
+    Scenario: A join across two datasets stays inside the key's project set
+      Given the restricted identity carries a key-hash set for tenant-a and tenant-b
+      When it joins two LangWatchQL tables on their declared join key
+      Then both sides of the join return only rows for tenant-a and tenant-b
+      And no row of a tenant outside the set is returned
+      And a key-hash set holding only tenant-a narrows both sides of the join to tenant-a alone
+
     @unit
     Scenario: The query door redacts content to the strictest protection across the readable set
       Given a key that reads several projects with differing content protections
