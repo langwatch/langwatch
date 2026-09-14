@@ -427,6 +427,25 @@ async function resolveKeyPrincipal({
 
   // No project resolved: an organization / multi-project API key that named no
   // project. That is the fan-out case, not a failure — resolve the org.
+  return resolveOrgFanoutPrincipal({ resolver, credentials, diag });
+}
+
+/**
+ * The organization fan-out path: an API key that authenticated but named no
+ * project. Resolving the org is the success case here; only a token that
+ * resolves to neither a project nor an org is invalid.
+ */
+async function resolveOrgFanoutPrincipal({
+  resolver,
+  credentials,
+  diag,
+}: {
+  resolver: TokenResolver;
+  credentials: { token: string; projectId: string | null };
+  diag: AuthDiagnostics;
+}): Promise<
+  { ok: true; principal: KeyPrincipal } | { ok: false; refusal: AuthRefusal }
+> {
   let org: OrgResolution;
   try {
     org = await resolver.resolveOrgOnly({ token: credentials.token });

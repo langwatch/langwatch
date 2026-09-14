@@ -191,8 +191,6 @@ describe("given the LangWatchQL settings profile's scan ceilings", () => {
   });
 
   /**
-   * @scenario "A parameterised LIMIT cannot outrun the server-side ceiling"
-   *
    * The validator's `LIMIT_TOO_HIGH` check only reads a static integer
    * literal — a `LIMIT` supplied as a bound parameter is not a value it can
    * see, so it passes both that refusal and the append decision. This is the
@@ -226,6 +224,7 @@ describe("given the LangWatchQL settings profile's scan ceilings", () => {
       ).toBeGreaterThan(TINY_RESULT_ROW_CEILING);
     });
 
+    /** @scenario "A parameterised LIMIT cannot outrun the server-side ceiling" */
     it("fails with lwql_result_too_large rather than a raw driver error", async () => {
       await provisionWith({
         ...DEFAULT_LWQL_RESOURCE_LIMITS,
