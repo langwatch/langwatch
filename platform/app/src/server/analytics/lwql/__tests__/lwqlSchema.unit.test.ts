@@ -91,7 +91,7 @@ describe("given the LangWatchQL schema catalog", () => {
      * to know the column exists and what it is called before it can write that
      * predicate — the schema endpoint is the only place it can learn either.
      */
-    /** @scenario "Every dataset publishes a project identifier column to filter on" */
+    /** @scenario "Every view publishes a project identifier column to filter on" */
     it("lists an ungated, joinable TenantId column on every dataset", () => {
       for (const dataset of schemaFor(FULLY_PERMITTED).datasets) {
         const tenantColumn = dataset.columns.find(
@@ -123,7 +123,7 @@ describe("given the LangWatchQL schema catalog", () => {
      * `TenantId` reads the base relation's own column name rather than the
      * ClickHouse row-policy column this field governs.
      */
-    /** @scenario "Every dataset publishes a project identifier column to filter on" */
+    /** @scenario "Every view publishes a project identifier column to filter on" */
     it("aliases each ClickHouse dataset's declared tenant column to TenantId", () => {
       for (const view of LWQL_VIEW_CATALOG) {
         if (isPostgresResident(view)) continue;

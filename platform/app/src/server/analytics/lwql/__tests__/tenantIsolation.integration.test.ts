@@ -316,7 +316,7 @@ describe("given the LangWatchQL analytics setup applied to a ClickHouse 25.10 se
      * `{a, b}`, not a superset that would include a tenant this suite never
      * seeded.
      */
-    /** @scenario "A join across two datasets stays inside the key's project set" */
+    /** @scenario "A join across two views stays inside the key's project set" */
     it("keeps both sides of the join inside a two-tenant key-hash set, and out of a third tenant's rows", async () => {
       const tracesControl = await recordSeedControl({
         harness,
@@ -374,7 +374,7 @@ describe("given the LangWatchQL analytics setup applied to a ClickHouse 25.10 se
       );
     });
 
-    /** @scenario "A join across two datasets stays inside the key's project set" */
+    /** @scenario "A join across two views stays inside the key's project set" */
     it("narrows both sides of the join to exactly one tenant when the set holds a single hash", async () => {
       await recordSeedControl({
         harness,

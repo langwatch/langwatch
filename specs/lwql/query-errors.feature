@@ -35,27 +35,27 @@ Feature: A query error tells the caller how to fix it
       And it lists every function name the validator allows
       And a diff test asserts the documented names equal the validator's allowlist
 
-  Rule: Use a column or dataset that does not exist
+  Rule: Use a column or view that does not exist
 
     @e2e @unimplemented
-    Scenario: Use a column or dataset that does not exist
+    Scenario: Use a column or view that does not exist
       Given a user with an API key with access to at least one project
-      When they run a query naming a column or dataset that does not exist
+      When they run a query naming a column or view that does not exist
       Then they are told what exists
 
     @unit
-    Scenario: A TABLE_NOT_ALLOWED violation names the datasets that exist
-      Given the LangWatchQL dataset allowlist the validator enforces
-      When a query names a dataset that is not on the allowlist
-      Then the violation's availableDatasets lists every dataset the caller may query
+    Scenario: A TABLE_NOT_ALLOWED violation names the views that exist
+      Given the LangWatchQL view allowlist the validator enforces
+      When a query names a view that is not on the allowlist
+      Then the violation's availableDatasets lists every view the caller may query
       And availableDatasets is sorted and deduplicated
 
     @unit
-    Scenario: A GATED_COLUMN violation names the dataset's columns
-      Given a dataset whose columns the validator knows
-      When a query names a column that is not available on that dataset
-      Then the violation's dataset names the dataset the column was read from
-      And the violation's availableColumns lists that dataset's columns
+    Scenario: A GATED_COLUMN violation names the view's columns
+      Given a view whose columns the validator knows
+      When a query names a column that is not available on that view
+      Then the violation's view names the view the column was read from
+      And the violation's availableColumns lists that view's columns
 
     @unit
     Scenario: Every violation carries a corrective hint

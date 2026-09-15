@@ -1352,7 +1352,7 @@ describe("given the /api/v1/query REST family's service, isolation and policy pr
      * validator's `allowedTables` is what makes it the second thing, and it is
      * the half a caller who reads no documentation would find.
      */
-    /** @scenario "A dataset withheld from a caller cannot be named in a query" */
+    /** @scenario "A view withheld from a caller cannot be named in a query" */
     it("refuses a query naming a dataset the caller's permissions withhold, and answers it for one who holds them", async () => {
       const transcripts: LangWatchQLViewDefinition = {
         name: "transcripts",

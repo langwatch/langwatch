@@ -206,9 +206,9 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
   @unit
   Scenario: Every LangWatchQL view declares its grain, join keys, and time column
     Given the LangWatchQL analytics schema catalog
-    When each dataset is inspected
+    When each view is inspected
     Then it declares a grain, join keys, a freshness, and the column that prunes its partitions
-    And every column it advertises is one the dataset exposes
+    And every column it advertises is one the view exposes
 
   @unit
   Scenario: The gated column set is derived from the data privacy policy, not hand-listed
@@ -219,26 +219,26 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     And a caller whose permissions are unresolved has every gated column withheld
 
   @unit
-  Scenario: A pre-aggregated dataset declares that its rows merge rather than supersede
+  Scenario: A pre-aggregated view declares that its rows merge rather than supersede
     Given the LangWatchQL analytics schema catalog
-    When a dataset whose source aggregates is inspected
+    When a view whose source aggregates is inspected
     Then it declares every key its rows merge on
     And it declares no version column, because no version supersedes another
-    And a dataset whose source keeps versions still declares the column that picks the survivor
+    And a view whose source keeps versions still declares the column that picks the survivor
 
   @unit
-  Scenario: The analytics-optimised datasets expose no captured content
+  Scenario: The analytics-optimised views expose no captured content
     Given the LangWatchQL analytics schema catalog
-    When the datasets built over the analytics projections are inspected
+    When the views built over the analytics projections are inspected
     Then none of them exposes a content-gated column
-    And every attribute map any dataset exposes has the content keys filtered out
+    And every attribute map any view exposes has the content keys filtered out
 
   @unit
-  Scenario: A pre-aggregated dataset advertises its whole bucket key as its join keys
+  Scenario: A pre-aggregated view advertises its whole bucket key as its join keys
     Given the LangWatchQL analytics schema catalog
-    When a dataset whose rows are pre-aggregated buckets is inspected
+    When a view whose rows are pre-aggregated buckets is inspected
     Then every column of its bucket key is advertised as a join key
-    And a dataset whose rows are records may still advertise a key it is not unique on
+    And a view whose rows are records may still advertise a key it is not unique on
 
   @unit
   Scenario: A summed measure reads the column it is named after
@@ -249,15 +249,15 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     And it cannot carry SQL of its own that says otherwise
 
   @unit
-  Scenario: A dataset whose sort key moves declares the strategy that deduplicates it
+  Scenario: A view whose sort key moves declares the strategy that deduplicates it
     Given the LangWatchQL analytics schema catalog
-    When a dataset whose source sorts by a column its write path moves is inspected
+    When a view whose source sorts by a column its write path moves is inspected
     Then it declares that one row is one record rather than one sort key
-    And a dataset that declares a grain narrower than its engine's key declares a strategy that can deliver it
-    And the datasets whose sort keys hold still keep the shipped default
+    And a view that declares a grain narrower than its engine's key declares a strategy that can deliver it
+    And the views whose sort keys hold still keep the shipped default
 
   @integration
-  Scenario: A pre-aggregated dataset returns one merged row per bucket
+  Scenario: A pre-aggregated view returns one merged row per bucket
     Given a rollup table holding two partial rows for the same bucket
     And the restricted identity carries tenant-a's valid key-hash context
     When it reads that bucket through the LangWatchQL view
@@ -265,7 +265,7 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     And every measure is the sum of its own column's partial rows
 
   @integration
-  Scenario: A dataset whose sort key moves is deduplicated by its own identity
+  Scenario: A view whose sort key moves is deduplicated by its own identity
     Given a fact table holding two versions of one record under two different sort keys
     And the restricted identity carries tenant-a's valid key-hash context
     When it reads that record through the LangWatchQL view
@@ -397,11 +397,11 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     Then no shape leaks a tenant-b row from the mapped table
 
   @integration
-  Scenario: Every PostgreSQL-resident dataset in the catalog is tenant-scoped
+  Scenario: Every PostgreSQL-resident view in the catalog is tenant-scoped
     Given the PostgreSQL-resident half of the LangWatchQL catalog is mapped into ClickHouse
     And the restricted identity carries tenant-a's valid key-hash context
-    When it reads each mapped dataset in turn
-    Then every dataset returns the caller's tenant rows and no other tenant's
+    When it reads each mapped view in turn
+    Then every view returns the caller's tenant rows and no other tenant's
 
   @integration
   Scenario: The LangWatchQL view sends a tenant predicate PostgreSQL can use
@@ -477,8 +477,8 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
   Scenario: Authenticated client discovers its LangWatchQL schema scoped to its own permissions
     Given an authenticated API client
     When it calls the schema discovery endpoint
-    Then it receives the LangWatchQL analytics datasets with descriptions, types, units, grain, freshness, allowed joins, content restrictions, and example SQL
-    And datasets outside its permissions are absent
+    Then it receives the LangWatchQL analytics views with descriptions, types, units, grain, freshness, allowed joins, content restrictions, and example SQL
+    And views outside its permissions are absent
 
   @integration
   Scenario: The schema endpoint names which permission unlocks each gated column
@@ -509,10 +509,10 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
   @integration
   Scenario: A query naming a column that does not exist is refused with the column named
     Given an authenticated API client
-    When it submits a query selecting a column no dataset carries
+    When it submits a query selecting a column no view carries
     Then the query is refused with error code lwql_unknown_identifier at HTTP 400
     And the response names the column the server could not resolve
-    And the fault is the caller's, and the remediation tells them to check the name against the dataset's columns
+    And the fault is the caller's, and the remediation tells them to check the name against the view's columns
     And no part of the server's own refusal text reaches the caller, because it echoes the submitted query
 
   @integration
@@ -604,11 +604,11 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     Then typed results answer the question from the authenticated tenant's data only
 
   # @unimplemented — https://github.com/langwatch/langwatch/issues/7334. The
-  # PostgreSQL-resident dataset that bound this was removed in #7194: its
+  # PostgreSQL-resident view that bound this was removed in #7194: its
   # declared grain named a run id `BatchEvaluation` does not have, and its base
   # relation is written only by the legacy evaluate route, so it answered this
   # from a subset while the real experiment runs live in ClickHouse. Rebinds
-  # against a ClickHouse-resident dataset.
+  # against a ClickHouse-resident view.
   @unimplemented
   Scenario: Experiment run comparisons
     Given seeded experiment runs for two tenants
@@ -642,11 +642,11 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     And the gated-field set matches the canonical visibility policy
 
   @integration
-  Scenario: A dataset withheld from a caller cannot be named in a query
-    Given an authenticated API client whose permissions withhold a whole dataset
-    When it names that dataset in a query
+  Scenario: A view withheld from a caller cannot be named in a query
+    Given an authenticated API client whose permissions withhold a whole view
+    When it names that view in a query
     Then the query is rejected before it reaches the database
-    And a caller holding the permission reads the same dataset normally
+    And a caller holding the permission reads the same view normally
 
   # ---------------------------------------------------------------------------
   # Read-only, exfiltration, and fail-closed behavior at the gateway
@@ -660,7 +660,7 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     When it submits SQL using postgresql, url, s3, remote, or any table function
     Then the gateway rejects the query by AST policy with error code lwql_not_permitted at HTTP 400
     And every refusal names the TABLE_FUNCTION rule, which a rejection by the database could not produce
-    And the fault is the caller's, and the remediation tells them to read only the datasets the schema endpoint lists
+    And the fault is the caller's, and the remediation tells them to read only the views the schema endpoint lists
 
   @unit
   Scenario: Only the functions a LangWatchQL question needs can be called
@@ -738,7 +738,7 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
   @integration
   Scenario: An unbounded read is reported as covering the whole history
     Given an authenticated API client
-    When it queries a dataset with no condition on the column that prunes its partitions
+    When it queries a view with no condition on the column that prunes its partitions
     Then the response carries the unbounded-time-range diagnostic naming that column
     And the same question with that condition carries no diagnostic
 
@@ -886,17 +886,17 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
 #   → Scenario: Multiple statements in one request are rejected
 #
 # LangWatchQL schema (the analytics.* catalog and the views over the fact tables):
-# AC "Expose a stable analytics.* namespace; every exposed dataset declares grain,
+# AC "Expose a stable analytics.* namespace; every exposed view declares grain,
 #     join keys, sensitivity, freshness"
 #   → Scenario: Every LangWatchQL view declares its grain, join keys, and time column
 #   → Scenario: The catalog's declared columns match the tables the views read
 #   → Scenario: Every LangWatchQL view names the column that prunes its partitions
-#   → Scenario: A pre-aggregated dataset declares that its rows merge rather than supersede
+#   → Scenario: A pre-aggregated view declares that its rows merge rather than supersede
 #     (issue #6856: the analytics projections and their per-minute rollups join
 #      the catalog, and a rollup's source is an AggregatingMergeTree — its rows
 #      for one key are SUMMED rather than superseded, which is a third answer to
 #      "which row survives" and cannot be inferred from the other two)
-#   → Scenario: A pre-aggregated dataset returns one merged row per bucket
+#   → Scenario: A pre-aggregated view returns one merged row per bucket
 #     (the same claim proven against the shipped table: partial rows in
 #      separate parts, one summed row out, every measure read back against a
 #      total no other measure shares — a bucket whose measures share a value
@@ -905,11 +905,11 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
 #     (the declaration is single-sourced: name, published type and "this is a
 #      sum" are stated once and the SQL is derived, because a cast returns a
 #      number whatever column it reads)
-#   → Scenario: A pre-aggregated dataset advertises its whole bucket key as its join keys
+#   → Scenario: A pre-aggregated view advertises its whole bucket key as its join keys
 #     (every column of a bucket is a sum, so a join matching part of the key
 #      adds several buckets together rather than repeating a row)
-#   → Scenario: A dataset whose sort key moves declares the strategy that deduplicates it
-#   → Scenario: A dataset whose sort key moves is deduplicated by its own identity
+#   → Scenario: A view whose sort key moves declares the strategy that deduplicates it
+#   → Scenario: A view whose sort key moves is deduplicated by its own identity
 #     (evaluation_analytics folds a moving watermark into OccurredAt, which is
 #      part of its sort key, so FINAL keeps every lifecycle version and every
 #      aggregate counts the evaluation once per version)
@@ -920,7 +920,7 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
 #     handwritten gated-field list; keep a parity test"
 #   → Scenario: The gated column set is derived from the data privacy policy, not hand-listed
 #   → Scenario: Captured content is reachable only through the gated columns
-#   → Scenario: The analytics-optimised datasets expose no captured content
+#   → Scenario: The analytics-optimised views expose no captured content
 #     (issue #6856: the analytics projections carry no captured input or output
 #      at all, and every attribute map in the catalog is filtered against the
 #      same policy — the map is the one place a view can leak content without
@@ -938,7 +938,7 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
 # Product:
 # AC "schema discovery scoped to own permissions"
 #   → Scenario: Authenticated client discovers its LangWatchQL schema scoped to its own permissions
-#     (the catalog carries a per-column unit and a dataset-level gate; a dataset
+#     (the catalog carries a per-column unit and a view-level gate; a view
 #      the caller can read nothing in is absent rather than listed-and-refused)
 #   → Scenario: The schema endpoint names which permission unlocks each gated column
 #     (per-column gate kinds, not a collapsed boolean)
@@ -976,7 +976,7 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
 #     (the run grouping ClickHouse holds)
 #   → Scenario: Experiment run comparisons
 #     (the experiment-shaped comparison — @unimplemented, awaiting a
-#      ClickHouse-resident experiment-runs dataset, issue #7334)
+#      ClickHouse-resident experiment-runs view, issue #7334)
 # fanout warning → Fanout warning on a trace-to-span join
 #
 # Tenant isolation and authorization:
@@ -984,18 +984,18 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
 # AC "row policies independently prevent cross-tenant reads, verified against the restricted identity"
 #   → the bound isolation-proof scenarios (baseline + CTE/UNION/JOIN/subquery above)
 # AC "content-gated fields refused in every expression position" → Scenario: Content-gated fields are refused in every expression position
-#   → Scenario: A dataset withheld from a caller cannot be named in a query
-#     (the dataset-level half of the same gate: absent from the published schema
+#   → Scenario: A view withheld from a caller cannot be named in a query
+#     (the view-level half of the same gate: absent from the published schema
 #      is not the same as out of reach, and the validator's allowed-table set is
 #      what makes it the second thing)
 # AC "row-policy + zero-rows-on-garbage-key on PG-engine mapped tables (PG container)"
 #   → Scenario: A PG-resident table is readable through ClickHouse only within the caller's tenant rows
 #   → Scenario: Garbage key context yields zero rows from a PG-engine mapped table
 #   → Scenario: Row policy on a PG-engine mapped table holds under CTE, UNION, JOIN, and subquery shapes
-#   → Scenario: Every PostgreSQL-resident dataset in the catalog is tenant-scoped
+#   → Scenario: Every PostgreSQL-resident view in the catalog is tenant-scoped
 #     ("for every table still served via the named collection at ship time":
 #      the case iterates the shipped catalog rather than naming one table, so a
-#      dataset added without a policy fails it with no test edit)
+#      view added without a policy fails it with no test edit)
 #
 # Reaching PostgreSQL-resident data:
 # AC "per-table latency + load measurements recorded before projections" → recorded in the
@@ -1175,12 +1175,12 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
       And no row of tenant-b is returned
 
     @unit
-    Scenario: Every dataset publishes a project identifier column to filter on
+    Scenario: Every view publishes a project identifier column to filter on
       Given the LangWatchQL schema for a fully permitted caller
-      When each published dataset's columns are inspected
-      Then every dataset lists a TenantId column
+      When each published view's columns are inspected
+      Then every view lists a TenantId column
       And that column is ungated and available
-      And it is included in the dataset's join keys
+      And it is included in the view's join keys
 
   Rule: Never see a project the key cannot read
 
@@ -1201,7 +1201,7 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     # isolation is not the same claim as the JOIN's combined result staying
     # inside the set, since a join is two reads that could disagree.
     @integration
-    Scenario: A join across two datasets stays inside the key's project set
+    Scenario: A join across two views stays inside the key's project set
       Given the restricted identity carries a key-hash set for tenant-a and tenant-b
       When it joins two LangWatchQL tables on their declared join key
       Then both sides of the join return only rows for tenant-a and tenant-b
@@ -1226,7 +1226,7 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     @e2e @unimplemented
     Scenario: Discover what I can ask
       Given a user with an API key with access to at least one project
-      When they ask what datasets, columns and functions exist
+      When they ask what views, columns and functions exist
       Then they get an answer they can use without reading the docs
 
     @integration

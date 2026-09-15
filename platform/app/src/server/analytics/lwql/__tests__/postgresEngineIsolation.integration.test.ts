@@ -140,7 +140,7 @@ describe("given the PostgreSQL-resident catalog mapped into ClickHouse through t
      * it would assert the two layers together and prove neither. The engine
      * table has only the policy, which is the layer this case is about.
      */
-    /** @scenario "Every PostgreSQL-resident dataset in the catalog is tenant-scoped" */
+    /** @scenario "Every PostgreSQL-resident view in the catalog is tenant-scoped" */
     it("scopes every PostgreSQL-resident dataset to the caller's tenant", async () => {
       expect(
         POSTGRES_VIEWS.length,

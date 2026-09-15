@@ -2,7 +2,7 @@ Feature: Everything about a coding-agent session is queryable
 
   As a coding agent (or any API client) calling the LangWatchQL query door
   I want the sessions, events, and tool output of coding-agent runs — and the
-  organization-level facts around them — available as queryable datasets
+  organization-level facts around them — available as queryable views
   So that I can answer questions about my own runs and about the fleet without
   reaching for a bespoke endpoint per question
 
@@ -37,7 +37,7 @@ Feature: Everything about a coding-agent session is queryable
 
   Rule: Ask about organization-level facts
 
-    # Needs an organization-level capability, not a project-scoped dataset —
+    # Needs an organization-level capability, not a project-scoped view —
     # every LangWatchQL key is tenant-scoped to one project's row policy today.
     @e2e @unimplemented
     Scenario: Ask about organization-level facts

@@ -496,7 +496,7 @@ describe("validateLangWatchQL", () => {
   });
 
   describe("given a violation whose refusal should name what exists", () => {
-    /** @scenario "A TABLE_NOT_ALLOWED violation names the datasets that exist" */
+    /** @scenario "A TABLE_NOT_ALLOWED violation names the views that exist" */
     it("lists the caller's allowed datasets on an unknown dataset", () => {
       const result = validate("SELECT id FROM billing.invoices");
 
@@ -511,7 +511,7 @@ describe("validateLangWatchQL", () => {
       ]);
     });
 
-    /** @scenario "A TABLE_NOT_ALLOWED violation names the datasets that exist" */
+    /** @scenario "A TABLE_NOT_ALLOWED violation names the views that exist" */
     it("sorts and deduplicates availableDatasets regardless of the policy's own order", () => {
       const result = validate("SELECT id FROM billing.invoices", {
         allowedTables: [
@@ -550,7 +550,7 @@ describe("validateLangWatchQL", () => {
       expect(violation?.hint).toBeTruthy();
     });
 
-    /** @scenario "A GATED_COLUMN violation names the dataset's columns" */
+    /** @scenario "A GATED_COLUMN violation names the view's columns" */
     it("names the dataset and its columns on a gated field read through an alias", () => {
       const result = validate("SELECT t.body FROM traces AS t", {
         ...POLICY,
@@ -568,7 +568,7 @@ describe("validateLangWatchQL", () => {
       expect(violation?.availableColumns).toEqual(["body", "Cost", "TraceId"]);
     });
 
-    /** @scenario "A GATED_COLUMN violation names the dataset's columns" */
+    /** @scenario "A GATED_COLUMN violation names the view's columns" */
     it("resolves the dataset from the sole table in scope when the reference is unqualified", () => {
       const result = validate("SELECT body FROM traces", {
         ...POLICY,
