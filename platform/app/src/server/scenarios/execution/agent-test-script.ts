@@ -43,11 +43,11 @@ export class ScriptedUserAgent extends ScenarioRunner.UserSimulatorAgentAdapter 
 export function buildAgentTestRun({
   adapter,
   script,
-  agentGreetsFirst = false,
+  doesAgentGreetFirst = false,
 }: {
   adapter: ScenarioRunner.AgentAdapter;
   script: ScriptedRun;
-  agentGreetsFirst?: boolean;
+  doesAgentGreetFirst?: boolean;
 }): {
   agents: ScenarioRunner.AgentAdapter[];
   script: ScenarioRunner.ScriptStep[];
@@ -55,7 +55,7 @@ export function buildAgentTestRun({
   return {
     agents: [adapter, new ScriptedUserAgent()],
     script: [
-      ...(agentGreetsFirst ? [ScenarioRunner.agent()] : []),
+      ...(doesAgentGreetFirst ? [ScenarioRunner.agent()] : []),
       ScenarioRunner.user(script.userMessage),
       ScenarioRunner.agent(),
       ScenarioRunner.succeed("The agent answered"),

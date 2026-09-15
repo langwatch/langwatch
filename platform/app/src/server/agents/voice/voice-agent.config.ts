@@ -71,7 +71,7 @@ function normalizeLegacyVoiceConfig(input: unknown): unknown {
     return input;
   }
   const source = input as Record<string, unknown>;
-  const legacyInboundRequested =
+  const isLegacyInboundRequested =
     source.callDirection === undefined &&
     (source.isAgentSpeaksFirst === true || source.agentSpeaksFirst === true);
   const normalized: Record<string, unknown> = {};
@@ -79,7 +79,7 @@ function normalizeLegacyVoiceConfig(input: unknown): unknown {
     if (key === "isAgentSpeaksFirst" || key === "agentSpeaksFirst") continue;
     normalized[key] = value;
   }
-  if (legacyInboundRequested) normalized.callDirection = "inbound";
+  if (isLegacyInboundRequested) normalized.callDirection = "inbound";
   return normalized;
 }
 

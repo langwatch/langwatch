@@ -382,7 +382,7 @@ function buildRunCast({
     return buildAgentTestRun({
       adapter,
       script: jobData.script,
-      agentGreetsFirst: agentGreetsFirst(jobData.adapterData),
+      doesAgentGreetFirst: agentGreetsFirst(jobData.adapterData),
     });
   }
   const { nlpServiceUrl, scenario } = jobData;
