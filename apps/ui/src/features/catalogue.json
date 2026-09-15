@@ -69,7 +69,7 @@
       "uses": {
         "screens": ["@langwatch/annotation-web/annotations"],
         "surfaces": [
-          "@langwatch/organization-web/personal-workspace-features",
+          "@langwatch/organization-web/surfaces/personal-workspace-features",
           "@langwatch/trace-web/surfaces/annotation-queue-session",
           "@langwatch/trace-web/surfaces/conversation-turns",
           "@langwatch/trace-web/surfaces/conversation-view",

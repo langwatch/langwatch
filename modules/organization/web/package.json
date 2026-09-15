@@ -13,7 +13,7 @@
       "types": "./dist/organization-client.d.ts",
       "default": "./src/organization-client.ts"
     },
-    "./personal-workspace-features": {
+    "./surfaces/personal-workspace-features": {
       "types": "./dist/behavior/personal-workspace-features-api.d.ts",
       "default": "./src/behavior/personal-workspace-features-api.ts"
     },

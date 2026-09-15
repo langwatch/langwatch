@@ -7,7 +7,7 @@ const mocks = vi.hoisted(() => ({
   mutateAsync: vi.fn<({ projectId }: { projectId: string }) => Promise<void>>(),
 }));
 
-vi.mock("@langwatch/organization-web/personal-workspace-features", () => ({
+vi.mock("@langwatch/organization-web/surfaces/personal-workspace-features", () => ({
   personalWorkspaceFeaturesApi: {
     personalWorkspaceFeatures: {
       get: { useQuery: () => ({ data: { datasets: false } }) },
