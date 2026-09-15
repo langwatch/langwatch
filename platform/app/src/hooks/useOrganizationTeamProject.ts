@@ -279,6 +279,12 @@ export const useOrganizationTeamProject = (
       router.query.project === publicEnv.data.DEMO_PROJECT_SLUG,
   );
 
+  // Hoisted so the loading contract below can tell "switched off because the
+  // session has not resolved" from "switched off because nothing here is
+  // organization-scoped". The two look identical on the query itself.
+  const isOrganizationsQueryEnabled =
+    session.status !== "loading" && (!!session.data || !isPublicRoute);
+
   const organizations = api.organization.getAll.useQuery(
     { isDemo: isDemo },
     {
@@ -295,8 +301,7 @@ export const useOrganizationTeamProject = (
       // Waiting for RESOLUTION rather than for data is what makes it correct
       // both ways: an unauthenticated visitor on a private route still asks,
       // and is still refused, which is the answer that sends them to the door.
-      enabled:
-        session.status !== "loading" && (!!session.data || !isPublicRoute),
+      enabled: isOrganizationsQueryEnabled,
       // Small reference query that drives load-bearing client state (current
       // project incl. defaultModel). Cheap to refetch — prefer freshness over
       // a "cache forever" default. Background refetch on focus picks up edits
@@ -650,7 +655,25 @@ export const useOrganizationTeamProject = (
     team,
   ]);
 
-  if (organizations.isLoading && !organizations.isFetched) {
+  // React Query derives `isLoading` as `isPending && isFetching`, so a query it
+  // was told not to run reports `isLoading: false` with no data — the same
+  // shape as one that answered with nothing. Asking `isLoading` alone
+  // therefore called the workspace RESOLVED for the whole width of the session
+  // fetch, and callers read the empty graph as fact: the project chrome drew
+  // its full-page not-found scene on every refresh of a project address, and
+  // the landing redirect sent a member who has organizations to
+  // /onboarding/welcome before correcting itself.
+  //
+  // So the question is "has this read answered", not "is it in flight" — with
+  // the wait for the session counted as part of the read. An address that asks
+  // for no graph at all (public, signed out) is resolved immediately, which is
+  // what keeps the share page from waiting forever on a read it never makes.
+  const isAwaitingOrganizations =
+    !organizations.isFetched &&
+    !organizations.isError &&
+    (isOrganizationsQueryEnabled || session.status === "loading");
+
+  if (isAwaitingOrganizations) {
     return {
       isLoading: true,
       project: publicShareProjectData,

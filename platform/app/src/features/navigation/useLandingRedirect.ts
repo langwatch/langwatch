@@ -3,6 +3,7 @@ import { carryLangyConversation } from "~/features/langy/logic/langyConversation
 import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
 import { api } from "~/utils/api";
 import { useRouter } from "~/utils/compat/next-router";
+import { belongsToNoOrganization } from "./logic/belongsToNoOrganization";
 import { readLastVisitedProduct } from "./logic/productMemory";
 import { resolveLandingDestination } from "./logic/resolveLandingDestination";
 import type { ProductId } from "./products";
@@ -175,8 +176,11 @@ export function useLandingRedirect(): void {
             : null,
           projectSlug: project?.slug ?? null,
           projectHomeSlug: llmOpsProjectSlug,
-          isOrgless:
-            !isLoading && !organization && (organizations?.length ?? 0) === 0,
+          isOrgless: belongsToNoOrganization({
+            isWorkspaceResolving: isLoading,
+            organization,
+            organizations,
+          }),
         }),
         search: window.location.search,
       }),

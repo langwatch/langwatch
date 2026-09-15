@@ -63,12 +63,41 @@ function askedForOrganizations(): boolean | undefined {
 }
 
 function mount() {
-  renderHook(() =>
+  return renderHook(() =>
     useOrganizationTeamProject({
       redirectToOnboarding: false,
       redirectToProjectOnboarding: false,
     }),
   );
+}
+
+/** What the last render told a screen about the workspace. */
+function workspaceIsResolving(
+  rendered: ReturnType<typeof mount>,
+): boolean | undefined {
+  return rendered.result.current.isLoading;
+}
+
+/** The shape React Query reports for a query it was told not to run. */
+function switchedOff() {
+  return {
+    data: undefined,
+    isLoading: false,
+    isFetched: false,
+    isError: false,
+    isRefetching: false,
+  };
+}
+
+/** The shape it reports while the request is actually in flight. */
+function inFlight() {
+  return {
+    data: undefined,
+    isLoading: true,
+    isFetched: false,
+    isError: false,
+    isRefetching: false,
+  };
 }
 
 beforeEach(() => {
@@ -132,6 +161,67 @@ describe("given a route anybody can open", () => {
       mount();
 
       expect(askedForOrganizations()).toBe(false);
+    });
+  });
+});
+
+/**
+ * A disabled query and a query that answered with nothing are the same shape:
+ * no data, `isLoading: false`. Every caller reads the second one as fact, so
+ * the first has to be reported as "still resolving" or the project chrome 404s
+ * and the landing redirect sends a member to onboarding.
+ *
+ * Spec: specs/navigation/workspace-resolution.feature
+ */
+describe("given a screen asking what workspace it is in", () => {
+  describe("when the session has not resolved yet", () => {
+    /** @scenario "The workspace is still resolving while the session is" */
+    it("reports the workspace as still resolving", () => {
+      session.status = "loading";
+      session.data = null;
+      mockOrganizationsQuery.mockReturnValue(switchedOff());
+
+      expect(workspaceIsResolving(mount())).toBe(true);
+    });
+  });
+
+  describe("when the session has resolved and the graph is being read", () => {
+    /** @scenario "The workspace is still resolving while the organization graph is read" */
+    it("reports the workspace as still resolving", () => {
+      session.status = "authenticated";
+      session.data = { user: { id: "user-jane" } };
+      mockOrganizationsQuery.mockReturnValue(inFlight());
+
+      expect(workspaceIsResolving(mount())).toBe(true);
+    });
+  });
+
+  describe("when the graph has answered", () => {
+    /** @scenario "A workspace whose graph has answered has resolved" */
+    it("reports the workspace as resolved", () => {
+      session.status = "authenticated";
+      session.data = { user: { id: "user-jane" } };
+      mockOrganizationsQuery.mockReturnValue({
+        data: [],
+        isLoading: false,
+        isFetched: true,
+        isError: false,
+        isRefetching: false,
+      });
+
+      expect(workspaceIsResolving(mount())).toBe(false);
+    });
+  });
+
+  describe("when the address is one anybody can open", () => {
+    /** @scenario "An address anybody can open resolves without waiting for a graph" */
+    it("reports the workspace as resolved rather than waiting for a graph it never asks for", () => {
+      mockRouter.route = "/auth/signin";
+      session.status = "unauthenticated";
+      session.data = null;
+      mockOrganizationsQuery.mockReturnValue(switchedOff());
+
+      expect(workspaceIsResolving(mount())).toBe(false);
     });
   });
 });
