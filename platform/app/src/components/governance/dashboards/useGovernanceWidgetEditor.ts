@@ -110,6 +110,23 @@ export function useGovernanceWidgetEditor({
 
   const { lastRuns, run, forgetRuns } = useStatementRuns(executeQuery);
 
+  // What both ways out of the drawer have to do, whatever the editor is left
+  // holding: draw the chart from the statements the editor is closing ON,
+  // straight past the preview's wait, and drop what the runs reported.
+  //
+  // Both, because a row count describes the statement it was read from. Edit
+  // that statement and the count describes nothing on screen — worse, it reads
+  // as the answer to the statement that replaced it. A save is as much an edit
+  // as a discard, so it clears the same way a discard does.
+  const settle = useCallback(
+    (code: string, queries: DashboardWidgetQuery[]) => {
+      preview.reset(code, queries);
+      forgetRuns();
+      setIsOpen(false);
+    },
+    [preview, forgetRuns],
+  );
+
   const handleSave = useCallback(() => {
     onSave({
       ...widget,
@@ -120,20 +137,26 @@ export function useGovernanceWidgetEditor({
         queries: draft.draftQueries,
       },
     });
-    setIsOpen(false);
-  }, [widget, draft.draftName, draft.draftCode, draft.draftQueries, onSave]);
+    // The edit is what the card draws now, so the preview is seeded with it
+    // rather than left to catch up a wait later — the card sits behind the
+    // closing drawer and a stale chart there is visible the whole time.
+    settle(draft.draftCode, draft.draftQueries);
+  }, [
+    widget,
+    draft.draftName,
+    draft.draftCode,
+    draft.draftQueries,
+    onSave,
+    settle,
+  ]);
 
   // Covers Cancel, the drawer's own close control and a click outside it, so
   // none of the three can leave a discarded edit sitting in the draft for the
-  // next open to reveal. The preview is seeded past its wait for the same
-  // reason, and the run results are dropped: a row count from a statement the
-  // reader has just thrown away describes nothing on screen.
+  // next open to reveal.
   const handleClose = useCallback(() => {
     draft.resetToWidget();
-    preview.reset(widget.definition.code, widget.definition.queries);
-    forgetRuns();
-    setIsOpen(false);
-  }, [draft, preview, widget.definition, forgetRuns]);
+    settle(widget.definition.code, widget.definition.queries);
+  }, [draft, widget.definition, settle]);
 
   return {
     isOpen,

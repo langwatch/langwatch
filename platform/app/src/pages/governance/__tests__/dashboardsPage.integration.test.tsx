@@ -610,6 +610,34 @@ describe("given a member who wants to see what one chart asks", () => {
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
+  /**
+   * A row count describes the statement it was read from. Once that statement
+   * has been edited the count describes nothing on screen, so leaving it beside
+   * the new one reports an answer nobody asked for — and reports it as if the
+   * edit had already been run.
+   *
+   * @scenario "Running a statement in the editor answers from the invented figures"
+   */
+  it("drops what a run reported once the statement it read is edited away", async () => {
+    renderPage();
+    const editor = await openQueryDrawer("Cost by department");
+
+    fireEvent.click(screen.getByRole("button", { name: /^run$/i }));
+    await waitFor(() =>
+      expect(screen.getAllByText(/\d+ rows?/).length).toBeGreaterThan(0),
+    );
+
+    // Saved, so the statement on screen is no longer the one that was run.
+    fireEvent.change(editor, { target: { value: "SELECT 7" } });
+    fireEvent.click(screen.getByRole("button", { name: /^save$/i }));
+    await waitFor(() =>
+      expect(screen.queryByTestId("widget-editor-sql")).not.toBeInTheDocument(),
+    );
+
+    await openQueryDrawer("Cost by department");
+    expect(screen.queryAllByText(/\d+ rows?/)).toHaveLength(0);
+  });
+
   /** @scenario "An edit made in the editor lasts the visit and no longer" */
   it("keeps a saved change for the visit and loses it on the next one", async () => {
     renderPage();

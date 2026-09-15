@@ -1,11 +1,4 @@
-import {
-  Button,
-  Heading,
-  HStack,
-  Spacer,
-  Text,
-  VStack,
-} from "@chakra-ui/react";
+import { Button, Heading, HStack, Text, VStack } from "@chakra-ui/react";
 import { Code } from "lucide-react";
 import { useMemo } from "react";
 
@@ -177,19 +170,29 @@ function CardHeader({
 }) {
   return (
     <HStack gap={2}>
-      {/* Only the title is the handle. A button inside one is dragged as often
-          as it is pressed. */}
+      {/* Only the title is the handle — a button inside one is dragged as often
+          as it is pressed — and it carries the same grab cursor the product's
+          own cards carry on the same grid, since a handle that looks like plain
+          text is a handle nobody finds.
+
+          It grows alone: a `Spacer` beside it would split the row between the
+          two of them and leave the title half the width it can have. */}
       <HStack
         gap={2}
         flex="1"
         minWidth={0}
         className={CHART_GRID_DRAG_HANDLE_CLASS}
+        cursor="grab"
+        _active={{ cursor: "grabbing" }}
       >
-        <Heading as="h3" size="sm">
+        {/* Truncated rather than wrapped: the card subtracts a FIXED header
+            height from its grid cell to size the chart frame, so a title that
+            took a second line would push the frame past the bottom of its own
+            card. */}
+        <Heading as="h3" size="sm" truncate>
           {name}
         </Heading>
       </HStack>
-      <Spacer />
       <Button
         size="xs"
         variant="ghost"
