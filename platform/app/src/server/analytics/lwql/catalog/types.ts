@@ -369,6 +369,17 @@ export interface LangWatchQLViewDefinition {
   readonly dedup: LangWatchQLViewDedup;
   readonly columns: readonly LangWatchQLViewColumn[];
   /**
+   * The source table's column holding the owning project, when it is not the
+   * default `TenantId`.
+   *
+   * Almost every fact table names it `TenantId` and the row-policy generator
+   * uses that literal; a source that spells it differently (`stored_objects`
+   * carries `project_id`) declares it here so its policy filters the right
+   * column. Absent means the default. Read by the row-policy generator; a
+   * derived dataset ({@link ./defineDatasetFromTable}) passes it through.
+   */
+  readonly tenantColumn?: string;
+  /**
    * A second physical table this view joins, so the dataset spans two sources.
    *
    * Absent on a single-table view, which is all of them today. Present, its
