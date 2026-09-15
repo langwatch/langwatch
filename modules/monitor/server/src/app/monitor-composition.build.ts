@@ -2,7 +2,7 @@
  * Builds MonitorAppInfrastructure. The performance trend read calls EvaluationApi
  * instead of private ClickHouse access.
  */
-import { AnalyticsComparisonWindowService } from "@langwatch/analytics-server";
+import { createAnalyticsComparisonWindow } from "@langwatch/analytics-server";
 import type { EvaluationApi, MonitorPerformanceQuery } from "@langwatch/evaluation-contract";
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import { EvaluatorReplicationService } from "@langwatch/evaluator-server";
@@ -105,7 +105,7 @@ class ProcessMonitorReplication implements MonitorReplicationReader {
 function composeMonitorPerformance(
   evaluation: Pick<EvaluationApi, "getMonitorPerformance">,
 ): MonitorPerformance {
-  const window = AnalyticsComparisonWindowService.create();
+  const window = createAnalyticsComparisonWindow();
   const previousPeriodStartMs = ({ startMs, endMs }: { startMs: number; endMs: number }) =>
     window.currentVsPrevious({ startDate: startMs, endDate: endMs }).previousPeriodStartDate.getTime();
 

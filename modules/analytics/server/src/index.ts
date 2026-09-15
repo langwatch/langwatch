@@ -1,5 +1,15 @@
 export { AnalyticsAdapter } from "./services/analytics-composition.service.ts";
-export { analyticsServer } from "./analytics.server.ts";
+export {
+  analyticsServer,
+  type AnalyticsClickHouseClientResolver,
+  type AnalyticsServiceCompositionInput,
+  type ClickHouseFilterConditions,
+  createAnalyticsComparisonWindow,
+  createAnalyticsService,
+  createClickHouseFilterConditions,
+  createLegacyFilterMatching,
+  createPreconditionTraceData,
+} from "./analytics.server.ts";
 
 /** The transport declarations a process mounts, and the doors they open on. */
 export {
@@ -25,14 +35,12 @@ export {
 } from "./transport/saved-workbench-chart.rest.ts";
 export { analyticsTrpcTransport } from "./transport/analytics.trpc.ts";
 export { type AnalyticsLwqlApi, analyticsLwqlTrpcTransport } from "./transport/analytics-lwql.trpc.ts";
-export {
-  AnalyticsApp,
-  type AnalyticsInfrastructure,
-  type AnalyticsAppDependencies,
-  type AnalyticsFilterOptionsLookup,
-  type AnalyticsFilterOptionsRequest,
+export type {
+  AnalyticsInfrastructure,
+  AnalyticsAppDependencies,
+  AnalyticsFilterOptionsLookup,
+  AnalyticsFilterOptionsRequest,
 } from "./app/analytics.app.ts";
-export { LoggingAnalyticsTripwireService } from "./services/analytics-tripwire.service.ts";
 
 /**
  * Filter matching without a query engine: the legacy `filters` grammar
@@ -41,49 +49,30 @@ export { LoggingAnalyticsTripwireService } from "./services/analytics-tripwire.s
  */
 export { LegacyFilterMatchingService } from "./services/legacy-filter-matching.service.ts";
 export { PreconditionTraceDataService } from "./services/precondition-trace-data.service.ts";
-export { ANALYTICS_CLICKHOUSE_SETTINGS } from "./rules/clickhouse-settings.rules.ts";
 
 /**
- * The LangWatchQL workbench: its restricted-identity service, rollout gate,
- * schemas, and statement ceiling — moved here so a process composes it from
- * one package rather than from six platform paths.
+ * The LangWatchQL workbench: the refusals a caller can act on, and the shapes
+ * its dependencies are named by. The services themselves stay private to this
+ * package and are reached through the composition seam above.
  */
-export { LangWatchQLAdapter } from "./services/langwatch-ql-composition.service.ts";
-export {
-  DEFAULT_LWQL_DATABASE,
-  LangWatchQLService,
-  type LangWatchQLServiceDependencies,
-} from "./services/langwatch-ql.service.ts";
-export { lwqlEnabled, LWQL_FLAG } from "./rules/lwql-access.rules.ts";
-export { LangWatchQLCapabilityService } from "./services/langwatch-ql-capability.service.ts";
+export type { LangWatchQLServiceDependencies } from "./services/langwatch-ql.service.ts";
 export {
   LangWatchQLNotEnabledError,
   LangWatchQLParameterMissingError,
   LangWatchQLUnavailableError,
 } from "@langwatch/analytics-contract";
-export {
-  DEFAULT_LWQL_RESULT_LIMITS,
-  LangWatchQLExecutorService,
-} from "./services/langwatch-ql-executor.service.ts";
-export {
-  type LangWatchQLConnection,
+export type {
+  LangWatchQLConnection,
   LangWatchQLExecutor,
-  type LangWatchQLResultLimits,
+  LangWatchQLResultLimits,
 } from "./repositories/langwatch-ql-executor.repository.ts";
-export { ClickHouseLangWatchQLExecutorAdapter } from "./repositories/clickhouse/clickhouse.langwatch-ql-executor.repository.ts";
 
-/**
- * The filter picker: the values one field can offer, and the two facts a door
- * refuses on before it asks for them.
- */
-export { FilterOptionsAdapter } from "./services/filter-options-composition.service.ts";
-export { FilterService, type GetFilterOptionsInput } from "./services/filter.service.ts";
-export { FilterOptions, type FindFilterOptionsInput } from "./repositories/filter-options.repository.ts";
-export type { FilterOption } from "./repositories/filter-options.repository.ts";
-export {
-  filterFieldRequiresKey,
-  filterFieldRequiresSubkey,
-} from "./rules/analytics-filter-catalogue.rules.ts";
+/** The filter picker: the values one field can offer. */
+export type { GetFilterOptionsInput } from "./services/filter.service.ts";
+export type {
+  FilterOption,
+  FindFilterOptionsInput,
+} from "./repositories/filter-options.repository.ts";
 
 /** The shared analytics read input every charted door and the REST body parse. */
 export {
@@ -96,7 +85,6 @@ export {
   type TimeseriesInput,
   type TracesPivotFilters,
 } from "@langwatch/analytics-contract";
-export { AnalyticsComparisonWindowService } from "./services/analytics-comparison-window.service.ts";
 
 /** The four ClickHouse query refusals a caller can act on. */
 export {
@@ -107,25 +95,12 @@ export {
 } from "@langwatch/analytics-contract";
 export { generateClickHouseFilterConditions } from "./rules/analytics-filter-conditions.rules.ts";
 
-// The LangWatchQL key map: the row a project's access is granted by, written at
-// project creation and repaired by the deploy backfill.
-export {
-  LwqlKeyMapErrorSink,
-  LwqlKeyMapService,
-} from "./services/langwatch-ql-key-map.service.ts";
-export { LwqlKeyMapClickHouseRepository } from "./repositories/clickhouse/clickhouse.langwatch-ql-key-map.repository.ts";
-
-// The production provisioning statements and names the deploy task runs. Kept
-// beside the runtime reader deliberately: the views a query reads and the
-// statements that create them are one description of the same objects.
-export {
-  KEY_MAP_COLUMNS,
-  type LangWatchQLNames,
-} from "./services/langwatch-ql-access-model.service.ts";
-export {
-  type LwqlKeyMapBackfillPlan,
-  type LwqlKeyMapRow,
-  LangWatchQLProductionProvisioningService,
+// The LangWatchQL key map: the names a project's access is granted through,
+// and the rows the deploy backfill repairs.
+export type { LangWatchQLNames } from "./services/langwatch-ql-access-model.service.ts";
+export type {
+  LwqlKeyMapBackfillPlan,
+  LwqlKeyMapRow,
 } from "./services/langwatch-ql-production-provisioning.service.ts";
 
 export { LwqlProvisionTask } from "./tasks/lwql-provision.task.ts";

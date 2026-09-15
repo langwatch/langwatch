@@ -3,7 +3,7 @@
  * window and step the surface asked for, through the restricted LangWatchQL
  * identity that owns the bucket budget.
  */
-import { LangWatchQLService, recordingExecutor } from "@langwatch/analytics-server/testing";
+import { createLangWatchQLService, recordingExecutor } from "@langwatch/analytics-server/testing";
 import { describe, expect, it } from "vitest";
 
 import { createDashboardTestAnalytics } from "../../app/__tests__/dashboard.fixture.ts";
@@ -31,7 +31,7 @@ const FULLY_PERMITTED = {
 
 async function serviceWithSavedChart() {
   const executor = recordingExecutor();
-  const langWatchQL = LangWatchQLService.create({ executor, database: "analytics" });
+  const langWatchQL = createLangWatchQLService({ executor, database: "analytics" });
   const analytics = createDashboardTestAnalytics({
     validateLangWatchQL: (input) => langWatchQL.validate(input),
     executeLangWatchQL: (input) => langWatchQL.execute(input),

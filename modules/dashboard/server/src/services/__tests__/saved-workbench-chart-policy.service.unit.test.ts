@@ -5,7 +5,7 @@
  */
 
 import { VEGA_LITE_SCHEMA_URL } from "@langwatch/analytics-contract/visualization/validation";
-import { LangWatchQLService } from "@langwatch/analytics-server/testing";
+import { createLangWatchQLService } from "@langwatch/analytics-server/testing";
 import { SavedWorkbenchChartAlreadyExistsError } from "@langwatch/dashboard-contract";
 import { describe, expect, it } from "vitest";
 
@@ -42,7 +42,7 @@ const WITHOUT_CONTENT = {
  * database, and a stubbed validator would prove only that the stub refuses.
  */
 function policy(): SavedWorkbenchChartPolicyService {
-  const langWatchQL = LangWatchQLService.create({ executor: null, database: "analytics" });
+  const langWatchQL = createLangWatchQLService({ executor: null, database: "analytics" });
 
   return SavedWorkbenchChartPolicyService.create({
     analytics: createDashboardTestAnalytics({

@@ -5,7 +5,7 @@
  */
 import { type ClickHouseClient, createClient } from "@clickhouse/client";
 import { buildSeriesName, type AnalyticsSeries } from "@langwatch/analytics-contract";
-import { AnalyticsAdapter } from "@langwatch/analytics-server";
+import { createAnalyticsService } from "@langwatch/analytics-server";
 import { ClickHouseMigrateTask, DEFAULT_CLICKHOUSE_SETTINGS } from "@langwatch/clickhouse-client";
 import { startTestClickHouseEndpoints } from "@langwatch/test-harness";
 import { nanoid } from "nanoid";
@@ -406,7 +406,7 @@ export const readAnalyticsPageNumbers = async ({
   currentStartMs: number;
   endMs: number;
 }) => {
-  const analytics = AnalyticsAdapter.create({
+  const analytics = createAnalyticsService({
     resolveClient: async () => client,
     clickhouseEnabled: true,
   });

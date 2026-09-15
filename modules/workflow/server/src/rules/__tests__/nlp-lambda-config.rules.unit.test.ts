@@ -7,11 +7,11 @@
 import { describe, expect, it } from "vitest";
 import {
   NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_DEFAULT_SECONDS,
-  buildStudioLambdaConfig,
   buildStudioLambdaEnvironment,
   clampCodeBlockTimeoutSeconds,
   type StudioLambdaFleetFields,
 } from "../nlp-lambda-config.rules.ts";
+import { buildStudioLambdaConfig } from "../../workflow.server.ts";
 
 const FIELDS: StudioLambdaFleetFields = {
   region: "eu-central-1",

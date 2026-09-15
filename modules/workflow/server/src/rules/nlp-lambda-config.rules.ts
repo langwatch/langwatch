@@ -71,49 +71,6 @@ export function clampCodeBlockTimeoutSeconds(rawValue: string | undefined): numb
   return Math.min(parsed, maxSeconds);
 }
 
-function positiveNumber(raw: unknown, fallback: number): number {
-  const parsed = Number(raw);
-
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
-}
-
-/**
- * Assembles the studio's Lambda deployment from its already-parsed fields.
- * Pure: every raw string this needs is read once, at the process's own
- * config boot seam, and handed in here already resolved.
- */
-export function buildStudioLambdaConfig(input: {
-  fields: StudioLambdaFleetFields;
-  /** Where a running function reports its traces back to; blank if unnamed. */
-  langwatchEndpoint: string;
-  codeBlockTimeoutRawValue: string | undefined;
-  stagingThresholdBytesRawValue: unknown;
-  stagingTtlSecondsRawValue: unknown;
-}): StudioLambdaConfig {
-  const { fields } = input;
-
-  return {
-    region: fields.region,
-    accessKeyId: fields.accessKeyId,
-    secretAccessKey: fields.secretAccessKey,
-    roleArn: fields.roleArn,
-    imageUri: fields.imageUri,
-    cacheBucket: fields.cacheBucket,
-    subnetIds: fields.subnetIds,
-    securityGroupIds: fields.securityGroupIds,
-    langwatchEndpoint: input.langwatchEndpoint,
-    codeBlockTimeoutSeconds: clampCodeBlockTimeoutSeconds(input.codeBlockTimeoutRawValue),
-    stagingThresholdBytes: positiveNumber(
-      input.stagingThresholdBytesRawValue,
-      STUDIO_INVOKE_STAGING_THRESHOLD_BYTES,
-    ),
-    stagingTtlSeconds: positiveNumber(
-      input.stagingTtlSecondsRawValue,
-      STUDIO_STAGING_TTL_SECONDS_DEFAULT,
-    ),
-  };
-}
-
 /**
  * The environment every per-project function must carry. One source for both
  * creation and reconciliation, so the two cannot drift apart.

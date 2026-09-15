@@ -8,7 +8,7 @@
 // The seeded dataset carries every way those two could diverge.
 
 import type { ClickHouseClient } from "@clickhouse/client";
-import { AnalyticsComparisonWindowService } from "@langwatch/analytics-server";
+import { createAnalyticsComparisonWindow } from "@langwatch/analytics-server";
 import {
   MonitorPerformanceAdapter,
   type EvaluationClickHouseResolver,
@@ -36,7 +36,7 @@ const endMs = Date.now();
 const currentStartMs = endMs - 7 * DAY_MS;
 // Derived through the same service the monitors surface uses, so the window
 // the trend is measured against is the one the page would have asked for.
-const previousStartMs = AnalyticsComparisonWindowService.create()
+const previousStartMs = createAnalyticsComparisonWindow()
   .currentVsPrevious({ startDate: currentStartMs, endDate: endMs })
   .previousPeriodStartDate.getTime();
 

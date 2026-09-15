@@ -9,9 +9,9 @@ export {
   type NlpInvokeResponse,
   type NlpInvokeStagingConfig,
 } from "./channels/workflow-nlp-lambda.channel.ts";
-export {
-  type NlpLambdaInvoke,
-  type NlpPayloadStaging,
-  type NlpLambdaInvokeResult,
-  type StagedNlpPayload,
+export type {
+  NlpLambdaInvoke,
+  NlpPayloadStaging,
+  NlpLambdaInvokeResult,
+  StagedNlpPayload,
 } from "./app/workflow.app.ts";
