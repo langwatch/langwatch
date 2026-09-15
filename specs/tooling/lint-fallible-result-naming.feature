@@ -16,6 +16,18 @@ Feature: The fallible-result-naming lint rule
   undefined, and only a `find*` method may carry a nullable result. No
   redundant `require` prefix, and every method states its result type.
 
+  A repository answers `find*`; `get*` and `list*` are the service layer's
+  vocabulary. A repository's interface file and both its backends
+  (`repositories/`, `repositories/prisma/`, `repositories/memory/`) are
+  checked for a public method or interface signature named with that
+  vocabulary, and told to rename to `find*` instead — in the interface and in
+  every implementation. A `get*`/`list*` repository method that is also
+  nullable draws only this one message: the same rename that fixes the
+  vocabulary is what makes the nullable return legal, so nullableWithoutFind
+  stays silent for it rather than prescribing the same fix twice. Outside a
+  repository file, `get*` keeps its ordinary meaning and this check says
+  nothing.
+
   Background:
     Given a workspace whose agent feature is at strict layout version 0
 
@@ -65,3 +77,26 @@ Feature: The fallible-result-naming lint rule
     When the fallible-result-naming rule runs over it
     Then it reports noResultType
     But a method of a class that implements an interface is left alone, since the interface states the type
+
+  @unit
+  Scenario: A repository get method is reported
+    Given a repository class method named get or getSomething, in the interface file or a prisma or memory backend
+    When the fallible-result-naming rule runs over it
+    Then it reports repositoryServiceVocabulary naming the find-prefixed rename
+    And a bare get renames to findAll
+    And it does not also report nullableWithoutFind when the same method is nullable
+    But a find-prefixed method on the same file is left alone
+
+  @unit
+  Scenario: A repository list signature is reported
+    Given a repository interface's TSMethodSignature named list or listSomething
+    When the fallible-result-naming rule runs over it
+    Then it reports repositoryServiceVocabulary naming the find-prefixed rename
+    But a get accessor on the same file is left alone
+
+  @unit
+  Scenario: A service get method is left alone
+    Given a get-prefixed method declared outside a repository file
+    When the fallible-result-naming rule runs over it
+    Then it does not report repositoryServiceVocabulary
+    But nullableWithoutFind still applies to it as before

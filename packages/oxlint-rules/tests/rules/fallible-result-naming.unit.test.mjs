@@ -11,6 +11,8 @@ afterAll(() => workspace.cleanup());
 const PORT = "modules/agent/server/src/ports/agent.port.ts";
 const SERVICE = "modules/agent/server/src/services/agent.service.ts";
 const API = "modules/agent/contract/src/agent.api.ts";
+const REPOSITORY_INTERFACE = "modules/agent/server/src/repositories/agent.repository.ts";
+const REPOSITORY_MEMORY = "modules/agent/server/src/repositories/memory/memory.agent.repository.ts";
 
 function report(code, filename = PORT) {
   return runRule(fallibleResultNamingRule, { code, cwd: workspace.cwd, filename });
@@ -208,6 +210,106 @@ describe("given a strict feature API interface", () => {
       );
 
       expect(found).toEqual([]);
+    });
+  });
+});
+
+describe("given a repository class or interface file", () => {
+  describe("when a repository method is named with get vocabulary", () => {
+    /** @scenario "A repository get method is reported" */
+    it("reports repositoryServiceVocabulary for getById on a memory repository class", () => {
+      const found = report(
+        "export class MemoryAgentRepository { getById(): Promise<string> { return this.lookup(); } }",
+        REPOSITORY_MEMORY,
+      );
+
+      expect(found.map((entry) => entry.messageId)).toEqual(["repositoryServiceVocabulary"]);
+      expect(found[0].data).toEqual({ name: "getById", rest: "ById" });
+      expect(found[0].message).toBe(
+        "Repository method `getById` uses service vocabulary; repositories answer `find*`, services answer `get*`." +
+          " Rename it `findById` here and in the repository interface this class implements.",
+      );
+    });
+
+    /** @scenario "A repository get method is reported" */
+    it("reports repositoryServiceVocabulary only, not nullableWithoutFind, when the result is nullable", () => {
+      const found = report(
+        "export class MemoryAgentRepository { getById(): Promise<string | undefined> { return this.lookup(); } }",
+        REPOSITORY_MEMORY,
+      );
+
+      expect(found.map((entry) => entry.messageId)).toEqual(["repositoryServiceVocabulary"]);
+    });
+
+    /** @scenario "A repository get method is reported" */
+    it("maps a bare get to findAll", () => {
+      const found = report(
+        "export class MemoryAgentRepository { get(): Promise<string[]> { return this.all(); } }",
+        REPOSITORY_MEMORY,
+      );
+
+      expect(found.map((entry) => entry.messageId)).toEqual(["repositoryServiceVocabulary"]);
+      expect(found[0].data).toEqual({ name: "get", rest: "All" });
+    });
+
+    /** @scenario "A repository get method is reported" */
+    it("leaves a find-prefixed method on the same file alone", () => {
+      const found = report(
+        "export class MemoryAgentRepository { findById(): Promise<string | null> { return this.lookup(); } }",
+        REPOSITORY_MEMORY,
+      );
+
+      expect(found).toEqual([]);
+    });
+  });
+
+  describe("when a repository interface signature is named with list vocabulary", () => {
+    /** @scenario "A repository list signature is reported" */
+    it("reports repositoryServiceVocabulary for a listActive TSMethodSignature", () => {
+      const found = report(
+        "export interface AgentRepository { listActive(): Promise<string[]>; }",
+        REPOSITORY_INTERFACE,
+      );
+
+      expect(found.map((entry) => entry.messageId)).toEqual(["repositoryServiceVocabulary"]);
+      expect(found[0].data).toEqual({ name: "listActive", rest: "Active" });
+    });
+
+    /** @scenario "A repository list signature is reported" */
+    it("leaves a get accessor on the same file alone", () => {
+      const found = report(
+        "export class MemoryAgentRepository { get id(): string { return this._id; } }",
+        REPOSITORY_MEMORY,
+      );
+
+      expect(found).toEqual([]);
+    });
+  });
+
+  describe("when a repository file still carries the other messageIds' defects", () => {
+    /** @scenario "The require prefix is reported with a rename fix" */
+    it("still reports requirePrefix on a repository file, unaffected by the new vocabulary check", () => {
+      const found = report(
+        "export interface AgentRepository { requireById(): Promise<string>; }",
+        REPOSITORY_INTERFACE,
+      );
+
+      expect(found.map((entry) => entry.messageId)).toEqual(["requirePrefix"]);
+    });
+  });
+});
+
+describe("given a file outside the repository path gate", () => {
+  describe("when a service method is named with get vocabulary", () => {
+    /** @scenario "A service get method is left alone" */
+    it("does not report repositoryServiceVocabulary for getById on a service file", () => {
+      const found = report(
+        "export abstract class AgentPort { abstract getById(): Promise<string | undefined>; }",
+        SERVICE,
+      );
+
+      expect(found.map((entry) => entry.messageId)).not.toContain("repositoryServiceVocabulary");
+      expect(found.map((entry) => entry.messageId)).toEqual(["nullableWithoutFind"]);
     });
   });
 });

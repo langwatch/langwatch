@@ -13,6 +13,13 @@ const FALLIBLE_RESULT_MODULE = /^src\/(?!.*__tests__\/)(?!.*\.fixture\.ts$)(?!.*
 const FUNCTION_BOUNDARY = new Set(["FunctionDeclaration", "FunctionExpression", "ArrowFunctionExpression"]);
 const TRY_PREFIX = /^try[A-Z]/;
 
+// A repository answers `find*`; `get*`/`list*` on one is the service layer's
+// vocabulary, not its own (CLAUDE.md's layer-vocabulary row). Scoped to the
+// interface file and both backends by path, never by what the class extends
+// or implements — that is what keeps this a per-file syntactic check.
+const REPOSITORY_METHOD_FILE = /\/repositories\/(?:prisma\/|memory\/)?[^/]*\.repository\.ts$/;
+const REPOSITORY_SERVICE_VOCABULARY = /^(get|list)([A-Z]|$)/;
+
 /** Shared with `no-try-prefix` so the two rules cannot drift apart on what counts as hedged. */
 export function isTryPrefixedName(name) {
   return TRY_PREFIX.test(name);
@@ -133,6 +140,27 @@ export function withoutPrefix(name, prefix) {
   return rest.charAt(0).toLowerCase() + rest.slice(1);
 }
 
+/** `getById` -> `ById` (so `find{{rest}}` reads `findById`); a bare `get`/`list` -> `All`. */
+export function repositoryVocabularyRest(name) {
+  if (name === "get" || name === "list") return "All";
+  return name.startsWith("get") ? name.slice("get".length) : name.slice("list".length);
+}
+
+function isFindPrefixed(name) {
+  return /^find[A-Z]?/.test(name);
+}
+
+// A try-prefixed name's rename belongs to `no-try-prefix`, and a repository
+// get*/list* name's rename belongs to `repositoryServiceVocabulary` — both
+// already prescribe the exact fix this message would otherwise restate.
+function shouldReportNullableWithoutFind(name, returnType, isRepositoryVocabularyName) {
+  if (!containsNullableType(returnType)) return false;
+  if (isFindPrefixed(name)) return false;
+  if (isTryPrefixedName(name)) return false;
+  if (isRepositoryVocabularyName) return false;
+  return true;
+}
+
 export const fallibleResultNamingRule = defineRule({
   name: "fallible-result-naming",
   kind: "problem",
@@ -168,9 +196,20 @@ export const fallibleResultNamingRule = defineRule({
         + " this is a write whose target may normally be absent, return an explicit"
         + " result union instead of null.",
     },
+    repositoryServiceVocabulary: {
+      what: "Repository method `{{name}}` uses service vocabulary; repositories answer `find*`, services answer `get*`.",
+      fix: "Rename it `find{{rest}}` here and in the repository interface this class implements.",
+    },
   },
-  create(context) {
-    const check = (key, returnType, accessibility, { isSwallow = false, typeStatedElsewhere = false } = {}) => {
+  create(context, file) {
+    const isRepositoryVocabularyFile = REPOSITORY_METHOD_FILE.test(file.workspacePath ?? "");
+
+    const check = (
+      key,
+      returnType,
+      accessibility,
+      { allowRepositoryVocabulary = false, isSwallow = false, typeStatedElsewhere = false } = {},
+    ) => {
       if (!key || key.type !== "Identifier") return;
       if (accessibility === "private") return;
       const name = key.name;
@@ -182,6 +221,16 @@ export const fallibleResultNamingRule = defineRule({
           data: { name, plain: withoutPrefix(name, "try") },
         });
         return;
+      }
+
+      const isRepositoryVocabularyName =
+        allowRepositoryVocabulary && isRepositoryVocabularyFile && REPOSITORY_SERVICE_VOCABULARY.test(name);
+      if (isRepositoryVocabularyName) {
+        context.report({
+          node: key,
+          messageId: "repositoryServiceVocabulary",
+          data: { name, rest: repositoryVocabularyRest(name) },
+        });
       }
 
       if (/^require[A-Z]/.test(name)) {
@@ -198,10 +247,7 @@ export const fallibleResultNamingRule = defineRule({
         return;
       }
 
-      // A try-prefixed name's nullable-without-find defect is `no-try-prefix`'s
-      // to report — that rule already names the same rename for every try*
-      // name, swallow or not. Restating it here would be the same fix twice.
-      if (containsNullableType(returnType) && !/^find[A-Z]?/.test(name) && !isTryPrefixedName(name)) {
+      if (shouldReportNullableWithoutFind(name, returnType, isRepositoryVocabularyName)) {
         context.report({ node: key, messageId: "nullableWithoutFind", data: { name } });
       }
     };
@@ -216,6 +262,7 @@ export const fallibleResultNamingRule = defineRule({
       if (node.kind !== "method" || node.computed) return;
       const body = node.value?.body;
       check(node.key, node.value?.returnType?.typeAnnotation, node.accessibility, {
+        allowRepositoryVocabulary: true,
         isSwallow: isSwallowCandidate(node.key) && bodyIsSwallow(body),
         typeStatedElsewhere: implementsInterface(node),
       });
@@ -226,7 +273,7 @@ export const fallibleResultNamingRule = defineRule({
       TSAbstractMethodDefinition: checkMethod,
       TSMethodSignature(node) {
         if (node.computed) return;
-        check(node.key, node.returnType?.typeAnnotation, undefined);
+        check(node.key, node.returnType?.typeAnnotation, undefined, { allowRepositoryVocabulary: true });
       },
       FunctionDeclaration(node) {
         check(node.id, node.returnType?.typeAnnotation, undefined, {

@@ -143,8 +143,8 @@ Messages:
 
 - Kind: problem
 - Applies to: every file
-- Fixable: no
-- Spec: none yet
+- Fixable: code
+- Spec: `specs/tooling/lint-banned-test-model-names.feature`
 - Enforced: yes, at `error`
 
 Options: none.

@@ -7623,6 +7623,690 @@
       "measured": "2026-09-10"
     },
     {
+      "key": "fallible-result-naming|enterprise/modules/audit-log/server/src/repositories/agent-audit-log-migration.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|enterprise/modules/audit-log/server/src/repositories/prisma/prisma.agent-audit-log-migration.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|enterprise/modules/billing/server/src/repositories/memory/memory.billing-report-organization.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|enterprise/modules/billing/server/src/repositories/prisma/prisma.billing-report-organization.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|enterprise/modules/governance/server/src/repositories/ai-tool-catalog.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|enterprise/modules/governance/server/src/repositories/ingestion-pull-lifecycle.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|enterprise/modules/governance/server/src/repositories/ingestion-source.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|enterprise/modules/governance/server/src/repositories/ingestion-template.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|enterprise/modules/governance/server/src/repositories/memory/memory.anomaly-rule.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|enterprise/modules/governance/server/src/repositories/memory/memory.department.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|enterprise/modules/governance/server/src/repositories/memory/memory.governance-personal-key.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|enterprise/modules/governance/server/src/repositories/memory/memory.governance-routing.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|enterprise/modules/governance/server/src/repositories/memory/memory.spend-spike-anomaly.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|enterprise/modules/governance/server/src/repositories/prisma/prisma.ai-tool-catalog.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|enterprise/modules/governance/server/src/repositories/prisma/prisma.anomaly-rule.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|enterprise/modules/governance/server/src/repositories/prisma/prisma.department.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|enterprise/modules/governance/server/src/repositories/prisma/prisma.governance-personal-key.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|enterprise/modules/governance/server/src/repositories/prisma/prisma.governance-routing.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|enterprise/modules/governance/server/src/repositories/prisma/prisma.ingestion-pull-lifecycle.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|enterprise/modules/governance/server/src/repositories/prisma/prisma.ingestion-source.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|enterprise/modules/governance/server/src/repositories/prisma/prisma.ingestion-template.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|enterprise/modules/governance/server/src/repositories/prisma/prisma.spend-spike-anomaly.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|enterprise/modules/scim/server/src/repositories/prisma/prisma.scim.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|enterprise/modules/scim/server/src/repositories/scim.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/agent/server/src/repositories/agent.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/agent/server/src/repositories/memory/memory.agent.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/agent/server/src/repositories/prisma/prisma.agent.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/annotation/server/src/repositories/annotation-queue-item.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/annotation/server/src/repositories/annotation-queue.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/annotation/server/src/repositories/annotation-score.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/annotation/server/src/repositories/annotation.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/annotation/server/src/repositories/memory/memory.annotation-queue-item.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/annotation/server/src/repositories/memory/memory.annotation-queue.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/annotation/server/src/repositories/memory/memory.annotation-score.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/annotation/server/src/repositories/memory/memory.annotation.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/annotation/server/src/repositories/prisma/prisma.annotation-queue-item.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/annotation/server/src/repositories/prisma/prisma.annotation-queue.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/annotation/server/src/repositories/prisma/prisma.annotation-score.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/annotation/server/src/repositories/prisma/prisma.annotation.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/api-key/server/src/repositories/api-key.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/api-key/server/src/repositories/memory/memory.api-key.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/api-key/server/src/repositories/prisma/prisma.api-key.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/auth/server/src/repositories/auth-session.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/auth/server/src/repositories/memory/memory.auth-session.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/auth/server/src/repositories/prisma/prisma.auth-session.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/automation/server/src/repositories/automation-settlement-ledger.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/automation/server/src/repositories/automation-settlement-read.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/automation/server/src/repositories/automation-trace-trigger-catalogue.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/coding-agent/server/src/repositories/coding-agent-session-event.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/coding-agent/server/src/repositories/coding-agent-session.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/coding-agent/server/src/repositories/memory/memory.coding-agent-session-event.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/coding-agent/server/src/repositories/memory/memory.coding-agent-session.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/data-privacy/server/src/repositories/prisma/prisma.data-privacy-directory.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/data-retention/server/src/repositories/memory/memory.retroactive-retention.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/data-retention/server/src/repositories/prisma/prisma.data-retention-directory.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/data-retention/server/src/repositories/retroactive-retention.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/dataset/server/src/repositories/dataset-content.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/dataset/server/src/repositories/dataset-record.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/dataset/server/src/repositories/dataset.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/dataset/server/src/repositories/memory/memory.dataset-content.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/dataset/server/src/repositories/memory/memory.dataset-record.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/dataset/server/src/repositories/memory/memory.dataset.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/dataset/server/src/repositories/prisma/prisma.dataset-content.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/dataset/server/src/repositories/prisma/prisma.dataset-record.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/dataset/server/src/repositories/prisma/prisma.dataset.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/entitlement/server/src/repositories/memory/memory.usage-membership.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/entitlement/server/src/repositories/prisma/prisma.usage-membership.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/entitlement/server/src/repositories/usage-membership.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/experiment/server/src/repositories/experiment-dspy-retention.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/experiment/server/src/repositories/experiment-dspy.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/experiment/server/src/repositories/experiment-run.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/experiment/server/src/repositories/experiment.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/experiment/server/src/repositories/memory/memory.experiment-run-state.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/experiment/server/src/repositories/prisma/prisma.experiment.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/gateway/server/src/repositories/gateway-budget.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/gateway/server/src/repositories/gateway-cache-rule.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/gateway/server/src/repositories/gateway-guardrail.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/gateway/server/src/repositories/gateway-internal-store.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/gateway/server/src/repositories/memory/memory.gateway-internal-store.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/gateway/server/src/repositories/prisma/prisma.gateway-budget-scope-reach.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/gateway/server/src/repositories/prisma/prisma.gateway-budget-scope-target.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/gateway/server/src/repositories/prisma/prisma.gateway-budget.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/gateway/server/src/repositories/prisma/prisma.gateway-cache-rule.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/gateway/server/src/repositories/prisma/prisma.gateway-guardrail.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/gateway/server/src/repositories/prisma/prisma.gateway-internal-store.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/gateway/server/src/repositories/prisma/prisma.gateway-organization-directory.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/identity/server/src/repositories/prisma/prisma.legacy-sso-domain-routing.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/identity/server/src/repositories/prisma/prisma.sso-connection-routing.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/langy/server/src/repositories/langy-token-buffer.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/log/server/src/repositories/canonical-log-record.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/metric/server/src/repositories/metric-data-point.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/model-provider/server/src/repositories/memory/memory.model-cost.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/model-provider/server/src/repositories/memory/memory.model-default.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/model-provider/server/src/repositories/memory/memory.model-provider.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/model-provider/server/src/repositories/model-cost.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/model-provider/server/src/repositories/model-default.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/model-provider/server/src/repositories/model-provider.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/model-provider/server/src/repositories/prisma/prisma.model-cost.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/model-provider/server/src/repositories/prisma/prisma.model-default.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/model-provider/server/src/repositories/prisma/prisma.model-provider.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/notification/server/src/repositories/memory/memory.notification.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/notification/server/src/repositories/notification.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/notification/server/src/repositories/prisma/prisma.notification.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/ops/server/src/repositories/memory/memory.anomaly-rate-tracker.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/ops/server/src/repositories/memory/memory.anomaly-state.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/ops/server/src/repositories/memory/memory.process-audit.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/ops/server/src/repositories/memory/memory.replay.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/ops/server/src/repositories/memory/memory.scheduler-audit.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/ops/server/src/repositories/memory/memory.usage-stats.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/ops/server/src/repositories/ops-queue-metrics-source.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/ops/server/src/repositories/prisma/prisma.process-audit.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/ops/server/src/repositories/prisma/prisma.project-tenant-source.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/ops/server/src/repositories/prisma/prisma.scheduler-audit.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/ops/server/src/repositories/prisma/prisma.usage-stats-organization.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/organization/server/src/repositories/group.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/organization/server/src/repositories/memory/memory.group.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/organization/server/src/repositories/memory/memory.organization-membership.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/organization/server/src/repositories/memory/memory.organization.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/organization/server/src/repositories/memory/memory.team.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/organization/server/src/repositories/organization-membership.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/organization/server/src/repositories/organization.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/organization/server/src/repositories/prisma/prisma.group.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/organization/server/src/repositories/prisma/prisma.organization-membership.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/organization/server/src/repositories/prisma/prisma.organization-user-directory.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/organization/server/src/repositories/prisma/prisma.organization.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/organization/server/src/repositories/prisma/prisma.team.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/organization/server/src/repositories/team.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/presence/server/src/repositories/memory/memory.presence.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/presence/server/src/repositories/presence.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/project/server/src/repositories/coding-agent-activity.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/project/server/src/repositories/memory/memory.project.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/project/server/src/repositories/prisma/prisma.coding-agent-activity.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/project/server/src/repositories/prisma/prisma.project.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/project/server/src/repositories/prisma/prisma.recent-items.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/project/server/src/repositories/project.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/project/server/src/repositories/recent-items.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/prompt/server/src/repositories/prisma/prisma.prompt-tag-assignment.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/prompt/server/src/repositories/prisma/prisma.prompt-version.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/prompt/server/src/repositories/prisma/prisma.prompt.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/prompt/server/src/repositories/prompt-tag-assignment.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/prompt/server/src/repositories/prompt-version.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/prompt/server/src/repositories/prompt.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/scenario/server/src/repositories/memory/memory.scenario.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/scenario/server/src/repositories/memory/memory.simulation-run-state.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/scenario/server/src/repositories/prisma/scenario.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/scenario/server/src/repositories/scenario.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/scenario/server/src/repositories/simulation.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/stored-object/server/src/repositories/memory/memory.stored-object-blob.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/stored-object/server/src/repositories/object-storage-migration-inventory.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/stored-object/server/src/repositories/stored-object-blob.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/stored-object/server/src/repositories/stored-object-legacy-writer-drain.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/stored-object/server/src/repositories/stored-object-owner-instance-directory.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/stored-object/server/src/repositories/stored-object-project-source.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/stored-object/server/src/repositories/stored-object-storage.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/suite/server/src/repositories/memory/memory.suite-run.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/suite/server/src/repositories/memory/memory.suite.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/suite/server/src/repositories/prisma/prisma.suite.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/suite/server/src/repositories/suite-run.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/suite/server/src/repositories/suite.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/trace/server/src/repositories/log-record-storage.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/trace/server/src/repositories/span-storage.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/trace/server/src/repositories/trace-legacy-read.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/user/server/src/repositories/memory/memory.user.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/user/server/src/repositories/prisma/prisma.user.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/user/server/src/repositories/user.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/webhook/server/src/repositories/memory/memory.webhook-endpoint.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/webhook/server/src/repositories/prisma/prisma.webhook-endpoint.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/webhook/server/src/repositories/webhook-endpoint.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/workflow/server/src/repositories/memory/memory.workflow.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/workflow/server/src/repositories/prisma/prisma.workflow.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "fallible-result-naming|modules/workflow/server/src/repositories/workflow.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
       "key": "feature-source-layout|enterprise/modules/audit-log/server/src/migrations/agent-audit-log-ids.migration.ts",
       "measured": "2026-09-10"
     },
