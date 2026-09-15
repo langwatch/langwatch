@@ -13,7 +13,10 @@ const logger = createLogger("langwatch:ssrfProtection");
 
 /** Which addresses this validator admits. Injected, never read from the environment. */
 export interface SsrfPolicy {
-  /** When true, refuse private / loopback / link-local, and hostnames resolving to them. Metadata is refused either way. */
+  /**
+   * When true, refuses private/loopback/link-local addresses and hostnames resolving to them.
+   * Metadata is refused either way.
+   */
   blockLocal: boolean;
   /** Literal hostname allowlist (case-insensitive) that bypasses the local-address block only. */
   allowedHosts: string[];

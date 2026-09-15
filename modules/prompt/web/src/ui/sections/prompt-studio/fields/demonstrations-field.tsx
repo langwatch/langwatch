@@ -8,21 +8,10 @@ import { transposeColumnsFirstToRowsFirstWithId } from "@langwatch/workflow-cont
 import { type PromptConfigFormValues } from "@langwatch/prompt-contract";
 
 /**
- * The few-shot examples a prompt carries, shown read-only.
- *
- * A NARROWED family-local copy of
- * `platform/app/src/prompts/forms/fields/DemonstrationsField.tsx`, which the
- * workflow studio's signature panel also renders, so the platform copy stays
- * and keeps its editor.
- *
- * EDITING DID NOT TRAVEL, and it is a recorded loss. The Edit button opened
- * `DatasetEditorTable` - 937 lines of spreadsheet with four non-Datasets
- * callers, whose in-memory branch the datasets family deliberately dropped when
- * it narrowed its own copy into `@langwatch/dataset-web`. Rebuilding that branch
- * on the primitives that package publishes is the datasets feature's work, not
- * a page move's. Demonstrations still render, and the prompt editor drawer - 
- * still `platform/app`'s, opened from the workflow studio and the experiments
- * workbench - still edits them.
+ * The few-shot examples a prompt carries, shown read-only — a narrowed family-local copy of
+ * `platform/app`'s `DemonstrationsField.tsx`, which keeps its own editor. Demonstrations are
+ * still edited through the prompt editor drawer, opened from the workflow studio and the
+ * experiments workbench.
  */
 export function DemonstrationsField() {
   const { watch, formState } = useFormContext<PromptConfigFormValues>();

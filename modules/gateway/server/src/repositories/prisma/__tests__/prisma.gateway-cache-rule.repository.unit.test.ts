@@ -1,14 +1,7 @@
 /**
- * The Postgres side of the cache-rule catalogue, over a recording client.
- *
- * These three facts used to be asserted against the App's own copy of this
- * repository, which is gone: the bundle projection's filter and order, the
- * mode column being recomputed from whatever action the write ends with, and
- * the change event and audit row landing inside the same transaction as the
- * write. The first is what the gateway scans first-match-wins, the second is
- * what every aggregate-by-mode query reads instead of parsing the JSON, and
- * the third is why a rule can never exist without the revision bump that tells
- * the gateway to drop its cached bundle.
+ * The Postgres side of the cache-rule catalogue. Guards three facts still load-bearing after
+ * the App's own copy was removed: bundle filter/order (first-match-wins), the mode column
+ * recomputed from the write, and the audit row sharing the write's transaction.
  */
 import { describe, expect, it } from "vitest";
 import type { GatewayAudit } from "../../../app/gateway.members.ts";

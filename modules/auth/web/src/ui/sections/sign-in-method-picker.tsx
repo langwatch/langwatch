@@ -176,13 +176,10 @@ export function AlternativeMethods({
 }
 
 /**
- * The seat any other way in sits in while a passkey ceremony is running.
- *
- * A system sheet is already over the page; a live rail underneath it invites
- * a second hand-off on top of the first. `inert` is the primitive that means
- * "unavailable" all at once — no pointer events, no focus, out of the tab
- * order — rather than merely faint, and it is restored the moment the flag
- * that started it clears, which happens on every way the ceremony can end.
+ * The seat any other way in sits in while a passkey ceremony is running. A
+ * system sheet is already over the page, so `inert` makes it fully
+ * unavailable (no pointer events, no focus, out of tab order) rather than
+ * merely faint, restored the moment the ceremony ends.
  */
 function StandsBackWhileBusy({ isBusy, children }: { isBusy: boolean; children: ReactNode }) {
   return (

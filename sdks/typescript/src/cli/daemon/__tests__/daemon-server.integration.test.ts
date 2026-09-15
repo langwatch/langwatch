@@ -213,13 +213,10 @@ describe("daemon over a unix socket", () => {
   });
 
   /**
-   * A symlink is the shape of debris the trust check deliberately lets through
-   * — `socket-not-a-socket` is NOT a squat, because inside our own 0700
-   * directory nobody else could have put it there. So it has to be cleanable,
-   * and a DANGLING one is the case that is invisible to `stat`: nothing exists
-   * to stat, yet the name is taken as far as `link(2)` is concerned. Every
-   * daemon then died at publish time with EEXIST, which `daemon.ts` reads as a
-   * lost start race and swallows — a permanent wedge with no output anywhere.
+   * A symlink is not a squat here — inside our own 0700 directory nobody else could have put it
+   * there — but a DANGLING one is invisible to `stat`, so `link(2)` still sees the name as taken.
+   * That makes the daemon die at publish time with EEXIST, which `daemon.ts` reads as a lost
+   * start race and swallows: a permanent wedge with no output anywhere.
    */
   describe("given a dangling symlink where the socket should be", () => {
     beforeEach(() => {
@@ -278,14 +275,9 @@ describe("daemon over a unix socket", () => {
     });
 
     /**
-     * `publishSocket`'s EEXIST branch, against the thing it actually guards: a
-     * real, listening socket that a real winner already published.
-     *
-     * Nothing else reaches it. `server.unit.test.ts` publishes regular files,
-     * and `listen()`'s own second-daemon case is answered by the `isSocketAlive`
-     * pre-check long before `linkSync` is called. So the one call whose
-     * fail-CLOSED behaviour the whole publish design rests on was never
-     * exercised on a socket at all.
+     * `publishSocket`'s EEXIST branch, against the thing it actually guards: a real, listening
+     * socket a real winner already published. Nothing else reaches it, so this is the only case
+     * that exercises the fail-CLOSED behaviour the whole publish design rests on.
      */
     describe("when a real socket already answers to the shared name", () => {
       it("refuses to publish over it and leaves the winner dialable", async () => {
@@ -478,18 +470,11 @@ describe("daemon over a unix socket", () => {
 
     describe("when several commands are dispatched at once", () => {
       it("serves them concurrently, each with its own output and exit code", async () => {
-        // A TIMEOUT HERE MEANS THE DAEMON SERIALISED THESE. The five commands
-        // are held at a rendezvous, so a daemon serving one at a time never
-        // gets past the first: it waits on four peers that cannot arrive until
-        // it returns.
-        //
-        // Concurrency is the whole point of the daemon, since an agent fanning
-        // out must not be slower than five cold processes running in parallel,
-        // and a rendezvous is what tests that property directly. No command
-        // emits its output or its exit code until all five are inside the
-        // daemon at the same moment, so being served concurrently is what lets
-        // this test finish at all. Nothing is measured against the clock, so
-        // machine load cannot decide the outcome.
+        // A TIMEOUT HERE MEANS THE DAEMON SERIALISED THESE: the five commands are held at a
+        // rendezvous, so a daemon serving one at a time never gets past the first. Nothing
+        // emits its output or exit code until all five arrive at once, so being served
+        // concurrently is what lets this test finish at all — nothing is measured against the
+        // clock, so machine load cannot decide the outcome.
         const fanOut = [1, 2, 3, 4, 5];
         let releaseAll: (() => void) | undefined;
         const allArrived = new Promise<void>((resolve) => {
@@ -1013,15 +998,11 @@ describe("daemon over a unix socket", () => {
   describe("given a daemon asked to stop while it is still serving", () => {
     describe("when a request is in flight", () => {
       it("waits for it before tearing the execution window down", async () => {
-        // What actually goes wrong without the drain is NOT a missing exit
-        // frame — the frame still arrives, and the client still reports exit 0.
-        // It is that `window.reset()` restores the daemon's OWN cwd and
-        // environment underneath a command that has not finished, so the
-        // command resolves its remaining paths and reads its credentials
-        // against the wrong globals and then reports a status the client
-        // trusts. That is invisible to the transcript, so the transcript is not
-        // what this asserts on: the executor records what it SEES at the moment
-        // it completes, the way `resumableProgram` does in the runner tests.
+        // Without the drain, `window.reset()` restores the daemon's OWN cwd and environment
+        // underneath a command that has not finished, so it resolves paths and reads
+        // credentials against the wrong globals yet still reports a status the client trusts.
+        // That is invisible to the transcript, so this asserts on what the executor SEES at
+        // the moment it completes instead, the way `resumableProgram` does in the runner tests.
         const seen: { cwd?: string; token?: string } = {};
         const savedCwd = process.cwd();
         const callerCwd = fs.realpathSync(dir);

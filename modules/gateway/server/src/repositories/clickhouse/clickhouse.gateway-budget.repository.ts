@@ -27,9 +27,8 @@ const EVENTS_TABLE = "gateway_budget_ledger_events" as const;
 const TOTALS_TABLE = "gateway_budget_scope_totals" as const;
 
 /**
- * How far back the budget detail page's recent-activity panel looks. Wide enough to cover several periods of the
- * longest recurring window the product offers, a month, and narrow enough that the read prunes to a handful of
- * `toYYYYMM(OccurredAt)` partitions.
+ * Wide enough to cover a month-long recurring window; narrow enough that the read prunes to a
+ * handful of `toYYYYMM(OccurredAt)` partitions.
  */
 const RECENT_EVENTS_LOOKBACK_DAYS = 90;
 
@@ -47,9 +46,8 @@ type BudgetDebitRow = {
   providerKey?: string | null;
   gatewayRequestId: string;
   /**
-   * What the request cost, as the integer nano-USD it was priced in. The only amount a caller states: the
-   * `AmountUSD` column is written from this one, so the two cannot drift apart, and it is a `Decimal(18, 6)` that
-   * a nano figure does not fit in, which is why it is not the one that gets summed.
+   * The amount a caller states; `AmountUSD` is derived from this one so the two can't drift,
+   * since a `Decimal(18, 6)` can't hold a nano figure.
    */
   amountNanoUsd: number;
   tokensInput: number;
@@ -64,16 +62,15 @@ type BudgetDebitRow = {
 };
 
 /**
- * Non-enforcement is structural, not a flag: this string is deliberately NOT a `GatewayBudgetScopeType`, so a budget under it cannot be created, and every
- * enforcement read resolves real budgets first. There is nothing to remember to check.
- * The ledger scope pulled provider cost is written under (ADR-088).
+ * Deliberately not a `GatewayBudgetScopeType`, so no budget can be created under it and every
+ * enforcement read resolves real budgets first (ADR-088).
  */
 export const PULLED_USAGE_SCOPE = "pulled" as const;
 
 /**
- * The synthetic budget id every pulled row carries. The ledger's storage key is `(TenantId, BudgetId, GatewayRequestId)` and demands one; this is not a cuid,
- * so it can never equal a real `GatewayBudget.id`. Sharing one value across all pulled rows also keeps them contiguous under the sorting key, so the read
- * below stays an index seek.
+ * The ledger's storage key is `(TenantId, BudgetId, GatewayRequestId)` and demands one; this is
+ * not a cuid, so it can never equal a real `GatewayBudget.id`. One shared value also keeps
+ * pulled rows contiguous under the sorting key, so the read below stays an index seek.
  */
 export const PULLED_USAGE_BUDGET_ID = "pulled" as const;
 
@@ -143,9 +140,9 @@ export type BudgetBucketBoundary = {
 };
 
 /**
- * One budget's read target. `scopeId` is the ledger bucket, not the budget's target: a provider-filtered budget and a per-member GROUP allowance each accrue
- * under their own key (see `bucketScopeIdFor` / `groupBucketScopeId`). `match: "prefix"` sums every bucket under the key, which is how a GROUP budget reports
- * what a whole group has spent when no single member is in context.
+ * `scopeId` is the ledger bucket, not the budget's target: a provider-filtered budget and a
+ * per-member GROUP allowance each accrue under their own key. `match: "prefix"` sums every
+ * bucket under the key, for a GROUP budget's whole-group total.
  */
 export type BudgetSpendTarget = {
   budgetId: string;
@@ -154,23 +151,21 @@ export type BudgetSpendTarget = {
   window: GatewayBudgetWindow;
   match?: "exact" | "prefix";
   /**
-   * Only meaningful with `match: "prefix"`. A string anchors the bucket's provider suffix (`|provider:<key>`) so a
-   * provider-filtered group budget matches its own buckets; null/undefined requires the bucket to carry NO
-   * provider suffix, so an unfiltered group budget does not absorb a filtered sibling's buckets on the same group.
+   * Only meaningful with `match: "prefix"`: anchors the bucket's provider suffix so a filtered
+   * group budget matches its own buckets, not an unfiltered sibling's.
    */
   bucketSuffix?: string | null;
   /**
-   * Lower bound (unix ms) for the spend read when the budget's period boundary is NOT the calendar one: always set for MANUAL windows
-   * (currentPeriodStartedAt) and set on calendar windows after a mid-period reset (until the next calendar boundary passes). Targets with a floor read the
-   * raw ledger events bounded by OccurredAt instead of the rollup's PeriodStart-equality fast path, which cannot see a moved boundary.
+   * Lower bound (unix ms) when the period boundary isn't the calendar one (MANUAL windows, or a
+   * reset mid-period). Forces the raw-ledger read bounded by OccurredAt, since the rollup's
+   * PeriodStart-equality fast path can't see a moved boundary.
    */
   periodFloorMs?: number;
 };
 
 /**
- * Read-shape for ledger events. Mirrors the columns previously read off the PG `GatewayBudgetLedger` table, scoped
- * to whatever the caller needs (one VK, one budget, or all VKs in a project). All fields use the same names as the
- * equivalent Prisma row so call sites can be migrated with minimal shape juggling.
+ * Read-shape for ledger events, scoped to whatever the caller needs (one VK, one budget, or all
+ * VKs in a project). Field names mirror the equivalent Prisma row.
  */
 export type LedgerEventRow = {
   id: string; // GatewayRequestId — unique within (tenant, budget)
@@ -202,9 +197,9 @@ type RollupScopeRow = {
 type ClickHouseClientFor = Awaited<ReturnType<GatewayClickHouseResolver>>;
 
 /**
- * Everything the two per-bucket reads share: the bound parameters, the predicate that selects one budget's
- * buckets, and the per-bucket floors for buckets whose own boundary has moved. Built once so the rollup path and
- * the raw-ledger path cannot drift apart on which buckets they mean.
+ * Everything the two per-bucket reads share: bound parameters, the bucket predicate, and any
+ * per-bucket floors. Built once so the rollup and raw-ledger paths can't drift on which buckets
+ * they mean.
  */
 type BucketQueryShape = {
   params: Record<string, string | number | string[]>;
@@ -227,9 +222,9 @@ export class GatewayBudgetClickHouseRepository implements GatewayBudgetSpend {
   }
 
   /**
-   * Insert one debit row per applicable budget. Idempotency is structural at the ledger table level (ReplacingMergeTree on (TenantId, BudgetId, GatewayRequestId) collapses replays on merge), but the
-   * gateway_budget_scope_totals materialised view aggregates at INSERT time and does NOT dedup. Without a pre-insert guard, replaying the same gateway_request_id multiplies the rollup totals (3 fires of $0.0125 →
-   * $0.0375 enforced against the budget until the merge eventually fires, which can be hours later or never if the ledger sees no further activity).
+   * Idempotent at the ledger level (ReplacingMergeTree dedups on merge), but the
+   * gateway_budget_scope_totals view aggregates at INSERT time and does not dedup — a replay
+   * without a pre-insert guard multiplies the rollup total until the next merge.
    */
   async insertDebit(rows: BudgetDebitRow[]): Promise<void> {
     if (rows.length === 0) return;
@@ -379,10 +374,9 @@ export class GatewayBudgetClickHouseRepository implements GatewayBudgetSpend {
     rows: PulledUsageRow[];
   }): Promise<PulledUsageRow[]> {
     const client = await this.resolveClient(tenantId);
-    // The batch's own bucket span, which is what makes this a partition-pruned read instead of a full-history scan. `OccurredAt` is the partition key, and
-    // a probe without it touches every partition the tenant has ever written — including whatever has aged onto S3 — on every single pull. A restatement
-    // always carries its ORIGINAL bucket time (that is what makes it a restatement), so any prior version of these rows is inside this span by
-    // construction; the day of slack on each side is for a provider that nudges a bucket boundary, not for correctness.
+    // `OccurredAt` is the partition key, so probing without it scans every partition the tenant
+    // ever wrote. A restatement always carries its ORIGINAL bucket time, so any prior version
+    // stays inside this span; the day of slack per side is for provider nudges, not correctness.
     const occurredAtMs = rows.map((r) => r.occurredAt.epochMilliseconds);
     const SPAN_SLACK_MS = 24 * 60 * 60 * 1000;
     const probe = await client.query({
@@ -508,9 +502,9 @@ export class GatewayBudgetClickHouseRepository implements GatewayBudgetSpend {
   }
 
   /**
-   * The debit insert the writer uses. One request resolves several budgets and each lands its own row, so the probe is per (BudgetId, GatewayRequestId)
-   * rather than the whole-request one insertDebit takes: a whole-request probe would see the first budget's row and silently skip every other budget the same
-   * request owes. Per budget, a replay still dedups. The probe-then-insert race analysis on insertDebit applies verbatim.
+   * One request resolves several budgets, each landing its own row, so the probe is per
+   * (BudgetId, GatewayRequestId) rather than the whole-request one `insertDebit` takes — a
+   * whole-request probe would silently skip every budget after the first it saw.
    */
   async insertDebitsForBudgets(rows: BudgetDebitRow[]): Promise<void> {
     if (rows.length === 0) return;
@@ -539,10 +533,9 @@ export class GatewayBudgetClickHouseRepository implements GatewayBudgetSpend {
         r.ScopeId,
       ]),
     );
-    // A budget already on this request suppresses the row, which is how a replay stays idempotent. When the row
-    // that already sits there names a DIFFERENT bucket, the suppression is not a replay: the ledger keys rows by
-    // (TenantId, BudgetId, GatewayRequestId) with no bucket in the key, so a disagreement about the bucket
-    // silently drops one side's spend from whichever bucket enforcement reads. Never quiet.
+    // A budget already on this request suppresses the row (idempotent replay) — unless the
+    // existing row names a DIFFERENT bucket, since the ledger key has no bucket in it. That
+    // silently drops one side's spend from whichever bucket enforcement reads.
     for (const row of rows) {
       const seenScopeId = existing.get(row.budgetId);
       if (seenScopeId === undefined || seenScopeId === row.scopeId) continue;
@@ -585,9 +578,9 @@ export class GatewayBudgetClickHouseRepository implements GatewayBudgetSpend {
   }
 
   /**
-   * Same as `getSpendForBudgets` but sums spend across multiple tenants (projects). Used by `GatewayBudgetService.list()` / `listForProject()` to render the
-   * org-level budget table — those paths span every project in the org/team, and ORG/TEAM/PRINCIPAL- scoped budgets accumulate ledger rows under whichever
-   * project actually emitted the trace (TenantId on the ledger row = the project the trace landed in, not the budget's scope).
+   * Same as `getSpendForBudgets` but sums across tenants (projects): an ORG/TEAM/PRINCIPAL-scoped
+   * budget accumulates ledger rows under whichever project actually emitted the trace, since
+   * TenantId on the ledger row is the project, not the budget's scope.
    */
   async getSpendForBudgetsAcrossTenants(
     tenantIds: string[],
@@ -644,9 +637,9 @@ export class GatewayBudgetClickHouseRepository implements GatewayBudgetSpend {
   }
 
   /**
-   * Spend for the targets whose period floor has moved off the calendar: MANUAL windows, anchored windows, and calendar windows reset mid-period. The floor
-   * sits inside the rollup's calendar bucket, which cannot answer it, so the total is summed straight off the ledger, successful requests only. An anchored
-   * budget lives here permanently: its periods never coincide with the calendar ones the rollup keys on.
+   * Spend for targets whose period floor has moved off the calendar (MANUAL, anchored, or reset
+   * mid-period): the rollup's calendar bucket can't answer it, so the total is summed straight
+   * off the ledger. An anchored budget lives here permanently.
    */
   private async readFlooredTargetSpend(
     tenantIds: string[],
@@ -850,9 +843,9 @@ export class GatewayBudgetClickHouseRepository implements GatewayBudgetSpend {
   }
 
   /**
-   * Bucket spend for a budget whose own boundary moved: a MANUAL window, or a template reset mid-period. The floor
-   * now sits inside the rollup's calendar bucket, which cannot answer it, so the whole read goes to the raw
-   * ledger. Buckets with a boundary of their own keep it; every other bucket reads from the template's floor.
+   * Bucket spend for a budget whose own boundary moved (MANUAL, or a template reset mid-period):
+   * the rollup's calendar bucket can't answer it, so the read goes to the raw ledger. Buckets
+   * with a boundary of their own keep it; every other bucket reads the template's floor.
    */
   private async flooredBucketSpend(args: {
     client: ClickHouseClientFor;
@@ -919,9 +912,8 @@ export class GatewayBudgetClickHouseRepository implements GatewayBudgetSpend {
   }
 
   /**
-   * Most recent ledger events for a single budget, ordered by `OccurredAt` descending. Used by the budget detail
-   * page to render the recent-activity panel (post-cutover replacement for `prisma.gatewayBudgetLedger.findMany`
-   * in budget.service.ts:getDetail).
+   * Most recent ledger events for one budget, ordered by `OccurredAt` descending. Backs the
+   * budget detail page's recent-activity panel.
    */
   async recentEventsForBudget(
     tenantIds: string[],
@@ -1053,9 +1045,9 @@ export class GatewayBudgetClickHouseRepository implements GatewayBudgetSpend {
   }
 
   /**
-   * The SQL that says a row belongs to one target: the target's own budget, in a single bucket or in every bucket
-   * under the anchor carrying the target's provider suffix. An unfiltered target matches only buckets carrying no
-   * suffix at all, so it never absorbs a provider-filtered sibling's spend.
+   * The SQL predicate for "this row belongs to this target": the target's budget, in one bucket
+   * or every bucket under the anchor carrying its provider suffix. An unfiltered target matches
+   * only buckets with no suffix, so it never absorbs a filtered sibling's spend.
    */
   private static bucketMatchSql(
     target: BudgetSpendTarget,

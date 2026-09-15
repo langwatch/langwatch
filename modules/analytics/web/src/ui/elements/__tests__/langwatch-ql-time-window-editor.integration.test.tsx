@@ -1,14 +1,8 @@
 /**
  * @vitest-environment jsdom
- *
- * What the time-window fields commit, and what they refuse to commit.
- *
- * Driven at the component rather than through the workbench because the thing
- * under test is the moment an override is raised: the workbench only makes a
- * window observable once the member presses Run, by which point the half-typed
- * states this suite is about are long gone.
- *
- * Spec: modules/analytics/specs/analytics-lwql-workbench.feature
+ * What the time-window fields commit, and what they refuse to commit. Driven at the component
+ * rather than through the workbench, since the workbench only makes a window observable once
+ * Run is pressed — by which point the half-typed states this suite is about are long gone.
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

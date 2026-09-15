@@ -1,30 +1,7 @@
 /**
- * Which codex session ran this command, read from the process tree instead of
- * inferred from file times.
- *
- * Codex exports nothing about itself into the processes it spawns
- * (openai/codex#8923), which is why the rest of this seam infers the session
- * from rollout timestamps. But codex holds its rollout transcript OPEN for the
- * whole session, and `langwatch ingest context` always runs as a descendant of
- * the codex process, because codex spawns the shell that runs it. So the
- * invoking session is identifiable by construction: walk up the parent chain
- * and the first ancestor holding a rollout file open IS the session asking.
- * Two sessions running side by side stop being ambiguous, because each one's
- * command reaches its own process, not the newest writer on the machine.
- *
- * The identifying property is the open rollout, never the process name. A
- * process called `codex` that holds no rollout is not a session, and a session
- * renamed or wrapped still holds its rollout. The rollout has to be one of
- * codex's own, inside the sessions tree, since any process can open a file
- * named like one.
- *
- * Every step of the walk is best-effort. A sandbox that blocks `lsof`, a
- * platform without it, a `ps` that fails, a process that exits mid-walk: all
- * of them return nothing and the caller falls back to the timestamp inference.
- * The whole walk is also bounded in time, because this runs in front of a live
- * agent turn.
- *
- * Spec: specs/ai-governance/cli-wrappers/session-context-declare.feature
+ * Which codex session ran this command, found by walking the process tree — codex holds its
+ * rollout transcript open for the whole session, and this always runs as its descendant, so
+ * the first ancestor with an open rollout IS the session asking, best-effort throughout.
  */
 
 import { execFile } from "node:child_process";

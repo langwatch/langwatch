@@ -13,18 +13,9 @@ import { runHasEvaluators } from "./evaluation-summaries.ts";
 import { RunResultRow } from "./run-result-row.tsx";
 
 /**
- * The columns of the table. The last one holds the row menu, and grows to fit
- * a Stop control while the run still has one to offer.
- *
- * The Evaluators column exists only on a run that has evaluators. When it
- * does, the scenario and the evaluators share the free width and the
- * scenario keeps a readable floor, so a narrow table wraps the pills rather
- * than cutting the name.
- */
-/**
- * Compose the grid template from the columns actually shown. The Caller column
- * (AC24) appears only when a run in the table has a caller — text runs never
- * add it. It sits between the scenario/evaluators columns and Time · cost.
+ * The columns of the table, composed from what's actually shown: the last always holds the row
+ * menu (grows to fit a Stop control); Evaluators and Caller (AC24) appear only when a run in
+ * the table has one, and a narrow table wraps pills rather than cutting the scenario name.
  */
 function resultColumns({
   hasEvaluators,

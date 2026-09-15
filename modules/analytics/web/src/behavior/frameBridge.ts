@@ -1,20 +1,18 @@
 /**
- * The parent side of the chart-frame bridge. Framework-free TypeScript so the
- * eventual production surface can reuse it outside React.
- *
- * Handshake: on the iframe's `load`, create a `MessageChannel`, post
- * `lw:init` with `port2` transferred — exactly once. The sandboxed frame's
- * origin is the opaque `"null"`, so the init targets `"*"` and the frame is
- * identified by holding the transferred port; nothing else is ever read off
- * the window channel.
- *
- * Watchdog: the shim heartbeats every 2s; CHART_FRAME_HEARTBEAT_TIMEOUT_MS
- * (~10s) of silence means the frame is wedged (busy loop, crash) and the
- * bridge tears it down. While the tab is hidden the watchdog is suspended —
- * background-tab timer throttling applies to both sides of the bridge, so a
- * missed beat there proves nothing — and resumes with a fresh grace period
- * on return to visible so a backlog of throttled misses never triggers an
- * instant kill.
+ * The parent side of the chart-frame bridge. Framework-free TypeScript so the eventual
+ * production surface can reuse it outside React.
+ */
+
+/**
+ * Handshake: on `load`, create a `MessageChannel` and post `lw:init` with `port2` transferred,
+ * exactly once. The frame's origin is opaque `"null"`, so init targets `"*"` — holding the
+ * transferred port is what identifies the frame, nothing else read off the window channel.
+ */
+
+/**
+ * Watchdog: heartbeats every 2s; CHART_FRAME_HEARTBEAT_TIMEOUT_MS (~10s) of silence means the
+ * frame is wedged. Suspended while the tab is hidden, since background-tab throttling hits both
+ * sides equally, and resumes with a fresh grace period so throttled misses never trigger a kill.
  */
 
 import type {

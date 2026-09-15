@@ -1,10 +1,5 @@
 /**
- * Asks for the name of a new test suite, and nothing else.
- *
- * A new suite starts as a grouping with a name. What else it declares, its
- * fields and its evaluators, is the suite editor's to ask for once the suite
- * exists.
- *
+ * Asks only for the name of a new test suite; what it declares next is the suite editor's job.
  * @see specs/features/agent-testing/suites-rail.feature
  * @see specs/suites/test-suites.feature
  */

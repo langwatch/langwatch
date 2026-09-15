@@ -1,12 +1,7 @@
 /**
- * The socket-file bookkeeping: which FILE a path leads to, whether this process
- * is allowed to remove it, and how a bound socket takes on the shared name.
- *
- * Real files, no sockets — the lifecycle these rules protect is exercised over
- * real sockets in daemon-server.integration.test.ts. The one call this file
- * replaces is `fs.linkSync`: publishing has a fallback precisely for a
- * filesystem that refuses to hard-link a socket, and no filesystem a test can
- * create here behaves that way.
+ * Real files, no sockets — the socket lifecycle is exercised over real sockets in
+ * daemon-server.integration.test.ts. This file only fakes `fs.linkSync`, since publishing's
+ * fallback exists for a filesystem that refuses to hard-link a socket.
  */
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import * as fs from "node:fs";
@@ -174,7 +169,7 @@ describe("stagingSocketPath", () => {
         // The staging path is the one handed to bind(), so it — not the shared
         // path — is what has to fit. Worst case is the longest pid a platform
         // can issue (7 digits on Linux) standing in for `.sock`.
-        //
+
         // Asserted against the CONSTANT, not a literal 3: that constant is the
         // allowance `daemonSocketDir` and `isDaemonSocketPathUsable` reserve, so
         // a literal here would keep passing after somebody widened the budget

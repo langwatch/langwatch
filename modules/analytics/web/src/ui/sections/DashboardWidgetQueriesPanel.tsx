@@ -1,15 +1,7 @@
 /**
- * The drawer's Queries tab: every query the widget declares, as an accordion
- * of `DashboardWidgetQueryRow`s, the first one open by default. No save
- * affordance of its own — Code and Queries edit one persisted record, so the
- * drawer's own Footer is the single Save for both tabs. "+ Add query" lives
- * in the drawer's tab bar (`DashboardWidgetEditDrawer`), inline with
- * "Code" / "Queries (N)", not here — `nextQueryName` is exported for it.
- *
- * Holds no execution state of its own — `lastRuns` and `onRun` come from the
- * card's `useDashboardWidgetExecutor`, the same instance the live chart
- * preview runs through, so a query's last result reads the same regardless
- * of whether the chart or this tab's own Run button produced it.
+ * The drawer's Queries tab: every query as an accordion of `DashboardWidgetQueryRow`s. No save
+ * of its own — the drawer's Footer saves both tabs — and no execution state of its own either:
+ * `lastRuns`/`onRun` come from the card's shared executor, so Run here or in the chart agree.
  */
 
 import { Accordion, VStack } from "@chakra-ui/react";
@@ -28,7 +20,9 @@ export function nextQueryName(existing: DashboardWidgetQuery[]): string {
   return `query${n}`;
 }
 
-/** Query names that collide with a sibling — a row shows this inline instead of blocking typing. */
+/**
+ * Query names that collide with a sibling — a row shows this inline instead of blocking typing.
+ */
 function duplicateNames(queries: DashboardWidgetQuery[]): Set<string> {
   const seen = new Set<string>();
   const dupes = new Set<string>();
@@ -39,7 +33,9 @@ function duplicateNames(queries: DashboardWidgetQuery[]): Set<string> {
   return dupes;
 }
 
-/** Whether every query has a name, and no two share one — the drawer's own Save gate reuses this. */
+/**
+ * Whether every query has a name, and no two share one — the drawer's own Save gate reuses this.
+ */
 export function queryNamesAreValid(queries: DashboardWidgetQuery[]): boolean {
   return (
     queries.every((q) => q.name.trim().length > 0) &&

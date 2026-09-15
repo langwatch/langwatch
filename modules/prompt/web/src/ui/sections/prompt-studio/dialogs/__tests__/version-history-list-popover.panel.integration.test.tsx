@@ -1,11 +1,7 @@
 /**
  * @vitest-environment jsdom
- *
- * The version-history panel: what each row says, which one is marked current,
- * how another version is loaded, and how a version is compared with the one
- * before it.
- *
- * @see specs/prompts/prompt-version-history-panel.feature
+ * The version-history panel: what each row says, which one is marked current, how another
+ * version is loaded, and how a version is compared with the one before it.
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

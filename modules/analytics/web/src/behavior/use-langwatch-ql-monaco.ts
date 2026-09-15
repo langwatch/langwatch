@@ -1,15 +1,8 @@
 /**
- * Everything the SQL editor teaches Monaco, and everything it takes back.
- *
- * Kept out of the component because it is lifecycle rather than markup:
- * providers registered once per mount and disposed on unmount, a schema read
- * through a ref so a fresh response never leaves two providers answering the
- * same request, and the markers a refusal named.
- *
- * The assistance is the schema response and nothing else. No dataset, column or
+ * Everything the SQL editor teaches Monaco, and everything it takes back. Kept out of the
+ * component because it is lifecycle, not markup — providers register once per mount and
+ * dispose on unmount. The assistance is the schema response only: no dataset, column or
  * physical table name is written here.
- *
- * @see modules/analytics/specs/analytics-lwql-workbench.feature
  */
 
 import type { Monaco, OnMount } from "@monaco-editor/react";

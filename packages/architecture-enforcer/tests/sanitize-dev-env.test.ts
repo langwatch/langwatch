@@ -1,14 +1,7 @@
 /**
  * @vitest-environment node
- *
- * Tests for dev/scripts/lib/sanitize-dev-env.sh — guards lw#3453 ("make
- * quickstart" on a worktree where APP_PORT != 5560 must not 403 on login
- * because of a stale localhost-pinned NEXTAUTH_URL inherited from a prior
- * shell). Real proxy-style overrides (boxd, ngrok, https) must pass
- * through untouched.
- *
- * The helper is bash; we drive it by sourcing it from `bash -c` and
- * reading the resulting env.
+ * Tests dev/scripts/lib/sanitize-dev-env.sh — guards lw#3453 (a stale localhost-pinned
+ * NEXTAUTH_URL from a prior shell must not 403 login on a worktree with a different port).
  */
 
 import { execSync } from "node:child_process";

@@ -1,5 +1,5 @@
 /**
- * The right half of the Scenarios tab: the suite that is open, the scenarios in it, and the way into a recent run of it.
+ * The right half of the Scenarios tab: the open suite, its scenarios, and the way into a run.
  * @see specs/features/agent-testing/cases-table.feature
  * @see specs/features/agent-testing/page-structure.feature
  */

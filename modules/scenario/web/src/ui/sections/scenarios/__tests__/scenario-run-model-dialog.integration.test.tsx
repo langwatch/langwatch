@@ -1,5 +1,5 @@
 /**
- * Integration tests for ScenarioRunModelDialog — the model picker shown after a target is chosen in the scenario "Save and run" flow.
+ * Integration tests for ScenarioRunModelDialog: the model picker after choosing a target.
  * @vitest-environment jsdom
  * @see specs/scenarios/scenario-model-selection.feature
  */

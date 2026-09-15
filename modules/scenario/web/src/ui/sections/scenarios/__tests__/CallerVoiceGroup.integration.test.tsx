@@ -1,10 +1,8 @@
 /**
  * @vitest-environment jsdom
  *
- * The Caller voice group lives under Customize scenario for every scenario
- * (there is no target field in the scenario form itself), and reloads the
- * saved caller values into the form.
- *
+ * The Caller voice group lives under Customize scenario for every scenario,
+ * and reloads the saved caller values into the form.
  * @see specs/features/agents/voice-agents-v1.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

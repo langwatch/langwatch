@@ -14,15 +14,10 @@ export interface PrivateRoute {
   /** The organization whose traffic goes to this cluster. */
   orgId: string;
   /**
-   * The name a human calls this cluster, from the `<label>` segment.
-   *
-   * This used to be parsed and thrown away — the format was documented as
-   * "<label> is a human-readable customer name, ignored by code". It is the
+   * The name a human calls this cluster, from the `<label>` segment. The
    * only human-readable name the platform has for a customer's dedicated
-   * ClickHouse, and discarding it had a cost: when a private instance rejected
-   * ~5.6k statements in three hours on 2026-08-13, no log line said which
-   * cluster had refused them, and identifying it meant reading a concurrency
-   * limit out of the vendor's error text and matching it against terraform.
+   * ClickHouse — discarding it means no log line can say which cluster
+   * refused a query, only a vendor error to match against terraform by hand.
    */
   cluster: string;
 }

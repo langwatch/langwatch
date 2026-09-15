@@ -1,12 +1,8 @@
 /**
- * Repeatable `key=value` command-line flags.
- *
- * Two families share the same shape on the command line and differ in what a
- * key holds: a spend filter may repeat one key with several values, while a run
- * parameter holds exactly one value per name, read as the type it looks like.
- *
- * Equals rather than a colon, because a value may itself contain a colon and a
- * shell user expects `key=value`.
+ * Repeatable `key=value` command-line flags. Two families share this shape
+ * and differ in what a key holds: a spend filter may repeat one key with
+ * several values, while a run parameter holds exactly one value per name.
+ * Equals rather than a colon, because a value may itself contain a colon.
  */
 
 import { commandValidationError, reportCommandError } from "./errorOutput";
@@ -83,18 +79,11 @@ export const parseKeyValueFlags = ({
 };
 
 /**
- * Read one flag value as the type it looks like: exactly `true` or `false`
- * becomes a boolean, a number that renders back to exactly what was typed
- * becomes a number, and everything else stays text.
- *
- * The round-trip check is what keeps `007`, `1.50` and a twenty-digit account
- * number as text: they are identifiers that merely look numeric, and handing
- * the run a number would change the value it was given.
- *
- * A declared type settles the guess: a string parameter keeps "007" as text,
- * a number parameter reads "5" as 5 (and "007" as 7), and a boolean one reads
- * `true` and `false`. Text that cannot be read as the declared type stays
- * text, and the platform refuses it by name.
+ * Read one flag value as the type it looks like: exactly `true`/`false`
+ * becomes boolean, a number that round-trips back to what was typed becomes a
+ * number (keeping `007`, `1.50` and long account numbers as text), and
+ * everything else stays text. A declared type overrides the guess; text that
+ * cannot be read as it stays text, and the platform refuses it by name.
  */
 export const coerceParameterValue = ({
   value,

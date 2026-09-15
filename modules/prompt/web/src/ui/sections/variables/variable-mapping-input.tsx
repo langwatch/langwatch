@@ -80,7 +80,10 @@ type VariableMappingInputProps = {
   disabled?: boolean;
   /** Whether this mapping is missing and should be highlighted */
   isMissing?: boolean;
-  /** When true, shows the missing-highlight background but not the "Required" placeholder (for optional fields) */
+  /**
+   * When true, shows the missing-highlight background but not the "Required" placeholder (for
+   * optional fields).
+   */
   optionalHighlighting?: boolean;
   /** Identifier used for data-testid on the underlying input element */
   inputTestId?: string;

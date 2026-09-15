@@ -1,11 +1,9 @@
 /**
  * Building Redis connections — the only place in the platform that constructs
- * an ioredis client.
- *
- * `RedisConnectionService` composes a `RedisConfigService` and holds the logger
- * for the connections it builds, so a caller states both once at construction
- * and then just asks for clients. Importing this module creates nothing: a
- * connection exists only because a method was called (ADR-093).
+ * an ioredis client. `RedisConnectionService` composes a `RedisConfigService`
+ * and holds the logger for the connections it builds. Importing this module
+ * creates nothing: a connection exists only because a method was called
+ * (ADR-093).
  */
 import IORedis, { Cluster, type Redis } from "ioredis";
 import {
@@ -24,22 +22,12 @@ export interface RedisConnectionServiceOptions {
 }
 
 /**
- * ioredis options shared by both modes.
- *
- * `maxRetriesPerRequest: null` is required by BullMQ-style blocking commands
- * and by the GroupQueue dispatcher: a blocking read must not be failed by a
- * retry budget.
- *
- * There is deliberately no offline-queue option here. Both call sites this
- * package replaces passed `offlineQueue: false`, which ioredis never reads from
- * its constructor options — the option that disables buffering is
- * `enableOfflineQueue`, and `offlineQueue` is only a parameter of the internal
- * `flushQueue()`. So the offline queue has always been ioredis's default (on),
- * and carrying the dead key forward would state a guarantee the client does not
- * give. Turning it off for real is a behaviour change, not a rename: commands
- * issued during a disconnect would start rejecting instead of replaying, and
- * `rateLimit` does not yet catch a rejected `incr`. That belongs in its own
- * change, sequenced after the callers can survive it.
+ * ioredis options shared by both modes. `maxRetriesPerRequest: null` is
+ * required by BullMQ-style blocking commands and the GroupQueue dispatcher: a
+ * blocking read must not be failed by a retry budget. Deliberately no
+ * offline-queue option: `offlineQueue: false` from the callers this package
+ * replaces never worked (the real option is `enableOfflineQueue`), and turning
+ * it off for real is a behaviour change that needs its own sequenced work.
  */
 const SHARED_OPTIONS = {
   maxRetriesPerRequest: null,
@@ -96,13 +84,10 @@ export class RedisConnectionService {
 
   /**
    * Creates a standalone connection from a URL, typed as one. `null` when no
-   * URL is supplied.
-   *
-   * Some callers need a standalone client specifically rather than "whatever
-   * this environment configured" — replay and the Redis-cached fold store both
-   * run multi-key operations that Redis Cluster rejects with CROSSSLOT. Taking
-   * a URL rather than a full environment is what makes the return type `Redis`:
-   * there is no cluster branch to widen it.
+   * URL is supplied. Some callers need a standalone client specifically —
+   * replay and the Redis-cached fold store run multi-key operations that Redis
+   * Cluster rejects with CROSSSLOT — which is what makes the return type
+   * `Redis` rather than `RedisConnection`.
    */
   connectStandalone({
     url,

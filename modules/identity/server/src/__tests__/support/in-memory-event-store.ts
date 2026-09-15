@@ -7,23 +7,12 @@ import type { IdentityLedger } from "../../rules/identity-ledger.rules.ts";
 import { type InMemoryHeads, T0 } from "./in-memory-heads.ts";
 
 /**
- * The event store, in memory, WITH its idempotency contract.
- *
- * Every fact a command emits is keyed `<commandId>:<index>` — the framework's
- * convention, stamped by the app's identity envelope and honoured by the
- * ClickHouse store. A retried command therefore re-states facts the store
- * already holds, and the store absorbs them: the caller is handed the rows
- * that landed the first time, and nothing is written twice.
- *
- * That is not decoration on a double. It is the ONLY reason a restated
- * attach converges on one identifier: the identifier id is derived from
- * `(user, provider, subject, value, occurredAt)`, so a pass that restates a
- * second later legitimately derives a DIFFERENT identifier id. What makes the
- * two the same fact is the command id, which every restating caller pins —
- * the backfill through `adoptUserEmailCommandId`, a ceremony through its own
- * staged re-run. A double that appended whatever it was handed showed two
- * identifiers whenever the two attempts straddled a second boundary — a suite
- * failing on the clock, for a convergence production has.
+ * The event store, in memory, WITH its idempotency contract: every fact is
+ * keyed `<commandId>:<index>`, so a retried command re-states facts the store
+ * already holds and absorbs them rather than writing twice. This is the ONLY
+ * reason a restated attach converges on one identifier — the derived id
+ * depends on `occurredAt`, so only the pinned command id makes two attempts
+ * the same fact.
  */
 export class InMemoryIdentityEventStore {
   /** `<commandId>:<index>` → the fact that landed under it. */
@@ -63,12 +52,9 @@ export class InMemoryIdentityEventStore {
 
 /**
  * The ledger every in-memory stack runs on: append through the store, fold
- * what landed into the heads. What the app's pipeline does once ClickHouse
- * holds the append and the projection catches up.
- *
- * `commands` records every command DISPATCHED, deduped or not — the command
- * really did run, and the absorption happens at the store, exactly where it
- * happens in production.
+ * what landed into the heads — what the app's pipeline does once ClickHouse
+ * holds the append. `commands` records every command DISPATCHED, deduped or
+ * not, since the absorption happens at the store, exactly as in production.
  */
 export function inMemoryIdentityLedger({
   heads,

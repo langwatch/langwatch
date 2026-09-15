@@ -1,11 +1,8 @@
 /**
- * The fake workbench tab's run half: posting the page's own execute request and
- * draining the stream into the store.
- *
- * Split out of `fake-workbench-tab.ts` so the tab's wiring stays readable. The
- * request is built by the app's own `buildExecutionRequest` and the frames are
- * folded by the app's own `foldEvaluationEvent`; what is stood in for is the
- * page's SSE client, which needs an origin the browser supplies.
+ * The fake workbench tab's run half: posting the page's own execute request
+ * and draining the stream into the store. Split out of `fake-workbench-tab.ts`
+ * so the tab's wiring stays readable; what is stood in for is the page's SSE
+ * client, which needs an origin the browser supplies.
  */
 import { buildExecutionRequest } from "@langwatch/experiment-contract";
 import { foldEvaluationEvent } from "@langwatch/experiment-web/surfaces/workbench-results-fold";
@@ -58,12 +55,10 @@ function eventsInFrame(frame: string): EvaluationV3Event[] {
 
 /**
  * Fold one event into the store, the way the page's own results hook does.
- *
  * Folding rather than ignoring the stream is what makes a candidate-only
- * comparison run possible: `buildExecutionRequest` builds `seedTargetOutputs`
- * from `results.targetOutputs`, and `workbench.getState` from a live page
- * projects results too. A tab that never folds would answer differently from
- * the page it stands in for.
+ * comparison run possible: `buildExecutionRequest` and `workbench.getState`
+ * both read projected results, so a tab that never folds would answer
+ * differently from the page it stands in for.
  */
 function foldIntoStore(event: EvaluationV3Event): void {
   useEvaluationsV3Store.setState((current) => ({

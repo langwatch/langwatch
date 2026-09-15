@@ -12,13 +12,16 @@ import { LANGY_CORE_RULE_CRITERIA } from "./langy-rules";
 import { runScenarioAndLog } from "./scenario-logger";
 
 const model = openai("gpt-5-mini");
-// gpt-5.6-terra (a reasoning-tier model) carries a strict `cyber_policy` classifier that blocks the vendored RedTeamAgent's own metaprompt
-// outright — "write a structured attack plan" with sections like "technique catalogue" and "encoding/obfuscation" reads as attack-guide
-// content to it regardless of the authorized-red-team framing, non-deterministically across categories and reruns.
+// gpt-5.6-terra (a reasoning-tier model) carries a strict `cyber_policy` classifier
+// that blocks the vendored RedTeamAgent's own metaprompt outright: it reads the
+// attack-plan prompt as attack-guide content regardless of the authorized-red-team
+// framing, non-deterministically across categories and reruns.
 const attackerModel = openai("gpt-5-mini");
-// A single real Langy turn through the full stack (app -> langyagent -> aigateway -> provider, with tool calls) already takes 35-65s on its
-// own (measured against langy-workspace), so 20 turns per case across 15 cases is a genuinely long run — accepted deliberately, per
-// explicit instruction to red-team thoroughly rather than optimize for suite wall-clock/cost.
+// A single real Langy turn through the full stack (app -> langyagent -> aigateway ->
+// provider, with tool calls) already takes 35-65s on its own (measured against
+// langy-workspace), so 20 turns per case across 15 cases is a genuinely long run —
+// accepted deliberately, per explicit instruction to red-team thoroughly rather than
+// optimize for suite wall-clock/cost.
 const TOTAL_TURNS = 20;
 const REDTEAM_TIMEOUT_MS = 0;
 

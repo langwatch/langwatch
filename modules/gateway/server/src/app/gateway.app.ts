@@ -1,5 +1,9 @@
 /**
- * The gateway feature's application: the one typed thing every door is given, replacing seven previously-separate bags (six private Gateway*Application types plus GatewayPlatformRestMembers) that named the same members differently or with different signatures. Virtual-key WRITE pre-flight, run identically by every door, lives here as behaviour rather than duplicated thirteen times. A caller arrives as {@link GatewayActor}, an argument rather than read from session/request, so one check serves both a browser session and an API key. Budget row shapes moved to @langwatch/gateway-contract ({@link GatewayApplicableBudget}, {@link GatewayVirtualKeyDirectBudget}) since a generic type parameter never actually reached the browser — every tRPC transport declared `app` with no type arguments, so it always typed against `unknown`.
+ * The gateway feature's application: the one typed thing every door is given, replacing seven
+ * previously-separate bags that named the same members differently. Virtual-key WRITE
+ * pre-flight, run identically by every door, lives here as shared behaviour rather than
+ * duplicated per transport. A caller arrives as {@link GatewayActor}, an argument rather than
+ * read from session/request, so one check serves both a browser session and an API key.
  */
 import { toDate, type Instant } from "@langwatch/time";
 import type {
@@ -80,12 +84,16 @@ import { GatewaySpendScopeAdapter } from "../adapters/postgres.gateway-spend-sco
 import { settlementGraceMs } from "../intents/gateway-spend-settlement.intent.ts";
 
 /**
- * Identity a write authorizes as, opaque on purpose: a caller may be a browser session, scoped API key or legacy project key, and what any of those IS belongs to the process's authentication, not this feature — the doors hand one straight to the checks below and never read it.
+ * Identity a write authorizes as, opaque on purpose: a caller may be a browser session, scoped
+ * API key or legacy project key. What it IS belongs to the process's authentication, not this
+ * feature — the doors hand one straight to the checks below and never read it.
  */
 export type GatewayActor = unknown;
 
 /**
- * A key's own budget, as the write service takes it. The canonical parser is schemas.virtualKeyBudgetInput, so the decimal regex and positive-amount refinement are never restated here.
+ * A key's own budget, as the write service takes it. The canonical parser is
+ * schemas.virtualKeyBudgetInput, so its decimal regex and positive-amount refinement are never
+ * restated here.
  */
 export type GatewayVirtualKeyBudgetInput = Readonly<{
   limitUsd: string;
@@ -95,7 +103,8 @@ export type GatewayVirtualKeyBudgetInput = Readonly<{
 }>;
 
 /**
- * Virtual-key read/write capability, as every door calls it — one description where there were three (tRPC's VirtualKeyWrites & VirtualKeyReads, REST's GatewayRestVirtualKeyWrites & GatewayRestVirtualKeyReads), which differed only in which optional fields each remembered to mention.
+ * Virtual-key read/write capability, as every door calls it — one description where there were
+ * three, which differed only in which optional fields each remembered to mention.
  */
 export type GatewayVirtualKeyOperations = Readonly<{
   getAll(organizationId: string): Promise<VirtualKeyWithScopes[]>;
@@ -217,7 +226,10 @@ export type GatewayApplicableBudgetTarget = Readonly<{
 }>;
 
 /**
- * What the process composes this application from: capabilities built over persistence this package cannot reach, or decisions made against role bindings/memberships it cannot see. Everything that is NOT such a decision (wire casing, cursors, money formatting, DTO projections) lives in this package directly instead.
+ * What the process composes this application from: capabilities built over persistence this
+ * package cannot reach, or decisions made against role bindings/memberships it cannot see.
+ * Everything else (wire casing, cursors, money formatting, DTO projections) lives in this
+ * package directly.
  */
 export type GatewayRestInfrastructure = Readonly<{
   /** Absent only where this process has no encryption and mounts no agent-cache family. */
@@ -237,7 +249,9 @@ export interface GatewayAppDependencies extends GatewayRestInfrastructure {
   /** The virtual-key read and write capability. */
   virtualKeys: GatewayVirtualKeyOperations;
   /**
-   * The one canonical Gateway service: budget decisions plus the cache-rule and guardrail catalogues it owns. The process used to build the latter two a second time over its own copies of the same tables, so a rule written through one was invisible to the other.
+   * The one canonical Gateway service: budget decisions plus the cache-rule and guardrail
+   * catalogues it owns. The process used to build the latter two a second time over its own
+   * copies of the same tables, so a rule written through one was invisible to the other.
    */
   budgetDecisions: GatewayService;
   /**
@@ -307,7 +321,9 @@ export interface GatewayAppDependencies extends GatewayRestInfrastructure {
   /** Whether a user belongs to this organization. */
   isOrganizationMember(input: { organizationId: string; userId: string }): Promise<boolean>;
   /**
-   * Identity a REST credential authorizes as, plus the audit-row id: a scoped API key acts as its owning user; a legacy project key carries none and acts as a stable synthetic machine principal for its project, keeping audit entries traceable back to the credential.
+   * Identity a REST credential authorizes as, plus the audit-row id: a scoped API key acts as
+   * its owning user; a legacy project key carries none and acts as a stable synthetic machine
+   * principal for its project, keeping audit entries traceable back to the credential.
    */
   actorForCredential(input: { projectId: string; credential: GatewayRequestCredential }): {
     actor: GatewayActor;
@@ -317,7 +333,9 @@ export interface GatewayAppDependencies extends GatewayRestInfrastructure {
   // ── Visibility ───────────────────────────────────────────────────────────
 
   /**
-   * Org keys narrowed to what this USER can see. Visibility is membership-based, not permission-based: a caller sees a key when one of its scopes intersects their membership set, so a non-member gets an empty summary rather than a refusal.
+   * Org keys narrowed to what this USER can see. Visibility is membership-based, not
+   * permission-based: a caller sees a key when one of its scopes intersects their membership
+   * set, so a non-member gets an empty summary rather than a refusal.
    */
   listVisibleVirtualKeys(input: {
     organizationId: string;
@@ -330,7 +348,9 @@ export interface GatewayAppDependencies extends GatewayRestInfrastructure {
     virtualKey: VirtualKeyWithScopes;
   }): Promise<boolean>;
   /**
-   * One key for a by-id READ under the list's visibility rule: a key outside the caller's membership set is indistinguishable from nonexistent. Mutations deliberately don't use this — their contract is permission-based, so an unauthorized caller gets FORBIDDEN instead.
+   * One key for a by-id READ under the list's visibility rule: a key outside the caller's
+   * membership set is indistinguishable from nonexistent. Mutations don't use this — their
+   * contract is permission-based, so an unauthorized caller gets FORBIDDEN instead.
    */
   requireVisibleVirtualKeyForUser(input: {
     organizationId: string;
@@ -338,7 +358,9 @@ export interface GatewayAppDependencies extends GatewayRestInfrastructure {
     userId: string;
   }): Promise<VirtualKeyWithScopes>;
   /**
-   * Keys a PROJECT CREDENTIAL may see on a page: org-scoped keys, its own team's, its own project's — never a sibling team's. Applied to the page, not the query, which is why a page can be shorter than `limit` without the walk being done.
+   * Keys a PROJECT CREDENTIAL may see on a page: org-scoped keys, its own team's, its own
+   * project's — never a sibling team's. Applied to the page, not the query, so a page can be
+   * shorter than `limit` without the walk being done.
    */
   visibleToProjectCredential(input: {
     project: ProjectIdentity;
@@ -452,29 +474,18 @@ type GatewaySetup = FeatureSetup<
 export class GatewayApp implements GatewayApi {
   static readonly contract = GatewayApiToken;
   /**
-   * `webhooks` is the SAME outbound platform a live spend push is delivered
-   * through, reached through its module API: the reconciliation pull and the
-   * push are two views of one ledger, so a second reading of either the
-   * envelope format or the subscription grammar could disagree with what a
-   * customer already received.
-   *
-   * `entitlement` is this deployment's plan lookup. The application never asks
-   * it anything — the billing REST door does, for the ADR-072 plan gate — and
-   * it is declared HERE so a process that composed no plan store refuses at
-   * boot naming it, rather than mounting an enterprise surface that answers
-   * every organization as entitled.
+   * `webhooks` is the SAME outbound platform a live spend push is delivered through — the
+   * reconciliation pull and the push must not disagree about what a customer already received.
+   * `entitlement` is declared HERE, though only the billing REST door ever asks it anything, so
+   * a process with no plan store refuses at boot rather than answering every org as entitled.
    */
   static readonly dependencies = {
     webhooks: WebhookApi,
     entitlement: EntitlementApi,
     /**
-     * The four capabilities the control plane reaches that belong to other
-     * features, resolved as peers rather than rebuilt: the permission service
-     * every other surface authorizes with, the project directory a key's
-     * scope is anchored to, the evaluators a guardrail rule runs and the
-     * monitors an attachment names. A guardrail attachment and the monitor
-     * page it points at must agree about what one runs, so they are the SAME
-     * applications the rest of the process reads.
+     * The four capabilities the control plane reaches that belong to other features, resolved
+     * as peers rather than rebuilt. A guardrail attachment and the monitor page it points at
+     * must agree about what one runs, so they are the SAME applications the process reads.
      */
     authz: AuthzApi,
     projects: ProjectApi,
@@ -996,7 +1007,9 @@ export class GatewayApp implements GatewayApi {
   }
 
   /**
-   * One key projected through the batched read a listing uses — a page of one, not a second projection, since a key's destination fact belongs to the PROJECT row, and a per-key path would be the one place a deleted destination could still read as live.
+   * One key projected through the batched read a listing uses — a page of one, not a second
+   * projection, since a key's destination fact belongs to the PROJECT row, and a per-key path
+   * would be the one place a deleted destination could still read as live.
    */
   async toVirtualKeyCamelDto(virtualKey: VirtualKeyWithScopes): Promise<VirtualKeyCamelDto> {
     const [dto] = await this.#dependencies.toVirtualKeyCamelDtos({ virtualKeys: [virtualKey] });
@@ -1040,7 +1053,11 @@ export class GatewayApp implements GatewayApi {
   // ── The virtual-key write pre-flights ────────────────────────────────────
 
   /**
-   * Scope set + trace destination are the caller's to choose: manage on every requested scope, each anchored to this org, the destination anchored too, and manage on the destination project — NOT mere tenancy, since the destination also routes budget debits, and tenancy alone would let a team manager point a key at a sibling team's project and consume its budget. Separate from authorizeVirtualKeyCreate because previewing a draft's budgets needs exactly this and no more, with no key config yet to judge.
+   * Scope set + trace destination are the caller's to choose: manage on every requested scope,
+   * each anchored to this org, and manage on the destination project too — NOT mere tenancy,
+   * since the destination also routes budget debits, and tenancy alone would let a team manager
+   * point a key at a sibling team's project and consume its budget. Separate from
+   * authorizeVirtualKeyCreate because previewing a draft's budgets needs exactly this.
    */
   async authorizeVirtualKeyScopeSelection(input: {
     actor: GatewayActor;
@@ -1064,7 +1081,10 @@ export class GatewayApp implements GatewayApi {
   }
 
   /**
-   * Everything that must hold before a key is minted, in order: scope selection, then guardrail attachments against the resolved project. Read-only, not folded into the mint — the public create dispatches the mint through an idempotency receipt, and a replay skipping this would trust a grant the caller held only yesterday.
+   * Everything that must hold before a key is minted, in order: scope selection, then guardrail
+   * attachments against the resolved project. Read-only, not folded into the mint — the public
+   * create dispatches the mint through an idempotency receipt, and a replay skipping this would
+   * trust a grant the caller held only yesterday.
    */
   async authorizeVirtualKeyCreate(input: {
     actor: GatewayActor;
@@ -1094,7 +1114,11 @@ export class GatewayApp implements GatewayApi {
   }
 
   /**
-   * Everything that must hold before editing an existing key, plus the key already read (so the caller doesn't re-read it). Mutating needs update on a scope the key ALREADY lives in; re-scoping additionally needs manage on every NEW scope. scopes/traceProjectId absent means "not changing": a scope change without re-sent config still revalidates STORED attachments against the new project, so a stale cross-project attachment can't survive the move, and a plain metadata edit demands no guardrail permission.
+   * Everything that must hold before editing an existing key, plus the key already read (so the
+   * caller doesn't re-read it). Mutating needs update on a scope the key ALREADY lives in;
+   * re-scoping additionally needs manage on every NEW scope. scopes/traceProjectId absent means
+   * "not changing": a scope change without re-sent config still revalidates STORED attachments
+   * against the new project, so a stale cross-project attachment can't survive the move.
    */
   async authorizeVirtualKeyUpdate(input: {
     actor: GatewayActor;
@@ -1148,7 +1172,9 @@ export class GatewayApp implements GatewayApi {
   }
 
   /**
-   * Gate for every other key mutation (rotate/revoke/disable/enable): key exists in this org, caller holds the operation's permission on a scope it lives in. Deliberately NOT the visibility rule — an unauthorized caller gets FORBIDDEN rather than a not-found that would hide the refusal.
+   * Gate for every other key mutation (rotate/revoke/disable/enable): key exists in this org,
+   * caller holds the operation's permission on a scope it lives in. Deliberately NOT the
+   * visibility rule — an unauthorized caller gets FORBIDDEN rather than a hidden not-found.
    */
   async authorizeVirtualKeyOperation(input: {
     actor: GatewayActor;
@@ -1169,7 +1195,9 @@ export class GatewayApp implements GatewayApi {
   }
 
   /**
-   * Gate for a tenant-wide write: budgets and cache rules are org-owned rows, addressed by id, that a project credential can name regardless of which project they belong to — so this checks at the organization, the scope the write actually acts on.
+   * Gate for a tenant-wide write: budgets and cache rules are org-owned rows, addressed by id,
+   * that a project credential can name regardless of which project they belong to — so this
+   * checks at the organization, the scope the write actually acts on.
    */
   async authorizeOrganizationWideOperation(input: {
     actor: GatewayActor;

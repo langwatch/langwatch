@@ -23,9 +23,10 @@ import { runScenarioAndLog } from "./scenario-logger";
 const model = openai("gpt-5-mini");
 
 /**
- * The failing-traces flows need errored APPLICATION traces to exist: Langy correctly excludes simulation/langy
- * origins (its own runs and this suite's), so on a clean project "no failed traces" is a true answer and the
- * drill scenario has nothing to drill into.
+ * The failing-traces flows need errored APPLICATION traces to exist: Langy
+ * correctly excludes simulation/langy origins (its own runs and this suite's),
+ * so on a clean project "no failed traces" is a true answer and the drill
+ * scenario has nothing to drill into.
  */
 const FIXTURE_RUN_STAMP = String(Math.floor(Date.now() / 60_000));
 
@@ -112,8 +113,9 @@ async function seedFailingApplicationTraces(): Promise<void> {
  * and the model has no correct move left.
  */
 async function seedNavigablePrompt(): Promise<void> {
-  // Retried: on a loaded machine the process's first request has stalled in front of the app for longer than any
-  // sane single-attempt budget while probes from a fresh process answered instantly, so a short per-attempt
+  // Retried: on a loaded machine the process's first request has stalled in
+  // front of the app for longer than any sane single-attempt budget, while
+  // probes from a fresh process answered instantly — a short per-attempt
   // timeout with retries beats one long wait.
   let lastError: unknown;
   for (let attempt = 0; attempt < 3; attempt++) {

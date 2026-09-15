@@ -260,13 +260,8 @@ function UsersContent() {
 }
 
 /**
- * The page guard is the routes section's, not this module's.
- *
- * `platform/app` wrapped each of these in `withPermissionGuard("analytics:view")`
- * — and, on two of them, in `DashboardLayout` as well. Both are the composing
- * application's: the policy is stated once in
- * `apps/ui/src/features/analytics/ui/sections/analytics-routes.tsx`, in front of
- * the same loader registry, and the chrome belongs to the route tree these
- * screens are children of.
+ * The page guard is the routes section's, not this module's. `platform/app` wrapped these in
+ * `withPermissionGuard("analytics:view")` and `DashboardLayout` — both the composing
+ * application's job, stated once in `analytics-routes.tsx`, in front of the same loader registry.
  */
 export default UsersContent;

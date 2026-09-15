@@ -22,7 +22,9 @@ import {
   settleSpendCommandDataSchema,
 } from "../processes/gateway-spend-commands.process.ts";
 /**
- * The four spend commands are pure appends: validate, stamp identity, emit one event. Aggregate is the gateway request itself (ULID), the id staying the idempotency key everywhere (internal dedup, external webhook event_id, replay). One event per (tenant, request, lifecycle step): a redelivered or double-posted command reuses the same key and the store drops the duplicate, so at-least-once emission can never double a request or a crash-retried confirm double-rate it.
+ * One event per (tenant, request, lifecycle step): a redelivered or double-posted command reuses
+ * the same idempotency key and the store drops the duplicate, so at-least-once emission can
+ * never double a request.
  */
 
 function idempotencyKey({
@@ -220,7 +222,9 @@ export class SettleSpendCommand implements CommandHandler<
 }
 
 /**
- * The envelope is the framework's, not this feature's — a hand-written z.object here disagreed with @langwatch/eventing's in three ways (no createdAt, occurredAt as Date vs epoch ms, plain strings vs branded tenantId/aggregateType/type), so every event type below failed the Event constraint the pipeline, handlers and process manager all declare.
+ * The envelope is the framework's, not this feature's: a hand-written z.object here disagreed
+ * with @langwatch/eventing's shape, so every event type below failed the Event constraint the
+ * pipeline and handlers declare.
  */
 const eventEnvelope = EventSchema.extend({
   version: z.literal(GATEWAY_SPEND_EVENT_VERSION_LATEST),
@@ -251,7 +255,8 @@ export const gatewaySpendSettledEventSchema = eventEnvelope.extend({
 export type GatewaySpendSettledEvent = z.infer<typeof gatewaySpendSettledEventSchema>;
 
 /**
- * Every event the spend pipeline folds and its process manager wakes on. Declared here because it is this module's own union; the pipeline, the settlement process manager and the fold projection each named it and none of them could resolve it.
+ * Every event the spend pipeline folds and its process manager wakes on. Declared here since the
+ * pipeline, process manager and fold projection each need it and none can resolve it.
  */
 export type GatewaySpendProcessingEvent =
   | GatewaySpendAdmittedEvent

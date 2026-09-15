@@ -2,22 +2,10 @@ import { generate } from "@langwatch/ksuid";
 
 /**
  * Identity command identity — the analogue of the grants ledger's
- * `deriveGrantId` (`packages/authz-server/src/ledger/grant-identity.ts`,
- * ADR-092 §13). Every form a command id takes lives here, so the string
- * that decides whether a retry is the same command is never a template
- * literal three modules apart from the one it has to agree with.
- *
- * Two families, and the difference between them is the whole point:
- *
- *  - A LIVE ceremony mints a random id. Two sign-ins are two commands, and
- *    a retry of one ceremony reuses the id it already minted.
- *  - An ADOPTION derives its id from the SOURCE ROW. Every backfill pass
- *    over an unchanged user therefore states the same command id, and the
- *    store's read-side dedupe absorbs the restatement (ADR-101 §6, #7429).
- *
- * These strings are a persisted contract: changing one makes every prior
- * command a different command, so a pass would restate history that is
- * already in the log. Add a form; never edit one.
+ * `deriveGrantId` (ADR-092 §13). A LIVE ceremony mints a random id per
+ * ceremony; an ADOPTION derives its id from the source row, so a repeated
+ * backfill restates the same id and read-side dedupe absorbs it. A persisted
+ * contract — add a form, never edit one.
  */
 
 /** A live ceremony's command id — random, minted once per ceremony. */

@@ -1,12 +1,7 @@
 /**
- * How the product says a person's name back to them.
- *
- * The stored profile name is whatever they typed at sign-up, so it can be a
- * full name, a single word, or an email address the identity provider filled
- * in for them. A surface that addresses the person wants the short, human half
- * of that and nothing at all when we only have an email, because greeting
- * someone by their email address reads as a database row talking rather than
- * as the product knowing who they are.
+ * How the product says a person's name back to them. The stored profile name may be a full
+ * name, single word, or an email an identity provider filled in for them — a surface wants the
+ * short human half, never a bare email, which reads as a database row talking, not the product.
  */
 
 /**

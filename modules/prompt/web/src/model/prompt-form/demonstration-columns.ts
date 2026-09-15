@@ -29,18 +29,9 @@ export function inputsAndOutputsToDemostrationColumns(
 }
 
 /**
- * The demonstrations a stored prompt settles on once it is in the form.
- *
- * The columns of the demonstrations dataset are DERIVED from the prompt's
- * inputs and outputs: the form recomputes them on load and writes them into
- * itself (`usePromptConfigForm`). A stored prompt carries no columns of its
- * own, so a dirty baseline taken straight from the document differs from the
- * form the moment it loads, and an untouched prompt reads as modified. Deriving
- * them here is what keeps both sides the same shape.
- *
- * Returns the demonstrations untouched, undefined included, when the columns
- * already match: the form leaves them alone in that case, and adding an empty
- * dataset would be the same difference in the other direction.
+ * The demonstrations a stored prompt settles on once it is in the form. Columns are DERIVED
+ * from the prompt's inputs and outputs, since a stored prompt carries none of its own — without
+ * this, a dirty baseline taken from the document would differ from the form on load.
  */
 export function withDerivedDemonstrationColumns({
   demonstrations,

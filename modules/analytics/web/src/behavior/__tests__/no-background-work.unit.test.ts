@@ -1,17 +1,7 @@
 /**
- * The workbench talks to the server when the member asks it to, and never
- * otherwise.
- *
- * A behavioural test cannot prove the absence of a schedule — it can only prove
- * that the one it happened to wait for did not fire. So this reads the feature's
- * own source instead, and fails the moment a timer, a polling option or a
- * persistence call appears anywhere in it.
- *
- * Scanning the whole feature directory's production source, excluding every
- * `__tests__` directory, is deliberate: the promise is about the surface, not
- * about the file that happens to hold the request state today.
- *
- * Spec: modules/analytics/specs/analytics-lwql-workbench.feature
+ * The workbench talks to the server when asked, never otherwise. A behavioural test cannot
+ * prove the absence of a schedule — only that the one it waited for did not fire — so this
+ * reads the feature's own source instead, failing if a timer, poll or persistence call appears.
  */
 
 import { readdirSync, readFileSync } from "node:fs";
@@ -31,14 +21,9 @@ const SKIPPED_DIRECTORY = "__tests__";
 const SOURCE_EXTENSIONS = [".ts", ".tsx"];
 
 /**
- * Each entry is a way the surface could start working on its own, or start
- * remembering things the feature does not promise to remember.
- *
- * `token` is the name to look for. An entry may also carry a `pattern`, which
- * is then what decides the offence: some of these names are only a problem
- * when they are switched on, and the source is expected to carry them turned
- * off. Matching the bare name there would fail the feature for doing the very
- * thing this file exists to require.
+ * Each entry is a way the surface could start working on its own, or remembering things the
+ * feature does not promise to. A `pattern` marks a name that is only a problem when switched
+ * on, so matching the bare name there would fail the feature for doing what it must do.
  */
 const FORBIDDEN: readonly {
   token: string;

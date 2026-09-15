@@ -186,7 +186,7 @@ export class LangWatch {
   readonly dashboards: DashboardsApiService;
   readonly modelProviders: ModelProvidersApiService;
   readonly analytics: AnalyticsApiService;
-  /** The raw LangWatchQL door — run a governed SELECT or discover the analytics schema directly, outside a saved chart. */
+  /** The raw LangWatchQL door: a governed SELECT or schema discovery outside a saved chart. */
   readonly query: QueryApiService;
   readonly triggers: TriggersApiService;
   readonly graphs: GraphsApiService;

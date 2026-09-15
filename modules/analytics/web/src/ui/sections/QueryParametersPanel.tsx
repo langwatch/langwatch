@@ -1,15 +1,13 @@
 /**
- * Shared parameters panel for LangWatchQL: a locked "Dashboard context" group
- * (the `RESERVED_PARAMETERS` the executor binds automatically) above an
- * editable "Parameters" group (what the member declares), in the same
- * "variables" visual language as the prompt playground's
- * {@link ~/components/variables/VariablesSection}.
- *
- * Both the LWQL workbench (`LangWatchQLParametersEditor`, free-text rows keyed
- * by name) and the dashboard-widget query editor
- * (`DashboardWidgetQueryParamsEditor`, typed declarations) drive this same
- * panel through the `QueryParameterRowVM` adapter shape rather than
- * hand-duplicating the row markup.
+ * Shared parameters panel for LangWatchQL: a locked "Dashboard context" group (the
+ * `RESERVED_PARAMETERS` the executor binds automatically) above an editable "Parameters" group,
+ * in the same visual language as {@link ~/components/variables/VariablesSection}.
+ */
+
+/**
+ * Both the LWQL workbench (`LangWatchQLParametersEditor`) and the dashboard-widget query editor
+ * (`DashboardWidgetQueryParamsEditor`) drive this panel through the `QueryParameterRowVM`
+ * adapter shape, rather than hand-duplicating the row markup.
  */
 
 import {

@@ -1,6 +1,7 @@
 /**
  * @vitest-environment node
- * Real Postgres + real ClickHouse. Month total and budget standing are different measurements, which only holds if the read buckets to the budget's own period. Spec: specs/ai-gateway/budgets.feature
+ * Real Postgres + real ClickHouse. Month total and budget standing are different
+ * measurements, which only holds if the read buckets to the budget's own period.
  */
 import { nowInstant, toDate } from "@langwatch/time";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";

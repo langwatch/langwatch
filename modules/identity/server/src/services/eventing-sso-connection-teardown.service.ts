@@ -21,23 +21,20 @@ export abstract class SsoConnectionDirectoryRevocation {
 }
 
 /**
- * What the teardown grace wake actually does: dispatch the guarded
- * `completeTeardown` command (ADR-117 §5).
- *
- * A command rather than a projection write, and that is the point — the
- * process manager decides WHEN, the guard still decides WHETHER. It re-reads
- * the folded deadline, so a wake that fires early (a lagged queue, a replayed
- * job, a hand-run maintenance script) completes nothing.
- *
- * The service arrives as a PROVIDER rather than a value. The pipeline takes
- * this port at registration time, and the service behind it is built from a
- * ledger whose staged sender only exists once that same registration has
- * returned. Deferring the read to the wake is what makes the graph composable
- * in one pass.
- *
- * The command id is minted fresh per wake: a wake that ran and failed should
- * retry as itself, and the guard's state check is what makes a duplicate
- * harmless.
+ * Dispatches the guarded `completeTeardown` command (ADR-117 §5): a command rather than a
+ * projection write, so the process manager decides WHEN and the guard still decides WHETHER,
+ * re-reading the folded deadline so an early wake completes nothing.
+ */
+
+/**
+ * The service arrives as a PROVIDER rather than a value: the service behind it is built from a
+ * ledger that isn't ready until registration returns, so deferring the read to the wake is what
+ * makes the graph composable in one pass.
+ */
+
+/**
+ * The command id is minted fresh per wake: a failed wake retries as itself, and the guard's
+ * state check is what makes a duplicate harmless.
  */
 export class EventingSsoConnectionTeardownAdapter implements ConnectionTeardown {
   static create(options: {
@@ -109,15 +106,9 @@ export class EventingSsoConnectionTeardownAdapter implements ConnectionTeardown 
 }
 
 /**
- * The revocation a process with no directory capability performs: none, said
- * out loud.
- *
- * It logs rather than throwing, for the reason the real adapter catches: the
- * teardown fact has already landed by the time this runs, and failing the
- * wake would retry a completed teardown forever. The tokens are unusable
- * regardless — every SCIM request verifies against a connection this fold has
- * just moved to TORN_DOWN — so what is actually lost is the row deletion, not
- * the security property.
+ * No directory capability, so no revocation — logged, not thrown, since the teardown fact
+ * already landed and the tokens are unusable regardless: every SCIM request now verifies
+ * against a connection this fold already moved to TORN_DOWN.
  */
 export class UnrevokedSsoConnectionDirectory extends SsoConnectionDirectoryRevocation {
   static create(): UnrevokedSsoConnectionDirectory {

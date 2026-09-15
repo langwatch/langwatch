@@ -1,19 +1,9 @@
 /**
- * What this package's suites mount the screen inside.
- *
- * The host port is an abstract class, so a test constructs one rather than
- * mocking a module: the fake below RECORDS what the screen asked the
- * application to do — which query it wrote, which platform drawer it addressed,
- * what it reported, whether it asked for an upgrade — which is exactly the
- * surface the real adapter answers. The same shape `@langwatch/gateway-web`'s
- * `testing.tsx` introduced.
- *
- * Its tab storage is an in-memory double rather than jsdom's `localStorage`,
- * which is the whole reason the store took its capabilities as an argument:
- * one test's open tabs cannot leak into the next.
- *
- * Not exported from the package. A test imports it relatively; nothing outside
- * this package has any business constructing a host.
+ * What this package's suites mount the screen inside. The host port is an
+ * abstract class, so a test constructs one rather than mocking a module: the
+ * fake here RECORDS what the screen asked the application to do, the same
+ * surface the real adapter answers. Its tab storage is an in-memory double so
+ * one test's open tabs cannot leak into the next; not exported from the package.
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

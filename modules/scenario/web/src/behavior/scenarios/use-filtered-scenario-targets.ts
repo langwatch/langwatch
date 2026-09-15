@@ -1,12 +1,8 @@
 /**
  * The agents a simulation can be pointed at, and what each of them reads as.
- *
- * A connected agent is one of them (ADR-128): it carries an environment, a
- * presence and, in a development environment, an owner. A development agent
- * that belongs to another person can only be run by that person, and a
- * connected agent no process is holding cannot be run at all, so the picker
- * draws either disabled and says why on hover.
- *
+ * A connected agent is one of them (ADR-128): a development agent belonging
+ * to another person, or a connected agent no process is holding, can't be
+ * run, so the picker draws it disabled and says why on hover.
  * @see specs/features/agents/connected-agents-ui.feature
  */
 

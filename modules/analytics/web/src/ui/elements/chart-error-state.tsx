@@ -4,13 +4,9 @@ import { RefreshCw } from "react-feather";
 import { HandledErrorAlert } from "./handled-error-alert.tsx";
 
 /**
- * Full-area error state for analytics charts.
- *
- * Replaces chart content when a query fails, providing the registry's copy for
- * the failure (headline, what to do about it, remediation tips, docs link and
- * a copyable error id) plus a retry button. It deliberately shows no raw
- * backend message: since #5984 that string is the error's code slug, and
- * anything a customer can act on already comes through the handled payload.
+ * Full-area error state for analytics charts: the registry's copy (headline, remediation,
+ * docs link, error id) plus a retry button. It deliberately shows no raw backend message —
+ * since #5984 that string is only the error's code slug, not something a customer can act on.
  */
 export function ChartErrorState({
   error,

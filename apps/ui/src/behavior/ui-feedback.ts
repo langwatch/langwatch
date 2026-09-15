@@ -25,14 +25,14 @@ import { isUiNavigatingAway } from "./ui-departure";
 const FAILURE_DURATION_MS = 12_000;
 
 /**
- * What we say when nothing answered at all.
- *
- * Said as a WAIT rather than as a fault, because that is what it is: a deploy
- * rolling, a laptop waking, a server still coming up. The generic line — "We've
- * been notified. Try again in a moment." — is a promise nobody kept here, since
- * the request never left the browser and there is no trace to have been
- * notified about. The screen's own title is dropped with it: it names the
- * action, and the action is not what went wrong.
+ * What we say when nothing answered at all — said as a WAIT rather than a fault: a deploy
+ * rolling, a laptop waking, a server still coming up. The generic "We've been notified" line is
+ * a promise nobody kept, since the request never left the browser.
+ */
+
+/**
+ * The screen's own title is dropped with it: it names the action, and the action is not what
+ * went wrong.
  */
 const SERVER_UNREACHABLE_COPY = {
   title: "Waiting for LangWatch",

@@ -1,71 +1,9 @@
 /**
- * Idempotent local-dev / CI seed. Creates (or upserts, on re-run) one
- * Organization, Team, Project, and a BetterAuth-credential admin User, plus a
- * private (full-access) and a public (ingestion-only) API token. haven
- * (tools/thuishaven) runs this on every `haven up`; sdk-javascript-ci.yml's
- * e2e job and charts/langwatch/tests/e2e-full-stack.sh run it against a fresh
- * database per CI run.
- *
- * Optional extras (all env-gated, all idempotent):
- *   - Model providers from the environment (HAVEN_SEED_MODEL_PROVIDERS=0
- *     disables): every registry provider whose API-key variable is set in the
- *     process env / .env / repo-root .env gets an enabled,
- *     org-scoped ModelProvider row with those keys.
- *   - HAVEN_SEED_FIRST_MESSAGE=1|0 forces the project's firstMessage/
- *     integrated flags on or off, independent of HAVEN_SEED_PRESET=demo.
- *
- * Every identity value below is a fixed, hardcoded constant — nothing here is
- * randomly generated. The same admin login and the same organization/team/
- * project/user IDs and keys/tokens exist on every worktree and every
- * machine. Re-running upserts by these fixed IDs, so nothing is ever
- * duplicated — `haven up` can call this on every up.
- *
- * Admin login (BetterAuth email + password, bcrypt-hashed — the same
- * mechanism as scripts/seed-local-admin.ts, but a distinct identity so the
- * two seeders never collide on email):
- *   Email:    admin@mail.langwatch.localhost (was admin@haven.localhost;
- *             SEED_EMAIL_DOMAIN overrides the domain per-stack — see
- *             seed-identity.ts. The admin User row is upserted by its fixed
- *             ID, never by email, so reseeding a database that still holds
- *             the retired address updates that same account in place instead
- *             of creating a second admin.)
- *   Password: LocalHavenAdmin!2026
- *
- * IDs:
- *   Organization: local-dev-organization
- *   Team:         local-dev-team
- *   Project:      local-dev-project
- *   User:         local-dev-admin-user
- *
- * Ingestion key — Project.apiKey, the legacy project key SDKs paste into
- * LANGWATCH_API_KEY (exact-string-match lookup; see token-resolver.ts's
- * "legacyProjectKey" path — this predates and is independent of the ApiKey
- * table below). Overridable via the LANGWATCH_API_KEY env var: haven injects
- * this same default automatically (domain.DefaultLocalAPIKey in
- * tools/thuishaven/domain/overlay.go — keep the two in sync by hand, they
- * intentionally can't share a constant across the Go/TS boundary), and CI
- * sets its own per-workflow value:
- *   sk-lw-local-development-key
- *
- * Private access token — an ApiKey-table row (sk-lw- prefix), owned by the
- * admin user with an ORGANIZATION-scope ADMIN binding: a full-access personal
- * access token, the same shape api-key.service.ts mints for a real PAT, just
- * with a fixed token instead of a randomly generated one:
- *   sk-lw-LocalDevPrivate1_LocalDevPrivateAccessTokenSecretFixedValue000000
- *
- * Public access token — an ApiKey-table row using ik-lw-, this codebase's
- * actual "ingestion-only" key prefix, PROJECT-scoped and restricted by a
- * CUSTOM role to traces:create only. This is the closest real equivalent to
- * a "safe to embed more broadly" public token that exists here — there is no
- * client-side-safe/publishable-key concept in this codebase, so it is still
- * a bearer secret, just the least-privileged key type available:
- *   ik-lw-LocalDevPublicIk_LocalDevPublicIngestionTokenSecretFixedValue0000
- *
- * The plaintext tokens above are identical on every machine; only their
- * stored hash differs, because hashSecret() keys on each machine's own
- * CREDENTIALS_SECRET/NEXTAUTH_SECRET pepper (by design — a database-only leak
- * must stay useless without it). Verification always succeeds locally
- * because hashing and verifying both read that same local pepper.
+ * Idempotent local-dev / CI seed: upserts one Organization, Team, Project,
+ * admin User and API tokens under fixed, hardcoded IDs (never random), so
+ * re-running never duplicates them. The admin User is upserted by ID, not
+ * email, so a changed SEED_EMAIL_DOMAIN updates the same account. Plaintext
+ * tokens are identical on every machine; only the stored hash differs.
  */
 
 import { hash as hashPassword } from "bcrypt";
@@ -512,18 +450,10 @@ async function seedAccessTokens({
   });
 }
 
-// ---------------------------------------------------------------------------
-// Model providers from the environment.
-//
-// For every provider in the registry whose primary API-key variable is set —
-// in the process env, .env, or the repo-root .env — upsert an
-// enabled, ORGANIZATION-scoped ModelProvider carrying those keys (encrypted
-// exactly as the former model-provider persistence adapter did), so a fresh local stack can talk
-// to the providers the developer already has credentials for without pasting
-// them into the settings UI. Fixed per-provider row IDs keep re-runs
-// idempotent. HAVEN_SEED_MODEL_PROVIDERS=0 disables the whole block
-// (`haven seed --skip-model-providers`).
-// ---------------------------------------------------------------------------
+// Model providers from the environment: for every registry provider whose
+// API-key variable is set (process env / .env / repo-root .env), upsert an
+// enabled, ORGANIZATION-scoped ModelProvider row under a fixed per-provider
+// ID (idempotent). HAVEN_SEED_MODEL_PROVIDERS=0 disables the whole block.
 
 const MODEL_PROVIDER_ID_PREFIX = "local-dev-model-provider-";
 

@@ -1,23 +1,9 @@
 /**
- * Platform-tool policy table.
- *
- * Per-tool toggles that gate the two `langwatch <tool>` paths the
- * wrapper can take:
- *
- *   - allowVk: tool may route through the gateway via the user's
- *     personal VK (Path A). When false, the wrapper forces Path B
- *     even if a VK is present.
- *   - allowOtelDirect: tool may route via OTLP straight to
- *     `/api/otel/v1/logs` with the user's ingestion key (Path B).
- *     When false, the wrapper refuses to install Path B and surfaces
- *     a clear error.
- *
- * The resolver prefers the policy map the CLI cached at login
- * (`cfg.tool_policies`, served by the control plane's
- * PlatformToolPolicyService) and falls back to the hardcoded defaults
- * below when the cache is absent: an offline or legacy CLI that never
- * cached a map, or a tool the server did not return. The defaults must
- * stay in sync with the server-side PLATFORM_TOOL_POLICY_DEFAULTS.
+ * Platform-tool policy table: per-tool toggles gating the two `langwatch
+ * <tool>` routing paths — `allowVk` (gateway via the user's personal VK)
+ * and `allowOtelDirect` (OTLP direct with the user's ingestion key). Falls
+ * back to these hardcoded defaults when no login-cached policy map exists;
+ * keep in sync with the server-side PLATFORM_TOOL_POLICY_DEFAULTS.
  */
 
 export type PlatformToolSlug =

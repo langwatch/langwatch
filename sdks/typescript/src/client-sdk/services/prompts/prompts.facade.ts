@@ -77,11 +77,7 @@ export class PromptsFacade implements Pick<PromptsApiService, "sync" | "delete">
   }
 
   /**
-   * Retrieves a prompt by handle or ID.
-   *
-   * Supports shorthand `handle:tag` syntax — e.g. `get("pizza-prompt:production")`.
-   * Shorthand is parsed server-side; the SDK passes the string through as-is.
-   *
+   * Retrieves a prompt by handle or ID (supports `handle:tag` shorthand, parsed server-side).
    * @param handleOrId The prompt's handle, unique identifier, or `handle:tag` shorthand.
    * @param options Optional parameters for the request.
    * @returns The Prompt instance.

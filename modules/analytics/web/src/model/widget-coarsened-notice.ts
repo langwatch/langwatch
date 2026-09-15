@@ -1,17 +1,8 @@
 /**
- * What a coarsened dashboard widget tells the member.
- *
- * Its own module, with no imports beyond the vocabulary, because the widget
- * that renders it reaches Chakra, the tRPC client and the lazy Vega boundary —
- * and the copy is the part worth testing directly. A test that had to mount the
- * widget to read one string would be proving the harness, not the sentence.
- *
- * The substitution this describes is otherwise invisible: the card redraws at a
- * coarser step and nothing on screen says the answer is not the one the chart
- * was configured to give. So the sentence names both steps and cites the
- * ceiling that forced the change, rather than asserting a bare number the
- * member has no way to check.
- *
+ * What a coarsened dashboard widget tells the member. Its own module, no
+ * imports beyond the vocabulary, because the widget that renders it reaches
+ * Chakra, tRPC and the lazy Vega boundary — the copy is the part worth
+ * testing directly, naming both steps and the ceiling that forced the change.
  * @see specs/analytics/lwql-saved-charts.feature
  */
 

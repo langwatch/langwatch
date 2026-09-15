@@ -95,16 +95,10 @@ export const gqJobsDispatchedTotal = new Counter({
 });
 
 /**
- * The subset of `gq_jobs_dispatched_total` admitted by the work-conserving
- * override — jobs let past a tenant's fair share because slots would otherwise
- * have sat idle.
- *
- * It exists to make `gq_parked_groups` readable. A high parked count has two
- * opposite causes that look identical on their own: the cap is holding work
- * back while capacity is free (bad — the override should have fired), or the
- * fleet is saturated and there is no slot to give (expected). A non-zero rate
- * here says the override is doing its job; a flat zero alongside a full fleet
- * says the parked work is waiting on capacity, not on fairness.
+ * Jobs admitted past a tenant's fair share because slots would otherwise sit
+ * idle. Distinguishes why `gq_parked_groups` is high: a non-zero rate here
+ * means the override is working; a flat zero with a full fleet means parked
+ * work is waiting on capacity, not fairness.
  */
 export const gqJobsDispatchedOverrideTotal = new Counter({
   name: "gq_jobs_dispatched_override_total",
@@ -185,13 +179,9 @@ export const gqRetryBackoffMilliseconds = new Histogram({
 
 // --- Per-job duration metric ---
 /**
- * Failed reads of the group retry-chain counter.
- *
- * Matters more than it looks. A failed read returns 0, so a sibling-led retry
- * resolves to attempt 1 — byte-identical to a genuine fresh delivery in the
- * span, the metrics, and the `deliveryAttempt` reaching the fold. That both
- * restarts the retry budget AND makes the fold discard its record of what the
- * chain already applied. Without this counter the two are indistinguishable.
+ * Failed reads of the group retry-chain counter. A failed read returns 0, so a
+ * sibling-led retry is indistinguishable from a genuine fresh delivery — it
+ * resets the retry budget and makes the fold discard what the chain applied.
  */
 export const gqGroupAttemptReadFailuresTotal = new Counter({
   name: "gq_group_attempt_read_failures_total",
@@ -214,13 +204,10 @@ export const gqOldestPendingAgeMilliseconds = new Gauge({
 });
 
 /**
- * Backlog age the eligible-waiting gauge is structurally blind to. A group
- * pinned in retry backoff has its ready score REWRITTEN to now+backoff on every
- * failed attempt, so `gq_oldest_pending_age_milliseconds` (which clocks off the
- * ready score) reads seconds even while the group's head job has been due for a
- * day. This gauge clocks off the per-group jobs zset instead, whose scores are
- * preserved across retries/blocks/parks, sampling the most-deferred ready
- * groups — exactly where retry-pinned and in-flight groups live.
+ * Backlog age the eligible-waiting gauge is structurally blind to: a group
+ * pinned in retry backoff has its ready score rewritten to now+backoff on every
+ * failed attempt, so this gauge clocks off the per-group jobs zset instead,
+ * whose scores survive retries/blocks/parks.
  */
 export const gqOldestBacklogAgeMilliseconds = new Gauge({
   name: "gq_oldest_backlog_age_milliseconds",
@@ -229,23 +216,11 @@ export const gqOldestBacklogAgeMilliseconds = new Gauge({
 });
 
 /**
- * Deepest single group's staging hash, in staged jobs.
- *
- * The aggregate gauges cannot see this. `gq_pending_groups` counts groups and
- * `gq_oldest_backlog_age_milliseconds` clocks the head job's age, so one group
- * holding hundreds of thousands of staged fields looks, to both of them, like
- * a queue with one slightly old group in it. In the 2026-06 incident a single
- * trace's `:data` hash reached ~290k fields and ~2.9 GB, and it grew for hours
- * behind a coarse Redis-capacity alarm that only fired at 50% of the cluster.
- *
- * Per-key, because that is the shape of the failure. A per-group accumulation
- * is caused by one producer or one hot key, and the aggregate is unremarkable
- * the whole time it is happening.
- *
- * Published from a rotating sweep, so it means "the deepest group seen since
- * this rotation began" rather than "the deepest group right now". See
- * `sweepStagingDepth` in metricsCollector.ts for why a rotation rather than a
- * sample, and what the lag costs.
+ * Deepest single group's staging hash, in staged jobs. The aggregate gauges
+ * are blind to this: one group holding hundreds of thousands of fields looks
+ * unremarkable to both of them (2026-06 incident: ~290k fields, ~2.9 GB).
+ * Published from a rotating sweep — "deepest seen since this rotation began",
+ * not "right now"; see `sweepStagingDepth` in metricsCollector.ts.
  */
 export const gqGroupStagingDepthMax = new Gauge({
   name: "gq_group_staging_depth_max",
@@ -267,34 +242,19 @@ export const gqGroupsOverStagingDepth = new Gauge({
 });
 
 /**
- * Depth at which a group starts being counted as accumulating.
- *
- * A floor, and inclusive: a group sitting at exactly this depth is counted.
- * The alternative reads better in a sentence and worse in an incident, since
- * the one depth that would slip through is the round number a person is most
- * likely to have chosen deliberately.
- *
- * 10k staged jobs in one group is far outside anything the queue produces in
- * normal operation and far below the ~290k the incident reached, so it leaves
- * room to act. It is a reporting floor only: nothing in the queue changes
- * behaviour when a group crosses it, and where the alarm sits is a dashboard
- * decision, not this module's.
+ * Depth at which a group starts being counted as accumulating. Inclusive — a
+ * group at exactly this depth is counted, since a round number is the one most
+ * likely to be chosen deliberately. A reporting floor only: nothing in the
+ * queue changes behaviour when a group crosses it.
  */
 export const STAGING_DEPTH_REPORT_FLOOR = 10_000;
 
 /**
- * Jobs whose producer supplied a ready score the queue refused.
- *
- * Raised at the staging fallback, once per job, the moment the value is
- * rejected - not by scanning the ready set afterwards. That ordering is the
- * whole point: the guard replaces the bad score before it is written, so a scan
- * would find nothing and report zero for ever while the broken producer carried
- * on. This is a true monotonic count of events, so `rate()` and `increase()`
- * mean what they usually mean.
- *
- * Only a value the producer actually supplied counts. A payload with no
- * occurrence time at all (`deferredOriginResolution` and friends) is scored at
- * staging time by design, and is not a defect to report.
+ * Jobs whose producer supplied a ready score the queue refused. Raised at the
+ * staging fallback the moment the value is rejected, before the bad score is
+ * written — a post-hoc scan of the ready set would find nothing and report
+ * zero forever. Excludes payloads scored at staging time by design (no
+ * occurrence time supplied at all).
  */
 export const gqReadyScoreImplausibleTotal = new Counter({
   name: "gq_ready_score_implausible_total",
@@ -304,7 +264,10 @@ export const gqReadyScoreImplausibleTotal = new Counter({
 
 // --- Blob lifecycle observability ---
 
-/** A stored blob exceeded the decode cap — possible tamper / zip-bomb. Distinct from a missing blob. */
+/**
+ * A stored blob exceeded the decode cap — possible tamper / zip-bomb.
+ * Distinct from a missing blob.
+ */
 export const gqBlobDecodeCapExceededTotal = new Counter({
   name: "gq_blob_decode_cap_exceeded_total",
   help: "Blob read exceeded the decode byte cap — treated as missing (possible tamper / zip-bomb)",
@@ -344,35 +307,11 @@ export const gqRetryEncodeFailuresTotal = new Counter({
 });
 
 /**
- * A staged job we could not decode and therefore discarded (#5538).
- *
- * Why this exists at all: the drop path used to be silent. It called
- * `scripts.complete()`, whose Lua INCRs the same `stats:completed` counter a
- * genuine success takes — so a discarded job did not merely go unnoticed, it was
- * counted as a WIN and cleared the group's stored error on the way out. Nothing
- * else in this module distinguishes "processed it" from "threw it away".
- *
- * Why the full label set and not just `{queue_name, reason}`: queue name alone
- * cannot identify which registered route lost work. Labels are read from the
- * envelope header via `readJobRoutingMeta`, which survives a body we cannot
- * decode.
- *
- * `reason` (see `DecodeFailureReason`, plus this module's terminal reasons):
- * - `missing_blob` — the body is GONE. Irreducible loss: no retry, park, or
- *   replay resurrects it.
- * - `malformed_envelope` / `body_unreadable` — the body is PRESENT but
- *   unreadable to this worker. Its value is deliberately NOT released, so a
- *   later worker (post-rollout) can still read it.
- * - `transient_exhausted` — the blob store stayed unreachable for every retry.
- * - `sibling_restage_failed` — a coalesced sibling could not be re-staged.
- * - `retry_encode_failed` — a retry's re-encode failed, so the retry never went
- *   back. Also counted by `gq_retry_encode_failures_total`, which stays as the
- *   specific diagnostic; this counter is the complete ledger of discards.
- * - `unknown` — an unclassified throw. Non-zero here means a decode failure mode
- *   exists that we have not named; that is a bug in the enum, not a shrug.
- *
- * A non-zero rate is permanent work loss unless the owning application has an
- * explicit replay mechanism. This counter is the transport-level signal.
+ * A staged job we could not decode and therefore discarded (#5538): the drop
+ * path used to call `scripts.complete()`, incrementing the same counter a
+ * genuine success takes, so a discard read as a win. See `DecodeFailureReason`
+ * for what each `reason` label means; a non-zero rate is permanent work loss
+ * unless the owning application replays.
  */
 export const gqJobsDroppedTotal = new Counter({
   name: "gq_jobs_dropped_total",
@@ -404,21 +343,11 @@ export function recordDroppedJob(labels: {
 }
 
 /**
- * A dispatched job whose routing metadata names a pipeline this worker does
- * not have registered, so it could not be handed to a handler.
- *
- * The body decoded fine and the payload is intact. What is missing is the
- * pipeline, in THIS process. That makes it a provisioning signal, not a data
- * signal, and the normal cause is a fleet running two builds at once: during a
- * rolling deploy the old workers still poll the same queue, so every job for a
- * newly added pipeline can land on a worker that has never heard of it. The
- * job is rejected so the queue re-offers it, and a worker on the new build
- * takes it.
- *
- * Read a sustained non-zero rate as "some workers are on the wrong build". A
- * burst that ends when a deploy finishes is the expected shape; a rate that
- * outlives the rollout means a pipeline was removed without a tombstone, and
- * those jobs will retry to exhaustion and park their group.
+ * A dispatched job whose routing metadata names a pipeline this worker has not
+ * registered. Normal cause is a rolling deploy: old workers still poll the
+ * queue and reject jobs for a pipeline they don't know, so a new-build worker
+ * can take them. A burst ending with the deploy is expected; a rate that
+ * outlives it means a pipeline was removed without a tombstone.
  */
 export const gqJobsUnroutableTotal = new Counter({
   name: "gq_jobs_unroutable_total",
@@ -427,24 +356,11 @@ export const gqJobsUnroutableTotal = new Counter({
 });
 
 /**
- * A release retired a blob's LAST lease, so its expiry dropped from the 4-day
- * backstop to the release grace window.
- *
- * This is the liveness signal for blob reclaim, and it exists because the
- * failure mode it guards against is silence. When releases left the full
- * backstop on unreferenced blobs, nothing in this module said so; the only
- * evidence was Redis memory climbing for four days, which the lease rollout had
- * already told operators to expect. A rate near zero while jobs complete means
- * reclaim is not happening — read it beside `gq_jobs_completed_total`, not
- * alone.
- *
- * ⚠️ Scope: terminal retirement only — the TS release and transfer paths. The
- * dedup-squash release inside `STAGE_LUA` applies the same grace window but is
- * NOT counted, because reporting it would mean widening the stage scripts'
- * return contract on the hot path. So this is a liveness signal ("is reclaim
- * happening at all"), not a complete ledger of graced blobs: treat the count as
- * a floor, and do not compute a reclaim ratio from it. The squash path's own
- * coverage is the integration tests plus Redis memory itself.
+ * A release retired a blob's LAST lease, dropping its expiry from the 4-day
+ * backstop to the release grace window. Liveness signal for reclaim: a rate
+ * near zero while jobs complete means reclaim isn't happening — read beside
+ * `gq_jobs_completed_total`. Scope: terminal retirement only, not the
+ * dedup-squash release in `STAGE_LUA` — treat this count as a floor.
  */
 export const gqBlobReleaseGraceTotal = new Counter({
   name: "gq_blob_release_grace_total",
@@ -453,21 +369,11 @@ export const gqBlobReleaseGraceTotal = new Counter({
 });
 
 /**
- * Every blob the reclaim runner examined, by what it decided.
- *
- * Unlike `gq_blob_release_grace_total` this accounts for the WHOLE keyspace: the
- * outcomes partition it, so `sum by (outcome)` is the full picture rather than a
- * floor. That is what makes it the signal to read when retention climbs anyway.
- *
- * How to read it:
- * - `repaired` rising steadily means blobs are reaching the runner unreferenced
- *   but NOT on the grace window — i.e. releases are being missed or withheld
- *   (holders dying mid-flight, orphaned holder tokens). Healthy at first; a
- *   persistently high rate means the release path is not doing its job.
- * - `reclaimed` is the only outcome that frees bytes. Flat while `repaired`
- *   climbs means the margin is never being reached — look for something
- *   re-arming blobs between sweeps.
- * - `leased` dominating is normal and healthy: most blobs are in use.
+ * Every blob the reclaim runner examined, by outcome. Unlike
+ * `gq_blob_release_grace_total`, outcomes partition the WHOLE keyspace, so
+ * `sum by (outcome)` is a full picture, not a floor — the signal to read when
+ * retention climbs anyway. `repaired` rising means releases are being missed;
+ * `reclaimed` is the only outcome that frees bytes.
  */
 export const gqBlobSweepTotal = new Counter({
   name: "gq_blob_sweep_total",
@@ -477,15 +383,10 @@ export const gqBlobSweepTotal = new Counter({
 
 /**
  * Drained siblings restaged because their `__jobName` differed from the
- * dispatched job's (ADR-066 pillar 2 mixed-command isolation).
- *
- * Distinct from the batch-failure restage paths (transient decode, oversized
- * poison) that share `restageDrainedSiblings`: those restage the WHOLE batch
- * because dispatch aborted, whereas this restages only foreign-command siblings
- * that were coalesced into a group whose key namespace is shared across command
- * types under `serializeByAggregate`. A steady rate means genuinely mixed
- * command traffic hitting one aggregate; a spike can flag a group-key collision
- * or a misrouted producer. Counts siblings restaged, not restage calls.
+ * dispatched job's (ADR-066 mixed-command isolation) — distinct from the
+ * batch-failure restage paths, which restage the whole batch. A steady rate
+ * means genuinely mixed command traffic; a spike flags a group-key collision
+ * or a misrouted producer.
  */
 export const gqForeignSiblingsRestagedTotal = new Counter({
   name: "gq_foreign_siblings_restaged_total",
@@ -495,29 +396,10 @@ export const gqForeignSiblingsRestagedTotal = new Counter({
 
 /**
  * A coalesced batch failed retryably and was split in half to isolate the
- * cause.
- *
- * Increments ONCE PER SPLIT, not once per batch, so one failing batch produces
- * a burst rather than a single event. Read it as a rate, not a total, and do
- * not infer a batch count from it — how many splits a batch costs depends on
- * why it failed:
- * - a single unprocessable payload costs one split per level of the descent to
- *   it, so roughly `log2(batchSize)` — but the exact count moves with the
- *   payload's position (a batch of 5 costs 2 or 3, not 2.32).
- * - a batch that fails purely on size keeps splitting until every part fits, so
- *   the cost is driven by how far the working size is below the batch bound and
- *   approaches `batchSize - 1` in the worst case, far above `log2(batchSize)`.
- *
- * A steady non-zero rate is the signal worth acting on, and it means one of two
- * things — both real:
- * - the batch bound is too generous for what the handler can process in one
- *   pass (size-driven; the fix is a tighter budget, not more bisection), or
- * - a payload in this pipeline is persistently unprocessable (poison; bisection
- *   is containing the blast radius but something still needs to look at it).
- *
- * Zero means batches either succeed whole or fail non-retryably. Correlate with
- * `gq_jobs_retried_total` to tell "we recovered inside the dispatch" from "we
- * gave the whole batch back to the queue".
+ * cause. Increments ONCE PER SPLIT, not once per batch, so read it as a rate: a
+ * steady non-zero rate means either the batch bound is too generous or a
+ * payload in this pipeline is persistently unprocessable. Zero means batches
+ * succeed whole or fail non-retryably.
  */
 export const gqBatchBisectionsTotal = new Counter({
   name: "gq_batch_bisections_total",

@@ -13,7 +13,10 @@ export type FilterParam =
   | Record<string, string[]>
   | Record<string, Record<string, string[]>>;
 
-/** Applies a saved view's cached filters onto `filters`, keeping only keys this registry still recognizes. */
+/**
+ * Applies a saved view's cached filters onto `filters`, keeping only keys
+ * this registry still recognizes.
+ */
 function applyCachedViewFilters(
   filters: Partial<Record<FilterField, FilterParam>>,
   viewFilters: Record<string, FilterParam>,
@@ -25,7 +28,10 @@ function applyCachedViewFilters(
   }
 }
 
-/** Looks up `viewId` in the project's cached saved-views list and applies its filters, if any, onto `filters`. */
+/**
+ * Looks up `viewId` in the project's cached saved-views list and applies its
+ * filters, if any, onto `filters`.
+ */
 function applyCachedViewById(
   filters: Partial<Record<FilterField, FilterParam>>,
   projectId: string,

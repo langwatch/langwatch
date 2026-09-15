@@ -1,20 +1,11 @@
 /** @vitest-environment node */
 
 /**
- * The gateway's handled errors, and the three properties that made them worth
- * writing.
- *
- * These surfaces arrived after the migration and invented their own channel: a
- * pseudo-code glued to the front of a prose message. Three things were wrong
- * with it, and one test guards each.
- *
- * Assertions are on `code`, `fault` and `meta` — never on the sentence. The
- * words a customer reads come from the presentation registry keyed by `code`
- * (ADR-045), so a test that pins prose pins the half that is meant to change.
- *
- * That registry is a client surface and lives outside this package, so the
- * three assertions this file used to make on the rendered copy are gone with
- * the move. What is pinned here is the half the feature owns.
+ * The gateway's handled errors, and the three properties that made them
+ * worth writing: assertions are on `code`, `fault` and `meta` — never the
+ * sentence, since customer-facing words come from the presentation registry
+ * keyed by `code` (ADR-045). That registry lives outside this package, so
+ * only the half the feature owns is pinned here.
  */
 import { describe, expect, it } from "vitest";
 

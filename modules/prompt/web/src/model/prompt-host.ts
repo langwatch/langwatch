@@ -1,27 +1,9 @@
 /**
- * What the Prompt Studio screen asks of the application it is mounted in.
- *
- * A screen may not import `@langwatch/ui`, the router, a toast singleton, the
- * session client or Web Storage: those are the imports ADR-004 seals off from a
- * feature-web package, and reaching for any of them is also what would make the
- * screen untestable outside a running application. It asks this port instead,
- * and the frontend feature that owns it — `apps/ui/src/features/prompt` —
- * answers it by adapting the browser capabilities the application resolves.
- *
- * THE TENTH FAMILY TO DECLARE THIS SHAPE, after governance, gateway, the
- * personal workspace, automations, ops, agents, data governance, datasets and
- * model configuration. Every one of those recorded that a repeat is the signal
- * to promote it into one place, and every one left it, for the same reason:
- * promotion changes packages a page-family move does not own. Recorded again in
- * `dev/docs/plans/ui-family-move-manifests.md`.
- *
- * WHAT THIS FAMILY ASKS THAT THE OTHERS DID NOT is `tabCapabilities`. The open
- * prompt tabs are persisted per project in Web Storage, one key per tab, and
- * the store that owns them was already written to take its storage and its
- * logger as arguments (`model/browser-capabilities.ts`) — `platform/app` bound
- * them to `window.localStorage` in an app adapter. That adapter is what the
- * host answers now, so the package never names a browser global and the screen
- * closure stays clean.
+ * What the Prompt Studio screen asks of the application it is mounted in. A
+ * screen may not import `@langwatch/ui`, the router, a toast singleton, the
+ * session client or Web Storage (ADR-004), so it asks this port instead; the
+ * frontend feature that owns it — `apps/ui/src/features/prompt` — answers it.
+ * `tabCapabilities` persists open prompt tabs per project in Web Storage.
  */
 
 import { createContext, useContext } from "react";
@@ -79,18 +61,10 @@ export type PromptCopyTarget = {
 
 /**
  * Whether this deployment runs the playground chat, and what to say when it
- * does not.
- *
- * The chat is not a screen this package can decide about on its own: it talks
- * to an execution endpoint the SERVER has to mount, and whether one is mounted
- * is a property of the process the screen was served from. A deployment that
- * mounts none leaves the chat with nowhere to post, and it used to render
- * anyway: a reader typed a message and got a 404 with no explanation.
- *
- * The words travel with the answer rather than being written here, because the
- * copy a customer reads is resolved from an error code by the host's
- * presentation registry, and a package that composed its own sentence would be
- * the one place in the product where that is not true.
+ * does not — a deployment with no execution endpoint mounted used to render
+ * the chat anyway, and a message posted into it 404'd with no explanation.
+ * The words travel with the answer rather than being written here: copy is
+ * resolved from an error code by the host's presentation registry.
  */
 export type PromptPlaygroundChatAvailability =
   | { available: true }
@@ -99,13 +73,10 @@ export type PromptPlaygroundChatAvailability =
 /**
  * A `platform/app` drawer this screen opens by address rather than by mounting.
  *
- * `traceV2Details` is registered in `platform/app/src/components/drawerRegistry.ts`
- * and opened by most of the product, so this move may not delete it and may not
- * copy it — a registry is composition, and a screen only ever needed the
- * address. Same recorded gap the me, automations, agents and model-config
- * families carry: nothing mounts that registry above a screen served from
- * `apps/ui` until the chrome layout route exists, so the address is right and
- * the drawer does not open yet.
+ * `traceV2Details` is registered in `platform/app/src/components/drawerRegistry.ts`,
+ * so this move may not delete or copy it — a registry is composition, and a screen
+ * only ever needed the address. Nothing mounts that registry above a screen served
+ * from `apps/ui` yet, so the address is right and the drawer does not open yet.
  */
 export type PromptPlatformDrawer = "traceV2Details";
 
@@ -142,15 +113,10 @@ export abstract class PromptHostApi {
   /**
    * Whether the application has already shown this failure to the reader.
    *
-   * `platform/app` deduped a refusal one of its four global mutation
-   * interceptors had already rendered as a modal — the prompt limit, the
-   * lite-member restriction — so a reader was not told the same thing twice,
-   * and the prompt actions asked before toasting. A RECORDED GAP, answered
-   * `false` in this application: that answer is a `WeakSet` those interceptors
-   * write to, and the cache they live on does not wrap the client `apps/ui`
-   * builds. Nothing reaching this screen has been through them, so nothing has
-   * been reported twice; the screen's own notice is the only one. Same shape
-   * the datasets and model-config families recorded, third use.
+   * `platform/app` dedupes a refusal one of its global mutation interceptors
+   * already rendered as a modal, via a `WeakSet` those interceptors write to.
+   * That cache does not wrap the client `apps/ui` build, so nothing reaching
+   * this screen has been through them — answered `false` here, a recorded gap.
    */
   abstract isReportedGlobally(error: unknown): boolean;
 

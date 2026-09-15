@@ -1,17 +1,9 @@
 /**
- * Prompt Studio - the whole `/:project/prompts` page.
- *
- * `DashboardLayout` does not travel, and that is the same chrome gap every
- * family since the gateway has recorded: 738 lines of header, product menu,
- * command bar, Langy dock and drawer registry belong to the composing
- * application, and this page is a child of a layout route it still serves. The
- * `compactMenu` flag went with it - the studio asked the application's product
- * menu to collapse so the prompt sidebar had room, and there is no capability
- * for a screen to ask that of a chrome it no longer knows about.
- *
- * Everything else is unchanged: the prompt-config dialogs and the chat-sync
- * context wrap a two-column layout, the sidebar on the left and the tabbed
- * browser on the right.
+ * Prompt Studio - the whole `/:project/prompts` page. `DashboardLayout` does
+ * not travel: header, product menu, command bar, Langy dock and drawer
+ * registry belong to the composing application, and this page is a child of
+ * a layout route it still serves. Everything else — the prompt-config
+ * dialogs, the chat-sync context, the two-column layout — is unchanged.
  */
 
 import { HStack, VStack } from "@chakra-ui/react";

@@ -87,7 +87,7 @@ describe.skipIf(!RUN_EXTERNAL)("LangChain Multi-Agent Integration Tests", () => 
 
     await tracer.withActiveSpan("multi-agent-collaboration", { root: true }, async () => {
       // Create simple research agent
-      const llm = new ChatOpenAI({ model: "gpt-4.1", temperature: 1 }); // gpt-4.1 takes too long to respond
+      const llm = new ChatOpenAI({ model: "gpt-4.1", temperature: 1 }); // gpt-4.1 is slow
       const tools = [
         new DynamicStructuredTool({
           name: "search",

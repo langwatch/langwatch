@@ -1,5 +1,7 @@
 /**
- * The fields of the run dialog that describe the run itself rather than the agent: what it covers, the targets it compares, the simulation models, and how many times it repeats.
+ * The fields of the run dialog that describe the run itself rather than the
+ * agent: what it covers, the targets it compares, the simulation models, and
+ * how many times it repeats.
  * @see specs/features/agent-testing/run-dialog.feature
  * @see specs/features/agent-testing/comparison-mode.feature
  */

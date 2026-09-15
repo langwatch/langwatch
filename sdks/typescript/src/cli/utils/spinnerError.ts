@@ -8,20 +8,19 @@ import {
 } from "./errorOutput";
 
 /**
- * Collapses the `spinner.fail(); console.error(...)` pattern into a single
- * call. A bare `spinner.fail()` leaves the spinner's starting text
- * ("Fetching X...") on screen with a red X, then the real error prints
- * on a separate line — two lines that look unrelated.
- *
- * This is also where a failure becomes OUTPUT, in the shape the caller asked
- * for. Every command already funnels its catch through here, so the two
- * renderings — the human block, and the `--format json` document a parser reads
- * — are decided ONCE rather than at ~100 call sites, and no command can forget
- * to do it.
- *
- * The spinner writes to stderr (ora's default), so under `--format json` the
- * document has stdout to itself: a parser never has to step over a red X to
- * find it, and a human still gets a legible line on the other stream.
+ * Collapses `spinner.fail(); console.error(...)` into one call — a bare `spinner.fail()` leaves
+ * the starting text on screen with a red X while the real error prints on a separate,
+ * unrelated-looking line.
+ */
+
+/**
+ * Also where a failure becomes OUTPUT: every command funnels its catch through here, so the
+ * human vs `--format json` rendering is decided ONCE rather than at ~100 call sites.
+ */
+
+/**
+ * The spinner writes to stderr (ora's default), so under `--format json` the document has
+ * stdout to itself — a parser never has to step over a red X to find it.
  */
 export function failSpinner({
   spinner,

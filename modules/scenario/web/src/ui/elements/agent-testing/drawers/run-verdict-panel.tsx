@@ -1,13 +1,7 @@
 /**
- * What the judge decided about one run: a labelled verdict line, then the
- * criteria that passed in one section, the criteria that failed in another,
- * the evaluators that ran on the scenario, and whatever the judge said about
- * the run as a whole.
- *
- * The panel carries no status pill, no success rate, no criteria count and no
- * duration: the chip strip at the top of the drawer already reads all four.
- *
- * @see specs/features/agent-testing/side-by-side-run-drawer.feature
+ * What the judge decided about one run: verdict line, passed/failed criteria, evaluators that
+ * ran, and the judge's overall note. No status pill, success rate, criteria count or duration —
+ * the chip strip at the top of the drawer already reads all four.
  */
 
 import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
@@ -120,14 +114,9 @@ function PanelHeading({
 }
 
 /**
- * The labelled verdict line at the top of the panel. It reads the run status
- * as a single word: PASSED in green when the run met every criterion, FAILED
- * in red when the judge missed one. It reads first because it is the answer;
- * the criteria under it are how the judge got there.
- *
- * A required evaluator that failed the run is named on the line: "FAILED"
- * beside a full set of green criteria reads as a contradiction, and the name
- * says which check failed the scenario instead.
+ * The labelled verdict line at the top of the panel: PASSED in green when every criterion
+ * passed, FAILED in red otherwise. A required evaluator that failed is named on the line,
+ * since "FAILED" beside an all-green criteria list would otherwise read as a contradiction.
  */
 function VerdictStatusLine({
   status,

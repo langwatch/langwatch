@@ -1,14 +1,15 @@
 /**
  * The Layer-2 facts every prompt-improvement suite asserts, in one place.
- *
- * Two suites now grade the same loop from opposite sides, one with a page
- * attached and one without, and the parity claim between them is only worth
- * anything if both read the outcome the same way. So the outcome is a shared
- * function rather than a block copied into each file.
- *
- * Not a test file on purpose: an `expect` inside a helper that lives beside its
- * `it()` reads as a misplaced assertion, and a helper the suites share has no
- * business being in one of them.
+ */
+
+/**
+ * Two suites grade the same loop from opposite sides — one with a page attached, one without —
+ * so the outcome must be a shared function, not a block copied into each file.
+ */
+
+/**
+ * Not a test file on purpose: an `expect` inside a helper beside its `it()` reads as a misplaced
+ * assertion, and a helper the suites share has no business living in one of them.
  */
 
 import { expect } from "vitest";
@@ -259,14 +260,9 @@ interface RecordedPart {
 }
 
 /**
- * The recorded turn keeps the order the turn happened in.
- *
- * A turn is a sequence: a paragraph, a call, another paragraph, another call.
- * A record that holds every call first and one closing paragraph gives a
- * reader who refreshes a pile of cards and no account of the work.
- * Read the way the panel reads it on reload, and asserted as the interleaving
- * rather than as a count, because how many calls a turn makes is the model's
- * business and how they are ordered is not.
+ * The recorded turn keeps the order it happened in: read the way the panel reads it on reload,
+ * and asserted as the interleaving rather than a count, since how many calls a turn makes is
+ * the model's business and how they're ordered is not.
  */
 export async function expectInterleavedTranscript(conversationId: string | null): Promise<void> {
   expect(conversationId, "the scenario recorded no conversation").toBeTruthy();

@@ -1,21 +1,19 @@
 /**
- * Click-to-edit widget name, shared by every surface that shows one: the
- * edit drawer's own header, a playground card's title, a pinned widget's
- * title on a dashboard card. Same pattern `AnalyticsHeader` uses for a
- * dashboard's own name: a flushed `Input` while editing (auto-focused,
- * auto-selected), a pencil icon that fades in on hover otherwise. Commits
- * on blur/Enter, discards on Escape — `onRename` is only called with a
- * real, non-empty change, never on every keystroke.
- *
- * `name` is always the full underlying value (editing starts from it, even
- * on a surface that only *displays* something derived from it, like the
- * dashboard's own prefix-stripped `displayText` — editing the stripped text
- * directly would silently drop the "North-star:"/"Legacy:" prefix on save).
- *
- * The id is shown in a tooltip, not inline — a member copying a widget id
- * for the CLI/REST API needs to find it somewhere, but it's not something
- * to read at a glance next to the name, so it stays a hover affordance
- * rather than permanent on-card text.
+ * Click-to-edit widget name, shared by every surface that shows one. Same pattern
+ * `AnalyticsHeader` uses for a dashboard's own name. Commits on blur/Enter, discards on Escape —
+ * `onRename` fires only on a real, non-empty change, never on every keystroke.
+ */
+
+/**
+ * `name` is always the full underlying value, even on a surface that only *displays* something
+ * derived from it (like the dashboard's prefix-stripped `displayText`) — editing the stripped
+ * text directly would silently drop the "North-star:"/"Legacy:" prefix on save.
+ */
+
+/**
+ * The id is shown in a tooltip, not inline: a member copying it for the CLI/REST API needs to
+ * find it, but it's not something to read at a glance, so it stays a hover affordance rather
+ * than permanent on-card text.
  */
 
 import { Box, HStack, Input, Text } from "@chakra-ui/react";

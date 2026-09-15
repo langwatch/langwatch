@@ -1,6 +1,7 @@
 /**
  * @vitest-environment node
- * Real Postgres + real ClickHouse. Ledger writes one row per (budget, request); reads keyed by scope alone used to sum both into each, so N sibling budgets each reported N times true spend. Spec: specs/ai-gateway/budgets.feature
+ * Real Postgres + real ClickHouse. Reads keyed by scope alone used to sum N sibling budgets'
+ * spend into each, reporting N times true spend. Spec: specs/ai-gateway/budgets.feature
  */
 import { fromDate, type Instant, nowInstant, Temporal, toDate } from "@langwatch/time";
 

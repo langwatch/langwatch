@@ -1,17 +1,7 @@
 /**
- * The step a submission buckets at.
- *
- * A third value that looks like a parameter and deliberately is not:
- * `period_granularity_seconds` is supplied by whatever surface is showing the
- * chart, exactly as the period is, and the backend refuses a request that sends
- * it among its own named parameters. Offering it as a filled-in parameter would
- * be offering the member a way to be refused.
- *
- * Only the steps the contract admits are offered. An arbitrary number is not a
- * finer control but a broken one: an off-list step is refused outright, and one
- * that fits the bucket budget only by accident produces a chart whose buckets
- * silently stop lining up with everyone else's.
- *
+ * The step a submission buckets at. `period_granularity_seconds` looks like
+ * a parameter but is supplied by the surface showing the chart, which the
+ * backend refuses among named parameters; only contract-admitted steps are offered.
  * @see @langwatch/analytics-contract — the vocabulary this fills
  * @see modules/analytics/specs/analytics-lwql-workbench.feature
  */

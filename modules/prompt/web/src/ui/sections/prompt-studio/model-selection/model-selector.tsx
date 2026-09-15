@@ -91,23 +91,11 @@ const scopeRank = (scopeType?: string): number =>
   SCOPE_RANK[scopeType as keyof typeof SCOPE_RANK] ?? 0;
 
 /**
- * Provider keys whose registry models in `mode` must not be offered,
- * because the row that would actually serve them cannot.
- *
- * Availability follows the row execution picks, not the union of rows.
- * A registry model is listed in no row's custom catalog, so
- * `findRowServingModel` finds nothing and `resolveServingRow` keeps the
- * scope-collapse winner - enabled beats disabled, then narrowest scope
- * (ModelProviderApi.isNarrower). An AI Studio row at organization
- * scope therefore does NOT rescue an Agent Platform row at project scope:
- * the project row wins and answers 404 on the embeddings endpoint.
- *
- * Ties inside the winning tier resolve conservatively - if any row that
- * could win cannot serve the mode, the models stay hidden. Offering a
- * model that fails is the defect this exists to remove; hiding one that
- * would have worked costs a configuration change the customer can see.
- *
- * Exported for tests.
+ * Provider keys whose registry models in `mode` must not be offered, because
+ * the row that would actually serve them cannot. Availability follows the row
+ * `resolveServingRow` picks (enabled beats disabled, then narrowest scope) —
+ * not the union of rows, so a broader-scope row does not rescue a
+ * narrower-scope row that can't serve the mode. Exported for tests.
  */
 export const providersWithoutRegistryModels = (
   rows: Array<{
@@ -605,16 +593,11 @@ export const ModelSelector = React.memo(function ModelSelector({
 });
 
 /**
- * Builds the list of available models by combining registry models with custom models.
- *
- * Registry models from `options` are always included for enabled providers,
- * filtered by mode (chat or embedding). Custom models are returned first
- * so they appear at the top of the selector.
- *
- * @param modelProviders - Map of provider keys to their configuration
+ * Builds the available-models list: custom models first, then registry models.
+ * @param modelProviders - Provider keys to their configuration
  * @param options - Registry model IDs (e.g., "openai/gpt-4o")
  * @param mode - Whether to include chat or embedding custom models
- * @returns Combined list of model IDs for enabled providers (custom first, then registry)
+ * @returns Combined list of model IDs, custom first then registry
  */
 export const getCustomModels = (
   modelProviders: Record<string, MaybeStoredModelProvider>,

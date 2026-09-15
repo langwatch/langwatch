@@ -1,27 +1,10 @@
 import { otlpKeyValueSchema, type OtlpAnyValue } from "./any-value.ts";
 
 /**
- * The one value an `AnyValue` carries, read in the order OTLP declares its
- * `oneof`.
- *
- * The schema does not enforce exclusivity (see {@link otlpAnyValueSchema}), so
- * the order here is what decides a payload that sets more than one field. It
- * follows the `oneof` field order, which is also what the collector does.
- *
- * Each branch also converts:
- *
- *   - `{ low, high }` is reassembled as a signed 64-bit integer. `low` is
- *     masked to 32 bits before the OR because it is delivered signed, so a
- *     `low` above 2^31 arrives negative and would otherwise corrupt the high
- *     half.
- *   - base64 `bytesValue` becomes a `Buffer`, so a caller sees bytes whichever
- *     transport delivered them.
- *   - an array of scalars becomes its JSON — an attribute map's values are
- *     strings, and this is the only lossless spelling of a list in one.
- *
- * Returns `undefined` for a value with no scalar reading: an empty `AnyValue`,
- * a `kvlistValue`, or an `arrayValue` holding anything but scalars. Those are
- * the cases {@link normalizeOtlpAttributeMap} descends into rather than reads.
+ * The one value an `AnyValue` carries, read in oneof field order — the schema doesn't enforce
+ * exclusivity, so order decides a payload setting more than one field, matching the collector.
+ * `{low, high}` reassembles as a signed 64-bit int with `low` masked to 32 bits before the OR,
+ * since it arrives signed and a `low` above 2^31 would otherwise corrupt the high half.
  */
 export function otlpScalarValue(
   value: OtlpAnyValue,
@@ -59,15 +42,10 @@ export function otlpScalarValue(
 }
 
 /**
- * Flattens one `AnyValue` into `output`, keyed by its dotted path.
- *
- * A `kvlistValue` contributes its keys, an `arrayValue` its indices, and the
- * separator is `.` in both — so `{ a: { b: [1, 2] } }` becomes `a.b.0` and
- * `a.b.1`. A scalar terminates the walk.
- *
- * An array whose items are all scalars never reaches the array branch: it is a
- * scalar itself by {@link otlpScalarValue}, and lands as one JSON string. Only
- * a MIXED array — objects among the scalars — is indexed out.
+ * Flattens one `AnyValue` into `output`, keyed by its dotted path — `.` separates both kvlist
+ * keys and array indices, so `{ a: { b: [1, 2] } }` becomes `a.b.0` and `a.b.1`. An array whose
+ * items are all scalars never reaches this branch: {@link otlpScalarValue} already turns it into
+ * one JSON string, so only a MIXED array — objects among the scalars — is indexed out here.
  */
 function flatten(value: OtlpAnyValue, prefix: string, output: Record<string, unknown>): void {
   const primitive = otlpScalarValue(value);
@@ -87,26 +65,9 @@ function flatten(value: OtlpAnyValue, prefix: string, output: Record<string, unk
 }
 
 /**
- * An OTLP attribute array as a flat map of strings.
- *
- * This is the shape the log and metric ingestion paths store attributes in:
- * one string per leaf, addressed by its dotted path. Structure is flattened
- * rather than preserved, which is what lets a column store index an attribute
- * by name without knowing the shape ahead of time.
- *
- * The rules, in the order they apply per value:
- *
- *   - bytes are hex, matching how identifiers are spelled everywhere else;
- *   - a string that LOOKS like JSON — `{...}` or `[...]` after trimming — is
- *     re-serialised through `JSON.parse`/`JSON.stringify`, which normalises
- *     the sender's whitespace so two senders of the same object produce the
- *     same stored string. Malformed JSON is kept exactly as it arrived, since
- *     the alternative is discarding an attribute the customer sent;
- *   - everything else is `String(value)`.
- *
- * Anything that is not an array, and any entry that does not parse as a
- * `{ key, value }` pair, is skipped rather than raising: this runs on the
- * ingestion path, where one malformed attribute must not cost the whole batch.
+ * An OTLP attribute array as a flat map of strings, one leaf per dotted path — flattened so a
+ * column store can index an attribute by name without knowing its shape. JSON-looking strings
+ * are re-serialised to normalise sender whitespace; malformed entries are skipped, not raised.
  */
 export function normalizeOtlpAttributeMap(attributes: unknown): Record<string, string> {
   if (!Array.isArray(attributes)) return {};

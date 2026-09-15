@@ -1,5 +1,9 @@
 /**
- * Virtual-key crypto: mint/hash/verify vk-lw-<ULID>. hashedSecret is HMAC-SHA256(pepper, secret) for deterministic lookup-by-hash in one indexed query; HMAC over argon2id since the secret already carries 128+ bits of entropy (no offline brute-force to mitigate) and must stay fast on the hot resolve path — same choice Stripe/GitHub API keys make. The pepper (LW_VIRTUAL_KEY_PEPPER) keeps a DB leak alone from recovering plaintext.
+ * Virtual-key crypto: mint/hash/verify vk-lw-<ULID>. hashedSecret is
+ * HMAC-SHA256(pepper, secret) for deterministic lookup-by-hash in one query;
+ * HMAC over argon2id since the secret already has 128+ bits of entropy (no
+ * brute-force to mitigate) and must stay fast on the hot path — same choice
+ * Stripe/GitHub keys make. The pepper keeps a DB leak from recovering plaintext.
  */
 import { createHmac, randomBytes, timingSafeEqual } from "crypto";
 import { type GatewayVirtualKeyCrypto } from "../app/gateway.members.ts";

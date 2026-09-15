@@ -1,11 +1,8 @@
 /**
- * `?promptId=` — the address that opens one prompt in a new tab.
- *
- * A family-local copy of `platform/app/src/hooks/usePromptIdQueryParam.ts`,
- * which had no other importer and reached the router directly. The host answers
- * the address instead, and it is READ rather than mirrored into state: the same
- * correction the data-governance and model-config families made to their own
- * scope filters.
+ * `?promptId=` — the address that opens one prompt in a new tab. A
+ * family-local copy of `platform/app/src/hooks/usePromptIdQueryParam.ts`; the
+ * host answers the address instead, and it is READ rather than mirrored into
+ * state.
  */
 
 import { useCallback } from "react";

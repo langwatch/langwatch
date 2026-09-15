@@ -1,21 +1,8 @@
 /**
- * The boundary that keeps Vega out of the dashboard bundle.
- *
- * The dashboard route is loaded by every member who opens Reports, whether or
- * not any workbench chart is placed on it. Vega, Vega-Lite, vega-embed and the
- * generated schema validator are several megabytes that only a grid actually
- * containing a workbench widget ever needs, so everything that reaches them is
- * behind this one lazy import.
- *
- * Mount this, not the widget-chart module — importing that directly is what
- * would put Vega back in the dashboard's entry chunk, and nothing would look
- * wrong. This used to have a sibling boundary for the Custom query
- * workbench (`LazyLangWatchQLChartMode.tsx`), removed along with that page —
- * this is now the only surface that draws a Vega-Lite chart.
- *
- * Type re-exports below are type-only, so they are erased at build and pull
- * nothing eagerly.
- *
+ * The boundary that keeps Vega out of the dashboard bundle: Vega, Vega-Lite,
+ * vega-embed and the generated schema validator are megabytes every Reports
+ * member would load regardless of whether a workbench chart is on the page.
+ * Mount this, not the widget-chart module directly.
  * @see specs/analytics/lwql-saved-charts.feature
  */
 

@@ -1,6 +1,7 @@
 /**
  * @vitest-environment node
- * Real Postgres. Three rules narrow a key's provider bundle: routing policy, the key's own allowlist (narrows only), and safety-type providers (never dispatchable). Spec: specs/ai-gateway/governance/vk-provider-access.feature
+ * Real Postgres. Three rules narrow a key's provider bundle: routing policy, allowlist, and
+ * safety-type providers. Spec: specs/ai-gateway/governance/vk-provider-access.feature
  */
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";

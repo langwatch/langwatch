@@ -35,15 +35,9 @@ export type AccountQuery =
   /** updatePassword — every credential account of one user. */
   | { kind: "byUserAndProvider"; userId: string; providerId: string }
   /**
-   * The SAME callback lookup as `byProviderSubject`, for a provider whose
-   * issuer is its own rather than one we minted.
-   *
-   * Google, GitHub, GitLab and Azure AD are keyed by better-auth on the
-   * issuer the provider itself asserts, and no rule of ours derives a
-   * provider id from one. The identifier stores that issuer verbatim — the
-   * backfill copies the legacy column and the attach ceremony records what
-   * better-auth was about to write — so the pair (issuer, providerAccountId)
-   * is a key this branch can answer on, and the index for it already exists.
+   * The SAME callback lookup as `byProviderSubject`, for a provider whose issuer is its own
+   * rather than one we minted: better-auth keys these on the issuer the provider asserts, so
+   * (issuer, providerAccountId) is a key this branch can answer on, with an index already there.
    */
   | { kind: "byIssuerSubject"; issuer: string; accountId: string };
 

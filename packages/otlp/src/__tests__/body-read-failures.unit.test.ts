@@ -1,18 +1,7 @@
 /**
- * How the shared OTLP body reader answers a body it cannot read.
- *
- * Written against the ~190/day of 500s the `/api/otel/v1/traces` receiver was
- * returning in production. None of them were server faults: an exporter gave up
- * mid-upload, the half-read stream was torn down, and nothing on the path
- * classified that — so it reached the request boundary unhandled and was
- * answered, logged and alerted on as a 5xx.
- *
- * The `releaseLock` scenarios are the subtle half. Releasing the reader lived
- * in a `finally`, and a throw from `finally` REPLACES the error already
- * propagating, which is why the logs named a stream-internals TypeError instead
- * of the disconnect that actually happened.
- *
- * Spec: specs/otlp/otlp-body-read-failures.feature
+ * How the shared OTLP body reader answers a body it cannot read: an exporter that gives up
+ * mid-upload is not a server fault. The `releaseLock` cases are the subtle half — a throw from
+ * `finally` REPLACES the error already propagating, so logs named a TypeError, not the disconnect.
  */
 
 import { gzipSync } from "node:zlib";

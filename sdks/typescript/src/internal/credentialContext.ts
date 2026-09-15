@@ -1,29 +1,10 @@
 /**
- * Request-scoped resolved credentials.
- *
- * The CLI daemon is one long-lived process that admits multiple requests
- * concurrently when they share a `(cwd, env, colorLevel)` execution window
- * (see cli/daemon/execution.ts). Device-mode requests do exactly that: the
- * caller environment carries NO API key, so the window fingerprint is
- * identical across two different logged-in users and they run at the same
- * time. Writing the resolved per-user key into the single shared
- * `process.env.LANGWATCH_API_KEY` would let one in-flight request build a
- * service with another request's key the instant a concurrent resolution (or
- * a login/logout) overwrote the global: the cross-identity leak the daemon
- * design says must be structurally impossible.
- *
- * The fix keeps the resolved key out of the global entirely. Each request runs
- * inside a credential HOLDER scope established at the request boundary
- * (`runWithCredentialHolder`, wrapped around the in-process command dispatch
- * and around every daemon request in cli/daemon/execution.ts). The resolver,
- * running later inside that scope, mutates the holder; the API-client factory
- * reads it. Because the holder object identity is fixed per request by
- * `AsyncLocalStorage.run` at the top, and `run` (unlike `enterWith`)
- * propagates the store to every continuation of the wrapped callback, a
- * mutation made mid-command is visible to the service constructed afterward,
- * while a concurrent request in its own holder never observes it. Outside any
- * scope (a plain SDK embed, or a direct unit call) a process-local fallback
- * holder is used, which is safe because those paths are single-request.
+ * Request-scoped resolved credentials. The CLI daemon serves concurrent
+ * requests from one process; device-mode requests share no API key in the
+ * environment, so writing a resolved key into `process.env.LANGWATCH_API_KEY`
+ * would let one in-flight request build a service with another's key — the
+ * cross-identity leak this holder (an `AsyncLocalStorage` scope established at
+ * each request boundary) exists to make structurally impossible.
  */
 
 import { AsyncLocalStorage } from "node:async_hooks";
@@ -75,12 +56,9 @@ export function scopedApiKey(): string | undefined {
 
 /**
  * Publish the project the current request targets. A user-scoped API key
- * (`sk-lw-{lookupId}_{secret}`) carries no project identity of its own, so the
- * server resolves the role binding from the project the request names: the
- * resolver decides which project that is (the personal one by default,
- * `--project <id|slug>` otherwise) and every client built afterwards reads it
- * from here. Same request scoping as the key, for the same reason — two
- * concurrent daemon requests can target different projects.
+ * carries no project identity of its own, so the resolver decides which
+ * project the request names (the personal one by default, `--project
+ * <id|slug>` otherwise) and every client built afterwards reads it from here.
  */
 export function setResolvedProjectId(projectId: string | undefined): void {
   currentHolder().projectId = projectId;

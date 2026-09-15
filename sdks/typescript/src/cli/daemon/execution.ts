@@ -264,14 +264,9 @@ export class ExecutionWindow {
   }
 
   /**
-   * Wait until the process globals match `request`, then return a release
-   * function. Rejects if the globals cannot be applied (e.g. the caller's cwd
-   * was deleted), which the server turns into a clean in-process fallback.
-   *
-   * `signal` aborts the WAIT: a queued waiter whose client has already
-   * cancelled (or whose request timed out) is removed from the queue rather
-   * than being admitted — and wedging the window — long after anyone stopped
-   * listening for it.
+   * Wait until the process globals match `request`, then return a release function. Rejects
+   * if the globals cannot be applied, which the server turns into a clean in-process fallback.
+   * `signal` aborts the WAIT: a cancelled waiter is removed rather than wedging the window.
    */
   async acquire({
     request,

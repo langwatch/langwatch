@@ -1,23 +1,23 @@
 /**
  * The one overlay these pages open, as a query write.
- *
- * `platform/app` wrote it through `useDrawer`, which is application composition
- * a feature-web package may not reach. What a drawer actually needs is the
- * address: `CurrentDrawer` hydrates itself from `drawer.open` plus the
- * `drawer.*` parameters, so writing the same keys is writing the same intent.
- *
- * KNOWN CHROME GAP, stated here rather than papered over. `traceV2Details` is
- * registered in `platform/app` and mounted by `DashboardPageBody`, which is
- * application chrome; a screen served from `apps/ui` has nothing above it yet.
- * So on the feedback table the address changes and nothing opens until the
- * chrome layout route lands — the same gap the coding-agent, me, automations
- * and annotations families recorded. Writing the address is still right: it is
- * what makes the overlay come back for free when the chrome does, and it is
- * what a shared link already means.
- *
- * Every `drawer.` key already on the address is taken off first and everything
- * else is left alone, which is what the platform registry did — so opening a
- * trace from the users page leaves the range and the filters standing under it.
+ */
+
+/**
+ * `platform/app` used `useDrawer`, application composition a feature-web package may not reach.
+ * `CurrentDrawer` actually just hydrates from `drawer.open` plus `drawer.*` params, so writing
+ * the same keys is writing the same intent.
+ */
+
+/**
+ * KNOWN CHROME GAP: `traceV2Details` is mounted by `DashboardPageBody` (application chrome); a
+ * screen served from `apps/ui` has nothing above it yet, so nothing opens until the chrome
+ * layout route lands. Writing it is still right — it comes back for free once chrome lands.
+ */
+
+/**
+ * Every `drawer.` key already on the address is taken off first and everything else is left
+ * alone, matching the platform registry — opening a trace from the users page leaves the range
+ * and filters standing under it.
  */
 
 /** The whole-query write the host port takes: `undefined` removes a key. */

@@ -1,5 +1,6 @@
 /**
- * The fixed band at the top of the run drawer: status, title, the version of the scenario the run used, the actions, and the strip of chips under them.
+ * The fixed band at the top of the run drawer: status, title, the version of
+ * the scenario the run used, the actions, and the strip of chips under them.
  * @see specs/features/agent-testing/side-by-side-run-drawer.feature
  * @see specs/scenarios/scenario-version-on-runs.feature
  */

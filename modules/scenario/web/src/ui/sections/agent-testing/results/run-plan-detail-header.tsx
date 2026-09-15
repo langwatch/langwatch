@@ -1,39 +1,7 @@
 /**
- * The top line of an open run plan: which run is on screen on the left, and
- * everything a person can do with the plan on the right, all on one row.
- *
- * The name of the plan is not here: it reads as the page title while the plan
- * is open, so this line can stay on the run itself.
- *
- * A set that runs from code is not a plan anyone wrote, so it carries neither
- * "Edit run plan" nor Run. Export lives in the overflow menu, so the line ends
- * on the two actions the prototype draws.
- *
- * "Show run settings" turns on the block under this line that says what the
- * run was configured with. It is off until it is asked for, so nothing pushes
- * the results down on a page a person opened to read them.
- *
- * The line holds one row whatever the note says. The run summary takes the
- * space the actions leave and cuts the note with an ellipsis, so the actions
- * keep the same place on a run with a note and on a run without one. On a
- * window too narrow even for the actions alone the line breaks, and the
- * actions stay at its right end.
- *
- * The evaluators of the run read after the pass block, one pill each, at the
- * size of the pass block: the run's verdict and how each check scored are
- * peers. A pass or fail evaluator reads its pass rate over the run; a score
- * reads its mean with no colour.
- *
- * How long ago the run started is not on this line. The runs rail beside it
- * already says that for every run, and the settings block says it again with
- * the date, so a third copy on the line the results start from says nothing
- * new.
- *
- * The back control is not here: it lives in the runs rail, beside the list it
- * goes back to.
- *
- * @see specs/features/agent-testing/results-tabs.feature
- * @see specs/suites/run-notes.feature
+ * The top line of an open run plan: which run is on screen, and everything a person can do
+ * with the plan, all on one row. Plan name, run start time, and the back control are
+ * deliberately not here — the page title, runs rail and settings block already show them.
  */
 
 import { Box, Button, HStack, Text } from "@chakra-ui/react";

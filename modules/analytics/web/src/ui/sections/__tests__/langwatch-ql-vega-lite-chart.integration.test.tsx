@@ -1,14 +1,8 @@
 /**
  * @vitest-environment jsdom
- *
- * The chart's contract with the Vega runtime, and its behaviour when there is
- * no chart to show.
- *
- * `vega-embed` is replaced at the module boundary. What is asserted here is
- * ours — the options a LangWatchQL chart is embedded with, when a view is rebuilt
- * versus fed, and that every failure has a state of its own. What Vega draws
- * from those options is Vega's, and is proven in a real browser instead.
- *
+ * The chart's contract with the Vega runtime: what is asserted here is ours —
+ * the options a chart is embedded with, when a view is rebuilt versus fed,
+ * and that every failure has its own state. What Vega draws is Vega's.
  * Spec: modules/analytics/specs/analytics-lwql-workbench.feature
  */
 

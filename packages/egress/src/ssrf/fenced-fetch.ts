@@ -4,42 +4,26 @@ import { Agent, type Response as FetchResponse, fetch as undiciFetch } from "und
 import type { SsrfUrlValidator, SsrfValidationResult } from "./url-validator.ts";
 
 /**
- * The fetch a validated destination is actually reached through.
- *
- * FROZEN TWIN of the fetch half of `platform/app/src/utils/ssrfProtection.ts`
- * (`fetchWithResolvedIp`, `RedirectRefusedError`, the connection-error
- * formatters and the redirect ladder). The application keeps its copy while
- * both graphs send.
- *
- * ## Why it is not a plain fetch
- * The connection is pinned to the IP the policy judged, via an undici Agent
- * whose `lookup` answers that address and nothing else, so the name cannot be
- * re-resolved to somewhere else between the decision and the socket. The `Host`
- * header and TLS servername still carry the original hostname, so the receiver
- * routes correctly.
- *
- * ## Redirects
- * `redirect: "manual"`, always. What happens next is the caller's policy:
- * - `followRedirects: false` refuses the hop outright. This is what a
- *   customer-supplied destination uses: a hop is a new address that the
- *   original admission never judged.
- * - Otherwise the hop is re-validated through `revalidate` before it is taken,
- *   at most `MAX_REDIRECTS` times, carrying the caller's deadline across every
- *   hop so one signal bounds the whole chain.
- *
- * THE ONE DELIBERATE DIFFERENCE FROM THE APPLICATION'S COPY: there, the hop is
- * re-validated by a module-level validator built from the environment, and the
- * webhook channel refuses redirects precisely BECAUSE that validator is weaker
- * than the one the send was admitted under. A package has no environment to
- * build such a validator from, so `revalidate` is a parameter — and a caller
- * that asked to follow redirects without supplying one is refused rather than
- * allowed through unjudged. An admission this module cannot evaluate refuses.
- *
- * ## Timeouts
- * Two independent bounds, both opt-in: `init.signal` is forwarded to undici and
- * carried across every hop, and `headersTimeoutMs` / `bodyTimeoutMs` ride on the
- * Agent as a socket-level backstop, so a slowloris receiver is still bounded if
- * the signal is ever dropped. Omitted leaves undici's 300s defaults.
+ * The fetch a validated destination is actually reached through. FROZEN TWIN
+ * of the fetch half of `platform/app/src/utils/ssrfProtection.ts`. Pins the
+ * connection to the IP the policy judged (via an undici Agent's `lookup`) so
+ * the hostname cannot be re-resolved between decision and socket, while the
+ * `Host` header and TLS servername still carry the original hostname.
+ */
+
+/**
+ * Redirects are `manual`, always: `followRedirects: false` refuses every hop
+ * (a customer-supplied destination), otherwise each hop is re-validated
+ * through `revalidate` (a parameter, since a package has no environment to
+ * build one from — an admission this module cannot evaluate refuses) up to
+ * `MAX_REDIRECTS` times under one shared deadline.
+ */
+
+/**
+ * Two independent timeout bounds, both opt-in: `init.signal` carries across
+ * every hop, and `headersTimeoutMs` / `bodyTimeoutMs` ride on the Agent as a
+ * socket-level backstop if the signal is ever dropped. Omitted leaves
+ * undici's 300s defaults.
  */
 
 const logger = createLogger("langwatch:ssrfProtection");
@@ -81,13 +65,10 @@ function formatConnectionError(err: Error, hostname: string, port: number): Erro
 }
 
 /**
- * The receiver redirected and this caller declined the hop.
- *
- * A class rather than a message, because the catch below funnels every plain
- * `Error` through `formatConnectionError`, which rewrites it as "Connection
- * failed to host:port: …". A caller told the endpoint was unreachable goes and
- * checks their network, when the endpoint answered perfectly well and simply
- * redirected. This type passes through that catch untouched.
+ * The receiver redirected and this caller declined the hop. A class rather
+ * than a message, because the catch below funnels every plain `Error`
+ * through `formatConnectionError`, rewriting it as "Connection failed" —
+ * this type passes through that catch untouched.
  */
 export class RedirectRefusedError extends Error {
   constructor(

@@ -1,5 +1,5 @@
 /**
- * SimulationModelSelect is the model picker for the scenario user-simulator / judge roles — specs/model-providers/custom-model-display-name.feature, "Scenario model picker shows the configured display name".
+ * SimulationModelSelect is the model picker for the scenario user-simulator / judge roles.
  * @vitest-environment jsdom
  * @see specs/model-providers/custom-model-display-name.feature
  */

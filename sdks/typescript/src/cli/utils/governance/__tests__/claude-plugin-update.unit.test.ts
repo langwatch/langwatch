@@ -1,14 +1,7 @@
 /**
- * Keeping the installed LangWatch plugin up to date: when a wrapped run spends
- * a subprocess looking, what it does with what it finds, and what it costs on
- * the runs in between.
- *
- * `node:child_process` is the only thing mocked. The install record, the
- * marketplace listing and its plugin manifest are real files under a temp HOME,
- * because the version comparison reads them the way Claude Code writes them and
- * a hand-stubbed reader would prove nothing about that.
- *
- * Feature: specs/ai-governance/cli-wrappers/claude-plugin-update.feature
+ * `node:child_process` is the only thing mocked; the install record, marketplace listing and
+ * plugin manifest are real files under a temp HOME, since version comparison reads them the way
+ * Claude Code writes them. Feature: specs/ai-governance/cli-wrappers/claude-plugin-update.feature
  */
 
 import { mkdirSync } from "node:fs";

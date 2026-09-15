@@ -53,7 +53,8 @@ export type PromptTabbedSectionProps = {
 };
 
 /**
- * Tabbed section of the prompt browser window that contains the conversation, variables, and demonstrations tabs.
+ * Tabbed section of the prompt browser window that contains the
+ * conversation, variables, and demonstrations tabs.
  */
 export function PromptTabbedSection({
   layoutMode,

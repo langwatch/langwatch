@@ -4,7 +4,9 @@ import type { MfaEnrollmentState } from "@langwatch/identity-contract";
  * How the two-step verification guards see current state: reads over the
  * `MfaEnrollment` projection, and the one organization read the disable
  * guard needs. The app implements this with Prisma.
- *
+ */
+
+/**
  * Serialized the same way the identity guards are — read-your-writes on the
  * calling path, the queue's per-user FIFO on the staged path — so a guard
  * reads the enrollment first and states only what it does not carry.

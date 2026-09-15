@@ -47,7 +47,9 @@ function makeEvent<E extends { type: string; data: unknown }>(
 }
 
 /**
- * Attribution an outcome states about itself when its emitter does NOT repeat it — the fold takes attribution from admission, so this exercises the path where the outcome adds nothing (an older gateway build's shape).
+ * Attribution an outcome states about itself when its emitter does NOT
+ * repeat it — the fold takes attribution from admission, so this exercises
+ * the path where the outcome adds nothing (an older gateway build's shape).
  */
 const UNATTRIBUTED_OUTCOME = {
   organization_id: "",
@@ -63,7 +65,9 @@ const UNATTRIBUTED_OUTCOME = {
 };
 
 /**
- * Attribution an outcome states about itself when its emitter repeats it — a brokered voice session is confirmed by the control plane after the gateway admitted it, so the confirmation may be the first event the fold sees.
+ * Attribution an outcome states about itself when its emitter repeats it — a
+ * brokered voice session is confirmed by the control plane after the gateway
+ * admitted it, so the confirmation may be the first event the fold sees.
  */
 const ATTRIBUTED_OUTCOME = {
   ...UNATTRIBUTED_OUTCOME,

@@ -1,19 +1,8 @@
 /**
- * Extracts the most informative, user-facing message from an API error body.
- *
- * Errors from the LangWatch API follow the shape `{ error: string, message?: string }`
- * per `errorSchema` in the server. In production the middleware may return a
- * generic `{ error: "Internal server error", message: "Internal server error" }`
- * which is useless to a user — this helper at least falls back to stringifying
- * the raw body so no diagnostic information is lost.
- *
- * Priority (first non-generic, non-empty wins):
- *   1. `body.message` (descriptive sentence from the server)
- *   2. `body.error`   (error kind — "NotFoundError", "Conflict", …)
- *   3. Any other string fields on the body object (e.g. `detail`, `reason`)
- *   4. JSON stringification of the entire body
- *   5. `Error#message` if the input is a thrown Error
- *   6. A status-code-derived fallback, if available
+ * Extracts the most informative, user-facing message from an API error body. A generic
+ * `{ error: "Internal server error" }` is useless to a user, so this tries, in order:
+ * `body.message`, `body.error`, other string fields, then falls back to stringifying the body
+ * or the thrown Error's own message — nothing here discards diagnostic information.
  */
 import { isCodeAsMessage, looksLikeErrorCode, sentenceForCode } from "./error-code-copy";
 
@@ -63,14 +52,9 @@ interface ZodIssue {
 }
 
 /**
- * Renders a Zod validation error body into a user-readable string. Returns
- * undefined if `body` is not a Zod error shape.
- *
- * Examples:
- *   { name: "ZodError", issues: [{ path: ["format"], message: "Invalid enum value..." }] }
- *   → "Validation failed: format — Invalid enum value..."
- *   { name: "ZodError", issues: [<issue1>, <issue2>] }
- *   → "Validation failed: a.b — msg1; c — msg2"
+ * Renders a Zod validation error body into a user-readable string, e.g.
+ * `"Validation failed: format — Invalid enum value..."` for one issue, joined by `;` for more.
+ * Returns undefined if `body` is not a Zod error shape.
  */
 function formatZodIssues(body: Record<string, unknown>): string | undefined {
   const isZod = body.name === "ZodError" || (Array.isArray(body.issues) && body.issues.length > 0);

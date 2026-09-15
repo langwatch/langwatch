@@ -1,15 +1,7 @@
 /**
  * @vitest-environment node
- *
- * @see specs/setup/task-runner-program-seam.feature
- * @see dev/docs/adr/130-the-api-router-type-is-declared.md
- *
- * The same ratchet the router type carries, on the process that composes the
- * least: how many workspace source files the task runner has to load.
- *
- * The walk follows type-only imports as well as value ones, because that is
- * what the compiler does, and resolution is the workspace resolver's, so a
- * third-party specifier is not followed.
+ * The same ratchet the router type carries, on the process that composes the least: how many
+ * workspace source files the task runner has to load, following type-only imports too.
  */
 import { dirname, join, sep } from "node:path";
 import { fileURLToPath } from "node:url";

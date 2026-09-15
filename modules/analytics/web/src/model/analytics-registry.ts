@@ -395,16 +395,14 @@ export const seriesInput = z.object({
 export type SeriesInputType = z.infer<typeof seriesInput>;
 
 /**
- * Whether an absent result value for this series truly means zero. Counts and
- * sums are additive: no matching rows IS zero. Averages, extrema and
- * percentiles are not: they are only ever absent when there was no data, and
- * defaulting them to 0 fabricates a measurement (e.g. a 0% pass rate on a day
- * an evaluator never ran). Pipeline series re-aggregate per entity, so the
- * cross-entity pipeline aggregation decides additivity.
- *
- * Both the ClickHouse summary builder (its empty-result coalesce) and the
- * timeseries row parser (its cross-period key normalisation) key their
- * zero-defaulting on this predicate.
+ * Counts and sums are additive, so no matching rows IS zero; averages, extrema and percentiles
+ * are not — they're only absent when there was no data, and defaulting to 0 fabricates a
+ * measurement (e.g. a 0% pass rate on a day an evaluator never ran).
+ */
+
+/**
+ * Both the ClickHouse summary builder and the timeseries row parser key their zero-defaulting
+ * on this predicate.
  */
 export function isZeroWhenAbsentSeries(series: SeriesInputType): boolean {
   if (series.pipeline) return series.pipeline.aggregation === "sum";

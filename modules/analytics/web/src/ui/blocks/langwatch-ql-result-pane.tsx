@@ -102,16 +102,11 @@ function resultChip({
 }
 
 /**
- * The refusal's own reasons, under the registry copy.
- *
- * This is the one place the workbench reads `meta`, and it clears the bar the
- * error-handling contract sets for that: the shape is declared by the API
- * (`LangWatchQLViolation`), every message is customer-safe by construction, and
- * this pane is the named consumer. Without them a policy refusal would say
- * "this query isn't allowed here" and leave the member guessing which of five
- * joins to change.
- *
- * The validation service supplies the structured violation shape.
+ * The refusal's own reasons, under the registry copy. This is the one place
+ * the workbench reads `meta`: the shape is declared by the API
+ * (`LangWatchQLViolation`), every message is customer-safe by construction,
+ * and this pane is the named consumer. Without them a refusal would say "this
+ * query isn't allowed here" and leave the member guessing which join to change.
  */
 function ViolationList({ failure }: { failure: LangWatchQLFailure }) {
   if (failure.violations.length === 0) return null;
@@ -172,15 +167,10 @@ function StaleNotice({ onRun }: { onRun: () => void }) {
 }
 
 /**
- * How much of the answer arrived, in the only number that is always true.
- *
- * It cites the rows actually returned and never a row ceiling, because the
- * ceiling is usually not what bit: a response is also capped by a byte budget,
- * so a wide result is commonly cut off in the hundreds. Naming "10,000" here
- * would tell a member their query hit a limit it never reached, and send them
- * looking for ten thousand rows that were never coming.
- *
- * The query service supplies the result and truncation metadata.
+ * How much of the answer arrived, in the only number that is always true. It
+ * cites rows actually returned, never a row ceiling — a response is also
+ * capped by a byte budget, so naming "10,000" here would send a member
+ * looking for rows that were never coming.
  */
 function TruncationBanner({ result }: { result: LangWatchQLQueryResult }) {
   return (

@@ -1,18 +1,7 @@
 /**
- * The machine-readable command catalog — one builder behind
- * `langwatch commands`, `langwatch help-tree`, and the `status` cheat-sheet.
- *
- * The command tree itself comes from commander (`buildProgram()` is the
- * ground truth for what exists); the metadata layered on top — usage hints
- * and skill annotations — comes from the canonical `feature-map.json`,
- * embedded at codegen time as `internal/generated/cli/feature-map.generated.ts`
- * (same copy-types.sh precedent as llmModels.json). No hand-maintained
- * parallel registry: a command added to program.ts shows up here
- * automatically, and the drift test in `cli/__tests__/` fails if the feature
- * map doesn't claim it.
- *
- * Token cost follows gcx: an estimate of what injecting this command's help
- * into an agent's context costs — chars of its rendered help / 4, rounded up.
+ * The machine-readable command catalog behind `langwatch commands`, `help-tree`, and the
+ * `status` cheat-sheet — metadata comes from `feature-map.json`, kept in sync by a drift test.
+ * Token cost estimates an agent's context cost for a command's help: chars / 4, rounded up.
  */
 import type { Command } from "commander";
 import {
@@ -49,13 +38,9 @@ export interface CatalogEntry {
 }
 
 /**
- * Top-level commands that are CLI plumbing rather than product resources:
- * auth, config, browser openers, docs fetchers, the daemon, the gateway
- * pass-through wrappers, and the catalog commands themselves (self-referential).
- * Shared by the status cheat-sheet (which lists only resources) and the
- * feature-map drift test (which requires feature-map coverage for everything
- * NOT in this set). Keep it in sync with the exclusion list in the app-side
- * capabilityCatalog coverage test.
+ * Top-level commands that are CLI plumbing, not product resources — excluded from the
+ * feature-map coverage the drift test requires. Keep in sync with the exclusion list in the
+ * app-side capabilityCatalog coverage test.
  */
 export const PLUMBING_COMMANDS: ReadonlySet<string> = new Set([
   // Auth/session plumbing.

@@ -1,12 +1,9 @@
 /**
  * Pure address-resolution helpers for the local-dev seed (seed.ts), split out
- * so the rules are testable without booting Prisma.
- *
- * SEED_EMAIL_DOMAIN is a purely opt-in per-stack override. Unset, every
- * seeded account uses DEFAULT_SEED_EMAIL_DOMAIN — one stable, global address
- * that works on every worktree and keeps a saved password-manager login
- * working across worktrees and reseeds. Set, every seeded account's domain
- * moves to it; local parts never change. haven never sets this itself.
+ * so the rules are testable without booting Prisma. SEED_EMAIL_DOMAIN is a
+ * purely opt-in per-stack override; unset, every seeded account uses
+ * DEFAULT_SEED_EMAIL_DOMAIN, one stable global address that keeps a saved
+ * password-manager login working across worktrees and reseeds.
  */
 
 /** The domain every seeded account uses unless SEED_EMAIL_DOMAIN overrides it. */

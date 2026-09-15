@@ -1,5 +1,8 @@
 /**
- * Data-access for VirtualKey. Post-collapse model: organization-scoped + reachable from N (scopeType, scopeId) entries in VirtualKeyScope. dbMultiTenancyProtection enforces every where-clause carries organizationId, a row id, a hashedSecret, or a scopes:{some:{...}} predicate.
+ * Data-access for VirtualKey. Post-collapse model: organization-scoped + reachable from N
+ * (scopeType, scopeId) entries in VirtualKeyScope. dbMultiTenancyProtection enforces every
+ * where-clause carries organizationId, a row id, a hashedSecret, or a scopes:{some:{...}}
+ * predicate.
  */
 import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
 import type { GatewayVirtualKeyRecord, GatewayVirtualKeyScope } from "@langwatch/gateway-contract";
@@ -18,7 +21,9 @@ import type { GatewayPersistenceTransaction } from "../../app/gateway.members.ts
 
 const wirePages = GatewayWirePaginationAdapter.create();
 /**
- * Routing-policy columns the materialiser reads off a virtual key — one constant, not a copy per query: this select appears on every read path, and a site missing a column doesn't fail, it silently materializes a bundle without it (a policy's tier fallthrough stops reaching the gateway with nothing to notice).
+ * Routing-policy columns the materialiser reads off a virtual key — one constant, not a copy
+ * per query: a site missing a column doesn't fail, it silently materializes a bundle without
+ * it (a policy's tier fallthrough stops reaching the gateway with nothing to notice).
  */
 export type VirtualKeyWithScopes = GatewayVirtualKeyRecord;
 export type ScopeInput = GatewayVirtualKeyScope;
@@ -121,7 +126,9 @@ export class PrismaGatewayVirtualKeyRepository extends GatewayVirtualKeys {
   }
 
   /**
-   * Customer-facing org listing excludes product-managed keys (purpose != USER, e.g. the Langy VK) — the customer neither created nor may mutate them, so surfacing them only invites a rotate that silently breaks the feature holding the secret (internal lookups needing them use tryFindById/tryFindByHashedSecret, unfiltered; same posture as HIDDEN_SYSTEM_KEY_NAMES). One page, newest first, keyed (createdAt, id); the ROUTE still filters by caller visibility, so a page can come back shorter than limit with nothing skipped, just unevenly distributed.
+   * Customer-facing org listing excludes product-managed keys (purpose != USER) — surfacing
+   * them would invite a rotate that silently breaks the feature holding the secret. The ROUTE
+   * still filters by caller visibility, so a page can come back shorter than limit.
    */
   async findPageInOrganization(args: {
     organizationId: string;
@@ -183,7 +190,9 @@ export class PrismaGatewayVirtualKeyRepository extends GatewayVirtualKeys {
   }
 
   /**
-   * Every customer-owned VK reachable from a given scope entry, for project/team/org settings pages listing keys with a matching scope row. Product-managed keys excluded, same reason as findAllInOrganization.
+   * Every customer-owned VK reachable from a given scope entry, for project/team/org settings
+   * pages listing keys with a matching scope row. Product-managed keys excluded, same reason
+   * as findAllInOrganization.
    */
   async findAllForScope(
     scope: ScopeInput,

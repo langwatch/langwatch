@@ -86,13 +86,10 @@ interface CreateWebhookEndpointBase {
 }
 
 /**
- * The POST body, exactly as the wire takes it.
- *
- * A destination is one kind and one address, so the two are a union rather
- * than independent optional fields: the type refuses `{destination_kind:
- * "sqs"}` with no queue, and `{url, sqs}` together, which is what the server
- * refuses too. `destination_kind` is optional only on the http branch, where
- * absent has always meant http.
+ * The POST body, exactly as the wire takes it. A destination is one kind and one address, so
+ * the two are a union rather than independent optional fields — matching what the server
+ * refuses too. `destination_kind` is optional only on the http branch, where absent has
+ * always meant http.
  */
 export type WebhookDestinationInput =
   | { destination_kind?: "http"; url: string; sqs?: never }
@@ -197,24 +194,9 @@ export class WebhooksApiError extends Error {
 }
 
 /**
- * Client for the org-anchored webhook platform surface (/api/webhooks/v1).
- * Authenticates with an ORGANIZATION API key (sk-lw-*); project keys are
- * rejected by the server. The surface is anchored on the organization alone,
- * so there is no project id to give this client.
- *
- * The key MUST be an organization API key (`sk-lw-{id}_{secret}`, from
- * Settings > API Keys). A project API key is refused with
- * `credential_class_mismatch` before any permission is consulted, and no
- * header makes it work. The same organization key also reaches the
- * project-scoped surfaces when given `X-Project-Id`, so one key covers both
- * families and a project key covers only one.
- *
- * The endpoint entity and the create/update bodies mirror the wire verbatim,
- * so their fields are lowercase snake_case: virtual keys and gateway budgets
- * already take the wire body as it is, and translating field by field here
- * only made the request bodies of the four billing surfaces disagree. Call
- * options this SDK invents (query filters, per-call behaviour, action
- * arguments) stay camelCase like the rest of the SDK.
+ * Client for the org-anchored webhook platform surface (/api/webhooks/v1) — an ORGANIZATION
+ * API key only; a project key is refused with `credential_class_mismatch`. Fields mirror the
+ * wire verbatim in snake_case, since translating field-by-field made billing surfaces disagree.
  */
 export class WebhooksApiService {
   private readonly endpoint: string;
@@ -315,14 +297,9 @@ export class WebhooksApiService {
   }
 
   /**
-   * Retire an endpoint: the server soft-archives the row, stamping
-   * `archived_at` and dropping the status to disabled, so the delivery
-   * history stays readable for audit while nothing more is ever sent. The
-   * row is archived, not removed, and `gatewayBudgets.archive()` already
-   * names that operation, so the billing surfaces agree on the verb.
-   *
-   * Nothing comes back: the response body carries only an `archived: true`
-   * acknowledgement, and a non-2xx already raises.
+   * Retire an endpoint: the server soft-archives the row (stamping `archived_at`, disabling
+   * delivery) so history stays readable for audit. Archived, not removed — same verb as
+   * `gatewayBudgets.archive()`, so the billing surfaces agree.
    */
   async archive(id: string, options?: MutationOptions): Promise<void> {
     await this.request<unknown>(

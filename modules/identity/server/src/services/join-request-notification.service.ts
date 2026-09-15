@@ -11,18 +11,9 @@ const UNNAMED_ORGANIZATION = "your organization";
 const UNNAMED_REQUESTER = "A colleague";
 
 /**
- * Who is told when a join request's own timers fire, and what happens when
- * telling them fails.
- *
- * Every fan-out is `Promise.allSettled`, for the reason the re-request mail
- * gives: one bouncing admin address must not silence the rest. A mail that
- * cannot be sent is logged and the request stands — the durable fact is the
- * request, not the notification, and a deployment with no email provider
- * configured is an ordinary self-hosted install rather than an error.
- *
- * The log line names the request and the count, never an address: a
- * notification failure is an operational fact, and turning one into a list of
- * who works where would make the log a directory.
+ * Who is told when a join request's own timers fire, and what happens when telling them fails.
+ * Every fan-out is `Promise.allSettled`, so one bouncing admin address can't silence the rest;
+ * a failed mail is logged and the request stands, and the log line never names an address.
  */
 export class JoinRequestNotificationService {
   static create(options: {

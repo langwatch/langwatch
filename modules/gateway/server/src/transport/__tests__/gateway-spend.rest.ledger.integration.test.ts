@@ -1,6 +1,7 @@
 /**
  * @vitest-environment node
- * Real ClickHouse (spend/budget rows) + real Postgres (tenancy filters name). Pins what no double can stand in for: insert-order paging that never skips a late fold, the tenant fence, and rollup/end-user arithmetic. Boundary decisions in front (auth, plan gate, cursor/window validation) are pinned in apps/api against the process's own credential chain; the org on this context is installed the same way, everything behind it is production code. Spec: specs/ai-gateway/gateway-spend-rest.feature, billing-spend-events.feature, end-user-attribution.feature
+ * Real ClickHouse + real Postgres. Pins insert-order paging, the tenant fence, and
+ * rollup/end-user arithmetic. Spec: gateway-spend-rest.feature, billing-spend-events.feature.
  */
 import { Temporal, nowInstant, toDate } from "@langwatch/time";
 import type { ClickHouseClient } from "@clickhouse/client";
@@ -61,7 +62,10 @@ let budgets: GatewayBudgetClickHouseRepository;
 let app: ReturnType<typeof mountSpendFamily>;
 
 /**
- * Canonical envelope, reduced to the two fields these scenarios read. Wire format belongs to the Enterprise webhook platform (this package may not depend on it; its mapping is pinned in its own suite) — what matters here is the id carries the request + family, so a page walk and tenant fence can be asserted on the join key.
+ * Canonical envelope, reduced to the two fields these scenarios read. Wire format belongs to
+ * the Enterprise webhook platform (this package may not depend on it), so what matters here is
+ * that the id carries the request + family, letting a page walk and tenant fence be asserted
+ * on the join key.
  */
 function testEnvelope(row: SpendEventRow) {
   const family = row.status === "confirmed" ? "completed" : row.status;

@@ -19,16 +19,9 @@ export function CustomDashboardsSection({ projectSlug }: CustomDashboardsSection
   const projectId = project?.id ?? "";
   const currentDashboardId = host.route().query.dashboard;
   /**
-   * Creating a dashboard is a DIALOG THIS SECTION MOUNTS, not a registered
-   * overlay. `platform/app` called `openDrawer("dashboardName")`, and that
-   * registry is application chrome a packaged screen has nothing above it to
-   * supply — the gateway family's ruling, applied to this family's own overlay:
-   * the registry was composition, and a screen only ever needed the dialog.
-   *
-   * In component state rather than in the address, unlike the routing-policy
-   * and queue editors: those open a NAMED thing, so a link to one is worth
-   * having. This one names nothing — it is an empty form — so an address for it
-   * would be a link to a blank dialog.
+   * Creating a dashboard is a DIALOG THIS SECTION MOUNTS, not a registered overlay — a screen
+   * has nothing above it to supply that registry. Kept in component state, not the address:
+   * unlike the routing-policy and queue editors, this dialog names nothing worth linking to.
    */
   const [creatingDashboard, setCreatingDashboard] = useState(false);
   const utils = analyticsApi.useUtils();

@@ -1,12 +1,10 @@
 /**
- * The sweeps the worker process used to assemble, now declared by the
- * module. Three things make them the same sweeps: the pipeline the shared
- * queue was staged with, a revoke through THIS module's repositories (and,
- * for the CLI login-key sweep, the installing graph's own app) rather than
- * an inert stand-in, and an outbox pruned against the installing graph's
- * store.
- * Spec: specs/server/declarative-process-composition.feature
+ * The sweeps the worker process used to assemble, now declared by the module: same pipeline, a
+ * revoke through this module's own repositories rather than an inert stand-in, and an outbox
+ * pruned against the installing graph's store.
  */
+
+/** Spec: specs/server/declarative-process-composition.feature */
 import { AGENT_SANDBOX_API_KEY_NAME } from "@langwatch/api-key-contract";
 import { EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
 import { EventStoreMemory } from "@langwatch/eventing/testing";

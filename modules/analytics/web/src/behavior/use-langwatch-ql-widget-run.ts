@@ -1,25 +1,7 @@
 /**
- * The dashboard widget's request orchestration: when to run a saved chart, and
- * which settled response the card is allowed to draw.
- *
- * `run` is a mutation because executing SQL is not a cacheable read, so this
- * hook drives it from an effect rather than getting react-query's own
- * fetch-on-change. The ref carries the last request actually issued so that a
- * re-render with the same period and step does not re-execute.
- *
- * The sequence numbers answer the question "which request does the rendered
- * outcome belong to". A period drag fires a run per intermediate window, and
- * nothing orders the responses: a query over a narrow window can resolve after
- * one over a wide window issued later, leaving the card showing an answer for
- * a period the dashboard is no longer on — with no spinner and nothing on
- * screen saying so. Each issued request takes the next sequence number, and a
- * resolution — success or failure alike — is kept only when it carries the
- * latest one, so a straggler is dropped rather than winning by arriving last.
- * Failures ride the same guard as answers: a stale error settling last must
- * not replace the fresh answer already on screen.
- *
- * @see ../components/LangWatchQLDashboardWidget.tsx — the card this drives
- * @see specs/analytics/lwql-saved-charts.feature
+ * The dashboard widget's request orchestration: when to run a saved chart, and which settled
+ * response the card may draw. Nothing orders responses, so each request takes the next
+ * sequence number; only a resolution carrying the latest one is kept, so a straggler is dropped.
  */
 
 import { useEffect, useRef, useState } from "react";

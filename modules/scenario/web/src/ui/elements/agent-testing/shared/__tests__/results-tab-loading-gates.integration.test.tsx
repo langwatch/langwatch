@@ -1,7 +1,7 @@
 /**
- * How the Results tab reads while a run plan is on its way in, and which stored rows reach the list.
+ * How the Results tab reads while a run plan is on its way in, and which stored rows reach
+ * the list.
  * @vitest-environment jsdom
- * @see specs/features/agent-testing/results-tabs.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, within } from "@testing-library/react";

@@ -1,6 +1,7 @@
 /**
  * @vitest-environment node
- * Real Postgres. Every 60s the gateway revalidates via If-None-Match; the token must move when config moves, including writes that bypass the service. Spec: specs/ai-gateway/governance/provider-credential-rotation.feature
+ * Real Postgres. Every 60s the gateway revalidates via If-None-Match; the token must move
+ * when config moves, including writes that bypass the service.
  */
 import { nanoid } from "nanoid";
 import type { VirtualKeyWithScopes } from "@langwatch/gateway-contract";
