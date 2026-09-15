@@ -385,6 +385,71 @@ Feature: Proving a domain by publishing a record
     When the sweep finds the well-known address answering without our token
     Then the proof on "acme.com" is wavering, with the same deadline a missing record earns
 
+  # ── The sweep itself, rather than what it finds ────────────────────────
+
+  # Everything above is about ONE domain's answer. These are about the sweep
+  # that asks: which domains it gets to, what it does when asking goes wrong,
+  # and what it says about the half of the fleet it did not reach. A sweep
+  # can be right about every domain it reads and still be broken, by never
+  # reading most of them.
+
+  @unit
+  Scenario: Every proved domain is re-read in turn rather than the same few for ever
+    Given more domains are proved than one sweep re-reads
+    When the sweep runs and then runs again
+    Then the second sweep re-reads the domains the first one did not
+    And a healthy domain is looked at again on a later cycle, not dropped from the rotation
+
+  # REGRESSION. The rotation cannot be ordered by anything the re-read
+  # writes. A healthy re-read writes nothing, so ordering by "when did this
+  # connection last change" reads the same prefix for ever — and the one
+  # domain that DOES write, the one that just started wavering, sorts itself
+  # out of every later batch and is never re-read again. Its grace runs out
+  # and nothing ever notices, so it vouches for new people for ever. Looking
+  # is its own fact for exactly this reason.
+  @unit
+  Scenario: A domain that has started wavering is still re-read, and still lapses
+    Given a domain began wavering on the last sweep and its grace has now run out
+    And there are enough other proved domains to fill a batch on their own
+    When the sweep runs again
+    Then the wavering domain was re-read rather than sorted out of the batch
+    And its proof has lapsed
+
+  @unit
+  Scenario: A domain whose re-read failed goes to the back of the queue like any other
+    Given one domain's re-read throws rather than answering
+    When the sweep finishes
+    Then that domain is recorded as looked at, the same as the ones that answered
+    And it does not hold up every domain queued behind it on the next cycle
+
+  @unit
+  Scenario: One domain's failure does not abandon the domains after it
+    Given a sweep of four domains where the second one's re-read throws
+    When the sweep runs
+    Then the other three were each re-read and acted on
+    And the failure is carried out of the sweep naming the domain it belongs to
+
+  @unit
+  Scenario: A sweep that filled its batch says so rather than reading as complete
+    Given there are more domains due a re-read than one sweep takes
+    When the sweep finishes
+    Then it reports that it was truncated
+    And a sweep that reached the end of the queue reports that it was not
+
+  @unit
+  Scenario: Two re-reads of one domain are two observations, not one repeated
+    Given "acme.com" is re-read on Monday and again on Tuesday
+    When both find the record missing
+    Then the two checks are two separate commands rather than one deduplicated away
+    And the second is not mistaken for a retry of the first
+
+  @unit
+  Scenario: The history says the system looked, and names no person
+    Given the sweep re-reads "acme.com" and finds nothing published
+    When the wavering is recorded
+    Then the act is attributed to the system rather than to any administrator
+    And nobody is recorded as having decided the record was missing
+
   # ── Taking a domain back out ───────────────────────────────────────────
 
   @integration

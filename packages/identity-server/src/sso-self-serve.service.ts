@@ -220,6 +220,16 @@ export interface SsoOrganizationMember {
   userId: string;
   name: string | null;
   email: string | null;
+  /**
+   * Whether this person holds a password, and so could actually walk through
+   * a way back in if they were granted one.
+   *
+   * On the list rather than filtered out of it: an administrator choosing who
+   * keeps a door needs to see that their first choice cannot hold it yet, and
+   * why — a name silently missing from a picker teaches nobody anything. The
+   * grant itself refuses, which is where the promise is kept.
+   */
+  holdsPassword: boolean;
 }
 
 /**

@@ -48,7 +48,9 @@ function scimStatusOf({
  * belongs beside these rather than in whichever branch of `getProgress`
  * happens to compute the evidence for it.
  */
-function migrationBlockers({
+/** Exported so the blocker set — including the words a blocked administrator
+ *  reads — is testable without standing the whole progress read up. */
+export function migrationBlockers({
   selectedRoute,
   testSignInDone,
   liveRecoveryCount,
@@ -83,7 +85,8 @@ function migrationBlockers({
   if (liveRecoveryCount === 0) {
     blockers.push({
       code: "recovery-path-missing",
-      message: "Keep at least one live way back in before finalizing.",
+      message:
+        "Keep at least one live way back in before finalizing. Grant it to somebody who has set a password — after the switch the old provider will not be there to sign them in, and a password can only be set while somebody is still signed in.",
     });
   }
   if (linkedCount < activeCount) {
@@ -244,7 +247,49 @@ export class PrismaSsoMigrationProgressRepository
   constructor(
     private readonly prisma: PrismaClient,
     private readonly now: () => number = Date.now,
+    /**
+     * Whether one person holds a password.
+     *
+     * Injected because "holds a password" is the credential service's
+     * question, not this repository's: an account may still route to the
+     * legacy store, and a `credential` row with no password in it is not a
+     * way in either. Defaulting to "yes" would put the old bug back — the
+     * blocker counted GRANTS, and a grant nobody can use satisfied "keep at
+     * least one live way back in" while opening nothing.
+     */
+    private readonly holdsPassword: (args: {
+      userId: string;
+    }) => Promise<boolean> = async () => true,
   ) {}
+
+  /**
+   * Ways back in that can actually be walked.
+   *
+   * A live, unexpired, unsuperseded grant is necessary and not sufficient.
+   * The holder has to hold the key too, and on an organization moving off a
+   * brokered identity provider its administrators typically hold none —
+   * their password lived at the provider. Counting grants let such an
+   * organization finalize with no way back in at all.
+   */
+  private async countUsableRecoveries({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<number> {
+    const live = await this.prisma.ssoBreakGlassBinding.findMany({
+      where: {
+        organizationId,
+        supersededAt: null,
+        expiresAt: { gt: new Date(this.now()) },
+      },
+      select: { userId: true },
+      distinct: ["userId"],
+    });
+    return countUsableWaysBackIn({
+      holders: live,
+      holdsPassword: this.holdsPassword,
+    });
+  }
 
   async getProgress({
     organizationId,
@@ -503,13 +548,7 @@ export class PrismaSsoMigrationProgressRepository
         where: { organizationId, connectionId: legacy.connectionId },
         orderBy: { authenticatedAt: "desc" },
       }),
-      this.prisma.ssoBreakGlassBinding.count({
-        where: {
-          organizationId,
-          supersededAt: null,
-          expiresAt: { gt: new Date(this.now()) },
-        },
-      }),
+      this.countUsableRecoveries({ organizationId }),
       this.prisma.scimSyncState.findFirst({
         where: { organizationId, connectionId: legacy.connectionId },
       }),
@@ -589,4 +628,25 @@ export class PrismaSsoMigrationProgressRepository
       })) > 0
     );
   }
+}
+
+/**
+ * How many of these grants somebody could actually walk through.
+ *
+ * Separated from the query so the rule is testable without standing up the
+ * whole progress read: the defect it replaces was arithmetic, not SQL — the
+ * blocker counted grants, and a grant whose holder has no password opens
+ * nothing.
+ */
+export async function countUsableWaysBackIn({
+  holders,
+  holdsPassword,
+}: {
+  holders: readonly { userId: string }[];
+  holdsPassword: (args: { userId: string }) => Promise<boolean>;
+}): Promise<number> {
+  const usable = await Promise.all(
+    holders.map((holder) => holdsPassword({ userId: holder.userId })),
+  );
+  return usable.filter(Boolean).length;
 }

@@ -37,9 +37,19 @@ export class PrismaSsoMigrationFinalizationRepository
   constructor(
     private readonly prisma: PrismaClient,
     private readonly recovery: SsoBreakGlassBindingRepository,
-    now: () => number = Date.now,
+    /** The progress read's own two seams, passed straight through: it is what
+     *  counts the ways back in, and it may only count the ones somebody can
+     *  actually walk. */
+    reads: {
+      now?: () => number;
+      holdsPassword?: (args: { userId: string }) => Promise<boolean>;
+    } = {},
   ) {
-    this.progress = new PrismaSsoMigrationProgressRepository(prisma, now);
+    this.progress = new PrismaSsoMigrationProgressRepository(
+      prisma,
+      reads.now ?? Date.now,
+      reads.holdsPassword,
+    );
   }
 
   async inspect({
