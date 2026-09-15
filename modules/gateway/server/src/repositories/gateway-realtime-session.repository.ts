@@ -63,6 +63,16 @@ export abstract class GatewayRealtimeSessionRepository {
     since: Instant;
     limit: number;
   }): Promise<GatewayRealtimeSession[]>;
+  /**
+   * Open sessions the vendor still owes a report for, oldest first. The
+   * reconciliation sweep's read: system-owned and across every tenant, so it
+   * takes no organization.
+   */
+  abstract findOpenAwaitingVendorReport(input: {
+    vendor: string;
+    mintedBefore: Instant;
+    limit: number;
+  }): Promise<GatewayRealtimeSession[]>;
   abstract tryFindForReport(input: {
     sessionId: string;
     projectId: string;

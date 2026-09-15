@@ -3,7 +3,6 @@
  * asserted against real ClickHouse arithmetic, not an in-memory double). Application code
  * importing a service/repository directly would make the port stop being the seam.
  */
-export { GatewayUsageService } from "./services/gateway-usage.service.ts";
 export type { GatewayService } from "./services/gateway.service.ts";
 export { PostgresVirtualKeyAdapter } from "./adapters/postgres.virtual-key.adapter.ts";
 export {

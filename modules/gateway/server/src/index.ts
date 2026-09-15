@@ -1,5 +1,15 @@
-export { GatewayService } from "./services/gateway.service.ts";
-export { gatewayServer } from "./gateway.server.ts";
+/**
+ * The feature declaration, and what another package composes from this
+ * feature: the advisory dedupe window a spend graph debits through, and the
+ * poller that settles brokered voice sessions the vendor never reported.
+ */
+export {
+  gatewayServer,
+  createGatewayBudgetChangeDedupe,
+  createGatewayRealtimeSessionReconciliation,
+  type ElevenLabsConversationSource,
+  type GatewayRealtimeSessionReconciliationSubstrates,
+} from "./gateway.server.ts";
 export { gatewayBudgetTrpcTransport } from "./transport/gateway-budget.trpc.ts";
 export { agentCacheRest } from "./transport/agent-cache.rest.ts";
 export { gatewayPlatformRest } from "./transport/gateway-platform.rest.ts";
@@ -35,10 +45,14 @@ export {
   PrismaGatewayAdapter,
   type GatewayPersistence,
 } from "./adapters/prisma.gateway.adapter.ts";
-export { GatewaySpendEventsService } from "./services/gateway-spend-events.service.ts";
 export { GatewayEndUserCapsAdapter } from "./adapters/gateway-end-user-caps.adapter.ts";
-export { GatewayEndUserCapsService } from "./services/gateway-end-user-caps.service.ts";
-export * from "./services/gateway-usage.service.ts";
+export type {
+  GatewayUsageProjects,
+  GatewayUsageVirtualKeys,
+  UsageSummary,
+  UsageWindow,
+  VirtualKeyUsageSummary,
+} from "./services/gateway-usage.service.ts";
 export type { GatewayBudgetSpendRecord, BudgetBucketBoundary, BudgetSpendTarget, ScopeSpend, BucketSpend, LedgerEventRow, BudgetDebitRow, PulledUsageRow, PulledUsageTotals, GatewayBudgetSpend } from "./app/gateway.members.ts";
 export type { GatewayChangeEventKind, GatewayChangeEvent, AppendGatewayChangeEventInput, GatewayPersistenceTransaction, GatewayChangeEvents } from "./app/gateway.members.ts";
 export type { GatewayAuditAction, GatewayAuditTargetKind, AppendGatewayAuditInput, GatewayAuditTransaction, GatewayAudit } from "./app/gateway.members.ts";
@@ -84,7 +98,11 @@ export * from "./processes/gateway-spend-commands.process.ts";
 export * from "./processes/gateway-spend-settlement.process.ts";
 export * from "./intents/gateway-spend-settlement.intent.ts";
 export * from "./ports/gateway-open-admissions.port.ts";
-export * from "./adapters/clickhouse.gateway-open-admissions.adapter.ts";
+export {
+  ClickHouseGatewayOpenAdmissionsAdapter,
+  type GatewayClickHouseInstance,
+  type GatewayClickHouseInstanceResolver,
+} from "./adapters/clickhouse.gateway-open-admissions.adapter.ts";
 export * from "./adapters/eventing.gateway-spend.adapter.ts";
 export { GatewaySpendProducerAdapter } from "./adapters/gateway-spend-producer.adapter.ts";
 export {
@@ -102,51 +120,35 @@ export type * from "./services/gateway.service.ts";
  * service and port the seven transports reach and owning the virtual-key write
  * pre-flight both doors used to run for themselves.
  */
-export {
-  GatewayApp,
-  type GatewayActor,
-  type GatewayAppDependencies,
-  type GatewayInfrastructure,
-  type GatewayRestInfrastructure,
-  type GatewayApplicableBudgetTarget,
-  type GatewayVirtualKeyBudgetInput,
-  type GatewayVirtualKeyOperations,
+export type {
+  GatewayActor,
+  GatewayAppDependencies,
+  GatewayInfrastructure,
+  GatewayRestInfrastructure,
+  GatewayApplicableBudgetTarget,
+  GatewayVirtualKeyBudgetInput,
+  GatewayVirtualKeyOperations,
 } from "./app/gateway.app.ts";
-export { GatewayInternalStore } from "./repositories/gateway-internal-store.repository.ts";
-export { PrismaGatewayInternalStoreRepository } from "./repositories/prisma/prisma.gateway-internal-store.repository.ts";
-export { MemoryGatewayInternalStoreRepository } from "./repositories/memory/memory.gateway-internal-store.repository.ts";
 
 /**
  * The gateway control plane: virtual keys, budgets, guardrail evaluation, realtime voice
  * sessions, the ElevenLabs credential read, and the config bundle the Go data plane long-polls.
  */
-export { VirtualKeyService } from "./services/virtual-key.service.ts";
-export {
-  type CreateVirtualKeyInput,
-  type CreatedVirtualKey,
+export type {
+  CreateVirtualKeyInput,
+  CreatedVirtualKey,
 } from "./services/virtual-key-validation.service.ts";
-export {
-  type ActorContext,
-  type MembershipSet,
-  type RBACContext,
-  type Scope,
-  type VirtualKeyActor,
-  type VirtualKeyReader,
-  type VirtualKeySessionActor,
-  VirtualKeyAuthorizationService,
+export type {
+  ActorContext,
+  MembershipSet,
+  RBACContext,
+  Scope,
+  VirtualKeyActor,
+  VirtualKeyReader,
+  VirtualKeySessionActor,
 } from "./services/virtual-key-authorization.service.ts";
-export { BudgetOverviewService } from "./services/gateway-budget-overview.service.ts";
-export {
-  GatewayApplicableBudgetsService,
-  type ApplicableBudget,
-} from "./services/gateway-applicable-budgets.service.ts";
-export { VirtualKeyDirectBudgetService } from "./services/virtual-key-direct-budget.service.ts";
-export { GatewayConfigMaterialiserService } from "./services/gateway-config-materialisation.service.ts";
-export { GatewayScopeResolutionService } from "./services/gateway-scope-resolution.service.ts";
-export {
-  GatewayGuardrailEvaluationService,
-  type EvaluatorRunner,
-} from "./services/gateway-guardrail-evaluation.service.ts";
+export type { ApplicableBudget } from "./services/gateway-applicable-budgets.service.ts";
+export type { EvaluatorRunner } from "./services/gateway-guardrail-evaluation.service.ts";
 export {
   GatewayElevenLabsCredentialService,
   ELEVENLABS_DEFAULT_BASE_URL,
@@ -239,5 +241,4 @@ export {
   GatewayBudgetChangeDedupeService,
   type BudgetChangeEventDedupeService,
 } from "./services/gateway-budget-change-dedupe.service.ts";
-export { GatewayBudgetChangeDedupeRepository } from "./repositories/gateway-budget-change-dedupe.repository.ts";
 export { RedisGatewayBudgetChangeDedupeRepository } from "./repositories/redis/redis.gateway-budget-change-dedupe.repository.ts";

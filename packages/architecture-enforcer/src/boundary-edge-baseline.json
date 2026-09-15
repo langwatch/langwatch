@@ -1128,22 +1128,7 @@
       "expires": "2026-10-01"
     },
     {
-      "key": "private-runtime-export|modules/gateway/server/src/index.ts|./app/gateway.app.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/gateway/server/src/index.ts|./repositories/gateway-budget-change-dedupe.repository.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
       "key": "private-runtime-export|modules/gateway/server/src/index.ts|./repositories/redis/redis.gateway-budget-change-dedupe.repository.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/gateway/server/src/index.ts|./services/gateway-applicable-budgets.service.ts",
       "measured": "2026-09-10",
       "expires": "2026-10-01"
     },
@@ -1153,27 +1138,7 @@
       "expires": "2026-10-01"
     },
     {
-      "key": "private-runtime-export|modules/gateway/server/src/index.ts|./services/gateway-budget-overview.service.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/gateway/server/src/index.ts|./services/gateway-config-materialisation.service.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
       "key": "private-runtime-export|modules/gateway/server/src/index.ts|./services/gateway-elevenlabs-credential.service.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/gateway/server/src/index.ts|./services/gateway-end-user-caps.service.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/gateway/server/src/index.ts|./services/gateway-guardrail-evaluation.service.ts",
       "measured": "2026-09-10",
       "expires": "2026-10-01"
     },
@@ -1184,51 +1149,6 @@
     },
     {
       "key": "private-runtime-export|modules/gateway/server/src/index.ts|./services/gateway-realtime-session.service.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/gateway/server/src/index.ts|./services/gateway-scope-resolution.service.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/gateway/server/src/index.ts|./services/gateway-spend-events.service.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/gateway/server/src/index.ts|./services/gateway-usage.service.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/gateway/server/src/index.ts|./services/gateway.service.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/gateway/server/src/index.ts|./services/virtual-key-authorization.service.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/gateway/server/src/index.ts|./services/virtual-key-direct-budget.service.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/gateway/server/src/index.ts|./services/virtual-key-validation.service.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/gateway/server/src/index.ts|./services/virtual-key.service.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/gateway/server/src/testing.ts|./services/gateway-usage.service.ts",
       "measured": "2026-09-10",
       "expires": "2026-10-01"
     },
@@ -2533,37 +2453,7 @@
       "expires": "2026-10-01"
     },
     {
-      "key": "private-runtime-export|modules/webhook/server/src/index.ts|./repositories/clickhouse/clickhouse.webhook-events.repository.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/webhook/server/src/index.ts|./repositories/prisma/prisma.webhook-endpoint.repository.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/webhook/server/src/index.ts|./repositories/prisma/prisma.webhook-retention.repository.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/webhook/server/src/index.ts|./repositories/webhook-endpoint.repository.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/webhook/server/src/index.ts|./repositories/webhook-events.repository.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
       "key": "private-runtime-export|modules/webhook/server/src/index.ts|./repositories/webhook-repositories.registry.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/webhook/server/src/index.ts|./rules/sqs-queue-url.rules.ts",
       "measured": "2026-09-10",
       "expires": "2026-10-01"
     },
@@ -2578,21 +2468,6 @@
       "expires": "2026-10-01"
     },
     {
-      "key": "private-runtime-export|modules/webhook/server/src/index.ts|./services/sqs.webhook-destination.service.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/webhook/server/src/index.ts|./services/webhook-access.service.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/webhook/server/src/index.ts|./services/webhook-batch-planner.service.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
       "key": "private-runtime-export|modules/webhook/server/src/index.ts|./services/webhook-delivery.service.ts",
       "measured": "2026-09-10",
       "expires": "2026-10-01"
@@ -2603,27 +2478,7 @@
       "expires": "2026-10-01"
     },
     {
-      "key": "private-runtime-export|modules/webhook/server/src/index.ts|./services/webhook-destination.service.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/webhook/server/src/index.ts|./services/webhook-endpoint-policy.service.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
       "key": "private-runtime-export|modules/webhook/server/src/index.ts|./services/webhook-envelope.service.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/webhook/server/src/index.ts|./services/webhook-events.service.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/webhook/server/src/index.ts|./services/webhook-health.service.ts",
       "measured": "2026-09-10",
       "expires": "2026-10-01"
     },

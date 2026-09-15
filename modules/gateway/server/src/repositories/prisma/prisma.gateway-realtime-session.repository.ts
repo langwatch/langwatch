@@ -178,6 +178,29 @@ export class PrismaGatewayRealtimeSessionRepository extends GatewayRealtimeSessi
     return rows.map(toRealtimeSessionRow);
   }
 
+  async findOpenAwaitingVendorReport({
+    vendor,
+    mintedBefore,
+    limit,
+  }: {
+    vendor: string;
+    mintedBefore: Instant;
+    limit: number;
+  }): Promise<GatewayRealtimeSessionRow[]> {
+    const rows = await this.database.gatewayRealtimeSession.findMany({
+      where: {
+        vendor,
+        status: "OPEN",
+        vendorConversationId: { not: null },
+        mintedAt: { lt: toDate(mintedBefore) },
+      },
+      orderBy: { mintedAt: "asc" },
+      take: limit,
+    });
+
+    return rows.map(toRealtimeSessionRow);
+  }
+
   async tryFindForReport({
     sessionId,
     projectId,

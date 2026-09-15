@@ -70,7 +70,8 @@ import { buildGatewayControlPlane } from "./gateway-composition.build.ts";
 // The billing envelope and the subscription grammar are the webhook
 // platform's, and a reconciliation pull has to answer the same bytes a push
 // delivers, so both ARRIVE from that module rather than being restated here.
-import { eventMatches, WebhookEnvelopeService } from "@langwatch/webhook-server";
+import { eventMatches } from "@langwatch/webhook-contract";
+import { createWebhookEnvelopes, type WebhookEnvelopes } from "@langwatch/webhook-server";
 // The application's own refusal for "the store these figures live in is not
 // reachable": one taxonomy for an unreachable ClickHouse, shared with every
 // other read of it.
@@ -531,7 +532,7 @@ export class GatewayApp implements GatewayApi {
   #spend: GatewaySpendCollaborators | undefined;
   #spendScope: GatewaySpendScopeAdapter | undefined;
   #settlementPolicy: FixedGatewaySettlementPolicyAdapter | undefined;
-  readonly #envelopes = WebhookEnvelopeService.create();
+  readonly #envelopes: WebhookEnvelopes = createWebhookEnvelopes();
 
   private constructor(members: GatewayInfrastructure, spend?: GatewaySpendCollaborators) {
     this.#spend = spend;
@@ -608,8 +609,8 @@ export class GatewayApp implements GatewayApi {
 
   /** One spend row rendered as the canonical billing envelope. */
   spendEventEnvelope(
-    row: Parameters<WebhookEnvelopeService["fromSpendRow"]>[0],
-  ): ReturnType<WebhookEnvelopeService["fromSpendRow"]> {
+    row: Parameters<WebhookEnvelopes["fromSpendRow"]>[0],
+  ): ReturnType<WebhookEnvelopes["fromSpendRow"]> {
     return this.#envelopes.fromSpendRow(row);
   }
 

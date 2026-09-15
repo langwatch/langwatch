@@ -1,6 +1,9 @@
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { WebhookRetentionRepository } from "../webhook-retention.repository.ts";
 
+/** The client slice the two sweeps use: both are raw statements, by design. */
+export type WebhookRetentionDatabase = Pick<PrismaClient, "$executeRaw">;
+
 /**
  * Delivery-log retention, honored identically by both webhook channels.
  * ADR-040 §6 bounds the automations log at 30 days and the endpoints platform
@@ -13,9 +16,9 @@ export const WEBHOOK_DELIVERY_RETENTION_MS = 30 * 24 * 60 * 60 * 1000;
  * deliberately raw.
  */
 export class PrismaWebhookRetentionRepository implements WebhookRetentionRepository {
-  private constructor(private readonly prisma: PrismaClient) {}
+  private constructor(private readonly prisma: WebhookRetentionDatabase) {}
 
-  static create({ prisma }: { prisma: PrismaClient }): PrismaWebhookRetentionRepository {
+  static create({ prisma }: { prisma: WebhookRetentionDatabase }): PrismaWebhookRetentionRepository {
     return new PrismaWebhookRetentionRepository(prisma);
   }
 
