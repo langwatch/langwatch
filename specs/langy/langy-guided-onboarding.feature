@@ -990,15 +990,15 @@ Feature: Langy guides the first setup after sign-up
       And Langy shows the environment snippet through the secret_snippet card, with the reveal id the create printed
       And no message carries the secret
 
-    @e2e
-    Scenario: The governance path asks where to start
+    # The governance tour walks Costs, Agents, People and Inventory and ends
+    # on the Add source menu, so Langy has no page to open and nothing to ask.
+    @e2e @unit
+    Scenario: The governance path ends with one line
       Given the kickoff for the governance path
       When Langy starts
-      Then Langy says "To govern anything I first need to see it. Your identity provider gives me people and teams, vendor billing exports give me the dollars, and each tool's admin API gives me seats and usage. Where should we start?"
-      And the question offers "Connect identity provider" and "Connect a vendor billing export"
-      When I pick one
-      Then Langy opens the governance sources page
-      And the governance path is recorded as complete
+      Then the governance path is recorded as complete
+      And Langy says "Let me know if I can help you with anything! You can ask here"
+      And nothing else: no question, no page opened, no command on the pages
 
     @e2e
     Scenario: The coding path hands over the one command

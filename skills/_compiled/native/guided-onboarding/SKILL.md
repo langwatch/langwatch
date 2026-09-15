@@ -332,25 +332,12 @@ That's it from me. I will leave you to save the key somewhere safe, and let me k
 
 ## governance: Governance
 
-Ask with the `question` tool, verbatim:
-
-To govern anything I first need to see it. Your identity provider gives me people and teams, vendor billing exports give me the dollars, and each tool's admin API gives me seats and usage. Where should we start?
-
-Options, in this order:
-
-1. "Connect identity provider"
-2. "Connect a vendor billing export"
-
-Whichever they pick, open the sources page, where both connections start:
-
-```bash
-langwatch navigate open governance-sources
-```
-
-Then, in the same step, close the path:
+The tour has already walked the governance pages and ended on the Add source menu, so this path has no setup of its own: no question, no page opened, no command on the pages. Close the path:
 
 ```bash
 langwatch onboarding complete-path governance
 ```
 
-Then say in one line, with `say`, which source to add first on that page, as the last thing the turn does, and stop.
+Then say with `say`, verbatim, as the last thing the turn does, and stop:
+
+Let me know if I can help you with anything! You can ask here

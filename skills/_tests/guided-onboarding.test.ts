@@ -51,8 +51,7 @@ const VERBATIM_LINES = {
     "OPENAI_BASE_URL=the address after Gateway: in the brief, in double quotes",
   "the gateway closer":
     "That's it from me. I will leave you to save the key somewhere safe, and let me know if there is anything I can help with.",
-  "the governance opener":
-    "To govern anything I first need to see it. Your identity provider gives me people and teams, vendor billing exports give me the dollars, and each tool's admin API gives me seats and usage. Where should we start?",
+  "the governance line": "Let me know if I can help you with anything! You can ask here",
   "the skipped tour line":
     "No worries! Everything the tour covers is in the menu on the left. I'll be right here when you need me.",
   "the mid-setup line":
@@ -226,6 +225,22 @@ describe("the guided-onboarding skill", () => {
       expect(rendered).not.toContain("Then say, verbatim");
     });
 
+    /** @scenario "The governance path ends with one line" */
+    it("closes the governance path with no question and no page opened, then the one line", () => {
+      const section = rendered.slice(
+        rendered.indexOf("## governance: Governance"),
+      );
+      expect(section).toContain(
+        "this path has no setup of its own: no question, no page opened, no command on the pages",
+      );
+      expect(section).not.toContain("`question`");
+      expect(section).not.toContain("langwatch navigate");
+      expect(section).toContain(VERBATIM_LINES["the governance line"]);
+      expect(section.indexOf(VERBATIM_LINES["the governance line"])).toBeGreaterThan(
+        section.indexOf("langwatch onboarding complete-path governance"),
+      );
+    });
+
     it("ends every path by recording its completion", () => {
       for (const p of ["llmops", "coding", "gateway", "governance"]) {
         expect(rendered).toContain(`langwatch onboarding complete-path ${p}`);
@@ -243,7 +258,7 @@ describe("the guided-onboarding skill", () => {
       const endings: Array<[string, string]> = [
         ["langwatch onboarding complete-path llmops", VERBATIM_LINES["the closing line"]],
         ["langwatch onboarding complete-path coding", VERBATIM_LINES["the coding closer"]],
-        ["langwatch onboarding complete-path governance", "Then say in one line, with `say`, which source to add first on that page, as the last thing the turn does, and stop."],
+        ["langwatch onboarding complete-path governance", VERBATIM_LINES["the governance line"]],
       ];
       for (const [command, line] of endings) {
         const call = rendered.lastIndexOf(command);

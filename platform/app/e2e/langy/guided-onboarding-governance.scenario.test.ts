@@ -1,10 +1,10 @@
 /**
- * The governance path of the guided onboarding: Langy asks where to start
- * with the two sources, the user picks one on the card, Langy opens the
- * sources page and records the path as done.
+ * The governance path of the guided onboarding: the tour walks the pages,
+ * so Langy's part is one line. It records the path as done and says the
+ * line, and nothing else: no question, no page opened.
  *
- * Layer 2 is the question card the watcher answered (its options, in
- * order), the navigate instruction on the turn stream, and the guided state.
+ * Layer 2 is the absence of a question card and a navigate instruction on
+ * the turn stream, the complete-path call, and the guided state.
  *
  * RUN (one file per vitest run, see README):
  *   cd platform/app/e2e/langy && npx vitest run guided-onboarding-governance.scenario.test.ts --reporter=verbose
@@ -16,9 +16,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   assertPathCompletedAfterSkill,
   attachKickoffConversation,
-  GOVERNANCE_SOURCES_PATH,
   GUIDED_LINES,
-  GUIDED_OPTIONS,
   GUIDED_TONE_CRITERIA,
   type GuidedOrganization,
   mergeToolEvents,
@@ -33,13 +31,14 @@ import {
   watchLangyConversation,
 } from "./local-control-fixture";
 import { runScenarioAndLog } from "./scenario-logger";
+import { lastAssistantText } from "./scenario-transcript";
 
 const model = openai("gpt-5-mini");
 
 let org: GuidedOrganization;
 let watcher: ConversationWatcher | undefined;
 
-describe("Langy sets up governance from the kickoff", () => {
+describe("Langy closes the governance path from the kickoff", () => {
   beforeAll(async () => {
     org = await seedGuidedOrganization({
       label: "Governance",
@@ -53,12 +52,12 @@ describe("Langy sets up governance from the kickoff", () => {
   });
 
   describe("when the kickoff for the governance path arrives", () => {
-    /** @scenario The governance path asks where to start */
-    it("asks with the two sources, opens the sources page on the pick, and records the path", async () => {
+    /** @scenario The governance path ends with one line */
+    it("records the path and says the one line, with no question and no page opened", async () => {
       const langy = makeLangyAdapter();
       watcher = watchLangyConversation({
         adapter: langy,
-        answerQuestion: () => [GUIDED_OPTIONS.identityProvider],
+        answerQuestion: () => [],
       });
       await queueGuidedKickoff({
         adapter: langy,
@@ -71,28 +70,24 @@ describe("Langy sets up governance from the kickoff", () => {
         config: {
           name: "guided onboarding: the governance path",
           description:
-            "Someone who just signed up picked Governance. The app sends Langy the guided onboarding kickoff; nothing was typed by the person. Langy asks where to start with a question card, the person picks the identity provider on the card, and Langy opens the sources page.",
+            "Someone who just signed up picked Governance. The app sends Langy the guided onboarding kickoff; nothing was typed by the person. The tour has already walked the governance pages, so Langy only records the path and says one line.",
           agents: [
             langy,
             scenario.userSimulatorAgent({ model }),
             scenario.judgeAgent({
               model,
               criteria: [
-                `Langy asks, word for word: "${GUIDED_LINES.governanceAsk}"`,
-                "After the pick, Langy says in one line which source to add first on the sources page and ends there.",
-                "Langy creates nothing and asks no second question.",
+                `Langy says, word for word: "${GUIDED_LINES.governanceLine}"`,
+                "Langy asks no question, opens no page and creates nothing.",
+                "Langy ends the turn on that line, with nothing after it.",
                 ...GUIDED_TONE_CRITERIA,
               ],
             }),
           ],
           script: [
             scenario.agent(),
-            async (_state, executor) => {
+            async () => {
               await attachKickoffConversation({ org, adapter: langy });
-              // The pick happened on a card, which the judge cannot see.
-              for (const note of watcher!.drainAnswerNotes()) {
-                await executor.message({ role: "user", content: note });
-              }
             },
             scenario.judge(),
           ],
@@ -106,22 +101,9 @@ describe("Langy sets up governance from the kickoff", () => {
       console.log("[layer2] navigate:", langy.state.navigateHrefs.join(", "));
       console.log("[layer2] commands:", langy.state.toolCommands.join(" | "));
 
-      expect(langy.state.toolNames).toContain("question");
-      const question = watcher.questions[0]?.questions[0];
-      expect(question).toBeDefined();
-      expect(saysVerbatim(question!.question, GUIDED_LINES.governanceAsk)).toBe(
-        true,
-      );
-      expect(question!.options?.map((option) => option.label)).toEqual([
-        GUIDED_OPTIONS.identityProvider,
-        GUIDED_OPTIONS.billingExport,
-      ]);
-
-      expect(
-        langy.state.navigateHrefs.some((href) =>
-          href.includes(GOVERNANCE_SOURCES_PATH),
-        ),
-      ).toBe(true);
+      expect(langy.state.toolNames).not.toContain("question");
+      expect(watcher.questions).toHaveLength(0);
+      expect(langy.state.navigateHrefs).toHaveLength(0);
       expect(
         langy.state.toolCommands.some((command) =>
           /langwatch onboarding complete-path governance/.test(command),
@@ -131,6 +113,9 @@ describe("Langy sets up governance from the kickoff", () => {
         events: mergeToolEvents(langy.state.toolEvents, watcher.toolEvents),
         path: "governance",
       });
+      expect(
+        saysVerbatim(lastAssistantText(result), GUIDED_LINES.governanceLine),
+      ).toBe(true);
       const state = await waitForPathDone({
         organizationId: org.organizationId,
         path: "governance",

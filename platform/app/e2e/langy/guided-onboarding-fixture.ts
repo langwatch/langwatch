@@ -97,8 +97,8 @@ export const GUIDED_LINES = {
     "Your key production-app is live. Point your app at the gateway with it and every call gets budgets, routing and tracing for free:",
   gatewayClose:
     "That's it from me. I will leave you to save the key somewhere safe, and let me know if there is anything I can help with.",
-  governanceAsk:
-    "To govern anything I first need to see it. Your identity provider gives me people and teams, vendor billing exports give me the dollars, and each tool's admin API gives me seats and usage. Where should we start?",
+  governanceLine:
+    "Let me know if I can help you with anything! You can ask here",
 } as const;
 
 /**
@@ -441,13 +441,8 @@ export function createFirstScenarioLabel(question: {
 
 export const GUIDED_OPTIONS = {
   chatAboutThis: "Chat about this",
-  identityProvider: "Connect identity provider",
-  billingExport: "Connect a vendor billing export",
   describe: "I'd rather describe it",
 } as const;
-
-/** The route the governance script opens after the sources question. */
-export const GOVERNANCE_SOURCES_PATH = "/governance/inventory?tab=sources";
 
 /**
  * Whether the text carries the line, allowing for the ways a rendered reply
