@@ -14,7 +14,8 @@ describe("httpGetCheck", () => {
       try {
         const result = await httpGetCheck(`http://127.0.0.1:${port}/`)();
         expect(result.ok).toBe(true);
-        if (result.ok) expect(result.durationMs).toBeGreaterThanOrEqual(0);
+        if (!result.ok) throw new Error("expected the check to report ok");
+        expect(result.durationMs).toBeGreaterThanOrEqual(0);
       } finally {
         await new Promise<void>((r) => server.close(() => r()));
       }
@@ -34,7 +35,8 @@ describe("httpGetCheck", () => {
           expectStatus: 200,
         })();
         expect(result.ok).toBe(false);
-        if (!result.ok) expect(result.reason).toContain("503");
+        if (result.ok) throw new Error("expected the check to report a failure");
+        expect(result.reason).toContain("503");
       } finally {
         await new Promise<void>((r) => server.close(() => r()));
       }
@@ -64,7 +66,8 @@ describe("httpGetCheck", () => {
     it("reports the connect error in the reason", async () => {
       const result = await httpGetCheck("http://127.0.0.1:1/")();
       expect(result.ok).toBe(false);
-      if (!result.ok) expect(result.reason.length).toBeGreaterThan(0);
+      if (result.ok) throw new Error("expected the check to report a failure");
+      expect(result.reason.length).toBeGreaterThan(0);
     });
   });
 });
@@ -83,7 +86,8 @@ describe("execCheck", () => {
     it("reports the exit code in the reason", async () => {
       const result = await execCheck("node", ["-e", "process.exit(7)"])();
       expect(result.ok).toBe(false);
-      if (!result.ok) expect(result.reason).toContain("exit 7");
+      if (result.ok) throw new Error("expected the check to report a failure");
+      expect(result.reason).toContain("exit 7");
     });
   });
 
@@ -93,7 +97,8 @@ describe("execCheck", () => {
         expectStdoutContains: "PONG",
       })();
       expect(result.ok).toBe(false);
-      if (!result.ok) expect(result.reason).toContain("PONG");
+      if (result.ok) throw new Error("expected the check to report a failure");
+      expect(result.reason).toContain("PONG");
     });
   });
 });
@@ -107,7 +112,8 @@ describe("pollUntilHealthy", () => {
         intervalMs: 50,
       });
       expect(result.ok).toBe(true);
-      if (result.ok) expect(result.durationMs).toBeLessThan(100);
+      if (!result.ok) throw new Error("expected the check to report ok");
+      expect(result.durationMs).toBeLessThan(100);
     });
   });
 
@@ -136,10 +142,9 @@ describe("pollUntilHealthy", () => {
         intervalMs: 50,
       });
       expect(result.ok).toBe(false);
-      if (!result.ok) {
-        expect(result.reason).toContain("timed out");
-        expect(result.reason).toContain("still down");
-      }
+      if (result.ok) throw new Error("expected the check to report a failure");
+      expect(result.reason).toContain("timed out");
+      expect(result.reason).toContain("still down");
     });
   });
 });

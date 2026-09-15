@@ -522,17 +522,25 @@ describe("langwatchFetch", () => {
 
     /** @scenario a POST refuses a redirect to another host */
     it("refuses a redirect to another port on the same host", async () => {
-      await refuses({ status: 301, location: "https://app.langwatch.ai:8443/api/traces/search?limit=1" });
+      const location = "https://app.langwatch.ai:8443/api/traces/search?limit=1";
+      const error = await refuses({ status: 301, location });
+
+      expect(error.location).toBe(location);
     });
 
     /** @scenario a POST still refuses a redirect to another path */
     it("refuses a redirect that changes the path", async () => {
-      await refuses({ status: 308, location: OTHER_PATH });
+      const error = await refuses({ status: 308, location: OTHER_PATH });
+
+      expect(error.location).toBe(OTHER_PATH);
     });
 
     /** @scenario a POST still refuses a redirect to another path */
     it("refuses a redirect that changes the query", async () => {
-      await refuses({ status: 308, location: "https://app.langwatch.ai/api/traces/search?limit=2" });
+      const location = "https://app.langwatch.ai/api/traces/search?limit=2";
+      const error = await refuses({ status: 308, location });
+
+      expect(error.location).toBe(location);
     });
 
     /** @scenario a POST still refuses a redirect to another path */
@@ -550,12 +558,16 @@ describe("langwatchFetch", () => {
 
     /** @scenario a POST refuses a downgrade from https to http */
     it("refuses a downgrade from https to http", async () => {
-      await refuses({ url: HTTPS_URL, status: 301, location: HTTP_URL });
+      const error = await refuses({ url: HTTPS_URL, status: 301, location: HTTP_URL });
+
+      expect(error.location).toBe(HTTP_URL);
     });
 
     /** @scenario a POST refuses a 303 */
     it("refuses a 303 even when it only upgrades the scheme", async () => {
-      await refuses({ status: 303, location: HTTPS_URL });
+      const error = await refuses({ status: 303, location: HTTPS_URL });
+
+      expect(error.status).toBe(303);
     });
 
     /** @scenario refuses a redirect without a location */

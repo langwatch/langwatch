@@ -2,6 +2,7 @@
  * Unit tests for evaluation types and Zod schemas
  */
 import { describe, it, expect } from "vitest";
+import { z } from "zod";
 import {
   evaluationStatusSchema,
   targetTypeSchema,
@@ -20,9 +21,9 @@ describe("Evaluation Types", () => {
     });
 
     it("rejects invalid statuses", () => {
-      expect(() => evaluationStatusSchema.parse("invalid")).toThrow();
-      expect(() => evaluationStatusSchema.parse("")).toThrow();
-      expect(() => evaluationStatusSchema.parse(123)).toThrow();
+      expect(() => evaluationStatusSchema.parse("invalid")).toThrow(z.ZodError);
+      expect(() => evaluationStatusSchema.parse("")).toThrow(z.ZodError);
+      expect(() => evaluationStatusSchema.parse(123)).toThrow(z.ZodError);
     });
   });
 
@@ -34,8 +35,8 @@ describe("Evaluation Types", () => {
     });
 
     it("rejects invalid target types", () => {
-      expect(() => targetTypeSchema.parse("invalid")).toThrow();
-      expect(() => targetTypeSchema.parse("llm")).toThrow();
+      expect(() => targetTypeSchema.parse("invalid")).toThrow(z.ZodError);
+      expect(() => targetTypeSchema.parse("llm")).toThrow(z.ZodError);
     });
   });
 
@@ -57,14 +58,14 @@ describe("Evaluation Types", () => {
       const invalid = {
         config: { nested: "value" },
       };
-      expect(() => targetMetadataSchema.parse(invalid)).toThrow();
+      expect(() => targetMetadataSchema.parse(invalid)).toThrow(z.ZodError);
     });
 
     it("rejects arrays as values", () => {
       const invalid = {
         tags: ["a", "b"],
       };
-      expect(() => targetMetadataSchema.parse(invalid)).toThrow();
+      expect(() => targetMetadataSchema.parse(invalid)).toThrow(z.ZodError);
     });
   });
 
@@ -99,8 +100,8 @@ describe("Evaluation Types", () => {
     });
 
     it("requires id and name", () => {
-      expect(() => targetInfoSchema.parse({ id: "1" })).toThrow();
-      expect(() => targetInfoSchema.parse({ name: "test" })).toThrow();
+      expect(() => targetInfoSchema.parse({ id: "1" })).toThrow(z.ZodError);
+      expect(() => targetInfoSchema.parse({ name: "test" })).toThrow(z.ZodError);
     });
   });
 
@@ -187,8 +188,8 @@ describe("Evaluation Types", () => {
     });
 
     it("requires all mandatory fields", () => {
-      expect(() => batchEntrySchema.parse({ index: 0 })).toThrow();
-      expect(() => batchEntrySchema.parse({ index: 0, entry: {} })).toThrow();
+      expect(() => batchEntrySchema.parse({ index: 0 })).toThrow(z.ZodError);
+      expect(() => batchEntrySchema.parse({ index: 0, entry: {} })).toThrow(z.ZodError);
     });
 
     it("accepts complex entry objects", () => {

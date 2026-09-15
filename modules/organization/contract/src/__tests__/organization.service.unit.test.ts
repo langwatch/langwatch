@@ -9,10 +9,11 @@ import {
   type OrganizationService,
 } from "../index.ts";
 import { describe, expect, expectTypeOf, it } from "vitest";
+import { z } from "zod";
 
 describe("OrganizationService contract", () => {
   it("requires a non-empty organization id", () => {
-    expect(() => getOldestTeamInputSchema.parse({ organizationId: "" })).toThrow();
+    expect(() => getOldestTeamInputSchema.parse({ organizationId: "" })).toThrow(z.ZodError);
   });
 
   it("exposes a required non-null team lookup", () => {
@@ -38,7 +39,7 @@ describe("OrganizationService contract", () => {
         organizationId: "org",
         billingCustomerId: "",
       }),
-    ).toThrow();
+    ).toThrow(z.ZodError);
   });
 
   it("validates team writes and their durable actor", () => {
@@ -59,13 +60,13 @@ describe("OrganizationService contract", () => {
         role: "OWNER",
         actor: { type: "user", id: "actor" },
       }),
-    ).toThrow();
+    ).toThrow(z.ZodError);
     expect(() =>
       createOrganizationTeamInputSchema.parse({
         organizationId: "org",
         name: "",
       }),
-    ).toThrow();
+    ).toThrow(z.ZodError);
   });
 
   it("validates group membership and grant inputs with Zod 4", () => {
@@ -91,6 +92,6 @@ describe("OrganizationService contract", () => {
         scopeType: "PROJECT",
         scopeId: "project",
       }),
-    ).toThrow();
+    ).toThrow(z.ZodError);
   });
 });

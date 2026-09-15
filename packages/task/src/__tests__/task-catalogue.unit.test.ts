@@ -3,6 +3,16 @@ import { Task } from "../task.ts";
 import { TaskCatalogue } from "../task-catalogue.ts";
 import { TaskNotFoundError } from "../task.errors.ts";
 
+/** Runs `fn`, returning the error it throws so the caller can assert on it unconditionally. */
+function thrownBy(fn: () => unknown): unknown {
+  try {
+    fn();
+  } catch (error) {
+    return error;
+  }
+  throw new Error("expected fn to throw");
+}
+
 class StubTask extends Task {
   readonly name: string;
   readonly description = "a stub task";
@@ -31,14 +41,11 @@ describe("TaskCatalogue", () => {
   describe("when a name is not registered", () => {
     it("throws a task_not_found HandledError naming the available tasks", () => {
       const catalogue = TaskCatalogue.create({ tasks: [new StubTask("alpha")] });
-      try {
-        catalogue.get({ name: "missing" });
-        expect.unreachable("expected TaskNotFoundError");
-      } catch (error) {
-        expect(error).toBeInstanceOf(TaskNotFoundError);
-        expect((error as TaskNotFoundError).code).toBe("task_not_found");
-        expect((error as TaskNotFoundError).meta.availableNames).toEqual(["alpha"]);
-      }
+      const error = thrownBy(() => catalogue.get({ name: "missing" }));
+
+      expect(error).toBeInstanceOf(TaskNotFoundError);
+      expect((error as TaskNotFoundError).code).toBe("task_not_found");
+      expect((error as TaskNotFoundError).meta.availableNames).toEqual(["alpha"]);
     });
   });
 

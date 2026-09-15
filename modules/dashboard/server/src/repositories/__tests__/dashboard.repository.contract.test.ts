@@ -124,19 +124,19 @@ function contractCases(backend: Backend): void {
           dashboardId: "dash_absent",
           data: { name: "Renamed" },
         }),
-      ).rejects.toThrow();
+      ).rejects.toThrow(Error);
       await expect(
         repository.deleteDashboard({
           projectId: backend.projectId(),
           dashboardId: "dash_absent",
         }),
-      ).rejects.toThrow();
+      ).rejects.toThrow(Error);
       await expect(
         repository.updateDashboardOrder({
           projectId: backend.projectId(),
           dashboardIds: ["dash_absent"],
         }),
-      ).rejects.toThrow();
+      ).rejects.toThrow(Error);
     });
 
     it("refuses a graph write that names a row it does not hold", async () => {
@@ -148,23 +148,23 @@ function contractCases(backend: Backend): void {
           graphId: "graph_absent",
           name: "Renamed",
         }),
-      ).rejects.toThrow();
+      ).rejects.toThrow(Error);
       await expect(
         repository.deleteGraph({ projectId: backend.projectId(), graphId: "graph_absent" }),
-      ).rejects.toThrow();
+      ).rejects.toThrow(Error);
       await expect(
         repository.updateGraphLayout({
           projectId: backend.projectId(),
           graphId: "graph_absent",
           layout: LAYOUT,
         }),
-      ).rejects.toThrow();
+      ).rejects.toThrow(Error);
       await expect(
         repository.updateGraphLayouts({
           projectId: backend.projectId(),
           layouts: [{ graphId: "graph_absent", layout: LAYOUT }],
         }),
-      ).rejects.toThrow();
+      ).rejects.toThrow(Error);
     });
 
     it("raises the chart's own absence for a chart write it cannot match", async () => {
@@ -520,7 +520,7 @@ function contractCases(backend: Backend): void {
           graphId: saved.id,
           name: "Renamed",
         }),
-      ).rejects.toThrow();
+      ).rejects.toThrow(Error);
       await expect(
         repository.updateSavedWorkbenchChart({
           projectId: backend.projectId(),
@@ -559,10 +559,10 @@ function contractCases(backend: Backend): void {
           dashboardId: foreign.id,
           data: { name: "Stolen" },
         }),
-      ).rejects.toThrow();
+      ).rejects.toThrow(Error);
       await expect(
         repository.deleteDashboard({ projectId: backend.projectId(), dashboardId: foreign.id }),
-      ).rejects.toThrow();
+      ).rejects.toThrow(Error);
     });
 
     it("never reads or edits a chart belonging to that project", async () => {
@@ -600,7 +600,7 @@ function contractCases(backend: Backend): void {
       ).resolves.toBeUndefined();
       await expect(
         repository.deleteGraph({ projectId: backend.projectId(), graphId: foreignGraph.id }),
-      ).rejects.toThrow();
+      ).rejects.toThrow(Error);
       await expect(
         repository.deleteSavedWorkbenchChart({
           projectId: backend.projectId(),

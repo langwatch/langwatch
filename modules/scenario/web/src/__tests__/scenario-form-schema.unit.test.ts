@@ -18,17 +18,19 @@ describe("scenarioFormSchema turn config", () => {
   it("accepts maxTurns as a positive integer", () => {
     const result = scenarioFormSchema.safeParse({ ...base, maxTurns: 5 });
     expect(result.success).toBe(true);
-    if (result.success) {
-      expect(result.data.maxTurns).toBe(5);
+    if (!result.success) {
+      throw new Error("expected the parse to succeed");
     }
+    expect(result.data.maxTurns).toBe(5);
   });
 
   it("accepts minTurns as a non-negative integer", () => {
     const result = scenarioFormSchema.safeParse({ ...base, minTurns: 3 });
     expect(result.success).toBe(true);
-    if (result.success) {
-      expect(result.data.minTurns).toBe(3);
+    if (!result.success) {
+      throw new Error("expected the parse to succeed");
     }
+    expect(result.data.minTurns).toBe(3);
   });
 
   /** @scenario "maxTurns rejects non-positive values" */
@@ -52,10 +54,11 @@ describe("scenarioFormSchema turn config", () => {
   it("allows omitting both fields (backward compat)", () => {
     const result = scenarioFormSchema.safeParse(base);
     expect(result.success).toBe(true);
-    if (result.success) {
-      expect(result.data.maxTurns).toBeUndefined();
-      expect(result.data.minTurns).toBeUndefined();
+    if (!result.success) {
+      throw new Error("expected the parse to succeed");
     }
+    expect(result.data.maxTurns).toBeUndefined();
+    expect(result.data.minTurns).toBeUndefined();
   });
 
   it("allows null maxTurns (cleared field)", () => {

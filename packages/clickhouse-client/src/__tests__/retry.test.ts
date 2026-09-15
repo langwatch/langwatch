@@ -105,7 +105,7 @@ describe("retry", () => {
             sleep,
             random: () => 0,
           }).run(() => (next as never)(request), { request: request }),
-        ).rejects.toThrow();
+        ).rejects.toThrow(expect.objectContaining({ code: "ECONNRESET" }));
 
         expect(delays).toEqual([100, 200, 400]);
       });
@@ -186,7 +186,7 @@ describe("retry", () => {
             sleep,
             onRetry: (notice) => notices.push(notice.level),
           }).run(() => (next as never)(request), { request: request }),
-        ).rejects.toThrow();
+        ).rejects.toThrow(expect.objectContaining({ code: "ECONNRESET" }));
 
         expect(notices.filter((level) => level === "warn")).toHaveLength(1);
         expect(notices).toHaveLength(4);
@@ -201,7 +201,7 @@ describe("retry", () => {
           new RetryPolicy({ maxAttempts: 2, sleep, onRetry }).run(() => (next as never)(request), {
             request: request,
           }),
-        ).rejects.toThrow();
+        ).rejects.toThrow(expect.objectContaining({ code: "ECONNRESET" }));
 
         expect(onRetry).toHaveBeenCalledWith(
           expect.objectContaining({
@@ -242,7 +242,7 @@ describe("retry", () => {
               throw new Error("the metrics registry is misconfigured");
             },
           }).run(() => (next as never)(request), { request: request }),
-        ).rejects.toThrow();
+        ).rejects.toThrow(expect.objectContaining({ code: "ECONNRESET" }));
 
         expect(next).toHaveBeenCalledTimes(3);
       });

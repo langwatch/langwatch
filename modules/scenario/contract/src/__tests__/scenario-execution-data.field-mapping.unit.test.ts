@@ -27,9 +27,10 @@ describe("CodeAgentDataSchema", () => {
       });
 
       expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data.scenarioOutputField).toBe("answer");
+      if (!result.success) {
+        throw new Error("expected the parse to succeed");
       }
+      expect(result.data.scenarioOutputField).toBe("answer");
     });
   });
 
@@ -44,9 +45,10 @@ describe("CodeAgentDataSchema", () => {
       });
 
       expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data.scenarioOutputField).toBeUndefined();
+      if (!result.success) {
+        throw new Error("expected the parse to succeed");
       }
+      expect(result.data.scenarioOutputField).toBeUndefined();
     });
   });
 });
@@ -141,14 +143,16 @@ describe("ChildProcessJobDataSchema", () => {
       const result = ChildProcessJobDataSchema.safeParse(payload);
 
       expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data.adapterData.type).toBe("code");
-        if (result.data.adapterData.type === "code") {
-          expect(result.data.adapterData.scenarioMappings).toEqual(
-            payload.adapterData.scenarioMappings,
-          );
-        }
+      if (!result.success) {
+        throw new Error("expected the parse to succeed");
       }
+      expect(result.data.adapterData.type).toBe("code");
+      if (result.data.adapterData.type !== "code") {
+        throw new Error("expected a code adapter");
+      }
+      expect(result.data.adapterData.scenarioMappings).toEqual(
+        payload.adapterData.scenarioMappings,
+      );
     });
   });
 
@@ -201,14 +205,16 @@ describe("ChildProcessJobDataSchema", () => {
       const result = ChildProcessJobDataSchema.safeParse(payload);
 
       expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data.adapterData.type).toBe("http");
-        if (result.data.adapterData.type === "http") {
-          expect(result.data.adapterData.scenarioMappings).toEqual(
-            payload.adapterData.scenarioMappings,
-          );
-        }
+      if (!result.success) {
+        throw new Error("expected the parse to succeed");
       }
+      expect(result.data.adapterData.type).toBe("http");
+      if (result.data.adapterData.type !== "http") {
+        throw new Error("expected an http adapter");
+      }
+      expect(result.data.adapterData.scenarioMappings).toEqual(
+        payload.adapterData.scenarioMappings,
+      );
     });
   });
 });

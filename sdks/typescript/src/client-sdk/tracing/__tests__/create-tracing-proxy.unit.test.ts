@@ -265,11 +265,11 @@ describe("createTracingProxy", () => {
       expect(mockTracer.getSpan("ErrorTestClass.stringError")?.ended).toBe(true);
 
       // Test null errors
-      await expect(proxy.nullError()).rejects.toThrow();
+      await expect(proxy.nullError()).rejects.toThrow(Error);
       expect(mockTracer.getSpan("ErrorTestClass.nullError")?.ended).toBe(true);
 
       // Test undefined errors
-      await expect(proxy.undefinedError()).rejects.toThrow();
+      await expect(proxy.undefinedError()).rejects.toThrow(Error);
       expect(mockTracer.getSpan("ErrorTestClass.undefinedError")?.ended).toBe(true);
 
       // Test complex errors

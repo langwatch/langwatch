@@ -2,7 +2,7 @@
  * Unit tests for model selection logic with dependency injection.
  */
 
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ModelNotConfiguredError, resolveLatestAlias } from "@langwatch/model-provider-contract";
 import {
   type AgentFetcher,
@@ -566,10 +566,11 @@ describe("prefetchWithFixture", () => {
           );
           expect(deps.modelResolver.resolve).toHaveBeenCalledWith("scenarios.judge", "proj_123");
           expect(result.success).toBe(true);
-          if (result.success) {
-            expect(result.data.simulatorModelParams?.model).toBe("openai/sim-default");
-            expect(result.data.judgeModelParams?.model).toBe("openai/judge-default");
+          if (!result.success) {
+            throw new Error("prefetch should have succeeded");
           }
+          expect(result.data.simulatorModelParams?.model).toBe("openai/sim-default");
+          expect(result.data.judgeModelParams?.model).toBe("openai/judge-default");
         });
       });
     });
@@ -597,10 +598,11 @@ describe("prefetchWithFixture", () => {
           });
 
           expect(result.success).toBe(true);
-          if (result.success) {
-            expect(result.data.simulatorModelParams?.model).toBe("anthropic/sim-override");
-            expect(result.data.judgeModelParams?.model).toBe("openai/judge-default");
+          if (!result.success) {
+            throw new Error("prefetch should have succeeded");
           }
+          expect(result.data.simulatorModelParams?.model).toBe("anthropic/sim-override");
+          expect(result.data.judgeModelParams?.model).toBe("openai/judge-default");
         });
       });
     });
@@ -628,10 +630,11 @@ describe("prefetchWithFixture", () => {
           });
 
           expect(result.success).toBe(true);
-          if (result.success) {
-            expect(result.data.judgeModelParams?.model).toBe("anthropic/judge-override");
-            expect(result.data.simulatorModelParams?.model).toBe("openai/sim-default");
+          if (!result.success) {
+            throw new Error("prefetch should have succeeded");
           }
+          expect(result.data.judgeModelParams?.model).toBe("anthropic/judge-override");
+          expect(result.data.simulatorModelParams?.model).toBe("openai/sim-default");
         });
       });
     });
@@ -661,11 +664,12 @@ describe("prefetchWithFixture", () => {
           });
 
           expect(result.success).toBe(true);
-          if (result.success) {
-            expect(result.data.simulatorModelParams?.model).toBe("groq/plan-sim");
-            // Plan leaves judge unset -> falls through to the default judge.
-            expect(result.data.judgeModelParams?.model).toBe("openai/judge-default");
+          if (!result.success) {
+            throw new Error("prefetch should have succeeded");
           }
+          expect(result.data.simulatorModelParams?.model).toBe("groq/plan-sim");
+          // Plan leaves judge unset -> falls through to the default judge.
+          expect(result.data.judgeModelParams?.model).toBe("openai/judge-default");
         });
       });
     });
@@ -707,9 +711,10 @@ describe("prefetchWithFixture", () => {
         });
 
         expect(result.success).toBe(true);
-        if (result.success) {
-          expect(result.data.simulatorModelParams?.model).toBe(concreteFor("openai/latest"));
+        if (!result.success) {
+          throw new Error("prefetch should have succeeded");
         }
+        expect(result.data.simulatorModelParams?.model).toBe(concreteFor("openai/latest"));
       });
 
       /**
@@ -736,9 +741,10 @@ describe("prefetchWithFixture", () => {
         });
 
         expect(result.success).toBe(true);
-        if (result.success) {
-          expect(result.data.judgeModelParams?.model).toBe(concreteFor("anthropic/latest-mini"));
+        if (!result.success) {
+          throw new Error("prefetch should have succeeded");
         }
+        expect(result.data.judgeModelParams?.model).toBe(concreteFor("anthropic/latest-mini"));
       });
 
       /**
@@ -765,9 +771,10 @@ describe("prefetchWithFixture", () => {
         });
 
         expect(result.success).toBe(true);
-        if (result.success) {
-          expect(result.data.simulatorModelParams?.model).toBe(concreteFor("openai/latest-mini"));
+        if (!result.success) {
+          throw new Error("prefetch should have succeeded");
         }
+        expect(result.data.simulatorModelParams?.model).toBe(concreteFor("openai/latest-mini"));
       });
 
       /**
@@ -794,9 +801,10 @@ describe("prefetchWithFixture", () => {
         });
 
         expect(result.success).toBe(true);
-        if (result.success) {
-          expect(result.data.judgeModelParams?.model).toBe(concreteFor("gemini/latest"));
+        if (!result.success) {
+          throw new Error("prefetch should have succeeded");
         }
+        expect(result.data.judgeModelParams?.model).toBe(concreteFor("gemini/latest"));
       });
     });
 
@@ -828,10 +836,11 @@ describe("prefetchWithFixture", () => {
           });
 
           expect(result.success).toBe(true);
-          if (result.success) {
-            expect(result.data.simulatorModelParams?.model).toBe("openai/sim-default");
-            expect(result.data.judgeModelParams?.model).toBe("openai/judge-default");
+          if (!result.success) {
+            throw new Error("prefetch should have succeeded");
           }
+          expect(result.data.simulatorModelParams?.model).toBe("openai/sim-default");
+          expect(result.data.judgeModelParams?.model).toBe("openai/judge-default");
         });
       });
     });
@@ -858,9 +867,10 @@ describe("prefetchWithFixture", () => {
           });
 
           expect(result.success).toBe(false);
-          if (!result.success) {
-            expect(result.error).toBe("Scenario scen_123 not found");
+          if (result.success) {
+            throw new Error("prefetch should have failed");
           }
+          expect(result.error).toBe("Scenario scen_123 not found");
         });
       });
     });
@@ -885,9 +895,10 @@ describe("prefetchWithFixture", () => {
           });
 
           expect(result.success).toBe(false);
-          if (!result.success) {
-            expect(result.error).toBe("Project proj_123 not found");
+          if (result.success) {
+            throw new Error("prefetch should have failed");
           }
+          expect(result.error).toBe("Project proj_123 not found");
         });
       });
     });
@@ -912,9 +923,10 @@ describe("prefetchWithFixture", () => {
           });
 
           expect(result.success).toBe(false);
-          if (!result.success) {
-            expect(result.error).toBe("Prompt prompt_123 not found");
+          if (result.success) {
+            throw new Error("prefetch should have failed");
           }
+          expect(result.error).toBe("Prompt prompt_123 not found");
         });
       });
     });
@@ -939,9 +951,10 @@ describe("prefetchWithFixture", () => {
           });
 
           expect(result.success).toBe(false);
-          if (!result.success) {
-            expect(result.error).toBe("HTTP agent agent_123 not found");
+          if (result.success) {
+            throw new Error("prefetch should have failed");
           }
+          expect(result.error).toBe("HTTP agent agent_123 not found");
         });
       });
     });
@@ -966,9 +979,10 @@ describe("prefetchWithFixture", () => {
           });
 
           expect(result.success).toBe(false);
-          if (!result.success) {
-            expect(result.error).toBe("Connected agent agent_connected not found");
+          if (result.success) {
+            throw new Error("prefetch should have failed");
           }
+          expect(result.error).toBe("Connected agent agent_connected not found");
         });
       });
     });
@@ -993,10 +1007,11 @@ describe("prefetchWithFixture", () => {
           });
 
           expect(result.success).toBe(false);
-          if (!result.success) {
-            expect(result.error).toContain("Code agent");
-            expect(result.error).toContain("not found");
+          if (result.success) {
+            throw new Error("prefetch should have failed");
           }
+          expect(result.error).toContain("Code agent");
+          expect(result.error).toContain("not found");
         });
       });
     });
@@ -1037,10 +1052,11 @@ describe("prefetchWithFixture", () => {
           });
 
           expect(result.success).toBe(false);
-          if (!result.success) {
-            expect(result.error).toContain("Code agent");
-            expect(result.error).toContain("not found");
+          if (result.success) {
+            throw new Error("prefetch should have failed");
           }
+          expect(result.error).toContain("Code agent");
+          expect(result.error).toContain("not found");
         });
       });
     });
@@ -1081,12 +1097,13 @@ describe("prefetchWithFixture", () => {
           });
 
           expect(result.success).toBe(false);
-          if (!result.success) {
-            expect(result.error).toBe(
-              "Provider 'openai' is not enabled for this project. Enable it in Settings > Model Providers.",
-            );
-            expect(result.reason).toBe("provider_not_enabled");
+          if (result.success) {
+            throw new Error("prefetch should have failed");
           }
+          expect(result.error).toBe(
+            "Provider 'openai' is not enabled for this project. Enable it in Settings > Model Providers.",
+          );
+          expect(result.reason).toBe("provider_not_enabled");
         });
       });
     });
@@ -1192,15 +1209,16 @@ describe("prefetchWithFixture", () => {
           });
 
           expect(result.success).toBe(true);
-          if (result.success) {
-            expect(result.data.adapterData).toMatchObject({
-              type: "code",
-              agentId: "agent_456",
-              code: 'def execute(input):\n    return "classified"',
-              inputs: [{ identifier: "input", type: "str" }],
-              outputs: [{ identifier: "output", type: "str" }],
-            });
+          if (!result.success) {
+            throw new Error("prefetch should have succeeded");
           }
+          expect(result.data.adapterData).toMatchObject({
+            type: "code",
+            agentId: "agent_456",
+            code: 'def execute(input):\n    return "classified"',
+            inputs: [{ identifier: "input", type: "str" }],
+            outputs: [{ identifier: "output", type: "str" }],
+          });
         });
 
         // "uses project defaultModel (code agents have no model)" removed
@@ -1286,24 +1304,25 @@ describe("prefetchWithFixture", () => {
           });
 
           expect(result.success).toBe(true);
-          if (result.success) {
-            expect(result.data.context).toEqual(defaultContext);
-            expect(result.data.scenario).toEqual(defaultScenario);
-            expect(result.data.adapterData).toMatchObject({
-              type: "prompt",
-              promptId: "prompt_123",
-              systemPrompt: "You are helpful",
-            });
-            expect(result.data.modelParams).toEqual(defaultModelParams);
-            expect(result.data.target).toEqual({
-              type: "prompt",
-              referenceId: "prompt_123",
-            });
-            expect(result.telemetry).toEqual({
-              endpoint: "http://app:5560",
-              apiKey: "test-api-key",
-            });
+          if (!result.success) {
+            throw new Error("prefetch should have succeeded");
           }
+          expect(result.data.context).toEqual(defaultContext);
+          expect(result.data.scenario).toEqual(defaultScenario);
+          expect(result.data.adapterData).toMatchObject({
+            type: "prompt",
+            promptId: "prompt_123",
+            systemPrompt: "You are helpful",
+          });
+          expect(result.data.modelParams).toEqual(defaultModelParams);
+          expect(result.data.target).toEqual({
+            type: "prompt",
+            referenceId: "prompt_123",
+          });
+          expect(result.telemetry).toEqual({
+            endpoint: "http://app:5560",
+            apiKey: "test-api-key",
+          });
         });
       });
     });
@@ -1398,27 +1417,29 @@ describe("prefetchWithFixture", () => {
         });
 
         expect(result.success).toBe(true);
-        if (result.success) {
-          expect(result.data.adapterData.type).toBe("workflow");
-          if (result.data.adapterData.type === "workflow") {
-            expect(result.data.adapterData.agentId).toBe("agent_wf");
-            expect(result.data.adapterData.workflowId).toBe("wf_1");
-            expect(result.data.adapterData.inputs).toEqual([{ identifier: "query", type: "str" }]);
-            expect(result.data.adapterData.outputs).toEqual([
-              { identifier: "answer", type: "str" },
-              { identifier: "trace", type: "str" },
-            ]);
-            expect(result.data.adapterData.scenarioMappings).toEqual({
-              query: {
-                type: "source",
-                sourceId: "scenario",
-                path: ["input"],
-              },
-            });
-            expect(result.data.adapterData.scenarioOutputField).toBe("answer");
-            expect(result.data.adapterData.workflow).toEqual(workflowDsl);
-          }
+        if (!result.success) {
+          throw new Error("prefetch should have succeeded");
         }
+        expect(result.data.adapterData.type).toBe("workflow");
+        if (result.data.adapterData.type !== "workflow") {
+          throw new Error("expected a workflow adapter");
+        }
+        expect(result.data.adapterData.agentId).toBe("agent_wf");
+        expect(result.data.adapterData.workflowId).toBe("wf_1");
+        expect(result.data.adapterData.inputs).toEqual([{ identifier: "query", type: "str" }]);
+        expect(result.data.adapterData.outputs).toEqual([
+          { identifier: "answer", type: "str" },
+          { identifier: "trace", type: "str" },
+        ]);
+        expect(result.data.adapterData.scenarioMappings).toEqual({
+          query: {
+            type: "source",
+            sourceId: "scenario",
+            path: ["input"],
+          },
+        });
+        expect(result.data.adapterData.scenarioOutputField).toBe("answer");
+        expect(result.data.adapterData.workflow).toEqual(workflowDsl);
       });
     });
 
@@ -1440,9 +1461,10 @@ describe("prefetchWithFixture", () => {
         });
 
         expect(result.success).toBe(false);
-        if (!result.success) {
-          expect(result.error).toBe("Workflow agent agent_wf not found");
+        if (result.success) {
+          throw new Error("prefetch should have failed");
         }
+        expect(result.error).toBe("Workflow agent agent_wf not found");
       });
     });
 
@@ -1469,9 +1491,10 @@ describe("prefetchWithFixture", () => {
         });
 
         expect(result.success).toBe(false);
-        if (!result.success) {
-          expect(result.error).toBe("Workflow agent agent_wf not found");
+        if (result.success) {
+          throw new Error("prefetch should have failed");
         }
+        expect(result.error).toBe("Workflow agent agent_wf not found");
         expect(getLatestDsl).not.toHaveBeenCalled();
       });
     });
@@ -1574,30 +1597,34 @@ describe("prefetchWithFixture", () => {
         });
 
         expect(result.success).toBe(true);
-        if (result.success && result.data.adapterData.type === "workflow") {
-          const nodes = result.data.adapterData.workflow.nodes as Array<Record<string, unknown>>;
-          const signatureNode = nodes.find(
-            (n) => (n as { type?: unknown }).type === "signature",
-          ) as Record<string, unknown> | undefined;
-
-          expect(signatureNode).toBeDefined();
-
-          const data = signatureNode?.data as Record<string, unknown> | undefined;
-          const parameters = data?.parameters as Array<Record<string, unknown>> | undefined;
-          const llmParam = parameters?.find((p) => p.identifier === "llm" && p.type === "llm");
-
-          expect(llmParam).toBeDefined();
-
-          // The value must be hydrated — not undefined and not using the dummy key
-          const value = llmParam?.value as Record<string, unknown> | undefined;
-          expect(value).toBeDefined();
-          expect(value?.litellm_params).toBeDefined();
-
-          const litellmParams = value?.litellm_params as Record<string, unknown> | undefined;
-          expect(litellmParams?.api_key).toBeDefined();
-          expect(litellmParams?.api_key).not.toBe("dummy");
-          expect(litellmParams?.api_key).toBe(hydratedApiKey);
+        if (!result.success) {
+          throw new Error("prefetch should have succeeded");
         }
+        if (result.data.adapterData.type !== "workflow") {
+          throw new Error("expected a workflow adapter");
+        }
+        const nodes = result.data.adapterData.workflow.nodes as Array<Record<string, unknown>>;
+        const signatureNode = nodes.find(
+          (n) => (n as { type?: unknown }).type === "signature",
+        ) as Record<string, unknown> | undefined;
+
+        expect(signatureNode).toBeDefined();
+
+        const data = signatureNode?.data as Record<string, unknown> | undefined;
+        const parameters = data?.parameters as Array<Record<string, unknown>> | undefined;
+        const llmParam = parameters?.find((p) => p.identifier === "llm" && p.type === "llm");
+
+        expect(llmParam).toBeDefined();
+
+        // The value must be hydrated — not undefined and not using the dummy key
+        const value = llmParam?.value as Record<string, unknown> | undefined;
+        expect(value).toBeDefined();
+        expect(value?.litellm_params).toBeDefined();
+
+        const litellmParams = value?.litellm_params as Record<string, unknown> | undefined;
+        expect(litellmParams?.api_key).toBeDefined();
+        expect(litellmParams?.api_key).not.toBe("dummy");
+        expect(litellmParams?.api_key).toBe(hydratedApiKey);
       });
     });
 
@@ -1651,10 +1678,11 @@ describe("prefetchWithFixture", () => {
         });
 
         expect(result.success).toBe(false);
-        if (!result.success) {
-          expect(result.reason).toBe("provider_not_enabled");
-          expect(result.error).toContain("not enabled");
+        if (result.success) {
+          throw new Error("prefetch should have failed");
         }
+        expect(result.reason).toBe("provider_not_enabled");
+        expect(result.error).toContain("not enabled");
       });
     });
 
@@ -1731,10 +1759,11 @@ describe("prefetchWithFixture", () => {
 
         expect(modelAwarePrepare).toHaveBeenCalledWith(defaultContext.projectId, CODEX_NODE_MODEL);
         expect(result.success).toBe(false);
-        if (!result.success) {
-          expect(result.reason).toBe("preparation_error");
-          expect(result.error).toContain(CODEX_NODE_MODEL);
+        if (result.success) {
+          throw new Error("prefetch should have failed");
         }
+        expect(result.reason).toBe("preparation_error");
+        expect(result.error).toContain(CODEX_NODE_MODEL);
       });
     });
 
@@ -1947,20 +1976,24 @@ describe("prefetchWithFixture", () => {
 
         // litellm_params must be hydrated on the node
         expect(result.success).toBe(true);
-        if (result.success && result.data.adapterData.type === "workflow") {
-          const nodes = result.data.adapterData.workflow.nodes as Array<Record<string, unknown>>;
-          const signatureNode = nodes.find(
-            (n) => (n as { type?: unknown }).type === "signature",
-          ) as Record<string, unknown> | undefined;
-          const parameters = (signatureNode?.data as Record<string, unknown>)?.parameters as
-            | Array<Record<string, unknown>>
-            | undefined;
-          const llmParam = parameters?.find((p) => p.identifier === "llm" && p.type === "llm");
-          const litellmParams = (llmParam?.value as Record<string, unknown>)?.litellm_params as
-            | Record<string, unknown>
-            | undefined;
-          expect(litellmParams?.api_key).toBe(hydratedApiKey);
+        if (!result.success) {
+          throw new Error("prefetch should have succeeded");
         }
+        if (result.data.adapterData.type !== "workflow") {
+          throw new Error("expected a workflow adapter");
+        }
+        const nodes = result.data.adapterData.workflow.nodes as Array<Record<string, unknown>>;
+        const signatureNode = nodes.find(
+          (n) => (n as { type?: unknown }).type === "signature",
+        ) as Record<string, unknown> | undefined;
+        const parameters = (signatureNode?.data as Record<string, unknown>)?.parameters as
+          | Array<Record<string, unknown>>
+          | undefined;
+        const llmParam = parameters?.find((p) => p.identifier === "llm" && p.type === "llm");
+        const litellmParams = (llmParam?.value as Record<string, unknown>)?.litellm_params as
+          | Record<string, unknown>
+          | undefined;
+        expect(litellmParams?.api_key).toBe(hydratedApiKey);
       });
     });
 
@@ -2017,20 +2050,24 @@ describe("prefetchWithFixture", () => {
         });
 
         expect(result.success).toBe(true);
-        if (result.success && result.data.adapterData.type === "workflow") {
-          const nodes = result.data.adapterData.workflow.nodes as Array<Record<string, unknown>>;
-          const signatureNode = nodes.find(
-            (n) => (n as { type?: unknown }).type === "signature",
-          ) as Record<string, unknown> | undefined;
-          const parameters = (signatureNode?.data as Record<string, unknown>)?.parameters as
-            | Array<Record<string, unknown>>
-            | undefined;
-          const llmParam = parameters?.find((p) => p.identifier === "llm" && p.type === "llm");
-          const value = llmParam?.value as Record<string, unknown> | undefined;
-
-          expect(value?.model).toBe(DEFAULT_MODEL);
-          expect(value?.temperature).toBe(0.7);
+        if (!result.success) {
+          throw new Error("prefetch should have succeeded");
         }
+        if (result.data.adapterData.type !== "workflow") {
+          throw new Error("expected a workflow adapter");
+        }
+        const nodes = result.data.adapterData.workflow.nodes as Array<Record<string, unknown>>;
+        const signatureNode = nodes.find(
+          (n) => (n as { type?: unknown }).type === "signature",
+        ) as Record<string, unknown> | undefined;
+        const parameters = (signatureNode?.data as Record<string, unknown>)?.parameters as
+          | Array<Record<string, unknown>>
+          | undefined;
+        const llmParam = parameters?.find((p) => p.identifier === "llm" && p.type === "llm");
+        const value = llmParam?.value as Record<string, unknown> | undefined;
+
+        expect(value?.model).toBe(DEFAULT_MODEL);
+        expect(value?.temperature).toBe(0.7);
       });
     });
 

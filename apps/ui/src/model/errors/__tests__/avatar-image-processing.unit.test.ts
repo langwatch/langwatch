@@ -32,6 +32,16 @@ async function codeOf(run: () => Promise<unknown>): Promise<string> {
   throw new Error("expected the call to throw");
 }
 
+async function handledErrorOf(run: () => Promise<unknown>): Promise<HandledError> {
+  try {
+    await run();
+  } catch (err) {
+    if (HandledError.isHandled(err)) return err;
+    throw err;
+  }
+  throw new Error("expected the call to throw");
+}
+
 describe("avatar upload refusals", () => {
   describe("when the browser prepares the picked file", () => {
     /** @scenario A photo over the ceiling is refused with the size reason */
@@ -41,17 +51,12 @@ describe("avatar upload refusals", () => {
         bytes: AVATAR_MAX_SOURCE_BYTES + 1,
       });
 
-      try {
-        await processAvatarImage(oversized);
-        throw new Error("expected processAvatarImage to throw");
-      } catch (err) {
-        expect(HandledError.isHandled(err)).toBe(true);
-        const handled = err as HandledError;
-        expect(handled.code).toBe("avatar_image_too_large");
-        // The registry's copy reads the ceiling off `meta` to say "under 8 MB",
-        // so the number has to travel with the refusal.
-        expect(handled.meta.maxBytes).toBe(AVATAR_MAX_SOURCE_BYTES);
-      }
+      const handled = await handledErrorOf(() => processAvatarImage(oversized));
+
+      expect(handled.code).toBe("avatar_image_too_large");
+      // The registry's copy reads the ceiling off `meta` to say "under 8 MB",
+      // so the number has to travel with the refusal.
+      expect(handled.meta.maxBytes).toBe(AVATAR_MAX_SOURCE_BYTES);
     });
 
     /** @scenario A file that is not an image is refused as unusable */

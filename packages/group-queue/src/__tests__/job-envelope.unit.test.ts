@@ -170,11 +170,21 @@ describe("jobEnvelope", () => {
 
   describe("given a corrupt value", () => {
     it("decodeJobEnvelope rejects", async () => {
-      await expect(decodeJobEnvelope({ value: "GQ1|nonsense" })).rejects.toThrow();
-      await expect(decodeJobEnvelope({ value: "not json" })).rejects.toThrow();
-      await expect(decodeJobEnvelope({ value: "GQ1|5" })).rejects.toThrow();
-      await expect(decodeJobEnvelope({ value: "GQ1|0|{}" })).rejects.toThrow();
-      await expect(decodeJobEnvelope({ value: "GQ1|8|{not:js}body" })).rejects.toThrow();
+      await expect(decodeJobEnvelope({ value: "GQ1|nonsense" })).rejects.toMatchObject({
+        reason: "malformed_envelope",
+      });
+      await expect(decodeJobEnvelope({ value: "not json" })).rejects.toMatchObject({
+        reason: "malformed_envelope",
+      });
+      await expect(decodeJobEnvelope({ value: "GQ1|5" })).rejects.toMatchObject({
+        reason: "malformed_envelope",
+      });
+      await expect(decodeJobEnvelope({ value: "GQ1|0|{}" })).rejects.toMatchObject({
+        reason: "malformed_envelope",
+      });
+      await expect(decodeJobEnvelope({ value: "GQ1|8|{not:js}body" })).rejects.toMatchObject({
+        reason: "malformed_envelope",
+      });
     });
 
     it("readJobRoutingMeta returns nulls instead of throwing", () => {
@@ -260,7 +270,7 @@ describe("jobEnvelope", () => {
 
         await expect(
           decodeJobEnvelope({ value: encoded, tieredBlobs: bombStore }),
-        ).rejects.toThrow();
+        ).rejects.toThrow(PayloadTooLargeError);
       });
     });
 

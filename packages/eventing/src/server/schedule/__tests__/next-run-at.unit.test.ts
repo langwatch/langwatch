@@ -56,7 +56,7 @@ describe("computeNextRunAt", () => {
             timezone: "UTC",
             after: new Date("2026-01-01T00:00:00.000Z"),
           }),
-        ).toThrow();
+        ).toThrow(Error);
       });
     });
   });
@@ -127,7 +127,7 @@ describe("computeCatchUp (runLatest catch-up)", () => {
           slot: new Date("2026-01-01T00:00:00.000Z"),
           now: new Date("2026-01-02T00:00:00.000Z"),
         }),
-      ).toThrow();
+      ).toThrow(Error);
     });
   });
 });

@@ -125,6 +125,7 @@ describe("StoredObjectBlobS3Repository", () => {
 
       await driver.put(TEST_URI, bytes, mediaType);
 
+      expect(s3Client.send).toHaveBeenCalledOnce();
       assertSentCommand(s3Client.send, "PutObjectCommand", {
         Bucket: TEST_BUCKET,
         Key: "proj-123/deadbeef1234",
@@ -144,6 +145,7 @@ describe("StoredObjectBlobS3Repository", () => {
 
       await driver.delete(TEST_URI);
 
+      expect(s3Client.send).toHaveBeenCalledOnce();
       assertSentCommand(s3Client.send, "DeleteObjectCommand", {
         Bucket: TEST_BUCKET,
         Key: "proj-123/deadbeef1234",
@@ -190,7 +192,9 @@ describe("StoredObjectBlobS3Repository", () => {
 
   describe("when get is called with a non-s3 URI", () => {
     it("throws", async () => {
-      await expect(driver.get("file:///var/lib/langwatch/objects/proj/sha")).rejects.toThrow();
+      await expect(driver.get("file:///var/lib/langwatch/objects/proj/sha")).rejects.toThrow(
+        UnsupportedStorageSchemeError,
+      );
     });
   });
 

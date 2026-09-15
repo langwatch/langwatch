@@ -36,20 +36,22 @@ describe("Parameter Config", () => {
       const config = PARAMETER_CONFIG.max_tokens;
       expect(config).toBeDefined();
       expect(config?.type).toBe("slider");
-      if (config?.type === "slider") {
-        expect(config.dynamicMax).toBe(true);
+      if (config?.type !== "slider") {
+        throw new Error("expected a slider parameter config");
       }
+      expect(config.dynamicMax).toBe(true);
     });
 
     it("has unified reasoning config as select", () => {
       const config = PARAMETER_CONFIG.reasoning;
       expect(config).toBeDefined();
       expect(config?.type).toBe("select");
-      if (config?.type === "select") {
-        expect(config.options).toContain("low");
-        expect(config.options).toContain("medium");
-        expect(config.options).toContain("high");
+      if (config?.type !== "select") {
+        throw new Error("expected a select parameter config");
       }
+      expect(config.options).toContain("low");
+      expect(config.options).toContain("medium");
+      expect(config.options).toContain("high");
     });
 
     it("has frequency_penalty config", () => {
@@ -236,10 +238,11 @@ describe("Parameter Config", () => {
       const config = getParameterConfigWithModelOverrides("reasoning", reasoningConfig);
 
       expect(config?.type).toBe("select");
-      if (config?.type === "select") {
-        expect(config.options).toEqual(["low", "high"]);
-        expect(config.default).toBe("high");
+      if (config?.type !== "select") {
+        throw new Error("expected a select parameter config");
       }
+      expect(config.options).toEqual(["low", "high"]);
+      expect(config.default).toBe("high");
     });
 
     it("returns dynamic label for OpenAI reasoning_effort", () => {
@@ -305,22 +308,24 @@ describe("Parameter Config", () => {
       const config = getParameterConfigWithModelOverrides("reasoning", reasoningConfig);
 
       expect(config?.type).toBe("select");
-      if (config?.type === "select") {
-        expect(config.options).toEqual(["none", "low", "medium", "high", "xhigh"]);
-        expect(config.default).toBe("none");
+      if (config?.type !== "select") {
+        throw new Error("expected a select parameter config");
       }
+      expect(config.options).toEqual(["none", "low", "medium", "high", "xhigh"]);
+      expect(config.default).toBe("none");
     });
 
     it("returns fallback options when no reasoningConfig", () => {
       const config = getParameterConfigWithModelOverrides("reasoning");
 
       expect(config?.type).toBe("select");
-      if (config?.type === "select") {
-        // Should have fallback options
-        expect(config.options).toContain("low");
-        expect(config.options).toContain("medium");
-        expect(config.options).toContain("high");
+      if (config?.type !== "select") {
+        throw new Error("expected a select parameter config");
       }
+      // Should have fallback options
+      expect(config.options).toContain("low");
+      expect(config.options).toContain("medium");
+      expect(config.options).toContain("high");
     });
   });
 
@@ -370,17 +375,19 @@ describe("Parameter Config", () => {
     it("does not include none in reasoning fallback options", () => {
       const config = PARAMETER_CONFIG.reasoning;
       expect(config?.type).toBe("select");
-      if (config?.type === "select") {
-        expect(config.options).not.toContain("none");
+      if (config?.type !== "select") {
+        throw new Error("expected a select parameter config");
       }
+      expect(config.options).not.toContain("none");
     });
 
     it("has dynamic options enabled for reasoning", () => {
       const config = PARAMETER_CONFIG.reasoning;
       expect(config?.type).toBe("select");
-      if (config?.type === "select") {
-        expect(config.dynamicOptions).toBe(true);
+      if (config?.type !== "select") {
+        throw new Error("expected a select parameter config");
       }
+      expect(config.dynamicOptions).toBe(true);
     });
   });
 });

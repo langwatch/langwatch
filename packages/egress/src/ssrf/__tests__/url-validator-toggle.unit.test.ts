@@ -45,14 +45,14 @@ describe("SSRF blocking via BLOCK_LOCAL_HTTP_CALLS toggle (TS half)", () => {
       "refuses private IP literal %s",
       async (hostname) => {
         const url = hostname === "::1" ? `http://[${hostname}]/` : `http://${hostname}/`;
-        await expect(validate(url)).rejects.toThrow();
+        await expect(validate(url)).rejects.toThrow(Error);
       },
     );
 
     /** @scenario <impl> blocks DNS rebinding to private IPs when BLOCK_LOCAL_HTTP_CALLS is "true" */
     it("refuses a hostname that resolves to a private IP", async () => {
       resolvesTo({ a: ["10.0.5.3"] });
-      await expect(validate("http://internal.example.com/")).rejects.toThrow();
+      await expect(validate("http://internal.example.com/")).rejects.toThrow(Error);
     });
   });
 
@@ -86,7 +86,7 @@ describe("SSRF blocking via BLOCK_LOCAL_HTTP_CALLS toggle (TS half)", () => {
 
     /** @scenario <impl> hostname not in allowlist is still blocked */
     it("still refuses a private host the allowlist does not name", async () => {
-      await expect(validate("http://10.0.5.4/")).rejects.toThrow();
+      await expect(validate("http://10.0.5.4/")).rejects.toThrow(Error);
     });
   });
 

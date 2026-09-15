@@ -11,13 +11,14 @@ describe("mapEvaluatorResult", () => {
       });
 
       expect(result.type).toBe("evaluator_result");
-      if (result.type === "evaluator_result") {
-        expect(result.result.domainError).toMatchObject({
-          kind: "evaluator_execution_error",
-          meta: { httpStatus: 403 },
-        });
-        expect(result.result.details).toContain("Missing Authentication Token");
+      if (result.type !== "evaluator_result") {
+        throw new Error("expected an evaluator_result");
       }
+      expect(result.result.domainError).toMatchObject({
+        kind: "evaluator_execution_error",
+        meta: { httpStatus: 403 },
+      });
+      expect(result.result.details).toContain("Missing Authentication Token");
     });
 
     it("does not reclassify non-auth error strings", () => {
@@ -27,9 +28,10 @@ describe("mapEvaluatorResult", () => {
       });
 
       expect(result.type).toBe("evaluator_result");
-      if (result.type === "evaluator_result") {
-        expect(result.result.domainError).toBeUndefined();
+      if (result.type !== "evaluator_result") {
+        throw new Error("expected an evaluator_result");
       }
+      expect(result.result.domainError).toBeUndefined();
     });
   });
 });
