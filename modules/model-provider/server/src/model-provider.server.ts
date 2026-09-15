@@ -13,6 +13,47 @@ import {
   playgroundRestSystemPrompt,
 } from "./transport/playground.rest.ts";
 import { translateTrpcTransport } from "./transport/translate.trpc.ts";
+import { getModelById, type CustomModelEntry } from "@langwatch/model-provider-contract";
+import type { ModelProviderApi } from "@langwatch/model-provider-contract";
+
+import type {
+  ModelProviderCodexDeviceFlow,
+  ModelProviderInfrastructure,
+} from "./app/model-provider.app.ts";
+import type {
+  ModelProviderCredentialCipher,
+  ModelProviderCredentialCodec,
+  ModelProviderManagedGateway,
+  ModelProviderRateLimit,
+  ModelTranslation,
+} from "./app/model-provider.members.ts";
+import { PrismaModelCostCatalogRepository } from "./repositories/prisma/prisma.model-cost-catalog.repository.ts";
+import {
+  CodexAccountService,
+  CodexOAuthModelProviderTokenRefresherAdapter,
+} from "./services/codex-oauth.model-provider-token-refresher.service.ts";
+import {
+  EncryptedModelProviderCredentialAdapter,
+  type CustomKeysRead,
+} from "./services/encrypted.model-provider-api-key-credential.service.ts";
+import { HttpModelProviderCredentialProbeAdapter } from "./services/http.model-provider-credential-probe.service.ts";
+import type { ModelCostCatalogService } from "./services/model-cost-catalog.service.ts";
+import { ModelProviderExecutionHandleService } from "./services/model-provider-execution-handle.service.ts";
+import {
+  PostgresModelProviderAdapter,
+  type PostgresModelProviderAdapterOptions,
+} from "./services/model-provider-service.composition.ts";
+import { ModelProviderExecutionAdapter } from "./services/model-provider-topic-clustering-execution.service.ts";
+import { PrefixedModelProviderIdAdapter } from "./services/prefixed.model-provider-id.service.ts";
+import { RegistryModelProviderCatalogAdapter } from "./services/registry.model-provider-catalog.service.ts";
+import {
+  SsrfModelProviderEgressAdapter,
+  type ModelProviderEgressPolicy,
+} from "./services/ssrf.model-provider-egress.service.ts";
+import { UnavailableModelProviderCredentialProbeAdapter } from "./services/unavailable.model-provider-credential-probe.service.ts";
+import { UnmanagedModelProviderGatewayAdapter } from "./services/unmanaged.model-provider-gateway.service.ts";
+import { VercelAiModelTranslationAdapter } from "./services/vercel-ai.model-translation.service.ts";
+import { WindowedModelProviderConnectionRateLimiterAdapter } from "./services/windowed.model-provider-connection-rate-limiter.service.ts";
 
 export type { ModelProviderInfrastructure } from "./app/model-provider.app.ts";
 
@@ -44,3 +85,178 @@ export const modelProviderServer = defineServerModule("model-provider")
     bindRestHeader(playgroundRestProject, "x-project-id"),
     bindRestHeader(playgroundRestSystemPrompt, "x-system-prompt"),
   ]);
+
+// Model Provider's composition seam: a process composes the gateway through the factories below
+// and never names one of this module's adapters, services or repositories. What it passes are its
+// own substrates and the two decisions only a deployment can answer — whether it is hosted, and
+// which execution proxy a translation runs against.
+/** The execution proxy a translation is run against, when the process joined one. */
+export type ModelProviderTranslationSurface =
+  | Readonly<{ executionProxyBaseUrl: string }>
+  | ModelTranslation;
+
+export type ModelProviderRuntimeInput = Readonly<{
+  /** The one guarded connection every provider, default and cost row is read on. */
+  database: PostgresModelProviderAdapterOptions["database"];
+  /** Resolves a project's team and organization, for scope derivation. */
+  projects: PostgresModelProviderAdapterOptions["projects"];
+  /** Resolves an organization, for the organization-scoped provider rows. */
+  organizations: PostgresModelProviderAdapterOptions["organizations"];
+  /** Decides who may read and write a provider row. */
+  authorization: PostgresModelProviderAdapterOptions["authorization"];
+  /**
+   * The deployment's stored-secret cipher. Required rather than optional: without one every
+   * provider would look configured-but-unusable, because no stored credential could be read.
+   */
+  encryption: ModelProviderCredentialCipher;
+  /** The shared counters a connection test's fixed window is metered in. */
+  connectionRateLimiter: ModelProviderRateLimit;
+  /** The environment the system-held provider credentials are read from. */
+  systemProviderEnvironment: Readonly<Record<string, string | undefined>>;
+  /** Whether this is the hosted deployment, which decides the managed rows and TLS posture. */
+  isSaas: boolean;
+  translation: ModelProviderTranslationSurface;
+  /**
+   * The fence an outbound credential probe goes through. A process that names none composes no
+   * probe: a credential test with no fence is one this deployment has not decided it may make.
+   */
+  egress?: ModelProviderEgressPolicy;
+  /** The managed provider rows, when a deployment has an Enterprise service answering them. */
+  managedGateway?: ModelProviderManagedGateway;
+  /** The random half of a minted identifier, in the format this process mints ids in. */
+  idSuffix: () => string;
+}>;
+
+/**
+ * The gateway, and what the installed module is built over in this same process — one value, so
+ * the two can never be composed from two different registries.
+ */
+export type ModelProviderRuntime = Readonly<{
+  modelProviders: ModelProviderApi;
+  credentials: ModelProviderCredentialCodec;
+  /** Everything but the request's span reader, which the transport supplies per call. */
+  infrastructure: Omit<ModelProviderInfrastructure, "spans">;
+}>;
+
+/** Composes the model gateway from a process's own graph. */
+export function createModelProviderRuntime(input: ModelProviderRuntimeInput): ModelProviderRuntime {
+  const credentials = EncryptedModelProviderCredentialAdapter.create({ cipher: input.encryption });
+  const credentialProbe = input.egress
+    ? HttpModelProviderCredentialProbeAdapter.create({
+        egress: SsrfModelProviderEgressAdapter.create({ policy: input.egress }),
+      })
+    : UnavailableModelProviderCredentialProbeAdapter.create();
+  const ids = PrefixedModelProviderIdAdapter.create({ suffix: input.idSuffix });
+  const technical = {
+    codexTokenRefresher: CodexOAuthModelProviderTokenRefresherAdapter.create(),
+    connectionRateLimiter: WindowedModelProviderConnectionRateLimiterAdapter.create({
+      limiter: input.connectionRateLimiter,
+    }),
+    catalog: RegistryModelProviderCatalogAdapter.create({
+      managed: input.managedGateway ?? UnmanagedModelProviderGatewayAdapter.create(),
+      probe: credentialProbe,
+      systemProviderEnvironment: input.systemProviderEnvironment,
+      isSaas: input.isSaas,
+    }),
+    translation:
+      "executionProxyBaseUrl" in input.translation
+        ? VercelAiModelTranslationAdapter.create({
+            projects: input.projects,
+            executionProxyBaseUrl: input.translation.executionProxyBaseUrl,
+          })
+        : input.translation,
+    ids,
+  };
+
+  return {
+    modelProviders: PostgresModelProviderAdapter.create({
+      database: input.database,
+      projects: input.projects,
+      organizations: input.organizations,
+      authorization: input.authorization,
+      credentials,
+      ...technical,
+    }).build(),
+    credentials,
+    infrastructure: {
+      ...technical,
+      credentialProbe,
+      codexAccounts: createModelProviderCodexDeviceFlow(),
+    },
+  };
+}
+
+/** The Codex device ceremony's two answers, over this deployment's own issuer. */
+export function createModelProviderCodexDeviceFlow(): ModelProviderCodexDeviceFlow {
+  return new CodexAccountService();
+}
+
+/**
+ * The model cost catalogue a trace's cost is priced against, over the
+ * deployment's own connection.
+ */
+export function createModelProviderCostCatalog(
+  input: Parameters<typeof PrismaModelCostCatalogRepository.create>[0],
+): ModelCostCatalogService {
+  return PrismaModelCostCatalogRepository.create(input).build();
+}
+
+/**
+ * The custom keys stored beside a provider row, decoded. A read rather than a
+ * service: the caller holds a stored value and wants the keys in it.
+ */
+export function readModelProviderCustomKeys(
+  input: Readonly<{
+    stored: unknown;
+    decryptor: Parameters<typeof EncryptedModelProviderCredentialAdapter.readCustomKeys>[1];
+  }>,
+): CustomKeysRead {
+  return EncryptedModelProviderCredentialAdapter.readCustomKeys(input.stored, input.decryptor);
+}
+
+/** The model execution topic clustering runs its calls through. */
+export function createModelProviderExecution(
+  input: Parameters<typeof ModelProviderExecutionAdapter.create>[0],
+): ModelProviderExecutionAdapter {
+  return ModelProviderExecutionAdapter.create(input);
+}
+
+/** What a feature asks for when it needs a model to call, resolved through the scope cascade. */
+export type ModelProviderExecutionHandleRequest = Parameters<
+  typeof ModelProviderExecutionHandleService.getVercelAIModel
+>[0];
+
+/** The resolved model, ready to be called. */
+export type ModelProviderExecutionHandle = Awaited<
+  ReturnType<typeof ModelProviderExecutionHandleService.getVercelAIModel>
+>;
+
+/**
+ * Resolves the model a feature call runs on, through the project's own scope cascade. Refuses
+ * with `ModelNotConfiguredError` when the cascade resolves nothing, so the caller can decide.
+ */
+export function resolveModelProviderExecutionHandle(
+  request: ModelProviderExecutionHandleRequest,
+): Promise<ModelProviderExecutionHandle> {
+  return ModelProviderExecutionHandleService.getVercelAIModel(request);
+}
+
+type ProviderWithCustomModels = {
+  customModels?: CustomModelEntry[] | null;
+};
+
+/**
+ * The completion-token ceiling a model may be called with: a custom model's own limit where the
+ * project declared one, and the catalogue's otherwise.
+ */
+export function resolveMaxTokensCeiling(
+  modelId: string,
+  modelProvider: ProviderWithCustomModels | null | undefined,
+): number | undefined {
+  const modelName = modelId.split("/").slice(1).join("/");
+  const custom = modelProvider?.customModels?.find((entry) => entry.modelId === modelName);
+  if (custom?.maxTokens && custom.maxTokens > 0) return custom.maxTokens;
+
+  const model = getModelById(modelId) ?? getModelById(modelName);
+  return model?.maxCompletionTokens ?? undefined;
+}

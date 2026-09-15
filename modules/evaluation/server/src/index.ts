@@ -1,9 +1,27 @@
-export {
-  ClickhouseEvaluationRepository as EvaluationAdapter,
-  type EvaluationAdapterOptions,
-} from "./repositories/clickhouse/clickhouse.evaluation.repository.ts";
+export type { EvaluationAdapterOptions } from "./repositories/clickhouse/clickhouse.evaluation.repository.ts";
 export { EvaluationApp, type EvaluationInfrastructure } from "./app/evaluation.app.ts";
 export { evaluationServer } from "./evaluation.server.ts";
+
+// --------------------------------------------------------------------------- Evaluation's
+// composition seam: how a process builds this feature's runtime from its own substrates,
+// without naming one of the module's repositories or services.
+// ---------------------------------------------------------------------------
+export {
+  createEvaluationCostLedger,
+  createEvaluationEngine,
+  createEvaluationEventingStores,
+  createEvaluationExecutionIntent,
+  createEvaluationInputsOffload,
+  createEvaluationRunReads,
+  createMonitorPerformanceReads,
+  deriveEvaluationEvaluatorId,
+  type EvaluationClickHouseAccess,
+  type EvaluationCostLedger,
+  type EvaluationEngine,
+  type EvaluationInputsOffloadStore,
+  type EvaluationRunReads,
+  type MonitorPerformanceReads,
+} from "./evaluation.server.ts";
 /**
  * The `evaluation_runs` repository, for a process that needs one read and not the service
  * around it.
@@ -13,33 +31,31 @@ export { ClickHouseEvaluationRepository } from "./repositories/clickhouse/evalua
  * The monitors page's seven-day trend, for a process that reads it and executes nothing.
  */
 export { ClickhouseMonitorPerformanceRepository as MonitorPerformanceAdapter } from "./repositories/clickhouse/clickhouse.monitor-performance.repository.ts";
-export { MonitorPerformanceService } from "./services/monitor-performance.service.ts";
 export {
   EvaluationEventingAdapter,
   type EvaluationEventingStores,
 } from "./services/evaluation.eventing.service.ts";
-export { EvaluationRunProjectionRepository as EvaluationRunProjection } from "./repositories/evaluation-run-projection.repository.ts";
 export { EvaluationRunProjectionService } from "./services/evaluation-run-projection.service.ts";
-export {
-  type EvaluationExecution,
-  type EvaluationExecutionIntent,
-  type EvaluationExecutionReceipt,
-  type EvaluationAnalyticsAttributePolicy,
-  type EvaluationCostRecorder,
-  type EvaluationInputStorage,
-  type EvaluationInputOffloadAvailability,
-  type EvaluationAzureSafetyCredentials,
-  type EvaluationSettingsRecovery,
-  type EvaluationInputsOffload,
-  type EvaluationInputsResolution,
-  type EvaluationRetentionFloor,
+export type {
+  EvaluationExecution,
+  EvaluationExecutionIntent,
+  EvaluationExecutionReceipt,
+  EvaluationAnalyticsAttributePolicy,
+  EvaluationCostRecorder,
+  EvaluationInputStorage,
+  EvaluationInputOffloadAvailability,
+  EvaluationAzureSafetyCredentials,
+  EvaluationSettingsRecovery,
+  EvaluationInputsOffload,
+  EvaluationInputsResolution,
+  EvaluationRetentionFloor,
 } from "./app/evaluation.members.ts";
-export {
-  type EvaluationClickHouseResolver,
-  type EvaluationClickHouseClient,
-  type EvaluationClickHouseInsert,
-  type EvaluationClickHouseQuery,
-  type EvaluationClickHouseResult,
+export type {
+  EvaluationClickHouseResolver,
+  EvaluationClickHouseClient,
+  EvaluationClickHouseInsert,
+  EvaluationClickHouseQuery,
+  EvaluationClickHouseResult,
 } from "./repositories/clickhouse/evaluation-clickhouse-client.ts";
 export {
   EvaluationInputsOffloadService,
@@ -55,7 +71,7 @@ export {
   EVAL_INPUTS_STORED_OBJECT_PURPOSE,
 } from "./services/evaluation-inputs-offload.service.ts";
 export { ExecuteEvaluationCommand } from "./intents/evaluation-execution.intent.ts";
-export { EvaluationService, type EvaluationServiceOptions } from "./services/evaluation.service.ts";
+export type { EvaluationServiceOptions } from "./services/evaluation.service.ts";
 export {
   EvaluationExecutionIntentService,
   type ExecuteEvaluationCommandDeps,
@@ -65,31 +81,21 @@ export {
   type EvaluationProcessingPipelineDeps,
 } from "./services/evaluation-processing.service.ts";
 export { EvaluationProcessingProducerAdapter } from "./services/evaluation-processing-producer.service.ts";
-export {
-  EvaluatorAvailabilityService,
-  LINGUA_ENABLE_ENV_VAR,
-  PRESIDIO_ENABLE_ENV_VAR,
-  type EvaluatorInstallEnvironment,
-} from "./services/evaluator-availability.service.ts";
+export type { EvaluatorInstallEnvironment } from "./services/evaluator-availability.service.ts";
 export type { EvaluationRunData } from "@langwatch/evaluation-contract";
 export { evaluationTrpcTransport } from "./transport/evaluation.trpc.ts";
-export {
-  type EvaluationCustomEvaluators,
-  type EvaluationInstallEnvironment,
-  type EvaluationReport,
-  type EvaluationRescore,
-  type EvaluationRunAnalytics,
-  type EvaluationWarmupProbe,
+export type {
+  EvaluationCustomEvaluators,
+  EvaluationInstallEnvironment,
+  EvaluationReport,
+  EvaluationRescore,
+  EvaluationRunAnalytics,
+  EvaluationWarmupProbe,
 } from "./app/evaluation.members.ts";
 export { EvaluationNameAutoslugService } from "./services/evaluation-name-autoslug.service.ts";
-export {
-  EvaluationPreconditionService,
-  PRECONDITION_FIELDS,
-} from "./services/evaluation-precondition.service.ts";
 
 /** The cost ledger an evaluation run writes into, over the repositories it is handed. */
 export { EvaluationCostService } from "./services/evaluation-cost.service.ts";
-export { evaluationRepositories } from "./repositories/evaluation-repositories.registry.ts";
 
 /**
  * The ONLINE execution path: rendering a stored trace through its evaluator
@@ -100,21 +106,18 @@ export {
   EvaluationExecutionService,
   type EvaluationExecutionDeps,
 } from "./services/evaluation-execution.service.ts";
-export {
-  EvaluationThreadMappingService,
-  type GetThreadTraces,
-} from "./services/evaluation-thread-mapping.service.ts";
-export {
-  type EvaluationMonitorLookup,
-  type EvaluationTraceEvidence,
-  type EvaluationExecutionTelemetry,
-  type EvaluationLangevals,
-  type EvaluationModelEnv,
-  type EvaluationSpanDigest,
-  type EvaluationTraceRead,
-  type EvaluationWorkflowExecutor,
-  type EvaluationTraceProtections,
-  type LangevalsEvaluateParams,
+export type { GetThreadTraces } from "./services/evaluation-thread-mapping.service.ts";
+export type {
+  EvaluationMonitorLookup,
+  EvaluationTraceEvidence,
+  EvaluationExecutionTelemetry,
+  EvaluationLangevals,
+  EvaluationModelEnv,
+  EvaluationSpanDigest,
+  EvaluationTraceRead,
+  EvaluationWorkflowExecutor,
+  EvaluationTraceProtections,
+  LangevalsEvaluateParams,
 } from "./app/evaluation.members.ts";
 export {
   HttpLangevalsEvaluatorAdapter,

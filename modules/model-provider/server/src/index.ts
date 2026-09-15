@@ -6,13 +6,8 @@ export {
   PrismaModelCostCatalogRepository,
   type ModelCostCatalogDatabase,
 } from "./repositories/prisma/prisma.model-cost-catalog.repository.ts";
-export { ModelCostCatalogService } from "./services/model-cost-catalog.service.ts";
-export {
-  PostgresModelProviderEvidenceAdapter,
-  type ModelProviderEvidenceDatabase,
-} from "./services/model-provider-evidence-service.composition.ts";
-export { ModelProviderEvidenceService } from "./services/model-provider-evidence.service.ts";
-export { ModelProviderProjectScopeService } from "./services/model-provider-project-scope.service.ts";
+export type { ModelCostCatalogService } from "./services/model-cost-catalog.service.ts";
+export type { ModelProviderEvidenceDatabase } from "./services/model-provider-evidence-service.composition.ts";
 export {
   ModelCostProject,
   ModelCostProjectScope,
@@ -56,13 +51,9 @@ export {
   AiCallFailedError,
   AiCallFailureService,
 } from "./services/ai-call-failure.service.ts";
-export { ModelCostRegexSafetyService } from "./services/model-cost-regex-safety.service.ts";
-export { ModelLimitsService } from "./services/model-limits.service.ts";
-export {
-  ModelCostPreviewService,
-  PREVIEW_WINDOW_DAYS,
-  type ModelCostPreviewSpanReader,
-  type ModelCostRuleReader,
+export type {
+  ModelCostPreviewSpanReader,
+  ModelCostRuleReader,
 } from "./services/model-cost-preview.service.ts";
 export { WindowedModelProviderConnectionRateLimiterAdapter } from "./services/windowed.model-provider-connection-rate-limiter.service.ts";
 export {
@@ -76,8 +67,7 @@ export {
   type ModelProviderExecutionHandleInput,
   type ModelProviderExecutionHandleOptions,
 } from "./services/model-provider-execution-handle.service.ts";
-export { ModelProviderKeysService } from "./services/model-provider-keys.service.ts";
-export { resolveMaxTokensCeiling } from "./rules/max-tokens-ceiling.rules.ts";
+export { resolveMaxTokensCeiling } from "./model-provider.server.ts";
 export { ModelProviderExecutionAdapter } from "./services/model-provider-topic-clustering-execution.service.ts";
 export {
   getModelMetadataForFrontend,
@@ -92,15 +82,32 @@ export {
   toLegacyExecutionProvider,
   toLegacyProviderSummary,
 } from "./rules/legacy-model-provider.rules.ts";
-export {
-  ModelProviderApp,
-  type ModelProviderCaller,
-  type ModelProviderCodexDeviceFlow,
-  type ModelProviderIdFactory,
-  type ModelProviderInfrastructure,
-  type SpanReader,
+export type {
+  ModelProviderCaller,
+  ModelProviderCodexDeviceFlow,
+  ModelProviderIdFactory,
+  ModelProviderInfrastructure,
+  SpanReader,
 } from "./app/model-provider.app.ts";
 export { modelProviderServer } from "./model-provider.server.ts";
+
+// --------------------------------------------------------------------------- Model Provider's
+// composition seam: how a process composes the gateway from its own substrates, without naming
+// one of the module's adapters, services or repositories.
+// ---------------------------------------------------------------------------
+export {
+  createModelProviderCodexDeviceFlow,
+  createModelProviderCostCatalog,
+  createModelProviderExecution,
+  createModelProviderRuntime,
+  readModelProviderCustomKeys,
+  resolveModelProviderExecutionHandle,
+  type ModelProviderExecutionHandle,
+  type ModelProviderExecutionHandleRequest,
+  type ModelProviderRuntime,
+  type ModelProviderRuntimeInput,
+  type ModelProviderTranslationSurface,
+} from "./model-provider.server.ts";
 export { modelProviderRest } from "./transport/model-provider.rest.ts";
 export {
   modelDefaultsRest,
@@ -117,8 +124,6 @@ export {
 export { modelProviderTrpcTransport } from "./transport/model-provider.trpc.ts";
 export { llmModelCostTrpcTransport } from "./transport/llm-model-cost.trpc.ts";
 export { translateTrpcTransport } from "./transport/translate.trpc.ts";
-
-export { ModelProviderLegacyMigrationService } from "./services/model-provider-legacy-migration.service.ts";
 
 export { ModelProviderCredentialsMigrateTask } from "./tasks/model-provider-credentials-migrate.task.ts";
 export { ModelProviderCustomModelsMigrateTask } from "./tasks/model-provider-custom-models-migrate.task.ts";

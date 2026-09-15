@@ -1113,27 +1113,12 @@
       "expires": "2026-10-01"
     },
     {
-      "key": "private-runtime-export|modules/evaluation/server/src/index.ts|./repositories/clickhouse/clickhouse.evaluation.repository.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
       "key": "private-runtime-export|modules/evaluation/server/src/index.ts|./repositories/clickhouse/clickhouse.monitor-performance.repository.ts",
       "measured": "2026-09-10",
       "expires": "2026-10-01"
     },
     {
       "key": "private-runtime-export|modules/evaluation/server/src/index.ts|./repositories/clickhouse/evaluation.repository.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/evaluation/server/src/index.ts|./repositories/evaluation-repositories.registry.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/evaluation/server/src/index.ts|./repositories/evaluation-run-projection.repository.ts",
       "measured": "2026-09-10",
       "expires": "2026-10-01"
     },
@@ -1163,42 +1148,7 @@
       "expires": "2026-10-01"
     },
     {
-      "key": "private-runtime-export|modules/evaluation/server/src/index.ts|./services/evaluation-precondition.service.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
       "key": "private-runtime-export|modules/evaluation/server/src/index.ts|./services/evaluation-run-projection.service.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/evaluation/server/src/index.ts|./services/evaluation-thread-mapping.service.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/evaluation/server/src/index.ts|./services/evaluation.service.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/evaluation/server/src/index.ts|./services/evaluator-availability.service.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/evaluation/server/src/index.ts|./services/monitor-performance.service.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/evaluator/server/src/index.ts|./app/evaluator.app.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/evaluator/server/src/index.ts|./rules/evaluator-schemas.rules.ts",
       "measured": "2026-09-10",
       "expires": "2026-10-01"
     },
@@ -1558,22 +1508,12 @@
       "expires": "2026-10-01"
     },
     {
-      "key": "private-runtime-export|modules/model-provider/server/src/index.ts|./app/model-provider.app.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
       "key": "private-runtime-export|modules/model-provider/server/src/index.ts|./repositories/prisma/prisma.model-cost-catalog.repository.ts",
       "measured": "2026-09-10",
       "expires": "2026-10-01"
     },
     {
       "key": "private-runtime-export|modules/model-provider/server/src/index.ts|./rules/legacy-model-provider.rules.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/model-provider/server/src/index.ts|./rules/max-tokens-ceiling.rules.ts",
       "measured": "2026-09-10",
       "expires": "2026-10-01"
     },
@@ -1593,52 +1533,7 @@
       "expires": "2026-10-01"
     },
     {
-      "key": "private-runtime-export|modules/model-provider/server/src/index.ts|./services/model-cost-catalog.service.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/model-provider/server/src/index.ts|./services/model-cost-preview.service.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/model-provider/server/src/index.ts|./services/model-cost-regex-safety.service.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/model-provider/server/src/index.ts|./services/model-limits.service.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/model-provider/server/src/index.ts|./services/model-provider-evidence-service.composition.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/model-provider/server/src/index.ts|./services/model-provider-evidence.service.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
       "key": "private-runtime-export|modules/model-provider/server/src/index.ts|./services/model-provider-execution-handle.service.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/model-provider/server/src/index.ts|./services/model-provider-keys.service.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/model-provider/server/src/index.ts|./services/model-provider-legacy-migration.service.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/model-provider/server/src/index.ts|./services/model-provider-project-scope.service.ts",
       "measured": "2026-09-10",
       "expires": "2026-10-01"
     },
