@@ -37,7 +37,7 @@ describe("the /api/trigger/slack declaration", () => {
       ["POST /api/trigger/slack"],
     );
     expect(declaration.routes[0]?.permission).toBe("triggers:manage");
-    expect(declaration.routes[0]?.operation).toBe("createSlackTrigger");
+    expect(declaration.routes[0]?.operation).toBe("postApiTriggerSlack");
   });
 });
 

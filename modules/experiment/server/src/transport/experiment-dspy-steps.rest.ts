@@ -47,7 +47,7 @@ export const experimentDspyStepsRest = defineRestRouter(ExperimentApi)
   .withNamespace("dspy")
   .withVersion(MANAGEMENT_API_VERSION)
 
-  .post("/log_steps", "logDspySteps")
+  .post("/log_steps", "postApiDspyLogSteps")
   // Read as characters, parsed here: the door reports the wire size it
   // accepted, and answers its own sentence - built by `zodErrorMessage` from
   // the schema's own failure - on a bad batch.

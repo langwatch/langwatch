@@ -21,7 +21,7 @@ export const dashboardRest = defineRestRouter(DashboardApi)
   .withNamespace("dashboards")
   .withVersion(MANAGEMENT_API_VERSION)
 
-  .get("/", "listDashboards")
+  .get("/", "getApiDashboards")
   .withPermission("analytics:view")
   .withOutput(dashboardListResponseSchema)
   .withDocs({
@@ -50,7 +50,7 @@ export const dashboardRest = defineRestRouter(DashboardApi)
 
   // Creating asks for `analytics:create`; `:manage` still implies it, so nobody
   // who could create a dashboard yesterday loses that.
-  .post("/", "createDashboard")
+  .post("/", "postApiDashboards")
   .withInput(dashboardRestNameSchema)
   .withPermission("analytics:create")
   .withOutput(dashboardResponseSchema)
@@ -64,7 +64,7 @@ export const dashboardRest = defineRestRouter(DashboardApi)
 
   // Registered before /:id so "reorder" is not read as an id. Reordering
   // rewrites existing dashboards' positions — an `:update`.
-  .put("/reorder", "reorderDashboards")
+  .put("/reorder", "putApiDashboardsReorder")
   .withInput(dashboardRestReorderSchema)
   .withPermission("analytics:update")
   .withOutput(dashboardReorderResponseSchema)
@@ -76,7 +76,7 @@ export const dashboardRest = defineRestRouter(DashboardApi)
     app.reorder({ projectId: scope.id, dashboardIds: input.dashboardIds }),
   )
 
-  .get("/:id", "getDashboard")
+  .get("/:id", "getApiDashboardsById")
   .withParams(dashboardRestParamsSchema)
   .withPermission("analytics:view")
   .withOutput(dashboardDetailResponseSchema)
@@ -90,7 +90,7 @@ export const dashboardRest = defineRestRouter(DashboardApi)
     return { ...(await withLink(app, scope.id, found)), graphs: found.graphs };
   })
 
-  .patch("/:id", "renameDashboard")
+  .patch("/:id", "patchApiDashboardsById")
   .withParams(dashboardRestParamsSchema)
   .withInput(dashboardRestNameSchema)
   .withPermission("analytics:update")
@@ -107,7 +107,7 @@ export const dashboardRest = defineRestRouter(DashboardApi)
   })
 
   // Hard delete with cascade — deliberately stays at `:manage`.
-  .delete("/:id", "deleteDashboard")
+  .delete("/:id", "deleteApiDashboardsById")
   .withParams(dashboardRestParamsSchema)
   .withPermission("analytics:manage")
   .withOutput(dashboardDeletedResponseSchema)

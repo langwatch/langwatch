@@ -28,7 +28,7 @@ export const meRest = defineRestRouter(UserApi)
   .withNamespace("me")
   .withVersion(MANAGEMENT_API_VERSION)
 
-  .get("/usage", "getMyUsage")
+  .get("/usage", "getApiMeUsage")
   .withQuery(meUsageQuerySchema)
   .withPermission("project:view")
   .withMiddleware(mePersonalCredential)
@@ -49,7 +49,7 @@ export const meRest = defineRestRouter(UserApi)
     }),
   )
 
-  .get("/project", "getMyProject")
+  .get("/project", "getApiMeProject")
   .withPermission("project:view")
   .withOutput(meProjectResponseSchema)
   .withDocs({

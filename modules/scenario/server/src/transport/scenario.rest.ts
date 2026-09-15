@@ -123,7 +123,7 @@ export function createScenarioRest() {
     .withVersion(MANAGEMENT_API_VERSION)
 
     /** List every scenario in the project. */
-    .get("/", "listScenarios")
+    .get("/", "getApiScenarios")
     .withPermission("scenarios:view")
     .withOutput(z.array(scenarioRestResponseWithPlatformUrlSchema))
     .withDocs({ description: "Get all scenarios for a project" })
@@ -135,7 +135,7 @@ export function createScenarioRest() {
     })
 
     /** Read one scenario by id. */
-    .get("/:id", "getScenario")
+    .get("/:id", "getApiScenariosById")
     .withParams(scenarioRestIdParamsSchema)
     .withPermission("scenarios:view")
     .withOutput(scenarioRestResponseWithPlatformUrlSchema)
@@ -155,7 +155,7 @@ export function createScenarioRest() {
     // loses access: `:manage` implies `:create`, so every role and key that
     // could create a scenario yesterday still can. What changes is that access
     // granted at the CREATE grain now works.
-    .post("/", "createScenario")
+    .post("/", "postApiScenarios")
     .withInput(scenarioRestCreateSchema)
     .withPermission("scenarios:create")
     .withOutput(scenarioRestResponseWithPlatformUrlSchema)
@@ -196,7 +196,7 @@ export function createScenarioRest() {
      * both apply a partial update, so a client using either verb gets the
      * same behavior instead of a 404 on one of them.
      */
-    .put("/:id", "updateScenario")
+    .put("/:id", "putApiScenariosById")
     .withParams(scenarioRestIdParamsSchema)
     .withInput(scenarioRestUpdateSchema)
     .withPermission("scenarios:update")
@@ -217,7 +217,7 @@ export function createScenarioRest() {
       return withPlatformUrl(app, scenario, project.projectSlug);
     })
 
-    .patch("/:id", "patchScenario")
+    .patch("/:id", "patchApiScenariosById")
     .withParams(scenarioRestIdParamsSchema)
     .withInput(scenarioRestUpdateSchema)
     .withPermission("scenarios:update")
@@ -241,7 +241,7 @@ export function createScenarioRest() {
     // Archiving deliberately still asks for `:manage`. Create and update were
     // refined because access issued at that grain was being refused; nothing
     // is asking to destroy scenarios at a finer grain.
-    .delete("/:id", "archiveScenario")
+    .delete("/:id", "deleteApiScenariosById")
     .withParams(scenarioRestIdParamsSchema)
     .withPermission("scenarios:manage")
     .withOutput(scenarioRestArchivedSchema)
@@ -264,7 +264,7 @@ export function createScenarioRest() {
     })
 
     /** The version history of a scenario, newest first. */
-    .get("/:id/versions", "listScenarioVersions")
+    .get("/:id/versions", "getApiScenariosByIdVersions")
     .withParams(scenarioRestIdParamsSchema)
     .withQuery(scenarioRestListVersionsQuerySchema)
     .withPermission("scenarios:view")
@@ -311,7 +311,7 @@ export function createScenarioRest() {
      * `scenario_version_not_found` code, which the synthesized Created entry
      * also answers: it has no stored snapshot to serve.
      */
-    .get("/:id/versions/:version", "getScenarioVersion")
+    .get("/:id/versions/:version", "getApiScenariosByIdVersionsByVersion")
     .withParams(scenarioRestIdVersionParamsSchema)
     .withPermission("scenarios:view")
     .withOutput(scenarioRestVersionDetailResponseSchema)

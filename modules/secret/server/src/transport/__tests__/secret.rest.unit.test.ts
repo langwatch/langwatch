@@ -162,11 +162,11 @@ describe("the secret REST family", () => {
       "deleteSecret",
     ]);
     expect(secretsAliasRest.router().routes.map((route) => route.operation)).toEqual([
-      "listSecretsPluralAlias",
-      "getSecretPluralAlias",
-      "createSecretPluralAlias",
-      "updateSecretPluralAlias",
-      "deleteSecretPluralAlias",
+      "getApiSecrets",
+      "getApiSecretsById",
+      "postApiSecrets",
+      "putApiSecretsById",
+      "deleteApiSecretsById",
     ]);
     expect(secretRest.router().api).toBe(SecretApi);
   });

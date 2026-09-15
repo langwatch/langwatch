@@ -68,7 +68,7 @@ export function createAutomationRest(): Readonly<{
     .withNamespace("triggers")
     .withVersion(MANAGEMENT_API_VERSION)
 
-    .get("/", "listTriggers")
+    .get("/", "getApiTriggers")
     .withPermission("triggers:view")
     .withOutput(z.array(automationRestResponseSchema))
     .withDocs({
@@ -86,7 +86,7 @@ export function createAutomationRest(): Readonly<{
       );
     })
 
-    .get("/:id", "getTrigger")
+    .get("/:id", "getApiTriggersById")
     .withParams(automationRestIdParamsSchema)
     .withPermission("triggers:view")
     .responds({ 200: automationRestResponseSchema, 404: badRequestSchema })
@@ -101,7 +101,7 @@ export function createAutomationRest(): Readonly<{
 
     // Creating asks for `triggers:create`; `:manage` still implies it, so no
     // existing caller changes and a viewer is declined as before.
-    .post("/", "createTrigger")
+    .post("/", "postApiTriggers")
     .withInput(automationRestCreateInputSchema)
     .withPermission("triggers:create")
     .withOutput(automationRestResponseSchema)
@@ -131,7 +131,7 @@ export function createAutomationRest(): Readonly<{
       return automationWire({ app, projectSlug: project.projectSlug, trigger });
     })
 
-    .patch("/:id", "updateTrigger")
+    .patch("/:id", "patchApiTriggersById")
     .withParams(automationRestIdParamsSchema)
     .withInput(automationRestUpdateInputSchema)
     .withPermission("triggers:update")
@@ -146,7 +146,7 @@ export function createAutomationRest(): Readonly<{
     )
 
     // Destruction deliberately stays at `:manage`.
-    .delete("/:id", "deleteTrigger")
+    .delete("/:id", "deleteApiTriggersById")
     .withParams(automationRestIdParamsSchema)
     .withPermission("triggers:manage")
     .responds({ 200: automationRestDeletedSchema, 404: badRequestSchema })

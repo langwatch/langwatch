@@ -39,7 +39,7 @@ export const analyticsLegacyRest = defineRestRouter(AnalyticsApi)
   .withVersion(MANAGEMENT_API_VERSION)
   .withAddressing("literal")
 
-  .post("/api/analytics", "queryAnalyticsTimeseriesLegacy")
+  .post("/api/analytics", "postApiAnalytics")
   .withRawBody("text", { mediaType: "application/json" })
   .withPermission("analytics:view")
   .responds({ 200: analyticsTimeseriesResponseSchema, 400: legacySentenceErrorSchema })

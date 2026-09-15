@@ -40,7 +40,7 @@ describe("given the canonical analytics REST family", () => {
         {
           method: "post",
           path: "/timeseries",
-          operation: "queryAnalyticsTimeseries",
+          operation: "postApiAnalyticsTimeseries",
           permission: "analytics:view",
         },
       ]);
@@ -73,7 +73,7 @@ describe("given the legacy analytics REST family", () => {
       }).toEqual({
         method: "post",
         path: "/api/analytics",
-        operation: "queryAnalyticsTimeseriesLegacy",
+        operation: "postApiAnalytics",
         permission: "analytics:view",
       });
     });

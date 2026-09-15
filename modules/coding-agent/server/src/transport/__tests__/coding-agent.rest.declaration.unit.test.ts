@@ -28,7 +28,7 @@ describe("the coding-agent REST families", () => {
           route.permission,
         ]),
       ).toEqual([
-        ["get", "/sessions/:sessionId/events", "listCodingAgentSessionEvents", "traces:view"],
+        ["get", "/sessions/:sessionId/events", "getApiCodingAgentSessionsBySessionIdEvents", "traces:view"],
       ]);
     });
 
@@ -57,7 +57,7 @@ describe("the coding-agent REST families", () => {
         [
           "get",
           "/api/coding-agent/pull-request-usage",
-          "getCodingAgentPullRequestUsage",
+          "getApiCodingAgentPullRequestUsage",
           "traces:view",
         ],
       ]);

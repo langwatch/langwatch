@@ -160,7 +160,7 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
 
   // ── Virtual keys ─────────────────────────────────────────────────────────
 
-  .get("/virtual-keys", "listVirtualKeys")
+  .get("/virtual-keys", "getApiGatewayV1VirtualKeys")
   .withQuery(gatewayVirtualKeyListQuerySchema)
   .withPermission("virtualKeys:view")
   .withOutput(z.object({ data: z.array(gatewayVirtualKeyDtoSchema), next_cursor: gatewayNextCursorSchema }))
@@ -190,7 +190,7 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
     };
   })
 
-  .post("/virtual-keys", "createVirtualKey")
+  .post("/virtual-keys", "postApiGatewayV1VirtualKeys")
   .withInput(gatewayCreateVirtualKeySchema)
   .withPermission("virtualKeys:create")
   .withStatus(201)
@@ -235,7 +235,7 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
     return { virtual_key: await app.toVirtualKeySnakeDto(virtualKey), secret };
   })
 
-  .get("/virtual-keys/:id", "getVirtualKey")
+  .get("/virtual-keys/:id", "getApiGatewayV1VirtualKeysById")
   .withParams(gatewayIdParamsSchema)
   .withPermission("virtualKeys:view")
   .withOutput(z.object({ virtual_key: gatewayVirtualKeyDtoSchema }))
@@ -250,7 +250,7 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
     return { virtual_key: await app.toVirtualKeySnakeDto(vk) };
   })
 
-  .get("/virtual-keys/:id/spend", "getVirtualKeySpend")
+  .get("/virtual-keys/:id/spend", "getApiGatewayV1VirtualKeysByIdSpend")
   .withParams(gatewayIdParamsSchema)
   .withQuery(gatewayVkSpendWindowSchema)
   .withPermission("gatewayUsage:view")
@@ -292,7 +292,7 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
     };
   })
 
-  .patch("/virtual-keys/:id", "updateVirtualKey")
+  .patch("/virtual-keys/:id", "patchApiGatewayV1VirtualKeysById")
   .withParams(gatewayIdParamsSchema)
   .withInput(gatewayUpdateVirtualKeySchema)
   .withPermission("virtualKeys:update")
@@ -337,7 +337,7 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
     return { virtual_key: await app.toVirtualKeySnakeDto(updated) };
   })
 
-  .post("/virtual-keys/:id/rotate", "rotateVirtualKey")
+  .post("/virtual-keys/:id/rotate", "postApiGatewayV1VirtualKeysByIdRotate")
   .withParams(gatewayIdParamsSchema)
   .withPermission("virtualKeys:rotate")
   .withOutput(z.object({ virtual_key: gatewayVirtualKeyDtoSchema, secret: z.string() }))
@@ -365,7 +365,7 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
     return { virtual_key: await app.toVirtualKeySnakeDto(virtualKey), secret };
   })
 
-  .post("/virtual-keys/:id/disable", "disableVirtualKey")
+  .post("/virtual-keys/:id/disable", "postApiGatewayV1VirtualKeysByIdDisable")
   .withParams(gatewayIdParamsSchema)
   .withInput(gatewayDisableVkSchema)
   .withPermission("virtualKeys:update")
@@ -394,7 +394,7 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
     return { virtual_key: await app.toVirtualKeySnakeDto(updated) };
   })
 
-  .post("/virtual-keys/:id/enable", "enableVirtualKey")
+  .post("/virtual-keys/:id/enable", "postApiGatewayV1VirtualKeysByIdEnable")
   .withParams(gatewayIdParamsSchema)
   .withPermission("virtualKeys:update")
   .withOutput(z.object({ virtual_key: gatewayVirtualKeyDtoSchema }))
@@ -416,7 +416,7 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
     return { virtual_key: await app.toVirtualKeySnakeDto(updated) };
   })
 
-  .post("/virtual-keys/:id/revoke", "revokeVirtualKey")
+  .post("/virtual-keys/:id/revoke", "postApiGatewayV1VirtualKeysByIdRevoke")
   .withParams(gatewayIdParamsSchema)
   .withPermission("virtualKeys:delete")
   .withOutput(z.object({ virtual_key: gatewayVirtualKeyDtoSchema }))
@@ -441,7 +441,7 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
 
   // ── Budgets ──────────────────────────────────────────────────────────────
 
-  .get("/budgets", "listBudgets")
+  .get("/budgets", "getApiGatewayV1Budgets")
   .withQuery(gatewayBudgetListQuerySchema)
   .withPermission("gatewayBudgets:view")
   .withOutput(
@@ -483,7 +483,7 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
     };
   })
 
-  .get("/budgets/:id", "getBudget")
+  .get("/budgets/:id", "getApiGatewayV1BudgetsById")
   .withParams(gatewayIdParamsSchema)
   .withPermission("gatewayBudgets:view")
   .withOutput(z.object({ budget: gatewayPlatformBudgetDtoSchema, spend_available: z.boolean() }))
@@ -503,7 +503,7 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
     };
   })
 
-  .post("/budgets", "createBudget")
+  .post("/budgets", "postApiGatewayV1Budgets")
   .withInput(gatewayCreateBudgetSchema)
   .withPermission("gatewayBudgets:create")
   .withStatus(201)
@@ -547,7 +547,7 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
     };
   })
 
-  .patch("/budgets/:id", "updateBudget")
+  .patch("/budgets/:id", "patchApiGatewayV1BudgetsById")
   .withParams(gatewayIdParamsSchema)
   .withInput(gatewayUpdateBudgetSchema)
   .withPermission("gatewayBudgets:update")
@@ -581,7 +581,7 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
     return { budget: toBudgetDto({ budget: row, memberCount: memberCounts.get(row.scopeId) }) };
   })
 
-  .delete("/budgets/:id", "archiveBudget")
+  .delete("/budgets/:id", "deleteApiGatewayV1BudgetsById")
   .withParams(gatewayIdParamsSchema)
   .withPermission("gatewayBudgets:delete")
   .withOutput(z.object({ budget: gatewayPlatformBudgetDtoSchema }))
@@ -602,7 +602,7 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
     return { budget: toBudgetDto({ budget: row }) };
   })
 
-  .post("/budgets/:id/reset", "resetBudget")
+  .post("/budgets/:id/reset", "postApiGatewayV1BudgetsByIdReset")
   .withParams(gatewayIdParamsSchema)
   .withQuery(gatewayResetBudgetQuerySchema)
   .withInput(gatewayResetBudgetSchema)
@@ -634,7 +634,7 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
 
   // ── Cache rules ──────────────────────────────────────────────────────────
 
-  .get("/cache-rules", "listCacheRules")
+  .get("/cache-rules", "getApiGatewayV1CacheRules")
   .withQuery(gatewayPageQuerySchema)
   .withPermission("gatewayCacheRules:view")
   .withOutput(z.object({ data: z.array(gatewayPlatformCacheRuleDtoSchema), next_cursor: gatewayNextCursorSchema }))
@@ -665,7 +665,7 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
     };
   })
 
-  .get("/cache-rules/:id", "getCacheRule")
+  .get("/cache-rules/:id", "getApiGatewayV1CacheRulesById")
   .withParams(gatewayIdParamsSchema)
   .withPermission("gatewayCacheRules:view")
   .withOutput(z.object({ cache_rule: gatewayPlatformCacheRuleDtoSchema }))
@@ -681,7 +681,7 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
     return { cache_rule: toCacheRuleDto(row) };
   })
 
-  .post("/cache-rules", "createCacheRule")
+  .post("/cache-rules", "postApiGatewayV1CacheRules")
   .withInput(gatewayCreateCacheRuleSchema)
   .withPermission("gatewayCacheRules:create")
   .withStatus(201)
@@ -713,7 +713,7 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
     return { cache_rule: toCacheRuleDto(row) };
   })
 
-  .patch("/cache-rules/:id", "updateCacheRule")
+  .patch("/cache-rules/:id", "patchApiGatewayV1CacheRulesById")
   .withParams(gatewayIdParamsSchema)
   .withInput(gatewayUpdateCacheRuleSchema)
   .withPermission("gatewayCacheRules:update")
@@ -745,7 +745,7 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
     return { cache_rule: toCacheRuleDto(row) };
   })
 
-  .delete("/cache-rules/:id", "archiveCacheRule")
+  .delete("/cache-rules/:id", "deleteApiGatewayV1CacheRulesById")
   .withParams(gatewayIdParamsSchema)
   .withPermission("gatewayCacheRules:delete")
   .withOutput(z.object({ cache_rule: gatewayPlatformCacheRuleDtoSchema }))

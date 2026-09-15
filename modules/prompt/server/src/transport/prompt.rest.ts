@@ -306,7 +306,7 @@ export const promptRest = defineRestRouter(PromptApi)
   .withVersion(MANAGEMENT_API_VERSION)
   .withAddressing("literal", { v1Twin: true })
 
-  .get("/api/prompts", "listPrompts")
+  .get("/api/prompts", "getApiPrompts")
   .withPermission("prompts:view")
   .withOutput(z.array(promptWireSchema))
   .withMiddleware(promptRestFacts)
@@ -337,7 +337,7 @@ export const promptRest = defineRestRouter(PromptApi)
   // decides which version the customer's live traffic resolves to. That is a
   // deployment, and it belongs with the grain that administers the prompt
   // rather than with the one that edits its text.
-  .put("/api/prompts/:id{.+?}/tags/:tag", "assignPromptTag")
+  .put("/api/prompts/:id{.+?}/tags/:tag", "putApiPromptsByIdTagsByTag")
   .withParams(idTagParamsSchema)
   .withInput(z.object({ versionId: z.string() }))
   .withPermission("prompts:manage")
@@ -404,7 +404,7 @@ export const promptRest = defineRestRouter(PromptApi)
 
   // --- Tag definition CRUD (org-level) ---
 
-  .get("/api/prompts/tags", "listPromptTags")
+  .get("/api/prompts/tags", "getApiPromptsTags")
   .withPermission("prompts:view")
   .withOutput(z.array(tagDefinitionSchema))
   .withMiddleware(promptRestFacts)
@@ -421,7 +421,7 @@ export const promptRest = defineRestRouter(PromptApi)
     return tags.map((tag) => ({ id: tag.id, name: tag.name, createdAt: tag.createdAt }));
   })
 
-  .post("/api/prompts/tags", "createPromptTag")
+  .post("/api/prompts/tags", "postApiPromptsTags")
   .withInput(z.object({ name: z.string() }))
   .withPermission("prompts:manage")
   .withOutput(tagDefinitionSchema)
@@ -455,7 +455,7 @@ export const promptRest = defineRestRouter(PromptApi)
     }
   })
 
-  .put("/api/prompts/tags/:tag", "renamePromptTag")
+  .put("/api/prompts/tags/:tag", "putApiPromptsTagsByTag")
   .withParams(tagParamsSchema)
   .withInput(z.object({ name: z.string() }))
   .withPermission("prompts:manage")
@@ -492,7 +492,7 @@ export const promptRest = defineRestRouter(PromptApi)
     }
   })
 
-  .delete("/api/prompts/tags/:tag", "deletePromptTag")
+  .delete("/api/prompts/tags/:tag", "deleteApiPromptsTagsByTag")
   .withParams(tagParamsSchema)
   .withPermission("prompts:manage")
   .withMiddleware(promptRestFacts, promptRestCredential)
@@ -523,7 +523,7 @@ export const promptRest = defineRestRouter(PromptApi)
     }
   })
 
-  .get("/api/prompts/:id{.+?}/versions", "listPromptVersions")
+  .get("/api/prompts/:id{.+?}/versions", "getApiPromptsByIdVersions")
   .withParams(idParamsSchema)
   .withPermission("prompts:view")
   .withOutput(z.array(promptWireSchema))
@@ -559,7 +559,7 @@ export const promptRest = defineRestRouter(PromptApi)
 
   // Restore (rollback to) a specific version - a new version of a prompt that
   // already exists, i.e. an update of that prompt.
-  .post("/api/prompts/:id{.+?}/versions/:versionId/restore", "restorePromptVersion")
+  .post("/api/prompts/:id{.+?}/versions/:versionId/restore", "postApiPromptsByIdVersionsByVersionIdRestore")
   .withParams(idVersionParamsSchema)
   .withPermission("prompts:update")
   .withOutput(promptWireSchema)
@@ -602,7 +602,7 @@ export const promptRest = defineRestRouter(PromptApi)
     };
   })
 
-  .get("/api/prompts/:id{.+}", "getPrompt")
+  .get("/api/prompts/:id{.+}", "getApiPromptsById")
   .withParams(idParamsSchema)
   .withQuery(promptWindowQuerySchema)
   .withPermission("prompts:view")
@@ -678,7 +678,7 @@ export const promptRest = defineRestRouter(PromptApi)
   // Create prompt with initial version. Asks for `prompts:create`; `:manage`
   // still implies it, so no existing caller changes, and a viewer holding only
   // `prompts:view` is declined exactly as before.
-  .post("/api/prompts", "createPrompt")
+  .post("/api/prompts", "postApiPrompts")
   .withInput(createPromptInputSchema)
   .withPermission("prompts:create")
   .withOutput(promptWireSchema)
@@ -740,7 +740,7 @@ export const promptRest = defineRestRouter(PromptApi)
     }
   })
 
-  .post("/api/prompts/:id{.+?}/sync", "syncPrompt")
+  .post("/api/prompts/:id{.+?}/sync", "postApiPromptsByIdSync")
   .withParams(idParamsSchema)
   .withInput(syncInputSchema)
   .withPermission("prompts:manage")
@@ -800,7 +800,7 @@ export const promptRest = defineRestRouter(PromptApi)
     }
   })
 
-  .put("/api/prompts/:id{.+}", "updatePrompt")
+  .put("/api/prompts/:id{.+}", "putApiPromptsById")
   .withParams(idParamsSchema)
   .withInput(updatePromptInputSchema)
   .withPermission("prompts:update")
@@ -863,7 +863,7 @@ export const promptRest = defineRestRouter(PromptApi)
     }
   })
 
-  .delete("/api/prompts/:id{.+}", "deletePrompt")
+  .delete("/api/prompts/:id{.+}", "deleteApiPromptsById")
   .withParams(idParamsSchema)
   .withPermission("prompts:manage")
   .withOutput(successSchema)

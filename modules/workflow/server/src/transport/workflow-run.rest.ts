@@ -112,7 +112,7 @@ export const workflowRunRest = defineRestRouter(WorkflowApi)
   .withCredential("project")
   .withAddressing("literal", { v1Twin: false })
 
-  .post("/api/optimization/:workflowId/:versionId", "runOptimizationWorkflowVersion")
+  .post("/api/optimization/:workflowId/:versionId", "postApiOptimizationByWorkflowIdByVersionId")
   .withParams(workflowRunRestVersionedParamsSchema)
   .withRawBody("text", { mediaType: "application/json" })
   .withPermission("workflows:manage")
@@ -139,7 +139,7 @@ export const workflowRunRest = defineRestRouter(WorkflowApi)
     }),
   )
 
-  .post("/api/workflows/:workflowId/run", "runWorkflow")
+  .post("/api/workflows/:workflowId/run", "postApiWorkflowsByWorkflowIdRun")
   .withParams(workflowRunRestParamsSchema)
   .withRawBody("text", { mediaType: "application/json" })
   .withPermission("workflows:manage")
@@ -164,7 +164,7 @@ export const workflowRunRest = defineRestRouter(WorkflowApi)
     }),
   )
 
-  .post("/api/workflows/:workflowId/:versionId/run", "runWorkflowVersion")
+  .post("/api/workflows/:workflowId/:versionId/run", "postApiWorkflowsByWorkflowIdByVersionIdRun")
   .withParams(workflowRunRestVersionedParamsSchema)
   .withRawBody("text", { mediaType: "application/json" })
   .withPermission("workflows:manage")

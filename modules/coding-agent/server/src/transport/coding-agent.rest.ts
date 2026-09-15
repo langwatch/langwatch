@@ -177,7 +177,7 @@ export const codingAgentRest = defineRestRouter(CodingAgentApi)
   .withNamespace("coding-agent")
   .withVersion(MANAGEMENT_API_VERSION)
 
-  .get("/sessions/:sessionId/events", "listCodingAgentSessionEvents")
+  .get("/sessions/:sessionId/events", "getApiCodingAgentSessionsBySessionIdEvents")
   .withParams(sessionParamsSchema)
   .withQuery(eventsQuerySchema)
   .withPermission("traces:view")
@@ -224,7 +224,7 @@ export const codingAgentRollupRest = defineRestRouter(CodingAgentApi)
   // The bare path alone, at exactly the address it has always answered.
   .withAddressing("literal", { v1Twin: false })
 
-  .get("/api/coding-agent/pull-request-usage", "getCodingAgentPullRequestUsage")
+  .get("/api/coding-agent/pull-request-usage", "getApiCodingAgentPullRequestUsage")
   .withQuery(pullRequestUsageQuerySchema)
   .withPermission("traces:view")
   .withOutput(pullRequestUsageResponseSchema)

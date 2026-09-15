@@ -121,11 +121,11 @@ describe("the workflow module's transport declarations", () => {
   describe("given the REST families the module declares", () => {
     it("keeps the /api/workflows management addresses", () => {
       expect(routesOf(createWorkflowRest())).toEqual([
-        ["GET", "/", "listWorkflows", "workflows:view"],
-        ["GET", "/:id", "getWorkflow", "workflows:view"],
-        ["PATCH", "/:id", "updateWorkflow", "workflows:update"],
-        ["DELETE", "/:id", "archiveWorkflow", "workflows:manage"],
-        ["POST", "/:id/evaluate", "evaluateWorkflow", "workflows:create"],
+        ["GET", "/", "getApiWorkflows", "workflows:view"],
+        ["GET", "/:id", "getApiWorkflowsById", "workflows:view"],
+        ["PATCH", "/:id", "patchApiWorkflowsById", "workflows:update"],
+        ["DELETE", "/:id", "deleteApiWorkflowsById", "workflows:manage"],
+        ["POST", "/:id/evaluate", "postApiWorkflowsByIdEvaluate", "workflows:create"],
       ]);
       expect(createWorkflowRest().router().namespace).toBe("workflows");
     });
@@ -135,14 +135,14 @@ describe("the workflow module's transport declarations", () => {
         [
           "POST",
           "/api/optimization/:workflowId/:versionId",
-          "runOptimizationWorkflowVersion",
+          "postApiOptimizationByWorkflowIdByVersionId",
           "workflows:manage",
         ],
-        ["POST", "/api/workflows/:workflowId/run", "runWorkflow", "workflows:manage"],
+        ["POST", "/api/workflows/:workflowId/run", "postApiWorkflowsByWorkflowIdRun", "workflows:manage"],
         [
           "POST",
           "/api/workflows/:workflowId/:versionId/run",
-          "runWorkflowVersion",
+          "postApiWorkflowsByWorkflowIdByVersionIdRun",
           "workflows:manage",
         ],
       ]);

@@ -192,7 +192,7 @@ export function createWorkflowRest(): WorkflowRestDeclaration {
       .withVersion(MANAGEMENT_API_VERSION)
       .withCredential("project")
 
-      .get("/", "listWorkflows")
+      .get("/", "getApiWorkflows")
       .withPermission("workflows:view")
       .withOutput(z.array(workflowRestDetailSchema))
       .withDocs({ description: "List all non-archived workflows for the project" })
@@ -207,7 +207,7 @@ export function createWorkflowRest(): WorkflowRestDeclaration {
         }));
       })
 
-      .get("/:id", "getWorkflow")
+      .get("/:id", "getApiWorkflowsById")
       .withParams(workflowRestParamsSchema)
       .withPermission("workflows:view")
       .responds({ 200: workflowRestDetailSchema, 404: workflowRestRefusalSchema })
@@ -226,7 +226,7 @@ export function createWorkflowRest(): WorkflowRestDeclaration {
 
       // Editing metadata on a workflow that already exists is an `:update`.
       // `:manage` still implies it, so no existing caller changes.
-      .patch("/:id", "updateWorkflow")
+      .patch("/:id", "patchApiWorkflowsById")
       .withParams(workflowRestParamsSchema)
       .withInput(workflowRestUpdateSchema)
       .withPermission("workflows:update")
@@ -247,7 +247,7 @@ export function createWorkflowRest(): WorkflowRestDeclaration {
       })
 
       // Archiving deliberately stays at `:manage`.
-      .delete("/:id", "archiveWorkflow")
+      .delete("/:id", "deleteApiWorkflowsById")
       .withParams(workflowRestParamsSchema)
       .withPermission("workflows:manage")
       .responds({ 200: workflowRestArchivedSchema, 404: workflowRestRefusalSchema })
@@ -263,7 +263,7 @@ export function createWorkflowRest(): WorkflowRestDeclaration {
       // asks for `workflows:create`, the same grain as the suite run. The
       // second gate is the ceiling fact above: the caller must also be able to
       // READ the run it starts.
-      .post("/:id/evaluate", "evaluateWorkflow")
+      .post("/:id/evaluate", "postApiWorkflowsByIdEvaluate")
       .withParams(workflowRestParamsSchema)
       .withInput(workflowRestEvaluateSchema)
       .withPermission("workflows:create")

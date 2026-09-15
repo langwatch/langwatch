@@ -114,9 +114,9 @@ describe("given the experiment REST families", () => {
             permission,
           ]),
       ).toEqual([
-        ["get", "/", "listExperiments", "experiments:view"],
-        ["get", "/:slug", "getExperiment", "experiments:view"],
-        ["post", "/", "createExperiment", "experiments:create"],
+        ["get", "/", "getApiExperiments", "experiments:view"],
+        ["get", "/:slug", "getApiExperimentsBySlug", "experiments:view"],
+        ["post", "/", "postApiExperiments", "experiments:create"],
       ]);
     });
 
@@ -142,17 +142,17 @@ describe("given the experiment REST families", () => {
             permission,
           ]),
       ).toEqual([
-        ["post", "/:slug/run", "runExperiment", "evaluations:create"],
-        ["get", "/runs", "listExperimentRuns", "evaluations:view"],
-        ["get", "/runs/:runId", "getExperimentRunStatus", "evaluations:view"],
-        ["get", "/runs/:runId/results", "getExperimentRunResults", "evaluations:view"],
-        ["get", "/:slug/workbench-state", "getExperimentWorkbenchState", "experiments:view"],
-        ["put", "/:slug/workbench-state", "saveExperimentWorkbenchState", "experiments:update"],
-        ["get", "/:slug/versions", "listExperimentWorkbenchVersions", "experiments:view"],
+        ["post", "/:slug/run", "postApiExperimentsBySlugRun", "evaluations:create"],
+        ["get", "/runs", "getApiExperimentsRuns", "evaluations:view"],
+        ["get", "/runs/:runId", "getApiExperimentsRunsByRunId", "evaluations:view"],
+        ["get", "/runs/:runId/results", "getApiExperimentsRunsByRunIdResults", "evaluations:view"],
+        ["get", "/:slug/workbench-state", "getApiExperimentsBySlugWorkbenchState", "experiments:view"],
+        ["put", "/:slug/workbench-state", "putApiExperimentsBySlugWorkbenchState", "experiments:update"],
+        ["get", "/:slug/versions", "getApiExperimentsBySlugVersions", "experiments:view"],
         [
           "post",
           "/:slug/versions/:version/restore",
-          "restoreExperimentWorkbenchVersion",
+          "postApiExperimentsBySlugVersionsByVersionRestore",
           "experiments:update",
         ],
       ]);

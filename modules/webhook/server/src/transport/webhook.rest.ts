@@ -360,7 +360,7 @@ export const webhookRest = defineRestRouter(WebhookApi)
   // generation in the path and so has no `/api/v1` twin to declare.
   .withAddressing("v1-in-path")
 
-  .post("/endpoints", "createWebhookEndpoint")
+  .post("/endpoints", "postApiWebhooksV1Endpoints")
   .withInput(createEndpointSchema)
   .withPermission("webhookEndpoints:manage")
   .withOutput(endpointWithSecretDtoSchema)
@@ -390,7 +390,7 @@ export const webhookRest = defineRestRouter(WebhookApi)
     return { ...endpointResponse(endpoint), secret };
   })
 
-  .get("/endpoints", "listWebhookEndpoints")
+  .get("/endpoints", "getApiWebhooksV1Endpoints")
   .withPermission("webhookEndpoints:view")
   .withOutput(z.array(endpointDtoSchema))
   .withDocs({
@@ -405,7 +405,7 @@ export const webhookRest = defineRestRouter(WebhookApi)
     return list.map(endpointResponse);
   })
 
-  .get("/endpoints/:id", "getWebhookEndpoint")
+  .get("/endpoints/:id", "getApiWebhooksV1EndpointsById")
   .withParams(endpointIdParams)
   .withPermission("webhookEndpoints:view")
   .withOutput(endpointDtoSchema)
@@ -421,7 +421,7 @@ export const webhookRest = defineRestRouter(WebhookApi)
     return endpointResponse(endpoint);
   })
 
-  .patch("/endpoints/:id", "updateWebhookEndpoint")
+  .patch("/endpoints/:id", "patchApiWebhooksV1EndpointsById")
   .withParams(endpointIdParams)
   .withInput(updateEndpointSchema)
   .withPermission("webhookEndpoints:manage")
@@ -469,7 +469,7 @@ export const webhookRest = defineRestRouter(WebhookApi)
     return endpointResponse(endpoint);
   })
 
-  .delete("/endpoints/:id", "archiveWebhookEndpoint")
+  .delete("/endpoints/:id", "deleteApiWebhooksV1EndpointsById")
   .withParams(endpointIdParams)
   .withPermission("webhookEndpoints:manage")
   .withOutput(z.object({ archived: z.literal(true) }))
@@ -485,7 +485,7 @@ export const webhookRest = defineRestRouter(WebhookApi)
     return { archived: true as const };
   })
 
-  .post("/endpoints/:id/roll-secret", "rollWebhookEndpointSecret")
+  .post("/endpoints/:id/roll-secret", "postApiWebhooksV1EndpointsByIdRollSecret")
   .withParams(endpointIdParams)
   .withPermission("webhookEndpoints:manage")
   .withOutput(endpointWithSecretDtoSchema)
@@ -505,7 +505,7 @@ export const webhookRest = defineRestRouter(WebhookApi)
     return { ...endpointResponse(endpoint), secret };
   })
 
-  .post("/endpoints/:id/test", "testWebhookEndpoint")
+  .post("/endpoints/:id/test", "postApiWebhooksV1EndpointsByIdTest")
   .withParams(endpointIdParams)
   .withPermission("webhookEndpoints:manage")
   .withOutput(testFireResultSchema)
@@ -525,7 +525,7 @@ export const webhookRest = defineRestRouter(WebhookApi)
       : { delivered: false, response_status: result.responseStatus, error: result.error };
   })
 
-  .get("/endpoints/:id/deliveries", "listWebhookEndpointDeliveries")
+  .get("/endpoints/:id/deliveries", "getApiWebhooksV1EndpointsByIdDeliveries")
   .withParams(endpointIdParams)
   .withQuery(deliveriesQuerySchema)
   .withPermission("webhookEndpoints:view")
@@ -564,7 +564,7 @@ export const webhookRest = defineRestRouter(WebhookApi)
     };
   })
 
-  .get("/endpoints/:id/health", "getWebhookEndpointHealth")
+  .get("/endpoints/:id/health", "getApiWebhooksV1EndpointsByIdHealth")
   .withParams(endpointIdParams)
   .withPermission("webhookEndpoints:view")
   .withOutput(healthDtoSchema)
@@ -592,7 +592,7 @@ export const webhookRest = defineRestRouter(WebhookApi)
     };
   })
 
-  .get("/event-types", "listWebhookEventTypes")
+  .get("/event-types", "getApiWebhooksV1EventTypes")
   .withPermission("webhookEndpoints:view")
   .withOutput(z.array(eventTypeDtoSchema))
   .withDocs({
@@ -613,7 +613,7 @@ export const webhookRest = defineRestRouter(WebhookApi)
     }));
   })
 
-  .get("/events", "listWebhookEvents")
+  .get("/events", "getApiWebhooksV1Events")
   .withQuery(eventsQuerySchema)
   .withPermission("webhookEndpoints:view")
   .withOutput(z.object({ data: z.array(webhookEventEnvelopeSchema), next_cursor: nextCursorSchema }))
@@ -641,7 +641,7 @@ export const webhookRest = defineRestRouter(WebhookApi)
     return { data: page.events, next_cursor: page.nextCursor };
   })
 
-  .get("/events/:id", "getWebhookEvent")
+  .get("/events/:id", "getApiWebhooksV1EventsById")
   .withParams(endpointIdParams)
   .withPermission("webhookEndpoints:view")
   .withOutput(webhookEventEnvelopeSchema)

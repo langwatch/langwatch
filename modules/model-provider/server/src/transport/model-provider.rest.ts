@@ -41,7 +41,7 @@ export const modelProviderRest = defineRestRouter(ModelProviderApi)
   .withVersion(MANAGEMENT_API_VERSION)
 
   // Read scope, mirroring the tRPC modelProvider getAllForProject.
-  .get("/", "listModelProviders")
+  .get("/", "getApiModelProviders")
   .withPermission("project:view")
   .withOutput(apiResponseModelProvidersSchema)
   .withDocs({
@@ -56,7 +56,7 @@ export const modelProviderRest = defineRestRouter(ModelProviderApi)
   })
 
   // Write scope, mirroring the tRPC modelProvider update.
-  .put("/:provider", "upsertModelProvider")
+  .put("/:provider", "putApiModelProvidersByProvider")
   .withParams(providerParamsSchema)
   .withInput(updateModelProviderInputSchema)
   .withPermission("project:update")

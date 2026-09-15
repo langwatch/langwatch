@@ -57,7 +57,7 @@ export const experimentInitRest = defineRestRouter(ExperimentApi)
   .withNamespace("experiment")
   .withVersion(MANAGEMENT_API_VERSION)
 
-  .post("/init", "initExperiment")
+  .post("/init", "postApiExperimentInit")
   // Read as characters and parsed here: this handler answers its own sentence
   // on a bad body - built by `zodErrorMessage` from the schema's own failure -
   // which a validated input cannot hand back.

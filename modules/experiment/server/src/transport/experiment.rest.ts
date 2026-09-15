@@ -70,7 +70,7 @@ export const experimentRest = defineRestRouter(ExperimentApi)
 
   // Mirrors the canonical experiments-list permission: the tRPC procedures
   // that return this same project-scoped list gate on experiments:view.
-  .get("/", "listExperiments")
+  .get("/", "getApiExperiments")
   .withQuery(listExperimentsQuerySchema)
   .withPermission("experiments:view")
   .withOutput(experimentsListResponseSchema)
@@ -107,7 +107,7 @@ export const experimentRest = defineRestRouter(ExperimentApi)
   // Read one experiment, by the slug the list route just handed the caller.
   // The id is accepted too rather than refused, since the same list row
   // carries both and a caller reaching for `id` is not making a mistake.
-  .get("/:slug", "getExperiment")
+  .get("/:slug", "getApiExperimentsBySlug")
   .withParams(slugParamsSchema)
   .withPermission("experiments:view")
   .withOutput(experimentSummarySchema)
@@ -124,7 +124,7 @@ export const experimentRest = defineRestRouter(ExperimentApi)
     return summaryOf(withRuns ?? { experiment, runsCount: 0, lastRunAt: null });
   })
 
-  .post("/", "createExperiment")
+  .post("/", "postApiExperiments")
   .withInput(createExperimentBodySchema)
   .withPermission("experiments:create")
   .withOutput(createExperimentResponseSchema)

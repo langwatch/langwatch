@@ -71,7 +71,7 @@ export function createMonitorsRest(): Readonly<{
     .withNamespace("monitors")
     .withVersion(MANAGEMENT_API_VERSION)
 
-    .get("/", "listMonitors")
+    .get("/", "getApiMonitors")
     .withPermission("evaluations:view")
     .withOutput(z.array(monitorRestResponseSchema))
     .withDocs({
@@ -85,7 +85,7 @@ export function createMonitorsRest(): Readonly<{
       ),
     )
 
-    .get("/:id", "getMonitor")
+    .get("/:id", "getApiMonitorsById")
     .withParams(monitorRestIdParamsSchema)
     .withPermission("evaluations:view")
     .withOutput(monitorRestResponseSchema)
@@ -107,7 +107,7 @@ export function createMonitorsRest(): Readonly<{
     // button calls. `:manage` still satisfies this through the permission
     // hierarchy, so no existing caller loses access. Deletion stays on
     // `:manage` below, where the destructive line sits.
-    .post("/", "createMonitor")
+    .post("/", "postApiMonitors")
     .withInput(monitorRestCreateInputSchema)
     .withPermission("evaluations:create")
     .withOutput(monitorRestResponseSchema)
@@ -139,7 +139,7 @@ export function createMonitorsRest(): Readonly<{
       }),
     )
 
-    .patch("/:id", "updateMonitor")
+    .patch("/:id", "patchApiMonitorsById")
     .withParams(monitorRestIdParamsSchema)
     .withInput(monitorRestUpdateInputSchema)
     .withPermission("evaluations:update")
@@ -161,7 +161,7 @@ export function createMonitorsRest(): Readonly<{
     })
 
     // Enabling or disabling changes the monitor that already exists — an `:update`.
-    .post("/:id/toggle", "toggleMonitor")
+    .post("/:id/toggle", "postApiMonitorsByIdToggle")
     .withParams(monitorRestIdParamsSchema)
     .withInput(monitorRestToggleInputSchema)
     .withPermission("evaluations:update")
@@ -178,7 +178,7 @@ export function createMonitorsRest(): Readonly<{
     })
 
     // Destruction deliberately stays at `:manage`.
-    .delete("/:id", "deleteMonitor")
+    .delete("/:id", "deleteApiMonitorsById")
     .withParams(monitorRestIdParamsSchema)
     .withPermission("evaluations:manage")
     .withOutput(monitorRestDeletedSchema)

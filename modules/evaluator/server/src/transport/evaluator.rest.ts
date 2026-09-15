@@ -182,7 +182,7 @@ export function createEvaluatorRest(): EvaluatorRestDeclaration {
       .withNamespace("evaluators")
       .withVersion(MANAGEMENT_API_VERSION)
 
-      .get("/", "listEvaluators")
+      .get("/", "getApiEvaluators")
       .withPermission("evaluations:view")
       .withOutput(z.array(evaluatorWireSchema))
       .withDocs({ description: "Get all evaluators for a project" })
@@ -196,7 +196,7 @@ export function createEvaluatorRest(): EvaluatorRestDeclaration {
         );
       })
 
-      .get("/:idOrSlug", "getEvaluator")
+      .get("/:idOrSlug", "getApiEvaluatorsByIdOrSlug")
       .withParams(idOrSlugParamsSchema)
       .withPermission("evaluations:view")
       .withOutput(evaluatorWireSchema)
@@ -217,7 +217,7 @@ export function createEvaluatorRest(): EvaluatorRestDeclaration {
 
       // Creating asks for `evaluations:create`; `:manage` still implies it, so no
       // existing caller changes and a viewer is declined as before.
-      .post("/", "createEvaluator")
+      .post("/", "postApiEvaluators")
       .withInput(createEvaluatorInputSchema)
       .withPermission("evaluations:create")
       .withOutput(evaluatorWireSchema)
@@ -227,7 +227,7 @@ export function createEvaluatorRest(): EvaluatorRestDeclaration {
         createEvaluator({ app, input, project, projectId: scope.id }),
       )
 
-      .put("/:id", "updateEvaluator")
+      .put("/:id", "putApiEvaluatorsById")
       .withParams(idParamsSchema)
       .withInput(updateEvaluatorInputSchema)
       .withPermission("evaluations:update")
@@ -242,7 +242,7 @@ export function createEvaluatorRest(): EvaluatorRestDeclaration {
       )
 
       // Archiving deliberately stays at `:manage`.
-      .delete("/:id", "archiveEvaluator")
+      .delete("/:id", "deleteApiEvaluatorsById")
       .withParams(idParamsSchema)
       .withPermission("evaluations:manage")
       .withOutput(archivedSchema)

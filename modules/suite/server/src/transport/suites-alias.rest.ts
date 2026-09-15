@@ -614,7 +614,7 @@ export function createSuitesAliasRest() {
       .withDeprecated(DEPRECATION)
 
       // ── List Suites ────────────────────────────────────────────
-      .get("/", "listSuites")
+      .get("/", "getApiSuites")
       .withQuery(listSuitesQuerySchema)
       .withPermission("scenarios:view")
       .withOutput(z.array(suiteResponseWithPlatformUrlSchema))
@@ -633,7 +633,7 @@ export function createSuitesAliasRest() {
       )
 
       // ── Get Suite ──────────────────────────────────────────────
-      .get("/:id", "getSuite")
+      .get("/:id", "getApiSuitesById")
       .withParams(idParamsSchema)
       .withPermission("scenarios:view")
       .withOutput(suiteResponseWithPlatformUrlSchema)
@@ -654,7 +654,7 @@ export function createSuitesAliasRest() {
       // ── Create Suite ─────────────────────────────────────────── Creating a run plan asks
       // for `scenarios:create`, not `scenarios:manage`. `:manage` still implies `:create`,
       // so every role and key that could create a suite yesterday still can.
-      .post("/", "createSuite")
+      .post("/", "postApiSuites")
       .withInput(createSuiteInputSchema)
       .withPermission("scenarios:create")
       .withOutput(suiteResponseWithPlatformUrlSchema)
@@ -672,7 +672,7 @@ export function createSuitesAliasRest() {
 
       // ── Update Suite ─────────────────────────────────────────── `:update` for the same
       // reason as `:create` above.
-      .patch("/:id", "updateSuite")
+      .patch("/:id", "patchApiSuitesById")
       .withParams(idParamsSchema)
       .withInput(updateSuiteInputSchema)
       .withPermission("scenarios:update")
@@ -690,7 +690,7 @@ export function createSuitesAliasRest() {
 
       // ── Duplicate Suite ──────────────────────────────────────── A duplicate is a create:
       // it leaves the source suite untouched and produces a new one.
-      .post("/:id/duplicate", "duplicateSuite")
+      .post("/:id/duplicate", "postApiSuitesByIdDuplicate")
       .withParams(idParamsSchema)
       .withPermission("scenarios:create")
       .withOutput(suiteResponseWithPlatformUrlSchema)
@@ -709,7 +709,7 @@ export function createSuitesAliasRest() {
       // ── Run Suite ────────────────────────────────────────────── RUNNING A SUITE IS NOT
       // ADMINISTERING IT. The run creates scenario runs; the suite definition, its scenarios
       // and its targets are left exactly as they were.
-      .post("/:id/run", "runSuite")
+      .post("/:id/run", "postApiSuitesByIdRun")
       .withParams(idParamsSchema)
       .withInput(runSuiteInputSchema)
       .withPermission("scenarios:create")
@@ -732,7 +732,7 @@ export function createSuitesAliasRest() {
 
       // ── Delete (Archive) Suite ───────────────────────────────── Archiving deliberately
       // stays at `:manage` — it is the only grain that carries destruction.
-      .delete("/:id", "archiveSuite")
+      .delete("/:id", "deleteApiSuitesById")
       .withParams(idParamsSchema)
       .withPermission("scenarios:manage")
       .withOutput(archivedSuiteSchema)

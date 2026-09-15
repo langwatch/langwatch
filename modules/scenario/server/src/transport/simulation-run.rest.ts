@@ -119,7 +119,7 @@ export function createSimulationRunsRest() {
     .withNamespace("simulation-runs")
     .withVersion(MANAGEMENT_API_VERSION)
 
-    .get("/", "listSimulationRuns")
+    .get("/", "getApiSimulationRuns")
     .withQuery(simulationRunListQuerySchema)
     .withPermission("scenarios:view")
     .withOutput(simulationRunListResponseSchema)
@@ -172,7 +172,7 @@ export function createSimulationRunsRest() {
       };
     })
 
-    .get("/:scenarioRunId", "getSimulationRun")
+    .get("/:scenarioRunId", "getApiSimulationRunsByScenarioRunId")
     .withParams(scenarioRunIdParamsSchema)
     .withPermission("scenarios:view")
     .withOutput(scenarioRunRestResponseWithPlatformUrlSchema)
@@ -194,7 +194,7 @@ export function createSimulationRunsRest() {
       return withPlatformUrl(app, run, project.projectSlug);
     })
 
-    .get("/batches/list", "listSimulationRunBatches")
+    .get("/batches/list", "getApiSimulationRunsBatchesList")
     .withQuery(simulationBatchQuerySchema)
     .withPermission("scenarios:view")
     .withOutput(simulationBatchListResponseSchema)
@@ -220,7 +220,7 @@ export function createSimulationRunsRest() {
       };
     })
 
-    .get("/batches/:batchRunId", "getSimulationRunBatch")
+    .get("/batches/:batchRunId", "getApiSimulationRunsBatchesByBatchRunId")
     .withParams(batchRunIdParamsSchema)
     .withPermission("scenarios:view")
     .withOutput(simulationBatchSummaryRestSchema)

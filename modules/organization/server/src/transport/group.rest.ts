@@ -73,7 +73,7 @@ export const groupsRest = defineRestRouter(OrganizationApi)
   .withVersion(MANAGEMENT_API_VERSION)
   .withCredential("organization")
 
-  .get("/", "listGroups")
+  .get("/", "getApiGroups")
   .withPermission("organization:manage")
   .withQuery(organizationGroupRestListQuerySchema)
   .withOutput(organizationGroupRestPageSchema)
@@ -101,7 +101,7 @@ export const groupsRest = defineRestRouter(OrganizationApi)
     };
   })
 
-  .post("/", "createGroup")
+  .post("/", "postApiGroups")
   .withPermission("organization:manage")
   .withInput(organizationGroupRestCreateSchema)
   .withOutput(organizationGroupRestCreatedSchema)
@@ -128,7 +128,7 @@ export const groupsRest = defineRestRouter(OrganizationApi)
     };
   })
 
-  .get("/:id", "getGroup")
+  .get("/:id", "getApiGroupsById")
   .withPermission("organization:manage")
   .withParams(organizationGroupRestParamsSchema)
   .withOutput(organizationGroupRestDetailsSchema)
@@ -148,7 +148,7 @@ export const groupsRest = defineRestRouter(OrganizationApi)
     };
   })
 
-  .patch("/:id", "renameGroup")
+  .patch("/:id", "patchApiGroupsById")
   .withPermission("organization:manage")
   .withParams(organizationGroupRestParamsSchema)
   .withInput(organizationGroupRestRenameSchema)
@@ -165,7 +165,7 @@ export const groupsRest = defineRestRouter(OrganizationApi)
     return { id: group.id, name: group.name, slug: group.slug };
   })
 
-  .delete("/:id", "deleteGroup")
+  .delete("/:id", "deleteApiGroupsById")
   .withPermission("organization:manage")
   .withParams(organizationGroupRestParamsSchema)
   .withOutput(organizationRestSuccessSchema)
@@ -177,7 +177,7 @@ export const groupsRest = defineRestRouter(OrganizationApi)
     return { success: true };
   })
 
-  .get("/:id/members", "listGroupMembers")
+  .get("/:id/members", "getApiGroupsByIdMembers")
   .withPermission("organization:manage")
   .withParams(organizationGroupRestParamsSchema)
   .withOutput(organizationGroupRestMemberListSchema)
@@ -189,7 +189,7 @@ export const groupsRest = defineRestRouter(OrganizationApi)
     return { data: group.members.map(memberWire) };
   })
 
-  .post("/:id/members", "addGroupMember")
+  .post("/:id/members", "postApiGroupsByIdMembers")
   .withPermission("organization:manage")
   .withParams(organizationGroupRestParamsSchema)
   .withInput(organizationGroupRestAddMemberSchema)
@@ -207,7 +207,7 @@ export const groupsRest = defineRestRouter(OrganizationApi)
     return { success: true };
   })
 
-  .delete("/:id/members/:userId", "removeGroupMember")
+  .delete("/:id/members/:userId", "deleteApiGroupsByIdMembersByUserId")
   .withPermission("organization:manage")
   .withParams(organizationGroupRestMemberParamsSchema)
   .withOutput(organizationRestSuccessSchema)
@@ -223,7 +223,7 @@ export const groupsRest = defineRestRouter(OrganizationApi)
     return { success: true };
   })
 
-  .get("/:id/bindings", "listGroupBindings")
+  .get("/:id/bindings", "getApiGroupsByIdBindings")
   .withPermission("organization:manage")
   .withParams(organizationGroupRestParamsSchema)
   .withOutput(organizationGroupRestBindingListSchema)
@@ -238,7 +238,7 @@ export const groupsRest = defineRestRouter(OrganizationApi)
     return { data: bindings.map(bindingWire) };
   })
 
-  .post("/:id/bindings", "addGroupBinding")
+  .post("/:id/bindings", "postApiGroupsByIdBindings")
   .withPermission("organization:manage")
   .withParams(organizationGroupRestParamsSchema)
   .withInput(organizationGroupBindingInputSchema)
@@ -261,7 +261,7 @@ export const groupsRest = defineRestRouter(OrganizationApi)
     };
   })
 
-  .delete("/:id/bindings/:bindingId", "removeGroupBinding")
+  .delete("/:id/bindings/:bindingId", "deleteApiGroupsByIdBindingsByBindingId")
   .withPermission("organization:manage")
   .withParams(organizationGroupRestBindingParamsSchema)
   .withOutput(organizationRestSuccessSchema)

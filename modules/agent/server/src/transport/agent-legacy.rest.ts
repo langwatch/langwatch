@@ -63,7 +63,7 @@ export const agentLegacyRest: Readonly<{
   .withAddressing("dated", { v1Twin: false })
   .withDeprecated({ successor: AGENTS_ALIAS_SUCCESSOR, notice: `superseded by ${AGENTS_ALIAS_SUCCESSOR}` })
 
-  .get("/", "listLegacyAgents")
+  .get("/", "listAgents")
   .withQuery(agentRestQuerySchema)
   .withPermission("project:view")
   .withOutput(legacyListResponse)
@@ -78,7 +78,7 @@ export const agentLegacyRest: Readonly<{
     };
   })
 
-  .post("/", "createLegacyAgent")
+  .post("/", "createAgent")
   .withInput(createAgentRequestSchema)
   .withPermission("project:update")
   .withOutput(legacyResponse)
@@ -91,7 +91,7 @@ export const agentLegacyRest: Readonly<{
     return response(agent, app, facts.projectSlug);
   })
 
-  .get("/:id", "getLegacyAgent")
+  .get("/:id", "getAgent")
   .withParams(agentRestParamsSchema)
   .withPermission("project:view")
   .withOutput(legacyResponse)
@@ -101,7 +101,7 @@ export const agentLegacyRest: Readonly<{
     response(await app.getById({ ...input, projectId: scope.id }), app, facts.projectSlug),
   )
 
-  .patch("/:id", "updateLegacyAgent")
+  .patch("/:id", "updateAgent")
   .withParams(agentRestParamsSchema)
   .withInput(updateAgentRequestSchema)
   .withPermission("project:update")
@@ -112,7 +112,7 @@ export const agentLegacyRest: Readonly<{
     response(await app.update({ ...input, projectId: scope.id }), app, facts.projectSlug),
   )
 
-  .delete("/:id", "archiveLegacyAgent")
+  .delete("/:id", "archiveAgent")
   .withParams(agentRestParamsSchema)
   .withPermission("project:delete")
   .withOutput(archiveResultSchema)

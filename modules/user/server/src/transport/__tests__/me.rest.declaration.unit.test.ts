@@ -26,13 +26,13 @@ describe("the me REST family", () => {
       expect(
         declaration.routes.map((route) => [route.path, route.operation, route.permission]),
       ).toEqual([
-        ["/usage", "getMyUsage", "project:view"],
-        ["/project", "getMyProject", "project:view"],
+        ["/usage", "getApiMeUsage", "project:view"],
+        ["/project", "getApiMeProject", "project:view"],
       ]);
     });
 
     it("takes the resolved credential whole, because its class is half the decision", () => {
-      const usage = declaration.routes.find((route) => route.operation === "getMyUsage");
+      const usage = declaration.routes.find((route) => route.operation === "getApiMeUsage");
 
       expect(usage?.middleware?.map((fact) => fact.name)).toEqual(["mePersonalCredential"]);
     });
@@ -40,7 +40,7 @@ describe("the me REST family", () => {
 
   describe("given a half-specified usage window", () => {
     it("refuses it, rather than silently answering for the default month", () => {
-      const usage = declaration.routes.find((route) => route.operation === "getMyUsage");
+      const usage = declaration.routes.find((route) => route.operation === "getApiMeUsage");
 
       expect(usage?.query?.safeParse({ windowStartMs: 1 }).success).toBe(false);
       expect(usage?.query?.safeParse({ windowStartMs: 2, windowEndMs: 1 }).success).toBe(false);

@@ -2,7 +2,7 @@
  * The project's secrets over REST, metadata only: every answer is
  * `secretPublicSchema`, `.strict()` with no value field. `/api/secret` and
  * `/api/secrets` are both published and a declaration carries one namespace,
- * so the family is stated twice; the plural suffixes its operation ids.
+ * so the family is stated twice; each mount names its own five operation ids.
  */
 
 // `projectId` stays on the wire where released clients put it, and the
@@ -45,9 +45,18 @@ function callerOf(actor: Actor | null): SecretCaller {
   throw new AuthenticatedActorRequiredError();
 }
 
+/** The five operation ids one namespace mount publishes, one per route. */
+type SecretRestOperations = Readonly<{
+  list: string;
+  get: string;
+  create: string;
+  update: string;
+  delete: string;
+}>;
+
 function defineSecretRest(
   namespace: string,
-  operationSuffix: string,
+  operations: SecretRestOperations,
 ): Readonly<{
   protocol: "rest";
   namespace: string;
@@ -57,7 +66,7 @@ function defineSecretRest(
     .withNamespace(namespace)
     .withVersion(SECRET_REST_VERSION)
 
-    .get("/", `listSecrets${operationSuffix}`)
+    .get("/", operations.list)
     .withQuery(secretPublicListInputSchema)
     .withPermission("secrets:view")
     .withOutput(secretPublicSchema.array())
@@ -72,7 +81,7 @@ function defineSecretRest(
       return secrets.map(toSecretPublic);
     })
 
-    .get("/:id", `getSecret${operationSuffix}`)
+    .get("/:id", operations.get)
     .withParams(secretPublicParamsSchema)
     .withQuery(secretPublicListInputSchema)
     .withPermission("secrets:view")
@@ -82,7 +91,7 @@ function defineSecretRest(
       toSecretPublic(await app.get({ projectId: scope.id, id: input.id })),
     )
 
-    .post("/", `createSecret${operationSuffix}`)
+    .post("/", operations.create)
     .withInput(secretPublicCreateInputSchema)
     .withPermission("secrets:manage")
     .withOutput(secretPublicSchema)
@@ -101,7 +110,7 @@ function defineSecretRest(
       ),
     )
 
-    .put("/:id", `updateSecret${operationSuffix}`)
+    .put("/:id", operations.update)
     .withParams(secretPublicParamsSchema)
     .withInput(secretPublicUpdateInputSchema)
     .withPermission("secrets:manage")
@@ -120,7 +129,7 @@ function defineSecretRest(
       ),
     )
 
-    .delete("/:id", `deleteSecret${operationSuffix}`)
+    .delete("/:id", operations.delete)
     .withParams(secretPublicParamsSchema)
     .withInput(secretPublicDeleteInputSchema)
     .withPermission("secrets:manage")
@@ -135,5 +144,17 @@ function defineSecretRest(
     .build();
 }
 
-export const secretRest = defineSecretRest("secret", "");
-export const secretsAliasRest = defineSecretRest("secrets", "PluralAlias");
+export const secretRest = defineSecretRest("secret", {
+  list: "listSecrets",
+  get: "getSecret",
+  create: "createSecret",
+  update: "updateSecret",
+  delete: "deleteSecret",
+});
+export const secretsAliasRest = defineSecretRest("secrets", {
+  list: "getApiSecrets",
+  get: "getApiSecretsById",
+  create: "postApiSecrets",
+  update: "putApiSecretsById",
+  delete: "deleteApiSecretsById",
+});

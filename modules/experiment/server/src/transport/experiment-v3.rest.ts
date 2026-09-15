@@ -198,7 +198,7 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
   .withVersion(MANAGEMENT_API_VERSION)
 
   // ── POST /:slug/run  (CI/CD execution) ────────────────────────────────
-  .post("/:slug/run", "runExperiment")
+  .post("/:slug/run", "postApiExperimentsBySlugRun")
   .withParams(slugParamsSchema)
   // The body is read unparsed: an empty one is a full run, malformed JSON is
   // a 400 in this family's own words, and `runInputsBodySchema` parses what
@@ -369,7 +369,7 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
   )
 
   // ── GET /runs?experimentSlug=... (list runs for an experiment) ────────
-  .get("/runs", "listExperimentRuns")
+  .get("/runs", "getApiExperimentsRuns")
   .withQuery(listRunsQuerySchema)
   .withPermission("evaluations:view")
   .withRawResponse({ produces: "application/json" })
@@ -424,7 +424,7 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
   })
 
   // ── GET /runs/:runId (poll run status) ─────────────────────────────────
-  .get("/runs/:runId", "getExperimentRunStatus")
+  .get("/runs/:runId", "getApiExperimentsRunsByRunId")
   .withParams(runIdParamsSchema)
   .withPermission("evaluations:view")
   .withRawResponse({ produces: "application/json" })
@@ -523,7 +523,7 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
   })
 
   // ── GET /runs/:runId/results (full per-row results) ─────────────────────
-  .get("/runs/:runId/results", "getExperimentRunResults")
+  .get("/runs/:runId/results", "getApiExperimentsRunsByRunIdResults")
   .withParams(runIdParamsSchema)
   .withQuery(runResultsQuerySchema)
   .withPermission("evaluations:view")
@@ -582,7 +582,7 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
   })
 
   // ── GET /:slug/workbench-state ───────────────────────────────────────
-  .get("/:slug/workbench-state", "getExperimentWorkbenchState")
+  .get("/:slug/workbench-state", "getApiExperimentsBySlugWorkbenchState")
   .withParams(slugParamsSchema)
   .withQuery(workbenchStateQuerySchema)
   .withPermission("experiments:view")
@@ -618,7 +618,7 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
   })
 
   // ── PUT /:slug/workbench-state ───────────────────────────────────────
-  .put("/:slug/workbench-state", "saveExperimentWorkbenchState")
+  .put("/:slug/workbench-state", "putApiExperimentsBySlugWorkbenchState")
   .withParams(slugParamsSchema)
   .withInput(saveWorkbenchStateBodySchema)
   .withPermission("experiments:update")
@@ -660,7 +660,7 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
   })
 
   // ── GET /:slug/versions ─────────────────────────────────────────────
-  .get("/:slug/versions", "listExperimentWorkbenchVersions")
+  .get("/:slug/versions", "getApiExperimentsBySlugVersions")
   .withParams(slugParamsSchema)
   .withQuery(listVersionsQuerySchema)
   .withPermission("experiments:view")
@@ -716,7 +716,7 @@ export const experimentV3Rest = defineRestRouter(ExperimentV3RestApi)
   })
 
   // ── POST /:slug/versions/:version/restore ────────────────────────────
-  .post("/:slug/versions/:version/restore", "restoreExperimentWorkbenchVersion")
+  .post("/:slug/versions/:version/restore", "postApiExperimentsBySlugVersionsByVersionRestore")
   .withParams(slugVersionParamsSchema)
   .withPermission("experiments:update")
   .withRawResponse({ produces: "application/json" })
