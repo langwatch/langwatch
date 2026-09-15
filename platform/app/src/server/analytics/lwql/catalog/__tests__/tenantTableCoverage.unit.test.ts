@@ -37,8 +37,8 @@ const derived = deriveDefaultCatalog({
 const derivedSourceTables = new Set(derived.map((view) => view.sourceTable));
 
 const HAND_WRITTEN_TABLE_COUNT = 10;
-const DERIVED_TABLE_COUNT = 20;
-const SKIPPED_TABLE_COUNT = 13;
+const DERIVED_TABLE_COUNT = 25;
+const SKIPPED_TABLE_COUNT = 8;
 
 describe("given every table in the committed ClickHouse columns manifest", () => {
   it("is hand-written, derived, or skipped-with-a-reason — exactly once", () => {

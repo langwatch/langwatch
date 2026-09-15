@@ -8,6 +8,16 @@
  * reason to be skipped. A reason is required for every skip, so "not exposed" is
  * always a recorded decision rather than an oversight.
  *
+ * All customer-owned data is exposed by default — a skip is warranted only
+ * when the table (a) carries no tenant column at all, (b) is written under an
+ * internal/system tenant that no customer project can ever hold rows under,
+ * (c) is a materialised-view or `.inner` target whose data is already exposed
+ * through the table it feeds, or (d) is access-control plumbing that adds
+ * nothing beyond what the row policy already does. "Raw" or "legacy" shape is
+ * not by itself a reason — those tables move to the derived catalog (with an
+ * explicit override name where the default would collide) rather than being
+ * skipped.
+ *
  * Two shapes of skip: an exact table name in {@link LWQL_CATALOG_SKIPPED_TABLES},
  * and a family match in {@link matchesSkipPattern} for tables whose whole prefix
  * or suffix is bookkeeping ({@link skipReason} consults both).
@@ -18,30 +28,30 @@
  * analytics.
  */
 export const LWQL_CATALOG_SKIPPED_TABLES: Record<string, string> = {
-  event_log: "internal event bookkeeping, not customer analytics",
   lwql_api_key_tenant_map:
-    "the tenant key map the row policy reads; exposing it would leak the isolation mechanism",
-  stored_log_records:
-    "raw stored log payloads; the customer-facing shape is the log_records dataset",
-  stored_metric_records:
-    "raw stored metric payloads; the customer-facing shape is the metric datasets",
-  log_usage_estimates: "billing usage bookkeeping, not customer analytics",
-  metric_usage_estimates: "billing usage bookkeeping, not customer analytics",
+    "access-control plumbing, not customer telemetry — holds key hashes the " +
+    "row policy reads to self-filter; the policy already scopes it, so " +
+    "exposing it would leak the isolation mechanism for no customer benefit",
   goose_db_version:
-    "the goose migration-version table, engine-internal tooling state",
+    "the goose migration-version table, engine-internal tooling state — no " +
+    "tenant column at all",
 };
 
 /**
  * The reason a table is skipped by family, or `undefined` when no family
  * matches.
  *
- *  - `governance_*` — governance bookkeeping, internal to the platform.
+ *  - `governance_*` — every row is keyed by the org's hidden
+ *    `internal_governance` project id (see 00026_create_governance_ocsf_events.sql),
+ *    never a real customer project's TenantId, so there is no customer row to
+ *    expose.
  *  - `*_mv` / materialised-view internals — engine plumbing, not a table a
- *    caller would query.
+ *    caller would query; its data is already exposed through the table it
+ *    feeds.
  */
 export function matchesSkipPattern(table: string): string | undefined {
   if (table.startsWith("governance_")) {
-    return "governance bookkeeping, internal to the platform";
+    return "internal governance bookkeeping, keyed by the hidden internal_governance tenant, never a customer project";
   }
   if (table.endsWith("_mv") || table.includes(".inner")) {
     return "materialised-view internal, not a customer-facing table";
