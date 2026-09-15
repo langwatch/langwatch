@@ -207,6 +207,67 @@ def apply_gpt5_temperature_compatibility(
     return kwargs
 
 
+def is_claude_model(model: Optional[str]) -> bool:
+    """
+    Whether this model is an Anthropic Claude model, on any route.
+
+    Matched anywhere in the string rather than after the provider prefix,
+    because the routes disagree about where the name sits:
+    `anthropic/claude-sonnet-4-5`, `bedrock/anthropic.claude-sonnet-4-5-v1:0`,
+    `vertex_ai/claude-sonnet-4-5` and a Bedrock system inference-profile ARN
+    all carry it differently. No other vendor names a model "claude".
+    """
+    return "claude" in model.lower() if model else False
+
+
+def is_opaque_bedrock_inference_profile(model: Optional[str]) -> bool:
+    """
+    Whether this model is a Bedrock application inference profile, whose ARN
+    carries a generated id and not the underlying model's name
+    (`arn:aws:bedrock:<region>:<account>:application-inference-profile/<id>`).
+
+    Nothing in such a request says which family the profile serves, so the
+    name test above cannot claim or clear it — the caller decides what an
+    unknowable family means for its own treatment.
+    """
+    return "application-inference-profile/" in model if model else False
+
+
+def apply_anthropic_sampling_compatibility(kwargs: dict) -> dict:
+    """
+    Keep only one sampling parameter for Claude models, which reject a
+    request naming both with a BadRequestError ("`temperature` and `top_p`
+    cannot both be specified for this model. Please use only one.").
+
+    drop_params cannot cover this either: each parameter is supported on its
+    own — the model restricts the combination. The temperature is the one
+    kept, because evaluators default to temperature 0 for deterministic
+    verdicts, so it is the knob their determinism actually lives in; a top_p
+    riding alongside it is the one whose absence changes a verdict least.
+
+    Applied to every Claude model rather than only the generations known to
+    refuse, on the same asymmetry as the gpt-5 list above: dropping a top_p
+    from a call that also names a temperature costs almost nothing on a
+    model that would have accepted both, while keeping it fails the call
+    outright and the evaluation reaches no verdict at all.
+
+    A Bedrock application inference profile is treated as possibly Claude by
+    the same asymmetry, since its ARN hides which family it serves: on
+    whatever model such a profile actually fronts, a top_p riding alongside
+    a temperature is redundant, and on a Claude it is fatal. Resolving the
+    profile through the AWS API instead would put a network call and a
+    credential requirement on every judge call, to avoid a drop that is
+    nearly free.
+    """
+    model = kwargs.get("model")
+    if not (is_claude_model(model) or is_opaque_bedrock_inference_profile(model)):
+        return kwargs
+    if kwargs.get("temperature") is None or kwargs.get("top_p") is None:
+        return kwargs
+    del kwargs["top_p"]
+    return kwargs
+
+
 def convert_param_type(key: str, value: str):
     """Convert string env var value to proper type for litellm params."""
     if key in INT_PARAMS:
@@ -377,6 +438,10 @@ def patch_litellm_params(kwargs):
     kwargs = apply_gpt5_temperature_compatibility(
         kwargs, requested_model=requested_model
     )
+    # Same position again: both sampling knobs have landed by now, wherever
+    # each came from — an evaluator argument or a request's X_LITELLM_*
+    # setting — so this is the first point the conflict is even visible.
+    kwargs = apply_anthropic_sampling_compatibility(kwargs)
 
     return kwargs
 
