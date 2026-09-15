@@ -55,9 +55,12 @@ const hooksOver = ({
   authenticationDecision = { action: "continue" },
   arrivalConnection = null,
   arrivalOrganization = null,
+  governingConnectionId = null,
 }: {
   user?: DatabaseHookUser | null;
   organization?: LegacyOrganization | null;
+  /** The connection the ROUTER says governs the address, or null for none. */
+  governingConnectionId?: string | null;
   accountCount?: number;
   federationAllowed?: boolean;
   memberships?: number;
@@ -84,6 +87,13 @@ const hooksOver = ({
   const organizations = {
     findByDomain: vi.fn().mockResolvedValue(organization),
   };
+  const connectionGoverning = vi
+    .fn()
+    .mockResolvedValue(
+      governingConnectionId === null
+        ? null
+        : { connectionId: governingConnectionId },
+    );
   const accounts = {
     countForUser: vi.fn().mockResolvedValue(accountCount),
     reconcileOAuthAccounts: vi.fn().mockResolvedValue(undefined),
@@ -125,6 +135,7 @@ const hooksOver = ({
     hooks: new BetterAuthDatabaseHooks({
       users,
       organizations,
+      connectionRouting: { connectionGoverning },
       accounts,
       ssoArrival,
       ssoMigration,
@@ -134,6 +145,7 @@ const hooksOver = ({
     }),
     users,
     organizations,
+    connectionGoverning,
     accounts,
     ssoMigration,
     createMembership,
@@ -437,6 +449,128 @@ describe("beforeAccountCreate", () => {
       expect(users.updatePendingSsoSetup).toHaveBeenCalledWith({
         userId: "user_1",
         pendingSsoSetup: true,
+      });
+    });
+  });
+
+  describe("when a NATIVE social provider is used at a domain a CONNECTION proved", () => {
+    // The self-serve population, which the legacy guard below never covered:
+    // a connection writes no `ssoDomain`, so `findByDomain` answers null and
+    // every rule the router enforces was skipped by the button that skips the
+    // router. `organization: null` here is the point, not an omission.
+    const governedBy = (connectionId: string | null) =>
+      hooksOver({
+        user: userRow({ email: "sam@acme.com" }),
+        organization: null,
+        governingConnectionId: connectionId,
+        accountCount: 1,
+      });
+
+    /** @scenario "A native social sign-up on a proved domain is refused" */
+    it("refuses before any Google identity is attached to them", async () => {
+      const { hooks, users } = governedBy("ssoc_acme");
+
+      await expect(
+        hooks.beforeAccountCreate({ account: account() }),
+      ).rejects.toMatchObject({
+        body: { code: "SSO_REQUIRED_BY_ORGANIZATION" },
+      });
+
+      // Not the soft flag either: this person is being sent somewhere, not
+      // stranded behind a banner about a migration they are not in.
+      expect(users.updatePendingSsoSetup).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "The refusal names the connection, so it can be walked into" */
+    it("carries the connection as where they should go instead", async () => {
+      const { hooks } = governedBy("ssoc_acme");
+
+      // The message is the bounce TARGET: better-auth puts it in
+      // `error_description` on the callback redirect, and the error route
+      // dials it. A refusal that named nothing would be a dead end.
+      await expect(
+        hooks.beforeAccountCreate({ account: account() }),
+      ).rejects.toMatchObject({ body: { message: "ssoc_acme" } });
+    });
+
+    /** @scenario "A domain the connection never proved is not the connection's" */
+    it("lets the sign-up through when no connection governs the address", async () => {
+      const { hooks } = governedBy(null);
+
+      await expect(
+        hooks.beforeAccountCreate({ account: account() }),
+      ).resolves.toBeUndefined();
+    });
+
+    /**
+     * Both of these are the router's answer rather than this hook's, and that
+     * is exactly why they are asserted here: the hook asks one question and
+     * the live / proved / lapsed rules ride along with it, so a connection
+     * mid-setup governs nobody and a lapsed proof still routes (ADR-123).
+     */
+    /** @scenario "A connection still being set up governs nobody" */
+    it("lets the sign-up through while the connection is not live yet", async () => {
+      // The router answers `null` for a connection nobody turned on.
+      const { hooks } = governedBy(null);
+
+      await expect(
+        hooks.beforeAccountCreate({ account: account() }),
+      ).resolves.toBeUndefined();
+    });
+
+    /** @scenario "A domain whose proof has lapsed still sends them to the provider" */
+    it("still refuses on a lapsed proof, because a lapsed domain still routes", async () => {
+      // ADR-123: lapsed stops PROVISIONING, not routing — so the router still
+      // names the connection and the bounce still happens. Admitting nobody
+      // new is the arrival door's half, not this one's.
+      const { hooks } = governedBy("ssoc_acme");
+
+      await expect(
+        hooks.beforeAccountCreate({ account: account() }),
+      ).rejects.toMatchObject({
+        body: { code: "SSO_REQUIRED_BY_ORGANIZATION" },
+      });
+    });
+
+    /** @scenario "The connection dialling itself is not a native button" */
+    it("does not refuse the connection's own sign-in", async () => {
+      const { hooks } = governedBy("ssoc_acme");
+
+      await expect(
+        hooks.beforeAccountCreate({
+          account: account({ providerId: "ssoc_acme", accountId: "subject_1" }),
+        }),
+      ).resolves.toBeUndefined();
+    });
+
+    /** @scenario "A brokered sign-in mid-migration is left alone" */
+    it("does not refuse a brokered sign-in on another connection", async () => {
+      const { hooks } = governedBy("ssoc_acme");
+
+      await expect(
+        hooks.beforeAccountCreate({
+          account: account({
+            providerId: "auth0",
+            accountId: "google-oauth2|123",
+          }),
+        }),
+      ).resolves.toBeUndefined();
+    });
+
+    /** @scenario "An already-linked native account is refused on the sign-in path too" */
+    it("refuses on the update seam, where no account row is created", async () => {
+      const { hooks } = governedBy("ssoc_acme");
+
+      await expect(
+        hooks.afterAccountUpdate({
+          account: {
+            userId: "user_1",
+            providerId: "google",
+            accountId: "sub-1",
+          },
+        }),
+      ).rejects.toMatchObject({
+        body: { code: "SSO_REQUIRED_BY_ORGANIZATION" },
       });
     });
   });

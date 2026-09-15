@@ -1,6 +1,8 @@
 import { SYSTEM_ACTORS } from "@langwatch/actor";
-import type { SsoArrivalPolicy } from "@langwatch/identity";
-import { looksLikeSsoConnectionId } from "@langwatch/identity-server";
+import {
+  looksLikeSsoConnectionId,
+  type SsoArrivalPolicy,
+} from "@langwatch/identity";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import { KSUID_RESOURCES } from "~/utils/constants";

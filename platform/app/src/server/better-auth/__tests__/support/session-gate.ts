@@ -30,6 +30,7 @@ export function createSessionGateHooks({
       countOrganizationMemberships: async () => 0,
     },
     organizations: { findByDomain: async () => null },
+    connectionRouting: { connectionGoverning: async () => null },
     accounts: {
       countForUser: async () => 0,
       reconcileOAuthAccounts: async () => undefined,

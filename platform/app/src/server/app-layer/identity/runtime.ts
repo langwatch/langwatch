@@ -247,7 +247,7 @@ import { isAnyoneOnIdentityWrites, isUserOnIdentityWrites } from "./write-gate";
  * one of the two the boundary test says better-auth may reach only through
  * here.
  */
-export { looksLikeSsoConnectionId } from "@langwatch/identity-server";
+export { looksLikeSsoConnectionId } from "@langwatch/identity";
 /**
  * The method-set policy, re-stated on the runtime because the runtime is the
  * app's ONE door into app-layer identity (ADR-115) — and better-auth is the
@@ -585,11 +585,32 @@ export async function addressRoutesToConnection({
 }: {
   email: string;
 }): Promise<boolean> {
+  return (await connectionGoverningAddress({ email })) !== null;
+}
+
+/**
+ * The same question, answered with the connection rather than with a yes.
+ *
+ * Every caller of `addressRoutesToConnection` is a refusal that needs nothing
+ * but the yes. The native-social bounce needs the connection itself, because
+ * its refusal carries the place to go instead — so the two ask once, here,
+ * and cannot come to different conclusions about whose address this is.
+ *
+ * Left to throw for the reason stated above: on a deployment that mandates
+ * single sign-on for this address, failing open would hand out the very door
+ * the connection exists to close.
+ */
+export async function connectionGoverningAddress({
+  email,
+}: {
+  email: string;
+}): Promise<{ connectionId: string } | null> {
   const decision = await signInRouter().route({ identifier: email });
-  return (
-    decision.outcome === "redirect_to_connection" &&
-    decision.methodSet.some((method) => method.connectionId !== null)
-  );
+  if (decision.outcome !== "redirect_to_connection") return null;
+  const connectionId =
+    decision.methodSet.find((method) => method.connectionId !== null)
+      ?.connectionId ?? null;
+  return connectionId === null ? null : { connectionId };
 }
 
 export type LocalSignUpDecision =
@@ -1512,6 +1533,7 @@ export function databaseHooks(): BetterAuthDatabaseHooks {
   return new BetterAuthDatabaseHooks({
     users: identityUsers,
     organizations: new PrismaLegacySsoOrganizationRepository(prisma),
+    connectionRouting: { connectionGoverning: connectionGoverningAddress },
     accounts: new PrismaSsoAccountReconciliationRepository(prisma),
     ssoArrival: ssoArrival(),
     ssoMigration: new PrismaSsoMigrationCallbackPolicy(

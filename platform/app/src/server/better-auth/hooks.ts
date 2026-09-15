@@ -159,9 +159,36 @@ export interface DatabaseHookSsoArrivalPort {
   }): Promise<void>;
 }
 
+/**
+ * Whether an ORGANIZATION'S OWN connection governs an address, and which one.
+ *
+ * The legacy `ssoDomain` columns are `DatabaseHookOrganizationsPort`'s
+ * question and a different population's answer: a self-serve connection never
+ * writes them, so every organization that registered its own provider — the
+ * whole point of that journey — is invisible to `findByDomain`.
+ *
+ * Answered by the sign-in router rather than re-derived here, which is what
+ * makes live, proved and lapsed mean the same thing on this path as on the
+ * front door. ADR-123's rule rides along for free: a lapsed domain still
+ * ROUTES, so somebody who already works there is still sent to the provider,
+ * and the arrival door is the one that then admits nobody new.
+ *
+ * It answers the connection rather than a boolean because the refusal is a
+ * BOUNCE — the connection is what made the refusal, and carrying it is the
+ * difference between sending somebody to their own provider and showing them
+ * a page about why they cannot have Google.
+ */
+export interface DatabaseHookConnectionRoutingPort {
+  connectionGoverning(args: {
+    email: string;
+  }): Promise<{ connectionId: string } | null>;
+}
+
 export interface BetterAuthDatabaseHooksDeps {
   users: DatabaseHookUsersPort;
   organizations: DatabaseHookOrganizationsPort;
+  /** D04: the organization's own connection, ahead of the legacy columns. */
+  connectionRouting: DatabaseHookConnectionRoutingPort;
   accounts: DatabaseHookAccountsPort;
   ssoArrival: DatabaseHookSsoArrivalPort;
   ssoMigration: DatabaseHookSsoMigrationPort;
@@ -307,6 +334,14 @@ export class BetterAuthDatabaseHooks {
 
     if (await this.beforeMigrationAccountLink(account)) return;
 
+    // The organization's own connection, ahead of the legacy columns: it is
+    // the answer for every organization that registered one, and the legacy
+    // block below is the answer for every organization that never did.
+    await this.bounceNativeProviderToConnection({
+      email: user.email,
+      account,
+    });
+
     const domain = extractEmailDomain(user.email);
     if (!domain) return;
 
@@ -354,6 +389,61 @@ export class BetterAuthDatabaseHooks {
   }
 
   /**
+   * The bounce: a native social button pressed by somebody whose organization
+   * signs its people in through its own connection.
+   *
+   * WHY IT IS NOT THE LEGACY GUARD BELOW. That one asks `findByDomain`, which
+   * reads `Organization.ssoDomain` — two staff-set strings a self-serve
+   * connection never writes. An organization that proved its domain and went
+   * live through the setup journey therefore matched nothing there, and the
+   * button that skips the router skipped every rule the router enforces: the
+   * Google identity was attached, no membership was created, no request was
+   * queued, and the arrival policy the organization chose never ran.
+   *
+   * WHY IT THROWS RATHER THAN ROUTING. Nothing on the social path carries an
+   * address until the callback, by which point better-auth is already writing
+   * the account. Refusing here is the last moment before that, and better-auth
+   * carries an `APIError`'s code AND message into the callback redirect — so
+   * the connection travels with the refusal and `/auth/error` dials it. The
+   * person sees their own identity provider, not an error page.
+   *
+   * NATIVE PROVIDERS ONLY, exactly as the legacy guard: the connection dialling
+   * itself arrives under its own id, and a brokered sign-in mid-migration is
+   * the population `pendingSsoSetup` exists for. Refusing either would turn
+   * somebody away from the door they are supposed to be walking through.
+   */
+  private async bounceNativeProviderToConnection({
+    email,
+    account,
+  }: {
+    email: string;
+    account: { userId: string; providerId: string };
+  }): Promise<void> {
+    if (!isNativeSocialProvider(account.providerId)) return;
+
+    const governing = await this.deps.connectionRouting.connectionGoverning({
+      email,
+    });
+    if (!governing) return;
+
+    logger.info(
+      {
+        userId: account.userId,
+        attemptedProvider: account.providerId,
+        connectionId: governing.connectionId,
+      },
+      "Sent a native social sign-in to the organization's own connection",
+    );
+    // The message is the bounce TARGET, not prose: better-auth puts it in
+    // `error_description` on the callback redirect, and the error route reads
+    // it as a connection identifier — never as an address to navigate to.
+    throw APIError.from("FORBIDDEN", {
+      code: "SSO_REQUIRED_BY_ORGANIZATION",
+      message: governing.connectionId,
+    });
+  }
+
+  /**
    * Whether a provider that does not match the organization's is refused
    * outright, or only soft-flagged — and which rule decided, for the log line
    * an operator reads when somebody reports being turned away.
@@ -390,6 +480,12 @@ export class BetterAuthDatabaseHooks {
    *
    * Native providers only, exactly as on the create path: a brokered sign-in
    * on the wrong connection is the mid-migration member the soft flag is for.
+   *
+   * BOTH refusals live here, in the order they live in on the create path —
+   * the organization's own connection first, which bounces, and the legacy
+   * columns after, which do not. An account linked before the connection
+   * existed is exactly the population that reaches this seam and never the
+   * other one.
    */
   private async refuseNativeProviderOnSignIn(account: {
     userId: string;
@@ -402,6 +498,13 @@ export class BetterAuthDatabaseHooks {
     const user = await this.deps.users.findById({ userId: account.userId });
     const domain = extractEmailDomain(user?.email);
     if (!domain) return;
+
+    if (user?.email) {
+      await this.bounceNativeProviderToConnection({
+        email: user.email,
+        account,
+      });
+    }
 
     const org = await this.deps.organizations.findByDomain({ domain });
     // A `ssoProvider` the account already matches is this organization's own
