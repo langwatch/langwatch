@@ -210,8 +210,7 @@ describe("the scopes the procedure accepts", () => {
 });
 
 describe("the SQL a genuine governance call sends", () => {
-  /** @scenario "A reader of the person figures other than the cost screen keeps the governance scope"
-   *
+  /**
    * Pinned whole, not by fragment. Three screens still lead with dollars off
    * this read, so any edit to the scope branching that moves one character of
    * their query has to be a deliberate one.
@@ -223,7 +222,13 @@ describe("the SQL a genuine governance call sends", () => {
    * pre-flip repository, so it is the old query rather than a transcript of
    * the new one — but read it as a pin on the future, not as evidence about
    * the past.
+   *
+   * The annotation below closes its own comment on purpose. `isFollowedByTestCall`
+   * starts its walk at the end of the match and cannot leave a comment it begins
+   * inside, so an annotation opening this block would bind nothing and say
+   * nothing about it — see `scripts/check-feature-parity.ts:1151`.
    */
+  /** @scenario "A reader of the person figures other than the cost screen keeps the governance scope" */
   it("is unchanged, character for character", async () => {
     const call = await readWith("governance");
 
