@@ -3,6 +3,7 @@ import { defineServerModule } from "@langwatch/runtime-composition";
 import { TraceApp } from "./app/trace.app.ts";
 import { traceRepositories } from "./repositories/trace-repositories.registry.ts";
 import { collectorRest } from "./transport/collector.rest.ts";
+import { otlpIngestRest } from "./transport/otlp-ingest.rest.ts";
 import { spansTrpcTransport } from "./transport/spans.trpc.ts";
 import { traceLegacyRest } from "./transport/trace-legacy.rest.ts";
 import { traceEditOverlayTrpcTransport } from "./transport/trace-edit-overlay.trpc.ts";
@@ -35,9 +36,19 @@ export const traceServer = defineServerModule("trace")
     // parses them. The binding it does have is `TraceApp.collectorCredential`,
     // which every mounted process supplies through the API-key directory.
     //
-    // Mounted last of the REST families, and anything matching `/api/collector/*`
+    // Mounted after the reads, and anything matching `/api/collector/*`
     // must be mounted after it: a wildcard in front would swallow this literal.
     collectorRest,
+    // `POST /api/otel/v1/{traces,logs,metrics}`, the canonical OTLP receiver -
+    // where every OTLP exporter posts, our own langyagent included. Public and
+    // handler-resolved for the same reason the collector is, and its six
+    // members are all required, so a composition that cannot answer one fails
+    // the build rather than a customer's first export.
+    //
+    // Mounted LAST of the REST families, and the path alias - which claims
+    // `/api/otel/*` with a wildcard - must be mounted after this one when it
+    // returns, or it swallows these literals.
+    otlpIngestRest,
   )
   .withTransportFacts(() => [
     // The v1 trace reads answer through the key's own grants, so the routes

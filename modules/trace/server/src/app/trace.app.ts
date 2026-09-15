@@ -98,6 +98,18 @@ import type {
   CollectorProject,
 } from "../transport/collector.rest.ts";
 import type {
+  OtlpIngestCredential,
+  OtlpIngestProject,
+  OtlpIngestRestMembers,
+  OtlpLogCollection,
+  OtlpLogCollectionOutcome,
+  OtlpMetricCollection,
+  OtlpMetricCollectionOutcome,
+  OtlpTraceCollection,
+  OtlpTraceCollectionResult,
+} from "../transport/otlp-ingest.rest.ts";
+import { DEFAULT_PII_REDACTION_LEVEL } from "@langwatch/trace-contract";
+import type {
   CollectorEvaluationReport,
   CollectorSpanIngest,
 } from "../services/trace-collector-dispatch.service.ts";
@@ -386,17 +398,15 @@ export interface TraceAppDependencies {
   share: ShareApi;
   projects: ProjectApi;
   /**
-   * The door the deprecated `/api/trace/*` family resolves its own project
-   * credential through. Optional because a process that mounts no REST never
-   * reaches it; `credential` raises by name rather than admitting a caller
-   * when it is absent.
+   * The door the deprecated `/api/trace/*` family resolves its project
+   * credential through. Optional because a REST-less process never reaches
+   * it; `credential` raises by name rather than admitting an absent caller.
    */
   legacyCredential?: TraceLegacyCredentialService;
   /**
-   * The door `POST /api/collector` and the OTLP receiver resolve their own
-   * project credential through. Optional for the same reason the legacy one is:
-   * a process that mounts no REST never reaches it, and the members that read
-   * it raise by name rather than admitting an unauthenticated caller.
+   * The door `POST /api/collector` and the OTLP receiver resolve their
+   * project credential through — optional for the same reason as
+   * `legacyCredential`: absent members raise by name, never admit a caller.
    */
   ingestCredential?: TraceIngestCredentialService;
   /**
@@ -405,6 +415,14 @@ export interface TraceAppDependencies {
    * data they drop.
    */
   ingestion?: TraceIngestionService;
+  /**
+   * Where an exported OTLP LOG batch goes. Absent on every deployment today
+   * — the Log module owns the collection and this module may not import it.
+   * Absent, the door refuses permanently rather than retrying forever.
+   */
+  logCollection?: OtlpLogCollection;
+  /** The metric signal's twin of {@link logCollection}, absent for the same reason. */
+  metricCollection?: OtlpMetricCollection;
   /** The deployment's public origin, for `platformUrl`. Optional: not every install serves REST. */
   publicBaseUrl?: string;
 }
@@ -417,12 +435,9 @@ function occurredAtHint(occurredAtMs?: number): { occurredAtMs: number } | Recor
 }
 
 /**
- * What the deployment states for this module.
- *
- * `fallbackVisibilityDays` is the window a caller sees when no plan answers
- * one. It defaults to the free plan's fourteen days: both processes must read
- * the same number or one would redact what the other shows, and a core module
- * may not import the enterprise licensing contract that declares it.
+ * What the deployment states for this module. `fallbackVisibilityDays`
+ * defaults to the free plan's 14 days, since both processes must read the
+ * same number and a core module may not import the licensing contract.
  */
 const traceAppConfigSchema = z
   .object({
@@ -430,11 +445,9 @@ const traceAppConfigSchema = z
     fallbackVisibilityDays: z.number().default(14),
     publicBaseUrl: z.string().optional(),
     /**
-     * Whether this process registers the `trace_processing` pipeline while
-     * composing Trace, which is the producer role and the default. A process
-     * that ALSO drains the pipeline states `false`: its install phase
-     * registers Trace's complete definition, and one runtime holds one
-     * registration per pipeline name.
+     * Registers the `trace_processing` pipeline while composing Trace
+     * (the producer role, default `true`). A process that ALSO drains it
+     * states `false` — one runtime holds one registration per pipeline name.
      */
     registersProcessingPipeline: z.boolean().default(true),
   })
@@ -456,25 +469,18 @@ type TraceSetup = FeatureSetup<
 >;
 
 /**
- * The trace feature's application.
- *
- * It implements the module's own {@link TraceApi}, which peer modules call, and
- * {@link CollectorApp}, which the `POST /api/collector` door calls. The second
- * is declared here rather than left to agree by attention: the door is handed
- * this object through the operations-only feature-API proxy, so a member it
- * names and this class does not serve is not a type error at the seam - it is a
- * `TypeError` on the first span a customer sends. Naming the door's shape in
- * this `implements` clause is what turns that back into a build failure.
+ * The trace feature's application: implements {@link TraceApi},
+ * {@link CollectorApp} and {@link OtlpIngestRestMembers} explicitly, so an
+ * unserved door member fails the build instead of throwing at runtime.
  */
-export class TraceApp implements TraceApi, CollectorApp {
+export class TraceApp implements TraceApi, CollectorApp, OtlpIngestRestMembers {
   static readonly contract = TraceApiToken;
   static readonly dependencies = traceDependencies;
   static readonly configSchema = traceAppConfigSchema;
   /**
-   * ClickHouse is where every captured span lives, `eventing` is the pipeline
-   * this process stages commands on, and the logger names the process in a
-   * blob read's refusal. Everything else Trace composes over is a peer Api or
-   * a row from its own repository registry.
+   * ClickHouse holds every captured span; `eventing` is the pipeline this
+   * process stages commands on; the logger names the process in a blob
+   * read's refusal. Everything else is a peer Api or its own repository.
    */
   static readonly reads = reads("clickhouse", "eventing", "logger", "redis");
 
@@ -1313,17 +1319,14 @@ export class TraceApp implements TraceApi, CollectorApp {
   }
 
   // -- the deprecated /api/trace family's own members ----------------------
-  //
-  // `transport/trace-legacy.rest.ts` declares this set; the five addresses it
-  // mounts read nothing else off the application. Every one is a METHOD: a
-  // mounted family reads its application through a proxy that answers callable
-  // operations only, so a property member throws where it is read.
+  // `transport/trace-legacy.rest.ts` reads this application through an
+  // operations-only proxy — every member below is a METHOD because a
+  // property member throws where the proxy reads it.
 
   /**
-   * The project credential that family resolves for itself, and the refusal it
-   * publishes when there is none. Raises rather than refusing when the door was
-   * never composed: a process serving these addresses with no API-key directory
-   * is mis-wired, and answering a caller 401 would hide it.
+   * The project credential that family resolves for itself. Raises rather
+   * than refusing when the door was never composed: a mis-wired process
+   * should not hide that behind a caller-facing 401.
    */
   credential(input: {
     request: Request;
@@ -1376,16 +1379,13 @@ export class TraceApp implements TraceApi, CollectorApp {
   }
 
   // -- the SDK collector's own members --------------------------------------
-  //
-  // `transport/collector.rest.ts` declares this set. Every one is a METHOD: the
-  // mounted door reads this application through a proxy that answers callable
-  // operations only, so a property member throws where it is read.
+  // `transport/collector.rest.ts` reads this application through the same
+  // operations-only proxy — every member below is a METHOD for that reason.
 
   /**
-   * The project credential that door resolves for itself. Raises rather than
-   * refusing when the door was never composed: a process serving ingestion with
-   * no API-key directory is mis-wired, and answering a customer's SDK 401 would
-   * hide it behind a credential they would then go and rotate.
+   * The project credential that door resolves for itself. Raises rather
+   * than refusing when uncomposed: hiding a mis-wired process behind a
+   * customer's SDK 401 sends them off rotating a credential that's fine.
    */
   collectorCredential(input: { request: Request }): Promise<CollectorCredential> {
     if (!this.#dependencies.ingestCredential) {
@@ -1398,10 +1398,9 @@ export class TraceApp implements TraceApi, CollectorApp {
   }
 
   /**
-   * The plan's monthly allowance. Accepts every batch: the allowance is read
-   * through a usage meter no module contract publishes yet, so this deployment
-   * enforces none at this door. It is a member rather than an absence because
-   * the door reads it by name.
+   * The plan's monthly allowance. Accepts every batch — no module contract
+   * yet publishes a usage meter, so this deployment enforces none here. A
+   * member rather than an absence because the door reads it by name.
    */
   collectorUsageLimit(_input: { project: CollectorProject }): Promise<void> {
     return Promise.resolve();
@@ -1420,10 +1419,9 @@ export class TraceApp implements TraceApi, CollectorApp {
   }
 
   /**
-   * One custom SDK evaluation, on the same command the workbench's own re-scores
-   * travel. Parsed against the command's schema rather than cast onto it, so a
-   * field this door spells differently is a rejection here and not a malformed
-   * row downstream.
+   * One custom SDK evaluation, on the command the workbench's re-scores
+   * also travel. Parsed against its schema rather than cast, so a
+   * differently-spelled field is rejected here, not malformed downstream.
    */
   reportEvaluation(
     input: Parameters<CollectorEvaluationReport>[0],
@@ -1441,5 +1439,93 @@ export class TraceApp implements TraceApi, CollectorApp {
   /** A failure the door answered but did not raise, kept off the customer's body. */
   collectorReportError(error: Error, context: Readonly<{ projectId: string }>): void {
     logger.error({ error, projectId: context.projectId }, "the collector answered a failure");
+  }
+
+  // -- the OTLP receiver's own members ---------------------------------------
+  // `transport/otlp-ingest.rest.ts` reads this application through the same
+  // operations-only proxy; all six members are required and each is a METHOD
+  // for the same reason.
+
+  /**
+   * The project credential the receiver resolves for itself — same
+   * raise-rather-than-refuse reasoning as {@link collectorCredential}.
+   */
+  otlpCredential(input: { request: Request }): Promise<OtlpIngestCredential> {
+    if (!this.#dependencies.ingestCredential) {
+      throw new Error(
+        "The OTLP receiver asked for a credential, and this process composed Trace without the API-key directory it resolves through",
+      );
+    }
+
+    return this.#dependencies.ingestCredential.resolveForOtlp(input);
+  }
+
+  /**
+   * The plan's monthly allowance — unenforced here, same gap as
+   * {@link collectorUsageLimit}. Must close at both doors together, or
+   * one becomes the way around the other.
+   */
+  otlpUsageLimit(_input: {
+    project: OtlpIngestProject;
+    customerTraceIds: string[];
+  }): Promise<void> {
+    return Promise.resolve();
+  }
+
+  /** The trace signal: the same receiver `POST /api/collector` writes through. */
+  otlpTraces(
+    input: Parameters<OtlpTraceCollection>[0],
+  ): Promise<OtlpTraceCollectionResult | undefined> {
+    const ingestion = this.#dependencies.ingestion;
+    if (!ingestion) {
+      throw new TraceIngestionUnavailableError();
+    }
+
+    return ingestion.handleOtlpTraceRequest(
+      input.tenantId,
+      input.traceRequest,
+      DEFAULT_PII_REDACTION_LEVEL,
+    );
+  }
+
+  /**
+   * The log signal: every deployment today answers `not-served` — the Log
+   * module owns the collection and this module may not import it. Said in
+   * the answer, not thrown, so exporters don't retry forever.
+   */
+  otlpLogs(input: Parameters<OtlpLogCollection>[0]): Promise<OtlpLogCollectionOutcome> {
+    const collection = this.#dependencies.logCollection;
+    if (!collection) {
+      return Promise.resolve({
+        outcome: "not-served",
+        errorMessage: "This deployment does not receive OpenTelemetry logs",
+      });
+    }
+
+    return collection(input);
+  }
+
+  /** The metric signal, absent for the reason {@link otlpLogs} gives. */
+  otlpMetrics(input: Parameters<OtlpMetricCollection>[0]): Promise<OtlpMetricCollectionOutcome> {
+    const collection = this.#dependencies.metricCollection;
+    if (!collection) {
+      return Promise.resolve({
+        outcome: "not-served",
+        errorMessage: "This deployment does not receive OpenTelemetry metrics",
+      });
+    }
+
+    return collection(input);
+  }
+
+  /** A failure the receiver answered but did not raise. */
+  otlpReportError(
+    error: Error,
+    context: Readonly<{ projectId: string; customerTraceIds: string[] }>,
+  ): void {
+    logger.error(
+      { error, projectId: context.projectId, customerTraceIds: context.customerTraceIds },
+      "the OTLP receiver answered a failure",
+    );
   }
 }

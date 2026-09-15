@@ -1,10 +1,9 @@
 /**
  * The OTLP receiver: `POST /api/otel/v1/{traces,logs,metrics}`. Declared
  * public because the door resolves its own project-scoped credential through
- * `app.credential` (the process's `ApiHandlerManagedCredentials`, composed in
- * `api-trace-ingest.composition.ts`) rather than the framework's project-key
- * door: a refusal here answers with the credential chain's own status and
- * body, which a declared `projectKey` door does not let a route choose.
+ * `app.otlpCredential` rather than the framework's project-key door: a refusal
+ * here answers with the credential chain's own status and body, which a
+ * declared `projectKey` door does not let a route choose.
  */
 import {
   collectAuthDiagnostics,
@@ -109,7 +108,15 @@ export type OtlpLogCollectionOutcome =
       rejectedLogRecords: number;
       errorMessage?: string | undefined;
     }>
-  | Readonly<{ outcome: "unavailable"; errorMessage: string }>;
+  | Readonly<{ outcome: "unavailable"; errorMessage: string }>
+  /**
+   * This deployment receives no logs at all - it composed no log collection,
+   * so no batch posted here can ever land. Told apart from `unavailable`
+   * because that one is a retryable blip and this one is permanent: answering
+   * a retryable status to an exporter that can never succeed turns every
+   * fleet posting here into an unbounded retry loop.
+   */
+  | Readonly<{ outcome: "not-served"; errorMessage: string }>;
 
 export type OtlpLogCollection = (input: {
   tenantId: string;
@@ -123,7 +130,9 @@ export type OtlpMetricCollectionOutcome =
       rejectedDataPoints: number;
       errorMessage?: string | undefined;
     }>
-  | Readonly<{ outcome: "unavailable"; errorMessage: string }>;
+  | Readonly<{ outcome: "unavailable"; errorMessage: string }>
+  /** As {@link OtlpLogCollectionOutcome}'s own: permanent, not a blip. */
+  | Readonly<{ outcome: "not-served"; errorMessage: string }>;
 
 export type OtlpMetricCollection = (input: {
   tenantId: string;
@@ -137,16 +146,30 @@ export type OtlpIngestErrorReport = (
   context: Readonly<{ projectId: string; customerTraceIds: string[] }>,
 ) => void;
 
+/**
+ * The whole of what the three OTLP routes ask the process for.
+ *
+ * Every member carries the `otlp` prefix, because the one class that answers
+ * this door also answers `/api/trace/*` and `POST /api/collector`, and each of
+ * those resolves a credential and weighs an allowance of its own. A shared name
+ * would be one door silently reading another's answer.
+ *
+ * NONE of them is optional, and that is load-bearing rather than tidy: the
+ * mounted family reads this application through the operations-only feature-API
+ * proxy, which throws a `TypeError` on ANY name the application does not serve.
+ * An "optional" member is therefore not an absence the route can test for - it
+ * is a 500 on a customer's first export. Stating all six here makes a member the
+ * composition does not supply a build failure instead.
+ */
 export type OtlpIngestRestMembers = Readonly<{
-  credential: OtlpIngestCredentialResolver;
-  usageLimit: OtlpIngestUsageLimit;
-  traces?: OtlpTraceCollection | undefined;
-  logs?: OtlpLogCollection | undefined;
-  metrics?: OtlpMetricCollection | undefined;
-  reportError?: OtlpIngestErrorReport | undefined;
+  otlpCredential: OtlpIngestCredentialResolver;
+  otlpUsageLimit: OtlpIngestUsageLimit;
+  otlpTraces: OtlpTraceCollection;
+  otlpLogs: OtlpLogCollection;
+  otlpMetrics: OtlpMetricCollection;
+  otlpReportError: OtlpIngestErrorReport;
 }>;
 
-/** The whole of what the three OTLP routes ask the process for. */
 export const OtlpIngestApi = moduleApi<OtlpIngestRestMembers>("trace");
 
 const loggerTraces = createLogger("langwatch:otel:v1:traces");
@@ -238,7 +261,7 @@ type OtlpAuthenticated =
  */
 async function authenticate(
   request: Request,
-  credential: OtlpIngestRestMembers["credential"],
+  credential: OtlpIngestRestMembers["otlpCredential"],
   logger: Logger,
 ): Promise<OtlpAuthenticated> {
   const url = new URL(request.url);
@@ -369,11 +392,10 @@ async function handleTracesRequest(
   span: Span,
   rawBytes: Uint8Array,
   ports: OtlpIngestRestMembers,
-  traces: OtlpTraceCollection,
 ): Promise<RestRawResult> {
   // Auth first - a 401 must not pay for body decompression, and the body is
   // irrelevant while we do not know who is calling.
-  const authenticated = await authenticate(request, ports.credential, loggerTraces);
+  const authenticated = await authenticate(request, ports.otlpCredential, loggerTraces);
   if ("refusal" in authenticated) {
     span.setStatus({ code: SpanStatusCode.ERROR, message: "unauthenticated" });
     return jsonAnswer(authenticated.refusal.body, authenticated.refusal.status);
@@ -396,7 +418,7 @@ async function handleTracesRequest(
     span.setAttribute("langwatch.otel.customer_trace_ids", customerTraceIds.join(","));
   }
 
-  await ports.usageLimit({ project, customerTraceIds });
+  await ports.otlpUsageLimit({ project, customerTraceIds });
 
   if (body.byteLength === 0) {
     loggerTraces.debug({ projectId: project.id }, "Received empty trace request, ignoring");
@@ -411,7 +433,7 @@ async function handleTracesRequest(
       { error: parsed.error, projectId: project.id, customerTraceIds, ...bodyForensics(body) },
       "error parsing traces",
     );
-    ports.reportError?.(new Error(parsed.error), { projectId: project.id, customerTraceIds });
+    ports.otlpReportError(new Error(parsed.error), { projectId: project.id, customerTraceIds });
     span.setStatus({ code: SpanStatusCode.ERROR, message: "Failed to parse traces" });
     return jsonAnswer({ error: "Failed to parse traces" }, 400);
   }
@@ -421,7 +443,7 @@ async function handleTracesRequest(
 
   applyReceiverProvenance({ request: parsed.request, identity, signal: "traces", logger: loggerTraces });
 
-  const result = await traces({ tenantId: project.id, traceRequest: parsed.request });
+  const result = await ports.otlpTraces({ tenantId: project.id, traceRequest: parsed.request });
 
   return jsonAnswer(
     {
@@ -441,9 +463,8 @@ async function handleLogsRequest(
   span: Span,
   rawBytes: Uint8Array,
   ports: OtlpIngestRestMembers,
-  logs: OtlpLogCollection,
 ): Promise<RestRawResult> {
-  const authenticated = await authenticate(request, ports.credential, loggerLogs);
+  const authenticated = await authenticate(request, ports.otlpCredential, loggerLogs);
   if ("refusal" in authenticated) {
     span.setStatus({ code: SpanStatusCode.ERROR, message: "unauthenticated" });
     return jsonAnswer(authenticated.refusal.body, authenticated.refusal.status);
@@ -452,7 +473,7 @@ async function handleLogsRequest(
   const { project, identity, markUsed } = authenticated;
   span.setAttribute("langwatch.project.id", project.id);
 
-  await ports.usageLimit({ project, customerTraceIds: [] });
+  await ports.otlpUsageLimit({ project, customerTraceIds: [] });
 
   const body = await readOtlpBody(requestForDecompression(request, rawBytes));
   const parsed = parseOtlpLogs(body, request.headers.get("content-type") ?? undefined);
@@ -463,7 +484,7 @@ async function handleLogsRequest(
       { error: parsed.error, projectId: project.id, ...bodyForensics(body) },
       "error parsing logs",
     );
-    ports.reportError?.(new Error(parsed.error), { projectId: project.id, customerTraceIds: [] });
+    ports.otlpReportError(new Error(parsed.error), { projectId: project.id, customerTraceIds: [] });
     return jsonAnswer({ error: "Failed to parse logs" }, 400);
   }
 
@@ -471,7 +492,7 @@ async function handleLogsRequest(
 
   applyReceiverProvenance({ request: parsed.request, identity, signal: "logs", logger: loggerLogs });
 
-  const result = await logs({
+  const result = await ports.otlpLogs({
     tenantId: project.id,
     organizationId: project.organizationId,
     logRequest: parsed.request,
@@ -483,6 +504,14 @@ async function handleLogsRequest(
   // data loss. 503 is in OTLP's retryable set.
   if (result.outcome === "unavailable") {
     return jsonAnswer({ error: result.errorMessage }, 503);
+  }
+
+  // This deployment receives no logs at all, which is not a blip and will not
+  // pass: 404, the same permanent refusal this address answers where the
+  // family is not mounted, rather than a retryable status an exporter would
+  // hammer forever for a batch that can never land.
+  if (result.outcome === "not-served") {
+    return jsonAnswer({ error: result.errorMessage }, 404);
   }
 
   return jsonAnswer(
@@ -504,9 +533,8 @@ async function handleMetricsRequest(
   span: Span,
   rawBytes: Uint8Array,
   ports: OtlpIngestRestMembers,
-  metrics: OtlpMetricCollection,
 ): Promise<RestRawResult> {
-  const authenticated = await authenticate(request, ports.credential, loggerMetrics);
+  const authenticated = await authenticate(request, ports.otlpCredential, loggerMetrics);
   if ("refusal" in authenticated) {
     span.setStatus({ code: SpanStatusCode.ERROR, message: "unauthenticated" });
     return jsonAnswer(authenticated.refusal.body, authenticated.refusal.status);
@@ -515,7 +543,7 @@ async function handleMetricsRequest(
   const { project, identity, markUsed } = authenticated;
   span.setAttribute("langwatch.project.id", project.id);
 
-  await ports.usageLimit({ project, customerTraceIds: [] });
+  await ports.otlpUsageLimit({ project, customerTraceIds: [] });
 
   const body = await readOtlpBody(requestForDecompression(request, rawBytes));
   const parsed = parseOtlpMetrics(body, request.headers.get("content-type") ?? undefined);
@@ -526,7 +554,10 @@ async function handleMetricsRequest(
       { error: parsed.error, projectId: project.id, ...bodyForensics(body) },
       "error parsing metrics",
     );
-    ports.reportError?.(new Error(parsed.error), { projectId: project.id, customerTraceIds: [] });
+    ports.otlpReportError(new Error(parsed.error), {
+      projectId: project.id,
+      customerTraceIds: [],
+    });
     return jsonAnswer({ error: "Failed to parse metrics" }, 400);
   }
 
@@ -534,7 +565,7 @@ async function handleMetricsRequest(
 
   markUsed();
 
-  const result = await metrics({
+  const result = await ports.otlpMetrics({
     tenantId: project.id,
     organizationId: project.organizationId,
     metricRequest: parsed.request,
@@ -542,6 +573,11 @@ async function handleMetricsRequest(
 
   if (result.outcome === "unavailable") {
     return jsonAnswer({ error: result.errorMessage }, 503);
+  }
+
+  // As the logs signal: permanent, so not a retryable status. See there.
+  if (result.outcome === "not-served") {
+    return jsonAnswer({ error: result.errorMessage }, 404);
   }
 
   if (result.rejectedDataPoints === 0) return jsonAnswer({}, 200);
@@ -572,13 +608,10 @@ export const otlpIngestRest = defineRestRouter(OtlpIngestApi)
   .withRawResponse({ produces: "application/json" })
   .withDocs({ hide: true })
   .handle(async ({ app, raw, request }) => {
-    const traces = app.traces;
-    if (!traces) return jsonAnswer({ error: "Failed to parse traces" }, 400);
-
     const tracer = getLangWatchTracer("langwatch.otel.traces");
 
     return tracer.withActiveSpan("TracesV1.handleTracesRequest", { kind: SpanKind.SERVER }, (span) =>
-      handleTracesRequest(request, span, raw as Uint8Array, app, traces),
+      handleTracesRequest(request, span, raw as Uint8Array, app),
     );
   })
 
@@ -588,15 +621,10 @@ export const otlpIngestRest = defineRestRouter(OtlpIngestApi)
   .withRawResponse({ produces: "application/json" })
   .withDocs({ hide: true })
   .handle(async ({ app, raw, request }) => {
-    const logs = app.logs;
-    if (!logs) return jsonAnswer({ error: "Failed to parse logs" }, 400);
-
     const tracer = getLangWatchTracer("langwatch.otel.logs");
 
-    return tracer.withActiveSpan(
-      "[POST] /api/otel/v1/logs",
-      { kind: SpanKind.SERVER },
-      (span) => handleLogsRequest(request, span, raw as Uint8Array, app, logs),
+    return tracer.withActiveSpan("[POST] /api/otel/v1/logs", { kind: SpanKind.SERVER }, (span) =>
+      handleLogsRequest(request, span, raw as Uint8Array, app),
     );
   })
 
@@ -606,15 +634,10 @@ export const otlpIngestRest = defineRestRouter(OtlpIngestApi)
   .withRawResponse({ produces: "application/json" })
   .withDocs({ hide: true })
   .handle(async ({ app, raw, request }) => {
-    const metrics = app.metrics;
-    if (!metrics) return jsonAnswer({ error: "Failed to parse metrics" }, 400);
-
     const tracer = getLangWatchTracer("langwatch.otel.metrics");
 
-    return tracer.withActiveSpan(
-      "[POST] /api/otel/v1/metrics",
-      { kind: SpanKind.SERVER },
-      (span) => handleMetricsRequest(request, span, raw as Uint8Array, app, metrics),
+    return tracer.withActiveSpan("[POST] /api/otel/v1/metrics", { kind: SpanKind.SERVER }, (span) =>
+      handleMetricsRequest(request, span, raw as Uint8Array, app),
     );
   })
 

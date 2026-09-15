@@ -2,6 +2,7 @@ import { TraceProcessingSpanIngestAdapter } from "../services/trace-processing-s
 import {
   TraceIngestionService,
   TraceIngressCommand,
+  type CodingAgentIngestFilter,
   type TraceSpanDedup,
 } from "../services/ingestion/trace-ingestion.service.ts";
 import { TraceIngestCredentialService } from "../services/support/trace-ingest-credential.service.ts";
@@ -89,6 +90,14 @@ export type TraceReaderCompositionOptions = {
    * key may create traces in its project.
    */
   ingestAuthz?: Pick<AuthzApi, "hasApiKeyPermission"> | undefined;
+  /**
+   * The one question the INGEST path asks the Coding Agent module: whether a
+   * span is one a coding agent emits about itself, which the receiver drops.
+   * Narrow, and separate from the whole `codingAgents` peer below, for the
+   * reason `ingestAuthz` is separate from the viewer protections' own authz -
+   * one question does not need the whole peer to ask it.
+   */
+  ingestCodingAgents?: CodingAgentIngestFilter | undefined;
   /** Analytics's filter translator; absent, a FILTERED legacy list refuses. */
   filterConditions?:
     | import("../repositories/clickhouse/trace-legacy-read.repository.ts").TraceLegacyFilterConditions
@@ -208,7 +217,7 @@ export function composeTraceAppDependencies(
     // command sender across both, so a span posted to `/api/collector` and the
     // same span exported over OTLP are one record, not two.
     ingestion: TraceIngestionService.create({
-      codingAgents: options.codingAgents,
+      codingAgents: options.ingestCodingAgents ?? options.codingAgents,
       codingAgentSpanFilterEnabled: CODING_AGENT_SPAN_FILTER_ENABLED,
       dedup: options.dedup,
       commands: TraceComposedIngressCommand.create(options.commands),
