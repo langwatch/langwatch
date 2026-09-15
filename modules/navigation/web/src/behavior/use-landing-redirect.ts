@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef } from "react";
 import { carryLangyConversation } from "@langwatch/langy-contract";
+import { belongsToNoOrganization } from "../model/belongs-to-no-organization.ts";
 import { useNavigationHost } from "../model/navigation-host.ts";
 import { readLastVisitedProduct } from "../model/product-memory.ts";
 import { resolveLandingDestination } from "../model/resolve-landing-destination.ts";
@@ -146,8 +147,11 @@ export function useLandingRedirect(): void {
             : null,
           projectSlug: project?.slug ?? null,
           projectHomeSlug: llmOpsProjectSlug,
-          isOrgless:
-            !isLoading && !organization && (organizations?.length ?? 0) === 0,
+          isOrgless: belongsToNoOrganization({
+            isWorkspaceResolving: isLoading,
+            organization,
+            organizations,
+          }),
         }),
         search: window.location.search,
       }),
