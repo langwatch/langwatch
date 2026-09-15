@@ -1,25 +1,17 @@
 export { AuthDirectory, type AuthDirectoryProject } from "./transport/auth-directory.ts";
-export { BetterAuthHooksRepository } from "./repositories/better-auth-hooks.repository.ts";
-export { PrismaBetterAuthHooksRepository } from "./repositories/prisma/prisma.better-auth-hooks.repository.ts";
-export { PrismaAuthDirectoryRepository } from "./repositories/prisma/prisma.auth-directory.repository.ts";
-export {
-  AuthApp,
-  AuthUnavailableError,
-  type AuthAccountRows,
-  type AuthInfrastructure,
-  type AuthInviteDirectory,
-  type AuthSignUpCollaborators,
+export type {
+  AuthAccountRows,
+  AuthInfrastructure,
+  AuthInviteDirectory,
+  AuthSignUpCollaborators,
 } from "./app/auth.app.ts";
 export { authServer } from "./auth.server.ts";
-export {
-  SIGN_UP_VERIFICATION_TTL_MS,
-  SignUpVerificationService,
-  type SignUpAccountDirectory,
-  type SignUpAccountFactory,
-  type SignUpVerificationDeps,
-  type SignUpVerificationMailer,
+export type {
+  SignUpAccountDirectory,
+  SignUpAccountFactory,
+  SignUpVerificationDeps,
+  SignUpVerificationMailer,
 } from "./services/signup-verification.service.ts";
-export { PrismaSignUpAccountDirectoryRepository } from "./repositories/prisma/prisma.signup-account-directory.repository.ts";
 export {
   BetterAuthAnnouncements,
   BetterAuthFederation,
@@ -65,13 +57,10 @@ export {
   type ShadowRun,
   type SignInRouterMode,
 } from "./transport/better-auth/sign-in-router-shadow.api.ts";
-export {
-  Auth0ApiError,
-  Auth0PasswordService,
-  buildAuth0Config,
-  type Auth0Config,
-  type Auth0ErrorCode,
-  type Auth0ManagementCredentials,
+export type {
+  Auth0Config,
+  Auth0ErrorCode,
+  Auth0ManagementCredentials,
 } from "./services/auth0-password.service.ts";
 
 // The `/api/auth` REST family: the Better Auth catch-all, the browser's
@@ -100,18 +89,12 @@ export {
 // The unauthenticated `frontDoor.*` surface (D13, ADR-117 §6).
 export { callerEmailFact, frontDoorTrpcTransport } from "./transport/front-door.trpc.ts";
 export type { CliDeviceSessionRepository } from "./repositories/cli-device-session.repository.ts";
-export {
-  ACCESS_TOKEN_TTL_SECONDS,
-  CliDeviceSessionService,
-  DEFAULT_REFRESH_TOKEN_TTL_SECONDS,
-  DEVICE_CODE_TTL_SECONDS,
-  MIN_POLL_INTERVAL_SECONDS,
-  POLL_RATE_LIMIT_SECONDS,
-  type CliAccessTokenRecord,
-  type CliClientInfo,
-  type CliCredentialType,
-  type CliDeviceCodeRecord,
-  type CliDeviceCodeStatus,
-  type CliMintedSession,
-  type CliRefreshTokenRecord,
+export type {
+  CliAccessTokenRecord,
+  CliClientInfo,
+  CliCredentialType,
+  CliDeviceCodeRecord,
+  CliDeviceCodeStatus,
+  CliMintedSession,
+  CliRefreshTokenRecord,
 } from "./services/cli-device-session.service.ts";

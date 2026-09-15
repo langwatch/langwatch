@@ -4,37 +4,21 @@
  * heads/ledger/records ports. The pure half is `@langwatch/identity-contract`.
  */
 export { identityServer } from "./identity.server.ts";
-export { IdentityApp } from "./app/identity.app.ts";
 export type { IdentityInfrastructure } from "./app/identity-members.ts";
-export { PrismaIdentityReservationRepository } from "./repositories/prisma/prisma.identity-reservations.repository.ts";
-export { PrismaIdentitySecretCarryRepository } from "./repositories/prisma/prisma.identity-secret-carry.repository.ts";
-export { PrismaJoinRequestAudienceRepository } from "./repositories/prisma/prisma.join-request-audience.repository.ts";
-export { AdminEmailPlatformOperatorsRepository } from "./repositories/prisma/prisma.sso-platform-operators.repository.ts";
 export { SsoConnectionLedgerWriterAdapter } from "./services/eventing-sso-connection-ledger.service.ts";
-export { PrismaSsoConnectionProjectionRepository } from "./repositories/prisma/prisma.sso-connection-projection.repository.ts";
 export type { SsoConnectionEvent } from "./projections/sso-connection-state.projection.ts";
 export { CryptoIdentifierIdentityAdapter } from "./services/crypto-identifier-identity.service.ts";
 export { type DeriveIdentifierIdInput, type IdentifierIdentity } from "./app/identity.members.ts";
-export { computeIdentifierHash, deriveNewbornUserId } from "./rules/identifier-hash.rules.ts";
-export { s256Challenge } from "./rules/pkce.rules.ts";
-export { mintUserHashKey } from "./rules/user-hash-key.rules.ts";
-export { IdentityGuardsService } from "./services/identity-guards.service.ts";
 export type {
   BackfillAccountRow,
   BackfillUserRow,
   IdentityBackfillRepository,
 } from "./repositories/identity-backfill.repository.ts";
-export {
-  IdentityBackfillPlanService,
-  type PlannedIdentifier,
-} from "./services/identity-backfill-plan.service.ts";
-export {
-  IDENTITY_BACKFILL_ACTOR,
-  type IdentityBackfillOutcome,
-  IdentityBackfillService,
-  type IdentityBackfillServiceDeps,
+export type { PlannedIdentifier } from "./services/identity-backfill-plan.service.ts";
+export type {
+  IdentityBackfillOutcome,
+  IdentityBackfillServiceDeps,
 } from "./services/identity-backfill.service.ts";
-export { IdentityEmailService } from "./services/identity-email.service.ts";
 /**
  * The synthetic issuer better-auth 1.7 expects on an account row. Exported
  * from the root, not just `./better-auth`, because it is a PERSISTED format
@@ -82,25 +66,12 @@ export {
   PostgresIdentityNewbornSweepAdapter,
   type PostgresIdentityNewbornSweepOptions,
 } from "./repositories/prisma/prisma.identity-newborn-sweep.repository.ts";
-export {
-  IDENTITY_LATCH_CACHE_MAX_USERS,
-  IDENTITY_LATCH_CACHE_TTL_MS,
-  PostgresIdentityEmailAdapter,
-  type PostgresIdentityEmailAdapterOptions,
-} from "./repositories/prisma/prisma.identity-email.repository.ts";
-export {
-  type AccountSecretPair,
-  IdentitySecretCarryService,
-  type IdentitySecretCarryOutcome,
-  type IdentitySecretCarryRepository,
+export type { PostgresIdentityEmailAdapterOptions } from "./repositories/prisma/prisma.identity-email.repository.ts";
+export type {
+  AccountSecretPair,
+  IdentitySecretCarryOutcome,
+  IdentitySecretCarryRepository,
 } from "./services/identity-secret-carry.service.ts";
-export {
-  adoptAccountCommandId,
-  adoptUserEmailCommandId,
-  detachOrphanCommandId,
-  establishUserEmailCommandId,
-  newIdentityCommandId,
-} from "./rules/identity-command-id.rules.ts";
 export type {
   IdentityHeadsReader,
   IdentityHeadsRepository,
@@ -109,7 +80,6 @@ export type {
   IdentifierReservationHolder,
   IdentityReservationRepository,
 } from "./repositories/identity-reservations.repository.ts";
-export { IdentityLatchRepository } from "./repositories/identity-latch.repository.ts";
 export type { IdentityLedger } from "./rules/identity-ledger.rules.ts";
 export type { IdentityUserGate } from "./rules/identity-user-gate.rules.ts";
 export type { IdentityUsersRepository } from "./repositories/identity-users.repository.ts";
@@ -117,18 +87,15 @@ export type {
   IdentityVerificationRecord,
   IdentityVerificationRepository,
 } from "./repositories/identity-verification.repository.ts";
-export { IdentityService } from "./services/identity.service.ts";
 export type { MfaEnrollmentRepository } from "./repositories/mfa-enrollment.repository.ts";
-export { MfaGuardsService } from "./services/mfa-guards.service.ts";
-export {
-  type SignInAccountLookup,
-  type SignInBreakGlassLimiter,
-  type SignInDomainRouting,
-  type SignInRouteRequest,
-  SignInRouterService,
-  type SignInRouterDeps,
-  type SignInRoutingRecord,
-  type SignInRoutingRecorder,
+export type {
+  SignInAccountLookup,
+  SignInBreakGlassLimiter,
+  SignInDomainRouting,
+  SignInRouteRequest,
+  SignInRouterDeps,
+  SignInRoutingRecord,
+  SignInRoutingRecorder,
 } from "./services/signin-router.service.ts";
 export type {
   IdentityAdoptionWrites,
@@ -137,61 +104,36 @@ export type {
   IdentityVerificationWrites,
 } from "./rules/identity-writes.rules.ts";
 export { IdentityJitDisabledError, IdentityLinkProposedError } from "@langwatch/identity-contract";
-export {
-  type CallbackAssertion,
-  type CallbackAuditRecord,
-  type CallbackLinkOutcome,
-  type CallbackUserMatch,
-  type SignInCallbackAudit,
-  type SignInCallbackDirectory,
-  SignInCallbackLinkingService,
-  type SignInCallbackLinkingDeps,
+export type {
+  CallbackAssertion,
+  CallbackAuditRecord,
+  CallbackLinkOutcome,
+  CallbackUserMatch,
+  SignInCallbackAudit,
+  SignInCallbackDirectory,
+  SignInCallbackLinkingDeps,
 } from "./services/signin-callback-linking.service.ts";
 export {
   PostgresJoinRequestNotificationAdapter,
   type JoinRequestNotificationDatabase,
   type PostgresJoinRequestNotificationOptions,
 } from "./repositories/prisma/prisma.join-request-notification.repository.ts";
-export {
-  JoinRequestGuardsService,
-  type JoinRequestGuardsDeps,
-} from "./services/join-request-guards.service.ts";
-export { type JoinRequestAudience } from "./repositories/join-request-audience.repository.ts";
+export type { JoinRequestGuardsDeps } from "./services/join-request-guards.service.ts";
+export type { JoinRequestAudience } from "./repositories/join-request-audience.repository.ts";
 export { type JoinRequestMail } from "./app/identity.members.ts";
-export { JoinRequestNotificationService } from "./services/join-request-notification.service.ts";
-export {
-  approveJoinCommandId,
-  expireJoinCommandId,
-  newJoinRequestCommandId,
-  newJoinRequestId,
-} from "./rules/join-request-id.rules.ts";
 export type { JoinRequestLedger } from "./rules/join-request-ledger.rules.ts";
 export type {
   JoinCandidateRepository,
   JoinRequestReadRepository,
 } from "./repositories/join-request.repository.ts";
-export { JoinRequestService } from "./services/join-request.service.ts";
-export {
-  SCIM_APPLY_MAX_ATTEMPTS,
-  ScimSyncGuardsService,
-} from "./services/scim-sync-guards.service.ts";
-export { newScimSyncCommandId } from "./rules/scim-sync-id.rules.ts";
 export type { ScimSyncLedger } from "./rules/scim-sync-ledger.rules.ts";
 export type { ScimSyncReadRepository } from "./repositories/scim-sync.repository.ts";
-export {
-  type LegacySsoOrganizationRepository,
-  type SsoConnectionGrandfatherDeps,
-  type SsoConnectionGrandfatherOutcome,
-  SsoConnectionGrandfatherService,
+export type {
+  LegacySsoOrganizationRepository,
+  SsoConnectionGrandfatherDeps,
+  SsoConnectionGrandfatherOutcome,
 } from "./services/sso-connection-grandfather.service.ts";
-export { SsoConnectionGuardsService } from "./services/sso-connection-guards.service.ts";
 export type { SsoConnectionGuardsDeps } from "./services/sso-connection-guard-checks.service.ts";
-export {
-  grandfatherCommandId,
-  grandfatheredSsoConnectionId,
-  newSsoConnectionCommandId,
-  newSsoConnectionId,
-} from "./rules/sso-connection-id.rules.ts";
 export type { SsoConnectionLedger } from "./rules/sso-connection-ledger.rules.ts";
 export {
   ShadowComparingDomainRoutingAdapter,
@@ -205,12 +147,9 @@ export type {
   SsoConnectionStrandingRepository,
   SsoPlatformOperatorRepository,
 } from "./repositories/sso-connection.repository.ts";
-export { SsoConnectionService } from "./services/sso-connection.service.ts";
-export {
-  IDENTITY_VERIFICATION_TTL_MS,
-  type MintedEmailVerification,
-  VerificationCeremonyService,
-  type VerificationCeremonyDeps,
+export type {
+  MintedEmailVerification,
+  VerificationCeremonyDeps,
 } from "./services/verification-ceremony.service.ts";
 
 // --------------------------------------------------------------------------- The composition half
@@ -234,61 +173,33 @@ export {
   type JoinRequestLedgerWriterDeps,
   type JoinRequestStagedSender,
 } from "./services/join-request-ledger.service.ts";
-export { EmailJoinRequestNotifierAdapter } from "./services/join-request-notifier.service.ts";
-export { JoinRequestLifecycleDispatcherAdapter } from "./services/join-request-lifecycle-dispatcher.service.ts";
 export { type JoinRequestNotificationMail } from "./app/identity.members.ts";
 export { InProcessBreakGlassLimiterAdapter } from "./services/in-process-break-glass-limiter.service.ts";
 export { LocalDoorBreakGlassBindingAdapter } from "./services/local-door-break-glass-binding.service.ts";
-export { PrismaIdentityVerificationRepository } from "./repositories/prisma/prisma.identity-verification.repository.ts";
-export { PrismaIdentityProjectionRepository } from "./repositories/prisma/prisma.identity-projection.repository.ts";
 export type {
   SsoConnectionBackofficePage,
   SsoConnectionBackofficeRepository,
 } from "./repositories/sso-connection-backoffice.repository.ts";
-export {
-  PrismaSsoConnectionBackofficeRepository,
-  type PrismaSsoConnectionBackofficeDatabase,
-} from "./repositories/prisma/prisma.sso-connection-backoffice.repository.ts";
-export {
-  PrismaJoinCandidateRepository,
-  PrismaJoinRequestReadRepository,
-} from "./repositories/prisma/prisma.join-request.repository.ts";
-export { PrismaJoinRequestProjectionRepository } from "./repositories/prisma/prisma.join-request-projection.repository.ts";
-export { LegacySsoDomainRoutingRepository } from "./repositories/prisma/prisma.legacy-sso-domain-routing.repository.ts";
+export type { PrismaSsoConnectionBackofficeDatabase } from "./repositories/prisma/prisma.sso-connection-backoffice.repository.ts";
 export { PrismaLegacySsoOrganizationRepository } from "./repositories/prisma/prisma.legacy-sso-organization.repository.ts";
-export { SsoConnectionDomainRoutingRepository } from "./repositories/prisma/prisma.sso-connection-routing.repository.ts";
-export { JoinRequestsService } from "./services/join-requests.service.ts";
-export {
-  JOIN_REJECTION_COOLDOWN_MS,
-  type JoinMembership,
-  type JoinRequestNotifier,
-  type JoinRequestsServiceDeps,
-  type JoinSetting,
+export type {
+  JoinMembership,
+  JoinRequestNotifier,
+  JoinRequestsServiceDeps,
+  JoinSetting,
 } from "./rules/join-requests-contract.rules.ts";
-export {
-  PrismaIdentityHeadsRepository,
-  type PrismaIdentityHeadsDatabase,
-} from "./repositories/prisma/prisma.identity-heads.repository.ts";
+export type { PrismaIdentityHeadsDatabase } from "./repositories/prisma/prisma.identity-heads.repository.ts";
 
 // The identity graph's remaining application half: the birth entrance, the
 // newborn sweep, the write-gate latch, the SCIM sync ledger and projection,
 // the operator back office, the teardown dispatcher, the three system
 // migrations and the Prisma repositories behind them. All were
 // `platform/app/src/server/app-layer/identity/`.
-export {
-  IdentityBirthService,
-  type IdentityBirthServiceDeps,
-} from "./services/identity-birth.service.ts";
-export {
-  IDENTITY_NEWBORN_ABANDONED_AFTER_MS,
-  IdentityNewbornReconciliationService,
-  type IdentityNewbornReconciliationDeps,
-  type IdentityNewbornSweepSummary,
+export type { IdentityBirthServiceDeps } from "./services/identity-birth.service.ts";
+export type {
+  IdentityNewbornReconciliationDeps,
+  IdentityNewbornSweepSummary,
 } from "./services/identity-newborn-reconciliation.service.ts";
-export {
-  IDENTITY_WRITE_GATE_TTL_MS,
-  IdentityWriteGateService,
-} from "./services/identity-write-gate.service.ts";
 export { type IdentityWriteGateState } from "./app/identity.members.ts";
 
 // better-auth's `database:` entry and its two account ceremonies (ADR-116 §1,
@@ -303,24 +214,13 @@ export {
   BetterAuthIdentityStorageAdapter,
   type IdentityStorageAdapterDeps,
 } from "./services/better-auth-identity-storage.service.ts";
-export { PrismaIdentityAccountsRepository } from "./repositories/prisma/prisma.identity-accounts.repository.ts";
-export { PrismaIdentityNewbornRepository } from "./repositories/prisma/prisma.identity-newborn.repository.ts";
-export { PrismaIdentityResolutionRepository } from "./repositories/prisma/prisma.identity-resolution.repository.ts";
-export {
-  PrismaIdentityUsersRepository,
-  type PrismaIdentityUsersDatabase,
-} from "./repositories/prisma/prisma.identity-users.repository.ts";
-export {
-  SsoConnectionBackofficeService,
-  type BackofficeSsoConnection,
-  type BackofficeSsoConnectionList,
-  type OperatorActor,
+export type { PrismaIdentityUsersDatabase } from "./repositories/prisma/prisma.identity-users.repository.ts";
+export type {
+  BackofficeSsoConnection,
+  BackofficeSsoConnectionList,
+  OperatorActor,
 } from "./services/sso-connection-backoffice.service.ts";
-export {
-  MAX_CACHE_ENTRIES,
-  PerSubjectCachedGateService,
-  type PerSubjectCachedFlag,
-} from "./services/per-subject-cached-gate.service.ts";
+export type { PerSubjectCachedFlag } from "./services/per-subject-cached-gate.service.ts";
 export {
   IDENTITY_CONNECTION_GRANDFATHER_MIGRATION_NAME,
   IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME,
@@ -344,14 +244,7 @@ export {
   SsoConnectionTeardownDispatcherAdapter,
   type ConnectionDirectoryRevocation,
 } from "./services/sso-connection-teardown.service.ts";
-export { PrismaScimSyncProjectionRepository } from "./repositories/prisma/prisma.scim-sync-projection.repository.ts";
-export { identityRepositories } from "./repositories/identity-repositories.registry.ts";
 export type { IdentityRepositories } from "./repositories/identity.repositories.ts";
-export { MemoryIdentityStore } from "./repositories/memory/memory-identity.store.ts";
-export { MemoryIdentityRepositories } from "./repositories/memory/memory.identity.repositories.ts";
-export { PostgresIdentityRepositories } from "./repositories/prisma/prisma.identity.repositories.ts";
-export { PrismaJoinMembershipRepository } from "./repositories/prisma/prisma.join-membership.repository.ts";
-export { PrismaJoinSettingRepository } from "./repositories/prisma/prisma.join-setting.repository.ts";
 export {
   BetterAuthIdentityBirthAdapter,
   type IdentityBirthScope,
