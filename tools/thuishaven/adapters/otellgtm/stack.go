@@ -7,11 +7,13 @@
 package otellgtm
 
 import (
+	"bytes"
 	"context"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -131,10 +133,59 @@ func (s *Stack) Ensure(ctx context.Context) (domain.ObservabilityEndpoints, erro
 	if err := s.pull(ctx, dockerHost); err != nil {
 		return domain.ObservabilityEndpoints{}, err
 	}
-	if err := s.rt.Docker(ctx, dockerHost, s.runArgs(s.ensureConfigs(ctx, dockerHost))...).Run(); err != nil {
+	limits := s.effectiveLimits(ctx)
+	cmd := s.rt.Docker(ctx, dockerHost, s.runArgs(limits, s.ensureConfigs(ctx, dockerHost))...)
+	if err := runCapturingStderr(cmd); err != nil {
 		return domain.ObservabilityEndpoints{}, fmt.Errorf("docker run %s: %w", domain.ObservabilityContainer, err)
 	}
 	return s.endpoints, s.waitHealthy(ctx)
+}
+
+// runCapturingStderr runs cmd and, on failure, folds docker's own stderr into
+// the returned error. `(*exec.Cmd).Run` alone reports only the exit status —
+// "exit status 125" and nothing else — because Cmd.Stderr is nil by default
+// and Run() sends a nil Stderr to the null device rather than capturing it.
+// `Output()` captures stdout+ExitError.Stderr for you; the plain `Run()` this
+// package used did neither, so docker's own one-line refusal was discarded.
+func runCapturingStderr(cmd *exec.Cmd) error {
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	if err := cmd.Run(); err != nil {
+		if msg := strings.TrimSpace(stderr.String()); msg != "" {
+			return fmt.Errorf("%w: %s", err, msg)
+		}
+		return err
+	}
+	return nil
+}
+
+// effectiveLimits clamps the configured limits to what the colima VM was
+// actually given, not what DefaultObservabilityLimits computed for the host.
+// Ensure never resizes an existing profile, so a VM created on a smaller
+// machine (or sized by hand) can be well below today's host-derived defaults;
+// asking the daemon for more CPUs or memory than the VM has is a hard refusal,
+// not something docker scales down for you. A failure to read the VM's
+// capacity is not fatal here — run with the configured limits and let docker
+// itself reject them if they still don't fit.
+func (s *Stack) effectiveLimits(ctx context.Context) domain.ObservabilityLimits {
+	cpus, memoryMB, err := s.rt.Capacity(ctx)
+	if err != nil {
+		return s.limits
+	}
+	return clampLimitsToCapacity(s.limits, cpus, memoryMB)
+}
+
+// clampLimitsToCapacity is the pure part of effectiveLimits, split out so it is
+// testable without a real colima VM. A non-positive capacity reads as
+// "unknown" (colima status omitted or zeroed the field) and clamps nothing.
+func clampLimitsToCapacity(l domain.ObservabilityLimits, vmCPUs, vmMemoryMB int) domain.ObservabilityLimits {
+	if vmCPUs > 0 && float64(vmCPUs) < l.CPUs {
+		l.CPUs = float64(vmCPUs)
+	}
+	if vmMemoryMB > 0 && vmMemoryMB < l.MemoryMB {
+		l.MemoryMB = vmMemoryMB
+	}
+	return l
 }
 
 type containerState int
@@ -176,10 +227,12 @@ func (s *Stack) pull(ctx context.Context, dockerHost string) error {
 	return nil
 }
 
-// runArgs is the whole security-and-limits story in one place. configMounts are
-// the derived config overrides (retention + the worktree label), possibly empty.
-func (s *Stack) runArgs(configMounts []string) []string {
-	l := s.limits
+// runArgs is the whole security-and-limits story in one place. limits are what
+// this run actually asks for — already clamped to the VM's real capacity, see
+// effectiveLimits — and configMounts are the derived config overrides
+// (retention + the worktree label), possibly empty.
+func (s *Stack) runArgs(limits domain.ObservabilityLimits, configMounts []string) []string {
+	l := limits
 	args := []string{
 		"run", "-d",
 		"--name", domain.ObservabilityContainer,

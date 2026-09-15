@@ -40,6 +40,36 @@ func TestRunGoesThroughTheColimaLane(t *testing.T) {
 	}
 }
 
+// The exact shape `colima status --json` prints in practice: a VM created
+// with 2 CPUs and 2GiB of memory, regardless of what the host it runs on has
+// today (see Runtime.Capacity for why that gap matters).
+//
+// @scenario "The observability stack fits inside an undersized colima VM"
+func TestParseVMStatusReadsSocketCPUAndMemory(t *testing.T) {
+	data := []byte(`{"display_name":"colima","docker_socket":"unix:///Users/x/.colima/default/docker.sock","cpu":2,"memory":2147483648,"disk":107374182400}`)
+
+	st, err := parseVMStatus(data)
+	if err != nil {
+		t.Fatalf("parseVMStatus: %v", err)
+	}
+	if st.DockerSocket != "unix:///Users/x/.colima/default/docker.sock" {
+		t.Errorf("DockerSocket = %q", st.DockerSocket)
+	}
+	if st.CPU != 2 {
+		t.Errorf("CPU = %d, want 2", st.CPU)
+	}
+	if st.MemoryBytes != 2147483648 {
+		t.Errorf("MemoryBytes = %d, want 2147483648", st.MemoryBytes)
+	}
+}
+
+// @scenario "The observability stack fits inside an undersized colima VM"
+func TestParseVMStatusRejectsInvalidJSON(t *testing.T) {
+	if _, err := parseVMStatus([]byte("not json")); err == nil {
+		t.Fatal("want an error decoding invalid JSON")
+	}
+}
+
 func TestDockerLanePinsTheDaemon(t *testing.T) {
 	lanes := &recordingLanes{}
 	rt := New("default", domain.ColimaLimits{}, lanes)

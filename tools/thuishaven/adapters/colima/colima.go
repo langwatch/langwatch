@@ -112,20 +112,61 @@ func (r *Runtime) profileState(ctx context.Context) (isFound, isRunning bool) {
 	return false, false
 }
 
+// vmStatus is the subset of `colima status --json` haven reads: the socket to
+// talk to the daemon on, and the shape the VM was actually given (which is not
+// necessarily what DefaultColimaLimits would compute for the host today — see
+// Capacity).
+type vmStatus struct {
+	DockerSocket string `json:"docker_socket"`
+	CPU          int    `json:"cpu"`
+	MemoryBytes  int64  `json:"memory"`
+}
+
+// parseVMStatus decodes `colima status --json`'s output. Split out from status
+// so the parsing is testable without shelling out to colima.
+func parseVMStatus(data []byte) (vmStatus, error) {
+	var st vmStatus
+	if err := json.Unmarshal(data, &st); err != nil {
+		return vmStatus{}, fmt.Errorf("decoding colima status: %w", err)
+	}
+	return st, nil
+}
+
+// status runs `colima status --json` for this profile and decodes it.
+func (r *Runtime) status(ctx context.Context) (vmStatus, error) {
+	out, err := exec.CommandContext(ctx, "colima", "status", "-p", r.profile, "--json").Output() //nolint:gosec // G204: r.profile is haven's own configured colima profile name (default "default", or HAVEN_COLIMA_PROFILE), not external input
+	if err != nil {
+		return vmStatus{}, fmt.Errorf("colima status -p %s: %w", r.profile, err)
+	}
+	return parseVMStatus(out)
+}
+
 // DockerHost asks colima where the profile's docker socket is, rather than
 // assuming the conventional path. It does not start the VM.
 func (r *Runtime) DockerHost(ctx context.Context) (string, error) {
-	out, err := exec.CommandContext(ctx, "colima", "status", "-p", r.profile, "--json").Output()
+	st, err := r.status(ctx)
 	if err != nil {
-		return "", fmt.Errorf("colima status -p %s: %w", r.profile, err)
+		return "", err
 	}
-	var st struct {
-		DockerSocket string `json:"docker_socket"`
-	}
-	if err := json.Unmarshal(out, &st); err != nil || st.DockerSocket == "" {
+	if st.DockerSocket == "" {
 		return "", fmt.Errorf("colima profile %q reports no docker socket", r.profile)
 	}
 	return st.DockerSocket, nil
+}
+
+// Capacity reports the CPU count and memory (in MB) the running VM was
+// actually given. This can be smaller than what DefaultColimaLimits would
+// compute for the host today: Ensure never resizes an existing profile (see
+// above), so a VM created on a smaller machine — or sized by hand — keeps
+// that shape even after the host gains cores or RAM. A caller that asks the
+// daemon for more than this gets docker's own hard refusal ("range of CPUs is
+// from 0.01 to N.NN, as there are only N CPUs available"), not a soft cap.
+func (r *Runtime) Capacity(ctx context.Context) (cpus int, memoryMB int, err error) {
+	st, err := r.status(ctx)
+	if err != nil {
+		return 0, 0, err
+	}
+	return st.CPU, int(st.MemoryBytes / (1 << 20)), nil
 }
 
 // IsRunning reports whether the VM is up, without starting it.

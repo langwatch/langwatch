@@ -20,7 +20,7 @@ import (
 // @scenario "The observability stack exposes its profiling endpoint"
 func TestRunArgsPublishesTheProfilingPort(t *testing.T) {
 	endpoints := domain.DefaultObservabilityEndpoints()
-	args := New(nil, t.TempDir(), "", endpoints, domain.DefaultObservabilityLimits(8<<30, 4)).runArgs(nil)
+	args := New(nil, t.TempDir(), "", endpoints, domain.DefaultObservabilityLimits(8<<30, 4)).runArgs(domain.DefaultObservabilityLimits(8<<30, 4), nil)
 
 	want := "127.0.0.1:4040:4040"
 	if !containsArg(args, want) {
@@ -38,7 +38,7 @@ func TestRunArgsPublishesTheProfilingPort(t *testing.T) {
 func TestRunArgsPublishesNoProfilingPortWhenDisabled(t *testing.T) {
 	endpoints := domain.DefaultObservabilityEndpoints()
 	endpoints.PyroscopePort = 0
-	args := New(nil, t.TempDir(), "", endpoints, domain.DefaultObservabilityLimits(8<<30, 4)).runArgs(nil)
+	args := New(nil, t.TempDir(), "", endpoints, domain.DefaultObservabilityLimits(8<<30, 4)).runArgs(domain.DefaultObservabilityLimits(8<<30, 4), nil)
 
 	for i, arg := range args {
 		if arg != "-p" || i+1 >= len(args) {
@@ -57,7 +57,7 @@ func TestRunArgsPublishesNoProfilingPortWhenDisabled(t *testing.T) {
 // @scenario "The observability stack exposes its profiling endpoint"
 func TestRunArgsBindsEveryPublishedPortToLoopback(t *testing.T) {
 	endpoints := domain.DefaultObservabilityEndpoints()
-	args := New(nil, t.TempDir(), "", endpoints, domain.DefaultObservabilityLimits(8<<30, 4)).runArgs(nil)
+	args := New(nil, t.TempDir(), "", endpoints, domain.DefaultObservabilityLimits(8<<30, 4)).runArgs(domain.DefaultObservabilityLimits(8<<30, 4), nil)
 
 	for i, arg := range args {
 		if arg != "-p" || i+1 >= len(args) {
