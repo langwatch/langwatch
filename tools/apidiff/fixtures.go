@@ -19,17 +19,39 @@ const (
 	fixtureTeam2ID    = "apidiff-team-2"
 	fixtureProjectBID = "apidiff-project-b"
 	fixtureProjectCID = "apidiff-project-c"
+
+	// The sacrificial rows. A destructive probe that would otherwise name a
+	// row the run depends on is aimed at one of these instead
+	// (self-protection.go). They sit in the SEEDED organization and team, so
+	// the probe still travels the real route with the real credential and
+	// meets the real authorization decision; the only thing that changes is
+	// which row is destroyed. Nothing authenticates as them and nothing reads
+	// them, so destroying one costs the run nothing.
+	fixtureDoomedProjectID = "apidiff-project-doomed"
+	fixtureDoomedTeamID    = "apidiff-team-doomed"
+
+	// fixtureDoomedProjectKey exists only because Project.apiKey is a required
+	// column. No probe ever presents it.
+	fixtureDoomedProjectKey = "sk-lw-apidiff-project-doomed-key"
 )
 
 // provisioningSQL inserts the permission-probe fixtures: organization 2 with
-// its team and project C, and project B in the seeded organization. Insert
-// order respects the foreign keys; ON CONFLICT makes re-runs into a kept
-// database idempotent.
+// its team and project C, project B in the seeded organization, and the two
+// sacrificial rows destructive probes are aimed at. Insert order respects the
+// foreign keys; ON CONFLICT makes re-runs into a kept database idempotent.
+//
+// The sacrificial project sits in the SEEDED team rather than in the
+// sacrificial team, so a probe that destroys the team cannot take the project
+// with it and leave the next destructive probe with nothing to aim at.
 func provisioningSQL() string {
 	return `INSERT INTO "Organization" ("id", "name", "slug") VALUES ('` + fixtureOrg2ID + `', 'apidiff org 2', 'apidiff-org-2') ON CONFLICT ("id") DO NOTHING;
-INSERT INTO "Team" ("id", "name", "slug", "organizationId") VALUES ('` + fixtureTeam2ID + `', 'apidiff team 2', 'apidiff-team-2', '` + fixtureOrg2ID + `') ON CONFLICT ("id") DO NOTHING;
+INSERT INTO "Team" ("id", "name", "slug", "organizationId") VALUES
+  ('` + fixtureTeam2ID + `', 'apidiff team 2', 'apidiff-team-2', '` + fixtureOrg2ID + `'),
+  ('` + fixtureDoomedTeamID + `', 'apidiff doomed team', 'apidiff-team-doomed', '` + seededOrganizationID + `')
+ON CONFLICT ("id") DO NOTHING;
 INSERT INTO "Project" ("id", "name", "slug", "apiKey", "teamId", "language", "framework") VALUES
-  ('` + fixtureProjectBID + `', 'apidiff project B', 'apidiff-project-b', '` + ProjectKeyB + `', 'local-dev-team', 'typescript', 'apidiff'),
-  ('` + fixtureProjectCID + `', 'apidiff project C', 'apidiff-project-c', '` + ProjectKeyC + `', '` + fixtureTeam2ID + `', 'typescript', 'apidiff')
+  ('` + fixtureProjectBID + `', 'apidiff project B', 'apidiff-project-b', '` + ProjectKeyB + `', '` + seededTeamID + `', 'typescript', 'apidiff'),
+  ('` + fixtureProjectCID + `', 'apidiff project C', 'apidiff-project-c', '` + ProjectKeyC + `', '` + fixtureTeam2ID + `', 'typescript', 'apidiff'),
+  ('` + fixtureDoomedProjectID + `', 'apidiff doomed project', 'apidiff-project-doomed', '` + fixtureDoomedProjectKey + `', '` + seededTeamID + `', 'typescript', 'apidiff')
 ON CONFLICT ("id") DO NOTHING;`
 }

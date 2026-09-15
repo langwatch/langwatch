@@ -113,6 +113,9 @@ type ProbeResult struct {
 	Transcripts []Transcript
 	Probed      int // operations actually probed (filters and excludes removed)
 	Suppressed  SuppressedCounts
+	// CredentialChecks is the run's own integrity reading: every credential
+	// read before the first probe and again after the last. See credentials.go.
+	CredentialChecks []CredentialCheck
 }
 
 // ProbeAll probes every selected operation in lockstep: each case runs on A
@@ -130,6 +133,11 @@ func ProbeAll(ctx context.Context, options ProbeOptions, operations []Operation)
 	}
 
 	selected := SelectOperations(operations, options.Filter)
+
+	// Read every credential before anything has had a chance to destroy one,
+	// so the closing read has something to be compared against.
+	canaries := engine.credentialCanaries(operations)
+	credentialsBefore := engine.readCanaries(canaries)
 
 	findings := make([]Finding, 0)
 	probed := 0
@@ -153,7 +161,22 @@ func ProbeAll(ctx context.Context, options ProbeOptions, operations []Operation)
 	findings = append(findings, engine.permissionProbes(selected)...)
 	findings = append(findings, engine.markUnverifiedLists(selected)...)
 	findings = append(findings, engine.entitledPass()...)
-	return ProbeResult{Findings: findings, Transcripts: engine.transcripts, Probed: probed, Suppressed: engine.suppressed}
+
+	// The closing assertion: every credential still authenticates. A run that
+	// destroyed one produced agreement, not evidence.
+	checks := buildCredentialChecks(canaries, credentialsBefore, engine.readCanaries(canaries))
+	for _, check := range checks {
+		if !check.Healthy() {
+			engine.progress("credential %s: %s\n", check.Label, check.Note)
+		}
+	}
+	return ProbeResult{
+		Findings:         findings,
+		Transcripts:      engine.transcripts,
+		Probed:           probed,
+		Suppressed:       engine.suppressed,
+		CredentialChecks: checks,
+	}
 }
 
 // SelectOperations filters the union by method and path prefix and applies
@@ -230,6 +253,10 @@ func (engine *probeEngine) probeOperation(operation Operation) []Finding {
 		return []Finding{unresolvedFinding(operation, unresolvedA, unresolvedB)}
 	}
 
+	if blocked, ok := engine.guardSelfDestruction(operation, paramsA, paramsB); ok {
+		return blocked
+	}
+
 	// Each side is probed at the alias form its own spec documents, with the
 	// values its OWN instance minted.
 	pathA, pathB := operation.SidePaths()
@@ -258,6 +285,22 @@ func (engine *probeEngine) probeOperation(operation Operation) []Finding {
 		engine.recordGate(operation, transcript)
 	}
 	return findings
+}
+
+// guardSelfDestruction keeps a destructive probe off the rows this run
+// authenticates as (self-protection.go). Retargeting keeps the coverage; a
+// skip announces the loss by name rather than letting it read as agreement
+// later on. The second return says the operation must not be probed at all.
+func (engine *probeEngine) guardSelfDestruction(operation Operation, sides ...resolvedParams) ([]Finding, bool) {
+	guard := GuardSelfDestruction(operation, sides...)
+	for _, note := range guard.Retargets {
+		engine.progress("retarget %s %s (%s)\n", operation.Method, operation.Path, note)
+	}
+	if guard.Blocked == "" {
+		return nil, false
+	}
+	engine.progress("skip %s %s (%s)\n", operation.Method, operation.Path, guard.Blocked)
+	return []Finding{skippedFinding(operation, guard.Blocked)}, true
 }
 
 // captureFrom files everything one probe case taught the engine: each side's

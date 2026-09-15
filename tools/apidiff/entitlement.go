@@ -39,7 +39,7 @@ const enterprisePlanRequiredCode = "enterprise_plan_required"
 
 // entitledOrgID is the seeded organization every probe run authenticates as
 // (see fixtures.go and boot.go's SCIM/permission fixtures).
-const entitledOrgID = "local-dev-organization"
+const entitledOrgID = seededOrganizationID
 
 // EntitlementActivator elevates entitledOrgID to an Enterprise plan on every
 // instance a run is probing, mid-run, with no restart. Only `apidiff run`

@@ -325,6 +325,20 @@ func RootCause(finding Finding) string {
 	return cause
 }
 
+// skipCause names why an operation was not probed. The three are different
+// jobs to burn down: a skip the run imposed on ITSELF to stay alive wants a
+// sacrificial row of that kind, an asymmetric resolution wants the symbol
+// table taught, and an unresolvable parameter wants an id to mint.
+func skipCause(reason string) string {
+	if isSelfDestructiveSkip(reason) {
+		return "self-destructive-target"
+	}
+	if strings.Contains(reason, "resolvable on the") {
+		return "harness-symbol-table"
+	}
+	return "unresolvable-parameter"
+}
+
 // rootCauseOf is RootCause without the entitled-pass namespace.
 func rootCauseOf(finding Finding) string {
 	before, after, hasStatus := statusPair(finding)
@@ -332,10 +346,7 @@ func rootCauseOf(finding Finding) string {
 	case FindingOperationMissing:
 		return missingCause(finding)
 	case FindingSkipped:
-		if strings.Contains(finding.Reason, "resolvable on the") {
-			return "harness-symbol-table"
-		}
-		return "unresolvable-parameter"
+		return skipCause(finding.Reason)
 	case FindingUnverifiedShape:
 		return "unverified-list-shape"
 	case FindingStatusDiff:

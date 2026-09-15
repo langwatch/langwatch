@@ -31,6 +31,10 @@ type Report struct {
 	OperationsProbed int              `json:"operationsProbed"`
 	Differences      int              `json:"differences"`
 	Suppressed       SuppressedCounts `json:"suppressed"`
+	// CredentialChecks says whether the run's own credentials outlived it.
+	// A reader must be able to tell a difference that was FIXED from one that
+	// disappeared because the probe went blind; this is that evidence.
+	CredentialChecks []CredentialCheck `json:"credentialChecks"`
 }
 
 // MapSpecChanges maps openapidiff changes to report entries.
@@ -58,6 +62,7 @@ func BuildReport(changes []openapidiff.Change, result ProbeResult) Report {
 		Transcripts:      result.Transcripts,
 		OperationsProbed: result.Probed,
 		Suppressed:       result.Suppressed,
+		CredentialChecks: result.CredentialChecks,
 	}
 	report.Differences = len(changes)
 	for _, finding := range result.Findings {
@@ -74,6 +79,9 @@ func BuildReport(changes []openapidiff.Change, result ProbeResult) Report {
 	}
 	if report.Transcripts == nil {
 		report.Transcripts = []Transcript{}
+	}
+	if report.CredentialChecks == nil {
+		report.CredentialChecks = []CredentialCheck{}
 	}
 	return report
 }
@@ -107,8 +115,33 @@ func WriteHumanSummary(writer io.Writer, report Report) error {
 	output.WriteString(openapidiff.Render(raw))
 	writeFindingsSection(&output, report.Findings)
 	writeTotalsLine(&output, report)
+	writeCredentialSection(&output, report.CredentialChecks)
 	_, err := io.WriteString(writer, output.String())
 	return err
+}
+
+// writeCredentialSection prints the run's own integrity reading. A healthy run
+// gets one line saying the credentials outlived it, because "nothing printed"
+// and "nothing checked" look identical, and telling them apart is the entire
+// point of the check.
+func writeCredentialSection(output *strings.Builder, checks []CredentialCheck) {
+	if len(checks) == 0 {
+		return
+	}
+	doubtful := make([]CredentialCheck, 0, len(checks))
+	for _, check := range checks {
+		if !check.Healthy() {
+			doubtful = append(doubtful, check)
+		}
+	}
+	if len(doubtful) == 0 {
+		fmt.Fprintf(output, "credentials: all %d still authenticate on both sides after the run\n", len(checks))
+		return
+	}
+	fmt.Fprintf(output, "credentials: %d of %d did not survive the run intact\n", len(doubtful), len(checks))
+	for _, check := range doubtful {
+		fmt.Fprintf(output, "  %s: %s\n", check.Label, check.Note)
+	}
 }
 
 // writeFindingsSection groups findings by kind, in the fixed findingKindOrder

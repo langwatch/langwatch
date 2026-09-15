@@ -363,6 +363,17 @@ func loadBaseline(path string) (map[string]bool, error) {
 // reported, and only a cause the baseline does not name fails the run, so a
 // branch can drive 40 causes to 0 without the tool being red throughout.
 func (verdict runVerdict) exitCode(out streams) int {
+	// A run that lost a credential did not measure the branch, it measured
+	// two refusals. That is an instrument failure, not a verdict about the
+	// code, so it exits as an error rather than as "differences" or "equal" —
+	// either of which would invite someone to read the numbers.
+	if lost := verdict.report.LostCredentials(); len(lost) > 0 {
+		for _, check := range lost {
+			fmt.Fprintf(out.stderr, "CREDENTIAL LOST: %s %s\n", check.Label, check.Note)
+		}
+		fmt.Fprintln(out.stderr, "this run's counts are not comparable with any other run: probes made after the loss compared a dead credential, and their agreement is not evidence")
+		return exitError
+	}
 	if verdict.probe.ledgerBaseline == "" {
 		if verdict.report.Differences > 0 {
 			return exitDifferences

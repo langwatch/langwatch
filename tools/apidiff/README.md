@@ -223,6 +223,45 @@ deterministic summary, or the machine report with `-json` (optionally to
   project C — fixed IDs, plaintext legacy-format keys, `ON CONFLICT` safe)
   and defaults the keys; `probe` mode needs `-project-key-b`/`-project-key-c`.
 
+## Self-protection — the run may not destroy what it authenticates as
+
+A difference that disappears must never be indistinguishable from a difference
+that was fixed. Run 8 of 2026-09-15 is the whole argument: probe #181 issued
+`DELETE /api/projects/{id}` against `local-dev-project`, whose `apiKey` **is**
+the probe credential. Both sides archived themselves, every project-key probe
+from #182 on answered `401` on both sides, the two sides AGREED — and seventeen
+differences left the report reading as fixes while coverage collapsed.
+
+Three mechanisms now stand between a run and that outcome
+(`self-protection.go`, `credentials.go`):
+
+- **Retargeting.** A destructive operation — any `DELETE`, plus the
+  `regenerate-api-key` / `rotate-api-key` forms — whose resolved parameters
+  name a row the run depends on is aimed at a **sacrificial** row of the same
+  kind instead (`fixtures.go` provisions `apidiff-project-doomed` and
+  `apidiff-team-doomed` in the seeded organization). Coverage is kept whole:
+  the same route, the same credential, the same authorization decision. Both
+  sides substitute from the same table of literal IDs, so A and B still issue
+  identical requests. Each substitution prints a `retarget` progress line and
+  is visible in the transcript's own `requestPathA`/`requestPathB`.
+- **A named skip.** A protected row with no sacrificial twin — an organization
+  carries the bearer token, the SCIM token and the plan the entitled pass
+  elevates, so a second one is not a substitute — blocks the operation. It is
+  reported as a skip whose root cause is `self-destructive-target`, its own
+  slug in the ledger, never folded into `unresolvable-parameter`. A lost
+  comparison is a row, not a silence.
+- **The closing assertion.** Every credential is read once before the first
+  probe and once after the last, through a parameterless operation its own
+  security scheme selects. A credential that authenticated at the start and is
+  refused at the end sets `lost` on its `credentialChecks` entry, prints
+  `CREDENTIAL LOST:` on stderr and exits **2**, because such a run measured two
+  refusals rather than the branch. A credential that never authenticated, and
+  one the union documents no way to read at all, are reported too — "nothing
+  printed" and "nothing checked" must not look alike.
+
+The first two stop the cause that is understood. The third is what catches the
+next one.
+
 ## Entitled pass
 
 Some operations answer with the handled-error code `enterprise_plan_required`

@@ -246,7 +246,7 @@ type foreignKey struct {
 func (engine *probeEngine) foreignKeys() []foreignKey {
 	return []foreignKey{
 		{label: "key-b", key: engine.options.Keys.ProjectKeyB, scope: map[string]bool{
-			fixtureProjectBID: true, "local-dev-organization": true, "local-dev-team": true,
+			fixtureProjectBID: true, seededOrganizationID: true, seededTeamID: true,
 		}},
 		{label: "key-c", key: engine.options.Keys.ProjectKeyC, scope: map[string]bool{
 			fixtureProjectCID: true, fixtureOrg2ID: true, fixtureTeam2ID: true,

@@ -410,14 +410,14 @@ func isIDKey(key string) bool {
 // the named resource does not exist, and that is itself a comparable probe
 // rather than a skip.
 var SeededConstants = map[string]string{
-	"projectid":      "local-dev-project",
-	"project":        "local-dev-project",
-	"organizationid": "local-dev-organization",
-	"organisationid": "local-dev-organization",
-	"orgid":          "local-dev-organization",
-	"organization":   "local-dev-organization",
-	"teamid":         "local-dev-team",
-	"team":           "local-dev-team",
+	"projectid":      seededProjectID,
+	"project":        seededProjectID,
+	"organizationid": seededOrganizationID,
+	"organisationid": seededOrganizationID,
+	"orgid":          seededOrganizationID,
+	"organization":   seededOrganizationID,
+	"teamid":         seededTeamID,
+	"team":           seededTeamID,
 	// Client-chosen slugs (see the comment above): PUT /api/model-providers/{provider}
 	// configures a fixed provider catalog entry; PUT/DELETE /api/prompts/tags/{tag}
 	// and PUT /api/prompts/{id}/tags/{tag} name a caller-chosen tag; PUT/GET/DELETE
