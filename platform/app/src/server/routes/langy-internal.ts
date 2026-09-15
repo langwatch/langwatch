@@ -95,6 +95,12 @@ const finalToolCallSchema = z.object({
       "Invalid CLI tool result",
     )
     .optional(),
+  /**
+   * The call ran in the folder the developer shared from their own machine
+   * (ADR-129) rather than in the sandbox. The shell that delegates there is
+   * registered as `bash`, so only this marker says where the command ran.
+   */
+  local: z.boolean().optional(),
 });
 
 const turnResultSchema = z.object({

@@ -41,11 +41,30 @@ export function getOnboardingFlowConfig({
   isSaaS,
   intent,
   intentForkEnabled,
+  guided,
 }: {
   isSaaS: boolean;
   intent: OrganizationIntent | undefined;
   intentForkEnabled: boolean;
+  /**
+   * The guided variant (specs/features/onboarding/guided-welcome-takeover.feature):
+   * the organization and tailor cards, then Langy takes over the screen. The
+   * organization and its project are created on leaving the tailor step, so
+   * the takeover screens never present themselves as the wizard's final
+   * submit. Same shape on SaaS and self-hosted.
+   */
+  guided: boolean;
 }): OnboardingFlowConfig {
+  if (guided) {
+    return buildConfig("guided", [
+      OnboardingScreenIndex.ORGANIZATION,
+      OnboardingScreenIndex.BASIC_INFO,
+      OnboardingScreenIndex.HELLO,
+      OnboardingScreenIndex.VALUE,
+      OnboardingScreenIndex.PROVIDER,
+    ]);
+  }
+
   if (!intentForkEnabled) {
     return isSaaS
       ? buildConfig("full", [

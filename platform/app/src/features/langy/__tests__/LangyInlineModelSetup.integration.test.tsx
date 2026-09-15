@@ -36,6 +36,12 @@ const projectRef = {
   } | null,
 };
 
+// The guided tour host reads the guided onboarding state over tRPC; this
+// suite covers the panel, not the tour.
+vi.mock("~/features/guided-onboarding/tour/GuidedOnboardingHost", () => ({
+  GuidedOnboardingHost: () => null,
+}));
+
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
   useOrganizationTeamProject: () => ({ project: projectRef.current }),
 }));
@@ -158,6 +164,11 @@ const refetchResolvedDefault = vi.fn(() => {
 
 vi.mock("~/utils/api", () => ({
   api: {
+    onboarding: {
+      attachConversation: {
+        useMutation: () => ({ mutate: vi.fn(), mutateAsync: vi.fn() }),
+      },
+    },
     useUtils: () => ({
       langy: {
         list: { invalidate: () => Promise.resolve() },

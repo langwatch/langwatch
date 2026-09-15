@@ -34,6 +34,7 @@ import { usePersonalContext } from "~/components/me/usePersonalContext";
 import { Link } from "~/components/ui/link";
 import { Tooltip } from "~/components/ui/tooltip";
 import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
+import { GuidedOnboardingOffer } from "~/features/guided-onboarding/home/GuidedOnboardingOffer";
 import Head from "~/utils/compat/next-head";
 
 // /me/usage frequently surfaces sub-cent spend; defer to the shared
@@ -97,6 +98,7 @@ function MyUsagePage() {
 
       <VStack align="stretch" gap={6} width="full">
         <PersonalWorkspaceViewOnlyNotice />
+        <GuidedOnboardingOffer space="me" />
 
         <VStack
           id={PERSONAL_AI_TOOLS_ANCHOR}

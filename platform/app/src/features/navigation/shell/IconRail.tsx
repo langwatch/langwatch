@@ -112,6 +112,7 @@ export function IconRail({
     <VStack
       as="nav"
       aria-label="Products"
+      data-tour="product-switcher"
       width={ICON_RAIL_WIDTH}
       minWidth={ICON_RAIL_WIDTH}
       minHeight="100vh"

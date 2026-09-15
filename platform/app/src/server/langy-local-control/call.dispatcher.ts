@@ -155,6 +155,9 @@ export class LocalCallDispatcher {
     timeoutMs: number;
   }): Promise<StoredLocalCall> {
     await this.requireWorkspace(conversationId);
+    // A turn that reaches the folder is the turn the connect message was for,
+    // so the folder is owed no turn of its own.
+    await this.presence.settleOwedConnectTurn(conversationId);
 
     const createdAt = this.now();
     const stored = {
@@ -526,7 +529,11 @@ export function callActivityLine({
         : command;
     return `Running on ${machine}: ${shown}`;
   }
-  if (call.tool === "local_write" || call.tool === "local_edit") {
+  if (
+    call.tool === "local_write" ||
+    call.tool === "local_edit" ||
+    call.tool === "local_langwatch_env"
+  ) {
     return `Editing on ${machine}`;
   }
   return `Reading on ${machine}`;

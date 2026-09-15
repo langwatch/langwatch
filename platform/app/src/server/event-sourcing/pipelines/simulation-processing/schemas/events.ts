@@ -19,6 +19,13 @@ export type { SimulationRunStatus, SimulationVerdict } from "./shared";
 /**
  * RunQueued event - emitted when a simulation run is scheduled but not yet started.
  */
+/** What an event-driven run executes against. */
+export const simulationRunTargetSchema = z.object({
+  type: z.enum(["prompt", "http", "code", "workflow", "connected", "voice"]),
+  referenceId: z.string(),
+});
+export type SimulationRunTarget = z.infer<typeof simulationRunTargetSchema>;
+
 export const simulationRunQueuedEventDataSchema = z.object({
   scenarioRunId: z.string(),
   scenarioId: z.string(),
@@ -37,19 +44,7 @@ export const simulationRunQueuedEventDataSchema = z.object({
    */
   secretParameters: runSecretCiphertextSchema.optional(),
   /** Target the event-driven execution runs against. */
-  target: z
-    .object({
-      type: z.enum([
-        "prompt",
-        "http",
-        "code",
-        "workflow",
-        "connected",
-        "voice",
-      ]),
-      referenceId: z.string(),
-    })
-    .optional(),
+  target: simulationRunTargetSchema.optional(),
   /**
    * The evaluators the run is graded with, resolved from its suite and its
    * plan when it was queued. Absent on a run scheduled before this was
@@ -138,6 +133,12 @@ export const simulationRunFinishedEventDataSchema = z.object({
   batchRunId: z.string().optional(),
   scenarioSetId: z.string().optional(),
   traceIds: z.array(z.string()).optional(),
+  /**
+   * The target the run was queued against, carried forward from its queued
+   * event so a subscriber can tell a run against a connected agent apart
+   * without reading the fold. Absent on a run driven from code.
+   */
+  target: simulationRunTargetSchema.optional(),
   /**
    * The evaluators the run is graded with, carried forward from its queued
    * event so nothing downstream reads the suite or the plan again. Backfilled

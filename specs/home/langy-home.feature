@@ -95,6 +95,17 @@ Feature: The Langy home
     And one quiet line tells me how to get access
     And the example asks are not shown
 
+  # The field starts conversations and the panel's composer continues them.
+  # Offered together, a line typed here while the panel was open on a
+  # conversation went into a new one.
+  Scenario: The field stands down while a conversation is open
+    Given the Langy home renders
+    And the Langy panel is open on a conversation, or a question I handed over is on its way
+    Then the ask field is not offered
+    And a quiet line offers to continue that conversation
+    And choosing it opens the panel and puts the cursor in its composer, and starts nothing
+    And the example asks step aside, keeping their room
+
   Scenario: A project with nothing in it yet still opens with the composer
     Given the Langy home renders
     And the project has never received a trace

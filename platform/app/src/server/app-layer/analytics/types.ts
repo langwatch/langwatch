@@ -44,6 +44,8 @@ export interface AnalyticsTimeseriesBuilderInput {
   groupByKey?: string;
   timeScale?: number | "full";
   timeZone?: string;
+  /** Trace origins left out of the count, ANDed after the user's filters. */
+  excludeOrigins?: string[];
 }
 
 /**
