@@ -693,6 +693,15 @@ describe("given a member who wants to see what one chart asks", () => {
       ).toBeInTheDocument(),
     );
     expect(screen.queryAllByText(/\d+ rows?/)).toHaveLength(0);
+
+    // And it must not claim anything FAILED. Nothing did: the reader has a
+    // switch turned off. The card already refuses to draw a red panel in this
+    // state for the same reason — a failure here sends a cost owner hunting
+    // for a broken read that does not exist.
+    expect(screen.queryByText(/query failed/i)).not.toBeInTheDocument();
+    expect(
+      screen.getAllByText(/sample data is off/i).length,
+    ).toBeGreaterThanOrEqual(1);
   });
 
   /** @scenario "An edit made in the editor lasts the visit and no longer" */

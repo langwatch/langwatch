@@ -42,7 +42,10 @@ import {
   frameSpanDays,
   type TimeFrame,
 } from "~/components/governance/filters/timeControls";
-import { toChartQueryResult } from "~/features/custom-chart-playground/bridge/bridgeProtocol";
+import {
+  type ChartQueryError,
+  toChartQueryResult,
+} from "~/features/custom-chart-playground/bridge/bridgeProtocol";
 import type { ChartFrameExecuteQuery } from "~/features/custom-chart-playground/bridge/frameBridge";
 
 import type { GovernanceWidgetId } from "./governanceWidgets";
@@ -270,12 +273,24 @@ function sampleAnswerBuilder(
  * A refusal rather than an empty result, for the same reason the factory below
  * refuses an unknown query: no rows reads as an organization that spent
  * nothing. This says which switch is off instead.
+ *
+ * It carries its own title because nothing here FAILED. A reader has a switch
+ * turned off, which is the state the page opens in, and a heading that says
+ * the query failed sends a cost owner hunting for a broken read that does not
+ * exist — the same reason the card draws "Nothing measured yet." instead of a
+ * red panel. The words travel with the refusal so the one place that shows
+ * them cannot put a failure heading over them.
  */
+export const SAMPLE_IS_OFF: ChartQueryError = {
+  code: "governance_sample_data_off",
+  title: "Sample data is off",
+  message:
+    "Every figure behind this widget is invented, so nothing is drawn until you ask to see sample data.",
+};
+
 export const refuseWhileSampleIsOff: ChartFrameExecuteQuery = () =>
   Promise.reject(
-    new Error(
-      "Sample data is off. Every figure behind this widget is invented, so nothing is drawn until you ask to see sample data.",
-    ),
+    Object.assign(new Error(SAMPLE_IS_OFF.message), SAMPLE_IS_OFF),
   );
 
 /**

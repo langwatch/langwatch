@@ -67,7 +67,29 @@ const NO_PARAMS = Object.freeze({});
  * that refusal is the message worth showing: it says the statement is not one
  * of the four rather than that something broke.
  */
+/**
+ * True for a refusal that already carries the words to show — a code, a
+ * heading and a sentence, written where the refusal is decided.
+ *
+ * It exists so a refusal can say it is not a failure. "Query failed" over
+ * "sample data is off" tells a cost owner a read broke when one did not, and
+ * the only place that knows the difference is the place that refused.
+ */
+function carriesItsOwnWords(error: unknown): error is ChartQueryError {
+  if (typeof error !== "object" || error === null) return false;
+  const candidate = error as Partial<ChartQueryError>;
+  return (
+    typeof candidate.code === "string" &&
+    typeof candidate.title === "string" &&
+    typeof candidate.message === "string"
+  );
+}
+
 function toRunError(error: unknown): ChartQueryError {
+  if (carriesItsOwnWords(error)) {
+    return { code: error.code, title: error.title, message: error.message };
+  }
+
   // Deliberately NOT `explainAnyError` here, which is what a Run that reaches
   // a server maps through (see the product's own executor). That rule exists
   // because a wire error's `message` is a code slug and prose only by luck, so
