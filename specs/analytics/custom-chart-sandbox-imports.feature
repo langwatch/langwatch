@@ -25,6 +25,20 @@ Feature: Custom chart widgets import any module and run under their own CSP
     And the response is never cached
 
   @unit
+  Scenario: The frame document is sandboxed even when opened directly
+    Given the app serves the chart frame document at "/sandbox/chart-frame"
+    When the frame document's response headers are built
+    Then its Content-Security-Policy carries a sandbox allow-scripts directive
+    And so the document runs at an opaque origin however it is loaded, not only when embedded
+
+  @unit
+  Scenario: The frame ignores init messages that do not come from its parent
+    Given the frame's shim is listening for lw:init
+    When an lw:init message arrives whose source is not the frame's parent window
+    Then the widget source is not published and the author runtime is not activated
+    But an lw:init message whose source is the parent window is accepted
+
+  @unit
   Scenario: The app's own policy is unchanged by the sandbox
     When the app's production security headers are built
     Then its Content-Security-Policy script-src does not list unpkg.com or esm.sh
@@ -63,6 +77,30 @@ Feature: Custom chart widgets import any module and run under their own CSP
     When a widget imports "https://esm.sh/canvas-confetti", "data:text/javascript,...", "blob:..." or "./helper"
     Then the specifier is left unchanged
 
+  @unit
+  Scenario: An http module URL is rejected with a clear compile error
+    When a widget imports "http://example.com/lib.js"
+    Then the compile fails with an error containing "Module URLs must use https"
+
+  @unit
+  Scenario: A widget's dynamic import of a bare package is rewritten too
+    When a widget calls import("dayjs") lazily
+    Then the bare specifier is rewritten to the CDN URL like a static import
+    And a dynamic import with a non-literal argument is left unchanged
+
+  @unit
+  Scenario: A widget exporting a memoized or forwardRef component mounts
+    When a widget exports React.memo or React.forwardRef
+    Then the component mounts successfully
+    And the error panel does not display "No default export"
+
+  @integration
+  Scenario: The bridge listens for the frame before navigating it
+    Given a chart frame is mounted
+    When the bridge attaches to it
+    Then the load listener is installed before the frame is navigated
+    So a fast load can never miss lw:init
+
   @integration
   Scenario: The parent delivers the widget source on init
     Given a sandboxed chart frame is mounted with widget source
@@ -75,7 +113,8 @@ Feature: Custom chart widgets import any module and run under their own CSP
     When the widget source changes
     Then the iframe is remounted and a fresh lw:init carries the new source
 
-  @browser
+  # Tracking: https://github.com/langwatch/langwatch/issues/8152
+  @integration @unimplemented
   Scenario: A widget importing a third-party package renders under enforced headers
     Given the app is running with enforced production security headers
     And a widget imports a package from npm that is not bundled with the app

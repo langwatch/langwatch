@@ -26,7 +26,6 @@ vi.mock("../bridge/frameBridge", () => ({
   },
 }));
 
-import { CHART_FRAME_PATH } from "../bridge/bridgeProtocol";
 import { SandboxedChartFrame } from "../SandboxedChartFrame";
 
 const dashboardContext = {
@@ -54,11 +53,11 @@ afterEach(() => {
 describe("given a sandboxed chart frame", () => {
   describe("when it mounts", () => {
     /** @scenario "The parent delivers the widget source on init" */
-    it("points the iframe at the shared frame route and hands the bridge the source", () => {
+    it("lets the bridge navigate to the frame route and hands it the source", () => {
       const { container } = render(ui("A"));
 
       const iframe = container.querySelector("iframe");
-      expect(iframe?.getAttribute("src")).toBe(CHART_FRAME_PATH);
+      expect(iframe?.hasAttribute("src")).toBe(false);
       expect(iframe?.hasAttribute("srcdoc")).toBe(false);
       expect(bridgeMock).toHaveBeenLastCalledWith(
         expect.objectContaining({ source: "A" }),

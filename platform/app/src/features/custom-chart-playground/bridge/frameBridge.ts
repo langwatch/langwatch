@@ -2,6 +2,10 @@
  * The parent side of the chart-frame bridge. Framework-free TypeScript so the
  * eventual production surface can reuse it outside React.
  *
+ * Navigation: the bridge owns iframe navigation. The load listener is
+ * registered before the src is assigned, so a fast frame load cannot miss
+ * the lw:init delivery.
+ *
  * Handshake: on the iframe's `load`, create a `MessageChannel`, post
  * `lw:init` with `port2` transferred — exactly once. The sandboxed frame's
  * origin is the opaque `"null"`, so the init targets `"*"` and the frame is
@@ -27,7 +31,10 @@ import type {
   FrameToParentMessage,
   LwLogMessage,
 } from "./bridgeProtocol";
-import { CHART_FRAME_HEARTBEAT_TIMEOUT_MS } from "./bridgeProtocol";
+import {
+  CHART_FRAME_HEARTBEAT_TIMEOUT_MS,
+  CHART_FRAME_PATH,
+} from "./bridgeProtocol";
 
 /** Upper bound on simultaneously in-flight `lw:query` requests per frame. */
 const MAX_CONCURRENT_QUERIES = 8;
@@ -63,6 +70,12 @@ export interface CreateFrameBridgeOptions {
    * own widget.
    */
   readonly source: string;
+  /**
+   * The frame document URL. Defaults to CHART_FRAME_PATH. The bridge assigns
+   * this after registering the load listener, ensuring the listener is in
+   * place before the frame navigates.
+   */
+  readonly src?: string;
   readonly onLog: (entry: ChartFrameLogEntry) => void;
   readonly onHeightChange: (px: number) => void;
   /**
@@ -100,6 +113,7 @@ export function createFrameBridge(
     onHeightChange,
     onNavigate,
     onTeardown,
+    src = CHART_FRAME_PATH,
   } = options;
 
   let port: MessagePort | null = null;
@@ -263,14 +277,10 @@ export function createFrameBridge(
     }, CHART_FRAME_HEARTBEAT_TIMEOUT_MS / 5);
   };
 
-  if (
-    iframe.contentDocument?.readyState === "complete" &&
-    iframe.contentWindow
-  ) {
-    onFrameLoad();
-  } else {
-    iframe.addEventListener("load", onFrameLoad);
-  }
+  // Register the load listener before assigning src, so a fast frame load
+  // cannot miss the lw:init delivery.
+  iframe.addEventListener("load", onFrameLoad);
+  iframe.src = src;
 
   return {
     postDashboardContextChange(dashboardContext: ChartFrameDashboardContext) {

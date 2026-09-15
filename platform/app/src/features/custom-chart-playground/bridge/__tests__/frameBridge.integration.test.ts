@@ -81,6 +81,75 @@ describe("given a sandboxed chart frame is mounted with widget source", () => {
       expect(init.params).toEqual({ threshold: 3 });
     });
   });
+
+  describe("when the bridge attaches to the iframe", () => {
+    /** @scenario "The bridge listens for the frame before navigating it" */
+    it("registers the load listener before assigning src", () => {
+      const iframe = document.createElement("iframe");
+      document.body.appendChild(iframe);
+
+      const listeners: string[] = [];
+      const originalAddEventListener = iframe.addEventListener;
+      const originalSrcSetter = Object.getOwnPropertyDescriptor(
+        HTMLIFrameElement.prototype,
+        "src",
+      )?.set;
+
+      iframe.addEventListener = function (
+        this: HTMLIFrameElement,
+        type: string,
+        listener: EventListener,
+        options?: boolean | AddEventListenerOptions,
+      ) {
+        listeners.push(`addEventListener:${type}`);
+        return originalAddEventListener.call(this, type, listener, options);
+      } as any;
+
+      if (originalSrcSetter) {
+        Object.defineProperty(iframe, "src", {
+          set(value: string) {
+            listeners.push(`src:${value}`);
+            originalSrcSetter.call(this, value);
+          },
+          get() {
+            const srcDescriptor = Object.getOwnPropertyDescriptor(
+              HTMLIFrameElement.prototype,
+              "src",
+            );
+            return srcDescriptor?.get?.call(this) ?? "";
+          },
+        });
+      }
+
+      // Create bridge — the load listener should be registered before src is assigned
+      createFrameBridge({
+        iframe,
+        executeQuery: vi.fn(),
+        dashboardContext: {
+          timeWindow: { start: 0, end: 1 },
+          granularitySeconds: 3600,
+          timezone: "UTC",
+          theme: "light",
+          projectId: "project_1",
+        },
+        source: "export default () => null;",
+        onLog: vi.fn(),
+        onHeightChange: vi.fn(),
+        onTeardown: vi.fn(),
+      });
+
+      // Verify addEventListener("load") came before src assignment
+      const loadListenerIndex = listeners.indexOf("addEventListener:load");
+      const srcAssignmentIndex = listeners.findIndex((l) =>
+        l.startsWith("src:"),
+      );
+
+      expect(loadListenerIndex).toBeGreaterThanOrEqual(0);
+      expect(srcAssignmentIndex).toBeGreaterThan(loadListenerIndex);
+
+      document.body.removeChild(iframe);
+    });
+  });
 });
 
 describe("given a frame that keeps opening queries without them settling", () => {

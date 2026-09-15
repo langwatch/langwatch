@@ -9,13 +9,27 @@
  * that one response, so a widget author may `import` any package or URL with
  * no allow list.
  *
- * This is safe precisely because the iframe stays `sandbox="allow-scripts"`
- * with NO `allow-same-origin`: it runs at an opaque origin, so no cookies,
- * storage or credentials of the app's origin ever reach it, and it cannot
- * touch the parent DOM — all it can do is talk over the transferred
- * MessagePort. `frame-ancestors 'self'` because the app itself embeds it, and
+ * This is safe precisely because the document ALWAYS runs at an opaque origin,
+ * so no cookies, storage or credentials of the app's origin ever reach it, and
+ * it cannot touch the parent DOM — all it can do is talk over the transferred
+ * MessagePort. Two things force that opaque origin, and the CSP one is what
+ * makes the route safe to navigate directly:
+ *  - the embedding iframe carries `sandbox="allow-scripts"` (no
+ *    `allow-same-origin`), and
+ *  - the response CSP carries `sandbox allow-scripts`, which sandboxes the
+ *    document itself regardless of how it is loaded. So even if an attacker
+ *    opens the route at top level (`window.open`), where there is no iframe
+ *    `sandbox` attribute, the document is still an opaque-origin sandbox with
+ *    no cookies — the shim's `lw:init` can then never reach the app origin.
+ * The two `allow-scripts`-only sandboxes intersect, so the legitimate embed is
+ * unchanged. `frame-ancestors 'self'` because the app itself embeds it, and
  * `X-Frame-Options: SAMEORIGIN` says the same for legacy enforcement. The
  * response is never cached so a frame document change ships immediately.
+ *
+ * This policy REPLACES the app-wide one for that response in both modes:
+ * `start.ts` removes the app's `Content-Security-Policy` and its dev-only
+ * `Content-Security-Policy-Report-Only` before setting these headers, so the
+ * app policy never lingers on the frame response.
  *
  * @see specs/analytics/custom-chart-sandbox-imports.feature
  */
@@ -39,6 +53,12 @@ export function buildChartFrameHeaders(): Record<string, string> {
     "frame-ancestors 'self'",
     "base-uri 'none'",
     "form-action 'none'",
+    // Forces opaque-origin sandboxing of THIS document however it is loaded,
+    // so the route is safe to navigate directly (not only when embedded in the
+    // parent's allow-scripts iframe). allow-scripts only, matching the iframe
+    // attribute — the two sandboxes intersect, so the legitimate embed runs
+    // unchanged.
+    "sandbox allow-scripts",
   ].join("; ");
 
   return {

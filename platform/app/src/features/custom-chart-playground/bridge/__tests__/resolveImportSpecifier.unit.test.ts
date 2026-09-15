@@ -70,7 +70,6 @@ describe("resolveImportSpecifier", () => {
     it("leaves the specifier unchanged", () => {
       for (const specifier of [
         "https://esm.sh/canvas-confetti",
-        "http://example.com/x.js",
         "data:text/javascript,export default 1",
         "blob:https://app/1234",
         "/absolute/helper.js",
@@ -79,6 +78,15 @@ describe("resolveImportSpecifier", () => {
       ]) {
         expect(resolve(specifier)).toBe(specifier);
       }
+    });
+  });
+
+  describe("given an http: URL specifier", () => {
+    /** @scenario "An http module URL is rejected with a clear compile error" */
+    it("throws with a clear error message", () => {
+      expect(() => resolve("http://example.com/x.js")).toThrow(
+        'Module URLs must use https: (got "http://example.com/x.js")',
+      );
     });
   });
 });

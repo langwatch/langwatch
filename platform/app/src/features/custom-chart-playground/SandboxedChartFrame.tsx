@@ -5,9 +5,8 @@
  * author code with an opaque origin, no cookies, no parent DOM. All it can do
  * is talk over the transferred MessagePort.
  *
- * The iframe points at `CHART_FRAME_PATH` — a static document served with its
- * own permissive CSP (see `~/server/chartSandboxFrame`) — rather than an
- * inline `srcdoc`, so a widget may import any package. The widget's own source
+ * The bridge navigates the iframe to the frame document route (not an inline
+ * `srcdoc`), so a widget may import any package. The widget's own source
  * no longer rides in the document; it is delivered over `lw:init`. Because the
  * document is identical for every widget and every code change, changing
  * `code` must remount the iframe (a fresh load, then a fresh `lw:init` with
@@ -24,7 +23,6 @@ import type {
 import {
   CHART_FRAME_MAX_HEIGHT_PX,
   CHART_FRAME_MIN_HEIGHT_PX,
-  CHART_FRAME_PATH,
 } from "./bridge/bridgeProtocol";
 import type {
   ChartFrameExecuteQuery,
@@ -178,7 +176,6 @@ export function SandboxedChartFrame({
         key={`${generation}:${codeGeneration}`}
         ref={iframeRef}
         sandbox="allow-scripts"
-        src={CHART_FRAME_PATH}
         title="Custom chart"
         style={{
           width: "100%",

@@ -318,6 +318,13 @@ export function buildShimScript(): string {
   window.addEventListener("message", function (event) {
     var data = event.data || {};
     if (data.type !== "lw:init") return;
+    // Only the parent frame that embeds us may initialise the frame. Without
+    // this, a document opened at top level (window.parent === window, no real
+    // parent) or cross-embedded by another window could post its own source
+    // and run arbitrary code at whatever origin the document loaded at. We
+    // only ever run at an opaque origin (sandbox), but this closes the shim
+    // side of that guard regardless.
+    if (window.parent === window || event.source !== window.parent) return;
     // The transferred port comes from the FIRST init only; later inits ignored.
     if (port || !event.ports || !event.ports[0]) return;
     port = event.ports[0];

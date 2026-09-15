@@ -72,7 +72,7 @@ export function buildAuthorRuntimeScript(): string {
   }
 
   function mount(Component) {
-    if (typeof Component !== "function") {
+    if (Component == null || (typeof Component !== "function" && typeof Component !== "object")) {
       showError("No default export", "The widget file must export default a React component.");
       return;
     }
@@ -98,6 +98,16 @@ export function buildAuthorRuntimeScript(): string {
     var src = path.node.source;
     if (src && typeof src.value === "string") {
       src.value = resolveImportSpecifier(src.value, BUILTINS);
+    }
+  }
+
+  // Rewrites the first argument of a dynamic import() call if it is a string
+  // literal. Non-literal arguments (computed specifiers) cannot be resolved
+  // statically and will only work for full URLs.
+  function rewriteDynamicImport(path) {
+    var args = path.node.arguments;
+    if (args && args.length > 0 && args[0].type === "StringLiteral") {
+      args[0].value = resolveImportSpecifier(args[0].value, BUILTINS);
     }
   }
 
@@ -129,14 +139,19 @@ export function buildAuthorRuntimeScript(): string {
         ],
         // ESM out (no transform-modules-commonjs): the import/export syntax
         // stays, so the compiled module's imports resolve through the frame's
-        // import map when it is loaded below. \`rewrite\` only rebases the
-        // specifier strings; \`Import\` (dynamic import()) is left alone.
+        // import map when it is loaded below. \`rewrite\` handles static imports
+        // and exports; \`CallExpression\` with Import callee rewrites dynamic
+        // import() calls where the argument is a string literal.
         plugins: [{
           visitor: {
             ImportDeclaration: rewrite,
             ExportNamedDeclaration: rewrite,
             ExportAllDeclaration: rewrite,
-            Import: function () {}
+            CallExpression: function (path) {
+              if (path.node.callee.type === "Import") {
+                rewriteDynamicImport(path);
+              }
+            }
           }
         }],
         sourceType: "module",

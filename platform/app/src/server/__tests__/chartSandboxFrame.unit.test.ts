@@ -55,6 +55,11 @@ describe("given the chart sandbox frame route", () => {
     it("never caches the response", () => {
       expect(headers["Cache-Control"]).toMatch(/no-store/);
     });
+
+    /** @scenario "The frame document is sandboxed even when opened directly" */
+    it("sandboxes the document via CSP so a direct navigation is opaque-origin too", () => {
+      expect(directive(csp, "sandbox")).toBe("sandbox allow-scripts");
+    });
   });
 
   describe("when the chart frame document is built", () => {

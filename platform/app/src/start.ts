@@ -295,14 +295,22 @@ export const startApp = async (dir = resolveAppPackageRoot()) => {
 
       // Chart sandbox frame document: its own permissive CSP replaces the
       // app-wide one (and X-Frame-Options) for this response, so a widget may
-      // import any https origin. Safe because the embedding iframe is
-      // sandbox="allow-scripts" with no allow-same-origin — an opaque origin
-      // with no cookies and no parent DOM. See
+      // import any https origin. Safe because the frame document always runs at
+      // an opaque origin — the embedding iframe is sandbox="allow-scripts" with
+      // no allow-same-origin, and the frame CSP carries `sandbox allow-scripts`
+      // so a direct top-level navigation is sandboxed too. See
       // specs/analytics/custom-chart-sandbox-imports.feature.
       if (
         (req.method === "GET" || req.method === "HEAD") &&
         pathname === CHART_FRAME_PATH
       ) {
+        // Drop the app-wide policy first so it cannot linger under a different
+        // header name. In dev the app emits Content-Security-Policy-Report-Only
+        // (a distinct header from Content-Security-Policy), which setHeader
+        // below would NOT overwrite — it would stay on the response and spew
+        // violation reports for exactly the CDN scripts this route allows.
+        res.removeHeader("Content-Security-Policy-Report-Only");
+        res.removeHeader("Content-Security-Policy");
         for (const [key, value] of Object.entries(chartFrameHeaders)) {
           res.setHeader(key, value);
         }

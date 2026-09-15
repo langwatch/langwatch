@@ -23,15 +23,10 @@ export function resolveImportSpecifier(
   builtins: readonly string[],
 ): string {
   if (builtins.includes(specifier)) return specifier;
-  const passthroughPrefixes = [
-    "http://",
-    "https://",
-    "data:",
-    "blob:",
-    "/",
-    "./",
-    "../",
-  ];
+  if (specifier.startsWith("http://")) {
+    throw new Error(`Module URLs must use https: (got "${specifier}")`);
+  }
+  const passthroughPrefixes = ["https://", "data:", "blob:", "/", "./", "../"];
   if (passthroughPrefixes.some((prefix) => specifier.startsWith(prefix))) {
     return specifier;
   }
