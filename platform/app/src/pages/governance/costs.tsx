@@ -41,6 +41,7 @@ import {
   CostLine,
   CostRankList,
   CostStackedBars,
+  fmtTokens,
   fmtWhole,
 } from "~/components/governance/costs/CostCharts";
 import { CostFilterBar } from "~/components/governance/costs/CostFilterBar";
@@ -77,6 +78,7 @@ import {
 import {
   sampleCostSummary,
   sampleSpenderRows,
+  sampleTokenRows,
 } from "~/components/governance/costs/sampleLanes";
 import { SampleSaidOnce } from "~/components/governance/costs/sampleMark";
 import {
@@ -85,13 +87,16 @@ import {
   recentMonths,
   SAMPLE_AGENTS,
   SAMPLE_DEPARTMENTS,
+  type SeatSeriesMeasure,
   sampleAdoption,
   sampleDaily,
   sampleForecast,
   sampleLine,
   sampleRanked,
   sampleSeats,
+  seatSeriesMeasureOf,
 } from "~/components/governance/costs/sampleSeries";
+import { tokenRowSecondaryLine } from "~/components/governance/costs/tokenRowSecondary";
 import {
   coerceInterval,
   DEFAULT_TIME_FRAME,
@@ -342,8 +347,12 @@ function CostsPage() {
             spenders={spenders}
             sourcesConnected={holdsFigures}
             organizationId={organizationId}
+            summaryDays={summary.data?.series ?? null}
+            hasSummaryFailure={summary.isError && !isRefusedRead(summary.error)}
             providerDays={providerDays.data?.rows ?? null}
-            hasProviderDaysFailure={providerDays.isError}
+            hasProviderDaysFailure={
+              providerDays.isError && !isRefusedRead(providerDays.error)
+            }
           />
         </SampleSaidOnce>
       </VStack>
@@ -861,11 +870,21 @@ interface Breakdowns {
     departmentId: string | null;
     departmentName: string;
     spendUsd: string;
+    /**
+     * Tokens the department ran, or null when none of its traces carried a
+     * count. Null is not zero: see `SpendByDepartmentRow`.
+     */
+    tokens: number | null;
+    /** Any counted trace of the department was estimated, not reported. */
+    hasEstimatedTokens: boolean;
   }> | null;
   userRows: Array<{
     actor: string;
     spendUsd: string;
     requests: number;
+    /** Null when no trace of theirs carried a count — see `SpendByUserRow`. */
+    tokens: number | null;
+    hasEstimatedTokens: boolean;
   }> | null;
   activeUsers: number | null;
   /**
@@ -892,6 +911,15 @@ interface Breakdowns {
    * what stops it drawing one at all.
    */
   failed: {
+    /**
+     * The activity summary, which the adoption headcount is read off. Named
+     * here for the same reason as its three neighbours and missed for longer:
+     * its figure is `activeUsers`, a failed read leaves that null, and null is
+     * what the adoption card draws its "fills once a source reports" copy
+     * from — so a broken read asked the reader to go connect a source that was
+     * already connected and already reporting.
+     */
+    adoption: boolean;
     byDepartment: boolean;
     byUser: boolean;
     byModel: boolean;
@@ -930,8 +958,28 @@ function useBreakdownQueries({
     args,
     options,
   );
+  // Sorted by tokens, not by spend, because the panel this feeds leads with
+  // tokens and the read is paginated: the top 8 by money is a different eight
+  // people from the top 8 by tokens, and ranking a money-picked page by
+  // tokens in the browser would quietly drop the people who belong on it.
+  // Every other reader of `spendByUser` keeps the spend sort.
+  //
+  // The scope rides the same seam, and for the same reason the unit did. The
+  // department panel beside this one covers every project of the organization;
+  // this read covered the hidden governance project alone and only traffic
+  // that arrived through a governance source, so the two panels reported the
+  // same unit off the same table over different people — the department one
+  // printing a token count while this one said nothing was recorded, over the
+  // very same rows. The other three readers name no scope and keep the
+  // governance one, because they still lead with dollars and a money figure
+  // must not move as a side effect of this.
   const byUser = api.activityMonitor.spendByUser.useQuery(
-    { ...args, limit: 8 },
+    {
+      ...args,
+      limit: 8,
+      sortBy: "tokens" as const,
+      scope: "organization" as const,
+    },
     options,
   );
   // The PULLED rollup, not the metered trace store the panels around it read.
@@ -962,9 +1010,13 @@ function useBreakdownQueries({
     userRows: byUser.data ?? null,
     activeUsers: summary.data?.activeUsersThisWindow ?? null,
     failed: {
-      byDepartment: byDepartment.isError,
-      byUser: byUser.isError,
-      byModel: byModel.isError,
+      // A refusal is filtered out of every one of these: a declined read is
+      // not broken, and "refreshing again is worth a try" is advice that
+      // cannot work against one. `SpenderPanelBody` draws the same line.
+      adoption: summary.isError && !isRefusedRead(summary.error),
+      byDepartment: byDepartment.isError && !isRefusedRead(byDepartment.error),
+      byUser: byUser.isError && !isRefusedRead(byUser.error),
+      byModel: byModel.isError && !isRefusedRead(byModel.error),
     },
     isFetching:
       summary.isFetching ||
@@ -1077,14 +1129,19 @@ interface SpenderReadState {
 }
 
 /**
- * The seat chart's two series, coloured apart.
+ * The seat chart's two MEASURES, coloured apart.
  *
  * Both hues come from the shared chart theme rather than being picked here, so
  * that these bars and the per-pool meter in the lane card cannot drift into two
  * different colours for one subject — which is exactly what they had done, in
  * two blues a reader could not tell apart. The reasoning is on the constants.
+ *
+ * Keyed by the measure rather than by the series, because the chart draws a
+ * pair per licence pool: what a colour has to say here is bought against
+ * assigned, and every pool's pair says it the same way. Which pool a bar
+ * belongs to is read off its legend label and its place in the group.
  */
-const SEAT_SERIES_COLORS: Record<string, string> = {
+const SEAT_SERIES_COLORS: Record<SeatSeriesMeasure, string> = {
   bought: CHART_SEAT_CONTRACT_FILL,
   assigned: CHART_SEAT_FILL,
 };
@@ -1107,18 +1164,19 @@ const MANAGE_DEPARTMENTS = {
  * turned the sample off watched half the screen disappear and had no way to
  * tell a panel that is coming from a panel that was never there. They are
  * drawn in both modes now, and outside sample mode they draw their empty
- * state.
+ * state. Three of them are still here; the token count left, and folds the
+ * summary's own `gatewayTokens` series in `CountPanels`.
  *
  * AN EMPTY ARRAY, NOT NULL, AND THAT IS A DELIBERATE OVERSTATEMENT. Null on
  * this screen means "no read has answered" and an empty array means "a read
  * answered and found nothing", and these panels are in the first state while
  * saying the second. It is the wording the product owner asked for, and it is
  * true of the store as it stands — the cost rollup carries an agent column
- * that is blank on every row it holds, and the metered lane these counts
- * would come from holds no rows at all — so "nothing in this window yet" is
- * not a lie about the money today. It WILL become one the day either of those
- * fills, because nothing here is measuring anything. Whoever wires the read
- * takes this constant out with it.
+ * that is blank on every row it holds, and nothing counts a conversation at
+ * all — so "nothing in this window yet" is not a lie about the money today.
+ * It WILL become one the day either of those fills, because nothing here is
+ * measuring anything. Whoever wires the last read takes this constant out
+ * with it.
  */
 const AWAITING_A_READ: [] = [];
 
@@ -1171,11 +1229,13 @@ function SpenderPanelBody({
 }
 
 /**
- * The two wide panels that only exist in sample mode.
+ * The two wide panels that run the width of the screen.
  *
- * Both illustrate a measurement the platform does not take yet, so neither has
- * a real counterpart to stand aside for — they are simply absent when sample
- * mode is off, rather than rendering empty.
+ * Both are rendered whether or not sample mode is on. Neither measurement is
+ * one the platform takes yet, so with sample mode off each draws its empty
+ * state — the panel says what it will show and what has to be connected for
+ * it to fill, which is more use to the reader than a panel that is simply not
+ * there.
  */
 function HeadlinePanels({
   sample,
@@ -1235,7 +1295,10 @@ function HeadlinePanels({
           buckets={showSample ? sample.seats : AWAITING_A_READ}
           format={fmtWhole}
           interval={interval}
-          colorFor={(key) => SEAT_SERIES_COLORS[key]}
+          colorFor={(key) => {
+            const measure = seatSeriesMeasureOf(key);
+            return measure ? SEAT_SERIES_COLORS[measure] : undefined;
+          }}
           grouped
           empty={costPanelEmpty({
             what: "Seats bought against seats assigned, period by period.",
@@ -1249,15 +1312,21 @@ function HeadlinePanels({
 }
 
 /**
- * Spend per person as the gateway measured it.
+ * Tokens per person, counted off their traces.
  *
- * "Metered", not "Cost", because the panel beside it also ranks people by
- * money and the two figures are different money — this one is what the
- * traffic measured as it was served, that one is what the provider put on the
- * invoice. They disagree routinely, so each title has to name its lane or the
- * pair reads as the same list rendered twice.
+ * It was titled "Metered spend by person", which was wrong twice over:
+ * "metered" names the gateway ledger everywhere else on this screen, and the
+ * gateway ledger carries no actor to group by — this read has always gone to
+ * the trace store. The title now says which store it is, because the panel
+ * beside it ranks the same people by money out of the invoice and an
+ * unlabelled pair reads as one list rendered twice.
+ *
+ * Leads with tokens for the reason the department panel does: a person on a
+ * subscription product runs plenty and costs no per-request dollars, so
+ * ranking people by money buries exactly the heaviest users. The money stays,
+ * one line down, saying what it covers.
  */
-function MeteredPersonPanel({
+function TracedPersonTokenPanel({
   rows,
   sample,
   showSample,
@@ -1269,16 +1338,16 @@ function MeteredPersonPanel({
   unrefreshed: boolean;
 }) {
   return (
-    <CostPanel title="Metered spend by person" sample={showSample}>
+    <CostPanel title="Tokens by person · trace store" sample={showSample}>
       {unrefreshed ? (
         <CostPanelUnrefreshed />
       ) : (
         <CostRankList
           rows={showSample ? sample.users : rows}
+          format={fmtTokens}
           empty={costPanelEmpty({
-            what: "Spend recorded against each person as their traffic was served.",
-            source:
-              "Fills from gateway traffic and from usage rows that name an actor.",
+            what: "Tokens each person ran, with what they cost per request beneath.",
+            source: "Fills from traces that name the person who made the call.",
             action: ADD_A_SOURCE,
           })}
         />
@@ -1477,6 +1546,8 @@ function BreakdownGrid({
   showSample,
   spenders,
   organizationId,
+  summaryDays,
+  hasSummaryFailure,
   providerDays,
   hasProviderDaysFailure,
 }: {
@@ -1489,6 +1560,19 @@ function BreakdownGrid({
   showSample: boolean;
   spenders: SpenderReadState;
   organizationId: string;
+  /**
+   * The summary's per-day series, which the token panel folds its line from.
+   * Null until the read answers, under the same rule `providerDays` follows.
+   */
+  summaryDays: readonly GovernanceCostDayDto[] | null;
+  /**
+   * Whether that read FAILED, which `summaryDays` cannot say on its own: a
+   * failed first read is null, which the panel reads as "not measured yet",
+   * and a failed refresh still holds the last good series, which the panel
+   * draws as though it were current. See `CostBreakdowns` for both. Refusals
+   * are filtered out before this.
+   */
+  hasSummaryFailure: boolean;
   /**
    * One figure per (day, provider) of the billed lane. NULL UNTIL THE READ
    * ANSWERS, which an empty list cannot say on its own: the panels below
@@ -1530,14 +1614,22 @@ function BreakdownGrid({
         interval={interval}
         showSample={showSample}
       />
-      <CostPanel title="Cost by department" sample={showSample}>
+      {/* Titled for the unit it ranks AND the store it read, the way the
+          people panel beside it is: this list is ordered by tokens, so a title
+          saying "cost" over a column of tokens misreads twice over. The store
+          rides in the title rather than in a line of body copy beneath it —
+          two stores count tokens for the same call and do not agree, and a
+          label that only shows while rows exist stops naming the store the
+          moment the panel is empty. The person panel names it the same way. */}
+      <CostPanel title="Tokens by department · trace store" sample={showSample}>
         {unrefreshed("byDepartment") ? (
           <CostPanelUnrefreshed />
         ) : (
           <CostRankList
             rows={orSample(rows.byDepartment, sample.departments)}
+            format={fmtTokens}
             empty={costPanelEmpty({
-              what: "Spend split across the departments people belong to.",
+              what: "Tokens run by the departments people belong to, with what they cost per request beneath.",
               source:
                 "Fills once people who are spending are assigned to a department.",
               action: MANAGE_DEPARTMENTS,
@@ -1565,7 +1657,7 @@ function BreakdownGrid({
           />
         )}
       </CostPanel>
-      <MeteredPersonPanel
+      <TracedPersonTokenPanel
         rows={rows.byUser}
         sample={sample}
         showSample={showSample}
@@ -1577,6 +1669,8 @@ function BreakdownGrid({
         sample={sample}
         interval={interval}
         showSample={showSample}
+        summaryDays={summaryDays}
+        hasSummaryFailure={hasSummaryFailure}
       />
     </SimpleGrid>
   );
@@ -1590,6 +1684,12 @@ function BreakdownGrid({
  * product docs is named after it; a panel named for one provider reads as
  * empty to every customer using another.
  *
+ * ONE OF THE TWO IS MEASURED NOW. Tokens come from the gateway ledger, by way
+ * of the same summary series the dollar lanes fold; conversations are still
+ * waiting on a read and draw `AWAITING_A_READ`. That asymmetry is why the
+ * token panel names its store on its face and the conversation panel names
+ * one only in its empty copy.
+ *
  * The two panels count different KINDS of thing and are formatted apart on
  * purpose. Conversations are a tally — somebody could in principle count them,
  * and a reader comparing quarters wants the figure, so the axis spells it out.
@@ -1602,11 +1702,39 @@ function CountPanels({
   sample,
   interval,
   showSample,
+  summaryDays,
+  hasSummaryFailure,
 }: {
   sample: SampleSeries;
   interval: TimeInterval;
   showSample: boolean;
+  /** The summary's per-day series. Null is an unanswered read. */
+  summaryDays: readonly GovernanceCostDayDto[] | null;
+  /**
+   * Whether the read behind that series FAILED, as opposed to answering
+   * nothing. Only the token panel reads it: the conversation panel beside it
+   * has no read behind it at all, so a failure it did not take part in has
+   * nothing to say about it.
+   */
+  hasSummaryFailure: boolean;
 }) {
+  // The token panel folds the SAME series the dollar lanes fold, bucketed the
+  // same way, because the only thing it has to agree with the lane beside it
+  // about is where a bucket starts. Null carries through: an unanswered read
+  // keeps the empty state, and a window whose every day metered zero tokens is
+  // a measurement that draws a flat zero — a window billed entirely in audio
+  // duration really did spend no tokens, and saying "nothing in this window
+  // yet" about it would report an absence nobody found.
+  const tokenPoints =
+    summaryDays === null
+      ? null
+      : aggregateLine(
+          summaryDays.map((day) => ({
+            day: day.day,
+            value: day.gatewayTokens,
+          })),
+          interval,
+        );
   return (
     <>
       <CostPanel title="Conversations over time" sample={showSample}>
@@ -1623,15 +1751,35 @@ function CountPanels({
         />
       </CostPanel>
       <CostPanel title="Tokens over time" sample={showSample}>
-        <CostLine
-          points={showSample ? sample.tokens : AWAITING_A_READ}
-          interval={interval}
-          empty={costPanelEmpty({
-            what: "How many tokens were spent, period by period.",
-            source: "Fills from traffic the gateway serves.",
-            action: ADD_A_SOURCE,
-          })}
-        />
+        {/* Sample mode outranks the failure, exactly as it does for the
+            provider-day panels above: the reader asked to be shown invented
+            figures, and a failure notice over the top of them reports on a
+            read this panel is not currently drawing. */}
+        {!showSample && hasSummaryFailure ? (
+          <CostPanelUnrefreshed />
+        ) : (
+          /* The store is named on the panel's own face, in both states. Two
+             stores count tokens for the same call and they do not agree — the
+             gateway meters what it served, including the image and audio work
+             a span never carries — so an unlabelled figure invites a reader to
+             read the difference as a defect in one of them. The empty copy
+             below names the gateway too, but only while the panel is empty,
+             and the label has to survive the panel filling up. */
+          <VStack align="stretch" gap={2}>
+            <Text fontSize="xs" color="fg.muted">
+              Counted by the gateway as it served the traffic.
+            </Text>
+            <CostLine
+              points={showSample ? sample.tokens : tokenPoints}
+              interval={interval}
+              empty={costPanelEmpty({
+                what: "How many tokens were spent, period by period.",
+                source: "Fills from traffic the gateway serves.",
+                action: ADD_A_SOURCE,
+              })}
+            />
+          </VStack>
+        )}
       </CostPanel>
     </>
   );
@@ -1654,6 +1802,8 @@ function CostBreakdowns({
   spenders,
   sourcesConnected: connected,
   organizationId,
+  summaryDays,
+  hasSummaryFailure,
   providerDays,
   hasProviderDaysFailure,
 }: {
@@ -1666,6 +1816,27 @@ function CostBreakdowns({
   /** See `sourcesConnected`: the Adoption count cannot state its own absence. */
   sourcesConnected: boolean;
   organizationId: string;
+  /**
+   * The summary's per-day series — the one the lanes above draw their figures
+   * and sparklines from — so the token panel counts the same window the money
+   * does. Null until the read answers, for the reason below.
+   */
+  summaryDays: readonly GovernanceCostDayDto[] | null;
+  /**
+   * Whether the summary read FAILED, which `summaryDays` cannot say on its
+   * own for the reason it cannot be said for the provider rows either — and
+   * here the confusion runs the other way as well. A failed FIRST read leaves
+   * the series null, and null is this screen's word for "not read yet", so the
+   * token panel invited the reader to wait for traffic that had already been
+   * measured and lost on the way. A failed REFRESH leaves the last successful
+   * series in hand, and drawing it unmarked presents figures nobody could
+   * confirm as current. One flag answers both.
+   *
+   * A REFUSED read is not carried in here. It is not broken, retrying cannot
+   * help, and `CostsRefused` above has already said what happened — the same
+   * line `SpenderPanelBody` draws between a failure and a decline.
+   */
+  hasSummaryFailure: boolean;
   /**
    * One figure per (day, provider) of the billed lane. NULL UNTIL THE READ
    * ANSWERS, which an empty list cannot say on its own: the panels below
@@ -1705,6 +1876,8 @@ function CostBreakdowns({
         showSample={showSample}
         spenders={spenders}
         organizationId={organizationId}
+        summaryDays={summaryDays}
+        hasSummaryFailure={hasSummaryFailure}
         providerDays={providerDays}
         hasProviderDaysFailure={hasProviderDaysFailure}
       />
@@ -1757,7 +1930,16 @@ function measuredRows({
             .map((row) => ({
               key: row.departmentId ?? "unassigned",
               label: row.departmentName,
-              value: Number(row.spendUsd),
+              // TOKENS, not dollars. A department that buys its assistants on
+              // subscription pays for seats, so every one of its requests
+              // carries a per-request cost of zero — ranked on money it sinks
+              // to the bottom of the panel on a zero it never earned, which
+              // is the opposite of what it ran. The dollars stay, one line
+              // down, because tokens are a worse COST ranking across a mixed
+              // model estate.
+              value: row.tokens ?? 0,
+              isUnmeasured: row.tokens === null,
+              secondary: tokenRowSecondaryLine(row),
             })),
     // Already totalled by the service. A model the provider named nothing
     // for keeps an honest label rather than an invented one, the same choice
@@ -1786,7 +1968,9 @@ function measuredRows({
         : breakdowns.userRows.map((row) => ({
             key: row.actor,
             label: row.actor,
-            value: Number(row.spendUsd),
+            value: row.tokens ?? 0,
+            isUnmeasured: row.tokens === null,
+            secondary: tokenRowSecondaryLine(row),
           })),
   };
 }
@@ -1860,6 +2044,7 @@ function AdoptionRow({
       <AdoptionFigures
         invented={invented}
         measured={measured}
+        hasFailure={breakdowns.failed.adoption}
         sourcesConnected={connected}
       />
     </CostPanel>
@@ -1876,10 +2061,17 @@ function AdoptionRow({
 function AdoptionFigures({
   invented,
   measured,
+  hasFailure,
   sourcesConnected: connected,
 }: {
   invented: boolean;
   measured: number | null;
+  /**
+   * Whether the read behind the headcount FAILED, as opposed to answering
+   * nothing. Without it the card tells a reader whose read just broke to go
+   * connect a source, which is the one move that cannot help them.
+   */
+  hasFailure: boolean;
   sourcesConnected: boolean;
 }) {
   if (invented) {
@@ -1905,6 +2097,13 @@ function AdoptionFigures({
       </HStack>
     );
   }
+  // A THIRD way to have no figure, and the only one that is not a finding:
+  // the read broke. It is tested before the two below because both of them
+  // end in advice — go connect a source — and a reader whose source is
+  // already connected and reporting would be sent to do it again. Below the
+  // sample branch on purpose: sample mode outranks a failure everywhere on
+  // this screen.
+  if (hasFailure) return <CostPanelUnrefreshed height="72px" />;
   // Two ways to have no figure: the read never answered, or it answered with a
   // zero that no connected source stands behind. Both are unanswered in the
   // sense the panel cares about — nothing was measured — and both name the move
@@ -2003,7 +2202,7 @@ function useSampleSeries(
       // panel read $10.2k under a chart of the same money drawing $280k a
       // quarter, and a reader who noticed had learned only that the screen
       // does not add up.
-      departments: totalPerSeries(byDepartment),
+      departments: sampleTokenRows(totalPerSeries(byDepartment)),
       // MEASURED ONLY. The forecast now runs a quarter past the end of the
       // window, and ranking agents by a total that included those months would
       // put money nobody has spent into a panel titled "Cost by agent".
@@ -2012,7 +2211,11 @@ function useSampleSeries(
       // to the same window total by hand: a 0.42 decay sums to about 1.72x its
       // leader, which puts the leader near sixty per cent of the year.
       models: sampleRanked(SAMPLE_MODELS, SAMPLE_WINDOW_TOTAL * 0.58),
-      users: sampleRanked(SAMPLE_PEOPLE, SAMPLE_WINDOW_TOTAL * 0.4),
+      // Both token panels rank counts, so their sample rows are the sample
+      // money turned into tokens rather than a second invented figure.
+      users: sampleTokenRows(
+        sampleRanked(SAMPLE_PEOPLE, SAMPLE_WINDOW_TOTAL * 0.4),
+      ),
       forecast: {
         // Measured months and projected months on one axis. The chart needs
         // them together — a forecast is only legible against what it continues

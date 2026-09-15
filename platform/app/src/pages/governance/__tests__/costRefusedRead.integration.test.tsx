@@ -9,6 +9,8 @@ const harness = vi.hoisted(() => ({
   /** tRPC's own code for the summary read: null when it answers cleanly. */
   summaryErrorCode: null as string | null,
   spendersErrorCode: null as string | null,
+  /** The day-split read, which the two provider charts are folded from. */
+  providerDaysErrorCode: null as string | null,
   isEnterprise: true,
 }));
 
@@ -63,9 +65,15 @@ vi.mock("~/utils/api", () => {
   return {
     api: {
       governanceCost: {
-        // The day-split read answers nothing here: it is its own panel with
-        // its own tests, and these stay about their own subject.
-        dailyByProvider: { useQuery: () => ({ data: undefined }) },
+        // Silent by default so the tests around it stay about their own
+        // subject; the two below drive it directly.
+        dailyByProvider: {
+          useQuery: () => ({
+            data: undefined,
+            isLoading: false,
+            ...failure(harness.providerDaysErrorCode),
+          }),
+        },
         spendByModel: { useQuery: () => ({ data: undefined }) },
         summary: {
           useQuery: () => ({
@@ -105,6 +113,7 @@ function renderPage() {
 beforeEach(() => {
   harness.summaryErrorCode = "FORBIDDEN";
   harness.spendersErrorCode = "FORBIDDEN";
+  harness.providerDaysErrorCode = null;
   harness.isEnterprise = true;
   // The section keeps ONE sample choice per sitting, in session storage, so a
   // test that presses the toggle would otherwise hand its answer to the next
@@ -154,6 +163,17 @@ describe("Costs page, a read the server declined", () => {
     expect(refused).not.toHaveTextContent(/Enterprise plan/i);
   });
 
+  /** @scenario A declined day-split read leaves its panels saying what would fill them */
+  it("does not mark the provider charts unrefreshed when the read was refused", async () => {
+    harness.providerDaysErrorCode = "FORBIDDEN";
+    renderPage();
+
+    // Both provider charts are folded from that one read, so a refusal marks
+    // both or neither. "Refreshing again is worth a try" cannot work against
+    // a decline, which is why every sibling read subtracts one first.
+    expect(screen.queryAllByTestId("cost-panel-unrefreshed")).toHaveLength(0);
+  });
+
   /** @scenario The spender panel states what it holds when its read is declined */
   it("does not offer Try again on a panel whose read was refused", async () => {
     renderPage();
@@ -178,6 +198,18 @@ describe("Costs page, a read that genuinely broke", () => {
 
     expect(screen.getByTestId("cost-lanes-error")).toBeInTheDocument();
     expect(screen.queryByTestId("cost-lanes-refused")).not.toBeInTheDocument();
+  });
+
+  /** @scenario A failed day-split read still marks its panels unrefreshed */
+  it("marks the provider charts unrefreshed on a server fault", async () => {
+    harness.providerDaysErrorCode = "INTERNAL_SERVER_ERROR";
+    renderPage();
+
+    // The far side of the test above: subtracting refusals must not swallow
+    // the faults the marker exists for.
+    expect(
+      screen.queryAllByTestId("cost-panel-unrefreshed").length,
+    ).toBeGreaterThan(0);
   });
 
   /** @scenario A failed read does not turn sample mode on by itself */

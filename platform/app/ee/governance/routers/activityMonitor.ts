@@ -15,6 +15,7 @@
  * Spec: specs/ai-gateway/governance/activity-monitor.feature
  */
 
+import { SPEND_BY_USER_SCOPES } from "@ee/governance/services/activity-monitor/activityMonitor.clickhouse.schemas";
 import { ActivityMonitorService } from "@ee/governance/services/activity-monitor/activityMonitor.service";
 import { z } from "zod/v4";
 
@@ -68,8 +69,26 @@ export const activityMonitorRouter = createTRPCRouter({
         windowDays: z.number().int().min(1).max(365).default(30),
         limit: z.number().int().min(1).max(500).default(50),
         offset: z.number().int().min(0).default(0),
-        sortBy: z.enum(["spend", "requests", "lastActivity"]).default("spend"),
+        // "tokens" is the person read only: it orders by a sum the team
+        // rollup has no column for. Every value here is a key into
+        // SORT_FIELD_TO_AGG_EXPR, which is what keeps the ORDER BY a
+        // whitelisted literal rather than caller input.
+        sortBy: z
+          .enum(["spend", "requests", "lastActivity", "tokens"])
+          .default("spend"),
         sortDir: z.enum(["asc", "desc"]).default("desc"),
+        // Which population the figures cover. The default is the scope every
+        // caller had before this existed, so the three screens that lead with
+        // dollars are answered exactly as before; the cost screen opts into
+        // "organization" so its person panel covers the same people as the
+        // department panel beside it.
+        //
+        // Built from the exported list rather than hand-written, so the enum
+        // cannot drift from `SpendByUserScope`. The list is passed as-is, not
+        // widened to `readonly [string, ...string[]]` the way
+        // `anomalyRules.ts:97` widens its own: that cast erases the literals,
+        // and the service takes the union.
+        scope: z.enum(SPEND_BY_USER_SCOPES).default("governance"),
       }),
     )
     .permission("activityMonitor:view")
@@ -86,6 +105,7 @@ export const activityMonitorRouter = createTRPCRouter({
         offset: input.offset,
         sortBy: input.sortBy,
         sortDir: input.sortDir,
+        scope: input.scope,
       });
     }),
 

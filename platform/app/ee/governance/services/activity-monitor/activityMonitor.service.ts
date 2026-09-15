@@ -12,11 +12,22 @@
  * stored_spans into trace_summaries.Attributes so the rollup queries here
  * don't need to scan span-level data.
  *
- * Tenancy: every query filters by `TenantId = govProjectId` where
+ * Tenancy: the money reads filter by `TenantId = govProjectId` where
  * `govProjectId` is the org's hidden internal_governance Project (lazily
  * minted by `ensureHiddenGovernanceProject`). When the org has no Gov
- * Project yet (no IngestionSource has ever been minted), the queries
- * short-circuit to empty results.
+ * Project yet (no IngestionSource has ever been minted), those money reads
+ * short-circuit to empty results. The reads that answer an organization
+ * question rather than a governance-project one - the department rollup and
+ * the adoption headcount - filter by `TenantId IN (...)` over every live
+ * project of the org, resolved from Prisma so they can only ever read this
+ * org's own projects, and run whether or not a Gov Project exists.
+ *
+ * `spendByUser` is the one read that answers EITHER question, because its
+ * four callers do not all ask the same one: the cost screen's token panel
+ * wants the organization and the three screens that lead with dollars want
+ * the governance project. It takes a `scope` naming which, defaulting to the
+ * governance one, and the origin filter travels with it - see
+ * `SpendByUserScope` and ADR-128 v3.21.
  *
  * Anomaly counts (`openAnomalyCount` / `anomalyBreakdown`) read from
  * `prisma.anomalyAlert` - unaffected by the trace-store path.
@@ -55,11 +66,18 @@ import type {
   SortDir,
   SpendByDepartmentChRow,
   SpendByTeamSourceChRow,
+  SpendByUserScope,
+  SpendByUserSortField,
   SpendOverTimeChRow,
   SpendOverTimeGroupBy,
   SpendSortField,
   WindowCountChRow,
 } from "./activityMonitor.clickhouse.schemas";
+import {
+  EMPTY_ACTIVE_USER_COUNT,
+  SPEND_BY_USER_SCOPES,
+} from "./activityMonitor.clickhouse.schemas";
+import { unsupportedValue } from "./unsupportedValue";
 
 // ---------------------------------------------------------------------------
 // Public interfaces — the service's API contract
@@ -96,6 +114,15 @@ export interface SpendByUserRow {
    */
   hasPriorBaseline: boolean;
   mostUsedTarget: string | null;
+  /**
+   * Prompt + completion tokens over the window, or null when not one of
+   * their traces carried a count — a person on a subscription product runs
+   * requests that bill per seat and report no token figure. Null is "we
+   * never counted", which a zero would misreport as "they ran nothing".
+   */
+  tokens: number | null;
+  /** Whether any counted trace of theirs was estimated rather than reported. */
+  hasEstimatedTokens: boolean;
 }
 
 export interface SpendByTeamRow {
@@ -134,6 +161,23 @@ export interface SpendByDepartmentRow {
   spendUsd: string;
   requestCount: number;
   lastActivityIso: string | null;
+  /**
+   * Prompt + completion tokens the department ran, or NULL when not one of
+   * its traces carried a count.
+   *
+   * Null is not zero and must not be rendered as one: a product that bills a
+   * seat rather than a request can record no token count at all, and printing
+   * a zero there states a measurement nobody made. Beside `spendUsd` rather
+   * than replacing it — the bird's-eye dashboard still ranks this list by
+   * money, and the cost screen ranks its own copy by tokens.
+   */
+  tokens: number | null;
+  /**
+   * True when any counted trace of the department had its tokens ESTIMATED
+   * rather than reported by the provider. An estimate printed beside a
+   * reported count with nothing to tell them apart reads as one measurement.
+   */
+  hasEstimatedTokens: boolean;
 }
 
 export interface IngestionSourceHealthRow {
@@ -442,12 +486,38 @@ export class ActivityMonitorService {
   /**
    * Resolves the org's hidden internal_governance Project ID. Returns null
    * when the org has no Gov Project yet (no IngestionSource has ever been
-   * minted) - callers short-circuit to empty results in that case.
+   * minted) - the money reads short-circuit to empty results in that case.
+   * Reads answering an organization question do not consult this at all.
    */
   private async resolveGovProjectId(
     organizationId: string,
   ): Promise<string | null> {
     return await resolveGovProjectId({ prisma: this.prisma, organizationId });
+  }
+
+  /**
+   * The hidden governance project as a tenant list, empty when the org has
+   * never minted one. The list shape is what lets a scoped read take either
+   * population without the caller branching on which it asked for.
+   */
+  private async governanceTenantIds(organizationId: string): Promise<string[]> {
+    const govProjectId = await this.resolveGovProjectId(organizationId);
+    return govProjectId ? [govProjectId] : [];
+  }
+
+  /**
+   * Every live project of the org - the tenant scope for the reads that
+   * answer an organization question rather than a governance-project one
+   * (the department rollup, the adoption headcount). Archived projects are
+   * left out so a retired project stops counting.
+   */
+  private async organizationProjects(
+    organizationId: string,
+  ): Promise<Array<{ id: string; departmentId: string | null }>> {
+    return await this.prisma.project.findMany({
+      where: { team: { organizationId }, archivedAt: null },
+      select: { id: true, departmentId: true },
+    });
   }
 
   // -----------------------------------------------------------------------
@@ -466,10 +536,6 @@ export class ActivityMonitorService {
       anomalyBreakdown.warning +
       anomalyBreakdown.info;
 
-    const govProjectId = await this.resolveGovProjectId(input.organizationId);
-    if (!govProjectId) {
-      return { ...EMPTY_SUMMARY, openAnomalyCount, anomalyBreakdown };
-    }
     if (!this.repository) {
       return { ...EMPTY_SUMMARY, openAnomalyCount, anomalyBreakdown };
     }
@@ -479,23 +545,60 @@ export class ActivityMonitorService {
     const thisWindowStart = now - windowMs;
     const previousWindowStart = now - 2 * windowMs;
 
-    const row = await this.repository.findSummarySpend({
-      tenantId: govProjectId,
-      thisStart: thisWindowStart,
-      prevStart: previousWindowStart,
-      windowEnd: now,
-    });
+    // Adoption is an organization question - a person who only ever worked in
+    // an application project is still one of the org's people - so the
+    // headcount reads every project while the money below keeps the
+    // governance project's scope. Splitting the read is what keeps a spend
+    // figure from moving as a side effect of this (ADR-128 ruling 6), and it
+    // is also why the two are gated separately: an org with no governance
+    // project yet has no spend to report, but its people are still its
+    // people, and returning the empty summary for all of them would answer
+    // the organization question with one hidden project's existence.
+    const projectIds = (
+      await this.organizationProjects(input.organizationId)
+    ).map((p) => p.id);
+    const userCounts =
+      projectIds.length === 0
+        ? EMPTY_ACTIVE_USER_COUNT
+        : await this.repository.findActiveUserCount({
+            tenantIds: projectIds,
+            thisStart: thisWindowStart,
+            prevStart: previousWindowStart,
+            windowEnd: now,
+          });
+
+    // Money is the governance project's question. With no governance project
+    // there is nothing to ask, and the spend fields stay at their empty
+    // values rather than being answered from some wider scope.
+    const govProjectId = await this.resolveGovProjectId(input.organizationId);
+    const spend = govProjectId
+      ? await this.repository.findSummarySpend({
+          tenantId: govProjectId,
+          thisStart: thisWindowStart,
+          prevStart: previousWindowStart,
+          windowEnd: now,
+        })
+      : null;
 
     return {
-      spentThisWindowUsd: row.thisSpend,
-      windowOverPreviousPct: pctChange(row.thisSpend, row.prevSpend),
-      hasPriorBaseline: row.prevSpend > 0,
-      activeUsersThisWindow: row.thisUsers,
-      // newUsers requires a baseline-window comparison query which is a
-      // follow-up (3b: governance_kpis fold materialises the per-user
-      // first-seen). For now the dashboard renders the field but the value
-      // is conservative - treat all active as new only when prev=0.
-      newUsersThisWindow: row.prevSpend === 0 ? row.thisUsers : 0,
+      ...EMPTY_SUMMARY,
+      ...(spend
+        ? {
+            spentThisWindowUsd: spend.thisSpend,
+            windowOverPreviousPct: pctChange(spend.thisSpend, spend.prevSpend),
+            hasPriorBaseline: spend.prevSpend > 0,
+          }
+        : {}),
+      activeUsersThisWindow: userCounts.thisUsers,
+      // Naming the people who are actually new requires the per-user
+      // first-seen fold, which is a follow-up (3b: governance_kpis
+      // materialises it). Until then the field is a conservative proxy:
+      // everybody active counts as new only when the organization had
+      // nobody active in the window before. The baseline question is asked
+      // of the same org-wide population the number describes - asking it of
+      // the governance project's spend would report every person as new
+      // whenever that one hidden project happened to bill nothing.
+      newUsersThisWindow: userCounts.prevUsers === 0 ? userCounts.thisUsers : 0,
       openAnomalyCount,
       anomalyBreakdown,
     };
@@ -521,23 +624,70 @@ export class ActivityMonitorService {
   // Spend by user
   // -----------------------------------------------------------------------
 
+  /**
+   * Per-person figures over the population `scope` names, defaulting to the
+   * governance scope every caller had before the choice existed.
+   *
+   * The cost screen takes `organization`, so its "tokens by person" panel
+   * covers the same people as the "tokens by department" panel beside it —
+   * ADR-128 ruling 8 put the two on the same unit and the same table, and this
+   * is the other half of them agreeing. The three screens that still lead with
+   * dollars name no scope and are answered exactly as before, because moving a
+   * money figure as a side effect of this is what ruling 6 forbids.
+   *
+   * The organization scope does NOT consult the hidden governance project. It
+   * is minted by connecting a provider bill, so its absence says nothing about
+   * an organization's people — the lesson ADR-128 v3.20 recorded when it
+   * deleted the same gate from the adoption read.
+   *
+   * Tenancy: the project ids come from Prisma scoped to the org, so the
+   * ClickHouse read can only ever reach this org's own projects — the same
+   * construction `spendByDepartment` relies on.
+   */
   async spendByUser(input: {
     organizationId: string;
     windowDays: number;
     limit?: number;
     offset?: number;
-    sortBy?: SpendSortField;
+    sortBy?: SpendByUserSortField;
     sortDir?: SortDir;
+    scope?: SpendByUserScope;
   }): Promise<SpendByUserRow[]> {
-    const govProjectId = await this.resolveGovProjectId(input.organizationId);
-    if (!govProjectId) return [];
+    const scope = input.scope ?? "governance";
+    // Rejects here, not only at the procedure. The router's zod enum protects
+    // the four screens; it does not protect a background worker or webhook
+    // adapter calling the service directly, which is the caller every enum
+    // guard in this directory exists for (`unsupportedValue.ts`), and the same
+    // guard `anomalyRule.service.ts` and `ingestionSource.service.ts` carry.
+    // Without it an unmatched value selects a population neither branch
+    // intends: the service resolves the governance tenant ids while the
+    // repository builds the organization SQL around them.
+    if (!SPEND_BY_USER_SCOPES.includes(scope)) {
+      throw unsupportedValue({
+        field: "scope",
+        value: scope,
+        allowed: SPEND_BY_USER_SCOPES,
+      });
+    }
+    const tenantIds =
+      scope === "organization"
+        ? (await this.organizationProjects(input.organizationId)).map(
+            (project) => project.id,
+          )
+        : await this.governanceTenantIds(input.organizationId);
+    // Nothing to read: no live project in the organization scope, no hidden
+    // governance project in the governance one. Both are a true emptiness
+    // rather than a gate — neither answers a question about people with the
+    // existence of a project.
+    if (tenantIds.length === 0) return [];
     if (!this.repository) return [];
 
     const now = Date.now();
     const windowMs = input.windowDays * 24 * 60 * 60 * 1000;
 
     const rows = await this.repository.findSpendByUser({
-      tenantId: govProjectId,
+      tenantIds,
+      scope,
       windowStart: now - windowMs,
       windowEnd: now,
       sortBy: input.sortBy ?? "spend",
@@ -556,6 +706,8 @@ export class ActivityMonitorService {
       hasPriorBaseline: false,
       mostUsedTarget:
         r.mostUsedTarget && r.mostUsedTarget !== "" ? r.mostUsedTarget : null,
+      tokens: r.tokensStr === null ? null : Number(r.tokensStr),
+      hasEstimatedTokens: r.tokensEstimatedStr === "1",
     }));
   }
 
@@ -565,10 +717,10 @@ export class ActivityMonitorService {
 
   /**
    * Spend rolled up by department across EVERY project in the org - the
-   * fix for the empty bird's-eye graphs. Unlike `summary`/`spendByUser`,
-   * which read only the hidden governance project and the governance
-   * ingestion origin, this aggregates the whole org's AI spend so an org
-   * with real traffic but no ingestion source still populates.
+   * fix for the empty bird's-eye graphs. Unlike the money reads in
+   * `summary`/`spendByUser`, which stay on the hidden governance project and
+   * the governance ingestion origin, this aggregates the whole org's AI spend
+   * so an org with real traffic but no ingestion source still populates.
    *
    * A trace's department is resolved by precedence (principal user → the
    * user's team → the project, else Unassigned), so a person's personal
@@ -587,13 +739,7 @@ export class ActivityMonitorService {
     organizationId: string;
     windowDays: number;
   }): Promise<SpendByDepartmentRow[]> {
-    const projects = await this.prisma.project.findMany({
-      where: {
-        team: { organizationId: input.organizationId },
-        archivedAt: null,
-      },
-      select: { id: true, departmentId: true },
-    });
+    const projects = await this.organizationProjects(input.organizationId);
     if (projects.length === 0) return [];
     if (!this.repository) return [];
 
@@ -1125,6 +1271,37 @@ interface SpendOverTimeRolled {
   rolledRows: RolledSpendRow[];
 }
 
+/**
+ * One CH row's tokens folded into what the department has accumulated so far.
+ *
+ * A department is UNMEASURED only when none of its rows carried a count: one
+ * measured project among several unmeasured ones is a partial figure, which
+ * is still a figure, and a null there would throw away a real measurement.
+ * The estimate flag only follows rows that contributed a count — a row with
+ * no tokens has no estimate to report.
+ */
+function addDepartmentTokens({
+  prior,
+  row,
+}: {
+  prior: { tokens: number | null; hasEstimatedTokens: boolean };
+  row: SpendByDepartmentChRow;
+}): { tokens: number | null; hasEstimatedTokens: boolean } {
+  // Rebuilt rather than returned as-is: the caller spreads this over the
+  // accumulator, and handing `prior` straight back would spread its spend and
+  // request counters over the ones the caller just advanced.
+  if (row.tokensStr === null)
+    return {
+      tokens: prior.tokens,
+      hasEstimatedTokens: prior.hasEstimatedTokens,
+    };
+  return {
+    tokens: (prior.tokens ?? 0) + Number(row.tokensStr),
+    hasEstimatedTokens:
+      prior.hasEstimatedTokens || row.tokensEstimatedStr === "1",
+  };
+}
+
 function assembleDepartmentRows({
   rows,
   projectDepartmentById,
@@ -1140,7 +1317,14 @@ function assembleDepartmentRows({
 }): SpendByDepartmentRow[] {
   const acc = new Map<
     string,
-    { spendNanoUsd: bigint; requestCount: number; lastActivityMs: number }
+    {
+      spendNanoUsd: bigint;
+      requestCount: number;
+      lastActivityMs: number;
+      /** Null until a contributing row carries a count. See the row type. */
+      tokens: number | null;
+      hasEstimatedTokens: boolean;
+    }
   >();
   for (const r of rows) {
     const hasPrincipalUser = r.actor !== "";
@@ -1159,14 +1343,21 @@ function assembleDepartmentRows({
       spendNanoUsd: 0n,
       requestCount: 0,
       lastActivityMs: 0,
+      tokens: null,
+      hasEstimatedTokens: false,
     };
     acc.set(key, {
       spendNanoUsd: prior.spendNanoUsd + usdToNanoUsd(r.spendUsdStr),
       requestCount: prior.requestCount + Number(r.requests),
       lastActivityMs: Math.max(prior.lastActivityMs, Number(r.lastActivityMs)),
+      ...addDepartmentTokens({ prior, row: r }),
     });
   }
 
+  // Ranked by money, deliberately: the bird's-eye dashboard reads this list in
+  // order and asks it a spend question. The cost screen leads its own copy
+  // with tokens and re-ranks at the render layer, which is where a per-screen
+  // unit belongs — one read cannot be sorted two ways at once.
   return [...acc.entries()]
     .map(([key, v]) => ({
       departmentId: key === UNASSIGNED_DEPARTMENT ? null : key,
@@ -1178,6 +1369,8 @@ function assembleDepartmentRows({
       requestCount: v.requestCount,
       lastActivityIso:
         v.lastActivityMs > 0 ? new Date(v.lastActivityMs).toISOString() : null,
+      tokens: v.tokens,
+      hasEstimatedTokens: v.hasEstimatedTokens,
     }))
     .sort((a, b) => {
       const aNano = usdToNanoUsd(a.spendUsd);

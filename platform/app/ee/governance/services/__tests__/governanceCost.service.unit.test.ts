@@ -40,6 +40,7 @@ function gatewayDay(overrides: Partial<GatewayDayRow> = {}): GatewayDayRow {
     requestCount: 0,
     pricedRequestCount: 0,
     requestsWithoutAmount: 0,
+    tokensTotal: 0,
     ...overrides,
   };
 }
@@ -364,7 +365,16 @@ describe("GovernanceCostService.summary", () => {
 
   describe("given an organization that has never ingested anything", () => {
     describe("when requesting the summary", () => {
-      it("reports unavailable with null amounts rather than zeros", async () => {
+      /**
+       * No `unavailableReason` any more. The missing governance project scopes
+       * the BILL and says nothing about the organization, so the lanes that
+       * are the organization's own still run — and here they answer nothing,
+       * which is what leaves the screen saying nothing was recorded. What this
+       * test has always been about is the shape of that nothing: null, never
+       * zero. `governanceCostWithoutGovProject.unit.test.ts` covers the
+       * organization that DOES have metered traffic without a bill.
+       */
+      it("holds null amounts rather than zeros", async () => {
         const service = createService({
           prisma: prismaWithGovProject(null),
           costRollup: rollupReturning({ rows: [] }),
@@ -375,9 +385,11 @@ describe("GovernanceCostService.summary", () => {
           windowDays: 30,
         });
 
-        expect(result.unavailableReason).toBe("no_governance_project");
         expect(result.billed.amountUsd).toBeNull();
         expect(result.gateway.amountUsd).toBeNull();
+        expect(result.billed.amountUsd).not.toBe(0);
+        expect(result.gateway.amountUsd).not.toBe(0);
+        expect(result.series).toEqual([]);
       });
     });
   });
@@ -418,6 +430,7 @@ describe("GovernanceCostService.summary", () => {
             day: "2026-08-01",
             billedUsd: 12,
             gatewayUsd: 7,
+            gatewayTokens: 0,
             billedCellsWithoutAmount: 0,
             gatewayCellsWithoutAmount: 0,
             // Neither row was ever revised or observed by a pull, so the day

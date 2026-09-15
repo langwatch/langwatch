@@ -2070,6 +2070,679 @@ money tables, only the identity tables and read paths.
 
 ## Revisions
 
+- **v3.21 (2026-09-15, captain: Sergio Esteban).** Finishes Ruling 8. The cost
+  screen's two people-facing panels now cover the same people, not only the
+  same unit. Completes Ruling 8 rather than superseding it; narrows the reach
+  of Ruling 6's **First** limit, which still stands where it was written. No
+  schema change.
+
+  - **What was wrong.** Ruling 8 gave the person panel the department panel's
+    unit "so the two people-facing panels on the cost screen agree on what they
+    measure", and stopped there. They read the same table and report the same
+    unit over different populations. `spendByDepartment` resolves every live
+    project of the organization and passes `tenantIds`
+    (`platform/app/ee/governance/services/activity-monitor/activityMonitor.service.ts:742-749`);
+    `spendByUser` resolved the one hidden governance project, and the read
+    additionally filtered
+    `Attributes['langwatch.origin.kind'] = 'ingestion_source'`, which
+    `findSpendByDepartment` does not
+    (`...spend.clickhouse.repository.ts:352`). Side by side over the same rows
+    the department panel therefore printed a token count and the person panel
+    beside it said nothing had been recorded. Measured on a development store
+    holding seven traces in the window: every one carried `langwatch.user_id`,
+    none carried the origin attribute, none sat under the hidden governance
+    project, and the two panels read 545 tokens and nothing at all.
+
+  - **Why Ruling 6's carve-out does not cover this read.** That limit is
+    written about `findSummarySpend` and the five outputs `summary()` derives
+    from it, and it stands there untouched. Its principle — a money figure must
+    not move as a side effect of a fix aimed elsewhere — is what shapes this
+    change rather than what forbids it. Ruling 8 had already stopped the cost
+    screen's person panel leading with money; three other render sites still
+    lead with dollars, and those are what the principle protects.
+
+  - **The decision: scope is a caller's choice, at the render layer.** The same
+    seam Rulings 7 and 8 used for the unit. `spendByUser` gains
+    `scope: "governance" | "organization"`
+    (`...activityMonitor.clickhouse.schemas.ts:70-71`), defaulting to
+    `"governance"` at the procedure
+    (`platform/app/ee/governance/routers/activityMonitor.ts:91`) and at the
+    service (`...activityMonitor.service.ts:656`). `"governance"` is the
+    behaviour every caller had: the hidden governance project, and only traffic
+    that arrived through a governance source. `"organization"` is every live
+    project of the org with no source filter — `findSpendByDepartment`'s
+    population exactly. Only `platform/app/src/pages/governance/costs.tsx:981`
+    opts in, riding the same argument that already carries `sortBy: "tokens"`.
+    The other three render sites name no scope and are answered as before, down
+    to the SQL: the governance branch keeps `TenantId = {tenantId:String}`
+    rather than a one-element `IN`
+    (`...spend.clickhouse.repository.ts:255-257`).
+
+  - **Two things that stay where they are.** The `ORDER BY` remains a lookup
+    into `SORT_FIELD_TO_AGG_EXPR`; the scope is a code branch choosing between
+    two literal fragments, never caller-supplied text
+    (`...spend.clickhouse.repository.ts:254-265`). And the project ids come
+    from Prisma scoped to the organization, so a ClickHouse read in the
+    organization scope can only ever reach this org's own projects — the same
+    construction `spendByDepartment` relies on.
+
+  - **The gate does not travel to the new scope.** In the organization scope
+    the read never consults `resolveGovProjectId`. That project is minted by
+    connecting a provider bill (`platform/app/ee/governance/services/govProject.ts:10-13`),
+    so its absence says nothing about an organization's people — the lesson
+    v3.20 recorded when it deleted the same gate from the adoption read. The
+    governance scope keeps its empty answer, because there the missing project
+    genuinely is the whole question.
+
+  - **A money figure this does move, stated rather than glossed.** Ruling 8
+    kept a small per-request dollar second line under each person's token
+    count. It is summed from the same rows, so widening the population widens
+    it too: a person's second line on the cost screen now covers the
+    organization's traffic rather than the governance silo's. This is
+    deliberate and is the point — it is the same figure, over the same rows, as
+    the department panel's own second line, so the two agree instead of
+    disagreeing. It is not a side effect of a headcount fix, and it is
+    confined to the panel Ruling 8 already moved; the three dollar-leading
+    screens are untouched.
+
+  - **What is pinned.** Three scenarios under *A people panel measures tokens
+    and says which store it read* in
+    `specs/governance/governance-cost-screen.feature:1931`, `:1942` and
+    `:1952`. The scope choice is proved at the service
+    (`activityMonitorSpendByUserScope.unit.test.ts`), the source filter and the
+    tenant predicate at the repository, against the SQL actually sent
+    (`activityMonitorSpendByUserOriginFilter.unit.test.ts`), the opt-in at the
+    one call site allowed to make it
+    (`spendByUserScopeCallSites.unit.test.ts`, which walks every caller so a
+    fifth one added later cannot opt in unnoticed), and the cost screen's own
+    request (`costPersonPanelScope.integration.test.tsx`). The organization
+    scope is a second query shape, so it takes its own row in the query-bounds
+    table rather than riding on the governance one's.
+
+  - **Both halves of the scope decision fail closed, toward governance.** The
+    scope is read twice — the service resolves the tenant ids from it, the
+    repository builds the SQL from it — and the two halves originally defaulted
+    in opposite directions: the service tested the `"organization"` literal and
+    fell back to the governance tenant ids, the repository tested the
+    `"governance"` literal and fell back to the wide `TenantId IN (...)` with
+    the source filter dropped. A value matching neither therefore read the
+    hidden governance project through the organization SQL, a population
+    neither branch intends. The repository now tests the `"organization"`
+    literal so its fallback is the narrow governance SQL
+    (`...spend.clickhouse.repository.ts:254-265`), matching the service and
+    matching the `sortBy` fallback in the same function
+    (`...spend.clickhouse.repository.ts:235-236`). The SQL a genuine
+    `"governance"` call sends is unchanged by construction rather than by
+    luck: both branches carry the same string literals they carried before,
+    and only the ternary arms swapped, so the governance fragments are the
+    identical characters. A whole-query snapshot pins that against future
+    edits (`activityMonitorSpendByUserScopeFailsClosed.unit.test.ts`).
+
+  - **The scope is rejected at the service, not only at the procedure.** These
+    services are deliberately reachable from more than the tRPC routers, so the
+    router's zod enum protects the four screens and nothing else
+    (`platform/app/ee/governance/services/activity-monitor/unsupportedValue.ts:8-12`);
+    `spendByUser` now carries the same `unsupportedValue` guard
+    `anomalyRule.service.ts:143-148` and `ingestionSource.service.ts:1026-1036`
+    already carry (`...activityMonitor.service.ts:665-671`). A `ValidationError`
+    naming the field and the allowed values, not a 5xx for a typo. The list
+    itself becomes the single source of truth — `SPEND_BY_USER_SCOPES` is
+    exported and `SpendByUserScope` derived from it
+    (`...activityMonitor.clickhouse.schemas.ts:70-71`), and the procedure's
+    enum and the guard's `allowed` both read it
+    (`platform/app/ee/governance/routers/activityMonitor.ts:91`), so a member
+    added later cannot reach one half and not the other. The sibling `sortBy`
+    stays a hand-written union because `SORT_FIELD_TO_AGG_EXPR` is a `Record`
+    over it and a drifted member is a compile error; nothing tied the scope
+    that way.
+
+- **v3.20 (2026-09-14, captain: Sergio Esteban).** Removes the two null-gates
+  that answered an organization question with the existence of one hidden
+  project, and records why the invariant they were defending survives without
+  them. Supersedes the **Second** limit on Ruling 6 in v3.18 (which v3.19 left
+  standing). No schema change; no change to the money scope.
+
+  - **What the gates were.** Both services short-circuited on
+    `resolveGovProjectId` returning null. The activity monitor returned
+    `EMPTY_SUMMARY` before issuing any read; the cost service returned
+    `unavailable({ reason: "no_governance_project" })` above every lane of the
+    summary. The first is deleted by commit `74d53ad732` ("count adoption
+    without a governance project, and show failed reads as failed"), which
+    touched no ADR; the second is deleted in this PR, where `summary()` moves
+    its five governance-tenant-scoped reads into a private
+    `readGovernanceTenantLanes()` that returns empty answers when the tenant is
+    null, and lets the organization-scoped lanes — the gateway metered lane
+    through `sumDaysForOrganizationProjects({ tenantIds })`, plus two Prisma
+    reads — answer for real. `summary()` can no longer report
+    `no_governance_project` at all. The reason survives only on the four
+    breakdowns (`spenderBreakdown`, `dailyByProvider`, `spendByModel`,
+    `periodRecords`), which read the governance rollup and nothing else, so for
+    them it is the true answer rather than a gate.
+
+  - **Why the ruling was wrong.** The hidden governance project scopes the
+    **bill**, not the organization. It is minted lazily by
+    `ensureHiddenGovernanceProject` when the org's first `IngestionSource` is
+    created — i.e. when somebody connects a provider bill — and nothing mints
+    it from ordinary SDK trace traffic or from gateway requests
+    (`platform/app/ee/governance/services/govProject.ts:7-18`). So an
+    organization serving real gateway traffic and buying no provider bill had
+    never minted one, and both screens told it that nothing had been recorded
+    and that nobody had used an AI tool. Both statements were false, and both
+    were produced by a gate, not by a read. A tenant id that exists to key
+    ClickHouse rows for the money is not evidence about an organization's
+    people or about its gateway spend.
+
+  - **The invariant the gate was defending still holds, by a better
+    mechanism.** "An adoption count of zero with nothing connected must not be
+    reported as a measurement" was the right concern; one hidden project's
+    existence was never the right test of it. The connectedness test now lives
+    in `summaryHoldsFigures`
+    (`platform/app/src/pages/governance/costs.tsx:2001-2011`), which requires
+    `unavailableReason === null` **and** at least one lane to have actually
+    reported — `summaryAsRead`
+    (`platform/app/src/components/governance/costs/costSampleMode.ts:50-66`)
+    counts the billed lane, the gateway lane and reported seats. An
+    organization with nothing connected has zero reporting lanes, so the banner
+    still says nothing was recorded and the adoption card still names what
+    would fill it. Banner and headcount are derived from the *same* lane count,
+    so they cannot disagree the way a gate and a read could. The two scenarios
+    the superseded limit cited still pin this and are unchanged in substance —
+    *"An adoption count of zero from a connected source is shown as the
+    measurement it is"* and *"An adoption count of zero with nothing connected
+    is not reported as a measurement"* in
+    `specs/governance/governance-cost-screen.feature`.
+
+  - **A residual, stated rather than glossed.** The adoption card's
+    connectedness still comes from the **cost** summary. An organization with
+    SDK trace traffic, no gateway requests and no provider bill has genuinely
+    empty cost lanes, so `summaryHoldsFigures` stays false and the card still
+    says to add a source — even though the activity monitor now measures its
+    people. This widening unlocks the card for **gateway** organizations only.
+    Closing the rest requires giving the activity read its own way to say "not
+    measured": `activeUsersThisWindow` is a plain zero-filled number today
+    (`activityMonitor.service.ts:84`, zeroed at `:273`), so it cannot
+    distinguish "measured, nobody" from "not measured". That is a different DTO
+    and a separate decision, deliberately not taken here.
+
+- **v3.19 (2026-09-13, captain: Sergio Esteban).** Corrects three rulings in
+  v3.18 that a red-team round disproved before any code was written. Two of
+  them rested on premises this document asserted without checking, and each
+  would have put a wrong number on a customer's screen. No schema change; the
+  scope, the out-list and the one-PR plan of v3.18 stand.
+  - **Why this is a revision and not a quiet edit.** v3.18 closed a parc-fermé
+    round. Its rulings were attacked on the way into implementation and three
+    did not survive. Rewriting them in place would erase the evidence that the
+    original reasoning was wrong, which is the part a later reader needs most —
+    the mistakes below are easy to make twice.
+
+  - **Supersedes Ruling 1 — cache tokens are counted, and two `Tokens*`
+    columns are subsets that must never be added.** v3.18 adopted the
+    `performance.total_tokens` shape — prompt + completion, cache excluded — on
+    the unstated belief that `TokensInput` on `gateway_spend` is a full prompt
+    count, the way `TotalPromptTokenCount` is on `trace_summaries`. It is not.
+    The gateway writes the *billable* figure: `BillableInputTokens()` returns
+    `PromptTokens - CacheReadTokens - CacheCreationTokens`
+    (`services/aigateway/domain/response.go:106-111`), and the emitter records
+    the same split in prose — *"CacheReadTokens and CacheCreationTokens are
+    disjoint from InputTokens"*
+    (`services/aigateway/adapters/spendemitter/record.go:47-54`). Cache has
+    already been taken out of the column. Applying `total_tokens` arithmetic on
+    top of it subtracts cache a second time.
+
+    **What that would have shipped.** The domain's own test fixes the
+    magnitude: prompt 4814, cache read 4736, stored value **78**
+    (`services/aigateway/domain/billable_input_test.go:25-32`). Agent traffic is
+    overwhelmingly cache reads, so the panel would have reported roughly 1.6% of
+    the tokens the models actually processed, on the screen a customer opens to
+    size their usage. The captain's ruling is that the panel reports the work
+    the model did, so cache is counted and the metered expression becomes
+
+    `TokensInput + TokensOutput + TokensCacheRead + TokensCacheWrite + TokensInputAudio + TokensOutputAudio + TokensInputImage + TokensOutputImage`
+
+    which is the `performance.total_processed_tokens` shape
+    (`platform/app/src/server/analytics/clickhouse/metric-translator.ts:554-564`),
+    not the `total_tokens` shape v3.18 named.
+
+    **Two `Tokens*` columns are deliberately absent, and both would
+    double-count.** `TokensReasoning` is a subset of the output count —
+    *"it stays a subset of OutputTokens"* (`record.go:53-54`). `TokensCacheWrite1h`
+    is *"the portion of CacheCreationTokens that bought"* the longer TTL
+    (`services/aigateway/domain/response.go:41`), normalised upward into
+    `CacheCreationTokens` when a provider reports them inconsistently (`:213-214`).
+    Eight of the thirteen metering columns are in the sum; two are subsets of
+    columns already in it; three (`CharsInput`, `AudioMS`, `ImageCount`) are not
+    tokens. The audio and image reasoning from v3.18 is unchanged and still
+    holds: those counts arrive already subtracted from `TokensInput` and
+    `TokensOutput` (`00078:27-28`, `00089:24-26`), so they are added back.
+
+    **Struck from Ruling 1: "the two stores then agree by construction."**
+    That claim is false and adding cache back makes it further from true. The
+    gateway's customer span publishes `gen_ai.usage.input_tokens` as the
+    billable, cache-subtracted figure, and the audio and image attributes never
+    reach `trace_summaries` at all. The two stores measure different things and
+    will report different numbers for the same call. Nothing depended on the
+    claim: Ruling 2 already forbids adding the lanes, and Ruling 3's labelling
+    requirement now carries the weight the false claim was carrying — each panel
+    names the store its tokens were counted in, and no scenario asserts the two
+    are equal.
+
+  - **Supersedes Ruling 4 — the per-SKU defect is in the mapper, not the fold,
+    and honouring it changes a spec line already adopted.** v3.18 named
+    `aggregateSeatCounts` (`platform/app/src/components/governance/costs/costsWindow.ts:317-331`)
+    as the place one row per SKU would be restored. It cannot be: pool identity
+    is already gone before that function runs. `DailyPoint` is
+    `{key, label, value}` (`platform/app/src/components/governance/costs/sampleSeries.ts:40-44`)
+    with no product field, and the mapper at `:322-337` folds every pool into
+    exactly two points, `bought` and `assigned`, through `total(...)`. The read
+    is per-pool and already correct — `GovernanceSeatPoolDto[]`
+    (`platform/app/ee/governance/services/governanceCost.service.ts:163-184`).
+    The flattening is the client's, one layer earlier than v3.18 said.
+
+    **The fold's real hazard is day skew, not same-day collision.**
+    `aggregateSeatCounts` replaces a bucket's whole points array with the latest
+    day's, so two pools whose newest reports fall on *different* days inside one
+    bucket lose the earlier-reported one entirely. Seat pools renew on their own
+    dates, so this is the normal case, not the edge. A scenario built on two
+    pools reported on the same day passes against both the broken and the fixed
+    implementation and must not be written.
+
+    **A spec line adopted earlier is being rewritten, not merely extended.**
+    `specs/governance/governance-cost-screen.feature:421`, inside *"Seats are
+    drawn as counts against a seat axis, never as money"*, read *"And the two
+    series are drawn side by side rather than added together"*. Two series is
+    the summed shape. One pair per SKU draws two series per product. The
+    captain's ruling is per SKU, so that line is rewritten in this PR to say the
+    pools are drawn as their own pairs and never added across products. Recorded
+    here because changing an adopted scenario is a decision, not a detail.
+
+  - **Narrows Ruling 7 — subscription departments have no measured tokens, and
+    the panel says so instead of showing a zero.** Ruling 7 rested on the
+    premise that tokens are true under both pricing models where dollars are
+    not. That is false for exactly the case it was written for. Routed
+    subscription conversations are assembled deliberately cost-free
+    (`platform/app/ee/governance/services/pullers/conversationTraceAssembly.ts:42-52`)
+    and they are token-free too: the Copilot Studio mapper carries no token
+    field at all, and the Genie mapper explicitly declines to copy the puller's
+    literal zeros, leaving the estimator to count text and stamp
+    `langwatch.tokens.estimated = true` (`genieTraceMapper.ts:475-477`).
+    `TotalPromptTokenCount` is `Nullable(UInt32)`
+    (`platform/app/src/server/clickhouse/migrations/00002_create_schema.sql:153-154`)
+    and stays null for them.
+
+    So a department working entirely inside a subscription assistant reads
+    either nothing or an estimate, never a measurement. The captain's ruling
+    keeps tokens as the figure and marks the rows: a department with no token
+    rows states it was not measured rather than rendering `0`, and a department
+    whose tokens are estimated is labelled estimated on the row. This holds
+    Ruling 3 — a panel never states a number it did not measure — rather than
+    carving an exception into it for this one panel. Rejects: falling back to
+    dollars for subscription rows (one column would then mean money for some
+    departments and tokens for others, which is the defect Ruling 7 exists to
+    remove); dropping the department change (the per-request departments are
+    measured correctly today and the panel is already wrong for them).
+
+  - **What did not change.** Rulings 2, 3, 5, 6, 8 and 9 stand as written in
+    v3.18, as does the out-of-scope list and the correction record against
+    langwatch-saas #1230. The blast-radius finding in v3.18 — that
+    `spendByUser` and `spendByDepartment` have consumers beyond this screen, so
+    the unit changes at the render layer — is unaffected by anything above.
+
+- **v3.18 (2026-09-13, captain: Sergio Esteban).** Wires the cost screen's
+  unmeasured panels to the lanes that already hold their data, and moves the
+  cost screen's two people-facing panels off money onto tokens. Nine rulings
+  from a parc-fermé round; no schema migration; one PR. Tracking issue
+  langwatch-saas #1230 (two of its items are corrected here — see *Corrections*
+  below). Red-teamed before adoption; the findings that changed the document
+  are recorded inline rather than summarised away.
+  - **Why now.** Six panels on a live screen draw a hardcoded empty array
+    (`AWAITING_A_READ`, declared `platform/app/src/pages/governance/costs.tsx:1123`,
+    consumed at `:1199`, `:1235`, `:1436`, `:1456`, `:1614`, `:1627`) while their
+    lanes hold rows, and two more state a number they did not measure. A
+    customer is looking at it.
+  - **What the blast radius actually is.** An earlier draft of this entry said
+    "the screen alone". That was false and is corrected here. Two of the reads
+    this revision touches are shared procedures with consumers beyond the cost
+    screen: `activityMonitor.spendByUser` renders at
+    `platform/app/src/pages/governance/costs.tsx:933`,
+    `platform/app/src/components/governance/PeopleTable.tsx:260`,
+    `platform/app/src/pages/governance/people.tsx:211` and
+    `platform/app/src/pages/governance/users/[id].tsx:38`; `spendByDepartment`
+    additionally powers the bird's-eye card its own docblock names
+    (`platform/app/ee/governance/routers/activityMonitor.ts:130`). Rulings 7
+    and 8 therefore change the unit **at the render layer, not at the service
+    layer** — see those rulings. No export, alert or invoice reads these
+    figures and a revert is a deploy, so this remains a revision rather than a
+    new ADR.
+
+  - **Ruling 1 — "tokens" means every token, input plus output, cache and
+    reasoning excluded.**
+
+    > **[SUPERSEDED — see revision v3.19.]** Cache is counted, not excluded.
+    > The expression below and the sentence "the two stores then agree by
+    > construction" are both wrong and must not be implemented from. The
+    > reasoning is kept because the mistake is easy to make twice.
+
+    The gateway ledger carries thirteen metering
+    quantity columns across three migrations (`00067:73-77`, `00078:57-61`,
+    `00089:44-46`), three of which — `CharsInput` (characters), `AudioMS`
+    (milliseconds) and `ImageCount` (pictures) — are not tokens at all. Ten
+    of the thirteen are named `Tokens*`. The product had already ruled the
+    arithmetic twice and neither definition was consulted:
+    `performance.total_tokens` is prompt + completion, carrying the comment
+    *"the 'new content' delta, excludes cache"*
+    (`platform/app/src/server/analytics/clickhouse/metric-translator.ts:509-517`),
+    and `performance.total_processed_tokens` adds cache read and cache
+    creation (`:554-564`, whose own comment records that reasoning is a
+    subset of completion and so is never added again). The governance screen
+    adopts the `total_tokens` shape: prompt + completion, no cache, no
+    separate reasoning term.
+
+    **The gateway ledger needs four columns added back to reach that
+    number, and an earlier draft of this entry missed it.** `TokensInput` and
+    `TokensOutput` on `gateway_spend` have audio and image tokens *already
+    subtracted* — the migrations state it twice, *"The two counts arrive
+    already subtracted from TokensInput and TokensOutput, so each token is
+    priced exactly once"* (`00078:27-28`, repeated `00089:24-26`). The exclusive
+    split exists so the rating path prices each token once at its own rate; it
+    is correct for money and wrong for a token count. `trace_summaries`
+    carries no such split. Left alone, the same word would name two numbers:
+    `00089:12-13` measures a 1024×1024 image answer at roughly 1600 output
+    image tokens against a prompt of a few dozen text tokens, so a gateway
+    panel would report ~40 where a trace-store panel reports ~1640 for the
+    same call. The captain's ruling is that a token is a token, so the metered
+    panel's expression is
+
+    `TokensInput + TokensOutput + TokensInputAudio + TokensOutputAudio + TokensInputImage + TokensOutputImage`
+
+    and the two stores then agree by construction. Rejects: inventing a
+    governance-only total (two screens would disagree using the same word);
+    shipping both as two lines (makes the reader carry a distinction the rest
+    of the product does not); leaving the gateway expression unpatched and
+    labelling the difference in prose (the difference is arithmetic, and prose
+    does not make two numbers one).
+
+    **Known limit, accepted.** Tokens are zero for usage that bills real
+    money: TTS is metered in `CharsInput` and audio duration in `AudioMS`, and
+    `00078:8-12` records three TTS calls worth $0.18 of real spend that moved
+    a budget by $0.0002. A voice-heavy department reads near zero tokens while
+    costing money. This is the same blind spot dollars have, pointed the other
+    way, and it is the price of one word meaning one thing.
+
+  - **Ruling 2 — lanes are never summed, and that now covers tokens as well
+    as money.** §1 was re-asked rather than carried over, because a constraint
+    nobody re-confirms is an assumption wearing a constraint's clothes.
+    Re-affirmed on the captain's own reasoning: *"they live in diff tables."*
+    The invariant table's wave-1 code-review gate is unchanged for money.
+
+    **The rule is extended to tokens here because rulings 7 and 8 move two
+    panels off the money lanes, where §1 does not reach.** After this revision
+    the screen carries three token figures over traffic that overlaps: "Tokens
+    over time" reads the gateway ledger; department and person tokens read
+    `trace_summaries`. The gateway emits a customer OTLP trace for every
+    completion it serves, so where a tenant points that export at their own
+    project the same request is counted in the gateway figure *and* in the
+    trace-store figures. The three also differ in scope — department reads
+    every project in the org with no origin filter, person reads one project
+    filtered to `origin.kind = ingestion_source`. They neither match nor sum,
+    for three independent reasons.
+
+    Therefore: **every token panel states on its face which traffic it counts,
+    and gateway-sourced figures say so in the panel itself, not in a
+    footnote.** This is the captain's wording — *numbers that come from the
+    gateway must be clearly highlighted as coming from the gateway.* Nothing
+    on the screen adds two token figures together, and cross-panel token
+    summing is a code-review gate exactly as "one dollar, one home" is.
+
+  - **Ruling 3 — a panel with no figures says so and names what would fill
+    it.** No zero, no hidden panel. This is what the screen already does and
+    what the spec already requires, and it is restated because rulings 6–8 add
+    new ways for a panel to come back empty. Two spec rules govern the
+    implementation and are easy to get wrong:
+    `specs/governance/governance-cost-screen.feature:321-331` — *emptiness is a
+    count of figures, not a count of days*, so a 365-bucket window of nothing
+    is not an empty list; and `:343-347` — "we did not measure this" and "we
+    measured nothing" are different answers and must not collapse to the
+    same 0.
+
+    **Scope of this ruling, corrected.** An earlier draft claimed ruling 3
+    neutralised the attribution assumption for both people-facing panels. It
+    does not. `findSpendByUser` filters `ts.Attributes[userKey] != ''`, so
+    unattributable rows drop out, the list returns empty and this ruling
+    fires — correct. `findSpendByDepartment` has **no** such filter: it groups
+    by `(projectId, actor)` with `actor` possibly empty, and the service
+    resolves department by precedence principal user → user's team →
+    **project**, else Unassigned (`departmentAttribution.ts:41-51`;
+    `specs/ai-gateway/governance/departments.feature:53` binds *"An agent trace
+    with no principal user attributes to its project's department"*). So where
+    attribution is sparse the department panel does not go empty — it renders,
+    attributed by project. That is intended behaviour, not a bug, but it means
+    ruling 3 covers the person panel only and the assumption below is not
+    neutralised for departments.
+
+  - **Ruling 4 — the seats panel shows one row per SKU, never one summed
+    pair.**
+
+    > **[SUPERSEDED in part — see revision v3.19.]** The ruling itself stands;
+    > the repair site named below is wrong. Pool identity is already gone
+    > before `aggregateSeatCounts` runs, so the mapper and the point shape
+    > change too, and an adopted spec line is rewritten.
+
+    Pools are per-SKU per-day (`platform/app/ee/governance/services/governanceCost.service.ts:163-170`)
+    and `platform/app/src/components/governance/CostLanePanel.tsx:324` already
+    forbids summing them (*"Nothing is summed across pools"*, `:323`). This is not a
+    free wire-up: `aggregateSeatCounts` (`costsWindow.ts:318`) keys its
+    output on bucket start alone, so multi-SKU input silently keeps only the
+    last SKU in each bucket. The helper is fixed as part of this work
+    regardless of which shape had been chosen.
+
+  - **Ruling 5 — the code is right about the two wide panels; the note is
+    stale.** The doc comment at `costs.tsx:1173-1179` says they exist only in
+    sample mode; `HeadlinePanels` (`:1180`) is rendered unconditionally at
+    `:1695` and both panels carry an empty state. The comment is corrected to
+    match, which is also what ruling 3 wants.
+
+  - **Ruling 6 — the adoption panel reads the right table and the wrong
+    scope.** It was previously recorded (langwatch-saas #1230) as reading the
+    wrong store. That was wrong. `findSummarySpend`
+    (`platform/app/ee/governance/services/activity-monitor/activityMonitor.spend.clickhouse.repository.ts:58-108`)
+    filters `langwatch.origin.kind = "ingestion_source"`
+    (`ee/governance/services/governanceAttributeKeys.ts:23`), which is exactly the
+    coding-assistant traffic the panel is meant to count — the ingestion
+    sources carry a `sourceType` label for that purpose (`:31`). The defect is
+    that its caller passes a single tenant, the hidden governance project
+    (`activityMonitor.service.ts:483`), while the sibling department read
+    resolves every non-archived project in the org (`:590-605`, `archivedAt:
+    null` at `:593`). Assistant traffic lands in the org's application
+    projects, which the adoption read never looks at, so it answers 0
+    correctly for the one project it was given. Fixed by giving it the org's
+    project list, the same way `spendByDepartment` already does. The panel's
+    own guard (`costs.tsx:1908-1919`) is correct and is not touched.
+
+    > **[SUPERSEDED in part — see revision v3.20.]** The **Second** limit
+    > below is wrong. The `resolveGovProjectId` null-gate does not stay: it
+    > is deleted, here and in the cost service, because the hidden governance
+    > project is minted by connecting a provider bill and therefore says
+    > nothing about an organization's people or its gateway traffic. The
+    > connectedness test it claimed to be now lives in `summaryHoldsFigures`,
+    > not in that gate, and the scenarios cited still hold. The First and Third
+    > limits, and the ruling itself, stand. The reasoning is kept because the
+    > mistake is easy to make twice.
+
+    > **[NARROWED in reach — see revision v3.21.]** The **First** limit below
+    > is about `findSummarySpend` and the outputs `summary()` derives from it,
+    > and it stands there. It was never a rule about `findSpendByUser`, whose
+    > scope no ruling in this document had addressed. v3.21 gives that read an
+    > explicit scope; the principle the limit states — a money figure must not
+    > move as a side effect of a fix aimed elsewhere — is what keeps the three
+    > dollar-reporting screens on the scope they have.
+
+    **Three limits on the widening, none of which an earlier draft stated.**
+    First, `findSummarySpend` returns `thisSpend`, `prevSpend` and `thisUsers`
+    from one row, and `summary()` derives five outputs from it
+    (`activityMonitor.service.ts:488-500`): `spentThisWindowUsd`,
+    `windowOverPreviousPct` and `hasPriorBaseline` are money;
+    `activeUsersThisWindow` is the headcount the panel wants; and
+    `newUsersThisWindow` is derived from the headcount against a zero-baseline
+    shortcut its own comment flags as provisional. Only the **headcount**
+    fields are widened; the money fields keep their existing single-tenant
+    scope, because this ADR forbids changing a money figure as a side effect
+    of a headcount fix. If that proves impractical to split, the widening of
+    the money fields is a separate decision and does not ride along. Second,
+    the `resolveGovProjectId` null-gate that returns `EMPTY_SUMMARY`
+    (`:469-471`, with a second repository gate at `:473-475`)
+    **stays**: it is the connectedness test
+    `specs/governance/governance-cost-screen.feature:375-390` pins, and an
+    adoption count of zero with nothing connected must not be reported as a
+    measurement. Third, the read scans a double window plus a dedup subquery
+    under `max_threads: 2, max_execution_time: 45` (`...spend.clickhouse.repository.ts:49-53`);
+    going from one project to every project in a large org is a real cost and
+    is gated below. A read that overruns must render as a failure, never as
+    zero.
+
+  - **Ruling 7 — the department panel measures tokens, not dollars, and stays
+    org-wide.**
+
+    > **[NARROWED — see revision v3.19.]** A department buying on subscription
+    > has no measured tokens. Rows say "not measured" or carry an estimated
+    > label; they never print a zero.
+
+    Its org-wide scope was also previously recorded as a missing
+    filter; that was wrong too — `findSpendByDepartment` (`...spend.clickhouse.repository.ts:352`)
+    reads every project in the org by design (`activityMonitor.service.ts:742-749`),
+    which is the intended bird's-eye view. What is wrong is the unit. A
+    growing share of assistant usage is bought as a subscription or bundle,
+    where the per-request cost is zero and the real cost is a fixed seat
+    price already accounted for in the seat lane. A dollar column therefore
+    reports a department of heavy subscription users as nearly free. Tokens
+    are true under both pricing models, which dollars are not. The columns
+    exist — `trace_summaries.TotalPromptTokenCount` and `.TotalCompletionTokenCount`
+    (`platform/app/src/server/clickhouse/migrations/00002_create_schema.sql:156-157`)
+    — the same pair ruling 1 adopts, so no migration is needed.
+
+    **Where the unit changes.** The procedure returns **both** figures; each
+    screen picks. The cost screen renders tokens; the bird's-eye card the
+    router docblock names keeps dollars, and the headers string-bound in
+    `specs/ai-gateway/governance/birds-eye-dashboard-v2.feature:154,165` are
+    therefore untouched. `specs/ai-gateway/governance/departments.feature`
+    keeps its money language for the surfaces that keep money; a cost-screen
+    scenario is added rather than the existing ones rewritten.
+
+    **Two honest limits.** A token ranking is not a fair cost ranking across a
+    mixed model estate: ten million tokens through a cheap model can cost less
+    than one million through an expensive one while ranking ten times larger,
+    and these are ranked panels. And the small dollar second line, kept and
+    labelled as per-request cost only, does not resolve the subscription
+    complaint — a reader still sees "5M tokens, $0". It is a label, not a fix;
+    it is kept because removing the figure entirely loses information that is
+    correct for metered users. Department attribution itself (principal user →
+    user's team → project, else Unassigned) is unchanged and remains wave-2
+    identity work.
+
+  - **Ruling 8 — spend by person becomes tokens by person on the cost screen,
+    on the same reasoning.**
+
+    > **[COMPLETED — see revision v3.21.]** This ruling took only half of
+    > Ruling 7. The panels agree on the unit and not on the population: the
+    > department read covers every project of the organization and filters on
+    > no origin, while this one stayed on the hidden governance project and the
+    > governance ingestion origin. The cost screen's panel now takes the
+    > department read's population through an explicit `scope` argument. The
+    > three render sites named below keep the governance scope along with their
+    > dollars, so nothing here is superseded.
+
+    `findSpendByUser` (`...spend.clickhouse.repository.ts:207`) gains a token figure alongside
+    its dollar figure for the same subscription argument as ruling 7, so the
+    two people-facing panels on the cost screen agree on what they measure.
+    The three other render sites listed under
+    *blast radius* keep dollars. The dollar figure is likewise kept as a small
+    second line — applied by symmetry with ruling 7 rather than separately
+    asked, and recorded here so the symmetry is deliberate and not an accident
+    of implementation.
+
+    **The sort key moves with the unit.** The panel is ranked and paginated
+    against a whitelist, `SORT_FIELD_TO_AGG_EXPR = { spend, requests,
+    lastActivity }` (`activityMonitor.clickhouse.schemas.ts:56-60`), default
+    `spend`, deep-linked via `?sort=` with the default deliberately absent
+    from the URL (`platform/app/src/hooks/useSpendSortParam.ts:4,22`). The
+    whitelist gains a token expression and the cost screen's panel defaults to
+    it; the other three render sites keep `spend`. Shipping the unit change
+    without this leaves page one ranked by dollars while displaying tokens,
+    and a "top 10" that is not the top 10.
+
+    **The title moves with the store.** The panel is titled "Metered spend by
+    person" (`platform/app/src/pages/governance/costs.tsx:1272`) and its own
+    docblock claims it reports "what the traffic measured as it was served"
+    (`:1255-1258`), but it is fed `rows.byUser` from
+    `api.activityMonitor.spendByUser` (`:933`, `:1569`) — the trace store, not
+    the gateway ledger. "Metered" names the gateway lane everywhere else on
+    this screen, and the spec forbids that lane being grouped this way at all:
+    *"the metered read offers model and virtual key as its only groupings"*
+    (`specs/governance/governance-cost-screen.feature:534`). So the title
+    names a lane the panel does not read and could not legally read. It is
+    renamed to name the store it does read, and its docblock corrected with
+    it. Ruling 3's requirement that an empty panel name what would fill it
+    buys nothing while the title points at the wrong lane. Raised during
+    implementation rather than in the parc-fermé round, and recorded here
+    rather than carried as an undocumented divergence.
+
+  - **Ruling 9 — the helpers stay local to this screen.** n = 1; no second
+    consumer exists. A shared abstraction is built when a second screen
+    turns up and shows what it actually needs.
+
+  - **Corrections to langwatch-saas #1230.** Two items in that issue are wrong
+    and are superseded by rulings 6 and 7: adoption is not a wrong-store
+    defect (it is wrong-scope), and the department panel is not missing an
+    origin filter (org-wide is the design; the unit is the defect). #1230 also
+    correctly notes that #1224's claim about a department origin filter was
+    itself wrong — that correction stands.
+
+  - **Assumptions recorded, not verified.** The captain chose to proceed
+    without a production check, so these are stated rather than measured: the
+    gateway ledger has a single writer (if false, tokens double-count); token
+    columns are populated across all providers (if false, a provider gap reads
+    as a quiet week); and `langwatch.user_id` is present on `trace_summaries`
+    rows with people carrying a department link. The third assumption is
+    stated over the trace store, not over `PrincipalUserId` on gateway rows as
+    an earlier draft had it — neither people-facing panel reads gateway rows.
+    Its consequences are asymmetric and are spelled out under ruling 3: the
+    person panel goes empty and reports that it did not measure; the
+    department panel falls back to project attribution and still renders.
+
+  - **Stale comments this revision creates, all corrected in the same PR.**
+    The `MeteredPersonPanel` docblock (`costs.tsx` ~1252) describing two money
+    figures side by side; the `spendByDepartment` router docblock
+    (`ee/governance/routers/activityMonitor.ts:130`); and the spec Rule
+    narrative at `specs/governance/governance-cost-screen.feature:1257ff`
+    describing a person panel that sums cost recorded on traces.
+
+  - **Gates.**
+
+    | Change | Reversible | Blast radius | Gate |
+    |---|---|---|---|
+    | Token definition on the metered panel | yes (code) | screen | test on an image request asserting the gateway expression equals the trace-store prompt+completion total for the same call; a test that omits the four audio/image terms passes wrongly |
+    | Token figures never summed across panels | yes (code) | screen | test that no rendered figure combines gateway tokens with trace-store tokens; review gate, same standing as "one dollar, one home" |
+    | Seats one row per SKU | yes (code) | screen | test with two SKUs in one bucket; today's helper drops one |
+    | Adoption scope → org-wide | yes (code) | screen | test that a trace in a non-governance project is counted; test that the gov-project null-gate still returns the unmeasured state; test that money fields are unchanged by the widening |
+    | Adoption read cost | yes (code) | screen | timed test at org scale against `max_execution_time: 45`; an overrun must render as a failure, never as zero |
+    | Department/person unit → tokens | yes (code) | cost screen only | test that a zero-cost subscription trace still reports tokens; test that the three non-cost-screen render sites still receive dollars |
+    | Person panel sort key | yes (code) | cost screen | test that page one of a token-ranked panel is ordered by tokens |
+    | Stale comments corrected (four named above) | yes | none | review |
+    | No schema migration | n/a | none | review: no file added under `clickhouse/migrations/` |
+
+  - **Out of scope, with reasons.** The three agent panels (`gateway_spend`
+    has no agent column; the rollup does, at `00092:93` — a migration, and
+    this branch takes none); conversations over time (no conversation grain
+    exists, and it is the only cut item carrying real volume risk); a
+    metered-over-time chart (no such panel exists — an earlier claim that it
+    came free was wrong); wiring
+    `GovernanceGatewaySpendClickhouseRepository.sumWindowByModel` / `.sumWindowByVirtualKey`
+    (test-only callers, and the names collide with a live rollup method);
+    re-adding a billed-against-metered chart
+    (`specs/governance/governance-cost-screen.feature:85-90`, deliberately
+    deleted); widening the adoption panel's **money** fields (ruling 6, first
+    limit); ranking tokens split by model to fix the mixed-estate comparison
+    (ruling 7, first limit); and the six remaining defects in #1224.
+
 - **v3.17 (2026-09-13).** The cost rollup comparator stops being a cron.
   Its daily check is now driven by the events it checks, on a per-tenant
   process manager (`costRollupWatch`) mounted on the pulled-usage pipeline.

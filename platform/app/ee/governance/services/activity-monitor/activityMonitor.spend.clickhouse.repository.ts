@@ -14,9 +14,12 @@
 import type { ClickHouseClientResolver } from "~/server/clickhouse/clickhouseClient";
 
 import {
+  type ActiveUserCountChRow,
   ATTR_INGESTION_SOURCE_ID,
   ATTR_ORIGIN_KIND,
   ATTR_USER_ID,
+  activeUserCountRowSchema,
+  EMPTY_ACTIVE_USER_COUNT,
   EMPTY_SUMMARY_SPEND,
   ORIGIN_KIND_VALUE,
   SORT_FIELD_TO_AGG_EXPR,
@@ -24,9 +27,10 @@ import {
   type SpendByDepartmentChRow,
   type SpendByTeamSourceChRow,
   type SpendByUserChRow,
+  type SpendByUserScope,
+  type SpendByUserSortField,
   type SpendOverTimeChRow,
   type SpendOverTimeGroupBy,
-  type SpendSortField,
   type SummarySpendChRow,
   spendByDepartmentRowSchema,
   spendByTeamSourceRowSchema,
@@ -108,7 +112,89 @@ export class ActivityMonitorSpendClickHouseRepository {
   }
 
   /**
-   * Per-user spend rollup with pagination + sort.
+   * Distinct people active in this window and in the one before it, across
+   * every project handed in.
+   *
+   * Adoption is an organization question, so this takes a tenant list where
+   * `findSummarySpend` takes one tenant - assistant traffic lands in the
+   * org's application projects, not the hidden governance one. The
+   * `langwatch.origin.kind` filter is the same, because it is what marks the
+   * assistant traffic this headcount is meant to count. Kept separate from
+   * the summary read so that widening the headcount cannot move a money
+   * figure with it (ADR-128 ruling 6).
+   *
+   * Both windows come back from one read, the way `findSummarySpend` answers
+   * its own pair: the dedup subquery is the expensive half of this read, and
+   * asking the two windows separately would run it twice over ranges that
+   * sit next to each other.
+   */
+  async findActiveUserCount({
+    tenantIds,
+    thisStart,
+    prevStart,
+    windowEnd,
+  }: {
+    tenantIds: string[];
+    thisStart: number;
+    prevStart: number;
+    windowEnd: number;
+  }): Promise<ActiveUserCountChRow> {
+    // Multi-tenant read across the org's projects; the shared client serves
+    // every project, so resolving by any one of them routes identically.
+    const ch = await this.resolveClient(tenantIds[0] ?? "");
+    const result = await ch.query({
+      query: `
+        SELECT
+          uniqExactIf(
+            ts.Attributes[{userKey:String}],
+            ts.OccurredAt >= fromUnixTimestamp64Milli({thisStart:UInt64})
+          ) AS thisUsers,
+          uniqExactIf(
+            ts.Attributes[{userKey:String}],
+            ts.OccurredAt < fromUnixTimestamp64Milli({thisStart:UInt64})
+          ) AS prevUsers
+        FROM trace_summaries ts
+        WHERE ts.TenantId IN ({tenantIds:Array(String)})
+          AND ts.OccurredAt >= fromUnixTimestamp64Milli({prevStart:UInt64})
+          AND ts.OccurredAt < fromUnixTimestamp64Milli({windowEnd:UInt64})
+          AND ts.Attributes[{originKey:String}] = {originValue:String}
+          AND ts.Attributes[{userKey:String}] != ''
+          AND (ts.TenantId, ts.TraceId, ts.UpdatedAt) IN (
+            SELECT TenantId, TraceId, max(UpdatedAt)
+            FROM trace_summaries
+            WHERE TenantId IN ({tenantIds:Array(String)})
+              AND OccurredAt >= fromUnixTimestamp64Milli({prevStart:UInt64})
+              AND OccurredAt < fromUnixTimestamp64Milli({windowEnd:UInt64})
+            GROUP BY TenantId, TraceId
+          )
+      `,
+      query_params: {
+        tenantIds,
+        thisStart,
+        prevStart,
+        windowEnd,
+        originKey: ATTR_ORIGIN_KIND,
+        originValue: ORIGIN_KIND_VALUE,
+        userKey: ATTR_USER_ID,
+      },
+      clickhouse_settings: GOVERNANCE_SPEND_CLICKHOUSE_SETTINGS,
+      format: "JSONEachRow",
+    });
+    const rows = activeUserCountRowSchema.array().parse(await result.json());
+    return rows[0] ?? EMPTY_ACTIVE_USER_COUNT;
+  }
+
+  /**
+   * Per-user spend rollup with pagination + sort, over the population `scope`
+   * names.
+   *
+   * `governance` reads the one hidden governance project and only the traffic
+   * that arrived through a governance ingestion source. `organization` reads
+   * every project it is handed and filters on no source at all, which is the
+   * population `findSpendByDepartment` below already reads — so the cost
+   * screen's two people-facing panels cover the same people. See
+   * `SpendByUserScope` for why this is a caller's choice rather than a
+   * widening of the read.
    *
    * ClickHouse 25.x resolves bare column names in ORDER BY to outer
    * aliases when the alias shadows a subquery column — so
@@ -119,7 +205,8 @@ export class ActivityMonitorSpendClickHouseRepository {
    * subquery's Float64 spendUsd column.
    */
   async findSpendByUser({
-    tenantId,
+    tenantIds,
+    scope,
     windowStart,
     windowEnd,
     sortBy,
@@ -127,22 +214,55 @@ export class ActivityMonitorSpendClickHouseRepository {
     limit,
     offset,
   }: {
-    tenantId: string;
+    tenantIds: string[];
+    scope: SpendByUserScope;
     windowStart: number;
     windowEnd: number;
-    sortBy: SpendSortField;
+    sortBy: SpendByUserSortField;
     sortDir: SortDir;
     limit: number;
     offset: number;
   }): Promise<SpendByUserChRow[]> {
-    const ch = await this.resolveClient(tenantId);
-    // Fails closed: SORT_FIELD_TO_AGG_EXPR is Record<SpendSortField, string>
+    // Multi-tenant read in the organization scope; the shared client serves
+    // every project, so resolving by any one of them routes identically —
+    // the same resolution `findSpendByDepartment` does.
+    const ch = await this.resolveClient(tenantIds[0] ?? "");
+    // Fails closed: SORT_FIELD_TO_AGG_EXPR is
+    // Record<SpendByUserSortField, string>
     // so this is exhaustive at compile time, but sortBy crosses a tRPC
     // boundary — an erased/loosened type upstream must never turn into an
     // interpolated `undefined` in the ORDER BY clause.
     const orderExpr =
       SORT_FIELD_TO_AGG_EXPR[sortBy] ?? SORT_FIELD_TO_AGG_EXPR.spend;
     const orderDir = sortDir === "asc" ? "ASC" : "DESC";
+
+    // Both fragments below are CODE, chosen by `scope`, never caller text —
+    // the same boundary SORT_FIELD_TO_AGG_EXPR is for the ORDER BY. The values
+    // they name stay bound parameters.
+    //
+    // The governance branch keeps `TenantId = {tenantId:String}` rather than a
+    // one-element IN so the SQL the three dollar-reporting screens send is
+    // unchanged by this, character for character.
+    //
+    // Fails closed the same way the ORDER BY above does, and toward the same
+    // scope the service defaults to: the ORGANIZATION literal is the one
+    // tested, so a value matching neither — an erased type upstream — yields
+    // the narrow governance SQL rather than the wide one. Testing the
+    // governance literal instead would have the two halves of the decision
+    // default in opposite directions, and an unmatched value would read the
+    // governance project through `IN` with the source filter dropped.
+    const organizationScoped = scope === "organization";
+    const tenantPredicate = organizationScoped
+      ? "TenantId IN ({tenantIds:Array(String)})"
+      : "TenantId = {tenantId:String}";
+    // The source filter travels with the scope. Keeping it in the organization
+    // scope would drop every row that did not arrive through a governance
+    // ingestion source, which is most of an organization's own traffic — and
+    // `findSpendByDepartment`, the panel beside this one, filters on nothing of
+    // the kind. Two panels over the same table would still disagree.
+    const originPredicate = organizationScoped
+      ? ""
+      : "AND ts.Attributes[{originKey:String}] = {originValue:String}";
 
     const result = await ch.query({
       query: `
@@ -151,23 +271,39 @@ export class ActivityMonitorSpendClickHouseRepository {
           toString(sum(spendUsd)) AS spendUsdStr,
           toString(count()) AS requests,
           toString(toUnixTimestamp64Milli(max(occurredAt))) AS lastActivityMs,
-          any(model) AS mostUsedTarget
+          any(model) AS mostUsedTarget,
+          -- NULL, not 0, when no trace of theirs carried a count: both token
+          -- columns are Nullable(UInt32) and a subscription product can leave
+          -- them unset. Same expressions as the department read, on the same
+          -- table, so the two panels cannot drift on what a token is.
+          if(
+            countIf(promptTokens IS NOT NULL OR completionTokens IS NOT NULL) = 0,
+            NULL,
+            toString(sum(coalesce(promptTokens, 0) + coalesce(completionTokens, 0)))
+          ) AS tokensStr,
+          toString(toUInt8(maxIf(
+            tokensEstimated,
+            promptTokens IS NOT NULL OR completionTokens IS NOT NULL
+          ))) AS tokensEstimatedStr
         FROM (
           SELECT
             ts.Attributes[{userKey:String}] AS actor,
             coalesce(ts.TotalCost, 0) AS spendUsd,
             ts.OccurredAt AS occurredAt,
-            arrayElement(ts.Models, 1) AS model
+            arrayElement(ts.Models, 1) AS model,
+            ts.TotalPromptTokenCount AS promptTokens,
+            ts.TotalCompletionTokenCount AS completionTokens,
+            ts.TokensEstimated AS tokensEstimated
           FROM trace_summaries ts
-          WHERE ts.TenantId = {tenantId:String}
+          WHERE ts.${tenantPredicate}
             AND ts.OccurredAt >= fromUnixTimestamp64Milli({windowStart:UInt64})
             AND ts.OccurredAt < fromUnixTimestamp64Milli({windowEnd:UInt64})
-            AND ts.Attributes[{originKey:String}] = {originValue:String}
+            ${originPredicate}
             AND ts.Attributes[{userKey:String}] != ''
             AND (ts.TenantId, ts.TraceId, ts.UpdatedAt) IN (
               SELECT TenantId, TraceId, max(UpdatedAt)
               FROM trace_summaries
-              WHERE TenantId = {tenantId:String}
+              WHERE ${tenantPredicate}
                 AND OccurredAt >= fromUnixTimestamp64Milli({windowStart:UInt64})
                 AND OccurredAt < fromUnixTimestamp64Milli({windowEnd:UInt64})
               GROUP BY TenantId, TraceId
@@ -178,11 +314,18 @@ export class ActivityMonitorSpendClickHouseRepository {
         LIMIT {limit:UInt32} OFFSET {offset:UInt32}
       `,
       query_params: {
-        tenantId,
+        // Only the parameters the chosen branch names are bound: an unbound
+        // `originValue` in the organization scope is what proves the filter is
+        // gone rather than merely matching everything.
+        ...(organizationScoped
+          ? { tenantIds }
+          : {
+              tenantId: tenantIds[0] ?? "",
+              originKey: ATTR_ORIGIN_KIND,
+              originValue: ORIGIN_KIND_VALUE,
+            }),
         windowStart,
         windowEnd,
-        originKey: ATTR_ORIGIN_KIND,
-        originValue: ORIGIN_KIND_VALUE,
         userKey: ATTR_USER_ID,
         limit,
         offset,
@@ -194,9 +337,17 @@ export class ActivityMonitorSpendClickHouseRepository {
   }
 
   /**
-   * Per-(projectId, actor) spend for the department rollup. Multi-tenant:
-   * queries across all org projects so the department bird's-eye view
-   * aggregates the whole org's AI spend.
+   * Per-(projectId, actor) spend AND tokens for the department rollup.
+   * Multi-tenant: queries across all org projects so the department bird's-eye
+   * view aggregates the whole org's AI spend.
+   *
+   * Tokens come back beside the dollars rather than instead of them. A
+   * subscription product bills a seat, not a request, so its traces carry no
+   * per-request cost at all — ranked on dollars a department of heavy
+   * subscription users reads as nearly free. Ranked on tokens it reads as what
+   * it ran. The two are not interchangeable (a million tokens through an
+   * expensive model costs more than ten million through a cheap one), so the
+   * read carries both and the screen decides which one it leads with.
    */
   async findSpendByDepartment({
     tenantIds,
@@ -217,7 +368,34 @@ export class ActivityMonitorSpendClickHouseRepository {
           ts.Attributes[{userKey:String}] AS actor,
           toString(sum(coalesce(ts.TotalCost, 0))) AS spendUsdStr,
           toString(count()) AS requests,
-          toString(toUnixTimestamp64Milli(max(ts.OccurredAt))) AS lastActivityMs
+          toString(toUnixTimestamp64Milli(max(ts.OccurredAt))) AS lastActivityMs,
+          -- NULL, not 0, when no row of the group carried a count. Both token
+          -- columns are Nullable(UInt32) and a subscription trace can leave
+          -- them unset, so the count of rows that DID carry one is what tells
+          -- "nothing measured" apart from "measured, and it was nothing". The
+          -- coalesce inside the sum keeps a row that carried only one of the
+          -- two halves from dropping its measured half.
+          if(
+            countIf(
+              ts.TotalPromptTokenCount IS NOT NULL
+              OR ts.TotalCompletionTokenCount IS NOT NULL
+            ) = 0,
+            NULL,
+            toString(
+              sum(
+                coalesce(ts.TotalPromptTokenCount, 0)
+                + coalesce(ts.TotalCompletionTokenCount, 0)
+              )
+            )
+          ) AS tokensStr,
+          -- Only over the rows that carried a count: a row with no tokens has
+          -- no estimate to report, and letting it set the flag would label a
+          -- department's real figure as an estimate.
+          toString(toUInt8(maxIf(
+            ts.TokensEstimated,
+            ts.TotalPromptTokenCount IS NOT NULL
+            OR ts.TotalCompletionTokenCount IS NOT NULL
+          ))) AS tokensEstimatedStr
         FROM trace_summaries ts
         WHERE ts.TenantId IN ({tenantIds:Array(String)})
           AND ts.OccurredAt >= fromUnixTimestamp64Milli({windowStart:UInt64})

@@ -32,7 +32,8 @@ import type {
 } from "@ee/governance/services/governanceCost.service";
 
 import type { SpenderRow } from "./CostSpenderPanel";
-import { sampleSeatPools } from "./sampleSeries";
+import { type RankRow, sampleSeatPools } from "./sampleSeries";
+import { tokenRowSecondaryLine } from "./tokenRowSecondary";
 
 /**
  * A billed lane that runs a little above the gateway's meter, which is the
@@ -40,6 +41,47 @@ import { sampleSeatPools } from "./sampleSeries";
  */
 const BILLED_PER_PERIOD = 18_400;
 const GATEWAY_PER_PERIOD = 13_950;
+
+/**
+ * A blended dollars-per-million-tokens rate, so the invented token count moves
+ * with the invented gateway spend instead of drifting free of it. A sample day
+ * showing thousands of dollars beside no tokens is a shape the real lane never
+ * produces: the ledger meters both from the same requests.
+ */
+const GATEWAY_USD_PER_MILLION_TOKENS = 3;
+
+/**
+ * The same invented money, told in tokens, for the panels that rank by count
+ * rather than by dollars.
+ *
+ * Derived from the money rows at `GATEWAY_USD_PER_MILLION_TOKENS` rather than
+ * invented separately, for the reason that constant exists at all: a sample
+ * where the department list implies one volume of traffic and the cost chart
+ * beside it implies another teaches a reader that the screen does not add up.
+ * Ranking is unaffected — every row is scaled by the same factor — so the
+ * panels keep the steep falloff real spend has.
+ *
+ * THE DOLLARS STAY, on the second line, in the real panels' own sentence. A
+ * measured token row carries one (`tokenRowSecondaryLine`) and is therefore
+ * drawn two lines high; a sample row without one drew `CostRankList`'s
+ * one-line shape, so sample mode taught a layout the real screen never shows.
+ * The money it names is the money this row was scaled FROM, which is what
+ * keeps the two lines telling one story rather than two.
+ *
+ * Never marked estimated: these tokens were not counted by the estimator, or
+ * by anything else. The marker states how a real count was arrived at, and a
+ * sample that wore it would be making a claim about a measurement nobody took.
+ */
+export function sampleTokenRows(rows: readonly RankRow[]): RankRow[] {
+  return rows.map((row) => ({
+    ...row,
+    value: Math.round((row.value / GATEWAY_USD_PER_MILLION_TOKENS) * 1_000_000),
+    secondary: tokenRowSecondaryLine({
+      spendUsd: String(row.value),
+      hasEstimatedTokens: false,
+    }),
+  }));
+}
 
 /**
  * The headline summary for a screen with nothing real on it.
@@ -61,12 +103,16 @@ export function sampleCostSummary(periods: string[]): GovernanceCostSummaryDto {
     const billedDrift = 1 + Math.sin(index / 2.4) * 0.18;
     const gatewayDrift = 1 + Math.sin(index / 2.4 + 0.9) * 0.24;
     const billedUsd = Math.round(BILLED_PER_PERIOD * billedDrift);
+    const gatewayUsd = Math.round(GATEWAY_PER_PERIOD * gatewayDrift);
     return {
       day,
       billedUsd,
-      gatewayUsd: Math.round(GATEWAY_PER_PERIOD * gatewayDrift),
+      gatewayUsd,
       billedCellsWithoutAmount: 0,
       gatewayCellsWithoutAmount: 0,
+      gatewayTokens: Math.round(
+        (gatewayUsd / GATEWAY_USD_PER_MILLION_TOKENS) * 1_000_000,
+      ),
       billedRevisedAt: null,
       // Invented spend, all of it in dollars and none of it ever revised. A
       // second currency here would be a made-up story about a customer's

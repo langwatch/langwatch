@@ -26,6 +26,7 @@ import {
 import "@testing-library/jest-dom/vitest";
 import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { costDay } from "./costFixtures";
 
 const harness = vi.hoisted(() => ({
   /** Every `useQuery` the page issued this render, in call order. */
@@ -137,7 +138,14 @@ vi.mock("~/utils/api", () => {
             ],
           },
           seats: { status: "awaiting_data" },
-          series: [{ day: "2026-01-15", billedUsd: 123.45, gatewayUsd: 67.89 }],
+          series: [
+            costDay({
+              day: "2026-01-15",
+              billedUsd: 123.45,
+              gatewayUsd: 67.89,
+              gatewayTokens: 1_200_000,
+            }),
+          ],
           windowDays: 30,
           // A source HAS stopped, so the collection warning is on screen and
           // the refresh has something of that kind to bring up to date.
@@ -302,7 +310,7 @@ describe("bringing the cost screen up to date", () => {
       renderScreen();
 
       const panel = screen
-        .getByText("Cost by department")
+        .getByText("Tokens by department · trace store")
         .closest('[data-testid="cost-panel"]');
       expect(panel).not.toBeNull();
       const department = within(panel as HTMLElement);

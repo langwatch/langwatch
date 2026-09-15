@@ -21,6 +21,7 @@ import userEvent from "@testing-library/user-event";
 import "@testing-library/jest-dom/vitest";
 import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { costDay } from "./costFixtures";
 
 const ENGINEERING = {
   departmentId: "dep-1",
@@ -101,7 +102,12 @@ vi.mock("~/utils/api", () => ({
             },
             seats: { status: "awaiting_data" },
             series: [
-              { day: "2026-08-01", billedUsd: 123.45, gatewayUsd: 67.89 },
+              costDay({
+                day: "2026-08-01",
+                billedUsd: 123.45,
+                gatewayUsd: 67.89,
+                gatewayTokens: 1_200_000,
+              }),
             ],
             windowDays: 30,
           },
@@ -188,7 +194,7 @@ describe("the department filter", () => {
       renderScreen();
       const userPanel = () =>
         screen
-          .getByText("Metered spend by person")
+          .getByText("Tokens by person · trace store")
           .closest('[data-testid="cost-panel"]')?.textContent;
       const originalUserPanel = userPanel();
       expect(originalUserPanel).toContain("ada@acme.test");
@@ -203,7 +209,7 @@ describe("the department filter", () => {
         /Department filters only the department breakdown\./,
       );
       const departmentPanel = screen
-        .getByText("Cost by department")
+        .getByText("Tokens by department · trace store")
         .closest('[data-testid="cost-panel"]');
       expect(departmentPanel?.textContent).toContain("Engineering");
       expect(departmentPanel?.textContent).not.toContain("Support");
@@ -255,7 +261,7 @@ describe("the department filter", () => {
       // The selection survives a window that still contains it: the panel is
       // filtered, so Support is not among the rows.
       const panel = screen
-        .getByText("Cost by department")
+        .getByText("Tokens by department · trace store")
         .closest('[data-testid="cost-panel"]') as HTMLElement;
       expect(panel.textContent).not.toContain("Support");
     });

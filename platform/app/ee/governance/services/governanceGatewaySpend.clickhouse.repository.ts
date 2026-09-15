@@ -97,16 +97,20 @@ const CHARGED_STATUSES = "('confirmed', 'failed')";
 const LATEST_REQUEST_SUBQUERY = `
   SELECT
     GatewayRequestId,
-    argMax(Status, EventTimestamp)           AS RequestStatus,
-    argMax(CostNanoUSD, EventTimestamp)      AS RequestCostNanoUSD,
-    argMax(OccurredAt, EventTimestamp)       AS RequestOccurredAt,
-    argMax(Model, EventTimestamp)            AS RequestModel,
-    argMax(VirtualKeyId, EventTimestamp)     AS RequestVirtualKeyId,
-    argMax(TokensInput, EventTimestamp)      AS RequestTokensInput,
-    argMax(TokensOutput, EventTimestamp)     AS RequestTokensOutput,
-    argMax(TokensCacheRead, EventTimestamp)  AS RequestTokensCacheRead,
-    argMax(TokensCacheWrite, EventTimestamp) AS RequestTokensCacheWrite,
-    argMax(TokensReasoning, EventTimestamp)  AS RequestTokensReasoning
+    argMax(Status, EventTimestamp)            AS RequestStatus,
+    argMax(CostNanoUSD, EventTimestamp)       AS RequestCostNanoUSD,
+    argMax(OccurredAt, EventTimestamp)        AS RequestOccurredAt,
+    argMax(Model, EventTimestamp)             AS RequestModel,
+    argMax(VirtualKeyId, EventTimestamp)      AS RequestVirtualKeyId,
+    argMax(TokensInput, EventTimestamp)       AS RequestTokensInput,
+    argMax(TokensOutput, EventTimestamp)      AS RequestTokensOutput,
+    argMax(TokensCacheRead, EventTimestamp)   AS RequestTokensCacheRead,
+    argMax(TokensCacheWrite, EventTimestamp)  AS RequestTokensCacheWrite,
+    argMax(TokensReasoning, EventTimestamp)   AS RequestTokensReasoning,
+    argMax(TokensInputAudio, EventTimestamp)  AS RequestTokensInputAudio,
+    argMax(TokensOutputAudio, EventTimestamp) AS RequestTokensOutputAudio,
+    argMax(TokensInputImage, EventTimestamp)  AS RequestTokensInputImage,
+    argMax(TokensOutputImage, EventTimestamp) AS RequestTokensOutputImage
   FROM ${TABLE}
   WHERE TenantId IN {tenantIds:Array(String)}
   GROUP BY TenantId, GatewayRequestId
@@ -129,7 +133,35 @@ const LATEST_REQUEST_SUBQUERY = `
  * at zero (free or unpriced — the ledger cannot tell which), plus a settled
  * request whose confirmation never arrived so its cost is unknown. Settled
  * rows add nothing to the money sum.
+ *
+ * "Consumed tokens" there is the SAME token surface `TokensTotal` sums, which
+ * is why both read `METERED_TOKEN_SUM` rather than each listing its own
+ * columns. A predicate naming only the text columns would miss a charged
+ * request priced at zero that carried audio or image tokens alone — the day
+ * would then report a measured zero where its cost is in fact unknown, the
+ * one mistake this count exists to prevent. `TokensReasoning` is added on top
+ * for presence only: it is a subset of the output and so cannot be
+ * double-counted by a `> 0` test, while the total must leave it out.
+ *
+ * `TokensTotal` is the work the models did, over the same charged requests.
+ * The ledger stores a BILLABLE input count with cache and the separately
+ * rated modalities already taken OUT of it — the rating path prices each
+ * token once at its own rate — so the stored columns alone report a fraction
+ * of the tokens a request processed: a 4,814-token prompt served 4,736 from
+ * cache is stored as 78. The sum adds them back, and adds nothing that is
+ * already inside something it counts: `TokensReasoning` is a subset of the
+ * output, `TokensCacheWrite1h` a subset of the cache write. `CharsInput`,
+ * `AudioMS` and `ImageCount` are not tokens at all and would put the figure
+ * in no unit.
+ *
+ * ADR-128 v3.19, "Supersedes Ruling 1".
  */
+const METERED_TOKEN_SUM = `(
+            RequestTokensInput + RequestTokensOutput + RequestTokensCacheRead
+            + RequestTokensCacheWrite + RequestTokensInputAudio
+            + RequestTokensOutputAudio + RequestTokensInputImage
+            + RequestTokensOutputImage)`;
+
 const METERED_FIGURE_COLUMNS = `
           toString(sumIf(RequestCostNanoUSD, RequestStatus IN ${CHARGED_STATUSES})) AS AmountNanoUsd,
           countIf(RequestStatus IN ${CHARGED_STATUSES}) AS RequestCount,
@@ -137,11 +169,11 @@ const METERED_FIGURE_COLUMNS = `
           countIf(
             RequestStatus IN ${CHARGED_STATUSES}
             AND RequestCostNanoUSD = 0
-            AND (
-              RequestTokensInput + RequestTokensOutput + RequestTokensCacheRead
-              + RequestTokensCacheWrite + RequestTokensReasoning
-            ) > 0
-          ) + countIf(RequestStatus = 'settled') AS RequestsWithoutAmount`;
+            AND (${METERED_TOKEN_SUM} + RequestTokensReasoning) > 0
+          ) + countIf(RequestStatus = 'settled') AS RequestsWithoutAmount,
+          sumIf(${METERED_TOKEN_SUM},
+            RequestStatus IN ${CHARGED_STATUSES}
+          ) AS TokensTotal`;
 
 /**
  * The breakdowns rank by money, largest first. `AmountNanoUsd` is the
@@ -178,6 +210,9 @@ export interface GovernanceGatewaySpendDayRow {
   pricedRequestCount: number;
   /** Requests carrying no dollar amount: zero-cost-with-tokens plus settled. */
   requestsWithoutAmount: number;
+  /** Tokens the day's charged requests processed, cache and the separately
+   *  rated modalities added back to the billable remainder. */
+  tokensTotal: number;
 }
 
 /** One model's or one virtual key's window total. */
@@ -231,6 +266,7 @@ export class GovernanceGatewaySpendClickHouseRepository {
       requestCount: int(row.RequestCount),
       pricedRequestCount: int(row.PricedRequestCount),
       requestsWithoutAmount: int(row.RequestsWithoutAmount),
+      tokensTotal: int(row.TokensTotal),
     }));
   }
 

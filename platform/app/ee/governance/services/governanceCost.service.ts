@@ -73,9 +73,19 @@ const logger = createLogger("langwatch:governance:cost");
  *
  * `no_cost_store` — the deployment has no ClickHouse, so cost was never
  * recorded anywhere. `no_governance_project` — the store exists but this
- * organization has never ingested anything, so there is nothing to summarize
- * yet. Both render as "unavailable"; they are distinguished so the copy can
- * eventually tell a customer which one they are looking at.
+ * organization has never connected a provider bill, so there is no tenant the
+ * BILL could be read under. Both render as "unavailable"; they are
+ * distinguished so the copy can eventually tell a customer which one they are
+ * looking at.
+ *
+ * The SUMMARY never reports the second one. Its metered lane is scoped to the
+ * organization's own projects and answers without that tenant, and the
+ * adoption headcount is gated on the summary holding figures — so a summary
+ * that called itself unavailable would withhold two answers that were never
+ * the governance project's to give. It reports the bill's absence the way an
+ * empty window does: null lanes, and a screen that says nothing was recorded
+ * only when nothing did. The reason stays on the four breakdowns below, which
+ * read the rollup and nothing else.
  */
 export type GovernanceCostUnavailableReason =
   | "no_cost_store"
@@ -200,6 +210,15 @@ export interface GovernanceCostDayDto {
   billedCellsWithoutAmount: number;
   /** Gateway-lane cells that day holding no USD figure. */
   gatewayCellsWithoutAmount: number;
+  /**
+   * Tokens the day's gateway traffic processed, 0 on a day the lane is silent.
+   *
+   * Zero rather than null, unlike `gatewayUsd`: a day with no metered requests
+   * really did process no tokens, and a token count is never withheld the way
+   * a partial money figure is — the ledger meters every charged request
+   * itself, so there is no "some of the day is missing" state to signal.
+   */
+  gatewayTokens: number;
 
   /**
    * When the provider last restated this day, epoch ms, or null if never
@@ -564,11 +583,16 @@ export class GovernanceCostService {
     }
 
     // TenantId of every rollup row for this organization. Absent until the
-    // org's first ingestion source is minted.
+    // org's first ingestion source is minted — and NOT a reason to stop:
+    // that project scopes the BILL, not the organization. The lanes keyed by
+    // it come back empty below, while the ones scoped to the organization
+    // itself answer for real. Returning `unavailable` here withheld the
+    // metered lane, which reads the organization's own projects, and with it
+    // the adoption headcount, which is gated on whether this summary holds
+    // figures — so an organization serving gateway traffic and buying no
+    // provider bill was told nothing had been recorded and that nobody used
+    // an AI tool.
     const tenantId = await resolveGovProjectId({ prisma, organizationId });
-    if (!tenantId) {
-      return unavailable({ reason: "no_governance_project", windowDays });
-    }
 
     // The metered lane reads the gateway's per-request ledger, which is keyed
     // by the traffic's own PROJECT tenant, not the hidden governance tenant
@@ -585,53 +609,23 @@ export class GovernanceCostService {
       new Date(now.getTime() - (windowDays - 1) * 86_400_000),
     );
 
-    // The seat read carries its own failure; the cost read does not. A broken
-    // licence read costs the screen one lane, so it degrades to `read_failed`
-    // and the money lanes still render — never to "awaiting data", which
-    // would tell a customer their licences have not been read when what
-    // actually happened is that we could not read them. A broken COST read
-    // still fails the whole summary: this screen is about money, and a money
-    // lane that swallowed its own failure would render an absence as a
-    // measurement.
-    const [
-      rows,
-      gatewayDays,
-      seats,
-      staleSources,
-      azureBilling,
-      unpricedWindow,
-      providers,
-      billedCurrencies,
-    ] = await Promise.all([
-      // PULLED ONLY. The metered lane no longer lives in the rollup, and the
-      // fold's leftover gateway rows must be read by nothing — so the billed
-      // day series asks for pulled rows by predicate, not by a filter the
-      // caller could forget.
-      costRollup.sumDaysByLane({
-        tenantId,
-        fromDay,
-        toDay,
-        costSource: GOVERNANCE_COST_SOURCE.PULLED,
-      }),
-      this.readGatewayDays({ tenantIds: gatewayTenantIds, fromDay, toDay }),
-      this.readSeats({ tenantId }),
-      this.readStaleSources({ organizationId }),
-      this.readAzureBillingNote({ organizationId, tenantId, fromDay, toDay }),
-      this.readUnpricedWindow({ organizationId }),
-      costRollup.sumWindowByProvider({ tenantId, fromDay, toDay }),
-      // The billed lane's currency lines come from their OWN window read
-      // rather than from folding the day rows, because the lane's headline
-      // does too. Both describe the same snapshot that way, which is the
-      // guarantee the read below the comment is about; folding one from days
-      // and reading the other from the window would let a backfill land
-      // between them and put two answers for the same money on one card.
-      costRollup.sumWindowByCurrency({
-        tenantId,
-        fromDay,
-        toDay,
-        costSource: GOVERNANCE_COST_SOURCE.PULLED,
-      }),
-    ]);
+    // Two groups, by WHOSE question they answer: the lanes the governance
+    // tenant owns, and the ones scoped to the organization itself. They still
+    // run together — the split is about scope, never about waiting.
+    const [governanceTenantLanes, gatewayDays, staleSources, unpricedWindow] =
+      await Promise.all([
+        this.readGovernanceTenantLanes({
+          tenantId,
+          organizationId,
+          fromDay,
+          toDay,
+        }),
+        this.readGatewayDays({ tenantIds: gatewayTenantIds, fromDay, toDay }),
+        this.readStaleSources({ organizationId }),
+        this.readUnpricedWindow({ organizationId }),
+      ]);
+    const { rows, seats, azureBilling, providers, billedCurrencies } =
+      governanceTenantLanes;
 
     return {
       unavailableReason: null,
@@ -658,6 +652,101 @@ export class GovernanceCostService {
       staleSources,
       unpricedWindow,
     };
+  }
+
+  /**
+   * Every lane keyed by the hidden governance tenant, or their empty answers
+   * when the organization has never minted one.
+   *
+   * One place rather than five guards, because the rule is one rule: these
+   * reads are about the BILL, `gateway_spend.TenantId` is a project id and not
+   * this tenant, and neither of the two prisma reads beside them names a
+   * tenant at all. A read added here is a read somebody has decided belongs to
+   * the governance project; a read added to `summary` next to them is not.
+   *
+   * Not issued at all without a tenant, rather than issued with an empty
+   * string: a predicate matching no rows and a query never sent both answer
+   * "nothing", but only one of them stops paying ClickHouse for the question.
+   *
+   * The seat read carries its own failure; the cost reads do not. A broken
+   * licence read costs the screen one lane, so it degrades to `read_failed`
+   * and the money lanes still render — never to "awaiting data", which would
+   * tell a customer their licences have not been read when what actually
+   * happened is that we could not read them. A broken COST read still fails
+   * the whole summary: this screen is about money, and a money lane that
+   * swallowed its own failure would render an absence as a measurement.
+   */
+  private async readGovernanceTenantLanes({
+    tenantId,
+    organizationId,
+    fromDay,
+    toDay,
+  }: {
+    /** Null when this organization has never minted a governance project. */
+    tenantId: string | null;
+    organizationId: string;
+    fromDay: string;
+    toDay: string;
+  }): Promise<{
+    rows: Awaited<
+      ReturnType<GovernanceCostRollupClickHouseRepository["sumDaysByLane"]>
+    >;
+    seats: GovernanceSeatLaneDto;
+    azureBilling: GovernanceAzureBillingNote | null;
+    providers: Awaited<
+      ReturnType<
+        GovernanceCostRollupClickHouseRepository["sumWindowByProvider"]
+      >
+    >;
+    billedCurrencies: Awaited<
+      ReturnType<
+        GovernanceCostRollupClickHouseRepository["sumWindowByCurrency"]
+      >
+    >;
+  }> {
+    const { costRollup } = this.deps;
+    if (!costRollup || !tenantId) {
+      return {
+        rows: [],
+        // Awaiting, not failed: no licence list was read, which is a different
+        // sentence from one we tried and could not read.
+        seats: { status: "awaiting_data" },
+        azureBilling: null,
+        providers: [],
+        billedCurrencies: [],
+      };
+    }
+
+    const [rows, seats, azureBilling, providers, billedCurrencies] =
+      await Promise.all([
+        // PULLED ONLY. The metered lane no longer lives in the rollup, and the
+        // fold's leftover gateway rows must be read by nothing — so the billed
+        // day series asks for pulled rows by predicate, not by a filter the
+        // caller could forget.
+        costRollup.sumDaysByLane({
+          tenantId,
+          fromDay,
+          toDay,
+          costSource: GOVERNANCE_COST_SOURCE.PULLED,
+        }),
+        this.readSeats({ tenantId }),
+        this.readAzureBillingNote({ organizationId, tenantId, fromDay, toDay }),
+        costRollup.sumWindowByProvider({ tenantId, fromDay, toDay }),
+        // The billed lane's currency lines come from their OWN window read
+        // rather than from folding the day rows, because the lane's headline
+        // does too. Both describe the same snapshot that way, which is the
+        // guarantee the read below the comment is about; folding one from days
+        // and reading the other from the window would let a backfill land
+        // between them and put two answers for the same money on one card.
+        costRollup.sumWindowByCurrency({
+          tenantId,
+          fromDay,
+          toDay,
+          costSource: GOVERNANCE_COST_SOURCE.PULLED,
+        }),
+      ]);
+
+    return { rows, seats, azureBilling, providers, billedCurrencies };
   }
 
   /**
@@ -1628,6 +1717,7 @@ function seriesFrom(
       gatewayUsd: null,
       billedCellsWithoutAmount: 0,
       gatewayCellsWithoutAmount: 0,
+      gatewayTokens: 0,
       billedRevisedAt: null,
       billedByCurrency: [],
       billedCurrenciesWithoutUsdAmount: [],
@@ -1669,7 +1759,12 @@ function seriesFrom(
   // be a warning about a thing that cannot happen. The lane never withholds a
   // day's figure, so `gatewayCellsWithoutAmount` stays zero.
   for (const day of gatewayDays) {
-    entryFor(day.day).gatewayUsd = gatewayDayUsd(day);
+    const entry = entryFor(day.day);
+    entry.gatewayUsd = gatewayDayUsd(day);
+    // The token count is reported even on a day whose dollar figure is
+    // withheld: what the models processed is known exactly whether or not
+    // every request of the day carries a price.
+    entry.gatewayTokens = day.tokensTotal;
   }
 
   return [...byDay.values()].sort((a, b) => a.day.localeCompare(b.day));

@@ -23,8 +23,8 @@ import userEvent from "@testing-library/user-event";
 import "@testing-library/jest-dom/vitest";
 import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-
 import { findNativeSelects } from "~/components/governance/filters";
+import { costDay } from "./costFixtures";
 
 const harness = vi.hoisted(() => ({
   /** Every windowDays the page asked any read for, in call order. */
@@ -97,26 +97,18 @@ vi.mock("~/utils/api", () => {
           series: [
             // Two days inside the same quarter. Drawn by day they are two
             // ticks; drawn by quarter they are one.
-            {
+            costDay({
               day: "2026-07-04",
               billedUsd: 500,
               gatewayUsd: 400,
-              billedCellsWithoutAmount: 0,
-              gatewayCellsWithoutAmount: 0,
-              billedRevisedAt: null,
-              billedByCurrency: [],
-              billedProvisional: false,
-            },
-            {
+              gatewayTokens: 1_500_000,
+            }),
+            costDay({
               day: "2026-08-09",
               billedUsd: 400,
               gatewayUsd: 300,
-              billedCellsWithoutAmount: 0,
-              gatewayCellsWithoutAmount: 0,
-              billedRevisedAt: null,
-              billedByCurrency: [],
-              billedProvisional: false,
-            },
+              gatewayTokens: 1_100_000,
+            }),
           ],
           staleSources: null,
           unpricedWindow: null,

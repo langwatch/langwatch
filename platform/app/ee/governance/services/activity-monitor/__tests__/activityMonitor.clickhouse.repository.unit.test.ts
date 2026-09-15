@@ -125,7 +125,8 @@ describe("ActivityMonitorClickHouseRepository", () => {
       ]);
 
       const rows = await repo.findSpendByUser({
-        tenantId: "t",
+        tenantIds: ["t"],
+        scope: "governance",
         windowStart: 0,
         windowEnd: Date.now(),
         sortBy: "spend",
@@ -207,7 +208,8 @@ describe("ActivityMonitorClickHouseRepository", () => {
 
       await expect(
         repo.findSpendByUser({
-          tenantId: "t",
+          tenantIds: ["t"],
+          scope: "governance",
           windowStart: 0,
           windowEnd: Date.now(),
           sortBy: "spend",
@@ -296,7 +298,8 @@ describe("ActivityMonitorClickHouseRepository", () => {
       ]);
 
       const rows = await repo.findSpendByUser({
-        tenantId: "t",
+        tenantIds: ["t"],
+        scope: "governance",
         windowStart: 0,
         windowEnd: Date.now(),
         sortBy: "spend",
@@ -312,6 +315,8 @@ describe("ActivityMonitorClickHouseRepository", () => {
           requests: "100",
           lastActivityMs: "1700000000000",
           mostUsedTarget: "claude-haiku-4-5",
+          tokensStr: null,
+          tokensEstimatedStr: "0",
         },
       ]);
     });

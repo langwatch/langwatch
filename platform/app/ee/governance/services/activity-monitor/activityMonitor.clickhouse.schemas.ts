@@ -30,7 +30,45 @@ import {
 
 /** Sort field accepted by `spendByUser` / `spendByTeam`. */
 export type SpendSortField = "spend" | "requests" | "lastActivity";
+/**
+ * What the PERSON read may be sorted by, which is one more thing than the
+ * team read.
+ *
+ * Tokens only: the per-person read counts them off `trace_summaries`, and the
+ * team rollup has no token figure to order by at all. Widening the shared
+ * field instead would make `spendByTeam` accept a sort it cannot honour.
+ */
+export type SpendByUserSortField = SpendSortField | "tokens";
 export type SortDir = "asc" | "desc";
+
+/**
+ * Which population the PERSON read answers over.
+ *
+ * `governance` is the hidden governance project alone, and only the traffic
+ * that arrived through a governance ingestion source — the money scope every
+ * caller had before this existed, and the one the three dollar-reporting
+ * screens keep.
+ *
+ * `organization` is every live project of the org with no source filter, which
+ * is exactly the population `findSpendByDepartment` already reads. The cost
+ * screen takes it so its two people-facing panels, which ADR-128 ruling 8 put
+ * on the same unit and the same table, also cover the same people.
+ *
+ * It is a choice and not a widening because `spendByUser` feeds four screens
+ * and three of them still lead with dollars: moving them would change a money
+ * figure as a side effect, which ruling 6 forbids. The decision therefore
+ * lives with the caller, the same seam ADR-128 used for the unit.
+ *
+ * The list is the source of truth and the type is derived from it, the shape
+ * `SUPPORTED_TILE_TYPES` / `SUPPORTED_SCOPES` use in `aiToolEntry.service.ts`.
+ * The procedure's zod enum and the service's guard both read this array, so a
+ * member added here reaches every half of the decision at once. The sibling
+ * `SpendByUserSortField` can stay a hand-written union because
+ * `SORT_FIELD_TO_AGG_EXPR` is a `Record` over it and a drifted member is a
+ * compile error; nothing ties the scope that way.
+ */
+export const SPEND_BY_USER_SCOPES = ["governance", "organization"] as const;
+export type SpendByUserScope = (typeof SPEND_BY_USER_SCOPES)[number];
 export type SpendOverTimeGroupBy = "team" | "user" | "model";
 
 // ---------------------------------------------------------------------------
@@ -53,10 +91,17 @@ export const ORIGIN_KIND_VALUE = GOVERNANCE_ORIGIN_KIND_VALUE;
  * does NOT support column-name interpolation; this whitelist is the
  * boundary that prevents injection through the public API.
  */
-export const SORT_FIELD_TO_AGG_EXPR: Record<SpendSortField, string> = {
+export const SORT_FIELD_TO_AGG_EXPR: Record<SpendByUserSortField, string> = {
   spend: "sum(spendUsd)",
   requests: "count()",
   lastActivity: "max(occurredAt)",
+  // The subquery's numeric columns, never the outer `tokensStr` alias — the
+  // same trap the `spendUsd` / `spendUsdStr` split above exists for: ordering
+  // by an alias that is a String makes this a sum over String and the query
+  // fails with ILLEGAL_TYPE_OF_ARGUMENT. A person with no counted trace sums
+  // to zero here and lands at the bottom of a descending page, which is where
+  // an unmeasured row belongs.
+  tokens: "sum(coalesce(promptTokens, 0) + coalesce(completionTokens, 0))",
 };
 
 // ---------------------------------------------------------------------------
@@ -86,6 +131,27 @@ export const EMPTY_SUMMARY_SPEND: SummarySpendChRow = {
   thisUsers: 0,
 };
 
+// -- 1b. Active people, org-wide --
+
+/**
+ * Headcount only, for both windows. Adoption is an organization question, so
+ * this row comes from a read scoped to every project of the org, while the
+ * money fields above keep the governance project's scope. The previous
+ * window rides along because the "is anybody new" question has to be asked
+ * of the same population the headcount describes, and asking it of the money
+ * row would answer it for one project's spend instead.
+ */
+export const activeUserCountRowSchema = z.object({
+  thisUsers: chNumeric,
+  prevUsers: chNumeric,
+});
+export type ActiveUserCountChRow = z.infer<typeof activeUserCountRowSchema>;
+
+export const EMPTY_ACTIVE_USER_COUNT: ActiveUserCountChRow = {
+  thisUsers: 0,
+  prevUsers: 0,
+};
+
 // -- 2. Spend by user --
 
 export const spendByUserRowSchema = z.object({
@@ -94,6 +160,14 @@ export const spendByUserRowSchema = z.object({
   requests: z.string(),
   lastActivityMs: z.string(),
   mostUsedTarget: z.string().nullable().catch(null),
+  /**
+   * Prompt + completion tokens summed over the person's traces, or NULL when
+   * not one of them carried a count. Read `tokensStr` on
+   * `spendByDepartmentRowSchema` for why NULL rather than zero.
+   */
+  tokensStr: z.string().nullable().catch(null),
+  /** "1" when any counted trace of theirs was estimated, not reported. */
+  tokensEstimatedStr: z.string().catch("0"),
 });
 export type SpendByUserChRow = z.infer<typeof spendByUserRowSchema>;
 
@@ -105,6 +179,27 @@ export const spendByDepartmentRowSchema = z.object({
   spendUsdStr: z.string(),
   requests: z.string(),
   lastActivityMs: z.string(),
+  /**
+   * Prompt + completion tokens summed over the group, or NULL when not one
+   * row of it carried a count.
+   *
+   * NULL rather than a separate "how many rows were measured" column: the
+   * distinction the screen needs is only ever "we measured this" against "we
+   * did not", and a zero is a measurement. Subscription products carry no
+   * per-request cost and some carry no token count either, so a group of them
+   * has to come back distinguishable from a group that genuinely ran nothing.
+   * `.catch(null)` for the same reason `mostUsedTarget` has one, and it
+   * degrades the honest way: a column this read cannot see is not a
+   * measurement of zero.
+   */
+  tokensStr: z.string().nullable().catch(null),
+  /**
+   * "1" when any counted row of the group had its tokens ESTIMATED rather
+   * than reported by the provider. A string because everything else here is
+   * one, and ClickHouse hands booleans back as `true`/`1` depending on the
+   * cast.
+   */
+  tokensEstimatedStr: z.string().catch("0"),
 });
 export type SpendByDepartmentChRow = z.infer<typeof spendByDepartmentRowSchema>;
 

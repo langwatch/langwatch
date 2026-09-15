@@ -90,13 +90,41 @@ const READS: Array<{
     name: "findSpendByUser",
     run: (repo) =>
       repo.findSpendByUser({
-        tenantId: "tenant-a",
+        tenantIds: ["tenant-a"],
+        scope: "governance",
         windowStart: WINDOW_START,
         windowEnd: WINDOW_END,
         sortBy: "spend",
         sortDir: "desc",
         limit: 8,
         offset: 0,
+      }),
+  },
+  {
+    // The organization scope builds a different WHERE clause — a tenant array
+    // and no source filter — so it is a second query shape and gets its own
+    // row here rather than riding on the governance one's bounds.
+    name: "findSpendByUser (organization scope)",
+    run: (repo) =>
+      repo.findSpendByUser({
+        tenantIds: ["tenant-a", "tenant-b"],
+        scope: "organization",
+        windowStart: WINDOW_START,
+        windowEnd: WINDOW_END,
+        sortBy: "tokens",
+        sortDir: "desc",
+        limit: 8,
+        offset: 0,
+      }),
+  },
+  {
+    name: "findActiveUserCount",
+    run: (repo) =>
+      repo.findActiveUserCount({
+        tenantIds: ["tenant-a", "tenant-b"],
+        thisStart: WINDOW_START,
+        prevStart: WINDOW_START,
+        windowEnd: WINDOW_END,
       }),
   },
   {

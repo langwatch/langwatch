@@ -8,6 +8,7 @@ import { api } from "~/utils/api";
 import { formatLaneUsd } from "../costLaneFormat";
 import { CostStackedBars, formatDayTick } from "./CostCharts";
 import { providerName } from "./CostProviderBreakdown";
+import { isRefusedRead } from "./costSampleMode";
 import { aggregateBuckets, bucketStartOf } from "./costsWindow";
 import type { DailyBucket } from "./sampleSeries";
 
@@ -466,34 +467,51 @@ function PeriodRecords({
       {/*
         A failed read and a read still in flight both leave `rows` null, and
         the screen this panel opens inside holds that the two must never look
-        alike: an empty answer is a finding, a failed read is something to try
-        again. So the failure is asked about first.
+        alike: an empty answer is a finding, a read that did not answer is
+        either something to try again or something to explain. So the failure
+        is asked about first.
       */}
       {records.isError ? (
-        <HStack gap={2}>
-          <Text fontSize="sm" color="fg.muted">
-            This period could not be read.
-          </Text>
-          {/*
-            A CONTROL, not the word "refresh". The screen's own refresh
-            deliberately leaves this read out — the records behind a period are
-            absent until a reader opens one, and refetching a query nobody
-            opened is work with no reader — so the sentence that told them to
-            refresh was pointing at a button that would not have retried this.
-            The only way back was to close the period and open it again, which
-            works by accident and reads as giving up.
-
-            Local on purpose: the retry belongs where the failure is, and the
-            read it repeats is this component's own.
-          */}
-          <Button
-            size="xs"
-            variant="outline"
-            onClick={() => void records.refetch()}
+        /*
+          A DECLINE gets words of its own rather than merely losing the button.
+          Nothing is in hand and nothing is in flight, so dropping only the
+          retry would leave the panel sitting forever on the line that says the
+          read is still running.
+        */
+        isRefusedRead(records.error) ? (
+          <Text
+            fontSize="sm"
+            color="fg.muted"
+            data-testid="cost-period-records-refused"
           >
-            Try again
-          </Button>
-        </HStack>
+            You do not have access to what this period was made of.
+          </Text>
+        ) : (
+          <HStack gap={2}>
+            <Text fontSize="sm" color="fg.muted">
+              This period could not be read.
+            </Text>
+            {/*
+              A CONTROL, not the word "refresh". The screen's own refresh
+              deliberately leaves this read out — the records behind a period
+              are absent until a reader opens one, and refetching a query
+              nobody opened is work with no reader — so the sentence that told
+              them to refresh was pointing at a button that would not have
+              retried this. The only way back was to close the period and open
+              it again, which works by accident and reads as giving up.
+
+              Local on purpose: the retry belongs where the failure is, and the
+              read it repeats is this component's own.
+            */}
+            <Button
+              size="xs"
+              variant="outline"
+              onClick={() => void records.refetch()}
+            >
+              Try again
+            </Button>
+          </HStack>
+        )
       ) : rows === null ? (
         <Text fontSize="sm" color="fg.muted">
           Reading what this period was made of.

@@ -35,8 +35,14 @@ const harness: {
   periodRecords:
     | { records: { label: string; amountUsd: number | null }[] }
     | undefined;
-  periodRecordsFails: boolean;
-} = { periodRecords: undefined, periodRecordsFails: false };
+  /**
+   * tRPC's own code for the read: null when it answers cleanly. A decline
+   * arrives as `FORBIDDEN` or `UNAUTHORIZED` and a fault as anything else, and
+   * the panel has to tell the two apart — so the code is what the harness
+   * carries, rather than a boolean that cannot say which of them happened.
+   */
+  periodRecordsErrorCode: string | null;
+} = { periodRecords: undefined, periodRecordsErrorCode: null };
 
 vi.mock("recharts", async (importOriginal) => {
   const actual = await importOriginal<typeof import("recharts")>();
@@ -60,7 +66,14 @@ vi.mock("~/utils/api", () => ({
         useQuery: () => ({
           data: harness.periodRecords,
           isLoading: false,
-          isError: harness.periodRecordsFails,
+          isError: harness.periodRecordsErrorCode !== null,
+          // Shaped the way tRPC hands a failure to a component: the code rides
+          // on `error.data.code`, and the panel reads that rather than the
+          // message.
+          error:
+            harness.periodRecordsErrorCode === null
+              ? null
+              : { data: { code: harness.periodRecordsErrorCode } },
         }),
       },
     },
@@ -106,7 +119,7 @@ const openFirstPeriod = () => {
 
 beforeEach(() => {
   harness.periodRecords = undefined;
-  harness.periodRecordsFails = false;
+  harness.periodRecordsErrorCode = null;
 });
 
 afterEach(() => cleanup());
@@ -127,7 +140,7 @@ describe("the records behind one period", () => {
      */
     /** @scenario "A period that could not be read offers a way to try again" */
     it("offers a control that tries the read again", () => {
-      harness.periodRecordsFails = true;
+      harness.periodRecordsErrorCode = "INTERNAL_SERVER_ERROR";
       renderPanel();
       openFirstPeriod();
 
@@ -135,6 +148,58 @@ describe("the records behind one period", () => {
         screen.getByLabelText("Records behind this period"),
       );
       expect(records.getByRole("button", { name: /try again/i })).toBeEnabled();
+    });
+  });
+
+  describe("given the read of them was declined", () => {
+    /**
+     * A decline is not a fault. This read carries the same permission and
+     * plan gates the charts above it already passed, so a reader only meets
+     * one when something changed under them between drawing the chart and
+     * opening a period — the grant taken away, or the plan lapsed. Pressing
+     * again cannot give either back.
+     *
+     * Both halves are asserted together because dropping the retry on its own
+     * leaves the panel on the line that says the read is still running, which
+     * it is not and never will be.
+     */
+    /** @scenario "A period the server declined says so instead of offering a retry" */
+    it("names the decline and offers nothing to press", () => {
+      harness.periodRecordsErrorCode = "FORBIDDEN";
+      renderPanel();
+      openFirstPeriod();
+
+      const records = within(
+        screen.getByLabelText("Records behind this period"),
+      );
+      expect(
+        records.queryByRole("button", { name: /try again/i }),
+      ).not.toBeInTheDocument();
+      expect(
+        records.getByTestId("cost-period-records-refused"),
+      ).toBeInTheDocument();
+      // The id carries the state's identity, the words carry its meaning: an
+      // id alone would let the sentence rot into something else.
+      expect(records.getByText(/do not have access/i)).toBeInTheDocument();
+      expect(records.queryByText(/Reading what this period/i)).toBeNull();
+    });
+
+    /** @scenario "A period declined for want of a grant reads the same as one declined by the plan" */
+    it("says the same thing when the grant is what is missing", () => {
+      harness.periodRecordsErrorCode = "UNAUTHORIZED";
+      renderPanel();
+      openFirstPeriod();
+
+      const records = within(
+        screen.getByLabelText("Records behind this period"),
+      );
+      expect(
+        records.queryByRole("button", { name: /try again/i }),
+      ).not.toBeInTheDocument();
+      expect(
+        records.getByTestId("cost-period-records-refused"),
+      ).toBeInTheDocument();
+      expect(records.getByText(/do not have access/i)).toBeInTheDocument();
     });
   });
 
