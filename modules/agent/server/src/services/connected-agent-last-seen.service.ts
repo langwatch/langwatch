@@ -12,6 +12,7 @@ export class ConnectedAgentLastSeenService {
   static create(agents: AgentService): ConnectedAgentLastSeenService {
     return new ConnectedAgentLastSeenService(agents);
   }
+
   private constructor(agents: AgentService) {
     this.#agents = agents;
   }

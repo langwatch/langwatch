@@ -100,6 +100,7 @@ export class DatasetChunkMaintenanceService {
       };
     });
   }
+
   /**
    * Change an s3_jsonl dataset's column schema under the lock (ADR-032 v19):
    * remap keys, convert values, rewrite chunks from index 0, update counters.

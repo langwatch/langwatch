@@ -49,6 +49,7 @@ export class LocalDatasetStorageAdapter implements DatasetStorage {
   static create(root: string): LocalDatasetStorageAdapter {
     return new LocalDatasetStorageAdapter(root);
   }
+
   /**
    * The local filesystem root for this project's chunk/staging objects, threaded
    * in from the resolver via `getDatasetStorage` (not read from env here).

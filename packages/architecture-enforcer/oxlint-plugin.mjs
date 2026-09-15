@@ -7,6 +7,8 @@ import {
   apiContextServicesRule,
   awaitedReturnChainRule,
   bannedLegacyNamesRule,
+  bannedTestModelNamesRule,
+  noInlineDynamicImportRule,
   noPortVocabularyRule,
   booleanWallRule,
   boundaryRule,
@@ -60,6 +62,7 @@ import {
   serviceQualityRule,
   standInCastRule,
   temporalOnlyRule,
+  testDescriptionIsAnActionRule,
   transportImportsARepositoryRule,
   typedPrismaSeamRule,
   typeOnlyValueImportRule,
@@ -129,6 +132,9 @@ export const rules = {
   "empty-catch": emptyCatchRule,
   "stand-in-cast": standInCastRule,
   "transport-imports-a-repository": transportImportsARepositoryRule,
+  "banned-test-model-names": bannedTestModelNamesRule,
+  "no-inline-dynamic-import": noInlineDynamicImportRule,
+  "test-description-is-an-action": testDescriptionIsAnActionRule,
 };
 
 // "nested-ternary" (superseded by the built-in no-nested-ternary) and

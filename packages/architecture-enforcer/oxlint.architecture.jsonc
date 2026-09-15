@@ -87,7 +87,42 @@
     "langwatch/stand-in-cast": "error",
     // Measured 2026-09-10 over the `lint:oxlint` paths: 9 reports across 9
     // files.
-    "langwatch/transport-imports-a-repository": "error"
+    "langwatch/transport-imports-a-repository": "error",
+    // Measured 2026-09-15 over the `lint:oxlint` paths with the baseline
+    // itself cleared first (the rule reads its own baseline entry to decide
+    // whether to report, so measuring with old entries in place undercounts):
+    // 471 reports across 95 files. Every file was already known on
+    // 2026-09-10; the baseline here is that same inventory minus 5 files
+    // fixed since. No new drift to fix.
+    "langwatch/banned-test-model-names": "error",
+    // Measured 2026-09-15 the same way: 517 reports across 170 files, most of
+    // them either a dynamic import inside a test body (module load order
+    // depends on mocks set up first) or a deliberate lazy `import()` for
+    // code-splitting a heavy component (editor, chart, drawer). Neither can
+    // be flipped to a top-level import without a behavioural or bundle-size
+    // change, so the baseline holds them until each is converted
+    // deliberately.
+    "langwatch/no-inline-dynamic-import": "error",
+    // NOT enabled: `test-description-is-an-action` is registered in the
+    // plugin above but deliberately left out of this map. Measured the same
+    // way: 1658 reports across 393 files, all `nestedDescribeMissingGivenWhen`
+    // (no in-scope `should` titles). The rule's `enclosingDescribe` check
+    // treats any nested `describe` as needing a "given "/"when " prefix, but
+    // dev/docs/TESTING_PHILOSOPHY.md blesses one further level of nesting for
+    // an MDN-style unit name (`describe(ClassName) > describe(methodName)`)
+    // before the given/when pair starts - that pattern is a false positive
+    // today. Enabling or baselining as-is would launder an unknown share of
+    // those 393 files into shrink-only debt as if they were real violations.
+    // Fix the rule's exemption first, then measure and enable for real.
+    "langwatch/awaited-return-chain": "error",
+    "langwatch/max-statements-per-line": "error",
+    // Measured 2026-09-15 over the `lint:oxlint` paths: 34 reports across 12
+    // service files. The rule does not read the oxlint baseline (it is a
+    // whitespace `layout` rule, not a `defineRule` baseline consumer), so
+    // there is nothing to seed; every report was auto-fixed with `--fix` in
+    // the same change instead.
+    "langwatch/service-member-spacing": "error",
+    "langwatch/service-quality": "error"
   },
   "overrides": [
     {

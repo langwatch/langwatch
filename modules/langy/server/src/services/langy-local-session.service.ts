@@ -414,6 +414,7 @@ export class LocalControlSessionCoreService {
 
     return !workspace || workspace.instanceId === session.instanceId;
   }
+
   /** The command line started the call. */
   ack(session: ControlSession, callId: string): Promise<void> {
     return this.frames.ack(session, callId);
@@ -437,6 +438,7 @@ export class LocalControlSessionCoreService {
   async pendingCalls(session: ControlSession): Promise<CallEnvelope[]> {
     return this.dispatcher.pendingEnvelopes(session.conversationId);
   }
+
   /**
    * The folder is gone. Clears presence, records it, and fails the calls it was
    * working on so the worker's poll answers at once instead of at the deadline.

@@ -7,9 +7,11 @@ export class TraceProcessingSpanIngestAdapter implements TraceSpanIngest {
   static create(commands: TraceProcessingCommands): TraceProcessingSpanIngestAdapter {
     return new TraceProcessingSpanIngestAdapter(commands);
   }
+
   private constructor(commands: TraceProcessingCommands) {
     this.#commands = commands;
   }
+
   async recordSpan(input: RecordSpanCommandData): Promise<void> {
     await this.#commands.recordSpan(input);
   }

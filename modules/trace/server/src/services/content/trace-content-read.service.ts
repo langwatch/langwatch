@@ -11,9 +11,11 @@ export class TraceContentReadServiceImpl extends TraceContentReadService {
   static create(read: TraceLegacyRead): TraceContentReadServiceImpl {
     return new TraceContentReadServiceImpl(read);
   }
+
   private constructor(private readonly read: TraceLegacyRead) {
     super();
   }
+
   listTraces(input: {
     query: TraceLegacyListInput;
     protections: unknown;
@@ -26,6 +28,7 @@ export class TraceContentReadServiceImpl extends TraceContentReadService {
   }): Promise<TracesForProjectResult> {
     return this.read.getAllTracesForProject(input.query, input.protections, input.options);
   }
+
   readTrace(input: {
     projectId: string;
     traceId: string;
@@ -37,6 +40,7 @@ export class TraceContentReadServiceImpl extends TraceContentReadService {
       ...(input.withEditOverlay !== undefined ? { withEditOverlay: input.withEditOverlay } : {}),
     });
   }
+
   readTracesWithSpans(input: {
     projectId: string;
     traceIds: string[];
@@ -55,6 +59,7 @@ export class TraceContentReadServiceImpl extends TraceContentReadService {
       },
     );
   }
+
   readTracesWithSpansPreview(input: {
     projectId: string;
     traceIds: string[];
@@ -69,6 +74,7 @@ export class TraceContentReadServiceImpl extends TraceContentReadService {
       input.withEditOverlay !== undefined ? { withEditOverlay: input.withEditOverlay } : {},
     );
   }
+
   async readOrderedSpansForTrace(input: {
     projectId: string;
     traceId: string;
@@ -84,6 +90,7 @@ export class TraceContentReadServiceImpl extends TraceContentReadService {
         : start;
     });
   }
+
   readThreadTraces(input: {
     projectId: string;
     threadId: string;
@@ -93,6 +100,7 @@ export class TraceContentReadServiceImpl extends TraceContentReadService {
       full: true,
     });
   }
+
   readThreadsTraces(input: {
     projectId: string;
     threadIds: string[];
@@ -109,6 +117,7 @@ export class TraceContentReadServiceImpl extends TraceContentReadService {
       },
     );
   }
+
   async readSampleTraces(input: {
     query: TraceLegacyListInput;
     protections: unknown;

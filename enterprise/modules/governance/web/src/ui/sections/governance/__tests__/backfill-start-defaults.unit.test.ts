@@ -169,7 +169,7 @@ describe("given the date a scheduled source reads history from", () => {
       expect(
         seedComposerParserConfig({
           sourceType: "openai_admin",
-          storedParserConfig: { model: "gpt-4o" },
+          storedParserConfig: { model: "gpt-5-mini" },
         }),
       ).not.toHaveProperty("startingAt");
     });

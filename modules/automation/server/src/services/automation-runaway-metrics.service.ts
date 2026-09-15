@@ -66,6 +66,8 @@ export class NoopAutomationRunawayMetrics extends AutomationRunawayMetricsSink {
   }
 
   onCeilingBreach(): void {}
+
   onAutoPaused(): void {}
+
   onContainmentFailed(): void {}
 }

@@ -73,11 +73,13 @@ export class AnnotationQueueService {
   ): Promise<AnnotationQueueListEntry[]> {
     return this.#repository.listQueues(input);
   }
+
   countQueues(
     input: Readonly<{ projectId: string; queueIds: readonly string[] }>,
   ): Promise<number> {
     return this.#repository.countQueues(input);
   }
+
   async getQueue(
     input: AnnotationQueueScope &
       Readonly<{
@@ -111,6 +113,7 @@ export class AnnotationQueueService {
   createQueueItems(input: CreateAnnotationQueueItemsInput): Promise<void> {
     return this.#items.createQueueItems(createAnnotationQueueItemsInputSchema.parse(input));
   }
+
   listQueueItems(
     input: Readonly<{
       projectId: string;
@@ -120,17 +123,21 @@ export class AnnotationQueueService {
   ): Promise<readonly AnnotationQueueListedItem[]> {
     return this.#items.listQueueItems(input);
   }
+
   countPendingItems(input: AnnotationQueueCaller): Promise<number> {
     return this.#items.countPendingItems(input);
   }
+
   countAssignedItems(input: AnnotationQueueCaller): Promise<number> {
     return this.#items.countAssignedItems(input);
   }
+
   listMemberQueuePendingCounts(
     input: AnnotationQueueCaller,
   ): Promise<readonly AnnotationQueuePendingCount[]> {
     return this.#items.listMemberQueuePendingCounts(input);
   }
+
   deleteQueueItems(
     input: AnnotationQueueCaller &
       Readonly<{
@@ -141,6 +148,7 @@ export class AnnotationQueueService {
   ): Promise<number> {
     return this.#items.deleteQueueItems(input);
   }
+
   async markQueueItemDone(
     input: AnnotationQueueCaller &
       Readonly<{
@@ -151,6 +159,7 @@ export class AnnotationQueueService {
   ): Promise<AnnotationQueueItem> {
     return this.#items.markQueueItemDone(input);
   }
+
   listQueueItemsPage(
     input: ListQueueItemsByUserInput & Readonly<{ queueId?: string }>,
   ): Promise<Readonly<{ totalCount: number; items: readonly AnnotationQueuePageItem[] }>> {
@@ -172,6 +181,7 @@ export class AnnotationQueueService {
 
     return this.#items.listQueueItemsByUser(input);
   }
+
   listQueuesWithItems(
     input: Readonly<{
       projectId: string;

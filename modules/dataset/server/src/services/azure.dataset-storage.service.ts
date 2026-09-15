@@ -58,6 +58,7 @@ export class AzureDatasetStorageAdapter implements DatasetStorage {
   static create(resolver: DatasetAzureConfigResolver): AzureDatasetStorageAdapter {
     return new AzureDatasetStorageAdapter(resolver);
   }
+
   constructor(private readonly resolver: DatasetAzureConfigResolver) {}
 
   private uriFor({

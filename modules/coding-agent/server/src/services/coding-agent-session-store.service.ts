@@ -150,7 +150,9 @@ export class EventingCodingAgentSessionStoreAdapter implements FoldProjectionSto
     aggregateId: string,
     context: ProjectionStoreContext,
   ): Promise<CodingAgentSessionState | null> {
-    return (await this.getWithApplied(aggregateId, context)).state;
+    const found = await this.getWithApplied(aggregateId, context);
+
+    return found.state;
   }
 }
 

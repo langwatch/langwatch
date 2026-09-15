@@ -49,6 +49,7 @@ export class S3DatasetStorageAdapter implements DatasetStorage {
   static create(resolver: DatasetS3ClientResolver): S3DatasetStorageAdapter {
     return new S3DatasetStorageAdapter(resolver);
   }
+
   constructor(private readonly resolver: DatasetS3ClientResolver) {}
 
   private async withClient<T>(

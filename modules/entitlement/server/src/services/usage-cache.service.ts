@@ -5,6 +5,7 @@ export class NoUsageCache implements UsageCache {
   async tryGet<T>(): Promise<T | undefined> {
     return undefined;
   }
+
   async set(): Promise<void> {}
 }
 
