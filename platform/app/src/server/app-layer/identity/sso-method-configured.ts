@@ -1,3 +1,5 @@
+import type { SsoConnectionSource } from "@langwatch/identity";
+
 /**
  * Whether a sign-in sent to a connection would ARRIVE anywhere (D09 — see
  * specs/identity/sso-idp-termination.feature).
@@ -35,12 +37,21 @@ export interface SsoMethodConfiguration {
 export function ssoMethodIsConfiguredWith(
   ports: SsoMethodConfiguration,
 ): (args: {
+  source: SsoConnectionSource;
   methodId: string;
   connectionId: string;
   organizationId: string;
 }) => Promise<boolean> {
-  return async ({ methodId, connectionId }) => {
-    if ((await ports.mountedMethodId()) === methodId) return true;
+  return async ({ source, methodId, connectionId }) => {
+    // The SOURCE decides which registry owns this connection, and it has to:
+    // `providerId` is what the customer calls their provider, so two
+    // organizations may both say `okta` and one of them may say the very name
+    // this deployment mounts. Asking the mounted provider first, by that name,
+    // let a self-serve connection the engine has never heard of answer
+    // "configured" purely because it borrowed the name.
+    if (source === "legacy-grandfathered") {
+      return (await ports.mountedMethodId()) === methodId;
+    }
     return ports.engineHoldsProvider({ connectionId });
   };
 }

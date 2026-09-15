@@ -3,6 +3,7 @@ import {
   type RoutableConnection,
   routingStateOf,
   type SignInMethod,
+  type SsoConnectionSource,
 } from "@langwatch/identity";
 import type { SignInDomainRoutingPort } from "@langwatch/identity-server";
 import type { PrismaClient, SsoConnection } from "~/generated/prisma/client";
@@ -92,6 +93,7 @@ export class SsoConnectionDomainRoutingRepository
      * organization's own registered provider is keyed by the connection.
      */
     private readonly isMethodConfigured: (args: {
+      source: SsoConnectionSource;
       methodId: string;
       connectionId: string;
       organizationId: string;
@@ -185,9 +187,17 @@ export class SsoConnectionDomainRoutingRepository
     row: SsoConnection,
     domain?: string,
   ): Promise<RoutableConnection> {
-    const providerId = providerIdOf(row);
+    // WHICH REGISTRY HOLDS THE PROVIDER IS WHICH ID GETS DIALED. A
+    // grandfathered connection is a reference to the provider this deployment
+    // mounts, and `idpMetadata.providerId` is that provider's name. A
+    // self-serve connection is registered with the engine under its CONNECTION
+    // id, so that is the id better-auth knows it by; dialing the customer's own
+    // label would dial a provider the engine has never registered.
+    const source = row.source as SsoConnectionSource;
+    const methodId =
+      source === "legacy-grandfathered" ? providerIdOf(row) : row.id;
     const method: SignInMethod = {
-      id: providerId,
+      id: methodId,
       kind: "federated",
       connectionId: row.id,
     };
@@ -196,7 +206,8 @@ export class SsoConnectionDomainRoutingRepository
       method,
       state: routingStateOf(row.state as Parameters<typeof routingStateOf>[0]),
       configured: await this.isMethodConfigured({
-        methodId: providerId,
+        source,
+        methodId,
         connectionId: row.id,
         organizationId: row.organizationId,
       }),
@@ -254,8 +265,9 @@ export function selectMigrationRoute(
   }
 }
 
-/** The provider id the sign-in surface dials, out of the projection's
- *  `idpMetadata`. An empty string is impossible for a registered connection
+/** The provider NAME a connection carries in its projection `idpMetadata` —
+ *  what a grandfathered connection dials, and what a self-serve one is merely
+ *  labelled with. An empty string is impossible for a registered connection
  *  and would route nowhere anyway, so it degrades to "not configured". */
 function providerIdOf(row: SsoConnection): string {
   const metadata = row.idpMetadata as { providerId?: unknown } | null;
