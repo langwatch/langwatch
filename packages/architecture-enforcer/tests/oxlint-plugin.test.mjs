@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, realpathSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { commentBlockSizeMessage } from "@langwatch/lint-core/grammar/comment-block-policy.mjs";
+import { commentBlockSizeMessage } from "@langwatch/oxlint-rules/grammar/comment-block-policy.mjs";
 import { RuleTester } from "oxlint/plugins-dev";
 import { describe, it } from "vitest";
 import plugin from "../oxlint-plugin.mjs";
@@ -1615,7 +1615,6 @@ const longCommentLine = `// ${"long".repeat(30)}`;
 looseTester.run("comment-block-size", plugin.rules["comment-block-size"], {
   valid: [
     { filename: "src/five.ts", code: blockComment(5) },
-    { filename: "src/eight.ts", code: blockComment(8) },
     { filename: "src/code.ts", code: lineComments(3) },
     {
       filename: "src/separated.ts",
@@ -1690,35 +1689,6 @@ looseTester.run("comment-block-size", plugin.rules["comment-block-size"], {
       filename: "src/wide.ts",
       code: `${longCommentLine}\nexport const value = 1;`,
       errors: [{ messageId: "commentColumns" }],
-    },
-  ],
-});
-
-looseTester.run("comment-block-size-warning", plugin.rules["comment-block-size-warning"], {
-  valid: [
-    { filename: "src/five.ts", code: blockComment(5) },
-    { filename: "src/nine.ts", code: blockComment(9) },
-    { filename: "src/three.ts", code: lineComments(3) },
-    { filename: "src/wide.ts", code: `${longCommentLine}\nexport const value = 1;` },
-  ],
-  invalid: [
-    {
-      filename: "src/six.ts",
-      code: blockComment(6),
-      errors: [
-        {
-          message: commentBlockSizeMessage(6),
-        },
-      ],
-    },
-    {
-      filename: "src/eight.ts",
-      code: blockComment(8),
-      errors: [
-        {
-          message: commentBlockSizeMessage(8),
-        },
-      ],
     },
   ],
 });

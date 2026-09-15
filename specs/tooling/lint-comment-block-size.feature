@@ -38,13 +38,13 @@ Feature: The comment-block-size lint rule
 
   @unit
   Scenario: The keep annotation does not suppress the error tier
-    Given a 9-line comment block whose @lint-keep gives a reason and names an ADR
+    Given an 8-line comment block whose @lint-keep gives a reason and names an ADR
     When the comment-block-size rule runs over it
     Then it reports the block and says the annotation does not apply
 
   @unit
-  Scenario: A keep annotation does not promote a warned block into the error tier
-    Given an 8-line comment block whose @lint-keep gives a reason and names an ADR
+  Scenario: A keep annotation's own line is not commentary
+    Given a 5-line comment block whose @lint-keep gives a reason and names an ADR
     When the comment-block-size rule runs over it
     Then it reports nothing, because the annotation's own line is not commentary
 

@@ -20,10 +20,9 @@ import {
 } from "../../grammar/comment-block-policy.mjs";
 import { defineRule } from "../define-rule.mjs";
 
-// A block of 6 to 8 lines warns (`comment-block-size-warning.rule.mjs`), 9 or
-// more errors, and a comment line wider than 100 columns errors. Both rules
-// share the one analysis below, which walks a file's comments exactly once and
-// is memoised so the second rule's visitor is a cache hit.
+// A block past the maximum errors, as does a comment line wider than 100
+// columns. There is no warning tier. The analysis below walks a file's
+// comments exactly once and is memoised, so the second visitor is a cache hit.
 
 export const MAX_COMMENT_COLUMNS = 100;
 

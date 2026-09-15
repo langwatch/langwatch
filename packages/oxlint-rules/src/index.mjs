@@ -22,7 +22,6 @@ export {
   isCommentScannedPath,
   isCoveredByAllowedRoot,
 } from "./rules/comment-block-size.rule.mjs";
-export { commentBlockSizeWarningRule } from "./rules/comment-block-size-warning.rule.mjs";
 export {
   cognitiveComplexity,
   cognitiveComplexityRule,

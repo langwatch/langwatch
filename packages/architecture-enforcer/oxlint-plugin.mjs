@@ -14,7 +14,6 @@ import {
   boundaryRule,
   cognitiveComplexityRule,
   commentBlockSizeRule,
-  commentBlockSizeWarningRule,
   conditionShapeRule,
   legacyMonolithPathRule,
   conditionalTypeDepthRule,
@@ -82,7 +81,6 @@ import {
 export const rules = {
   "api-context-services": apiContextServicesRule,
   "comment-block-size": commentBlockSizeRule,
-  "comment-block-size-warning": commentBlockSizeWarningRule,
   "conditional-type-depth": conditionalTypeDepthRule,
   "fallible-result-naming": fallibleResultNamingRule,
   "em-dash-in-copy": emDashInCopyRule,

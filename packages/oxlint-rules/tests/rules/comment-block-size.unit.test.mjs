@@ -36,7 +36,7 @@ describe("given a source file outside the burn-down allowlist", () => {
     /** @scenario "The keep annotation does not suppress the error tier" */
     it("still reports, and says the annotation does not apply", () => {
       const keep = "// @lint-keep the ordering table is the contract dev/docs/adr/140-x.md";
-      const code = `${commentLines(9)}\n${keep}\nexport const x = 1;`;
+      const code = `${commentLines(8)}\n${keep}\nexport const x = 1;`;
       const found = report(code);
 
       expect(found).toHaveLength(1);
@@ -45,11 +45,11 @@ describe("given a source file outside the burn-down allowlist", () => {
     });
   });
 
-  describe("when a warned block is annotated up to the error line count", () => {
-    /** @scenario "A keep annotation does not promote a warned block into the error tier" */
-    it("discounts the annotation line so the block stays in the warn tier", () => {
+  describe("when a block at the maximum carries the annotation", () => {
+    /** @scenario "A keep annotation's own line is not commentary" */
+    it("discounts the annotation line so the block stays at the maximum", () => {
       const keep = "// @lint-keep the ordering table is the contract dev/docs/adr/140-x.md";
-      const code = `${commentLines(8)}\n${keep}\nexport const x = 1;`;
+      const code = `${commentLines(5)}\n${keep}\nexport const x = 1;`;
 
       expect(report(code)).toEqual([]);
     });

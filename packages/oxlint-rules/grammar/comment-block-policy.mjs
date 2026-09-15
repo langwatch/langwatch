@@ -4,10 +4,20 @@
 
 export const REVIEW_LINE_COUNT = 4;
 export const MAX_COMMENT_BLOCK_LINES = 5;
-export const COMMENT_BLOCK_WARN_LINES = 6;
-export const COMMENT_BLOCK_ERROR_LINES = 9;
+// One threshold, not two. The 6-to-8 line warning tier is gone: it reported
+// 5,212 blocks across 3,154 files, 2,139 of which carried exactly one, and a
+// warning that never becomes an error is a report nobody is obliged to answer.
+// The maximum is 5, and the line after the maximum is where it fails --
+// anything that genuinely needs more belongs in an ADR with one line pointing
+// at it, which is what this rule has always said to do.
+export const COMMENT_BLOCK_ERROR_LINES = MAX_COMMENT_BLOCK_LINES + 1;
 
-/** The last resort, and almost never correct. It must name the ADR that holds the narrative. */
+/**
+ * The last resort, and almost never correct. It must name the ADR that holds
+ * the narrative. It silenced the warning tier alone, and in the life of that
+ * tier not one comment in the repository ever used it -- kept because the
+ * grammar's messages still name it, not because it has earned a second tier.
+ */
 export const LINT_KEEP_ANNOTATION = "@lint-keep";
 
 /** A reason is a clause, not a shrug: fewer words than this does not excuse the block. */

@@ -20,7 +20,6 @@
     "langwatch/legacy-monolith-path": "error",
     "langwatch/api-context-services": "error",
     "langwatch/comment-block-size": "error",
-    "langwatch/comment-block-size-warning": "warn",
     "langwatch/conditional-type-depth": "error",
     "langwatch/zod-object-composition": "error",
     "langwatch/fallible-result-naming": "error",
