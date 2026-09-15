@@ -37,6 +37,7 @@ import {
   ACCESS_LISTING_GROUP_SELECT,
   ACCESS_LISTING_USER_SELECT,
 } from "./access-listing.repository";
+import { LIVE_GROUP, LIVE_MEMBERSHIP } from "./live-rows";
 
 /** The relation predicate the whole-table and scope listings carry: a row is
  *  listed only while its principal is still of this organization. */
@@ -48,7 +49,10 @@ const principalInOrganizationWhere = (
       userId: { not: null },
       user: { orgMemberships: { some: { organizationId } } },
     },
-    { groupId: { not: null }, group: { organizationId } },
+    // "of this organization" includes "still exists": a deleted group's
+    // bindings are revoked, but a listing that showed them would report access
+    // nobody holds.
+    { groupId: { not: null }, group: { organizationId, ...LIVE_GROUP } },
     { apiKeyId: { not: null }, apiKey: { organizationId } },
   ],
 });
@@ -76,6 +80,11 @@ function toRow(binding: DecoratedRoleBinding): AccessListingBindingRow {
     scopeType: binding.scopeType,
     scopeId: binding.scopeId,
     createdAt: binding.createdAt,
+    // `RoleBinding` has no expiry column. An organization on this head
+    // cannot hold an expiring binding either - the ledger writer refuses to
+    // create one where it could not be stored - so null is the whole truth
+    // here, not a gap.
+    expiresAt: null,
     user: binding.user,
     group: binding.group,
     apiKey: binding.apiKey,
@@ -231,7 +240,18 @@ export class PrismaAccessListingRepository implements AccessListingRepository {
     const bindings = await this.prisma.roleBinding.findMany({
       where: {
         organizationId: { in: [...orgIds] },
-        OR: [{ userId }, { group: { members: { some: { userId } } } }],
+        OR: [
+          { userId },
+          // LIVE_MEMBERSHIP, not a bare `{ userId }`: a removal marks the
+          // membership row, so without the fence a group somebody LEFT still
+          // synthesizes its bindings onto them.
+          {
+            group: {
+              ...LIVE_GROUP,
+              members: { some: { userId, ...LIVE_MEMBERSHIP } },
+            },
+          },
+        ],
         scopeType: { in: ["TEAM", "ORGANIZATION", "PROJECT"] },
       },
       select: {

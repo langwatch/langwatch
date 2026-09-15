@@ -310,8 +310,12 @@ describe("budgets on every dimension (real PG + real CH)", () => {
       });
       expect(joined.map((r) => r.budget.id)).toContain(BUDGET_GROUP_ID);
 
-      await prisma.groupMembership.delete({
-        where: { userId_groupId: { userId: OTHER_USER_ID, groupId: GROUP_ID } },
+      // Marked, not deleted (ADR-125). A budget must stop reaching somebody
+      // the moment they leave the group, and the row that records the leaving
+      // must not be what makes it keep reaching them.
+      await prisma.groupMembership.updateMany({
+        where: { userId: OTHER_USER_ID, groupId: GROUP_ID },
+        data: { removedAt: new Date() },
       });
       const left = await resolveApplicableBudgets({
         client: prisma,

@@ -537,10 +537,16 @@ describe("GrantsAccessListingRepository", () => {
       expect(rows[0]?.userId).toBeNull();
       expect(rows[0]?.apiKeyId).toBeNull();
       // The fence that stops another organization's group name rendering on
-      // this page - the only thing bounding a lookup keyed by a bare id.
+      // this page - the only thing bounding a lookup keyed by a bare id - and
+      // the live fence beside it, so a deleted group does not decorate a row
+      // as though it still existed.
       expect(prisma.group.findMany).toHaveBeenCalledWith(
         expect.objectContaining({
-          where: { id: { in: ["group-1"] }, organizationId: ORG },
+          where: {
+            id: { in: ["group-1"] },
+            organizationId: ORG,
+            deletedAt: null,
+          },
         }),
       );
     });

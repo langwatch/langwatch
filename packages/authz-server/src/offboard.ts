@@ -82,7 +82,10 @@ export async function offboardUserFromOrganization({
 /**
  * The proof (§10 step 7): re-collect against the transaction — the deletes
  * are visible there — and fail loudly if anything still resolves. Group- or
- * key-held grants cannot survive for this user: memberships are gone, and a
+ * key-held grants cannot survive for this user: memberships are ENDED — the
+ * rows stay, marked, and every read of live membership is fenced on that mark,
+ * so a group the leaver was in resolves to nothing while the record of when
+ * they left survives — and a
  * personal key is ceilinged by an owner who now resolves to nothing
  * (AuthzService applies that ceiling on every check).
  *

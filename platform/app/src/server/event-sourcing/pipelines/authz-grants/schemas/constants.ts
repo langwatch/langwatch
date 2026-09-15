@@ -58,14 +58,45 @@ export const AUTHZ_ROLE_EVENT_TYPES = [
   ROLE_DELETED_EVENT_TYPE,
 ] as const;
 
+// The third family, and it rides the same pipeline for the same reason the
+// role family does (ADR-110): the aggregate TYPE is the storage partition key
+// and the event store refuses any event whose type differs from the one its
+// pipeline declares, so a `authz_group_member` type would need a pipeline of
+// its own. What separates a membership's fold from a grant's is the aggregate
+// ID its command stamps - a membership id.
+//
+// A membership is org-scoped because the group is, so `tenantId ===
+// organizationId` holds here exactly as it does for a grant command.
+export const ADD_GROUP_MEMBER_COMMAND_TYPE =
+  "lw.authz_group_member.add" as const;
+export const REMOVE_GROUP_MEMBER_COMMAND_TYPE =
+  "lw.authz_group_member.remove" as const;
+
+export const AUTHZ_GROUP_MEMBER_COMMAND_TYPES = [
+  ADD_GROUP_MEMBER_COMMAND_TYPE,
+  REMOVE_GROUP_MEMBER_COMMAND_TYPE,
+] as const;
+
+export const GROUP_MEMBER_ADDED_EVENT_TYPE =
+  "lw.authz.group_member.added" as const;
+export const GROUP_MEMBER_REMOVED_EVENT_TYPE =
+  "lw.authz.group_member.removed" as const;
+
+export const AUTHZ_GROUP_MEMBER_EVENT_TYPES = [
+  GROUP_MEMBER_ADDED_EVENT_TYPE,
+  GROUP_MEMBER_REMOVED_EVENT_TYPE,
+] as const;
+
 export const AUTHZ_GRANTS_COMMAND_TYPES = [
   ...AUTHZ_GRANT_COMMAND_TYPES,
   ...AUTHZ_ROLE_COMMAND_TYPES,
+  ...AUTHZ_GROUP_MEMBER_COMMAND_TYPES,
 ] as const;
 
 export const AUTHZ_GRANTS_EVENT_TYPES = [
   ...AUTHZ_GRANT_EVENT_TYPES,
   ...AUTHZ_ROLE_EVENT_TYPES,
+  ...AUTHZ_GROUP_MEMBER_EVENT_TYPES,
 ] as const;
 
 export const AUTHZ_GRANTS_EVENT_VERSION_LATEST = "2026-08-20" as const;
@@ -81,6 +112,8 @@ export const AUTHZ_AUDIT_VERBS = [
   "role_defined",
   "role_permissions_changed",
   "role_deleted",
+  "group_member_added",
+  "group_member_removed",
 ] as const;
 
 export type AuthzAuditVerb = (typeof AUTHZ_AUDIT_VERBS)[number];

@@ -31,7 +31,27 @@ describe("the binding a create answers with while the projection lags", () => {
         scopeId: "team_1",
         scopeName: null,
         createdAt: AT,
+        expiresAt: null,
       });
+    });
+  });
+
+  describe("when the create states the date its access ends", () => {
+    it("echoes it back rather than leaving the caller to guess", () => {
+      const endsAt = new Date("2026-12-31T23:59:59.000Z");
+      const wire = optimisticBindingWire({
+        id: "rb_5",
+        principal: { userId: "user_1" },
+        role: TeamUserRole.MEMBER,
+        scopeType: RoleBindingScopeType.TEAM,
+        scopeId: "team_1",
+        expiresAt: endsAt,
+        now: () => AT,
+      });
+
+      // Unlike the names, this is something the request stated rather than
+      // something the listing joins in, so the optimistic answer knows it.
+      expect(wire.expiresAt).toEqual(endsAt);
     });
   });
 

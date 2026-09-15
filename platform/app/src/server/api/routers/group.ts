@@ -6,6 +6,10 @@ import {
   RoleBindingScopeType,
   TeamUserRole,
 } from "~/generated/prisma/client";
+import {
+  LIVE_MEMBERSHIP,
+  liveGroups,
+} from "~/server/app-layer/authz/repositories/live-rows";
 import { GroupRestService } from "~/server/app-layer/groups/group.service";
 import { PrismaGroupRepository } from "~/server/app-layer/groups/repositories/group.prisma.repository";
 import { PrismaRoleBindingRepository } from "~/server/app-layer/role-bindings/repositories/role-binding.prisma.repository";
@@ -34,6 +38,9 @@ const ledgerActor = (userId: string): LedgerActor => ({
   id: userId,
 });
 
+// Live groups only, for the reason the repository's own copy of this states:
+// a deleted group's slug is free again — the uniqueness index is partial over
+// live rows — so suffixing around one hands back a name nothing is using.
 async function findUniqueGroupSlug(
   prisma: Pick<PrismaClient, "group">,
   organizationId: string,
@@ -49,7 +56,7 @@ async function findUniqueGroupSlug(
   let candidate = baseSlug;
   let suffix = 2;
   while (true) {
-    const exists = await prisma.group.findFirst({
+    const exists = await liveGroups(prisma).findFirst({
       where: {
         organizationId,
         slug: candidate,
@@ -122,7 +129,7 @@ export const groupRouter = createTRPCRouter({
         errorMessage: ENTERPRISE_FEATURE_ERRORS.SCIM,
       });
 
-      const groups = await ctx.prisma.group.findMany({
+      const groups = await liveGroups(ctx.prisma).findMany({
         where: { organizationId: input.organizationId },
         include: {
           roleBindings: {
@@ -130,8 +137,12 @@ export const groupRouter = createTRPCRouter({
           },
           _count: {
             select: {
+              // LIVE members. Without the fence the count includes everybody
+              // who was ever in the group, so a group somebody left reads as
+              // one seat larger than the access it actually confers.
               members: {
                 where: {
+                  ...LIVE_MEMBERSHIP,
                   user: {
                     orgMemberships: {
                       some: { organizationId: input.organizationId },
@@ -181,7 +192,7 @@ export const groupRouter = createTRPCRouter({
     // organization:manage; group.getById should match.
     .permission("organization:manage")
     .query(async ({ ctx, input }) => {
-      const group = await ctx.prisma.group.findFirst({
+      const group = await liveGroups(ctx.prisma).findFirst({
         where: { id: input.groupId, organizationId: input.organizationId },
         include: {
           roleBindings: {
@@ -189,6 +200,7 @@ export const groupRouter = createTRPCRouter({
           },
           members: {
             where: {
+              ...LIVE_MEMBERSHIP,
               user: {
                 orgMemberships: {
                   some: { organizationId: input.organizationId },
@@ -335,36 +347,19 @@ export const groupRouter = createTRPCRouter({
       }),
     )
     .permission("organization:manage")
-    .mutation(async ({ ctx, input }) => {
-      const group = await ctx.prisma.group.findFirst({
-        where: { id: input.groupId, organizationId: input.organizationId },
-      });
-      if (!group) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "Group not found" });
-      }
-      if (group.scimSource) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: "Cannot manually add members to a SCIM-managed group",
-        });
-      }
-
-      const orgMember = await ctx.prisma.organizationUser.findFirst({
-        where: { organizationId: input.organizationId, userId: input.userId },
-        select: { userId: true },
-      });
-      if (!orgMember) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message:
-            "User must belong to the organization before joining a group",
-        });
-      }
-
-      return ctx.prisma.groupMembership.create({
-        data: { groupId: input.groupId, userId: input.userId },
-      });
-    }),
+    // Through the service, not the table. A membership is a grant fact now:
+    // it goes on the ledger, it moves the organization's authz epoch, and it
+    // earns an audit row — none of which a `groupMembership.create` here does.
+    // The guards this drops are not lost, they are the service's own (group
+    // in organization, SCIM-managed, user in organization), stated once.
+    .mutation(async ({ ctx, input }) =>
+      groupService(ctx.prisma).addMember({
+        groupId: input.groupId,
+        organizationId: input.organizationId,
+        userId: input.userId,
+        actor: ledgerActor(ctx.session.user.id),
+      }),
+    ),
 
   /**
    * Delete a group and all its memberships and role bindings.
@@ -399,7 +394,7 @@ export const groupRouter = createTRPCRouter({
     )
     .permission("organization:manage")
     .mutation(async ({ ctx, input }) => {
-      const group = await ctx.prisma.group.findFirst({
+      const group = await liveGroups(ctx.prisma).findFirst({
         where: { id: input.groupId, organizationId: input.organizationId },
       });
       if (!group) {
@@ -441,10 +436,10 @@ export const groupRouter = createTRPCRouter({
     // organization that never had groups simply gets an empty list.
     .permission("organization:manage")
     .query(async ({ ctx, input }) => {
-      const groups = await ctx.prisma.group.findMany({
+      const groups = await liveGroups(ctx.prisma).findMany({
         where: {
           organizationId: input.organizationId,
-          members: { some: { userId: input.userId } },
+          members: { some: { userId: input.userId, ...LIVE_MEMBERSHIP } },
         },
         include: {
           roleBindings: {
@@ -481,23 +476,14 @@ export const groupRouter = createTRPCRouter({
     )
     .permission("organization:manage")
     .mutation(async ({ ctx, input }) => {
-      const group = await ctx.prisma.group.findFirst({
-        where: { id: input.groupId, organizationId: input.organizationId },
-      });
-      if (!group) {
-        throw new TRPCError({ code: "NOT_FOUND", message: "Group not found" });
-      }
-      if (group.scimSource) {
-        throw new TRPCError({
-          code: "BAD_REQUEST",
-          message: "Cannot manually remove members from a SCIM-managed group",
-        });
-      }
-
-      await ctx.prisma.groupMembership.delete({
-        where: {
-          userId_groupId: { userId: input.userId, groupId: input.groupId },
-        },
+      // Through the service for the reason `addMember` goes through it, and
+      // one more: this used to `delete` the row, which erased the answer to
+      // when the person left the group. The service MARKS it.
+      await groupService(ctx.prisma).removeMember({
+        groupId: input.groupId,
+        organizationId: input.organizationId,
+        userId: input.userId,
+        actor: ledgerActor(ctx.session.user.id),
       });
       return { success: true };
     }),
@@ -527,8 +513,12 @@ export const groupRouter = createTRPCRouter({
             scopeId: z.string(),
           }),
         ),
-        memberUserIdsToAdd: z.array(z.string()),
-        memberUserIdsToRemove: z.array(z.string()),
+        // `.min(1)` on the elements, not on the arrays: an empty array is a
+        // legitimate "change nothing here", but a blank id inside one is not
+        // an id at all, and a blank reaching the membership writer would widen
+        // its filter rather than narrow it.
+        memberUserIdsToAdd: z.array(z.string().min(1)),
+        memberUserIdsToRemove: z.array(z.string().min(1)),
       }),
     )
     .permission("organization:manage")

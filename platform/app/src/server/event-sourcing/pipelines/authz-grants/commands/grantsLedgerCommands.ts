@@ -1,8 +1,11 @@
+import { groupMembershipAggregateId } from "@langwatch/authz-server";
 import { createTenantId, defineCommandSchema, EventUtils } from "../../..";
 import type { Command, CommandHandler } from "../../../commands/command";
 import { eventIdempotencyKey } from "../../../commands/idempotencyKey";
 import {
+  type AddGroupMemberCommandData,
   type AttachGrantCommandData,
+  addGroupMemberCommandDataSchema,
   attachGrantCommandDataSchema,
   type ChangeGrantRoleCommandData,
   type ChangeRolePermissionsCommandData,
@@ -12,10 +15,13 @@ import {
   type DeleteRoleCommandData,
   defineRoleCommandDataSchema,
   deleteRoleCommandDataSchema,
+  type RemoveGroupMemberCommandData,
   type RevokeGrantCommandData,
+  removeGroupMemberCommandDataSchema,
   revokeGrantCommandDataSchema,
 } from "../schemas/commands";
 import {
+  ADD_GROUP_MEMBER_COMMAND_TYPE,
   ATTACH_GRANT_COMMAND_TYPE,
   AUTHZ_GRANT_AGGREGATE_TYPE,
   AUTHZ_GRANTS_EVENT_VERSION_LATEST,
@@ -26,6 +32,9 @@ import {
   GRANT_ATTACHED_EVENT_TYPE,
   GRANT_REVOKED_EVENT_TYPE,
   GRANT_ROLE_CHANGED_EVENT_TYPE,
+  GROUP_MEMBER_ADDED_EVENT_TYPE,
+  GROUP_MEMBER_REMOVED_EVENT_TYPE,
+  REMOVE_GROUP_MEMBER_COMMAND_TYPE,
   REVOKE_GRANT_COMMAND_TYPE,
   ROLE_DEFINED_EVENT_TYPE,
   ROLE_DELETED_EVENT_TYPE,
@@ -35,6 +44,8 @@ import type {
   GrantAttachedEvent,
   GrantRevokedEvent,
   GrantRoleChangedEvent,
+  GroupMemberAddedEvent,
+  GroupMemberRemovedEvent,
   RoleDefinedEvent,
   RoleDeletedEvent,
   RolePermissionsChangedEvent,
@@ -261,6 +272,114 @@ export class DeleteRoleCommand
         type: ROLE_DELETED_EVENT_TYPE,
         version: AUTHZ_GRANTS_EVENT_VERSION_LATEST,
         data: { roleId, actor },
+        metadata: {},
+        occurredAt: occurredAtMs,
+        idempotencyKey: eventIdempotencyKey({ commandId, index: 0 }),
+      }),
+    ];
+  }
+}
+
+/**
+ * A membership id is minted per FACT — adding somebody back to a group they
+ * left is a new row with a new id, which is what makes "when did they join,
+ * and when did they leave" answerable twice over rather than once.
+ *
+ * The AGGREGATE is the pair, not that id. Both commands here derive it the
+ * same way, so every change to one person's membership of one group rides one
+ * FIFO lane: `add`, its `remove`, and the `add` of the NEXT membership of the
+ * same pair. Keying on the row id would put that last one in a lane of its
+ * own, where it can overtake the removal it is supposed to follow and be
+ * dropped by the projection's own live-pair guard.
+ */
+export class AddGroupMemberCommand
+  implements
+    CommandHandler<Command<AddGroupMemberCommandData>, GroupMemberAddedEvent>
+{
+  static readonly schema = defineCommandSchema(
+    ADD_GROUP_MEMBER_COMMAND_TYPE,
+    addGroupMemberCommandDataSchema,
+    "Record one group membership",
+  );
+
+  static getAggregateId(payload: AddGroupMemberCommandData): string {
+    return groupMembershipAggregateId(payload);
+  }
+
+  async handle(
+    command: Command<AddGroupMemberCommandData>,
+  ): Promise<GroupMemberAddedEvent[]> {
+    const {
+      commandId,
+      membershipId,
+      groupId,
+      userId,
+      source,
+      actor,
+      occurredAtMs,
+    } = command.data;
+    return [
+      EventUtils.createEvent<GroupMemberAddedEvent>({
+        aggregateType: AUTHZ_GRANT_AGGREGATE_TYPE,
+        aggregateId: groupMembershipAggregateId({ groupId, userId }),
+        tenantId: createTenantId(command.tenantId),
+        type: GROUP_MEMBER_ADDED_EVENT_TYPE,
+        version: AUTHZ_GRANTS_EVENT_VERSION_LATEST,
+        data: { membershipId, groupId, userId, source, actor },
+        metadata: {},
+        // The fact's OWN business time — an imported membership keeps the
+        // legacy row's createdAt while `createdAt` (accepted time) stays
+        // honest.
+        occurredAt: occurredAtMs,
+        idempotencyKey: eventIdempotencyKey({ commandId, index: 0 }),
+      }),
+    ];
+  }
+}
+
+export class RemoveGroupMemberCommand
+  implements
+    CommandHandler<
+      Command<RemoveGroupMemberCommandData>,
+      GroupMemberRemovedEvent
+    >
+{
+  static readonly schema = defineCommandSchema(
+    REMOVE_GROUP_MEMBER_COMMAND_TYPE,
+    removeGroupMemberCommandDataSchema,
+    "End one group membership",
+  );
+
+  static getAggregateId(payload: RemoveGroupMemberCommandData): string {
+    return groupMembershipAggregateId(payload);
+  }
+
+  async handle(
+    command: Command<RemoveGroupMemberCommandData>,
+  ): Promise<GroupMemberRemovedEvent[]> {
+    const {
+      commandId,
+      membershipId,
+      groupId,
+      userId,
+      reason,
+      actor,
+      occurredAtMs,
+    } = command.data;
+    return [
+      EventUtils.createEvent<GroupMemberRemovedEvent>({
+        aggregateType: AUTHZ_GRANT_AGGREGATE_TYPE,
+        aggregateId: groupMembershipAggregateId({ groupId, userId }),
+        tenantId: createTenantId(command.tenantId),
+        type: GROUP_MEMBER_REMOVED_EVENT_TYPE,
+        version: AUTHZ_GRANTS_EVENT_VERSION_LATEST,
+        data: {
+          membershipId,
+          groupId,
+          userId,
+          ...(reason ? { reason } : {}),
+          actor,
+        },
         metadata: {},
         occurredAt: occurredAtMs,
         idempotencyKey: eventIdempotencyKey({ commandId, index: 0 }),

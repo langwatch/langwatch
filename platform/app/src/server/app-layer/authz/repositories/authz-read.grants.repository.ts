@@ -35,7 +35,12 @@ import {
 } from "@langwatch/authz-server";
 import type { Prisma } from "~/generated/prisma/client";
 import { CUSTOM_ROLE_KIND } from "../../../role/role-kind";
-import { liveGrants, liveRoles } from "./live-rows";
+import {
+  LIVE_GROUP,
+  liveGrants,
+  liveGroupMemberships,
+  liveRoles,
+} from "./live-rows";
 
 /** The three scope tiers a `CollectedBinding` can carry. RESOURCE rows are
  *  the share tier (findShareLinks) and PLATFORM rows are dormant facts that
@@ -87,7 +92,12 @@ export class GrantsAuthzReadRepository implements AuthzReadRepository {
         principalId: userId,
         scopeType: { in: [...BINDING_SCOPE_TYPES] },
       },
-      select: { roleKey: true, scopeType: true, scopeId: true },
+      select: {
+        roleKey: true,
+        scopeType: true,
+        scopeId: true,
+        expiresAt: true,
+      },
     });
     return collectBindings({ rows, viaGroupId: () => null });
   }
@@ -99,12 +109,21 @@ export class GrantsAuthzReadRepository implements AuthzReadRepository {
     userId: string;
     organizationId: string;
   }): Promise<CollectedBinding[]> {
-    // Same two-part gate the legacy group query carries: a GroupMembership row
-    // outlives removal from the organization, so the group member must be a
-    // CURRENT member, and the group itself must belong to this organization.
+    // Same three-part gate the legacy group query carries. A GroupMembership
+    // row outlives removal from the organization, so the group member must be
+    // a CURRENT member, and the group itself must belong to this organization.
+    // It also outlives the MEMBERSHIP now: a removal marks the row rather than
+    // deleting it, so the read has to be through `liveGroupMemberships` — a
+    // bare `findMany` here would hand the user every grant a group they left
+    // still holds.
     if (!(await this.isCurrentMember({ userId, organizationId }))) return [];
-    const memberships = await this.prisma.groupMembership.findMany({
-      where: { userId, group: { organizationId } },
+    const memberships = await liveGroupMemberships(this.prisma).findMany({
+      // LIVE_GROUP as well as the live membership: deleting a group ends its
+      // memberships first, so this would normally return nothing for one — but
+      // the fence must not depend on that ordering holding, because a group
+      // that outlives its own deletion here hands the user everything it
+      // grants.
+      where: { userId, group: { organizationId, ...LIVE_GROUP } },
       select: { groupId: true },
     });
     if (memberships.length === 0) return [];
@@ -123,6 +142,7 @@ export class GrantsAuthzReadRepository implements AuthzReadRepository {
         scopeType: true,
         scopeId: true,
         principalId: true,
+        expiresAt: true,
       },
     });
     return collectBindings({ rows, viaGroupId: (row) => row.principalId });
@@ -145,7 +165,12 @@ export class GrantsAuthzReadRepository implements AuthzReadRepository {
         principalId: apiKeyId,
         scopeType: { in: [...BINDING_SCOPE_TYPES] },
       },
-      select: { roleKey: true, scopeType: true, scopeId: true },
+      select: {
+        roleKey: true,
+        scopeType: true,
+        scopeId: true,
+        expiresAt: true,
+      },
     });
     return collectBindings({ rows, viaGroupId: () => null });
   }
@@ -347,6 +372,7 @@ export class GrantsAuthzReadRepository implements AuthzReadRepository {
         resourceKind: true,
         scopeId: true,
         projectId: true,
+        permission: true,
         expiresAt: true,
         maxViews: true,
       },
@@ -483,7 +509,12 @@ export class GrantsAuthzReadRepository implements AuthzReadRepository {
  * a binding here would change a decision the cutover promised not to change.
  */
 function collectBindings<
-  TRow extends { roleKey: string | null; scopeType: string; scopeId: string },
+  TRow extends {
+    roleKey: string | null;
+    scopeType: string;
+    scopeId: string;
+    expiresAt: Date | null;
+  },
 >({
   rows,
   viaGroupId,
@@ -502,6 +533,11 @@ function collectBindings<
       scopeType: row.scopeType,
       scopeId: row.scopeId,
       viaGroupId: viaGroupId(row),
+      // Reported, never filtered. Whether an elapsed expiry means the
+      // binding is gone is POLICY, and it lives in the collector - which is
+      // also what makes the compat head, whose table has no such column,
+      // behave identically for every row that has none.
+      expiresAt: row.expiresAt,
     });
   }
   return bindings;
@@ -530,6 +566,10 @@ type ShareLinkGrantCandidateRow = {
   resourceKind: string | null;
   scopeId: string;
   projectId: string | null;
+  /** The grant's own permission column - the ledger head has carried it
+   *  since the tier existed, and this is where the collector finally reads
+   *  it instead of assuming `traces:view`. */
+  permission: string | null;
   expiresAt: Date | null;
   maxViews: number | null;
 };
@@ -560,6 +600,7 @@ function shareLinkRowFrom({
       resourceId: row.scopeId,
       projectId: row.projectId,
       visibility,
+      permission: row.permission,
       expiresAt: row.expiresAt,
       maxViews: row.maxViews,
       viewCount: viewCounts.get(row.id) ?? 0,

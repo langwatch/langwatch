@@ -8,6 +8,8 @@ import {
   GRANT_ATTACHED_EVENT_TYPE,
   GRANT_REVOKED_EVENT_TYPE,
   GRANT_ROLE_CHANGED_EVENT_TYPE,
+  GROUP_MEMBER_ADDED_EVENT_TYPE,
+  GROUP_MEMBER_REMOVED_EVENT_TYPE,
   ROLE_DEFINED_EVENT_TYPE,
   ROLE_DELETED_EVENT_TYPE,
   ROLE_PERMISSIONS_CHANGED_EVENT_TYPE,
@@ -36,11 +38,16 @@ const MIGRATION_ACTOR = {
 function event(
   type: string,
   data: Record<string, unknown>,
-  overrides?: { id?: string; occurredAt?: number },
+  overrides?: { id?: string; occurredAt?: number; aggregateId?: string },
 ): AuthzGrantsEvent {
   return {
     id: overrides?.id ?? "evt_2Zk",
-    aggregateId: ORG,
+    // The GRANT, not the organization (ADR-110). The fixture used to stamp
+    // the organization here, left over from the model where the org WAS the
+    // aggregate — which made the row's `organizationId` assertion below pass
+    // no matter which field the subscriber read it from, and hid that it was
+    // reading `aggregateId`. Every real event carries an entity id here.
+    aggregateId: overrides?.aggregateId ?? "grant_1",
     aggregateType: AUTHZ_GRANT_AGGREGATE_TYPE,
     tenantId: createTenantId(ORG),
     createdAt: 1_800_000_000_000,
@@ -61,6 +68,38 @@ function attached(overrides?: Record<string, unknown>): AuthzGrantsEvent {
     actor: USER_ACTOR,
     ...overrides,
   });
+}
+
+const MEMBERSHIP_AGGREGATE = "group_sec_eng:user_dave";
+
+function memberAdded(overrides?: Record<string, unknown>): AuthzGrantsEvent {
+  return event(
+    GROUP_MEMBER_ADDED_EVENT_TYPE,
+    {
+      membershipId: "groupmember_1",
+      groupId: "group_sec_eng",
+      userId: "user_dave",
+      source: "grants-service",
+      actor: USER_ACTOR,
+      ...overrides,
+    },
+    { aggregateId: MEMBERSHIP_AGGREGATE },
+  );
+}
+
+function memberRemoved(overrides?: Record<string, unknown>): AuthzGrantsEvent {
+  return event(
+    GROUP_MEMBER_REMOVED_EVENT_TYPE,
+    {
+      membershipId: "groupmember_1",
+      groupId: "group_sec_eng",
+      userId: "user_dave",
+      reason: "removed from group",
+      actor: USER_ACTOR,
+      ...overrides,
+    },
+    { aggregateId: MEMBERSHIP_AGGREGATE },
+  );
 }
 
 /** Records every insert, and mimics the store's ON CONFLICT DO NOTHING so a
@@ -88,7 +127,7 @@ function deliver(
   const subscriber = createAuthzAuditTrailSubscriber({ store });
   return subscriber.handler(authzEvent, {
     tenantId: ORG,
-    aggregateId: ORG,
+    aggregateId: authzEvent.aggregateId,
     state: undefined,
   });
 }
@@ -103,7 +142,72 @@ describe("authz audit trail subscriber", () => {
         ROLE_DEFINED_EVENT_TYPE,
         ROLE_PERMISSIONS_CHANGED_EVENT_TYPE,
         ROLE_DELETED_EVENT_TYPE,
+        GROUP_MEMBER_ADDED_EVENT_TYPE,
+        GROUP_MEMBER_REMOVED_EVENT_TYPE,
       ]);
+    });
+  });
+
+  describe("when a membership change is delivered", () => {
+    /** @scenario "The change appears in the authz change history" */
+    it("files the row under the organization, never under the aggregate", async () => {
+      const store = recordingStore();
+      await deliver(store, memberRemoved());
+
+      // The aggregate is the pair, so reading `aggregateId` here would file
+      // every membership change under "group_sec_eng:user_dave" — a value the
+      // audit page, which queries by organization, can never find.
+      expect(store.inserts[0]!.organizationId).toBe(ORG);
+    });
+
+    /** @scenario "The change appears in the authz change history" */
+    it("names the person, the group and who made the change", async () => {
+      const store = recordingStore();
+      await deliver(store, memberRemoved());
+
+      expect(store.inserts[0]).toMatchObject({
+        action: "authz.grants.group_member_removed",
+        userId: "user_admin",
+        metadata: {
+          membershipId: "groupmember_1",
+          groupId: "group_sec_eng",
+          userId: "user_dave",
+          reason: "removed from group",
+        },
+      });
+    });
+
+    it("records an addition under its own verb", async () => {
+      const store = recordingStore();
+      await deliver(store, memberAdded());
+
+      expect(store.inserts[0]).toMatchObject({
+        action: "authz.grants.group_member_added",
+        metadata: {
+          membershipId: "groupmember_1",
+          groupId: "group_sec_eng",
+          userId: "user_dave",
+          source: "grants-service",
+        },
+      });
+    });
+
+    /** @scenario "A directory removing somebody is still a change somebody made" */
+    it("records a directory's own change, with no person to attribute it to", async () => {
+      const store = recordingStore();
+      await deliver(
+        store,
+        memberAdded({
+          source: "scim",
+          actor: { type: "system", id: "system:scim" },
+        }),
+      );
+
+      expect(store.inserts).toHaveLength(1);
+      expect(store.inserts[0]).toMatchObject({
+        userId: null,
+        metadata: { source: "scim" },
+      });
     });
   });
 

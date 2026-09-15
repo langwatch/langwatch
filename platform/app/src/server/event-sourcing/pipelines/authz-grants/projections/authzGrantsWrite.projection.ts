@@ -22,6 +22,7 @@
  */
 import {
   type GrantRowShape,
+  type GroupMembershipRowShape,
   PRINCIPAL_TO_DB,
   RESOURCE_KIND_TO_DB,
   type RoleRowShape,
@@ -33,6 +34,8 @@ import {
   GRANT_ATTACHED_EVENT_TYPE,
   GRANT_REVOKED_EVENT_TYPE,
   GRANT_ROLE_CHANGED_EVENT_TYPE,
+  GROUP_MEMBER_ADDED_EVENT_TYPE,
+  GROUP_MEMBER_REMOVED_EVENT_TYPE,
   ROLE_DEFINED_EVENT_TYPE,
   ROLE_DELETED_EVENT_TYPE,
   ROLE_PERMISSIONS_CHANGED_EVENT_TYPE,
@@ -41,9 +44,13 @@ import {
   type GrantAttachedEvent,
   type GrantRevokedEvent,
   type GrantRoleChangedEvent,
+  type GroupMemberAddedEvent,
+  type GroupMemberRemovedEvent,
   grantAttachedEventSchema,
   grantRevokedEventSchema,
   grantRoleChangedEventSchema,
+  groupMemberAddedEventSchema,
+  groupMemberRemovedEventSchema,
   type RoleDefinedEvent,
   type RoleDeletedEvent,
   type RolePermissionsChangedEvent,
@@ -80,7 +87,14 @@ export type GrantProjectionWrite =
       permissions: string[];
       occurredAt: Date;
     }
-  | { kind: "role.delete"; roleId: string; occurredAt: Date };
+  | { kind: "role.delete"; roleId: string; occurredAt: Date }
+  | { kind: "groupMembership.upsert"; row: GroupMembershipRowShape }
+  | {
+      kind: "groupMembership.remove";
+      membershipId: string;
+      reason: string | null;
+      occurredAt: Date;
+    };
 
 export type GrantProjectionWriteStore = AppendStore<GrantProjectionWrite>;
 
@@ -91,6 +105,8 @@ const authzGrantsEvents = [
   roleDefinedEventSchema,
   rolePermissionsChangedEventSchema,
   roleDeletedEventSchema,
+  groupMemberAddedEventSchema,
+  groupMemberRemovedEventSchema,
 ] as const;
 
 export const AUTHZ_GRANTS_WRITE_PROJECTION_NAME = "authzGrantsWrite" as const;
@@ -132,9 +148,12 @@ export class AuthzGrantsWriteProjection
           : null,
         projectId: data.resource?.projectId ?? null,
         createdByUserId: data.resource?.createdByUserId ?? null,
-        expiresAt: data.resource?.expiresAtMs
-          ? new Date(data.resource.expiresAtMs)
-          : null,
+        // One column, two tiers, and they are mutually exclusive by the
+        // event's own shape refinement: a RESOURCE grant states its expiry
+        // inside its terms, every other tier states it on the grant. An
+        // event carrying neither - which is every event appended before
+        // expiring bindings existed - lands null, exactly as it always did.
+        expiresAt: expiryFrom(data.resource?.expiresAtMs ?? data.expiresAtMs),
         maxViews: data.resource?.maxViews ?? null,
         occurredAt: new Date(event.occurredAt),
       },
@@ -205,6 +224,47 @@ export class AuthzGrantsWriteProjection
       occurredAt: new Date(event.occurredAt),
     };
   }
+
+  /**
+   * The membership row states itself, and states nothing about its own end.
+   *
+   * `removedAt` is absent from the row shape rather than merely unset — the
+   * same rule `revokedAt` follows on the grant side. A re-delivered `added`
+   * after a `removed` must not un-remove the membership, and the only way to
+   * guarantee that is to make the un-removal unrepresentable.
+   *
+   * The organization is nowhere here on purpose: the tenant is on the
+   * envelope, and the row's tenancy is the group it names. A membership row
+   * carrying its own organizationId could disagree with its group's.
+   */
+  mapAuthzGroupMemberAdded(event: GroupMemberAddedEvent): GrantProjectionWrite {
+    const { data } = event;
+    return {
+      kind: "groupMembership.upsert",
+      row: {
+        id: data.membershipId,
+        groupId: data.groupId,
+        userId: data.userId,
+        occurredAt: new Date(event.occurredAt),
+      },
+    };
+  }
+
+  mapAuthzGroupMemberRemoved(
+    event: GroupMemberRemovedEvent,
+  ): GrantProjectionWrite {
+    return {
+      kind: "groupMembership.remove",
+      membershipId: event.data.membershipId,
+      reason: event.data.reason ?? null,
+      occurredAt: new Date(event.occurredAt),
+    };
+  }
+}
+
+/** A ledger expiry as the projection column holds it. */
+function expiryFrom(expiresAtMs: number | undefined): Date | null {
+  return expiresAtMs != null ? new Date(expiresAtMs) : null;
 }
 
 export const AUTHZ_GRANTS_WRITE_EVENT_TYPES = [
@@ -214,4 +274,6 @@ export const AUTHZ_GRANTS_WRITE_EVENT_TYPES = [
   ROLE_DEFINED_EVENT_TYPE,
   ROLE_PERMISSIONS_CHANGED_EVENT_TYPE,
   ROLE_DELETED_EVENT_TYPE,
+  GROUP_MEMBER_ADDED_EVENT_TYPE,
+  GROUP_MEMBER_REMOVED_EVENT_TYPE,
 ] as const;

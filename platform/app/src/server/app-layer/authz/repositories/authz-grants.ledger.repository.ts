@@ -331,10 +331,28 @@ export class LedgerAuthzGrantsRepository implements AuthzGrantsRepository {
       actor,
     });
 
+    // Group memberships end the same way, and for the same reason they cannot
+    // stay in the transaction below: a command is not enrollable in a Prisma
+    // transaction. The sweep used to `deleteMany` them, which is exactly the
+    // hole ADR-125 named — the audit stream remembered the departure, the
+    // state did not, and the answer to "which groups was Dave in when he
+    // left" was gone.
+    //
+    // Before the transaction, like the revocations above and with the same
+    // fail-safe consequence: if the proof throws, the organization and team
+    // membership deletes roll back while these removals stand. That
+    // under-grants, a retry converges, and every read of live membership is
+    // fenced — so the proof inside the transaction sees them as gone whether
+    // or not the fold has run yet.
+    const removedMembershipIds = await this.writer.removeGroupMembersWhere({
+      organizationId,
+      where: { userId },
+      actor,
+      reason: "offboarded from organization",
+      bypass: "offboard",
+    });
+
     return this.db.$transaction(async (tx) => {
-      const groupMemberships = await tx.groupMembership.deleteMany({
-        where: { userId, group: { organizationId } },
-      });
       const legacyTeamMemberships = await tx.teamUser.deleteMany({
         where: { userId, team: { organizationId } },
       });
@@ -405,7 +423,7 @@ export class LedgerAuthzGrantsRepository implements AuthzGrantsRepository {
 
       return {
         bindings: bindings.length,
-        groupMemberships: groupMemberships.count,
+        groupMemberships: removedMembershipIds.length,
         legacyTeamMemberships: legacyTeamMemberships.count,
         pendingInvites: pendingInvites.count,
         organizationMembership: organizationMembership.count > 0,

@@ -63,11 +63,19 @@ describe("GrantsAuthzReadRepository", () => {
   describe("when findUserBindings collects a user's grants", () => {
     it("reads the user's own grants at the three binding scopes", async () => {
       const findMany = vi.fn().mockResolvedValue([
-        { roleKey: "admin", scopeType: "TEAM", scopeId: "team-1" },
+        {
+          roleKey: "admin",
+          scopeType: "TEAM",
+          scopeId: "team-1",
+          expiresAt: null,
+        },
         {
           roleKey: "custom:role-9",
           scopeType: "PROJECT",
           scopeId: "proj-1",
+          // The expiring-grants term (ADR-092). Reported as a fact; whether
+          // an elapsed one still grants is the collector's call.
+          expiresAt: new Date("2099-01-01T00:00:00.000Z"),
         },
       ]);
       const repository = new GrantsAuthzReadRepository(
@@ -90,7 +98,12 @@ describe("GrantsAuthzReadRepository", () => {
           scopeType: { in: ["ORGANIZATION", "TEAM", "PROJECT"] },
           revokedAt: null,
         },
-        select: { roleKey: true, scopeType: true, scopeId: true },
+        select: {
+          roleKey: true,
+          scopeType: true,
+          scopeId: true,
+          expiresAt: true,
+        },
       });
       expect(bindings).toEqual([
         {
@@ -99,6 +112,7 @@ describe("GrantsAuthzReadRepository", () => {
           scopeType: "TEAM",
           scopeId: "team-1",
           viaGroupId: null,
+          expiresAt: null,
         },
         {
           role: "CUSTOM",
@@ -106,6 +120,7 @@ describe("GrantsAuthzReadRepository", () => {
           scopeType: "PROJECT",
           scopeId: "proj-1",
           viaGroupId: null,
+          expiresAt: new Date("2099-01-01T00:00:00.000Z"),
         },
       ]);
     });
@@ -217,6 +232,7 @@ describe("GrantsAuthzReadRepository", () => {
           scopeType: "PROJECT",
           scopeId: "proj-1",
           principalId: "group-2",
+          expiresAt: null,
         },
       ]);
       const repository = new GrantsAuthzReadRepository(
@@ -232,8 +248,15 @@ describe("GrantsAuthzReadRepository", () => {
         organizationId: "org-1",
       });
 
+      // Live memberships of live groups only. Without `removedAt: null` a
+      // group alice left still hands her every grant that group holds; without
+      // `deletedAt: null` a group that was DELETED does the same.
       expect(groupFindMany).toHaveBeenCalledWith({
-        where: { userId: "alice", group: { organizationId: "org-1" } },
+        where: {
+          userId: "alice",
+          group: { organizationId: "org-1", deletedAt: null },
+          removedAt: null,
+        },
         select: { groupId: true },
       });
       expect(grantFindMany).toHaveBeenCalledWith({
@@ -249,6 +272,7 @@ describe("GrantsAuthzReadRepository", () => {
           scopeType: true,
           scopeId: true,
           principalId: true,
+          expiresAt: true,
         },
       });
       expect(bindings).toEqual([
@@ -258,6 +282,7 @@ describe("GrantsAuthzReadRepository", () => {
           scopeType: "PROJECT",
           scopeId: "proj-1",
           viaGroupId: "group-2",
+          expiresAt: null,
         },
       ]);
     });
@@ -286,11 +311,14 @@ describe("GrantsAuthzReadRepository", () => {
 
   describe("when findApiKeyBindings collects a key's grants", () => {
     it("reads the key's own grants with no membership gate", async () => {
-      const findMany = vi
-        .fn()
-        .mockResolvedValue([
-          { roleKey: "viewer", scopeType: "PROJECT", scopeId: "proj-1" },
-        ]);
+      const findMany = vi.fn().mockResolvedValue([
+        {
+          roleKey: "viewer",
+          scopeType: "PROJECT",
+          scopeId: "proj-1",
+          expiresAt: null,
+        },
+      ]);
       const repository = new GrantsAuthzReadRepository(
         clientFor({ grant: { findMany } }),
       );
@@ -310,7 +338,12 @@ describe("GrantsAuthzReadRepository", () => {
           scopeType: { in: ["ORGANIZATION", "TEAM", "PROJECT"] },
           revokedAt: null,
         },
-        select: { roleKey: true, scopeType: true, scopeId: true },
+        select: {
+          roleKey: true,
+          scopeType: true,
+          scopeId: true,
+          expiresAt: true,
+        },
       });
       expect(bindings).toEqual([
         {
@@ -319,6 +352,7 @@ describe("GrantsAuthzReadRepository", () => {
           scopeType: "PROJECT",
           scopeId: "proj-1",
           viaGroupId: null,
+          expiresAt: null,
         },
       ]);
     });
@@ -636,6 +670,7 @@ describe("GrantsAuthzReadRepository", () => {
           resourceKind: true,
           scopeId: true,
           projectId: true,
+          permission: true,
           expiresAt: true,
           maxViews: true,
         },

@@ -173,20 +173,9 @@ export const gatewayBudgetsRouter = createTRPCRouter({
     .input(z.object({ organizationId: z.string() }))
     .permission("gatewayBudgets:create")
     .query(async ({ ctx, input }) => {
-      const groups = await ctx.prisma.group.findMany({
-        where: { organizationId: input.organizationId },
-        select: {
-          id: true,
-          name: true,
-          _count: { select: { members: true } },
-        },
-        orderBy: { name: "asc" },
-      });
-      return groups.map((g) => ({
-        id: g.id,
-        name: g.name,
-        memberCount: g._count.members,
-      }));
+      return await GatewayBudgetService.create(ctx.prisma).groupTargets(
+        input.organizationId,
+      );
     }),
 
   create: protectedProcedure

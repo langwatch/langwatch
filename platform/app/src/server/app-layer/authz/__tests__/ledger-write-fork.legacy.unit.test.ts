@@ -35,6 +35,61 @@ beforeEach(() => {
 });
 
 describe("given an organization the genesis import has not reached", () => {
+  // The legacy table has no column for the date access ends. Writing the row
+  // anyway would produce a grant an admin believes ends on Friday and which
+  // never ends, so the writer refuses instead of dropping the term.
+  describe("when the attached binding carries a date its access ends", () => {
+    /** @scenario "An end date is refused where it could not be stored" */
+    it("refuses with grant_expiry_not_supported and writes nothing", async () => {
+      const { writer, db, sent } = harness({ onLedger: false });
+
+      await expect(
+        writer.attachBindings({
+          organizationId: ORG_ID,
+          bindings: [{ ...binding, expiresAtMs: 1_800_000_000_000 }],
+          actor: ACTOR,
+          onDuplicate: "reject",
+        }),
+      ).rejects.toMatchObject({ code: "grant_expiry_not_supported" });
+
+      expect(db.roleBinding.create).not.toHaveBeenCalled();
+      expect(db.roleBinding.createMany).not.toHaveBeenCalled();
+      expect(db.auditLog.createMany).not.toHaveBeenCalled();
+      expect(sent).toEqual([]);
+      expect(bumpAuthzEpoch).not.toHaveBeenCalled();
+    });
+
+    it("refuses the whole batch, so an undated sibling is not written either", async () => {
+      const { writer, db, sent } = harness({ onLedger: false });
+
+      await expect(
+        writer.attachBindings({
+          organizationId: ORG_ID,
+          bindings: [
+            binding,
+            {
+              ...binding,
+              bindingId: "rb_2",
+              scopeId: "team_billing",
+              expiresAtMs: 1_800_000_000_000,
+            },
+          ],
+          actor: ACTOR,
+          onDuplicate: "reject",
+        }),
+      ).rejects.toMatchObject({ code: "grant_expiry_not_supported" });
+
+      // All or nothing, and this is the direction that matters: the refusal
+      // scans the batch before it writes anything, so a caller who re-sends
+      // without the expiring binding cannot land a duplicate of the undated
+      // one. A partial write here would be the worst of both -- half the
+      // grant an admin asked for, and no error they could act on.
+      expect(db.roleBinding.create).not.toHaveBeenCalled();
+      expect(db.roleBinding.createMany).not.toHaveBeenCalled();
+      expect(sent).toEqual([]);
+    });
+  });
+
   describe("when a binding is attached rejecting duplicates", () => {
     /** @scenario "An organization that has not completed the genesis import keeps writing legacy rows imperatively" */
     it("writes the row itself and emits no command", async () => {

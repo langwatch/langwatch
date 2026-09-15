@@ -19,7 +19,12 @@ describe("AuthzService on a resource scope", () => {
         ),
       );
 
+    /** @scenario "Links created before permissions existed are unchanged" */
     it("check() walks token collection through to a public grant", async () => {
+      // `liveShareLinkRow` carries NO permission key at all — the shape a row
+      // written before the column existed has. It must keep answering exactly
+      // as it did, which is what the two assertions below and the annotate
+      // refusal further down together say.
       const decision = await authzWithLink().check({
         principal: { type: "anonymous" },
         permission: "traces:view",
@@ -36,6 +41,62 @@ describe("AuthzService on a resource scope", () => {
         scope: traceScope({ shareTokens: ["tok-1"] }),
       });
       expect(permissions).toEqual(["traces:view"]);
+    });
+
+    /** @scenario "A view-only link cannot annotate the trace it shows" */
+    it("refuses to annotate — the link says view and nothing else", async () => {
+      const decision = await authzWithLink().check({
+        principal: { type: "anonymous" },
+        permission: "annotations:create",
+        scope: traceScope({ shareTokens: ["tok-1"] }),
+      });
+      expect(decision.allowed).toBe(false);
+    });
+  });
+
+  describe("given a live public link that states annotations:create", () => {
+    const authzWithAnnotateLink = () =>
+      new AuthzService(
+        new AuthzCollectorService(
+          makeReader({
+            findShareLinks: vi
+              .fn()
+              .mockResolvedValue([
+                { ...liveShareLinkRow, permission: "annotations:create" },
+              ]),
+          }),
+        ),
+      );
+
+    /** @scenario "An annotate link lets its holder annotate the shared trace" */
+    it("admits the annotation the link names, through the resource tier", async () => {
+      const decision = await authzWithAnnotateLink().check({
+        principal: { type: "anonymous" },
+        permission: "annotations:create",
+        scope: traceScope({ shareTokens: ["tok-1"] }),
+      });
+      expect(decision.allowed).toBe(true);
+      expect(decision.via).toBe("resource-grant");
+      expect(decision.audience).toBe("public");
+    });
+
+    /** @scenario "An annotate link also lets its holder read the trace" */
+    it("still admits the read — annotating what you cannot see grants nothing", async () => {
+      const decision = await authzWithAnnotateLink().check({
+        principal: { type: "anonymous" },
+        permission: "traces:view",
+        scope: traceScope({ shareTokens: ["tok-1"] }),
+      });
+      expect(decision.allowed).toBe(true);
+    });
+
+    /** @scenario "An annotate link confers nothing beyond reading and commenting" */
+    it("does not widen past the two it names", async () => {
+      const permissions = await authzWithAnnotateLink().effectivePermissions({
+        principal: { type: "anonymous" },
+        scope: traceScope({ shareTokens: ["tok-1"] }),
+      });
+      expect(permissions).toEqual(["traces:view", "annotations:create"]);
     });
   });
 });
