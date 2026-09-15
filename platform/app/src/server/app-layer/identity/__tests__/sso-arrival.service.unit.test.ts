@@ -1,4 +1,16 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
+// The routine-versus-incident split below is a LOG LEVEL, so the logger is
+// the seam it has to be observed at.
+const log = vi.hoisted(() => ({
+  info: vi.fn(),
+  error: vi.fn(),
+  warn: vi.fn(),
+}));
+vi.mock("@langwatch/observability", () => ({
+  createLogger: () => log,
+}));
+
 import { SsoArrivalService } from "../sso-arrival.service";
 import type { SignInConnection } from "../sso-assertion.service";
 
@@ -100,6 +112,8 @@ const admit = (
 
 beforeEach(() => {
   vi.clearAllMocks();
+  log.info.mockClear();
+  log.error.mockClear();
 });
 
 describe("given somebody arriving through a live connection on a domain it proved", () => {
@@ -354,5 +368,75 @@ describe("given a domain-matched organization to join", () => {
       // Nothing to announce: somebody else already did, or will.
       expect(parts.announceSignup).not.toHaveBeenCalled();
     });
+  });
+});
+
+/**
+ * The sign-in has already succeeded and the account is already committed by
+ * the time any of this runs, so nothing here may turn a working sign-in into
+ * "unable to create user". What it may do is say so in the log — and say it
+ * at the right volume, because an administrator whose queue is empty is told
+ * to look for exactly one line.
+ *
+ * Spec: specs/identity/join-requests.feature, "A request nobody clicked".
+ */
+describe("given the queue will not take the request behind an arrival", () => {
+  /** @scenario "A sign-in never fails because the queue would not take the request behind it" */
+  it("leaves the sign-in succeeding rather than raising at the person signing in", async () => {
+    const parts = serviceOver({ row: connection() });
+    parts.requestFromSsoArrival.mockRejectedValue(
+      Object.assign(new Error("already waiting"), {
+        code: "join_request_already_pending",
+      }),
+    );
+
+    // The assertion is that this RESOLVES. Throwing here surfaced as
+    // "unable to create user" on a sign-in that had already worked.
+    await expect(admit(parts)).resolves.toBeUndefined();
+  });
+
+  /** @scenario "An arrival already in the queue is recorded as routine, not as a failure" */
+  it("files a duplicate as an ordinary outcome and a surprise as a failure", async () => {
+    const routine = serviceOver({ row: connection() });
+    routine.requestFromSsoArrival.mockRejectedValue(
+      Object.assign(new Error("already waiting"), {
+        code: "join_request_already_pending",
+      }),
+    );
+
+    await admit(routine);
+
+    // A fresh account row for somebody already waiting is a provider
+    // rotation or an unlink — a sentence about the world, not an incident.
+    expect(log.info).toHaveBeenCalledTimes(1);
+    expect(log.error).not.toHaveBeenCalled();
+
+    log.info.mockClear();
+    log.error.mockClear();
+
+    const surprise = serviceOver({ row: connection() });
+    surprise.requestFromSsoArrival.mockRejectedValue(
+      new Error("the database went away"),
+    );
+
+    await admit(surprise);
+
+    // And the line an administrator greps for still gets written when
+    // something genuinely went wrong.
+    expect(log.error).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("given somebody who already belongs to the organization", () => {
+  /** @scenario "Somebody who is already a member is nothing to admit and nothing to ask about" */
+  it("asks for nothing and writes nothing", async () => {
+    // Every administrator testing their own connection arrives this way.
+    const parts = serviceOver({ row: connection(), member: true });
+
+    await admit(parts);
+
+    expect(parts.requestFromSsoArrival).not.toHaveBeenCalled();
+    expect(parts.createMembership).not.toHaveBeenCalled();
+    expect(log.error).not.toHaveBeenCalled();
   });
 });

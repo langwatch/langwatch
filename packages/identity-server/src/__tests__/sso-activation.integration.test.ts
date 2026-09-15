@@ -164,8 +164,22 @@ beforeEach(async () => {
   activationBindings = new StubBreakGlassBindings(true);
   proofs = new StubProofs();
   members = new StubMembers(
-    [{ userId: ANA.userId, name: "Ana", email: "ana@acme.com" }],
-    [{ userId: BEN.userId, name: "Ben", email: "ben@acme.com" }],
+    [
+      {
+        userId: ANA.userId,
+        name: "Ana",
+        email: "ana@acme.com",
+        holdsPassword: true,
+      },
+    ],
+    [
+      {
+        userId: BEN.userId,
+        name: "Ben",
+        email: "ben@acme.com",
+        holdsPassword: true,
+      },
+    ],
   );
   committed = [];
   clock = T0;
@@ -578,8 +592,15 @@ describe("going live with your own identity provider", () => {
         organizationId: ORG,
       });
 
+      // Each candidate carries whether they could actually walk through a
+      // grant, so the picker can say what somebody would have to do first.
       expect(candidates).toEqual([
-        { userId: ANA.userId, name: "Ana", email: "ana@acme.com" },
+        {
+          userId: ANA.userId,
+          name: "Ana",
+          email: "ana@acme.com",
+          holdsPassword: true,
+        },
       ]);
     });
   });

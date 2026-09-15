@@ -266,7 +266,7 @@ describe("better-auth config", () => {
       // exercise auth0 mode without re-initializing the module under a
       // different NEXTAUTH_PROVIDER (which would need vi.resetModules()).
       const { isEmailPasswordEnabled } = await import(
-        "../config/email-and-password"
+        "../../auth/email-password-mounted"
       );
       const { buildGenericOAuthConfigs } = await import("@ee/sso/providers");
       const e = {
@@ -304,7 +304,7 @@ describe("better-auth config", () => {
     /** @scenario Self-hosted that never had a license hides SSO and offers email sign-in */
     it("mounts email/password on self-hosted so a denied deployment keeps a door", async () => {
       const { isEmailPasswordEnabled } = await import(
-        "../config/email-and-password"
+        "../../auth/email-password-mounted"
       );
 
       // ADR-027: mounting is not the gate. Self-hosted always mounts so an

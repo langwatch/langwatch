@@ -1104,3 +1104,146 @@ describe("given an existing account whose domain matches an organization", () =>
     });
   });
 });
+
+/**
+ * THE SECOND DOOR. Everywhere above, a request exists because somebody
+ * pressed a button. Here it exists because an account row appeared — a person
+ * signed in through a connection whose arrivals answer is "wait". The two
+ * doors ask different questions of different populations, and the differences
+ * are what these tests hold.
+ *
+ * Spec: specs/identity/join-requests.feature, "A request nobody clicked".
+ */
+describe("given a connection whose arrivals wait for approval", () => {
+  describe("when somebody signs in through it for the first time", () => {
+    /** @scenario "Somebody an identity provider admits but does not let straight in waits in the queue" */
+    it("puts them in the queue and tells the administrators", async () => {
+      const { service, requests, notifier } = harness();
+
+      const made = await service.requestFromSsoArrival({
+        userId: "user_sam",
+        organizationId: "org_acme",
+        domain: "acme.com",
+      });
+
+      expect(made).not.toBeNull();
+      expect(requests.requestJoin).toHaveBeenCalledTimes(1);
+      expect(notifier.requestArrived).toHaveBeenCalledWith(
+        expect.objectContaining({
+          organizationId: "org_acme",
+          requesterUserId: "user_sam",
+          domain: "acme.com",
+        }),
+      );
+    });
+
+    /** @scenario "The request a sign-in made is attributed to the system, not to the person" */
+    it("records the system as what made it, and nobody as having asked", async () => {
+      const { service, requests } = harness();
+
+      await service.requestFromSsoArrival({
+        userId: "user_sam",
+        organizationId: "org_acme",
+        domain: "acme.com",
+      });
+
+      const command = requests.requestJoin.mock.calls[0]?.[0];
+      // "sam" pressed nothing. An audit page that named them as the asker
+      // would be describing a decision nobody made.
+      expect(command?.actor).toEqual({ type: "system", id: null });
+      expect(command?.matchedVia).toBe("sso-connection-domain");
+    });
+
+    /** @scenario "An arrival is not re-asked the question the organization answered about strangers" */
+    it("never consults the organization's join policy, which is about strangers", async () => {
+      // Closed to people asking off the internet — and silent about its own
+      // staff, who are who this path is for.
+      const { service, requests, settings } = harness({
+        candidates: [{ ...acme, domainJoin: "off" }],
+        setting: { domainJoin: "off", joinDomains: [] },
+      });
+
+      const made = await service.requestFromSsoArrival({
+        userId: "user_sam",
+        organizationId: "org_acme",
+        domain: "acme.com",
+      });
+
+      expect(made).not.toBeNull();
+      expect(requests.requestJoin).toHaveBeenCalledTimes(1);
+      expect(settings.read).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the person was already rejected by an administrator", () => {
+    /** @scenario "Somebody already rejected does not climb back into the queue when their account is touched" */
+    it("makes no request and tells nobody", async () => {
+      // A row appearing again is routine: a provider rotation, an unlink, the
+      // account reconcile. None of them is "sam" asking a second time, and an
+      // administrator who said no should not have to say it again.
+      const { service, requests, notifier } = harness({
+        lastRejectionAt: new Date(NOW - JOIN_REJECTION_COOLDOWN_MS / 2),
+      });
+
+      const made = await service.requestFromSsoArrival({
+        userId: "user_sam",
+        organizationId: "org_acme",
+        domain: "acme.com",
+      });
+
+      expect(made).toBeNull();
+      expect(requests.requestJoin).not.toHaveBeenCalled();
+      expect(notifier.requestArrived).not.toHaveBeenCalled();
+    });
+
+    it("lets them back in the queue once the cool-down has run out", async () => {
+      const { service, requests } = harness({
+        lastRejectionAt: new Date(NOW - JOIN_REJECTION_COOLDOWN_MS - 1),
+      });
+
+      const made = await service.requestFromSsoArrival({
+        userId: "user_sam",
+        organizationId: "org_acme",
+        domain: "acme.com",
+      });
+
+      expect(made).not.toBeNull();
+      expect(requests.requestJoin).toHaveBeenCalledTimes(1);
+    });
+  });
+});
+
+describe("given somebody who has dismissed an offer", () => {
+  /** @scenario "A dismissed offer reads exactly like no offer at all" */
+  it("answers the same nothing a domain with no organization behind it answers", async () => {
+    const { service } = harness({ dismissedDomains: ["acme.com"] });
+
+    const dismissed = await service.offerForSignedInUser({
+      userId: "user_sam",
+      verifiedEmail: "sam@acme.com",
+    });
+    // The control: a domain nobody is behind. Anything that told these two
+    // apart would say which domains have an organization behind them.
+    const neverOffered = await service.offerForSignedInUser({
+      userId: "user_sam",
+      verifiedEmail: null,
+    });
+
+    expect(dismissed).toEqual({ outcome: "none" });
+    expect(dismissed).toEqual(neverOffered);
+  });
+
+  /** @scenario "Saying no thanks is remembered for that domain and no other" */
+  it("leaves an offer on a different address standing", async () => {
+    const { service } = harness({ dismissedDomains: ["acme.com"] });
+
+    const other = await service.offerForSignedInUser({
+      userId: "user_sam",
+      verifiedEmail: "sam@beta.example",
+    });
+
+    // Dismissal is per domain. A person who said "not this one" has said
+    // nothing about the next.
+    expect(other).not.toEqual({ outcome: "none" });
+  });
+});

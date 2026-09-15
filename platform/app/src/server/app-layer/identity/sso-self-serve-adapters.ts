@@ -641,7 +641,19 @@ export class PrismaSsoTestSignInLookup implements SsoTestSignInLookup {
 export class PrismaSsoOrganizationMemberLookup
   implements SsoOrganizationMemberLookup
 {
-  constructor(private readonly prisma: PrismaClient) {}
+  constructor(
+    private readonly prisma: PrismaClient,
+    /**
+     * Whether one person holds a password. Injected rather than queried here
+     * because a `credential` row is not the whole answer — an account may
+     * still route to the legacy store — and the credential service already
+     * owns that routing. Asking it per candidate is a handful of reads over
+     * one organization's administrators.
+     */
+    private readonly holdsPassword: (args: {
+      userId: string;
+    }) => Promise<boolean>,
+  ) {}
 
   async findAdministrators({
     organizationId,
@@ -656,7 +668,7 @@ export class PrismaSsoOrganizationMemberLookup
       },
       select: { user: { select: { id: true, name: true, email: true } } },
     });
-    return members.map(toMember);
+    return this.withPasswords(members.map(toMember));
   }
 
   async findByIds({
@@ -671,13 +683,26 @@ export class PrismaSsoOrganizationMemberLookup
       where: { organizationId, userId: { in: userIds } },
       select: { user: { select: { id: true, name: true, email: true } } },
     });
-    return members.map(toMember);
+    return this.withPasswords(members.map(toMember));
+  }
+
+  private async withPasswords(
+    members: Omit<SsoOrganizationMember, "holdsPassword">[],
+  ): Promise<SsoOrganizationMember[]> {
+    return Promise.all(
+      members.map(async (member) => ({
+        ...member,
+        holdsPassword: await this.holdsPassword({ userId: member.userId }),
+      })),
+    );
   }
 }
 
+/** The row as it comes out of Postgres. Whether they hold a password is a
+ *  second question, asked by `withPasswords`, so this cannot invent it. */
 function toMember(row: {
   user: { id: string; name: string | null; email: string | null };
-}): SsoOrganizationMember {
+}): Omit<SsoOrganizationMember, "holdsPassword"> {
   return {
     userId: row.user.id,
     name: row.user.name,

@@ -1,5 +1,5 @@
 import type { SsoBreakGlassBindingRepository } from "@langwatch/identity-server";
-import { LOCAL_METHOD_SET } from "./signin-method-policy";
+import { localSignInMethods } from "./signin-method-policy";
 
 /**
  * Activation's break-glass precondition, before break-glass BINDINGS exist.
@@ -13,7 +13,11 @@ import { LOCAL_METHOD_SET } from "./signin-method-policy";
  * authenticate them, and nobody left can turn it off.
  *
  * So the requirement ships now with the weakest honest answer to it: does
- * this deployment still hold a local door at all? On an instance whose method
+ * this deployment still hold a local door at all? The answer comes from the
+ * method policy rather than from the constant that names the door's shape:
+ * an instance brokering sign-in through another provider mounts no
+ * email/password routes, and reading the constant told it there was a door
+ * on every deployment there has ever been. On an instance whose method
  * policy has no local methods, activation is refused — that is the lockout
  * case, and refusing it is the whole point. On one that does, the door exists
  * and activation proceeds, which is exactly today's behavior.
@@ -29,8 +33,7 @@ export class LocalDoorBreakGlassBinding
   constructor(
     /** The instance's local method set. Injected so a test can express an
      *  instance with no local door without reaching for env. */
-    private readonly localMethods: () => readonly unknown[] = () =>
-      LOCAL_METHOD_SET,
+    private readonly localMethods: () => readonly unknown[] = localSignInMethods,
   ) {}
 
   async hasLiveBinding(_args: { organizationId: string }): Promise<boolean> {
@@ -85,4 +88,31 @@ export class RequiresLocalDoorAndBinding
     }
     return this.deps.bindings.reserveActivationRecovery(args);
   }
+}
+
+/**
+ * Who may be granted a way back in.
+ *
+ * BOTH HALVES, and they answer different questions. Being senior enough to be
+ * trusted with a door the rest of the organization does not have is the first;
+ * holding the key is the second. An administrator who has only ever signed in
+ * through the identity provider holds no password — which is every
+ * administrator of an organization moving off a brokered provider — and a
+ * grant naming them reads as a live way back in on the setup screen while
+ * opening nothing at all.
+ *
+ * Composed here rather than inline at the composition root so that the rule
+ * is a thing a test can hold, rather than a lambda inside a factory.
+ */
+export function breakGlassHolderEligibility(deps: {
+  isAdministrator: (args: {
+    organizationId: string;
+    userId: string;
+  }) => Promise<boolean>;
+  holdsPassword: (args: { userId: string }) => Promise<boolean>;
+}): (args: { organizationId: string; userId: string }) => Promise<boolean> {
+  return async ({ organizationId, userId }) => {
+    if (!(await deps.isAdministrator({ organizationId, userId }))) return false;
+    return deps.holdsPassword({ userId });
+  };
 }

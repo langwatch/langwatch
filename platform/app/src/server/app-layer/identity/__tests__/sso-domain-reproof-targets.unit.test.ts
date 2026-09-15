@@ -20,6 +20,7 @@ const connection = (id: string, domain: string) => ({
 });
 
 describe("PrismaSsoDomainReproofTargets", () => {
+  /** @scenario "Every proved domain is re-read in turn rather than the same few for ever" */
   it("chooses unswept connections before the oldest swept connections", async () => {
     const findMany = vi
       .fn()
@@ -62,6 +63,7 @@ describe("PrismaSsoDomainReproofTargets", () => {
     );
   });
 
+  /** @scenario "Every proved domain is re-read in turn rather than the same few for ever" */
   it("inserts missing cursors and advances existing cursors", async () => {
     const createMany = vi.fn().mockResolvedValue({ count: 1 });
     const updateMany = vi.fn().mockResolvedValue({ count: 2 });
@@ -99,5 +101,45 @@ describe("PrismaSsoDomainReproofTargets", () => {
     expect(createMany.mock.invocationCallOrder[0]).toBeLessThan(
       updateMany.mock.invocationCallOrder[0]!,
     );
+  });
+
+  /**
+   * REGRESSION. The rotation is ordered by THE LOOK, never by the write.
+   *
+   * A healthy re-read emits no facts, so `updatedAt` does not move — order by
+   * it and the same prefix is read every cycle, for ever. Worse, the one
+   * connection that DOES move it is the one that just started wavering, which
+   * sorted itself to the far end of the queue and was never re-read again:
+   * its grace ran out unobserved and it went on vouching for new people. The
+   * separate cursor exists so that looking is its own fact.
+   */
+  /** @scenario "A domain that has started wavering is still re-read, and still lapses" */
+  it("orders the rotation by when each connection was last looked at, never by when it last changed", async () => {
+    const findMany = vi
+      .fn()
+      .mockResolvedValueOnce([])
+      .mockResolvedValueOnce([connection("connection_wavering", "acme.com")]);
+    const prisma = {
+      ssoConnection: { findMany },
+      ssoConnectionReproofCursor: {
+        createMany: vi.fn(),
+        updateMany: vi.fn(),
+      },
+    };
+    const repository = new PrismaSsoDomainReproofTargets(prisma);
+
+    const targets = await repository.findDomainsProvedByRecord({ limit: 2 });
+
+    // The connection that just wavered is still reachable, because nothing in
+    // the ordering reacts to it having written.
+    expect(targets.map((target) => target.connectionId)).toEqual([
+      "connection_wavering",
+    ]);
+    const sweptQuery = findMany.mock.calls[1]?.[0];
+    expect(sweptQuery.orderBy).toEqual([
+      { reproofCursor: { lastReproofAt: "asc" } },
+      { id: "asc" },
+    ]);
+    expect(JSON.stringify(sweptQuery.orderBy)).not.toContain("updatedAt");
   });
 });

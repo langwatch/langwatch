@@ -266,6 +266,70 @@ Feature: Going live with your own identity provider, without asking us
     Then the ways back in are listed
     And no control that would grant or renew one is offered
 
+  # ── A way back in that can actually be walked ──────────────────────────
+
+  # Everything above promises that the person holding a grant "can sign in
+  # with a password even after single sign-on is on". Three things have to be
+  # true for that promise to hold, and each was once assumed rather than
+  # checked:
+  #
+  #   1. the deployment MOUNTS a password door at all. On cloud it does not
+  #      unless the instance is natively in email mode, so an organization
+  #      brokered through another provider has no local door behind the
+  #      promise.
+  #   2. the check that guards this reads the deployment's RESOLVED method
+  #      policy, rather than a hardcoded list that is never empty and so
+  #      answered "there is a door" everywhere.
+  #   3. the named person HOLDS a password. Anybody who has only ever signed
+  #      in through the brokered provider holds none, which is every
+  #      administrator of an organization moving off one.
+  #
+  # The module that implements the check already stated the standard it did
+  # not reach: "somebody could sign in with a password if they had one" is
+  # not the same as "this person can get in on Monday". These scenarios are
+  # that standard, and the product now meets it — the method policy answers
+  # whether a door is hung, the grant refuses a holder with no key, and the
+  # migration counts only the ways back in somebody could walk.
+
+  @unit
+  Scenario: A deployment that mounts no password door cannot promise a way back in
+    Given an installation where signing in with a password is not offered at all
+    When the administrator tries to turn the connection on
+    Then it is refused with "sso_activation_break_glass_missing"
+    And the refusal says the deployment has no password door for a grant to be a way in through
+
+  @unit
+  Scenario: A way back in names somebody who holds a password, not merely somebody senior
+    Given an administrator who has only ever signed in through the identity provider
+    When the administrator grants them a way back in
+    Then it is refused, because they hold no password to come back in with
+    And the refusal says they must set one first
+
+  @unit
+  Scenario: The people offered a way back in are the ones who could use it
+    Given some administrators hold a password and others have only ever used the identity provider
+    When the administrator opens the list of people to grant a way back in to
+    Then only the ones holding a password are offered
+    And the others are shown with what they would have to do first
+
+  # Setting a first password needs a live session, so the ask has to land
+  # while the provider being replaced still works. The migration screen is
+  # where it lands, which is why the blocker carries the remedy rather than
+  # only the complaint.
+  @unit
+  Scenario: The ask to set a password lands while the old provider can still sign somebody in
+    Given an organization whose administrators have only ever signed in through the provider being replaced
+    When the migration is checked for what is blocking it
+    Then the blocker says the way back in needs somebody who has set a password
+    And it says a password can only be set while somebody is still signed in
+
+  @unit
+  Scenario: Finalizing counts the ways back in that can actually be walked
+    Given the only unexpired grant belongs to somebody who holds no password
+    When the migration is checked for what is blocking it
+    Then "recovery-path-missing" is among the blockers
+    And a grant nobody can use does not satisfy the requirement to keep one live way back in
+
   # ---------------------------------------------------------------------
   # Going live
   # ---------------------------------------------------------------------

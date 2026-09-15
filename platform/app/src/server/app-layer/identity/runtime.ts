@@ -100,6 +100,7 @@ import { buildAddressConfirmationUrl } from "./address-confirmation-link";
 import { IdentityAddressLockReaperService } from "./address-lock-reaper";
 import { BetterAuthInstanceHandle } from "./better-auth-instance.adapter";
 import {
+  breakGlassHolderEligibility,
   LocalDoorBreakGlassBinding,
   RequiresLocalDoorAndBinding,
 } from "./break-glass-binding";
@@ -768,11 +769,23 @@ export function ssoBreakGlass(): SsoBreakGlassService {
     // The same people `breakGlassCandidates` lists, asked on the write path.
     // A grant naming anybody else satisfies activation's precondition and
     // opens no door.
-    holderIsEligible: async ({ organizationId, userId }) =>
-      (await memberships.countEligibleAdministrator({
-        organizationId,
-        userId,
-      })) > 0,
+    //
+    // BOTH HALVES, because a grant is a promise that THIS PERSON can get in
+    // on Monday. Being senior enough to be trusted with the door is one half;
+    // holding the key is the other, and an administrator who has only ever
+    // signed in through the identity provider holds none — which is every
+    // administrator of an organization moving off a brokered provider. A
+    // grant naming them reads as a live way back in on the setup screen and
+    // opens nothing.
+    holderIsEligible: breakGlassHolderEligibility({
+      isAdministrator: async ({ organizationId, userId }) =>
+        (await memberships.countEligibleAdministrator({
+          organizationId,
+          userId,
+        })) > 0,
+      holdsPassword: ({ userId }) =>
+        credentialAccounts().hasPassword({ userId }),
+    }),
   });
 }
 
@@ -843,13 +856,23 @@ export function ssoSelfServe(): SsoSelfServeService {
     // `ssoBreakGlass()`, which the setup service never holds — this surface
     // lists the ways back in and never writes one.
     breakGlass: ssoBreakGlass(),
-    members: new PrismaSsoOrganizationMemberLookup(prisma),
-    migrations: new PrismaSsoMigrationProgressRepository(prisma),
+    members: new PrismaSsoOrganizationMemberLookup(prisma, ({ userId }) =>
+      credentialAccounts().hasPassword({ userId }),
+    ),
+    migrations: new PrismaSsoMigrationProgressRepository(
+      prisma,
+      Date.now,
+      ({ userId }) => credentialAccounts().hasPassword({ userId }),
+    ),
     finalization: new SsoMigrationFinalizationService({
       connections: ssoConnections,
       evidence: new PrismaSsoMigrationFinalizationRepository(
         prisma,
         activationBreakGlassPort(),
+        {
+          holdsPassword: ({ userId }) =>
+            credentialAccounts().hasPassword({ userId }),
+        },
       ),
       retirement: new PrismaSsoLegacyIdentityRetirement({
         prisma,

@@ -13,6 +13,7 @@ import { SsoConnectionGuards } from "../sso-connection-guards";
 import type { SsoConnectionLedger } from "../sso-connection-ledger";
 import { SsoConnectionService } from "../sso-connection.service";
 import {
+  SSO_DOMAIN_REPROOF_BATCH,
   SsoDomainReproofService,
   type SsoDomainReproofNotifier,
   type SsoDomainReproofTarget,
@@ -547,6 +548,7 @@ describe("re-reading the record that proves a domain", () => {
   });
 
   describe("given one domain's re-read fails outright", () => {
+    /** @scenario "One domain's failure does not abandon the domains after it" */
     it("carries the failure out and re-reads every other domain anyway", async () => {
       targets.targets = [
         {
@@ -567,6 +569,104 @@ describe("re-reading the record that proves a domain", () => {
       ]);
       expect(outcome.wavered).toBe(1);
       expect(recorded()).toEqual(["domain_proof_wavered"]);
+    });
+  });
+
+  /**
+   * The sweep's own mechanics, rather than what any one domain answered. A
+   * sweep can be right about every domain it reads and still be broken, by
+   * never reaching most of them.
+   */
+  describe("given the sweep has run", () => {
+    /** @scenario "Every proved domain is re-read in turn rather than the same few for ever" */
+    it("records having looked at a healthy domain, which writes nothing else", async () => {
+      const outcome = await reproof.sweep();
+
+      expect(recorded()).toEqual([]);
+      // Nothing changed, so nothing is stated — but the LOOK is stamped, and
+      // that is what moves this connection to the back of the rotation.
+      // Without it the same prefix is re-read for ever.
+      expect(targets.swept).toEqual([[CONNECTION]]);
+      expect(outcome.checked).toBe(1);
+    });
+
+    /** @scenario "A domain whose re-read failed goes to the back of the queue like any other" */
+    it("stamps the look even for the domain whose re-read threw", async () => {
+      targets.targets = [
+        {
+          connectionId: "ssoc_missing",
+          organizationId: "org_gone",
+          domain: "gone.example",
+          tokenHash: TOKEN_HASH,
+          method: "dns-txt",
+        },
+        ...targets.targets,
+      ];
+
+      const outcome = await reproof.sweep();
+
+      expect(outcome.failed.map((failure) => failure.domain)).toEqual([
+        "gone.example",
+      ]);
+      // A connection whose look throws must still go to the back of the
+      // queue, or it holds up every connection behind it for ever.
+      expect(targets.swept).toEqual([["ssoc_missing", CONNECTION]]);
+    });
+
+    /** @scenario "A sweep that filled its batch says so rather than reading as complete" */
+    it("reports a full batch as truncated and a short one as complete", async () => {
+      const short = await reproof.sweep();
+      expect(short.truncated).toBe(false);
+
+      targets.targets = Array.from(
+        { length: SSO_DOMAIN_REPROOF_BATCH },
+        () => ({
+          connectionId: CONNECTION,
+          organizationId: ORG,
+          domain: "acme.com",
+          tokenHash: TOKEN_HASH,
+          method: "dns-txt" as const,
+        }),
+      );
+
+      const full = await reproof.sweep();
+
+      // A sweep that silently covers half the fleet reads exactly like one
+      // that covered all of it.
+      expect(full.truncated).toBe(true);
+    });
+
+    /** @scenario "The history says the system looked, and names no person" */
+    it("attributes the re-read to the system and to nobody in particular", async () => {
+      proofs.answer = { outcome: "absent" };
+
+      await reproof.sweep();
+
+      expect(recorded()).toEqual(["domain_proof_wavered"]);
+      const actor = committed[0]?.command.data.actor;
+      expect(actor).toEqual({ type: "system", id: null });
+    });
+
+    /** @scenario "Two re-reads of one domain are two observations, not one repeated" */
+    it("gives two checks of one domain two command identities", async () => {
+      proofs.answer = { outcome: "absent" };
+      await reproof.sweep();
+
+      clock = T0 + SSO_DNS_REPROOF_GRACE_MS + HOUR_MS;
+      await reproof.sweep();
+
+      expect(recorded()).toEqual([
+        "domain_proof_wavered",
+        "domain_proof_lapsed",
+      ]);
+      const [first, second] = committed.map(
+        (entry) => entry.command.data.commandId,
+      );
+      // Deriving the id from the domain would fold Tuesday's observation into
+      // Monday's and the lapse would never be stated.
+      expect(first).toBeDefined();
+      expect(second).toBeDefined();
+      expect(first).not.toBe(second);
     });
   });
 });
