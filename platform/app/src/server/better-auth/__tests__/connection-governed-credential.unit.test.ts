@@ -13,7 +13,11 @@ import { requestHooks } from "../config/request-hooks";
  * password beside it answers none of them.
  */
 
-const PASSWORD = { id: "password", kind: "password" as const, connectionId: null };
+const PASSWORD = {
+  id: "password",
+  kind: "password" as const,
+  connectionId: null,
+};
 const PASSKEY = { id: "passkey", kind: "passkey" as const, connectionId: null };
 const BROKER = { id: "auth0", kind: "federated" as const, connectionId: null };
 
