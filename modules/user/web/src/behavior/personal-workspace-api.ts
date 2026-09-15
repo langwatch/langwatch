@@ -206,6 +206,16 @@ export type PersonalOrganizationGraph = {
   }[];
 };
 
+/** One of THIS reader's own keys, the fields the profile summary shows. */
+export type PersonalApiKeyListEntry = {
+  id: string;
+  name: string;
+  permissionMode: string;
+  userId: string | null;
+  revokedAt: string | null;
+  lastUsedAt: string | null;
+};
+
 type BorrowedProcedures = {
   user: {
     personalUsage: {
@@ -341,6 +351,14 @@ type BorrowedProcedures = {
       query: {
         input: { isDemo?: boolean };
         output: PersonalOrganizationGraph[];
+      };
+    };
+  };
+  apiKey: {
+    list: {
+      query: {
+        input: { organizationId: string };
+        output: PersonalApiKeyListEntry[];
       };
     };
   };

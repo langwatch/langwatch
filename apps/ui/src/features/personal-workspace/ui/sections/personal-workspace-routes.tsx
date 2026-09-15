@@ -55,6 +55,15 @@ export const personalWorkspacePageLoaders: UiPageLoaderRegistry = {
     }),
     host: PersonalWorkspaceHost,
   }),
+  "pages/settings/profile": uiPage({
+    screen: async () => ({
+      default: withDocumentTitle(
+        "Profile · LangWatch",
+        (await personalWorkspaceScreens.profile()).default as ComponentType,
+      ),
+    }),
+    host: PersonalWorkspaceHost,
+  }),
   "pages/me/index": personalWorkspacePage("overview", { title: "My Usage · LangWatch" }),
   "pages/me/configure": personalWorkspacePage("configure", {
     title: "My Settings · LangWatch",

@@ -273,6 +273,10 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
             page: "pages/settings/api-keys",
           },
           {
+            path: "/settings/profile",
+            page: "pages/settings/profile",
+          },
+          {
             path: "/settings/scim",
             page: "pages/settings/scim",
           },

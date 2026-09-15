@@ -19,6 +19,7 @@ export const personalWorkspaceScreens = {
   projectPullRequests: () =>
     import("./ui/sections/personal-workspace/project-pull-requests.screen.tsx"),
   authentication: () => import("./ui/sections/personal-workspace/authentication.screen.tsx"),
+  profile: () => import("./ui/sections/personal-workspace/profile.screen.tsx"),
 } as const satisfies Record<string, PersonalWorkspaceScreenLoader>;
 
 export type PersonalWorkspaceScreenName = keyof typeof personalWorkspaceScreens;
