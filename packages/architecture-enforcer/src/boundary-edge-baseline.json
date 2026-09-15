@@ -1233,11 +1233,6 @@
       "expires": "2026-10-01"
     },
     {
-      "key": "private-runtime-export|modules/project/server/src/index.ts|./app/project.app.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
       "key": "private-runtime-export|modules/project/server/src/index.ts|./repositories/prisma/prisma.coding-agent-activity.repository.ts",
       "measured": "2026-09-10",
       "expires": "2026-10-01"
@@ -1253,11 +1248,6 @@
       "expires": "2026-10-01"
     },
     {
-      "key": "private-runtime-export|modules/project/server/src/index.ts|./repositories/prisma/prisma.recent-items.repository.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
       "key": "private-runtime-export|modules/project/server/src/index.ts|./services/governance-internal-project.service.ts",
       "measured": "2026-09-10",
       "expires": "2026-10-01"
@@ -1268,17 +1258,7 @@
       "expires": "2026-10-01"
     },
     {
-      "key": "private-runtime-export|modules/project/server/src/index.ts|./services/project-operations.service.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
       "key": "private-runtime-export|modules/project/server/src/index.ts|./services/project.service.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/project/server/src/index.ts|./services/recent-items.service.ts",
       "measured": "2026-09-10",
       "expires": "2026-10-01"
     },

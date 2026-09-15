@@ -1,6 +1,5 @@
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { ProjectCredentialsService } from "../../services/project-credentials.service.ts";
-import { PrismaProjectRepository } from "./prisma.project.repository.ts";
+import { PrismaProjectRepository, type PrismaProjectDatabase } from "./prisma.project.repository.ts";
 import {
   GovernanceInternalProjectService,
   ProjectOldestTeam,
@@ -12,14 +11,14 @@ import {
  */
 export class PrismaGovernanceInternalProjectRepository {
   static create(options: {
-    database: PrismaClient;
+    database: PrismaProjectDatabase;
     teams: ProjectOldestTeam;
   }): PrismaGovernanceInternalProjectRepository {
     return new PrismaGovernanceInternalProjectRepository(options);
   }
 
   private constructor(
-    private readonly options: { database: PrismaClient; teams: ProjectOldestTeam },
+    private readonly options: { database: PrismaProjectDatabase; teams: ProjectOldestTeam },
   ) {}
 
   build(): GovernanceInternalProjectService {
