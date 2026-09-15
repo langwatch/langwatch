@@ -24,6 +24,7 @@
     "langwatch/conditional-type-depth": "error",
     "langwatch/zod-object-composition": "error",
     "langwatch/fallible-result-naming": "error",
+    "langwatch/no-try-prefix": "error",
     "langwatch/feature-source-filename": "error",
     "langwatch/feature-source-layout": "error",
     "langwatch/feature-source-subject": "error",

@@ -41,6 +41,7 @@ export { noAliasReexportRule } from "./rules/no-alias-reexport.rule.mjs";
 export { noBootHookOutsideGuardRule } from "./rules/no-boot-hook-outside-guard.rule.mjs";
 export { noLoggerSpyRule } from "./rules/no-logger-spy.rule.mjs";
 export { noPrototypeStubRule } from "./rules/no-prototype-stub.rule.mjs";
+export { noTryPrefixRule } from "./rules/no-try-prefix.rule.mjs";
 export { noRawErrorOutputRule } from "./rules/no-raw-error-output.rule.mjs";
 export { handledErrorOutsideContractRule } from "./rules/handled-error-outside-contract.rule.mjs";
 export { noRuntimeReflectionRule } from "./rules/no-runtime-reflection.rule.mjs";
