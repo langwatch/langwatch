@@ -11,11 +11,13 @@ Feature: A failed sign-in says what went wrong
   Background:
     Given I am on the sign-in screen of a credentials installation
 
+  @integration
   Scenario: A wrong password says the password is wrong
     When I sign in with an email that exists and the wrong password
     Then the screen tells me the email or password is wrong
     And the message stays on screen next to the form
 
+  @unit
   Scenario: Too many attempts says to wait
     When I have tried to sign in more times than allowed
     Then the screen tells me to wait before trying again
@@ -24,16 +26,19 @@ Feature: A failed sign-in says what went wrong
   # installation is set up for and the address the browser is on. The reader is
   # not expected to know that phrase, so the screen names the thing they can
   # check: the address they are using.
+  @unit
   Scenario: An address mismatch says which thing to check
     When the installation refuses the sign-in because it is set up for another address
     Then the screen tells me LangWatch is set up for a different address
     And the message never shows an internal error code
 
+  @unit
   Scenario: An unexpected failure still says something honest
     When the sign-in fails for a reason the screen has no wording for
     Then the screen tells me the sign-in did not go through
     And the message never shows an internal error code
 
+  @unit
   Scenario: Sign-up failures read the same way
     Given I am on the sign-up screen
     When creating my account fails
@@ -41,6 +46,7 @@ Feature: A failed sign-in says what went wrong
 
   # The person reading the screen gets plain wording; whoever is on the other
   # side of the installation needs the specific cause, so it goes to the log.
+  @integration
   Scenario: The refused address is recorded for whoever runs the installation
     When the installation refuses a sign-in because it is set up for another address
     Then the log records the address it expected and the address it received

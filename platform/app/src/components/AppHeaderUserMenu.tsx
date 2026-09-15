@@ -1,5 +1,6 @@
 import { Button, Portal } from "@chakra-ui/react";
 import { Monitor, PanelsTopLeft } from "lucide-react";
+import { displayNameFor } from "~/features/auth/logic/displayName";
 import {
   DEFAULT_NAVIGATION_MODE,
   type NavigationMode,
@@ -54,6 +55,9 @@ export function AppHeaderUserMenu({
 }) {
   const { data: session } = useRequiredSession({ required: !publicPage });
   const user = session?.user;
+  // An account with no name of its own is ordinary — a passkey sign-up asks
+  // for none — and interpolating the gap put "null (sam@acme.com)" in the menu.
+  const displayName = displayNameFor({ name: user?.name, email: user?.email });
   const { organization } = useOrganizationTeamProject({
     redirectToOnboarding: false,
     redirectToProjectOnboarding: false,
@@ -105,8 +109,8 @@ export function AppHeaderUserMenu({
           aria-label={
             publicPage
               ? "Sign in"
-              : user?.name
-                ? `Open user menu for ${user.name}`
+              : displayName
+                ? `Open user menu for ${displayName}`
                 : "Open user menu"
           }
           {...(publicPage
@@ -129,7 +133,7 @@ export function AppHeaderUserMenu({
             : {})}
         >
           <UserAvatar
-            name={user?.name ?? undefined}
+            name={displayName || undefined}
             image={user?.image ?? undefined}
             size="xs"
             backgroundColor="orange.400"
@@ -143,9 +147,7 @@ export function AppHeaderUserMenu({
         <Portal>
           <Menu.Content>
             <ImpersonationSwitchBackMenuItem />
-            <Menu.ItemGroup
-              title={`${session.user.name} (${session.user.email})`}
-            >
+            <Menu.ItemGroup title={`${displayName} (${session.user.email})`}>
               {governancePreviewEnabled && (
                 <Menu.Item value="my-workspace" asChild>
                   <Link href="/me">My Workspace</Link>

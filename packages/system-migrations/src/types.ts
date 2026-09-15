@@ -65,6 +65,8 @@ export type MigrationPassSummary = {
   tenantsSeen: number;
   finalized: number;
   held: number;
+  /** Held outcomes from migrations that must settle before startup. */
+  finiteHeld?: number;
   parked: number;
   /** Outside the cohort, or an operator's mid-pass pin discarded the
    *  outcome. Never "already done" - that is `alreadyFinalized` /

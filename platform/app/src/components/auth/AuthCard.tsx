@@ -1,7 +1,7 @@
 import { Box, Card, Container, Heading, Text, VStack } from "@chakra-ui/react";
 import type { ReactNode } from "react";
 
-import "~/features/auth-front-door/authFrontDoor.css";
+import "~/features/auth/auth.css";
 import { FullLogo } from "../icons/FullLogo";
 
 /**
@@ -36,6 +36,7 @@ export function AuthCard({
   title,
   intro,
   finePrint,
+  solid = false,
   children,
 }: {
   title: string;
@@ -44,6 +45,13 @@ export function AuthCard({
   intro?: string;
   /** The small print under everything: terms, privacy, nothing louder. */
   finePrint?: ReactNode;
+  /**
+   * A near-solid floor instead of the glass. For the states that are one
+   * sentence with nothing to operate — "check your email" — where the glass
+   * that flatters a column of fields leaves the words washed against the
+   * ground.
+   */
+  solid?: boolean;
   children: ReactNode;
 }) {
   return (
@@ -55,7 +63,7 @@ export function AuthCard({
       marginY={{ base: 6, md: "8vh" }}
     >
       <Card.Root
-        className="lw-front-door-card"
+        className={solid ? "lw-auth-card lw-auth-card--solid" : "lw-auth-card"}
         width="full"
         borderWidth={{ base: 0, sm: "1px" }}
         borderRadius={{ base: 0, sm: "14px" }}
@@ -93,7 +101,11 @@ export function AuthCard({
             ) : null}
           </VStack>
         </Card.Header>
-        <Card.Body paddingX="32px" paddingTop="22px" paddingBottom="32px">
+        {/* Bottom matches the header's 34px top exactly: the card used to sit
+            on 32px and read bottom-heavy or bottom-light depending on whether
+            the last row was a solid button or a bare text link. One number,
+            same as the top, is the version nobody's eye snags on. */}
+        <Card.Body paddingX="32px" paddingTop="22px" paddingBottom="34px">
           {/* Named for the entrance: the rows rise in one after another, and
               the stagger is applied from the stylesheet rather than by giving
               every screen an animation prop to pass down. */}

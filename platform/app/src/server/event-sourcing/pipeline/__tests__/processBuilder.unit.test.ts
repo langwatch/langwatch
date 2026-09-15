@@ -138,4 +138,59 @@ describe("ProcessManagerBuilder", () => {
       });
     });
   });
+
+  describe("given a process keyed by something other than the aggregate", () => {
+    describe("when keyBy is declared", () => {
+      it("keeps the key function on the config", () => {
+        const definition = buildProcessManager<AutomationEvent>({
+          name: "tenantWatch",
+          applier: (pm) =>
+            pm
+              .state({ count: 0 })
+              .intent("persistMatch", payloadSchema, async () => {})
+              .on(TRIGGER_MATCH_RECORDED_EVENT_TYPE, (state) => ({ state }))
+              .keyBy((event) => `tenant:${event.tenantId}`),
+        });
+
+        expect(
+          definition.config.keyBy?.({
+            tenantId: "project-1",
+          } as AutomationEvent),
+        ).toBe("tenant:project-1");
+      });
+
+      it("throws when keyBy is declared twice", () => {
+        expect(() =>
+          buildProcessManager<AutomationEvent>({
+            name: "tenantWatch",
+            applier: (pm) =>
+              pm
+                .state({ count: 0 })
+                .intent("persistMatch", payloadSchema, async () => {})
+                .on(TRIGGER_MATCH_RECORDED_EVENT_TYPE, (state) => ({ state }))
+                .keyBy((event) => event.tenantId)
+                .keyBy((event) => event.aggregateId),
+          }),
+        ).toThrow(/already declares keyBy/);
+      });
+    });
+
+    describe("when it is also scheduled", () => {
+      it("throws because a schedule keys on the singleton", () => {
+        expect(() =>
+          buildProcessManager<AutomationEvent>({
+            name: "tenantSweep",
+            applier: (pm) =>
+              pm
+                .state({ count: 0 })
+                .intent("persistMatch", payloadSchema, async () => {})
+                .on(TRIGGER_MATCH_RECORDED_EVENT_TYPE, (state) => ({ state }))
+                .onWake((state) => ({ state }))
+                .keyBy((event) => event.tenantId)
+                .schedule({ everyMs: 30_000 }),
+          }),
+        ).toThrow(/cannot be keyed and scheduled/);
+      });
+    });
+  });
 });

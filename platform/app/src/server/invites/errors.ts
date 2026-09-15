@@ -7,7 +7,7 @@ import { HandledError } from "@langwatch/handled-error";
 import { remediation } from "../app-layer/error-remediation";
 
 /**
- * Message thrown by `organization.acceptInvite` when the invite has already
+ * Message thrown by `invite.acceptInvite` when the invite has already
  * been consumed. Shared between server (where it's thrown) and client (where
  * it's matched to trigger a redirect) so the two cannot drift.
  */
@@ -126,7 +126,7 @@ export class TeamNotInOrganizationError extends HandledError {
  *
  * The hint is MASKED, and the whole address never leaves the server. An
  * invite code is a bearer token that reaches inboxes, chat logs and support
- * threads; `frontDoor.inviteLanding` already refuses to name the invited
+ * threads; `auth.inviteLanding` already refuses to name the invited
  * address for that reason, and a mismatch is not the place to hand it over.
  * Enough survives the mask to recognize an address you own, and not enough
  * to learn one you do not.

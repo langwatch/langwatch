@@ -81,6 +81,12 @@ vi.mock("~/utils/api", () => ({
           refetch: calls.refetchedSessions,
         }),
       },
+      // The browser sign-ins strip above the device rows. Empty here so
+      // these tests stay about the DEVICES panel; WebSessionsPanel has its
+      // own test file for its own rows.
+      listWebSessions: {
+        useQuery: () => ({ data: [], isLoading: false, isError: false }),
+      },
       revoke: {
         useMutation: (options: { onSuccess: (result: unknown) => void }) => {
           handlers.onRevokeDeviceSuccess = options.onSuccess;

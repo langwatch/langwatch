@@ -11,12 +11,7 @@ import {
 } from "@ee/governance/repositories/governanceIdentity.repository";
 import { ActivityMonitorClickHouseRepository } from "@ee/governance/services/activity-monitor/activityMonitor.clickhouse.repository";
 import { resolveSourceNonBillable } from "@ee/governance/services/costAttributionPolicy.service";
-import {
-  COST_ROLLUP_COMPARATOR_TARGET_TYPE,
-  CostRollupComparatorService,
-  costRollupComparatorFireHandler,
-} from "@ee/governance/services/costRollupComparator.service";
-import { reconcileCostRollupComparatorSchedules } from "@ee/governance/services/costRollupComparatorSchedule";
+import { CostRollupComparatorService } from "@ee/governance/services/costRollupComparator.service";
 import { installGovernanceSuppressionSnapshot } from "@ee/governance/services/erasureSuppression.service";
 import { GovernanceCostRollupClickHouseRepository } from "@ee/governance/services/governanceCostRollup.clickhouse.repository";
 import { GovernanceGatewaySpendClickHouseRepository } from "@ee/governance/services/governanceGatewaySpend.clickhouse.repository";
@@ -257,6 +252,7 @@ import {
   JoinRequestLifecycleDispatcher,
 } from "./identity/join-request-adapters";
 import { AdminEmailPlatformOperators } from "./identity/platform-operators";
+import { EventLogIdentityRepository } from "./identity/repositories/identity-event-log.repository";
 import { PrismaIdentityHeadsRepository } from "./identity/repositories/identity-heads.prisma.repository";
 import { PrismaIdentityProjectionRepository } from "./identity/repositories/identity-projection.prisma.repository";
 import { PrismaIdentityReservationRepository } from "./identity/repositories/identity-reservations.prisma.repository";
@@ -359,7 +355,6 @@ import { PlanProviderService } from "./subscription/plan-provider";
 import { createSelfHostedPlanProvider } from "./subscription/self-hosted-plan-provider";
 import type { SubscriptionService } from "./subscription/subscription.service";
 import { SuiteRunService } from "./suites/suite-run.service";
-import { startSystemMigrations } from "./system-migrations/boot";
 import { startTopicClusteringBootSeeds } from "./topic-clustering/bootSeeds";
 import { clusterTopicsForProject } from "./topic-clustering/clustering";
 import { NullTopicRepository } from "./topic-clustering/repositories/null-topic.repository";
@@ -422,6 +417,14 @@ export function initializeWebApp(): App {
 
 export function initializeWorkerApp(): App {
   return initializeDefaultApp({ processRole: "worker" });
+}
+
+/**
+ * One-shot system-migration role. It processes only migration event work on
+ * an isolated queue without starting shared consumers, schedulers, or workers.
+ */
+export function initializeMigrationApp(): App {
+  return initializeDefaultApp({ processRole: "migration" });
 }
 
 /**
@@ -874,6 +877,9 @@ export function initializeDefaultApp(options?: {
   // The address lock is shared: the guards claim through it and the fold
   // releases through it, so the two must be the same instance (ADR-116 §6).
   const identityReservations = new PrismaIdentityReservationRepository(prisma);
+  // One instance, two roles: the `User` reads identity runs on, and the one
+  // address the platform-operator list asks about an actor.
+  const identityUsers = new PrismaIdentityUsersRepository(prisma);
 
   // Construct repositories at the composition root — ClickHouse-or-Memory decisions live here.
   const repositories: PipelineRepositories = {
@@ -964,8 +970,12 @@ export function initializeDefaultApp(options?: {
       identityReservations,
     ),
     identityHeads: new PrismaIdentityHeadsRepository(prisma),
-    identityUsers: new PrismaIdentityUsersRepository(prisma),
+    identityUsers,
     identityReservations,
+    // The proposal log, not a table: reads the identity events back through
+    // the App's own event store, resolved lazily for the same reason the
+    // ledger writer resolves it lazily — this composes before an App exists.
+    identityLinkProposals: new EventLogIdentityRepository(),
     mfaProjection: new PrismaMfaEnrollmentProjectionRepository(prisma),
     mfaEnrollments: new PrismaMfaEnrollmentRepository(prisma),
     ssoConnectionProjection: new PrismaSsoConnectionProjectionRepository(
@@ -974,7 +984,7 @@ export function initializeDefaultApp(options?: {
     ssoConnectionReads: new PrismaSsoConnectionReadRepository(prisma),
     ssoConnectionStranding: new PrismaSsoConnectionStrandingRepository(prisma),
     ssoBreakGlassBindings: new LocalDoorBreakGlassBinding(),
-    ssoPlatformOperators: new AdminEmailPlatformOperators(prisma),
+    ssoPlatformOperators: new AdminEmailPlatformOperators(identityUsers),
     ssoConnectionTeardown: new SsoConnectionTeardownDispatcher(),
     // One repository, two roles (D08): the fold's store and the guards' read
     // are the same `ScimSyncState` rows, so composing them separately would
@@ -1068,6 +1078,14 @@ export function initializeDefaultApp(options?: {
     : undefined;
   const governanceCostRollupStore = governanceCostRollupRepository
     ? new GovernanceCostRollupStore(governanceCostRollupRepository)
+    : undefined;
+  // The drift check reads the same repository the fold writes through, so the
+  // watchdog can never be comparing a day against a different table from the
+  // one the product shows. Gated on the repository rather than on ClickHouse
+  // directly: with no summary there is nothing to compare against, and the
+  // pipeline mounts no watch at all rather than one that cannot pass.
+  const costRollupDayComparer = governanceCostRollupRepository
+    ? new CostRollupComparatorService(governanceCostRollupRepository)
     : undefined;
 
   // ADR-128's metered lane reads the gateway's own per-request ledger rather
@@ -1230,66 +1248,6 @@ export function initializeDefaultApp(options?: {
       })
     : undefined;
   scheduler?.start();
-
-  // ADR-092 stage B: the in-place system migrations. Worker-only and
-  // fire-and-forget - passes run until the fleet stops moving and then stop,
-  // so held and parked organizations converge here rather than on the
-  // restart cadence with nobody running anything.
-  // Redis is handed in rather than read back off the App: this composes the
-  // App, so `tryGetApp()` is still null here, and a null handle would make
-  // the lease unacquirable and every pass a silent no-op.
-  const systemMigrations = roleRunsWorkers(config.processRole)
-    ? startSystemMigrations({ redis })
-    : undefined;
-
-  // ADR-128: the cost rollup's comparator, on the same calendar scheduler the
-  // reports use. The fire is a tiny trigger — the lane read back out of
-  // `targetId`, the day derived from the slot — so the handler re-derives
-  // everything at fire time rather than acting on a payload minted when the
-  // schedule was written.
-  //
-  // It samples YESTERDAY, not today: a day still being written to is expected
-  // to disagree with its own summary, and a watchdog that fires on that is a
-  // watchdog nobody reads.
-  if (roleRunsWorkers(config.processRole) && governanceCostRollupRepository) {
-    const comparator = new CostRollupComparatorService(
-      governanceCostRollupRepository,
-    );
-    const comparatorLogger = createLogger(
-      "langwatch:governance:cost-rollup:comparator-schedule",
-    );
-    schedulerRegistry.register({
-      targetType: COST_ROLLUP_COMPARATOR_TARGET_TYPE,
-      handler: costRollupComparatorFireHandler({
-        comparator,
-        logger: comparatorLogger,
-      }),
-    });
-
-    // Registering the handler is only half of it: without calendar entries
-    // carrying this targetType the loop never fires it. Boot reconciliation,
-    // fire-and-forget, the same shape as the report schedules below.
-    void reconcileCostRollupComparatorSchedules({
-      prisma,
-      scheduledJobs: new PrismaScheduledJobRepository(prisma),
-      targetType: COST_ROLLUP_COMPARATOR_TARGET_TYPE,
-      logger: comparatorLogger,
-    })
-      .then(({ created, deactivated }) => {
-        if (created > 0 || deactivated > 0) {
-          comparatorLogger.info(
-            { created, deactivated },
-            "Reconciled cost rollup comparator schedules at boot",
-          );
-        }
-      })
-      .catch((error: unknown) => {
-        comparatorLogger.error(
-          { error: error instanceof Error ? error.message : String(error) },
-          "Cost rollup comparator schedule reconciliation failed at boot (will retry next boot)",
-        );
-      });
-  }
 
   // ADR-044 Phase 3c: register the report handler so a due report ScheduledJob
   // renders + dispatches on schedule (worker-only, same notify pipeline as
@@ -1503,6 +1461,7 @@ export function initializeDefaultApp(options?: {
           }
         : undefined,
       governanceCostRollupStore,
+      costRollupDayComparer,
       // ADR-128 §12: the suggestion half's ONLY runtime composition, and the
       // engine's only trigger — the feed that discovers people, a call site
       // rather than a calendar entry. Worker role only (the name scorer
@@ -1906,14 +1865,6 @@ export function initializeDefaultApp(options?: {
     gracefulCloseables.push({
       name: "scheduler",
       close: () => scheduler.stop(),
-    });
-  }
-  if (systemMigrations) {
-    // Aborts the pass between tenants; a truncated pass is harmless because
-    // every migration is idempotent and the next boot resumes the sweep.
-    gracefulCloseables.push({
-      name: "system-migrations",
-      close: () => systemMigrations.stop(),
     });
   }
   gracefulCloseables.push({

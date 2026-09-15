@@ -18,7 +18,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const { getConnInfo } = vi.hoisted(() => ({ getConnInfo: vi.fn() }));
 vi.mock("@hono/node-server/conninfo", () => ({ getConnInfo }));
 
-import { getClientIp, getClientIpFromHonoContext } from "../getClientIp";
+import {
+  getClientIp,
+  getClientIpFromHonoContext,
+  getDirectPeerIp,
+  getTrustedProxyClientIp,
+  parseTrustedProxyAddresses,
+} from "../getClientIp";
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -71,6 +77,208 @@ describe("getClientIp()", () => {
   describe("when req is undefined", () => {
     it("returns undefined", () => {
       expect(getClientIp(undefined)).toBeUndefined();
+    });
+  });
+});
+
+describe("getDirectPeerIp()", () => {
+  it("uses the socket peer even when a forwarding header disagrees", () => {
+    const req = {
+      headers: { "x-forwarded-for": "198.51.100.77" },
+      socket: { remoteAddress: "203.0.113.9" },
+    };
+
+    expect(getDirectPeerIp(req)).toBe("203.0.113.9");
+  });
+
+  it("accepts compressed IPv6 socket addresses", () => {
+    const req = {
+      headers: {},
+      socket: { remoteAddress: "::1" },
+    };
+
+    expect(getDirectPeerIp(req)).toBe("::1");
+  });
+});
+
+describe("getTrustedProxyClientIp()", () => {
+  /** @scenario Auth throttles distinguish callers behind a trusted ingress */
+  it("resolves two forwarded clients behind the same trusted peer separately", () => {
+    const from = (forwardedFor: string) =>
+      getTrustedProxyClientIp(
+        {
+          headers: { "x-forwarded-for": forwardedFor },
+          socket: { remoteAddress: "10.0.0.9" },
+        },
+        ["10.0.0.0/24"],
+      );
+
+    expect(from("198.51.100.11, 10.0.0.9")).toBe("198.51.100.11");
+    expect(from("198.51.100.12, 10.0.0.9")).toBe("198.51.100.12");
+  });
+
+  it("uses the socket peer when an untrusted caller forges forwarding headers", () => {
+    expect(
+      getTrustedProxyClientIp(
+        {
+          headers: {
+            "cf-connecting-ip": "203.0.113.7",
+            "x-forwarded-for": "203.0.113.8",
+          },
+          socket: { remoteAddress: "198.51.100.4" },
+        },
+        ["10.0.0.0/8"],
+      ),
+    ).toBe("198.51.100.4");
+  });
+
+  it("walks a trusted forwarding chain from the right", () => {
+    expect(
+      getTrustedProxyClientIp(
+        {
+          headers: {
+            "x-forwarded-for": "192.0.2.100, 198.51.100.23, 10.0.0.8",
+          },
+          socket: { remoteAddress: "10.0.0.9" },
+        },
+        ["10.0.0.0/24"],
+      ),
+    ).toBe("198.51.100.23");
+  });
+
+  it("ignores a forged Cloudflare header passed through a generic trusted proxy", () => {
+    expect(
+      getTrustedProxyClientIp(
+        {
+          headers: {
+            "cf-connecting-ip": "192.0.2.100",
+            "x-forwarded-for": "198.51.100.23, 10.0.0.8",
+          },
+          socket: { remoteAddress: "10.0.0.9" },
+        },
+        ["10.0.0.0/24"],
+      ),
+    ).toBe("198.51.100.23");
+  });
+
+  it("parses the operator allow-list once into trimmed entries", () => {
+    expect(
+      parseTrustedProxyAddresses(" 10.0.0.9, 172.16.0.0/12, ,::1 "),
+    ).toEqual(["10.0.0.9", "172.16.0.0/12", "::1"]);
+  });
+
+  it.each([
+    "10.0.0.1/",
+    "10.0.0.1/00",
+    "10.0.0.1/8/extra",
+    "999.0.0.1/8",
+    "not-an-address",
+  ])("rejects malformed trusted proxy entry %s", (entry) => {
+    expect(() => parseTrustedProxyAddresses(entry)).toThrow(
+      `Invalid trusted proxy address: ${entry}`,
+    );
+  });
+
+  it("preserves an explicitly configured IPv4 zero-prefix range", () => {
+    expect(parseTrustedProxyAddresses("0.0.0.0/0")).toEqual(["0.0.0.0/0"]);
+  });
+
+  it("does not trust malformed CIDRs passed directly to the resolver", () => {
+    expect(
+      getTrustedProxyClientIp(
+        {
+          headers: { "x-forwarded-for": "203.0.113.8" },
+          socket: { remoteAddress: "198.51.100.4" },
+        },
+        ["10.0.0.1/", "198.51.100.4/24/extra"],
+      ),
+    ).toBe("198.51.100.4");
+  });
+
+  describe("when no trusted proxy is configured", () => {
+    const unconfigured = (
+      remoteAddress: string,
+      headers: Record<string, string> = {},
+    ) => getTrustedProxyClientIp({ headers, socket: { remoteAddress } }, []);
+
+    /** @scenario A caller on the public internet cannot choose its own throttle bucket */
+    it("counts the address a public caller connected from, not the one it claims", () => {
+      expect(
+        unconfigured("198.51.100.4", { "x-forwarded-for": "203.0.113.8" }),
+      ).toBe("198.51.100.4");
+    });
+
+    it("gives a public caller no fresh bucket per forged value", () => {
+      const forge = (claimed: string) =>
+        unconfigured("198.51.100.4", { "x-forwarded-for": claimed });
+
+      expect(forge("203.0.113.1")).toBe(forge("203.0.113.2"));
+    });
+
+    /** @scenario An in-cluster ingress does not collapse every visitor into one bucket */
+    it("reads the chain through a private ingress so visitors stay distinct", () => {
+      const through = (forwardedFor: string) =>
+        unconfigured("10.0.0.9", { "x-forwarded-for": forwardedFor });
+
+      expect(through("198.51.100.11, 10.0.0.9")).toBe("198.51.100.11");
+      expect(through("198.51.100.12, 10.0.0.9")).toBe("198.51.100.12");
+    });
+
+    it.each([
+      "10.0.0.9",
+      "172.16.4.4",
+      "192.168.1.7",
+      "127.0.0.1",
+    ])("reads %s as one of the deployment's own hops", (peer) => {
+      expect(unconfigured(peer, { "x-forwarded-for": "198.51.100.11" })).toBe(
+        "198.51.100.11",
+      );
+    });
+
+    it.each([
+      "::1",
+      "fd00::1",
+      "fe80::1",
+    ])("reads the IPv6 hop %s the same way", (peer) => {
+      expect(unconfigured(peer, { "x-forwarded-for": "198.51.100.11" })).toBe(
+        "198.51.100.11",
+      );
+    });
+
+    it("treats a carrier-NAT peer as a caller rather than a hop", () => {
+      expect(
+        unconfigured("100.64.0.5", { "x-forwarded-for": "198.51.100.11" }),
+      ).toBe("100.64.0.5");
+    });
+
+    it("falls back to the peer when every hop in the chain is one of ours", () => {
+      expect(
+        unconfigured("10.0.0.9", { "x-forwarded-for": "10.0.0.8, 10.0.0.9" }),
+      ).toBe("10.0.0.9");
+    });
+
+    it("leaves a private peer alone when it forwards nothing", () => {
+      expect(unconfigured("10.0.0.9")).toBe("10.0.0.9");
+    });
+
+    it("still ignores vendor-specific headers from a private hop", () => {
+      expect(
+        unconfigured("10.0.0.9", { "cf-connecting-ip": "203.0.113.7" }),
+      ).toBe("10.0.0.9");
+    });
+  });
+
+  describe("when a trusted proxy is configured", () => {
+    it("narrows trust inside a private network to the named hops", () => {
+      expect(
+        getTrustedProxyClientIp(
+          {
+            headers: { "x-forwarded-for": "198.51.100.11, 10.0.0.9" },
+            socket: { remoteAddress: "10.0.0.9" },
+          },
+          ["10.0.0.1"],
+        ),
+      ).toBe("10.0.0.9");
     });
   });
 });

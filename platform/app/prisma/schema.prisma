@@ -116,10 +116,15 @@ model Session {
   /// factor reads this when a member reaches its data; it is never read at
   /// mint and never ends a session.
   amr           String[] @default([])
+  actorUserId            String?
+  subjectUserId          String?
+  impersonationReason    String?   @db.Text
+  impersonationExpiresAt DateTime?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @default(now()) @updatedAt
 
   @@index([userId])
+  @@index([identifierId])
 }
 
 model User {
@@ -127,6 +132,8 @@ model User {
   name                          String?
   email                         String?                  @unique
   emailVerified                 Boolean                  @default(false)
+  signupConfirmationPending     Boolean                  @default(false)
+  passkeySignupClaimHash        String?
   image                         String?                  @db.Text
   pendingSsoSetup               Boolean                  @default(false)
   // Per-user HMAC key for identity event payload hashes (ADR-101 §4): minted
@@ -256,6 +263,7 @@ model Identifier {
   verifiedAt        DateTime?
   attachedAt        DateTime
   detachedAt        DateTime?
+  lastUsedAt        DateTime?
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @default(now()) @updatedAt
 
@@ -2639,6 +2647,7 @@ model AuditLog {
   id             String   @id @default(cuid())
   createdAt      DateTime @default(now())
   userId         String?
+  actorUserId    String?
   projectId      String?
   organizationId String?
   action         String
@@ -2656,6 +2665,7 @@ model AuditLog {
 
   @@index([createdAt])
   @@index([userId])
+  @@index([actorUserId])
   @@index([projectId])
   @@index([action])
   @@index([ipAddress])

@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import {
+  COST_ROLLUP_WATCH_PROCESS_NAME,
+  costRollupWatchPM,
+} from "@ee/governance/process-manager/costRollupWatch.process";
+import {
   PULLED_USAGE_LEDGER_PROCESS_NAME,
   type PulledUsageLedgerProcessDeps,
   pulledUsageLedgerPM,
@@ -10,6 +14,7 @@ import {
   GovernanceCostRollupFoldProjection,
   type GovernanceCostRollupState,
 } from "@ee/governance/projections/governanceCostRollup.foldProjection";
+import type { CostRollupComparatorDayComparer } from "@ee/governance/services/costRollupComparator.service";
 import { definePipeline } from "~/server/event-sourcing";
 import type { FoldProjectionStore } from "~/server/event-sourcing/projections/foldProjection.types";
 
@@ -50,11 +55,19 @@ import type { PulledUsageProcessingEvent } from "./schemas/events";
  * the same fold for its own lane, so a deployment running no pullers at all
  * still summarizes gateway spend; the two lanes are different rows by
  * construction (`CostSource` is in the key) and can never contend.
+ *
+ * Process manager: `costRollupWatch` (ADR-128) — the drift check, armed by the
+ * charges themselves. Mounted only where BOTH the summary store and the
+ * comparator exist, because the comparison reads the summary this pipeline's
+ * own projection writes: a deployment holding one without the other mounts
+ * nothing rather than asking for comparisons that would either die in the
+ * outbox five attempts at a time or report success without reading anything.
  */
 export function createPulledUsageProcessingPipeline(
   deps: {
     ledger?: PulledUsageLedgerProcessDeps;
     costRollupStore?: FoldProjectionStore<GovernanceCostRollupState>;
+    costRollupComparator?: CostRollupComparatorDayComparer;
   } = {},
 ) {
   let pipeline = definePipeline<PulledUsageProcessingEvent>()
@@ -68,11 +81,17 @@ export function createPulledUsageProcessingPipeline(
       new GovernanceCostRollupFoldProjection({ store: deps.costRollupStore }),
     );
   }
-  if (!deps.ledger) return pipeline.build();
-  return pipeline
-    .withProcessManager(
+  if (deps.ledger) {
+    pipeline = pipeline.withProcessManager(
       PULLED_USAGE_LEDGER_PROCESS_NAME,
       pulledUsageLedgerPM(deps.ledger),
-    )
-    .build();
+    );
+  }
+  if (deps.costRollupStore && deps.costRollupComparator) {
+    pipeline = pipeline.withProcessManager(
+      COST_ROLLUP_WATCH_PROCESS_NAME,
+      costRollupWatchPM({ comparator: deps.costRollupComparator }),
+    );
+  }
+  return pipeline.build();
 }

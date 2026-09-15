@@ -37,6 +37,7 @@ import { projectGovernanceCostRollupStateToRow } from "../../projections/governa
 import {
   COST_SOURCE_EVENT_TYPES,
   CostRollupComparatorService,
+  reportCostRollupDrift,
 } from "../costRollupComparator.service";
 import { GovernanceCostRollupClickHouseRepository } from "../governanceCostRollup.clickhouse.repository";
 
@@ -51,8 +52,18 @@ let tenantId: string;
 /**
  * Writes the day's summary at whatever figure the test wants it to claim, by
  * folding one dollar-billed observation through the real projection.
+ *
+ * Stamped at `DAY_MS`, the moment every test here charges at, so the row
+ * carries the same `LastEventOccurredAt` the fold would have written — which
+ * is what makes `comparison.behind` mean something on these tests rather than
+ * flagging every summary as still catching up.
  */
-async function writeSummary(amountNanoUsd: number): Promise<void> {
+async function writeSummary({
+  amountNanoUsd,
+}: {
+  amountNanoUsd: number;
+}): Promise<void> {
+  const occurredAtMs = DAY_MS;
   const projection = new GovernanceCostRollupFoldProjection({
     store: { store: async () => undefined, get: async () => null },
   });
@@ -61,11 +72,12 @@ async function writeSummary(amountNanoUsd: number): Promise<void> {
     type: "lw.obs.pulled_usage.observed",
     tenantId,
     aggregateId: "seed",
-    occurredAt: DAY_MS,
+    occurredAt: occurredAtMs,
     data: observedData({
       costNanoMinor: amountNanoUsd,
       currencyCode: "USD",
-      observedAtMs: DAY_MS,
+      observedAtMs: occurredAtMs,
+      occurredAtMs,
       restatementKey: "seed",
     }),
   } as never);
@@ -325,7 +337,7 @@ describe("CostRollupComparatorService", () => {
       await appendObserved({ costNanoMinor: 5_000_000_000 });
       await appendObserved({ costNanoMinor: 7_340_000_000 });
       // The summary claims a figure the events do not add up to.
-      await writeSummary(9_999_000_000);
+      await writeSummary({ amountNanoUsd: 9_999_000_000 });
 
       const before = await mismatchCount();
       const comparison = await comparator.compareDay({
@@ -333,6 +345,10 @@ describe("CostRollupComparatorService", () => {
         day: DAY,
         costSource: GOVERNANCE_COST_SOURCE.PULLED,
       });
+      // Comparing does not count: whether a disagreement is drift or a fold
+      // that is seconds behind is decided by the retry ladder in
+      // `costRollupWatch.process.ts`, and this is what it calls once it has.
+      reportCostRollupDrift({ tenantId, comparison });
 
       expect(await mismatchCount()).toBe(before + 1);
       expect(comparison.mismatches).toHaveLength(1);
@@ -345,7 +361,7 @@ describe("CostRollupComparatorService", () => {
 
     it("leaves the drifted row exactly as it found it", async () => {
       await appendObserved({ costNanoMinor: 5_000_000_000 });
-      await writeSummary(9_999_000_000);
+      await writeSummary({ amountNanoUsd: 9_999_000_000 });
 
       await comparator.compareDay({
         tenantId,
@@ -364,7 +380,7 @@ describe("CostRollupComparatorService", () => {
     it("counts nothing", async () => {
       await appendObserved({ costNanoMinor: 5_000_000_000 });
       await appendObserved({ costNanoMinor: 7_340_000_000 });
-      await writeSummary(12_340_000_000);
+      await writeSummary({ amountNanoUsd: 12_340_000_000 });
 
       const before = await mismatchCount();
       const comparison = await comparator.compareDay({
@@ -372,6 +388,10 @@ describe("CostRollupComparatorService", () => {
         day: DAY,
         costSource: GOVERNANCE_COST_SOURCE.PULLED,
       });
+      // Reported as the ladder's last look would report it, so the silence
+      // below is the reporting path finding nothing to say rather than the
+      // reporting path simply not having been walked.
+      reportCostRollupDrift({ tenantId, comparison });
 
       expect(comparison.mismatches).toEqual([]);
       expect(await mismatchCount()).toBe(before);
@@ -406,7 +426,7 @@ describe("CostRollupComparatorService", () => {
       });
 
       // The summary for DAY claims only the event whose business day is DAY.
-      await writeSummary(5_000_000_000);
+      await writeSummary({ amountNanoUsd: 5_000_000_000 });
 
       const sameDay = await comparator.compareDay({
         tenantId,
@@ -417,7 +437,8 @@ describe("CostRollupComparatorService", () => {
       expect(sameDay.mismatches).toEqual([]);
 
       // ...and it was not dropped on the floor either: it turns up on its own
-      // day, where no summary explains it.
+      // day, at its own amount. Were the 23:59:59.999 event to leak across,
+      // this would read 12_340_000_000.
       const nextDay = await comparator.compareDay({
         tenantId,
         day: "2026-08-02",
@@ -433,7 +454,7 @@ describe("CostRollupComparatorService", () => {
     // direction, and the one a naive comparator iterating only over derived
     // cells would be blind to.
     it("counts it too", async () => {
-      await writeSummary(9_999_000_000);
+      await writeSummary({ amountNanoUsd: 9_999_000_000 });
 
       const before = await mismatchCount();
       const comparison = await comparator.compareDay({
@@ -442,13 +463,15 @@ describe("CostRollupComparatorService", () => {
         costSource: GOVERNANCE_COST_SOURCE.PULLED,
       });
 
+      reportCostRollupDrift({ tenantId, comparison });
+
       expect(comparison.mismatches).toHaveLength(1);
       expect(comparison.mismatches[0]!.derivedNanoMinor).toBe(null);
       expect(await mismatchCount()).toBe(before + 1);
     });
   });
 
-  describe("when the comparator runs", () => {
+  describe("when the comparator runs against a lane that has summarized nothing", () => {
     it("measures how far the summary is behind the log", async () => {
       await appendObserved({ costNanoMinor: 5_000_000_000 });
 
@@ -463,6 +486,28 @@ describe("CostRollupComparatorService", () => {
       expect(comparison.lagMs).toBe(
         DAY_MS - Date.parse(`${DAY}T00:00:00.000Z`),
       );
+      // And the cell says so in its own right, which is what puts a named
+      // reason on the first retry instead of a shrug.
+      expect(comparison.behind).toHaveLength(1);
+    });
+  });
+
+  describe("when the comparator runs against a summary that has caught up", () => {
+    it("reports no lag and nothing left to fold", async () => {
+      await appendObserved({ costNanoMinor: 5_000_000_000 });
+      await writeSummary({ amountNanoUsd: 5_000_000_000 });
+
+      const comparison = await comparator.compareDay({
+        tenantId,
+        day: DAY,
+        costSource: GOVERNANCE_COST_SOURCE.PULLED,
+      });
+
+      // The guard on the guard above: a summary level with its log is behind
+      // by nothing, on the gauge and cell by cell.
+      expect(comparison.lagMs).toBe(0);
+      expect(comparison.behind).toEqual([]);
+      expect(comparison.mismatches).toEqual([]);
     });
   });
 

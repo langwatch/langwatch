@@ -74,6 +74,30 @@ export const azureBlobAuthModeSchema = z
   .enum(["sharedKey", "workloadIdentity", "managedIdentity", "azureCli"])
   .optional();
 
+/**
+ * The sign-in provider, under its supported name. `AUTH_PROVIDER` is the one
+ * to set; the NextAuth-era `NEXTAUTH_PROVIDER` still works but is deprecated
+ * — the modern name wins when both are set, and a deployment still on the
+ * old one is told once at boot, deliberately: the rename must never break a
+ * running install. The resolved value keeps flowing through the internal
+ * `NEXTAUTH_PROVIDER` field its readers already name; renaming those is a
+ * sweep of its own.
+ *
+ * Exported for unit testing.
+ */
+export const resolveConfiguredAuthProvider = () => {
+  const modern = process.env.AUTH_PROVIDER;
+  if (modern) return modern;
+  const legacy = process.env.NEXTAUTH_PROVIDER;
+  if (legacy) {
+    console.warn(
+      "NEXTAUTH_PROVIDER is deprecated - set AUTH_PROVIDER instead. The configured value still applies.",
+    );
+    return legacy;
+  }
+  return "email";
+};
+
 /** @param {import('zod').ZodTypeAny} schema */
 const optionalIfBuildTime = (schema) => {
   return process.env.BUILD_TIME ? schema.optional() : schema;
@@ -306,14 +330,6 @@ export function createEnvConfig() {
       // ADR-117 §7: the one flag covering the identifier-first router (D03)
       // and the screens that render its decisions (D13). Three-valued and
       // shipped `off`, because the front door is the highest-risk flip in the
-      // identity program: `shadow` computes the router's decision on every
-      // live login and logs how it compares against the legacy outcome
-      // WITHOUT changing anything, `enforce` is the flip, and `off` leaves the
-      // legacy path byte-for-byte untouched. Rollback is this value.
-      IDENTITY_ROUTER_V2: z
-        .enum(["off", "shadow", "enforce"])
-        .optional()
-        .default("off"),
       // D06: whether two-step verification exists at all. Reached SIGNED
       // OUT — a challenge stands between a password and a session — so it is
       // an env flag rather than a feature flag, which is read per project
@@ -325,11 +341,43 @@ export function createEnvConfig() {
       // set one up signed in and their enrollment rows intact — it stops
       // being ASKED for, and nothing is deleted.
       MFA_ENROLLMENT_OPEN: z.enum(["off", "on"]).optional().default("off"),
-      // D07: whether passkeys exist. Same reasoning — registering a passkey
-      // is reached signed out, on the sign-in screen. Off unmounts the
-      // ceremony routes and hides the option; passkeys already registered
-      // are left alone, so turning it on again finds them still there.
-      PASSKEYS_ENABLED: z.enum(["off", "on"]).optional().default("off"),
+      // D07: whether this deployment offers passkeys. Same reasoning as the
+      // flag above for why it is an env value — registering a passkey is
+      // reached signed out, on the sign-in screen — and the opposite default,
+      // because passkeys shipped and are now the shortest and strongest way
+      // in. The setting is for the operator who must refuse them, not a
+      // staged rollout.
+      //
+      // One switch governs the whole surface: `off` omits the method from
+      // every method set AND leaves the plugin unregistered, so its ceremony
+      // routes are not mounted. A deployment where the button exists and the
+      // endpoint does not is the state that arrangement makes unreachable.
+      //
+      // Off is not a deletion. Passkeys already registered are left alone and
+      // nobody is signed out, so turning it back on finds them still there.
+      PASSKEYS_ENABLED: z.enum(["off", "on"]).optional().default("on"),
+      // Whether THIS deployment issues and verifies its own passwords while a
+      // federated provider is also configured (D09).
+      //
+      // The rule it relaxes came from NextAuth and held everywhere until now:
+      // a deployment mounted EITHER a social provider OR credentials, never
+      // both, so nobody could sidestep the configured identity provider. Five
+      // sites say it — the sign-up method set, `user.register`,
+      // `user.setPassword`, the credential-route refusal and whether
+      // better-auth mounts the routes at all — and each reads "on this
+      // deployment, passwords live at the identity provider".
+      //
+      // On LangWatch Cloud that sentence is already false. Auth0's own
+      // Universal Login offers a password box and a sign-up link, so the
+      // password door exists; it is simply hosted at the broker. Turning this
+      // on RELOCATES that door rather than opening a new one, and it is what
+      // stops every new password account being minted inside the tenant we
+      // are trying to leave.
+      //
+      // Shipped `off`, so merging the wiring changes no deployment. A
+      // deployment already in email mode needs nothing from this: it issues
+      // its own passwords by definition, and every site reads that first.
+      LOCAL_PASSWORDS_ENABLED: z.enum(["off", "on"]).optional().default("off"),
       // ADR-117 §5: where the router's DOMAIN LOOKUP reads from. Three-valued
       // and shipped `off` for the same reason the router's own flag is: the
       // front door is the highest-risk flip in the identity program.
@@ -432,6 +480,7 @@ export function createEnvConfig() {
       // blocked). Default: false.
       BLOCK_LOCAL_HTTP_CALLS: z.boolean().optional(),
       ALLOWED_PROXY_HOSTS: z.string().optional(),
+      TRUSTED_PROXY_ADDRESSES: z.string().optional(),
       SHOW_OPS_IN_MAIN_SIDEBAR: z.string().optional(),
       // Post-2026-05-11 loop-prevention kill-switch. Set to "1" to
       // bypass the subscriber depth check; emergency rollback only.
@@ -652,7 +701,7 @@ export function createEnvConfig() {
       NODE_ENV: process.env.NODE_ENV,
       ENVIRONMENT: process.env.ENVIRONMENT,
       BASE_HOST: process.env.BASE_HOST,
-      NEXTAUTH_PROVIDER: process.env.NEXTAUTH_PROVIDER ?? "email",
+      NEXTAUTH_PROVIDER: resolveConfiguredAuthProvider(),
       NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET,
       NEXTAUTH_URL: process.env.NEXTAUTH_URL,
       LW_GATEWAY_INTERNAL_SECRET: process.env.LW_GATEWAY_INTERNAL_SECRET,
@@ -693,9 +742,9 @@ export function createEnvConfig() {
       TOPIC_CLUSTERING_MAX_PAYLOAD_BYTES:
         process.env.TOPIC_CLUSTERING_MAX_PAYLOAD_BYTES,
       LANGWATCH_LICENSE_KEY: process.env.LANGWATCH_LICENSE_KEY,
-      IDENTITY_ROUTER_V2: process.env.IDENTITY_ROUTER_V2,
       MFA_ENROLLMENT_OPEN: process.env.MFA_ENROLLMENT_OPEN,
       PASSKEYS_ENABLED: process.env.PASSKEYS_ENABLED,
+      LOCAL_PASSWORDS_ENABLED: process.env.LOCAL_PASSWORDS_ENABLED,
       SSOCONN_ROUTING: process.env.SSOCONN_ROUTING,
       SCIM_V2_GRANTS: process.env.SCIM_V2_GRANTS,
       TRIGGER_EMAIL_HOURLY_CAP: process.env.TRIGGER_EMAIL_HOURLY_CAP,
@@ -738,6 +787,7 @@ export function createEnvConfig() {
         process.env.BLOCK_LOCAL_HTTP_CALLS === "1" ||
         process.env.BLOCK_LOCAL_HTTP_CALLS?.toLowerCase() === "true",
       ALLOWED_PROXY_HOSTS: process.env.ALLOWED_PROXY_HOSTS,
+      TRUSTED_PROXY_ADDRESSES: process.env.TRUSTED_PROXY_ADDRESSES,
       SHOW_OPS_IN_MAIN_SIDEBAR: process.env.SHOW_OPS_IN_MAIN_SIDEBAR,
       LANGWATCH_DISABLE_CAUSALITY_LOOP_GUARD:
         process.env.LANGWATCH_DISABLE_CAUSALITY_LOOP_GUARD,

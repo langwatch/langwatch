@@ -2084,3 +2084,124 @@ describe("coding-agent session fold, codex", () => {
     });
   });
 });
+
+describe("coding-agent session fold, codex helper threads", () => {
+  /**
+   * The title generator's turn from codex 0.154, as the fold receives it: the
+   * helper's own tokens, nothing marking it. The mark rides the thread's
+   * app-server request span, stored stamped with the helper's thread id and
+   * contributing the auxiliary fact.
+   */
+  const helperTurnFacts = {
+    "gen_ai.request.model": "gpt-5.6-luna",
+    "gen_ai.response.model": "gpt-5.6-luna",
+    "gen_ai.usage.input_tokens": "387",
+    "gen_ai.usage.output_tokens": "16",
+    "gen_ai.usage.cache_read.input_tokens": "4864",
+    "gen_ai.usage.cache_creation.input_tokens": "0",
+    "codex.turn.token_usage.non_cached_input_tokens": "387",
+  };
+  const helperRequestFacts = { "langwatch.session.auxiliary": true };
+
+  const requestSpan = (spanId: string) =>
+    spanFactsEvent({
+      name: "turn/start",
+      spanId,
+      agent: "codex",
+      facts: helperRequestFacts,
+    });
+  const turnSpan = (spanId: string) =>
+    spanFactsEvent({
+      name: "session_task.turn",
+      spanId,
+      agent: "codex",
+      facts: helperTurnFacts,
+    });
+
+  describe("when the helper thread's request span contributes", () => {
+    /** @scenario "a codex helper thread's request span marks its session as auxiliary" */
+    it("marks the session auxiliary, in whichever order the thread's signals land", () => {
+      const projection = makeProjection();
+
+      // Log events first, then the request span, then the turn span: the
+      // order the export batches actually arrived in.
+      const afterPrompt =
+        projection.handleCodingAgentSessionLogFactsContributed(
+          logFactsEvent({
+            agent: "codex",
+            facts: { "event.name": "codex.user_prompt", prompt_length: 463 },
+          }),
+          initStateOf(projection),
+        );
+      expect(afterPrompt.auxiliary).toBe(false);
+
+      const marked = projection.handleCodingAgentSessionSpanFactsContributed(
+        requestSpan("helper-request"),
+        afterPrompt,
+      );
+      expect(marked.auxiliary).toBe(true);
+      // The request span counts nothing; the turn span still counts the
+      // helper's own work on its own session.
+      expect(marked.modelCalls).toBe(0);
+
+      const afterTurn = projection.handleCodingAgentSessionSpanFactsContributed(
+        turnSpan("helper-turn"),
+        marked,
+      );
+      expect(afterTurn.auxiliary).toBe(true);
+      expect(afterTurn.modelCalls).toBe(1);
+      expect(afterTurn.models).toEqual(["gpt-5.6-luna"]);
+
+      // And the reverse order: the turn span before the request span.
+      const turnFirst = projection.handleCodingAgentSessionSpanFactsContributed(
+        turnSpan("helper-turn"),
+        initStateOf(projection),
+      );
+      expect(turnFirst.auxiliary).toBe(false);
+      const thenRequest =
+        projection.handleCodingAgentSessionSpanFactsContributed(
+          requestSpan("helper-request"),
+          turnFirst,
+        );
+      expect(thenRequest.auxiliary).toBe(true);
+      expect(thenRequest.modelCalls).toBe(1);
+    });
+
+    /** @scenario "a codex turn without the fact keeps its session unmarked" */
+    it("leaves a session unmarked when only its turn span arrived", () => {
+      const projection = makeProjection();
+
+      const state = projection.handleCodingAgentSessionSpanFactsContributed(
+        turnSpan("user-turn"),
+        initStateOf(projection),
+      );
+
+      expect(state.auxiliary).toBe(false);
+    });
+  });
+
+  describe("when an auxiliary session's row is stored and read back", () => {
+    /** @scenario "an auxiliary session round-trips through its stored row" */
+    it("decodes the mark, and decodes its absence as unmarked", () => {
+      const projection = makeProjection();
+      const state = projection.handleCodingAgentSessionSpanFactsContributed(
+        requestSpan("helper-request"),
+        initStateOf(projection),
+      );
+
+      const row = projectCodingAgentSessionToRow({
+        state,
+        tenantId: "tenant-1",
+        sessionId: SESSION_ID,
+        version: CODING_AGENT_SESSION_PROJECTION_VERSION_LATEST,
+      });
+      expect(row.auxiliary).toBe(true);
+      expect(codingAgentSessionStateFromRow(row).auxiliary).toBe(true);
+
+      // A row from before the column decodes its default.
+      expect(
+        codingAgentSessionStateFromRow({ ...row, auxiliary: false }).auxiliary,
+      ).toBe(false);
+    });
+  });
+});

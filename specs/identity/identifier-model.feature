@@ -104,10 +104,40 @@ Feature: The identifier model - identity as an event-sourced pipeline
 
   @unit
   Scenario: A fact the heads already carry is not stated again
-    Given "sam"'s Google identifier is already folded into the projection
+    Given "sam"'s projection has folded at least once
+    And "sam"'s Google identifier is already folded into the projection
     When the same attach is handled again, from a staged re-run or a later backfill pass
     Then no event is emitted and nothing is appended, applied, or staged
     And an attach for an identifier the projection lacks is still emitted
+
+  @unit
+  Scenario: A sign-up states its identifier against the credential it just opened
+    Given "sam" registers with an address and a password
+    When the account is opened
+    Then the identifier is stated against that same credential, never a second one
+    And the backfill, which links by the credential, converges on one row
+
+  @unit
+  Scenario: Signing up makes the address routable before the fold lands
+    Given "sam" is a newborn whose projection has never folded
+    When a sign-up commits the attach of "sam"'s credential identifier
+    Then the Identifier row is written before the command is staged, and no cursor is written with it
+    And the front door can route the address while the fold is still in the queue
+    And when the fold lands it overwrites the same row whole and sets the cursor
+
+  @unit
+  Scenario: A newborn's provisional head does not silence its own attach
+    Given "sam" is a newborn whose provisional Identifier row is already written
+    When the queued run re-runs the attach guard against those heads
+    Then the attach event is still emitted and appended, and the cursor advances
+    But a user whose projection has folded gets no provisional write, and a restated attach still emits nothing
+
+  @unit
+  Scenario: A provisional head with no event is restated by the next pass
+    Given a newborn's provisional row was written and then staging failed
+    Then the row exists with no event behind it, and a replay before the next pass would drop it
+    When the next pass states the same attach again
+    Then the guard emits it, because the projection has still never folded
 
   @unit
   Scenario: Every identity event rides the pipeline's declared aggregate type
@@ -131,6 +161,22 @@ Feature: The identifier model - identity as an event-sourced pipeline
     Given "sam" holds a VERIFIED identifier "work" and a PRIMARY identifier "personal"
     When a detach_identifier command is handled for "work"
     Then the Identifier row for "work" remains with state DETACHED and a detachedAt timestamp
+
+  # A backup code is a second step past a way in, never a way in by itself: it
+  # is asked for only once somebody has already been let as far as a challenge,
+  # and no message can be sent to it. So what is LEFT when an identifier is
+  # removed is counted from the identifiers alone, and somebody holding ten
+  # unspent codes and one address still has exactly one way in. Removing the
+  # last identifier for an account with a second factor set up is the case this
+  # would be got wrong in: it looks like an account with two credentials and it
+  # is an account with one.
+  @unit
+  Scenario: Backup codes never count as a way into the account
+    Given "sam" holds one VERIFIED identifier and no other
+    And "sam" has two-step verification enabled with unspent backup codes
+    When a detach_identifier command is handled for that identifier
+    Then the command is refused, because removing it would strand "sam"
+    And no event is emitted, so the identifier still signs them in
 
   @unit
   Scenario: A verification refused because another user holds the address
@@ -253,6 +299,22 @@ Feature: The identifier model - identity as an event-sourced pipeline
     When the scanner fetches the magic link
     Then the identifier remains unverified and the token remains unconsumed
 
+  # The two ways a proof stops being a proof. A link left in an inbox is the
+  # ordinary one, and the only thing it costs is asking for another; a link
+  # opened twice is the one that matters, because a mailbox somebody else
+  # reaches later must not still carry a working proof.
+  @unit
+  Scenario: A verification proof expires unspent
+    Given a verification link that was never opened
+    When it is opened after the ceremony's lifetime has passed
+    Then the completion is refused as expired, and a fresh link is the way on
+
+  @unit
+  Scenario: A verification proof spends once
+    Given a verification completed with the emailed token and its matching verifier
+    When the identical completion is posted a second time
+    Then the second is refused as invalid, because the proof no longer exists
+
   @unit
   Scenario: The backfill adopts existing accounts and proves itself per user
     Given "sam" has legacy Account rows and a User.email
@@ -269,6 +331,21 @@ Feature: The identifier model - identity as an event-sourced pipeline
     Then the Google identifier is detached with a command id stable across retries
     And the email identifier, which has no account row, is left alone
     And a further pass detaches nothing
+
+  # D09: the Auth0 broker's subject is a compound — `google-oauth2|<sub>`
+  # states the person's identity AT GOOGLE, wrapped in the broker's
+  # namespace. Unfolding it at adoption is what lets the native provider's
+  # callback resolve a user who has only ever signed in through the broker:
+  # no linking ceremony, no second account, sign-in works on the first day
+  # the native provider is mounted.
+  @unit
+  Scenario: An Auth0-brokered social account is adopted under its own provider too
+    Given "sam" has an Auth0 Account row whose subject names a Google identity
+    When the identity backfill migrates "sam"
+    Then a Google identifier is adopted beside the Auth0 one, carrying the upstream subject
+    And it carries the issuer Google itself asserts, so the native callback resolves "sam"
+    And an Auth0 subject naming no known upstream derives nothing
+    And deleting the Auth0 Account row detaches the derived identifier with it
 
   # The READ fork (ADR-101 §5). `User.email` is a legacy column answering a
   # question identity now owns, so a finalized user's email comes from their

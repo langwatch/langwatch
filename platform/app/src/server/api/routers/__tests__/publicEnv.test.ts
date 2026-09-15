@@ -22,9 +22,10 @@ vi.mock("~/env.mjs", () => ({
 
 vi.mock("@ee/sso/sso-gate", () => ({
   resolveAuthProvider: vi.fn(),
+  platformSSOAllowed: vi.fn(),
 }));
 
-import { resolveAuthProvider } from "@ee/sso/sso-gate";
+import { platformSSOAllowed, resolveAuthProvider } from "@ee/sso/sso-gate";
 import { createInnerTRPCContext, createTRPCRouter } from "../../trpc";
 import { publicEnvRouter } from "../publicEnv";
 
@@ -38,6 +39,7 @@ const callPublicEnv = () => {
 describe("publicEnvRouter", () => {
   describe("when the platform SSO gate allows", () => {
     it("reports the configured provider via resolveAuthProvider", async () => {
+      vi.mocked(platformSSOAllowed).mockResolvedValue(true);
       vi.mocked(resolveAuthProvider).mockResolvedValue("auth0");
 
       const result = await callPublicEnv();
@@ -50,11 +52,34 @@ describe("publicEnvRouter", () => {
   describe("when the platform SSO gate denies", () => {
     /** @scenario Self-hosted that never had a license hides SSO and offers email sign-in */
     it("reports email instead of the raw env var, so the sign-in page renders the email form", async () => {
+      vi.mocked(platformSSOAllowed).mockResolvedValue(false);
       vi.mocked(resolveAuthProvider).mockResolvedValue("email");
 
       const result = await callPublicEnv();
 
       expect(result.NEXTAUTH_PROVIDER).toBe("email");
+    });
+  });
+
+  describe("when the browser asks what the deployment offers", () => {
+    it("reports the policy's federated providers, so settings and the rail agree", async () => {
+      vi.mocked(platformSSOAllowed).mockResolvedValue(true);
+      vi.mocked(resolveAuthProvider).mockResolvedValue("auth0");
+
+      const result = await callPublicEnv();
+
+      // The env above configures no social provider keys, so the policy's
+      // answer is exactly the NEXTAUTH_PROVIDER method and nothing invented.
+      expect(result.SIGNIN_FEDERATED_PROVIDERS).toEqual(["auth0"]);
+    });
+
+    it("reports whether passkeys are mounted, same contract as MFA_ENROLLMENT_OPEN", async () => {
+      vi.mocked(platformSSOAllowed).mockResolvedValue(false);
+      vi.mocked(resolveAuthProvider).mockResolvedValue("email");
+
+      const result = await callPublicEnv();
+
+      expect(result.PASSKEYS_ENABLED).toBe(true);
     });
   });
 });

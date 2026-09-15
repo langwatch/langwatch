@@ -17,24 +17,35 @@ const PUBLIC_PROCEDURE_ALLOWLIST: string[] = [
   // Both are gated by the single-purpose unsubscribe token in the URL.
   "emailSuppression.confirmUnsubscribe",
   "emailSuppression.resolveUnsubscribeToken",
-  // The signed-out front door (ADR-117). Every one of these answers a
+  // The signed-out auth screens (ADR-117). Every one of these answers a
   // question somebody asks BEFORE they have a session, so none of them can
   // be a protectedProcedure without breaking sign-in itself. Each carries a
-  // .noPermission reason at its definition and its own per-IP rate limit.
+  // .noPermission reason at its definition, and each but `auth.priorSession`
+  // its own per-IP rate limit.
   //
-  // `route` is a mutation rather than a query on purpose: a per-address
-  // query cache is an account-existence oracle built out of network timing.
-  // It reads no user data — org-level routing only.
+  // `route` deliberately reads account existence and credential KINDS so it
+  // can send an unknown address to sign-up and offer a known account only the
+  // methods it holds. It reads no credential secret and spends both a direct-
+  // peer budget and a canonical per-address budget.
   //
   // `inviteLanding` is the only one that returns anything tenant-shaped (an
   // organization name and the inviter's name). The invite code IS the
-  // authorization, exactly as in `organization.acceptInvite`, and a revoked
+  // authorization, exactly as in `invite.acceptInvite`, and a revoked
   // invitation is answered identically to a missing one.
-  "frontDoor.completeSignUpVerification",
-  "frontDoor.inviteLanding",
-  "frontDoor.requestFreshInvite",
-  "frontDoor.requestSignUpVerification",
-  "frontDoor.route",
+  "auth.inviteLanding",
+  "auth.requestFreshInvite",
+  "auth.requestSignUpVerification",
+  "auth.route",
+  // Requires the high-entropy, address-bound proof issued after the mailbox
+  // link is opened; the address alone cannot query this decision.
+  "auth.signUpEnrollment",
+  // The one signed-out procedure here with NO rate limit, deliberately. It
+  // takes no input, so the most it can ever describe is the session cookie
+  // the caller themselves presented: there is no address to pass in, and so
+  // no budget to spend on anybody else's behalf. A revoked session answers
+  // exactly as no session does, which is what stops the sign-in screen from
+  // confirming that an account exists. See PriorSessionService.
+  "auth.priorSession",
   // Client bootstrap: exposes only the PUBLIC_* env whitelist, no tenant data.
   "publicEnv",
   // The one anonymous trace read. Token-gated by ShareService.resolveForViewer;
@@ -47,6 +58,7 @@ const PUBLIC_PROCEDURE_ALLOWLIST: string[] = [
 describe("tRPC public surface", () => {
   describe("when enumerating procedures that skip authentication", () => {
     /** @scenario Adding a new public endpoint is a deliberate, reviewed act */
+    /** @scenario Invitation RPCs have one dedicated namespace */
     it("matches the reviewed allowlist exactly", () => {
       const procedures = (
         appRouter as unknown as {
@@ -60,6 +72,31 @@ describe("tRPC public surface", () => {
         .sort();
 
       expect(publicPaths).toEqual([...PUBLIC_PROCEDURE_ALLOWLIST].sort());
+
+      const paths = Object.keys(procedures);
+      expect(paths).toEqual(
+        expect.arrayContaining([
+          "invite.createInvites",
+          "invite.deleteInvite",
+          "invite.resendInvite",
+          "invite.getOrganizationPendingInvites",
+          "invite.acceptInvite",
+        ]),
+      );
+      const retiredPaths = [
+        "organization.createInvites",
+        "organization.deleteInvite",
+        "organization.resendInvite",
+        "organization.getOrganizationPendingInvites",
+        "organization.acceptInvite",
+        "organization.createInviteRequest",
+        "organization.approveInvite",
+        "invite.createInviteRequest",
+        "invite.approveInvite",
+      ];
+      for (const path of retiredPaths) {
+        expect(paths).not.toContain(path);
+      }
     });
 
     /** @scenario Knowing a shared trace's id is not enough to read it */

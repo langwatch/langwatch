@@ -179,6 +179,16 @@ describe("<ApiKeysSection /> project base key rotation", () => {
         expect(
           screen.getByRole("button", { name: ROTATE_LABEL }),
         ).toBeInTheDocument();
+        expect(
+          screen.queryByRole("button", {
+            name: /Edit API key Project API Key/,
+          }),
+        ).not.toBeInTheDocument();
+        expect(
+          screen.queryByRole("button", {
+            name: /Revoke API key Project API Key/,
+          }),
+        ).not.toBeInTheDocument();
       });
     });
 
@@ -247,29 +257,12 @@ describe("<ApiKeysSection /> project base key rotation", () => {
 
     describe("when viewing the legacy project key row", () => {
       /** @scenario Rotation requires permission to manage the project */
-      it("does not offer a control to rotate the project base API key", () => {
+      it("does not render the secret-bearing legacy key row", () => {
         renderSection();
         expect(
           screen.queryByRole("button", { name: ROTATE_LABEL }),
         ).not.toBeInTheDocument();
-      });
-
-      // The legacy row intentionally has no edit or revoke control — rotation
-      // is the only mutating affordance, and only when permitted.
-      /** @scenario "The base key keeps working until it is explicitly rotated" */
-      it("does not offer edit or revoke controls on the legacy row", () => {
-        renderSection();
-        expect(screen.getByText("Project API Key")).toBeInTheDocument();
-        expect(
-          screen.queryByRole("button", {
-            name: /Edit API key Project API Key/,
-          }),
-        ).not.toBeInTheDocument();
-        expect(
-          screen.queryByRole("button", {
-            name: /Revoke API key Project API Key/,
-          }),
-        ).not.toBeInTheDocument();
+        expect(screen.queryByText("Project API Key")).not.toBeInTheDocument();
       });
     });
   });

@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.15.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v1.14.0...typescript-sdk@v1.15.0) (2026-09-13)
+
+
+### Features
+
+* **agent-plugin,cli:** run the installed CLI from a committed launcher instead of a bundled hook ([#8095](https://github.com/langwatch/langwatch/issues/8095)) ([2877be0](https://github.com/langwatch/langwatch/commit/2877be087bf9da0726b5c10d79c01a825080ed38))
+* **agent-plugin,cli:** run the installed CLI from a committed launcher instead of a bundled hook ([#8095](https://github.com/langwatch/langwatch/issues/8095)) ([e9d9ea0](https://github.com/langwatch/langwatch/commit/e9d9ea025d4daa61418e49ff2b051558d76d817b))
+
+
+### Bug Fixes
+
+* **cli:** session context hooks report for a tool pinned with instrument --key ([#8102](https://github.com/langwatch/langwatch/issues/8102)) ([2e7ab41](https://github.com/langwatch/langwatch/commit/2e7ab4118395a3a3eeb82c4123f7982f10ccedbd))
+* **gateway:** publish image token quantities on the spend read surfaces ([#8104](https://github.com/langwatch/langwatch/issues/8104)) ([926364b](https://github.com/langwatch/langwatch/commit/926364bcd60001440881b888236f51c80ff8abb8))
+
 ## [1.14.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v1.13.0...typescript-sdk@v1.14.0) (2026-09-12)
 
 

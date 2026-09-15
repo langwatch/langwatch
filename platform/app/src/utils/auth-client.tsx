@@ -1,6 +1,7 @@
 "use client";
 
 import { passkeyClient } from "@better-auth/passkey/client";
+import { twoFactorClient } from "better-auth/client/plugins";
 import { createAuthClient } from "better-auth/react";
 import {
   type ReactElement,
@@ -9,6 +10,8 @@ import {
   useEffect,
   useState,
 } from "react";
+import { readHandledError } from "~/features/errors/logic/readHandledError";
+import { auth0BridgeConnectionOf } from "~/utils/auth0-bridge";
 
 /**
  * Client-side auth wrapper exposing a NextAuth-compatible API surface over
@@ -21,12 +24,21 @@ import {
 /**
  * The passkey plugin is declared unconditionally, and the METHOD SET decides
  * whether anyone is offered one: the server registers its half only when
- * `PASSKEYS_ENABLED` is on, and the sign-in router never names a passkey
+ * the passkey plugin is mounted, and the sign-in router never names a passkey
  * unless the same env says so. Gating the client half too would mean a second
  * place for the two to disagree, and the failure would be a button that
  * exists calling an endpoint that does not.
+ *
+ * The two-factor half is declared the same way and for the same reason: the
+ * server registers it only when `MFA_ENROLLMENT_OPEN` is on, and every screen
+ * that offers a setup reads the derived `MFA_ENROLLMENT_OPEN` off the public
+ * env first. One place decides, so a button that exists calling an endpoint
+ * that does not cannot happen here either.
+ *
  */
-const client = createAuthClient({ plugins: [passkeyClient()] });
+const client = createAuthClient({
+  plugins: [passkeyClient(), twoFactorClient()],
+});
 
 export const authClient = client;
 
@@ -89,8 +101,8 @@ interface UseSessionOptions {
  * BetterAuth's built-in `client.useSession()` calls `/api/auth/get-session`
  * which returns the raw admin session — no impersonation rewrite. Our
  * `/api/auth/session` endpoint runs through `getServerAuthSession` which
- * reads the `Session.impersonating` JSON column and rewrites `session.user`
- * to the impersonated identity. This mirrors how NextAuth's `useSession`
+ * reads the session's `{actor, subject}` claims and rewrites `session.user`
+ * to the subject's identity (D06). This mirrors how NextAuth's `useSession`
  * worked — both server and client saw the same impersonation-aware session.
  */
 // Module-level session cache — survives component unmount/remount so
@@ -189,6 +201,22 @@ export const useSession = (
   };
 };
 
+/**
+ * Whether a sign-in answered with a two-factor challenge instead of a session.
+ *
+ * Read off the body rather than inferred from an absent cookie: the flag is
+ * the two-factor plugin's own contract for this state, and a cookie the
+ * browser will not show us cannot tell a challenge apart from a sign-in that
+ * quietly failed to set one.
+ */
+function isTwoStepChallenge(data: unknown): boolean {
+  return (
+    typeof data === "object" &&
+    data !== null &&
+    (data as { twoFactorRedirect?: unknown }).twoFactorRedirect === true
+  );
+}
+
 export const signIn = async (
   provider: string,
   options?: {
@@ -196,6 +224,13 @@ export const signIn = async (
     password?: string;
     callbackUrl?: string;
     redirect?: boolean;
+    /**
+     * The address already typed on our screen, handed to a federated
+     * provider as OIDC `login_hint` so its own screen arrives prefilled —
+     * or, where the provider routes on it, skipped entirely. Nothing for
+     * the credential path, which carries the email in the body already.
+     */
+    loginHint?: string;
   },
 ): Promise<
   | {
@@ -209,6 +244,18 @@ export const signIn = async (
        * say how long instead of guessing "a minute".
        */
       retryAfterSeconds?: number;
+      /**
+       * The password was right and there is a second factor still to answer.
+       *
+       * Not a failure and not a session: the two-factor plugin answers a
+       * correct credential for an enrolled account with a challenge instead of
+       * a cookie, and the caller has to ask for the code. Named here because
+       * this is the seam where the browser used to be sent to its callback on
+       * the strength of an answer that carried no session at all — which
+       * landed somebody who had just typed the right password back on the
+       * log-in screen with nothing said.
+       */
+      twoStepRequired?: boolean;
     }
   | undefined
 > => {
@@ -241,13 +288,30 @@ export const signIn = async (
     if (result.error) {
       // `code` is what the screens map to wording; `error` stays the message
       // for callers that only ever read it.
+      //
+      // The code may be ours rather than better-auth's: the auth route
+      // re-answers the refusals we can name in the handled-error contract
+      // (`server/better-auth/handled-errors.ts`), and that body carries the
+      // slug in `error` rather than in `code`. Reading the handled payload
+      // first is what keeps the screens working across the seam — and it is
+      // never `error.message`, which for a handled refusal IS the slug.
+      const handled = readHandledError(result.error);
       return {
         error: result.error.message ?? "CredentialsSignin",
-        code: result.error.code,
+        code: handled?.code ?? result.error.code,
         status: result.error.status,
         retryAfterSeconds,
         ok: false,
       };
+    }
+    // An enrolled account gets a challenge rather than a session, and the
+    // answer says so in the body while looking like a success in every other
+    // respect. Navigating on it sends somebody who typed the RIGHT password to
+    // a page they hold no session for, which bounces them straight back to the
+    // door they just came through — so the caller is told instead, and the
+    // screen asks for the code.
+    if (isTwoStepChallenge(result.data)) {
+      return { ok: false, twoStepRequired: true };
     }
     // NextAuth compat: the caller expects signIn to navigate on success.
     // BetterAuth's signIn.email returns a JSON result and does NOT auto-
@@ -266,14 +330,27 @@ export const signIn = async (
   // is unset.
   //
   // Normalize `azure-ad` to `microsoft` (BetterAuth's internal provider id)
-  // to match `linkAccount()` which does the same mapping. Also honor
+  // to match `linkAccount()` which does the same mapping. A bridge id
+  // (`auth0-google` and friends) is a BUTTON, not a provider: it dials plain
+  // `auth0` with the `connection` Auth0's own screen would have set, so the
+  // person picks their provider exactly once, on ours. Also honor
   // `redirect: false` by passing `disableRedirect: true` so the caller can
   // handle navigation itself.
-  const mappedProvider = provider === "azure-ad" ? "microsoft" : provider;
+  const bridgeConnection = auth0BridgeConnectionOf(provider);
+  const mappedProvider =
+    bridgeConnection !== null
+      ? "auth0"
+      : provider === "azure-ad"
+        ? "microsoft"
+        : provider;
   const result = await client.signIn.social({
     provider: mappedProvider as "google",
     callbackURL,
     disableRedirect: !shouldRedirect,
+    ...(options?.loginHint ? { loginHint: options.loginHint } : {}),
+    ...(bridgeConnection !== null
+      ? { additionalParams: { connection: bridgeConnection } }
+      : {}),
   });
   if (result.error) {
     return {
