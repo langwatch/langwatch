@@ -156,15 +156,12 @@ Feature: The Inventory catalog is the tools the organization runs
   # Registering a tool
   # ===========================================================================
 
-  @integration
-  Scenario: Registering a tool opens the registration drawer
-    Given an admin who may manage the tool registry
-    When they press Add tool
-    Then the tool registration drawer opens
-    # The SAME drawer the tool-catalog editor opens. A second registration form
-    # over one registry is how two surfaces end up disagreeing about what a
-    # tool is.
-
+  # The page header carries no Add tool: Add source is its one create, on
+  # every pane (governance-ui-controls.feature). The registration drawer is
+  # reached through the deep link the Overview page's chip carries, and it is
+  # the SAME drawer the tool-catalog editor opens. A second registration form
+  # over one registry is how two surfaces end up disagreeing about what a
+  # tool is.
   @integration
   Scenario: The add deep link opens the registration drawer
     Given a link addressed at the catalog pane with the add flag set
