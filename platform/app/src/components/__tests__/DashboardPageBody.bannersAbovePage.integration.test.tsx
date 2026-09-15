@@ -72,11 +72,33 @@ vi.mock("../../utils/api", () => ({
       },
     },
     user: { getSsoStatus: { useQuery: () => ({ data: undefined }) } },
+    // The page's MFA gate reads this on every render (useOrganizationMfaGate).
+    // `data: undefined` is the honest stand-in for the query the gate does not
+    // run here: MFA_ENROLLMENT_OPEN is not set in this test's public env, so
+    // the real hook passes `enabled: false` and never fetches.
+    twoStepVerification: {
+      standing: {
+        useQuery: () => ({ data: undefined, refetch: vi.fn() }),
+      },
+    },
     governance: {
       recordWorkspaceView: {
         useMutation: () => ({ mutate: vi.fn(), isPending: false }),
       },
     },
+    // The page renders JoinYourTeamTakeover, which asks these before it shows
+    // anything. `isPending: true` is what this test wants: the takeover
+    // returns null until BOTH answers are in, so the page under test paints
+    // its own layers and nothing else.
+    joinRequests: {
+      offer: { useQuery: () => ({ isPending: true, data: undefined }) },
+      mine: { useQuery: () => ({ isPending: true, data: undefined }) },
+      dismissOffer: {
+        useMutation: () => ({ mutate: vi.fn(), isPending: false }),
+      },
+      request: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
+    },
+    useUtils: () => ({}),
   },
 }));
 

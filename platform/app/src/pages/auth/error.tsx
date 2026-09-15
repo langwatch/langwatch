@@ -1,11 +1,12 @@
 import { Box, Button, HStack, Spinner, Text, VStack } from "@chakra-ui/react";
+import { looksLikeSsoConnectionId } from "@langwatch/identity";
 import type { ReactNode } from "react";
 import { useEffect } from "react";
 import { AuthCard } from "~/components/auth/AuthCard";
 import { AuthShell } from "~/features/auth";
 import { AUTH_PRIMARY_STYLE } from "~/features/auth/components/AuthPrimaryButton";
 import { usePublishAuthStage } from "~/features/auth/logic/groundStage";
-import { isSameOrigin, useSession } from "~/utils/auth-client";
+import { isSameOrigin, signIn, useSession } from "~/utils/auth-client";
 import { hardNavigate } from "~/utils/browserNavigation";
 import Link from "~/utils/compat/next-link";
 import { useSearchParams } from "~/utils/compat/next-navigation";
@@ -61,10 +62,41 @@ export const STABLE_AUTH_ERRORS = [
   // fail the same way, because what has to change is a person's decision,
   // not the attempt.
   "LINK_NEEDS_APPROVAL",
+  // Stable only as a FALLBACK. The ordinary path for this code is the bounce
+  // below, which leaves before any timer runs; it reaches here when the
+  // refusal named no connection this page is willing to dial, and then the
+  // same button would be refused the same way.
+  "SSO_REQUIRED_BY_ORGANIZATION",
 ] as const;
 
 export const isStableAuthError = (error: string | null | undefined): boolean =>
   !!error && (STABLE_AUTH_ERRORS as readonly string[]).includes(error);
+
+/**
+ * A refusal that is a BOUNCE: somebody pressed a native social button, and
+ * their organization signs its people in through its own connection.
+ *
+ * The connection is what made the refusal, so the refusal carries it — the
+ * hook throws it as the `APIError` message and better-auth puts the message in
+ * `error_description` on the callback redirect. This page is where it is spent.
+ *
+ * READ AS AN IDENTIFIER, NEVER AS AN ADDRESS. The parameter arrives over the
+ * wire, which means anybody can write one; a page that navigated to whatever
+ * it found there would be an open redirect reachable from a bare URL. So the
+ * value only ever reaches `signIn`, which builds the address itself, and only
+ * once it is shaped like a connection id. Anything else is not followed, and
+ * the ordinary refusal copy is what shows instead.
+ */
+export const SSO_BOUNCE_ERROR = "SSO_REQUIRED_BY_ORGANIZATION";
+
+export const bounceConnectionFrom = (
+  error: string | null | undefined,
+  target: string | null | undefined,
+): string | null => {
+  if (error !== SSO_BOUNCE_ERROR) return null;
+  if (!target || !looksLikeSsoConnectionId(target)) return null;
+  return target;
+};
 
 /**
  * Server route that clears the app session and, on Auth0 deployments,
@@ -86,6 +118,7 @@ const errorTitle = (error: string): string => {
     case "DIFFERENT_EMAIL_NOT_ALLOWED":
       return "Can't link this account";
     case "SSO_PROVIDER_NOT_ALLOWED":
+    case "SSO_REQUIRED_BY_ORGANIZATION":
       return "Use your organization's sign-in";
     case "LINK_NEEDS_APPROVAL":
       return "This sign-in method needs approval";
@@ -118,6 +151,17 @@ function SignInErrorScreen() {
   usePublishAuthStage({ door: "signin", depth: "entry" });
   const isAuth0 = publicEnv.data?.NEXTAUTH_PROVIDER === "auth0";
   const isAzureAD = publicEnv.data?.NEXTAUTH_PROVIDER === "azure-ad";
+  const bounceTo = bounceConnectionFrom(error, query?.get("error_description"));
+
+  // The bounce, ahead of every other effect on this page and not waiting on
+  // the five-second timer: this is not somebody being told why they failed, it
+  // is somebody being taken to the door their organization chose. They should
+  // see their own provider, not a page about Google.
+  useEffect(() => {
+    if (!bounceTo) return;
+    void signIn(bounceTo, { callbackUrl: "/" });
+  }, [bounceTo]);
+
   useEffect(() => {
     if (!publicEnv.data) {
       return;
@@ -147,6 +191,20 @@ function SignInErrorScreen() {
 
     return () => clearTimeout(redirectTimeout);
   }, [publicEnv.data, isAuth0, isAzureAD, session, error]);
+
+  // Not an error card: they are on their way somewhere, and the card says
+  // where. A page headed "something went wrong" about a redirect that is
+  // working would be the third wrong answer this refusal has had.
+  if (bounceTo) {
+    return (
+      <AuthCard title="Taking you to your organization's sign-in">
+        <HStack gap={3}>
+          <Spinner size="sm" color="auth.detail" />
+          <Text color="fg.muted">One moment.</Text>
+        </HStack>
+      </AuthCard>
+    );
+  }
 
   if (error) {
     return <SignInError error={error} />;
@@ -285,6 +343,7 @@ function recoveryFor({
         },
       };
     case "SSO_PROVIDER_NOT_ALLOWED":
+    case "SSO_REQUIRED_BY_ORGANIZATION":
       return {
         prose: [
           "Your organization requires single sign-on. Sign out and sign in again by entering your company email address, then choose your organization's login.",

@@ -78,6 +78,8 @@ import { roleBindingRouter } from "./routers/roleBinding";
 import { routingPoliciesRouter } from "./routers/routingPolicies";
 import { savedViewsRouter } from "./routers/savedViews";
 import { scenarioRouter } from "./routers/scenarios";
+import { scimOversightRouter } from "./routers/scimOversight";
+import { scimReconciliationRouter } from "./routers/scimReconciliation";
 import { scimTokenRouter } from "./routers/scimToken";
 import { secretsRouter } from "./routers/secrets";
 import { setupSkillsRouter } from "./routers/setupSkills";
@@ -85,6 +87,7 @@ import { shareRouter } from "./routers/share";
 import { sharedTraceRouter } from "./routers/sharedTrace";
 import { spansRouter } from "./routers/spans";
 import { ssoConnectionsRouter } from "./routers/ssoConnections";
+import { ssoSetupRouter } from "./routers/ssoSetup";
 import { storedObjectsRouter } from "./routers/stored-objects.router";
 import { subscriptionRouter } from "./routers/subscription";
 import { suiteRouter } from "./routers/suites";
@@ -144,6 +147,7 @@ const coreRouters = {
   user: userRouter,
   bugReports: bugReportsRouter,
   ssoConnections: ssoConnectionsRouter,
+  ssoSetup: ssoSetupRouter,
   annotationScore: annotationScoreRouter,
   publicEnv: publicEnvRouter,
   setupSkills: setupSkillsRouter,
@@ -167,6 +171,8 @@ const coreRouters = {
   secrets: secretsRouter,
   license: licenseRouter,
   licenseEnforcement: licenseEnforcementRouter,
+  scimOversight: scimOversightRouter,
+  scimReconciliation: scimReconciliationRouter,
   scimToken: scimTokenRouter,
   roleBinding: roleBindingRouter,
   apiKey: apiKeyRouter,

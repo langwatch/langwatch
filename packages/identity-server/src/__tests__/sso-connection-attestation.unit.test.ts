@@ -11,6 +11,7 @@ import { SsoConnectionGuards } from "../sso-connection-guards";
 import {
   InMemoryConnections,
   StubBreakGlassBindings,
+  StubLicenseAuthority,
   StubPlatformOperators,
   StubStranding,
 } from "./support/in-memory-connections";
@@ -44,6 +45,8 @@ const identity = {
   occurredAtMs: T0,
   actor: ANA,
   source: "self-serve" as const,
+  evidenceRef: "support-case:SSO-42",
+  note: "Verified the customer-controlled registry record.",
 };
 
 const IDP = {
@@ -75,7 +78,7 @@ async function reachClaimed(): Promise<void> {
       ...identity,
       type: "oidc",
       idp: IDP,
-      allowsJit: true,
+      arrivalPolicy: "admit",
     }),
   );
   await run(() => guards.claimDomain({ ...identity, domain: "acme.com" }));
@@ -97,9 +100,11 @@ beforeEach(() => {
   breakGlass = new StubBreakGlassBindings(true);
   guards = new SsoConnectionGuards({
     connections,
+    registrationSlots: connections,
     breakGlass,
     stranding: new StubStranding([]),
     platformOperators: new StubPlatformOperators([OLIVE.id]),
+    licenseAuthority: new StubLicenseAuthority(true),
   });
 });
 
@@ -119,6 +124,8 @@ describe("operator attestation", () => {
         connectionId: CONNECTION,
         domain: "acme.com",
         actor: OLIVE,
+        evidenceRef: "support-case:SSO-42",
+        note: "Verified the customer-controlled registry record.",
       });
       // Nothing was published, so nothing was hashed: an attestation carries
       // no token at all, which is why it is its own fact rather than a
@@ -126,16 +133,22 @@ describe("operator attestation", () => {
       expect(facts[0]!.data).not.toHaveProperty("tokenHash");
 
       expect(state.state).toBe("VERIFIED");
+      expect(state.domainVerifications[0]).toMatchObject({
+        verifiedAtMs: T0,
+        verifier: OLIVE,
+        evidenceRef: "support-case:SSO-42",
+      });
       expect(state.verifiedDomains).toEqual(["acme.com"]);
       // No ceremony was ever opened, so none is in flight.
       expect(state.pendingVerification).toBeNull();
       expect(state.domainVerifications).toEqual([
-        {
+        expect.objectContaining({
           domain: "acme.com",
           method: "operator-attested",
           actorId: OLIVE.id,
           verifiedAtMs: T0,
-        },
+          proofState: "VERIFIED",
+        }),
       ]);
     });
 
@@ -176,17 +189,22 @@ describe("operator attestation", () => {
       expect(state.state).toBe("VERIFIED");
       expect(facts[0]!.data).toMatchObject({ actor: OLIVE });
 
-      // The same installation, a second connection in the same organization,
+      // The same installation, a connection in another organization,
       // approved and waiting to be proved. Its administrator still cannot
       // attest it — being self-hosted buys her nothing here.
-      const second = { ...identity, connectionId: "ssoc_2" };
+      const second = {
+        ...identity,
+        tenantId: "org_other",
+        organizationId: "org_other",
+        connectionId: "ssoc_2",
+      };
       await run(
         () =>
           guards.registerConnection({
             ...second,
             type: "oidc",
             idp: IDP,
-            allowsJit: true,
+            arrivalPolicy: "admit",
           }),
         { connectionId: "ssoc_2" },
       );
@@ -243,12 +261,13 @@ describe("operator attestation", () => {
       expect(aYearOn?.tearDownAfterMs).toBeNull();
       expect(aYearOn?.pendingVerification).toBeNull();
       expect(aYearOn?.domainVerifications).toEqual([
-        {
+        expect.objectContaining({
           domain: "acme.com",
           method: "operator-attested",
           actorId: OLIVE.id,
           verifiedAtMs: T0,
-        },
+          proofState: "VERIFIED",
+        }),
       ]);
 
       // And it is still commandable as an ACTIVE connection at that later
@@ -305,12 +324,13 @@ describe("operator attestation", () => {
         actor: OLIVE,
       });
       expect(suspended.state.domainVerifications).toEqual([
-        {
+        expect.objectContaining({
           domain: "acme.com",
           method: "operator-attested",
           actorId: OLIVE.id,
           verifiedAtMs: T0,
-        },
+          proofState: "VERIFIED",
+        }),
       ]);
     });
   });
@@ -362,6 +382,10 @@ describe("operator attestation", () => {
             method: "dns-txt",
             actorId: "user_first",
             verifiedAtMs: T0,
+            proofState: "VERIFIED",
+            firstAbsentAtMs: null,
+            graceEndsAtMs: null,
+            tokenHash: "sha256:first-proof",
           },
         ],
       });
@@ -405,15 +429,20 @@ describe("operator attestation", () => {
         guards.attestDomain({ ...identity, actor: OLIVE, domain: "acme.com" }),
       );
 
-      // A second connection, whose domain the customer proved themselves.
-      const proved = { ...identity, connectionId: "ssoc_2" };
+      // Another organization's connection, whose domain the customer proved.
+      const proved = {
+        ...identity,
+        tenantId: "org_other",
+        organizationId: "org_other",
+        connectionId: "ssoc_2",
+      };
       await run(
         () =>
           guards.registerConnection({
             ...proved,
             type: "oidc",
             idp: IDP,
-            allowsJit: true,
+            arrivalPolicy: "admit",
           }),
         { connectionId: "ssoc_2" },
       );
@@ -444,83 +473,33 @@ describe("operator attestation", () => {
         { connectionId: "ssoc_2" },
       );
 
-      // A third, on a self-hosted installation whose licence proved it.
-      const licensed = { ...identity, connectionId: "ssoc_3" };
-      await run(
-        () =>
-          guards.registerConnection({
-            ...licensed,
-            type: "oidc",
-            idp: IDP,
-            allowsJit: true,
-          }),
-        { connectionId: "ssoc_3" },
-      );
-      await run(
-        () => guards.claimDomain({ ...licensed, domain: "gamma.example" }),
-        { connectionId: "ssoc_3" },
-      );
-      await run(
-        () =>
-          guards.approveDomainClaim({
-            ...licensed,
-            actor: OLIVE,
-            domain: "gamma.example",
-          }),
-        { connectionId: "ssoc_3" },
-      );
-      await run(
-        () =>
-          guards.requestVerification({
-            ...licensed,
-            domain: "gamma.example",
-            method: "license-token",
-            tokenHash: "sha256:licence",
-          }),
-        { connectionId: "ssoc_3" },
-      );
-      await run(
-        () => guards.verifyDomain({ ...licensed, domain: "gamma.example" }),
-        { connectionId: "ssoc_3" },
-      );
-
       const attested = await connections.findConnection({
         connectionId: CONNECTION,
       });
       const published = await connections.findConnection({
         connectionId: "ssoc_2",
       });
-      const byLicence = await connections.findConnection({
-        connectionId: "ssoc_3",
-      });
 
       // Each domain names the method that proved it, and who — so a dispute
       // is answerable from the connection alone.
       expect(attested?.domainVerifications).toEqual([
-        {
+        expect.objectContaining({
           domain: "acme.com",
           method: "operator-attested",
           actorId: OLIVE.id,
           verifiedAtMs: T0,
-        },
+          proofState: "VERIFIED",
+        }),
       ]);
       expect(published?.domainVerifications).toEqual([
-        {
+        expect.objectContaining({
           domain: "beta.example",
           method: "dns-txt",
           actorId: ANA.id,
           verifiedAtMs: T0,
-        },
+          proofState: "VERIFIED",
+        }),
       ]);
-      expect(byLicence?.domainVerifications).toEqual([
-        {
-          domain: "gamma.example",
-          method: "license-token",
-          actorId: ANA.id,
-          verifiedAtMs: T0,
-        },
-      ]);
-
       // And nothing anywhere can present the attested one as customer-proved:
       // the method is a distinct value, not an absence to be defaulted.
       expect(
@@ -538,7 +517,7 @@ describe("operator attestation", () => {
           actor: OLIVE,
           type: "oidc",
           idp: IDP,
-          allowsJit: true,
+          arrivalPolicy: "admit",
         }),
       );
       const claimed = await run(() =>

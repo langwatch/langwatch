@@ -45,7 +45,14 @@ vi.mock("./dev/homeDevState", () => ({
   chartVariantFor: () => "strip",
 }));
 vi.mock("~/hooks/useOrganizationTeamProject", () => ({
-  useOrganizationTeamProject: () => ({ organization: { id: "org-1" } }),
+  // `hasPermission` is answered because the home now carries the pending
+  // join requests, which ask whether this reader may act on them. False:
+  // what that panel shows to whom is its own suite's claim, and this one is
+  // about which home composition resolves.
+  useOrganizationTeamProject: () => ({
+    organization: { id: "org-1" },
+    hasPermission: () => false,
+  }),
 }));
 vi.mock("~/utils/api", () => ({
   api: {
@@ -53,6 +60,12 @@ vi.mock("~/utils/api", () => ({
       getActivePlan: { useQuery: () => ({ data: gates.activePlan }) },
     },
   },
+}));
+// Stubbed like the hero below: the panel reads and writes join requests
+// through half a dozen procedures, and what it shows to whom is its own
+// suite's claim. These scenarios are about which home composition resolves.
+vi.mock("./PendingJoinRequests", () => ({
+  PendingJoinRequests: () => null,
 }));
 vi.mock("./LangyHomeHero", () => ({
   LangyHomeHero: () => <div data-testid="lantern" />,

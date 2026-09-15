@@ -27,6 +27,7 @@ import {
 import { KSUID_RESOURCES } from "~/utils/constants";
 import type {
   JoinMembershipPort,
+  JoinOfferDismissalPort,
   JoinRequestNotifier,
   JoinSettingPort,
 } from "./join-requests.service";
@@ -150,6 +151,52 @@ export class PrismaJoinSettings implements JoinSettingPort {
     await this.prisma.organization.update({
       where: { id: organizationId },
       data: { domainJoin, joinDomains },
+    });
+  }
+}
+
+/**
+ * "No thanks", remembered on the account.
+ *
+ * A list of domains rather than one flag, because the offer is per domain: a
+ * person who waves Acme away and later verifies an address at their new
+ * employer should be offered that organization, not silenced by a decision
+ * they made about the old one.
+ *
+ * On the account rather than in browser storage for the reason the passkey
+ * nudge gives — "appears once" that only holds on one browser is not "appears
+ * once".
+ */
+export class PrismaJoinOfferDismissals implements JoinOfferDismissalPort {
+  constructor(private readonly prisma: PrismaClient) {}
+
+  async dismissedDomains({ userId }: { userId: string }): Promise<string[]> {
+    const row = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { joinOfferDismissedDomains: true },
+    });
+    return row?.joinOfferDismissedDomains ?? [];
+  }
+
+  async dismiss({
+    userId,
+    domain,
+  }: {
+    userId: string;
+    domain: string;
+  }): Promise<void> {
+    const held = await this.dismissedDomains({ userId });
+    if (held.includes(domain)) return;
+    // APPEND, never rewrite. Waving two organizations away at once reads the
+    // same list twice, and a write of `[...held, domain]` would persist one
+    // snapshot over the other — the dismissal that lost would reappear as an
+    // offer on the next lookup. `push` is `array_append` in Postgres, so the
+    // two writes compose instead of racing. The read above stays as a cheap
+    // short-circuit, not as the value being written: the worst a lost race
+    // costs now is the same domain listed twice, which reads identically.
+    await this.prisma.user.update({
+      where: { id: userId },
+      data: { joinOfferDismissedDomains: { push: domain } },
     });
   }
 }

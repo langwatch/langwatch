@@ -109,15 +109,16 @@ describe("the pages under /settings", () => {
       expect(source).not.toContain("<SettingsLayout");
     });
 
-    it("forwards the old authentication address onto Security", () => {
+    it("keeps Authentication as the framed single-sign-on overview", () => {
       const source = readFileSync(
         sourceFileOf("pages/settings/authentication"),
         "utf-8",
       );
 
-      expect(source).toContain("<Navigate");
-      expect(source).toContain("/settings/security");
-      expect(source).not.toContain("<SettingsLayout");
+      expect(source).toContain("<SettingsLayout");
+      expect(source).toContain("<AuthenticationLayout");
+      expect(source).toContain("<AuthenticationSettings");
+      expect(source).not.toContain("<Navigate");
     });
   });
 });

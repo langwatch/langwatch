@@ -17,7 +17,7 @@ import { IDENTITY_CONNECTION_GRANDFATHER_MIGRATION_NAME } from "./migration-name
  * proof agreed for every domain the organization carries; a disagreement
  * HOLDS the organization with those domains named, and a later pass re-proves
  * it. Held is not failed, and nothing about the organization's sign-in
- * changes either way — `SSOCONN_ROUTING` is what would change it, and it
+ * changes either way — a connection only decides sign-in once it is live, and it
  * ships `off`.
  *
  * Spec: specs/identity/sso-connection-lifecycle.feature ("A legacy SSO

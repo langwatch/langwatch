@@ -2,10 +2,16 @@ import {
   ACTIVATE_CONNECTION_COMMAND_TYPE,
   type ActivateConnectionCommandData,
   activateConnectionCommandDataSchema,
+  BEGIN_MIGRATION_FINALIZATION_COMMAND_TYPE,
+  type BeginMigrationFinalizationCommandData,
+  beginMigrationFinalizationCommandDataSchema,
   APPROVE_DOMAIN_CLAIM_COMMAND_TYPE,
   type ApproveDomainClaimCommandData,
   approveDomainClaimCommandDataSchema,
   ATTEST_DOMAIN_COMMAND_TYPE,
+  WITHDRAW_DOMAIN_COMMAND_TYPE,
+  type WithdrawDomainCommandData,
+  withdrawDomainCommandDataSchema,
   type AttestDomainCommandData,
   attestDomainCommandDataSchema,
   CLAIM_DOMAIN_COMMAND_TYPE,
@@ -21,6 +27,12 @@ import {
   type GrandfatherConnectionCommandData,
   grandfatherConnectionCommandDataSchema,
   REGISTER_CONNECTION_COMMAND_TYPE,
+  REGISTER_REPLACEMENT_CONNECTION_COMMAND_TYPE,
+  type RegisterReplacementConnectionCommandData,
+  registerReplacementConnectionCommandDataSchema,
+  FINALIZE_MIGRATION_COMMAND_TYPE,
+  type FinalizeMigrationCommandData,
+  finalizeMigrationCommandDataSchema,
   REJECT_DOMAIN_CLAIM_COMMAND_TYPE,
   REQUEST_TEARDOWN_COMMAND_TYPE,
   REQUEST_VERIFICATION_COMMAND_TYPE,
@@ -35,6 +47,12 @@ import {
   requestVerificationCommandDataSchema,
   type ResumeConnectionCommandData,
   resumeConnectionCommandDataSchema,
+  SET_ARRIVAL_POLICY_COMMAND_TYPE,
+  SELECT_MIGRATION_ROUTE_COMMAND_TYPE,
+  type SelectMigrationRouteCommandData,
+  selectMigrationRouteCommandDataSchema,
+  type SetArrivalPolicyCommandData,
+  setArrivalPolicyCommandDataSchema,
   SUSPEND_CONNECTION_COMMAND_TYPE,
   type SsoConnectionCommand,
   type SsoConnectionFact,
@@ -44,6 +62,12 @@ import {
   VERIFY_DOMAIN_COMMAND_TYPE,
   type VerifyDomainCommandData,
   verifyDomainCommandDataSchema,
+  RECORD_DOMAIN_PROOF_ABSENT_COMMAND_TYPE,
+  RECORD_DOMAIN_PROOF_PRESENT_COMMAND_TYPE,
+  type RecordDomainProofAbsentCommandData,
+  type RecordDomainProofPresentCommandData,
+  recordDomainProofAbsentCommandDataSchema,
+  recordDomainProofPresentCommandDataSchema,
 } from "@langwatch/identity";
 import type { SsoConnectionGuards } from "./sso-connection-guards";
 import type { SsoConnectionLedger } from "./sso-connection-ledger";
@@ -74,6 +98,46 @@ export class SsoConnectionService {
     return this.commit(
       { type: REGISTER_CONNECTION_COMMAND_TYPE, data },
       await this.guards.registerConnection(data),
+    );
+  }
+
+  async registerReplacementConnection(
+    input: RegisterReplacementConnectionCommandData,
+  ): Promise<SsoConnectionFact[]> {
+    const data = registerReplacementConnectionCommandDataSchema.parse(input);
+    return this.commit(
+      { type: REGISTER_REPLACEMENT_CONNECTION_COMMAND_TYPE, data },
+      await this.guards.registerReplacementConnection(data),
+    );
+  }
+
+  async selectMigrationRoute(
+    input: SelectMigrationRouteCommandData,
+  ): Promise<SsoConnectionFact[]> {
+    const data = selectMigrationRouteCommandDataSchema.parse(input);
+    return this.commit(
+      { type: SELECT_MIGRATION_ROUTE_COMMAND_TYPE, data },
+      await this.guards.selectMigrationRoute(data),
+    );
+  }
+
+  async beginMigrationFinalization(
+    input: BeginMigrationFinalizationCommandData,
+  ): Promise<SsoConnectionFact[]> {
+    const data = beginMigrationFinalizationCommandDataSchema.parse(input);
+    return this.commit(
+      { type: BEGIN_MIGRATION_FINALIZATION_COMMAND_TYPE, data },
+      await this.guards.beginMigrationFinalization(data),
+    );
+  }
+
+  async finalizeMigration(
+    input: FinalizeMigrationCommandData,
+  ): Promise<SsoConnectionFact[]> {
+    const data = finalizeMigrationCommandDataSchema.parse(input);
+    return this.commit(
+      { type: FINALIZE_MIGRATION_COMMAND_TYPE, data },
+      await this.guards.finalizeMigration(data),
     );
   }
 
@@ -140,6 +204,17 @@ export class SsoConnectionService {
     );
   }
 
+  /** Take a domain back out of the connection, wherever it stood. */
+  async withdrawDomain(
+    input: WithdrawDomainCommandData,
+  ): Promise<SsoConnectionFact[]> {
+    const data = withdrawDomainCommandDataSchema.parse(input);
+    return this.commit(
+      { type: WITHDRAW_DOMAIN_COMMAND_TYPE, data },
+      await this.guards.withdrawDomain(data),
+    );
+  }
+
   async verifyDomain(
     input: VerifyDomainCommandData,
   ): Promise<SsoConnectionFact[]> {
@@ -147,6 +222,32 @@ export class SsoConnectionService {
     return this.commit(
       { type: VERIFY_DOMAIN_COMMAND_TYPE, data },
       await this.guards.verifyDomain(data),
+    );
+  }
+
+  /**
+   * What a re-check saw (ADR-123). Both verbs are ordinary members of this
+   * surface — a sweep changes a connection the same way a person does, through
+   * a parsed command, a guard and the ledger — and both routinely commit
+   * NOTHING, because the guard states a fact only when the world changed.
+   */
+  async recordDomainProofAbsent(
+    input: RecordDomainProofAbsentCommandData,
+  ): Promise<SsoConnectionFact[]> {
+    const data = recordDomainProofAbsentCommandDataSchema.parse(input);
+    return this.commit(
+      { type: RECORD_DOMAIN_PROOF_ABSENT_COMMAND_TYPE, data },
+      await this.guards.recordDomainProofAbsent(data),
+    );
+  }
+
+  async recordDomainProofPresent(
+    input: RecordDomainProofPresentCommandData,
+  ): Promise<SsoConnectionFact[]> {
+    const data = recordDomainProofPresentCommandDataSchema.parse(input);
+    return this.commit(
+      { type: RECORD_DOMAIN_PROOF_PRESENT_COMMAND_TYPE, data },
+      await this.guards.recordDomainProofPresent(data),
     );
   }
 
@@ -177,6 +278,17 @@ export class SsoConnectionService {
     return this.commit(
       { type: RESUME_CONNECTION_COMMAND_TYPE, data },
       await this.guards.resumeConnection(data),
+    );
+  }
+
+  /** Who this connection admits (ADR-117 §3). */
+  async setArrivalPolicy(
+    input: SetArrivalPolicyCommandData,
+  ): Promise<SsoConnectionFact[]> {
+    const data = setArrivalPolicyCommandDataSchema.parse(input);
+    return this.commit(
+      { type: SET_ARRIVAL_POLICY_COMMAND_TYPE, data },
+      await this.guards.setArrivalPolicy(data),
     );
   }
 

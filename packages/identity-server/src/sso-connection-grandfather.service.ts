@@ -23,7 +23,7 @@ import type { SsoConnectionService } from "./sso-connection.service";
  *     the organization, so a second pass costs no event.
  *  2. PROVE it, by routing. For every domain the organization carries, the
  *     connection-based lookup must answer what the string-based one answers.
- *     That is the same comparison `SSOCONN_ROUTING` shadow mode runs on every
+ *     That is the same comparison the routing ports answer on every
  *     live login, evaluated per tenant — one function, so a fleet-wide silent
  *     bake and a per-organization finalization cannot mean different things.
  *
@@ -118,7 +118,7 @@ export class SsoConnectionGrandfatherService {
       // Today's behavior, kept: an OAuth callback for an unknown person on a
       // routed domain creates them. Changing that at grandfathering would be
       // a behavior change wearing a migration's clothes.
-      allowsJit: true,
+      arrivalPolicy: "admit",
       domains,
     });
 

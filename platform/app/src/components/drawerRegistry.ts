@@ -223,6 +223,10 @@ const InviteMemberDrawer = lazyDefault({
   factory: () => import("./settings/InviteMemberDrawer"),
   key: "InviteMemberDrawer",
 });
+const PersonDrawer = lazyDefault({
+  factory: () => import("./access/PersonDrawer"),
+  key: "PersonDrawer",
+});
 const DataPrivacyRuleDrawer = lazyDefault({
   factory: () => import("./settings/DataPrivacyRuleDrawer"),
   key: "DataPrivacyRuleDrawer",
@@ -371,6 +375,7 @@ export const drawers = {
   editProject: EditProjectDrawer,
   createTeam: CreateTeamDrawer,
   inviteMember: InviteMemberDrawer,
+  person: PersonDrawer,
   // Online Evaluations (Monitors)
   onlineEvaluation: OnlineEvaluationDrawer,
   guardrails: GuardrailsDrawer,

@@ -96,9 +96,14 @@ export const isPublicAddress = (address: string): boolean =>
 export async function publicHopFor({
   url,
   resolveHost,
+  dialableInternalOrigins = [],
 }: {
   url: string;
   resolveHost: HostResolver;
+  /** Origins somebody named in advance, which may answer privately. Checked
+   *  per hop, so vouching for one never vouches for where it redirects.
+   *  See `dialable-internal-origins.ts` for who fills this and why. */
+  dialableInternalOrigins?: string[];
 }): Promise<PublicHop> {
   let parsed: URL;
   try {
@@ -110,9 +115,14 @@ export async function publicHopFor({
     return { ok: false, refusal: "not_https" };
   }
 
+  // Vouched BEFORE the address is judged, not after: the whole point of the
+  // list is an origin whose address would not pass, and a check that ran
+  // afterwards would only ever confirm what already succeeded.
+  const vouchedFor = dialableInternalOrigins.includes(parsed.origin);
+
   const literal = stripBrackets(parsed.hostname);
   if (isIpLiteral(literal)) {
-    return isPublicAddress(literal)
+    return vouchedFor || isPublicAddress(literal)
       ? { ok: true, url: parsed, addresses: [literal] }
       : { ok: false, refusal: "host_not_public" };
   }
@@ -127,7 +137,10 @@ export async function publicHopFor({
     return { ok: false, refusal: "unresolvable" };
   }
   if (answers.length === 0) return { ok: false, refusal: "unresolvable" };
-  if (!answers.every(isPublicAddress)) {
+  // An unresolvable name is still refused for a vouched origin: failing
+  // closed is what stops the guard being skippable by making it throw, and a
+  // vouched name that answers nothing is not evidence of anything either.
+  if (!vouchedFor && !answers.every(isPublicAddress)) {
     return { ok: false, refusal: "host_not_public" };
   }
   return { ok: true, url: parsed, addresses: answers };
@@ -198,6 +211,7 @@ export async function fetchFollowingPublicHosts({
   signal,
   headers,
   maxRedirects,
+  dialableInternalOrigins = [],
 }: {
   url: string;
   fetchImpl: typeof fetch;
@@ -205,10 +219,17 @@ export async function fetchFollowingPublicHosts({
   signal: AbortSignal;
   headers?: Record<string, string>;
   maxRedirects: number;
+  /** Passed to every hop rather than consulted once, so a vouched origin
+   *  that redirects elsewhere is judged on the address it redirects TO. */
+  dialableInternalOrigins?: string[];
 }): Promise<PublicFetchOutcome> {
   let next = url;
   for (let hop = 0; hop <= maxRedirects; hop++) {
-    const judged = await publicHopFor({ url: next, resolveHost });
+    const judged = await publicHopFor({
+      url: next,
+      resolveHost,
+      dialableInternalOrigins,
+    });
     if (!judged.ok) return { ok: false, refusal: judged.refusal };
 
     const response = await fetchImpl(next, {

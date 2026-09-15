@@ -4,6 +4,7 @@ import { PrismaClientKnownRequestError } from "@prisma/client/runtime/client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { PrismaClient, User } from "~/generated/prisma/client";
 import { ScimService } from "../scim.service";
+import { isScimError } from "../scim.types";
 
 // An App carrying no Redis, so the revoke helper reachable from the SCIM
 // deactivation paths takes its Postgres-only path instead of talking to a real
@@ -93,6 +94,7 @@ function buildMockUser(overrides: Partial<User> = {}): User {
     tracesExplorerTourDismissedAt: null,
     passkeyNudgeDismissedAt: null,
     langyCodeAccessPreference: null,
+    joinOfferDismissedDomains: [],
     ...overrides,
   };
 }
@@ -343,6 +345,7 @@ describe("ScimService", () => {
         ).mockResolvedValue(1);
 
         const result = await service.listUsers({ organizationId: "org-1" });
+        if (isScimError(result)) throw new Error("unexpected refusal");
 
         expect(result.schemas).toEqual([
           "urn:ietf:params:scim:api:messages:2.0:ListResponse",

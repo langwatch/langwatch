@@ -18,7 +18,7 @@ const operator = { userId: "user_olive", email: "olive@langwatch.ai" };
 function serviceResolving(addresses: string[]) {
   const registerConnection = vi.fn(async () => void 0);
   const service = new SsoConnectionBackofficeService({
-    prisma: {} as never,
+    reads: {} as never,
     connections: () => ({ registerConnection }) as never,
     resolveHost: async () => addresses,
   });
@@ -27,9 +27,9 @@ function serviceResolving(addresses: string[]) {
 
 const registration = {
   organizationId: "org_acme",
-  type: "oidc",
+  type: "oidc" as const,
   providerId: "okta",
-  allowsJit: false,
+  arrivalPolicy: "refuse" as const,
   operator: operator as never,
 };
 
