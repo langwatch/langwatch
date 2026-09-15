@@ -50,6 +50,13 @@ export interface ScimError {
   schemas: ["urn:ietf:params:scim:api:messages:2.0:Error"];
   status: string;
   detail: string;
+  /**
+   * The protocol's own name for WHY a 400 was refused (RFC 7644 §3.12) —
+   * `invalidFilter` for a filter we will not answer. Providers branch on
+   * this rather than on the prose, so a refusal without it reads to them as
+   * an unexplained failure.
+   */
+  scimType?: string;
 }
 
 /**

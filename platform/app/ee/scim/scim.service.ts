@@ -29,6 +29,7 @@ import {
 } from "./scim.types";
 import { ScimDeprovisionService } from "./scim-deprovision.service";
 import { ScimDirectoryIdentityService } from "./scim-directory-identity.service";
+import { parseScimFilter, type ScimFilterTerm } from "./scim-filter";
 import { reconcileScimGrants } from "./scim-grants.reconciler";
 import { scimGrantsWritePathEnabled } from "./scim-grants-flag";
 import { resolveHighestRole } from "./scim-role-resolver";
@@ -573,28 +574,58 @@ export class ScimService {
     return this.toScimUser(membership.user);
   }
 
+  /**
+   * Who this organization holds, one page at a time.
+   *
+   * Three things here are load-bearing only once the directory is bigger than
+   * one page, which is why all three were wrong until a five-thousand-person
+   * simulator read them back (specs/identity/scim-directory-reads.feature):
+   *
+   * - THE ORDER IS FIXED. A page is `skip`/`take` over a result set, and
+   *   Postgres promises no order without being asked for one. Fifty pages
+   *   over five thousand people are fifty separate queries, so an unordered
+   *   scan hands the same person to two pages and never hands over somebody
+   *   else at all. `userId` is unique within an organization, so it settles
+   *   the order completely rather than merely mostly.
+   * - THE PAGE SAYS WHAT IT HOLDS. `itemsPerPage` is the size of THIS page
+   *   (RFC 7644 §3.4.2.4), not the size that was asked for. Reporting the
+   *   request meant the last page of every directory claimed to be full, and
+   *   a provider advancing by what we reported stepped past the tail.
+   * - A FILTER IS HONOURED OR REFUSED. Never dropped — see `scim-filter.ts`.
+   */
   async listUsers({
     organizationId,
+    connectionId = null,
     filter,
     startIndex = 1,
     count = 100,
   }: {
     organizationId: string;
+    /** Whose directory identifiers an `externalId` filter resolves against.
+     *  A filter on one connection's identifier must never find another
+     *  connection's person, and the pair is the key that keeps them apart. */
+    connectionId?: string | null;
     filter?: string;
     startIndex?: number;
     count?: number;
-  }): Promise<ScimListResponse<ScimUser>> {
-    const emailFilter = this.parseUserNameFilter(filter);
-
-    const whereClause: Record<string, unknown> = {
-      organizationId,
-    };
-
-    if (emailFilter) {
-      whereClause.user = {
-        email: { equals: emailFilter, mode: "insensitive" },
-      };
+  }): Promise<ScimListResponse<ScimUser> | ScimError> {
+    const parsed = parseScimFilter({
+      filter,
+      supported: ["userName", "externalId"],
+    });
+    if (!parsed.ok) {
+      return this.scimError({
+        status: "400",
+        scimType: "invalidFilter",
+        detail: parsed.detail,
+      });
     }
+
+    const whereClause = await this.userListWhere({
+      organizationId,
+      connectionId,
+      term: parsed.term,
+    });
 
     const [memberships, totalCount] = await Promise.all([
       this.prisma.organizationUser.findMany({
@@ -602,17 +633,62 @@ export class ScimService {
         include: { user: true },
         skip: startIndex - 1,
         take: count,
+        orderBy: { userId: "asc" },
       }),
       this.prisma.organizationUser.count({ where: whereClause }),
     ]);
 
+    const resources = memberships.map((m) => this.toScimUser(m.user));
     return {
       schemas: ["urn:ietf:params:scim:api:messages:2.0:ListResponse"],
       totalResults: totalCount,
       startIndex,
-      itemsPerPage: count,
-      Resources: memberships.map((m) => this.toScimUser(m.user)),
+      itemsPerPage: resources.length,
+      Resources: resources,
     };
+  }
+
+  /**
+   * The `where` one listing runs under.
+   *
+   * An `externalId` term resolves through the connection's own mapping and
+   * narrows to that one person. A term naming an identifier this connection
+   * does not know narrows to NOBODY rather than widening back to everybody:
+   * `userId: { in: [] }` is an empty page, which is the honest answer to
+   * "who do you have under this identifier" when the answer is nobody.
+   */
+  private async userListWhere({
+    organizationId,
+    connectionId,
+    term,
+  }: {
+    organizationId: string;
+    connectionId: string | null;
+    term: ScimFilterTerm | null;
+  }): Promise<Record<string, unknown>> {
+    const whereClause: Record<string, unknown> = { organizationId };
+    if (!term) return whereClause;
+
+    if (term.attribute === "userName") {
+      whereClause.user = {
+        email: { equals: term.value, mode: "insensitive" },
+      };
+      return whereClause;
+    }
+
+    const mapped = connectionId
+      ? await this.prisma.scimExternalId.findUnique({
+          where: {
+            connectionId_externalId: {
+              connectionId,
+              externalId: term.value,
+            },
+          },
+          select: { userId: true },
+        })
+      : null;
+    whereClause.userId = { in: mapped ? [mapped.userId] : [] };
+    return whereClause;
   }
 
   async replaceUser({
@@ -1071,23 +1147,20 @@ export class ScimService {
     };
   }
 
-  private parseUserNameFilter(filter?: string): string | null {
-    if (!filter) return null;
-    const match = filter.match(/^userName\s+eq\s+"([^"]+)"$/);
-    return match?.[1] ?? null;
-  }
-
   private scimError({
     status,
     detail,
+    scimType,
   }: {
     status: string;
     detail: string;
+    scimType?: string;
   }): ScimError {
     return {
       schemas: ["urn:ietf:params:scim:api:messages:2.0:Error"],
       status,
       detail,
+      ...(scimType ? { scimType } : {}),
     };
   }
 }

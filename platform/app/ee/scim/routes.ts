@@ -590,10 +590,19 @@ secured
 
     const result = await scimService.listUsers({
       organizationId,
+      connectionId: c.get("scimConnectionId"),
       filter,
       startIndex,
       count,
     });
+
+    // A filter we will not answer comes back as a refusal rather than a page,
+    // and it has to reach the provider AS one: a 200 carrying an error body
+    // is read as an empty directory, which is how a refusal turns into a
+    // deprovision of everybody.
+    if (isScimError(result)) {
+      return scimJson(c, result, parseInt(result.status, 10));
+    }
 
     return scimJson(c, result);
   });
@@ -752,6 +761,10 @@ secured
       count: pageSizeQuery(c.req.query("count")),
       excludeMembers: excludedAttributes.includes("members"),
     });
+
+    if (isScimError(result)) {
+      return scimJson(c, result, parseInt(result.status, 10));
+    }
 
     return scimJson(c, result);
   });
