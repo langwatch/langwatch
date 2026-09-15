@@ -108,12 +108,21 @@ describe("resolveNavigateFallbackUrl", () => {
   });
 
   describe("given the governance sources page name", () => {
-    /** @scenario "The governance path asks where to start" */
-    it("resolves the inventory page on its sources tab under the project slug", async () => {
+    /** @scenario "An organization page opens at the top level, outside the project" */
+    it("resolves the inventory page on its sources tab at the top level, with no project slug", async () => {
       expect(await resolve("governance-sources")).toBe(
-        "https://app.langwatch.ai/acme/governance/inventory?tab=sources",
+        "https://app.langwatch.ai/governance/inventory?tab=sources",
       );
       expect(getScenarioRunData).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given a project page name", () => {
+    /** @scenario "An organization page opens at the top level, outside the project" */
+    it("resolves the page under the project slug", async () => {
+      expect(await resolve("prompts")).toBe(
+        "https://app.langwatch.ai/acme/prompts",
+      );
     });
   });
 

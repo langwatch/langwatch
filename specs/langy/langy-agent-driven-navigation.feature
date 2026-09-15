@@ -195,6 +195,17 @@ Feature: Langy opens the resource it surfaced in the browser
       Then the user is taken to that resource
       And they land on the same page the product's own links open
 
+    # The governance pages sit beside the project pages, not inside one. The
+    # sources page name used to be built under the project slug like the
+    # project pages, and that address only matches the project catch-all: a
+    # 404 wearing the project's own sidebar, which is where the governance
+    # onboarding left the user.
+    @unit
+    Scenario: An organization page opens at the top level, outside the project
+      When Langy asks to open the governance sources page
+      Then the user is taken to the inventory's sources tab at the top level, with no project slug in the address
+      And a project page name still opens under the project slug
+
     # The link a scenario create prints is remembered only when the command's
     # stdout is trusted, and the provenance check refuses a command whose
     # quoted text carries parentheses. A scenario whose situation reads

@@ -63,6 +63,16 @@ Feature: Guided onboarding tour
     Then the coding tour has no steps
     And the path is reported as having no tour
 
+  # A tour step or a Langy page name pointing at an address the router does
+  # not know lands the demo on the 404 page. The route table is the check.
+  @unit
+  Scenario: every address the guided onboarding navigates to is a registered route
+    Given the application's route table
+    Then each path's landing after the sign-up and the page Langy starts from match a route of their own
+    And every address a tour step navigates to matches a route of its own
+    And every page name Langy's navigate command opens matches a route of its own, under the project slug for a project page and at the top level for an organization page
+    And none of them falls through to the 404 catch-all
+
   @unit
   Scenario: a step reads at three times a slow reading pace
     When the reading time of "And create it." is computed
