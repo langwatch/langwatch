@@ -7,8 +7,8 @@ import {
   newDatasetEntriesSchema,
 } from "@langwatch/dataset-contract";
 import { Dialog } from "@langwatch/design-system/dialog";
+import { generate } from "@langwatch/ksuid";
 import { ArrowRight } from "lucide-react";
-import { nanoid } from "nanoid";
 import { useEffect, useMemo, useState } from "react";
 import { datasetApi } from "../../behavior/dataset-api.ts";
 import { useDatasetHost } from "../../model/dataset-host.ts";
@@ -17,6 +17,13 @@ import { TabularFileDropzone } from "./tabular-file-dropzone.tsx";
 
 /** The value that maps a dataset column to nothing at all. */
 const NO_SOURCE_COLUMN = "";
+
+/**
+ * The app's KSUID resource for a dataset record row (`KSUID_RESOURCES.RECORD`).
+ * The literal, not the constant table: the id this widget mints is sent to
+ * the server as-is and persisted, so it belongs with the writer.
+ */
+const RECORD_KSUID_RESOURCE = "record";
 
 export function AddRowsFromCSVModal({
   isOpen,
@@ -58,7 +65,7 @@ export function AddRowsFromCSVModal({
   const recordEntries: DatasetRecordEntry[] = useMemo(() => {
     if (fileRows.length === 0) return [];
     return fileRows.map((row) => {
-      const entry: DatasetRecordEntry = { id: nanoid() };
+      const entry: DatasetRecordEntry = { id: generate(RECORD_KSUID_RESOURCE).toString() };
       for (const name of datasetColumnNames) {
         const sourceHeader = mapping[name] ?? NO_SOURCE_COLUMN;
         const index = fileHeaders.indexOf(sourceHeader);

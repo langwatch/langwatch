@@ -29,6 +29,14 @@ import type { StudioEventPreparer } from "./studio-event-preparer.service.ts";
 
 const logger = createLogger("langwatch:workflows:execution");
 
+/**
+ * The app's KSUID resource for a synthesized trace id
+ * (`KSUID_RESOURCES.WORKFLOW_TRACE`). The literal rather than the app's
+ * constant table: the prefix is part of the id format already written to
+ * storage, so it belongs with the writer.
+ */
+const WORKFLOW_TRACE_KSUID_RESOURCE = "workflowtrace";
+
 type WorkflowNlpExecutionServiceOptions = {
   ids: WorkflowId;
   modelProviders: ModelProviderApi;
@@ -70,7 +78,7 @@ export class WorkflowNlpExecutionService {
     WorkflowNlpExecutionService.assertRequiredInputs(workflow, input.inputs);
     WorkflowNlpExecutionService.assertRequiredModelKeys(workflow, providers);
 
-    const traceId = controls.trace_id ?? `trace_${this.options.ids.next()}`;
+    const traceId = controls.trace_id ?? this.options.ids.next(WORKFLOW_TRACE_KSUID_RESOURCE);
     const origin = input.origin ?? "workflow";
     const event: StudioClientEvent = {
       type: "execute_flow",

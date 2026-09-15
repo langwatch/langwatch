@@ -22,7 +22,7 @@ import {
   registerFrameSchema,
   type SdkFrame,
 } from "@langwatch/agent-contract";
-import { nanoid } from "nanoid";
+import { generate } from "@langwatch/ksuid";
 import { z } from "zod";
 import { InstanceWatchService, type Watch } from "./connected-agent-instance-watch.service.ts";
 import { type InstanceNudge } from "@langwatch/agent-contract";
@@ -83,6 +83,13 @@ export interface LongPollTransportOptions {
   /** How long a pod keeps a watch after its last poll; test knob. */
   watchTtlMs?: number;
 }
+
+/**
+ * The app's KSUID resource for a session token (`KSUID_RESOURCES.AGENT_INSTANCE_TOKEN`).
+ * The literal rather than the app's constant table: `ait_` is the prefix
+ * every process and test already reads, so it belongs with the writer.
+ */
+const AGENT_INSTANCE_TOKEN_KSUID_RESOURCE = "ait";
 
 export class LongPollTransportService {
   static create(options: LongPollTransportOptions): LongPollTransportService {
@@ -155,7 +162,7 @@ export class LongPollTransportService {
       return this.#refused(error);
     }
 
-    const token = `ait_${nanoid(32)}`;
+    const token = generate(AGENT_INSTANCE_TOKEN_KSUID_RESOURCE).toString();
     await this.#saveSession({
       principalId: session.principalId,
       token,

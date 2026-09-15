@@ -66,7 +66,6 @@ import {
   type WorkflowNlpRuntime,
   type WorkflowLlmParameterResolution,} from "@langwatch/workflow-server";
 import type { LLMConfig } from "@langwatch/workflow-contract";
-import { nanoid } from "nanoid";
 
 import type { WorkerConfig } from "../platform/config/worker.config.ts";
 import { nowInstant, toDate } from "@langwatch/time";
@@ -92,6 +91,12 @@ export abstract class WorkerScenarioExecutionAbsenceReport {
 
 /** The ksuid resource prefix a scenario row is minted under, as the API mints it. */
 const SCENARIO_KSUID_RESOURCE = "scenario";
+
+/**
+ * The app's KSUID resource for a test suite's folder id
+ * (`KSUID_RESOURCES.SCENARIO_TEST_SUITE`), as the API mints it.
+ */
+const SCENARIO_TEST_SUITE_KSUID_RESOURCE = "suite";
 
 export type WorkerScenarioExecutionCompositionInput = Readonly<{
   config: WorkerConfig;
@@ -256,7 +261,7 @@ export async function createWorkerScenarioExecutionGraph(input: {
 
   const scenarioPorts = {
     ids: new KsuidScenarioId(),
-    testSuiteIds: new NanoidScenarioTestSuiteId(),
+    testSuiteIds: new KsuidScenarioTestSuiteId(),
     clock: new SystemScenarioClock(),
     secretCipher,
   };
@@ -311,7 +316,7 @@ export async function createWorkerScenarioExecutionGraph(input: {
     projectEnvironment: workflowProjectEnvironment,
     llmParameters: workflowLlmParameters,
   });
-  const workflowIds = WorkerNanoidWorkflowId.create();
+  const workflowIds = WorkerKsuidWorkflowId.create();
   const workflows = WorkflowService.create({
     repository: workflowRepos.workflows,
     datasets,
@@ -407,20 +412,20 @@ class KsuidScenarioId implements ScenarioId {
 }
 
 /** The folder id, in the `suite_` format the other tier reads. */
-class NanoidScenarioTestSuiteId implements ScenarioTestSuiteId {
+class KsuidScenarioTestSuiteId implements ScenarioTestSuiteId {
   next(): string {
-    return `suite_${nanoid()}`;
+    return generate(SCENARIO_TEST_SUITE_KSUID_RESOURCE).toString();
   }
 }
 
-/** The worker's own workflow-id generator, over the same nanoid the module used. */
-class WorkerNanoidWorkflowId implements WorkflowId {
-  static create(): WorkerNanoidWorkflowId {
-    return new WorkerNanoidWorkflowId();
+/** The worker's own workflow-id generator, over the same ksuid the module used. */
+class WorkerKsuidWorkflowId implements WorkflowId {
+  static create(): WorkerKsuidWorkflowId {
+    return new WorkerKsuidWorkflowId();
   }
 
-  next(): string {
-    return nanoid();
+  next(kind: string): string {
+    return generate(kind).toString();
   }
 }
 

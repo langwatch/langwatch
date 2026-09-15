@@ -11,7 +11,7 @@ import type { EmailDelivery } from "@langwatch/notification-server";
 import { createLogger, type Logger } from "@langwatch/observability";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
-import { nanoid } from "nanoid";
+import { generate } from "@langwatch/ksuid";
 import { z } from "zod";
 import { nowInstant } from "@langwatch/time";
 
@@ -193,6 +193,14 @@ const CLAIM_EXPIRE_SECONDS = 90_000;
 const CLAIM_SWEEP_INTERVAL_MS = 60_000;
 
 /**
+ * The app's KSUID resource for a containment-notice claim's fencing token
+ * (`KSUID_RESOURCES.AUTOMATION_CLAIM`). The literal rather than the app's
+ * constant table: the value is only ever compared for equality, never
+ * persisted, but the kind still says what the token is for.
+ */
+const AUTOMATION_CLAIM_KSUID_RESOURCE = "automationclaim";
+
+/**
  * The per-pod fallback when Redis is unreachable. Notifies once per pod rather
  * than not at all (which would silently leave runaway automations uncontained).
  */
@@ -214,7 +222,7 @@ async function claimOnce(input: {
   logger: Logger;
 }): Promise<ClaimLease | null> {
   const { connection, key, ttlSeconds = CLAIM_EXPIRE_SECONDS } = input;
-  const token = nanoid();
+  const token = generate(AUTOMATION_CLAIM_KSUID_RESOURCE).toString();
   if (connection) {
     try {
       const taken = await connection.set(key, token, "EX", ttlSeconds, "NX");

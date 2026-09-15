@@ -15,8 +15,8 @@ import {
   RESULT_POLL_MS,
   STICKY_PIN_TTL_SECONDS,
 } from "@langwatch/agent-contract";
+import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
-import { nanoid } from "nanoid";
 
 import {
   buildCallEnvelope,
@@ -44,6 +44,13 @@ import { ConnectedAgentReplyService } from "./connected-agent-reply.service.ts";
 import type { ConnectedAgentRegistryService } from "./connected-agent-registry.service.ts";
 
 const logger = createLogger("langwatch:connected-agents:dispatcher");
+
+/**
+ * The app's KSUID resource for a call id (`KSUID_RESOURCES.CALL`). The
+ * literal rather than the app's constant table: the prefix is part of the
+ * id format already written to the store, so it belongs with the writer.
+ */
+const CALL_KSUID_RESOURCE = "call";
 
 export interface CallDispatcherOptions {
   podId: string;
@@ -103,7 +110,7 @@ export class ConnectedAgentDispatchService {
       throwIfAborted(params.signal);
       const instance = await this.#pickInstance({ ...params, excluded, now });
       attempts += 1;
-      const callId = `call_${nanoid()}`;
+      const callId = generate(CALL_KSUID_RESOURCE).toString();
       const envelope = buildCallEnvelope({
         callId,
         agentId: params.agent.id,

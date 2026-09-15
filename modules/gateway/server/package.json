@@ -103,6 +103,7 @@
     "@langwatch/gateway-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/infrastructure": "workspace:*",
+    "@langwatch/ksuid": "workspace:*",
     "@langwatch/langy-contract": "workspace:*",
     "@langwatch/model-provider-contract": "workspace:*",
     "@langwatch/monitor-contract": "workspace:*",

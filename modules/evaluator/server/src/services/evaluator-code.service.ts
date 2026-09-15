@@ -22,12 +22,16 @@ const stripValues = (fields: CodeEvaluatorConfig["inputs"]): Field[] =>
     type: type as Field["type"],
   }));
 
+/** The ksuid kinds a code evaluator run mints an ad hoc trace and workflow id under. */
+const TRACE_KSUID_KIND = "codeevaluatortrace";
+const WORKFLOW_KSUID_KIND = "codeevaluatorworkflow";
+
 export class EvaluatorCodeService {
   static create(options: {
     repository: EvaluatorRepository;
     workflows: WorkflowApi;
     codeExecution: EvaluatorCodeExecution;
-    generateId: () => string;
+    generateId: (kind: string) => string;
   }): EvaluatorCodeService {
     return new EvaluatorCodeService(options);
   }
@@ -37,7 +41,7 @@ export class EvaluatorCodeService {
       repository: EvaluatorRepository;
       workflows: WorkflowApi;
       codeExecution: EvaluatorCodeExecution;
-      generateId: () => string;
+      generateId: (kind: string) => string;
     },
   ) {}
 
@@ -71,11 +75,11 @@ export class EvaluatorCodeService {
       const event: StudioClientEvent = {
         type: "execute_flow",
         payload: {
-          trace_id: input.traceId ?? `trace_${this.options.generateId()}`,
+          trace_id: input.traceId ?? this.options.generateId(TRACE_KSUID_KIND),
           workflow: EvaluatorCodeService.buildDsl({
             name: evaluator.name,
             config,
-            workflowId: `code_evaluator_${this.options.generateId()}`,
+            workflowId: this.options.generateId(WORKFLOW_KSUID_KIND),
           }),
           inputs: [inputs],
           manual_execution_mode: false,

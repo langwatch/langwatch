@@ -1,4 +1,4 @@
-import { nanoid } from "nanoid";
+import { generate } from "@langwatch/ksuid";
 import type { Field } from "@langwatch/workflow-contract";
 import {
   COMPARISON_COLUMN_REFUSAL,
@@ -9,7 +9,10 @@ import { inferAllEvaluatorMappings } from "../../mapping-inference.ts";
 import { type AddEvaluatorPayload, addEvaluatorPayloadSchema } from "../schemas.ts";
 import { type Transform, TransformError, type WorkbenchState } from "./types.ts";
 
-export const newEvaluatorId = () => `evaluator_${nanoid(8)}`;
+/** The app's KSUID resource for a workbench evaluator id (`KSUID_RESOURCES.EVALUATOR`). */
+const EVALUATOR_KSUID_RESOURCE = "evaluator";
+
+export const newEvaluatorId = () => generate(EVALUATOR_KSUID_RESOURCE).toString();
 
 /**
  * Refuses an evaluator that carries a `comparison` config it cannot own.

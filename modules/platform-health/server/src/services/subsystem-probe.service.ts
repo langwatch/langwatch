@@ -7,9 +7,13 @@ import { randomBytes } from "node:crypto";
 
 import { createLogger } from "@langwatch/observability";
 import { type Instant, nowInstant, Temporal } from "@langwatch/time";
-import { nanoid } from "nanoid";
+import { generate } from "@langwatch/ksuid";
 
 const logger = createLogger("langwatch:platform-health:probes");
+
+/** Canary trace/span ids; never read back, only fed through the real ingestion path. */
+const TRACE_KSUID_RESOURCE = "trace";
+const SPAN_KSUID_RESOURCE = "span";
 
 /** Why a probe did not pass, in a word this codebase owns. */
 export type SubsystemProbeReason =
@@ -90,7 +94,7 @@ export class SubsystemProbeService {
 
   async runCollector({ authToken }: { authToken: string }): Promise<SubsystemProbeOutcome> {
     const [restResponse, otelResponse] = await Promise.all([
-      this.#postRestCanary({ authToken, traceId: `trace_${nanoid()}`, input: "\u{1F423}" }),
+      this.#postRestCanary({ authToken, traceId: generate(TRACE_KSUID_RESOURCE).toString(), input: "\u{1F423}" }),
       this.#postOtelCanary({
         authToken,
         traceId: Buffer.from(randomBytes(16).toString("hex"), "hex").toString("base64"),
@@ -131,7 +135,7 @@ export class SubsystemProbeService {
   }
 
   async runProcessor({ authToken }: { authToken: string }): Promise<SubsystemProbeOutcome> {
-    const restTraceId = `trace_${nanoid()}`;
+    const restTraceId = generate(TRACE_KSUID_RESOURCE).toString();
     const otelTraceId = randomBytes(16).toString("base64");
     const startedAt = nowInstant().epochMilliseconds;
 
@@ -269,7 +273,7 @@ export class SubsystemProbeService {
         spans: [
           {
             trace_id: traceId,
-            span_id: `span_${nanoid()}`,
+            span_id: generate(SPAN_KSUID_RESOURCE).toString(),
             type: "span",
             input: { type: "text", value: input },
             output: { type: "text", value: "\u{1F4AF}" },

@@ -34,6 +34,7 @@
     "@langwatch/evaluator-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/infrastructure": "workspace:*",
+    "@langwatch/ksuid": "workspace:*",
     "@langwatch/model-provider-contract": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",
@@ -45,7 +46,6 @@
     "@trpc/server": "catalog:",
     "hono": "catalog:",
     "hono-openapi": "catalog:",
-    "nanoid": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {

@@ -38,7 +38,7 @@ import { ModelNotConfiguredError, ModelProviderApi } from "@langwatch/model-prov
 import type { FeatureSetup } from "@langwatch/runtime-composition";
 import { UserApi } from "@langwatch/user-contract";
 import { WorkflowApi } from "@langwatch/workflow-contract";
-import { nanoid } from "nanoid";
+import { generate } from "@langwatch/ksuid";
 import { z } from "zod";
 
 import type { EvaluatorRepositories } from "../repositories/evaluator.repositories.ts";
@@ -47,10 +47,8 @@ import { EvaluatorCodeExecutionService } from "../services/evaluator-code-execut
 import { EvaluatorHistoryService } from "../services/evaluator-history.service.ts";
 import { EvaluatorReplicationService } from "../services/evaluator-replication.service.ts";
 import { EvaluatorService as EvaluatorRuntimeService } from "../services/evaluator.service.ts";
-import {
-  EvaluatorGraphAdapter,
-  refusingEvaluatorNlpDispatcher,
-} from "./evaluator-composition.build.ts";
+import { EvaluatorGraphAdapter } from "../repositories/prisma/prisma.evaluator-graph.repository.ts";
+import { refusingEvaluatorNlpDispatcher } from "./evaluator-composition.build.ts";
 
 /**
  * The workflow and monitor rows an evaluator is entangled with. Both belong to
@@ -164,7 +162,7 @@ export class EvaluatorApp implements EvaluatorApi {
         }),
         ...(config.fallbackModels ? { fallbackModels: config.fallbackModels } : {}),
         codeExecution: EvaluatorCodeExecutionService.create(refusingEvaluatorNlpDispatcher()),
-        generateId: () => nanoid(),
+        generateId: (kind: string) => generate(kind).toString(),
       }),
       modelProviders: dependencies.modelProviders,
       permissions: dependencies.permissions,

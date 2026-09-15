@@ -5,7 +5,14 @@
 
 import { AnnotationApi, annotationScoreTrpc } from "@langwatch/annotation-contract";
 import { defineTrpcRouter } from "@langwatch/api/trpc";
-import { nanoid } from "nanoid";
+import { generate } from "@langwatch/ksuid";
+
+/**
+ * The app's KSUID resource for an annotation score row
+ * (`KSUID_RESOURCES.ANNOTATION_SCORE`). The literal, not the constant
+ * table: the prefix belongs with the writer of the id.
+ */
+const ANNOTATION_SCORE_KSUID_RESOURCE = "annotationscore";
 
 function radioOptions(values: readonly string[]) {
   return values.map((value) => ({ label: value, value }));
@@ -16,7 +23,7 @@ export const annotationScoreTrpcTransport = defineTrpcRouter(AnnotationApi, anno
   .withPermission("annotations:manage")
   .handle(async ({ app, input }) =>
     app.upsertScore({
-      id: input.annotationScoreId || nanoid(),
+      id: input.annotationScoreId || generate(ANNOTATION_SCORE_KSUID_RESOURCE).toString(),
       projectId: input.projectId,
       name: input.name,
       dataType: input.dataType,

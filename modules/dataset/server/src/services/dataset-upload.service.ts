@@ -1,4 +1,4 @@
-import { nanoid } from "nanoid";
+import { generate } from "@langwatch/ksuid";
 import {
   convertRowsToColumnTypes,
   datasetColumnsSchema,
@@ -42,6 +42,13 @@ import {
 import { DatasetChunkService } from "./dataset-chunk.service.ts";
 import { stripNullBytes } from "../rules/dataset-sanitize.rules.ts";
 import { nowInstant } from "@langwatch/time";
+
+/**
+ * The app's KSUID resource for a dataset row (`KSUID_RESOURCES.DATASET`).
+ * The literal, not the constant table: `dataset_` is the prefix already
+ * written to storage, so it belongs with the writer.
+ */
+const DATASET_KSUID_RESOURCE = "dataset";
 
 /** Owns upload lifecycle behavior; routes only see DatasetService's contract. */
 export class DatasetUploadAdapter implements DatasetUpload {
@@ -129,7 +136,7 @@ export class DatasetUploadAdapter implements DatasetUpload {
       ),
       renamedHeaders.map((name) => ({ name, type: "string" as const })),
     );
-    const datasetId = `dataset_${nanoid()}`;
+    const datasetId = generate(DATASET_KSUID_RESOURCE).toString();
     const storage = await this.storageResolver.forProject(input.projectId);
     const initial = await this.chunks.writeInitialChunks({
       projectId: input.projectId,
@@ -169,7 +176,7 @@ export class DatasetUploadAdapter implements DatasetUpload {
     const storage = await this.storageResolver.forProject(input.projectId);
     const upload = await storage.createPresignedUpload({ projectId: input.projectId });
     const dataset = await this.datasets.create({
-      id: `dataset_${nanoid()}`,
+      id: generate(DATASET_KSUID_RESOURCE).toString(),
       projectId: input.projectId,
       name: input.name,
       slug,

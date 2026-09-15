@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+import { generate } from "@langwatch/ksuid";
 import {
   StoredObjectBytesMissingError,
   StoredObjectDeletedError,
@@ -48,6 +48,9 @@ export type StoredObjectServiceOptions = Readonly<{
   operationId?: () => string;
 }>;
 
+/** The default upload-operation id, used only where a composition supplies none. */
+const UPLOAD_OPERATION_KSUID_RESOURCE = "upload";
+
 /** The feature's only lifecycle/orchestration class. */
 export class StoredObjectService {
   static create(options: StoredObjectServiceOptions): StoredObjectService {
@@ -68,7 +71,7 @@ export class StoredObjectService {
 
   private constructor(private readonly options: StoredObjectServiceOptions) {
     this.now = options.now ?? nowInstant;
-    this.operationId = options.operationId ?? (() => `upload_${randomUUID()}`);
+    this.operationId = options.operationId ?? (() => generate(UPLOAD_OPERATION_KSUID_RESOURCE).toString());
     this.uploads = StoredObjectUploadService.create({
       ...options,
       now: this.now,

@@ -1,4 +1,5 @@
 import { TraceApi } from "@langwatch/trace-contract";
+import { generate } from "@langwatch/ksuid";
 import type { AgentCallSignal } from "@langwatch/agent-contract";
 import {
   AgentApi,
@@ -61,6 +62,13 @@ import {
   type AgentPresence,
 } from "../services/connected-agent-presence.service.ts";
 import { HttpAgentTestService } from "../services/http-agent-test.service.ts";
+
+/**
+ * The app's KSUID resource for a call's thread id (`KSUID_RESOURCES.THREAD`).
+ * The literal rather than the app's constant table: the prefix is part of
+ * the id format already written to the store, so it belongs with the writer.
+ */
+const THREAD_KSUID_RESOURCE = "thread";
 
 const agentAppConfigSchema = z.object({
   publicBaseUrl: z.url(),
@@ -396,7 +404,7 @@ export class AgentApp implements AgentApi {
         isSticky: agent.config.sticky ?? false,
       },
       call: {
-        threadId: input.threadId ?? crypto.randomUUID(),
+        threadId: input.threadId ?? generate(THREAD_KSUID_RESOURCE).toString(),
         messages: input.messages,
         newMessages: input.newMessages ?? input.messages.slice(-1),
         params: input.params ?? {},

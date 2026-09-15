@@ -4,12 +4,12 @@
  */
 import { isAccountManagedPlan } from "@langwatch/entitlement-contract";
 import { createLogger } from "@langwatch/observability";
+import { generate } from "@langwatch/ksuid";
 import {
   InviteNotFoundError,
   OrganizationNotFoundError,
   type OrganizationInvite,
 } from "@langwatch/organization-contract";
-import { nanoid } from "nanoid";
 import type { OrganizationInviteRepository } from "../repositories/organization-invite.repository.ts";
 import type { OrganizationInviteMail } from "../app/organization.members.ts";
 import { resolveInviteDisplayStatus } from "../rules/invite-display-status.rules.ts";
@@ -22,6 +22,9 @@ import { InviteCreationService } from "./invite-creation.service.ts";
 import { nowInstant, toDate } from "@langwatch/time";
 
 const logger = createLogger("langwatch:invites:lifecycle");
+
+/** The app's KSUID resource for an invite's acceptance code. */
+const INVITE_CODE_KSUID_RESOURCE = "invite";
 
 export class InviteLifecycleService {
   static create(deps: InviteServiceDependencies): InviteLifecycleService {
@@ -63,7 +66,7 @@ export class InviteLifecycleService {
       throw new OrganizationNotFoundError();
     }
 
-    const freshCode = nanoid();
+    const freshCode = generate(INVITE_CODE_KSUID_RESOURCE).toString();
     const freshExpiration = toDate(nowInstant().add({ milliseconds: INVITE_EXPIRATION_MS }));
     const claimed = await this.invites.rotateInviteCode({
       inviteId: existing.id,
@@ -219,7 +222,7 @@ export class InviteLifecycleService {
     input: CreatePaymentPendingInviteInput,
   ): Promise<OrganizationInvite> {
     this.creation.assertAssignmentsWithinInvitedSeat(input);
-    const inviteCode = nanoid();
+    const inviteCode = generate(INVITE_CODE_KSUID_RESOURCE).toString();
 
     return this.invites.createPaymentPendingInvite({
       email: input.email,

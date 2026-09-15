@@ -39,6 +39,15 @@ import type { StudioEventPreparer } from "./studio-event-preparer.service.ts";
 import { WorkflowDatasetCopyService } from "./workflow-dataset-copy.service.ts";
 import { WorkflowDslService } from "./workflow-dsl.service.ts";
 
+/**
+ * The app's KSUID resources for a workflow row and a version row
+ * (`KSUID_RESOURCES.WORKFLOW`, `KSUID_RESOURCES.WORKFLOW_VERSION`). The
+ * literals rather than the app's constant table: the prefix is part of the
+ * id format already written to the database, so it belongs with the writer.
+ */
+const WORKFLOW_KSUID_RESOURCE = "workflow";
+const WORKFLOW_VERSION_KSUID_RESOURCE = "workflowversion";
+
 export type WorkflowServiceOptions = {
   repository: WorkflowRepository;
   datasets: DatasetApi;
@@ -250,7 +259,7 @@ export class WorkflowService {
     input: import("@langwatch/workflow-contract").CreateWorkflowCommand,
   ): Promise<{ workflow: WorkflowWithVersion; version: WorkflowVersion }> {
     const command = this.parse(createWorkflowCommandSchema, input);
-    const id = command.id ?? `workflow_${this.id()}`;
+    const id = command.id ?? this.id(WORKFLOW_KSUID_RESOURCE);
     await this.options.repository.createWorkflow({
       id,
       projectId: command.projectId,
@@ -313,7 +322,7 @@ export class WorkflowService {
     const major = Number.parseInt((latest?.version ?? "0.0").split(".")[0] ?? "0", 10);
     const dsl = { ...command.dsl, workflow_id: command.workflowId, state: {} };
     const persist: PersistWorkflowVersionInput = {
-      id: this.id(),
+      id: this.id(WORKFLOW_VERSION_KSUID_RESOURCE),
       workflowId: command.workflowId,
       projectId: command.projectId,
       parentId: workflow.currentVersionId,
@@ -402,7 +411,7 @@ export class WorkflowService {
           targetProjectId: command.targetProjectId,
         })
       : sourceDsl;
-    const workflowId = command.id ?? `workflow_${this.id()}`;
+    const workflowId = command.id ?? this.id(WORKFLOW_KSUID_RESOURCE);
     const workflow = await this.options.repository.createWorkflow({
       id: workflowId,
       projectId: command.targetProjectId,
@@ -495,8 +504,8 @@ export class WorkflowService {
     return version;
   }
 
-  private id(): string {
-    return this.options.ids.next();
+  private id(kind: string): string {
+    return this.options.ids.next(kind);
   }
 
   private parse<T>(

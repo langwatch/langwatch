@@ -9,7 +9,15 @@ import {
   type DeleteDatasetRecordsInput,
   type UpdateDatasetRecordInput,
 } from "@langwatch/dataset-contract";
+import { generate } from "@langwatch/ksuid";
 import type { DatasetContent, DatasetStorageResolver } from "../app/dataset.app.ts";
+
+/**
+ * The app's KSUID resource for a chunk-line row (`KSUID_RESOURCES.RECORD`).
+ * The literal, not the constant table: `record_` is the prefix every reader
+ * of the s3_jsonl layout already expects.
+ */
+const RECORD_KSUID_RESOURCE = "record";
 import type { DatasetContentRepository } from "../repositories/dataset-content.repository.ts";
 import type { ChunkOffset } from "../rules/dataset-chunking.rules.ts";
 import { DatasetChunkService } from "../services/dataset-chunk.service.ts";
@@ -306,7 +314,7 @@ function toDatasetRecord(line: unknown, dataset: Dataset): DatasetRecord {
       ? (line as { id?: unknown; entry: unknown })
       : { entry: line };
   return datasetRecordSchema.parse({
-    id: typeof value.id === "string" ? value.id : `record_${crypto.randomUUID()}`,
+    id: typeof value.id === "string" ? value.id : generate(RECORD_KSUID_RESOURCE).toString(),
     entry: value.entry,
     datasetId: dataset.id,
     projectId: dataset.projectId,

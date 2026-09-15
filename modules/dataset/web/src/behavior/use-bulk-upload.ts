@@ -1,7 +1,7 @@
 /** Fire-and-forget orchestrator (not a React effect): closing drawer doesn't
  * abort in-flight files.
  */
-import { nanoid } from "nanoid";
+import { generate } from "@langwatch/ksuid";
 import { useCallback, useRef, useState } from "react";
 import type { DatasetConfirmColumns } from "@langwatch/dataset-contract";
 import { detectFileFormat } from "@langwatch/dataset-contract";
@@ -28,6 +28,9 @@ export const BULK_MAX_UPLOAD_BYTES = 5 * 1024 * 1024 * 1024;
 /** Bounded headers read in parallel when files are added, so a big drop doesn't
  *  jank the UI thread. */
 const HEADER_PARSE_BATCH = 4;
+
+/** Never sent to the server: a browser-local key for one row of this widget's list. */
+const BULK_FILE_KSUID_RESOURCE = "bulkfile";
 
 export type BulkFileStatus =
   | "pending" // accepted, ready to upload
@@ -139,7 +142,7 @@ export function useBulkUpload(
           return makeRejected(file, columns, "too-large");
         }
         return {
-          id: nanoid(),
+          id: generate(BULK_FILE_KSUID_RESOURCE).toString(),
           file,
           name: baseNameFromFilename(file.name),
           columns,
@@ -314,7 +317,7 @@ const makeRejected = (
   columns: DatasetConfirmColumns | null,
   reason: "unsupported" | "too-large",
 ): BulkFile => ({
-  id: nanoid(),
+  id: generate(BULK_FILE_KSUID_RESOURCE).toString(),
   file,
   name: baseNameFromFilename(file.name),
   columns,

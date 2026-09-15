@@ -1,5 +1,5 @@
 import { nowInstant } from "@langwatch/time";
-import { nanoid } from "nanoid";
+import { generate } from "@langwatch/ksuid";
 import {
   copyDatasetInputSchema,
   datasetLookupInputSchema,
@@ -61,6 +61,13 @@ export type DatasetServiceOptions = {
   generateId?: () => string;
 };
 
+/**
+ * The default id minter, used only where a composition (a test, most often)
+ * supplies no `generateId` of its own — every real composition already does
+ * (`dataset.app.ts`'s own `DATASET_RECORD_KSUID_RESOURCE`).
+ */
+const DATASET_RECORD_KSUID_RESOURCE = "datasetrecord";
+
 export class DatasetService {
   private readonly generateId: () => string;
 
@@ -69,7 +76,7 @@ export class DatasetService {
   private readonly naming: DatasetNamingService;
 
   private constructor(private readonly options: DatasetServiceOptions) {
-    this.generateId = options.generateId ?? nanoid;
+    this.generateId = options.generateId ?? (() => generate(DATASET_RECORD_KSUID_RESOURCE).toString());
     this.naming = DatasetNamingService.create(options.repository);
     this.records = DatasetRecordService.create({
       options,

@@ -3,8 +3,15 @@
  */
 import type { Experiment, ExperimentType } from "@langwatch/experiment-contract";
 import type { ExperimentService } from "./experiment.service.ts";
-import { nanoid } from "nanoid";
+import { generate } from "@langwatch/ksuid";
 import originalSlugify from "slugify";
+
+/**
+ * The app's KSUID resource for an experiment row (`KSUID_RESOURCES.EXPERIMENT`).
+ * The literal, not the constant table: the prefix is part of the id format
+ * already written to the database, so it belongs with the writer.
+ */
+const EXPERIMENT_KSUID_RESOURCE = "experiment";
 
 /** What an SDK names an experiment by. Either identifier, or both. */
 export type ExperimentFindOrCreateInput = Readonly<{
@@ -55,7 +62,7 @@ export class ExperimentFindOrCreateService {
 
     if (!experiment && slug) {
       return await this.experiments.save({
-        id: `experiment_${nanoid()}`,
+        id: generate(EXPERIMENT_KSUID_RESOURCE).toString(),
         name: input.experimentName ?? input.experimentSlug ?? slug,
         requestedSlug: slug,
         slugMode: "deduplicate",

@@ -2,7 +2,7 @@
  * ADR-032 / AC37 (issue #4133): Azure Blob implementation of `DatasetStorage`.
  */
 import type { Readable } from "node:stream";
-import { nanoid } from "nanoid";
+import { generate } from "@langwatch/ksuid";
 import {
   assertKeyWithinProject,
   assertNoTraversal,
@@ -45,6 +45,14 @@ async function streamToString(stream: Readable): Promise<string> {
   }
   return Buffer.concat(chunks).toString("utf-8");
 }
+
+/**
+ * The app's KSUID resource for a staged upload's tracking id
+ * (`KSUID_RESOURCES.PRESIGNED_UPLOAD`). The literal, not the constant table:
+ * the value is only ever a staging-key path segment, but the kind still
+ * says what it is for.
+ */
+const PRESIGNED_UPLOAD_KSUID_RESOURCE = "presignedupload";
 
 export class AzureDatasetStorageAdapter implements DatasetStorage {
   static create(resolver: DatasetAzureConfigResolver): AzureDatasetStorageAdapter {
@@ -210,7 +218,7 @@ export class AzureDatasetStorageAdapter implements DatasetStorage {
    * doesn't implement — out of scope here).
    */
   createPresignedUpload({ projectId }: { projectId: string }): Promise<PresignedUpload> {
-    const uploadId = nanoid();
+    const uploadId = generate(PRESIGNED_UPLOAD_KSUID_RESOURCE).toString();
     return Promise.resolve({
       uploadId,
       key: stagingUploadKey(projectId, uploadId),

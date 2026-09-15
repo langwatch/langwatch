@@ -1,7 +1,7 @@
 /**
  * ADR-032: the streaming chunk writer — the I/O orchestrator that turns a
  */
-import { nanoid } from "nanoid";
+import { generate } from "@langwatch/ksuid";
 import {
   CHUNK_MAX_BYTES,
   type ChunkedDatasetMeta,
@@ -10,6 +10,13 @@ import {
   chunkMetaOf,
 } from "../rules/dataset-chunking.rules.ts";
 import type { DatasetStorage } from "../app/dataset.app.ts";
+
+/**
+ * The app's KSUID resource for a chunk-line row (`KSUID_RESOURCES.RECORD`).
+ * The literal, not the constant table: `record_` is the prefix every reader
+ * of the s3_jsonl layout already expects.
+ */
+const RECORD_KSUID_RESOURCE = "record";
 
 /**
  * A buffer that accumulates parsed records and flushes them to chunk objects as soon as their
@@ -46,12 +53,12 @@ export class StreamingChunkWriterService {
   ) {}
 
   /**
-   * Buffer one row. Mints a fresh `record_<nanoid>` id for new rows (normalize / upload);
+   * Buffer one row. Mints a fresh `record_<ksuid>` id for new rows (normalize / upload);
    * PRESERVES a caller-supplied `id` when given — the PG→S3 backfill passes the existing
    * `DatasetRecord.id` so edit/delete keeps targeting the same row after cutover (I-MIG).
    */
   async push(entry: unknown, opts?: { id?: string }): Promise<void> {
-    const record = { id: opts?.id ?? `record_${nanoid()}`, entry };
+    const record = { id: opts?.id ?? generate(RECORD_KSUID_RESOURCE).toString(), entry };
     // Track an approximate serialized size to decide when to roll over. The
     // authoritative byteSize is recomputed inside toJsonlChunks on flush.
     this.bufferBytes += Buffer.byteLength(JSON.stringify(record), "utf8") + 1;

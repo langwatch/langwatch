@@ -29,10 +29,10 @@
     "@langwatch/dataset-contract": "workspace:*",
     "@langwatch/evaluator-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
+    "@langwatch/ksuid": "workspace:*",
     "@langwatch/prompt-contract": "workspace:*",
     "@langwatch/runtime-composition": "workspace:*",
     "@langwatch/time": "workspace:*",
-    "nanoid": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {

@@ -1,5 +1,5 @@
 import { Alert, Box, HStack, Spacer, VStack } from "@chakra-ui/react";
-import { nanoid } from "nanoid";
+import { generate } from "@langwatch/ksuid";
 import { useEffect, useMemo, useState } from "react";
 import { AutosaveStatus } from "../../../ui/elements/experiments-v3/autosave-status.tsx";
 import { EditableHeading } from "../../../ui/elements/experiments-v3/editable-heading.tsx";
@@ -47,6 +47,11 @@ import {
   useRegisterLangyActions,
   useRegisterLangyHandlers,
 } from "@langwatch/langy-web/surfaces/langy-page-registration";
+
+/** The app's KSUID resource for a workbench evaluator id (`KSUID_RESOURCES.EVALUATOR`). */
+const EVALUATOR_KSUID_RESOURCE = "evaluator";
+/** The app's KSUID resource for a dataset record row (`KSUID_RESOURCES.RECORD`). */
+const RECORD_KSUID_RESOURCE = "record";
 
 /**
  * Experiments Workbench Page
@@ -219,7 +224,7 @@ export default function ExperimentsWorkbenchPage() {
           fields: { identifier: string; type: string; optional?: boolean }[];
         };
         addEvaluator({
-          id: `evaluator_${nanoid()}`,
+          id: generate(EVALUATOR_KSUID_RESOURCE).toString(),
           evaluatorType: evaluatorType as never,
           inputs: fields as never,
           dbEvaluatorId,
@@ -290,7 +295,7 @@ export default function ExperimentsWorkbenchPage() {
           ...(initialRows && initialRows.length > 0
             ? {
                 datasetRecords: initialRows.map((row) => ({
-                  id: nanoid(),
+                  id: generate(RECORD_KSUID_RESOURCE).toString(),
                   entry: row,
                 })) as never,
               }
@@ -312,7 +317,7 @@ export default function ExperimentsWorkbenchPage() {
         await createDatasetRecords.mutateAsync({
           projectId,
           datasetId,
-          entries: rows.map((row) => ({ id: nanoid(), ...row })) as never,
+          entries: rows.map((row) => ({ id: generate(RECORD_KSUID_RESOURCE).toString(), ...row })) as never,
         });
         await utils.dataset.getAll.invalidate({ projectId });
         return projectSlug

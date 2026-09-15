@@ -27,6 +27,7 @@
     "@langwatch/eventing": "workspace:*",
     "@langwatch/github-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
+    "@langwatch/ksuid": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/organization-contract": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",

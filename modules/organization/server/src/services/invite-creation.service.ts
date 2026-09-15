@@ -2,7 +2,7 @@
  * Creating invitations: the duplicate and membership guards, the seat-licence check, the team
  * assignments each invite carries, and the batch transaction that persists them.
  */
-import { nanoid } from "nanoid";
+import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import {
   AlreadyOrganizationMemberError,
@@ -37,6 +37,9 @@ import {
 } from "../rules/invite-contracts.rules.ts";
 
 const logger = createLogger("langwatch:invites");
+
+/** The app's KSUID resource for an invite's acceptance code. */
+const INVITE_CODE_KSUID_RESOURCE = "invite";
 
 export class InviteCreationService {
   static create(deps: InviteServiceDependencies): InviteCreationService {
@@ -216,7 +219,7 @@ export class InviteCreationService {
 
     return this.invites.createPendingInvite({
       email: input.email,
-      inviteCode: nanoid(),
+      inviteCode: generate(INVITE_CODE_KSUID_RESOURCE).toString(),
       expiration: toDate(nowInstant().add({ milliseconds: INVITE_EXPIRATION_MS })),
       organizationId: input.organizationId,
       teamIds: input.teamIds,

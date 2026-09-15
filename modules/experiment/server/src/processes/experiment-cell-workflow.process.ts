@@ -1,4 +1,4 @@
-import { nanoid } from "nanoid";
+import { generate } from "@langwatch/ksuid";
 import type {
   EvaluatorConfig,
   LocalPromptConfig,
@@ -54,6 +54,9 @@ type EvaluatorDbConfig = {
   settings?: Record<string, unknown>;
 };
 
+/** An ad hoc, single-cell workflow's id; never a persisted Workflow row. */
+const CELL_WORKFLOW_KSUID_RESOURCE = "evalv3workflow";
+
 /**
  * Builds a mini-workflow for executing a single cell (row + target +
  * evaluators).
@@ -69,7 +72,7 @@ export const buildCellWorkflow = (
   const { cell, datasetColumns } = input;
   const { targetConfig, evaluatorConfigs, datasetEntry, rowIndex } = cell;
 
-  const workflowId = `eval_v3_${nanoid(8)}`;
+  const workflowId = generate(CELL_WORKFLOW_KSUID_RESOURCE).toString();
 
   // Build entry node with the single row of data
   const entryNode = buildEntryNode(datasetColumns, datasetEntry);
@@ -192,7 +195,7 @@ export const buildEvaluatorCellWorkflow = ({
   return {
     workflow: {
       spec_version: LATEST_SPEC_VERSION,
-      workflow_id: `eval_v3_${nanoid(8)}`,
+      workflow_id: generate(CELL_WORKFLOW_KSUID_RESOURCE).toString(),
       name: `Evaluation V3 - Row ${rowIndex}`,
       icon: "🧪",
       description: `Evaluators for row ${rowIndex}`,

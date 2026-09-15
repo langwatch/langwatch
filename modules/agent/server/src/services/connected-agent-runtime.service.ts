@@ -4,7 +4,7 @@
  * by the composition root (ADR-093) rather than a module singleton.
  */
 
-import { nanoid } from "nanoid";
+import { generate } from "@langwatch/ksuid";
 
 import type { SessionStateStore } from "@langwatch/redis-client/session-state";
 import { ConnectedAgentDispatchService } from "./connected-agent-dispatch.service.ts";
@@ -12,6 +12,13 @@ import { ConnectedAgentRegistryService } from "./connected-agent-registry.servic
 import { ConnectedAgentInstanceOwnershipService } from "./connected-agent-instance-ownership.service.ts";
 
 import type { AgentCallSignal, DispatchAgent, DispatchCall } from "@langwatch/agent-contract";
+
+/**
+ * The app's KSUID resource for a pod id (`KSUID_RESOURCES.POD`). The literal
+ * rather than the app's constant table: the prefix is part of the id format
+ * already carried by every running instance, so it belongs with the writer.
+ */
+const POD_KSUID_RESOURCE = "pod";
 
 export interface InstanceMeta {
   instanceId: string;
@@ -53,7 +60,7 @@ export interface ConnectedAgentRuntime {
 export class ConnectedAgentRuntimeService {
   /** Builds a runtime around one store; tests build two to play two pods. */
   static create({
-    podId = `pod_${nanoid(10)}`,
+    podId = generate(POD_KSUID_RESOURCE).toString(),
     store,
     firstTurnGraceMs,
     firstTurnPollMs,

@@ -25,6 +25,7 @@
     "@langwatch/runtime-composition": "workspace:*",
     "@langwatch/api": "workspace:*",
     "@langwatch/hosted-mcp-contract": "workspace:*",
+    "@langwatch/ksuid": "workspace:*",
     "@langwatch/mcp-server": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/time": "workspace:*",

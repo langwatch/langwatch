@@ -12,21 +12,21 @@ import { ClickHouseExperimentDspyRepository } from "../repositories/clickhouse/c
 import { ClickHouseExperimentRunRepository } from "../repositories/clickhouse/clickhouse.experiment-run.repository.ts";
 import { ExperimentDspyRetentionRepository } from "../repositories/experiment-dspy-retention.repository.ts";
 import { ExperimentService } from "../services/experiment.service.ts";
+import { PrismaExperimentPeopleRepository } from "../repositories/prisma/prisma.experiment-people.repository.ts";
 import { PrismaExperimentRepository } from "../repositories/prisma/prisma.experiment.repository.ts";
 import { PrismaExperimentWorkflowVersionRepository } from "../repositories/prisma/prisma.experiment-workflow-version.repository.ts";
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
+import type { ProcessMembers } from "@langwatch/infrastructure/members";
 import type { Logger } from "@langwatch/observability";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { PromptApi } from "@langwatch/prompt-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
-import { nanoid } from "nanoid";
+import { generate } from "@langwatch/ksuid";
 
 import type {
   ExperimentAppDependencies,
   ExperimentBroadcast,
   ExperimentMonitorCascade,
   ExperimentModelCosts,
-  ExperimentPeople,
   ExperimentPermissions,
   ExperimentWorkflowAuthoring,
 } from "./experiment.app.ts";
@@ -51,6 +51,9 @@ const DSPY_DEFAULT_RETENTION_DAYS = 49;
 
 /** Cells in flight at once when a run names no limit of its own. */
 const RUN_DEFAULT_CONCURRENCY = 10;
+
+/** A draft name and an archived-slug disambiguator; never a row's own id. */
+const EXPERIMENT_DISAMBIGUATOR_KSUID_RESOURCE = "expdisambig";
 
 /**
  * The slug an experiment is saved under. Copied verbatim from the deleted
@@ -204,19 +207,6 @@ function inProcessBroadcast(): ExperimentBroadcast {
   };
 }
 
-/** The display names behind a version history's author ids. */
-function prismaPeople(prisma: PrismaClient): ExperimentPeople {
-  return {
-    namesOf: async (ids) => {
-      if (ids.length === 0) return [];
-      return prisma.user.findMany({
-        where: { id: { in: [...ids] } },
-        select: { id: true, name: true },
-      });
-    },
-  };
-}
-
 /** The two allowance checks this process answers through its ONE authorization service. */
 function authzPermissions(authz: AuthzApi): ExperimentPermissions & ExperimentWorkbenchPermissions {
   return {
@@ -245,7 +235,7 @@ function monitorCascade(monitors: MonitorApi): ExperimentMonitorCascade {
 
 /** What this process hands `ExperimentApp` at boot. */
 export function buildExperimentInfrastructure(input: {
-  prisma: PrismaClient;
+  prisma: ProcessMembers["prisma"];
   clickhouse: ClickHouseQueryClient;
   logger: Logger;
   dependencies: {
@@ -278,7 +268,7 @@ export function buildExperimentInfrastructure(input: {
       telemetry: runHistoryTelemetry,
     }),
     slugify: slugifyExperimentName,
-    newId: () => nanoid(8),
+    newId: () => generate(EXPERIMENT_DISAMBIGUATOR_KSUID_RESOURCE).toString(),
     references: {
       prompts: dependencies.prompts,
       agents: dependencies.agents,
@@ -314,7 +304,7 @@ export function buildExperimentInfrastructure(input: {
     broadcast: inProcessBroadcast(),
     permissions: authz,
     workbenchPermissions: authz,
-    people: prismaPeople(prisma),
+    people: PrismaExperimentPeopleRepository.create(prisma),
     modelCosts: refusing<ExperimentModelCosts>("model cost catalogue"),
     workflowAuthoring: refusing<ExperimentWorkflowAuthoring>("wizard workflow authoring"),
     runLoop,

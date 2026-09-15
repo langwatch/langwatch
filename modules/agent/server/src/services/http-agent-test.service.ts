@@ -15,7 +15,7 @@ import {
   type Field,
   type StudioWorkflow,
 } from "@langwatch/workflow-contract";
-import { nanoid } from "nanoid";
+import { generate } from "@langwatch/ksuid";
 import {
   buildAgentTestTrace,
   buildTraceparentHeader,
@@ -25,6 +25,15 @@ import {
 
 const logger = createLogger("langwatch:httpProxy");
 type ExecutionState = NonNullable<BaseComponent["execution_state"]>;
+
+/**
+ * The app's KSUID resources for an agent test's ad hoc trace and workflow ids
+ * (`KSUID_RESOURCES.AGENT_TEST_TRACE`, `KSUID_RESOURCES.AGENT_TEST_WORKFLOW`).
+ * The literals rather than the app's constant table: the prefix is part of
+ * the id format already written to storage, so it belongs with the writer.
+ */
+const AGENT_TEST_TRACE_KSUID_RESOURCE = "agenttesttrace";
+const AGENT_TEST_WORKFLOW_KSUID_RESOURCE = "agenttestworkflow";
 
 export class HttpAgentTestService {
   readonly #workflows: WorkflowApi;
@@ -53,7 +62,7 @@ export class HttpAgentTestService {
       variables: templateVariables,
       parameters: buildHttpNodeParameters({ ...call, headers, bodyTemplate }),
     });
-    const traceId = traceIds?.traceId ?? `agent-test-${nanoid(12)}`;
+    const traceId = traceIds?.traceId ?? generate(AGENT_TEST_TRACE_KSUID_RESOURCE).toString();
     const startedAt = nowInstant().epochMilliseconds;
 
     let result: HttpProxyResult;
@@ -130,7 +139,7 @@ function buildAgentTestWorkflow(input: {
 }): StudioWorkflow {
   return {
     spec_version: LATEST_SPEC_VERSION,
-    workflow_id: `agent_test_${nanoid(8)}`,
+    workflow_id: generate(AGENT_TEST_WORKFLOW_KSUID_RESOURCE).toString(),
     name: "Agent test",
     icon: "🔌",
     description: "One HTTP agent invocation from the agent editor",

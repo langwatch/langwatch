@@ -54,7 +54,6 @@
     "@trpc/server": "catalog:",
     "hono": "catalog:",
     "hono-openapi": "catalog:",
-    "nanoid": "catalog:",
     "safe-regex2": "catalog:",
     "slugify": "catalog:",
     "zod": "catalog:",

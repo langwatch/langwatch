@@ -41,7 +41,6 @@ import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 import { getInputsOutputs, type StudioEdge, type StudioNode } from "@langwatch/workflow-contract";
 import { HTTPException } from "hono/http-exception";
-import { nanoid } from "nanoid";
 import { ZodError as ZodErrorClass, z } from "zod";
 import { fromZodError } from "zod-validation-error";
 
@@ -71,6 +70,10 @@ const logger = createLogger("langwatch:evaluations-legacy");
  */
 const EVALUATION_KSUID_PREFIX = "eval";
 const COST_KSUID_PREFIX = "cost";
+/** A throwaway slug, minted only when the caller named neither — a lookup that always misses. */
+const LEGACY_EVAL_SLUG_KSUID_PREFIX = "evalslug";
+/** The ksuid prefix a dataset-evaluation row is minted with. Same reason as above. */
+const BATCH_EVALUATION_KSUID_PREFIX = "batchevaluation";
 
 /**
  * The model an evaluator falls back to when the project's cascade names none.
@@ -497,7 +500,8 @@ async function evaluateDataset({
   }
 
   const { datasetSlug } = params;
-  const experimentSlug = params.experimentSlug ?? params.batchId ?? nanoid();
+  const experimentSlug =
+    params.experimentSlug ?? params.batchId ?? generate(LEGACY_EVAL_SLUG_KSUID_PREFIX).toString();
   const evaluation = params.evaluation;
   const monitor = await app.findMonitorBySlug({ projectId, slug: evaluation });
   const checkType = monitor?.checkType ?? evaluation;
@@ -546,7 +550,7 @@ async function evaluateDataset({
 
   if ("cost" in result && result.cost) {
     await app.recordEvaluationCost({
-      id: `cost_${nanoid()}`,
+      id: generate(COST_KSUID_PREFIX).toString(),
       projectId,
       costType: "BATCH_EVALUATION",
       costName: evaluation,
@@ -560,7 +564,7 @@ async function evaluateDataset({
   const { score, passed, details, cost, status, label } = result as EvaluationResult;
 
   await app.recordDatasetEvaluationRow({
-    id: nanoid(),
+    id: generate(BATCH_EVALUATION_KSUID_PREFIX).toString(),
     experimentId: experiment.id,
     projectId,
     data: data.data,

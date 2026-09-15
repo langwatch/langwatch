@@ -6,8 +6,9 @@
 
 // biome-ignore-all lint/suspicious/noEmptyBlockStatements: deliberate no-ops.
 
-import { createHash, randomUUID } from "node:crypto";
+import { createHash } from "node:crypto";
 import type { IncomingMessage, ServerResponse } from "node:http";
+import { generate } from "@langwatch/ksuid";
 import {
   handlerManagedAuth,
   publicEndpoint,
@@ -69,6 +70,11 @@ const GRANT_REVOKED_CODE = "mcp_grant_revoked";
 
 /** Max concurrent sessions per API key. */
 const MAX_SESSIONS_PER_KEY = 20;
+
+/** Entropy sources; never read back by kind, only ever re-hashed or opaque. */
+const OAUTH_TOKEN_ENTROPY_KSUID_RESOURCE = "mcptoken";
+const OAUTH_CLIENT_KSUID_RESOURCE = "mcp";
+const SESSION_KSUID_RESOURCE = "mcpsession";
 
 /**
  * Derive an opaque key from an API key for use in Redis key names.
@@ -720,7 +726,9 @@ export function createMcpHandler(dependencies: HostedMcpDependencies): McpHandle
   // -------------------------------------------------------------------------
 
   function generateAccessToken(): string {
-    return createHash("sha256").update(randomUUID()).digest("hex");
+    return createHash("sha256")
+      .update(generate(OAUTH_TOKEN_ENTROPY_KSUID_RESOURCE).toString())
+      .digest("hex");
   }
 
   async function storeOAuthToken(
@@ -1077,7 +1085,7 @@ export function createMcpHandler(dependencies: HostedMcpDependencies): McpHandle
     // OAuth flow, so any registration succeeds. What DOES matter is binding
     // this client_id to the redirect_uris it registered with, so /mcp/authorize
     // can reject a request that later shows up with a different one.
-    const clientId = `mcp_${randomUUID().replace(/-/g, "")}`;
+    const clientId = generate(OAUTH_CLIENT_KSUID_RESOURCE).toString();
     const clientName = typeof body.client_name === "string" ? body.client_name : "MCP Client";
 
     try {
@@ -1450,7 +1458,7 @@ export function createMcpHandler(dependencies: HostedMcpDependencies): McpHandle
       }
 
       const transport = new StreamableHTTPServerTransport({
-        sessionIdGenerator: () => randomUUID(),
+        sessionIdGenerator: () => generate(SESSION_KSUID_RESOURCE).toString(),
         onsessioninitialized: (id) => {
           sessions.set(id, {
             transport,

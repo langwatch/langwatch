@@ -6,8 +6,8 @@ import { AnalyticsComparisonWindowService } from "@langwatch/analytics-server";
 import type { EvaluationApi, MonitorPerformanceQuery } from "@langwatch/evaluation-contract";
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
 import { EvaluatorReplicationService } from "@langwatch/evaluator-server";
-import { HandledError } from "@langwatch/handled-error";
-import { nanoid } from "nanoid";
+import { MonitorCapabilityUnavailableError } from "@langwatch/monitor-contract";
+import { generate } from "@langwatch/ksuid";
 
 import type {
   MonitorAppInfrastructure,
@@ -127,18 +127,8 @@ class EvaluationApiMonitorPerformance implements MonitorPerformance {
   }
 }
 
-/** A capability this deployment did not compose, refused by name. */
-class MonitorCapabilityUnavailableError extends HandledError {
-  declare readonly code: "service_unavailable";
-
-  constructor(capability: string) {
-    super("service_unavailable", `This deployment has no ${capability}.`, {
-      httpStatus: 503,
-      fault: "platform",
-    });
-    this.name = "MonitorCapabilityUnavailableError";
-  }
-}
+/** The app's KSUID resource for a monitor row (`KSUID_RESOURCES.MONITOR`). */
+const MONITOR_KSUID_RESOURCE = "monitor";
 
 /** What this process hands `MonitorApp` at boot, built from its own peers. */
 export function buildMonitorInfrastructure(input: {
@@ -151,6 +141,6 @@ export function buildMonitorInfrastructure(input: {
     evaluators: new ProcessMonitorEvaluators(evaluators),
     performance: composeMonitorPerformance(evaluation),
     replication: new ProcessMonitorReplication(evaluators, unreplicatedEvaluatorWorkflows()),
-    generateId: () => `monitor_${nanoid()}`,
+    generateId: () => generate(MONITOR_KSUID_RESOURCE).toString(),
   };
 }

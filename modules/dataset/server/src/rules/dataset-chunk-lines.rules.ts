@@ -3,7 +3,7 @@
  * `{ id, entry }` line wrapper, the persisted offset index, the readiness gate, and the
  * old-to-new column remap. No storage or database reaches into this module.
  */
-import { nanoid } from "nanoid";
+import { generate } from "@langwatch/ksuid";
 import {
   DatasetNotReadyError,
   DuplicateRecordIdError,
@@ -46,6 +46,13 @@ export type RecomputedDatasetCounts = {
  * can target it. Mirrors the shape the normalize/append paths write. */
 export type ChunkLine = { id: string; entry: unknown };
 
+/**
+ * The app's KSUID resource for a chunk-line row (`KSUID_RESOURCES.RECORD`).
+ * The literal, not the constant table: `record_` is the prefix every reader
+ * of the s3_jsonl layout already expects.
+ */
+const RECORD_KSUID_RESOURCE = "record";
+
 export const mapPreviousColumnsToNewColumns = (
   records: DatasetRecordInput[],
   previousColumns: DatasetColumns,
@@ -82,7 +89,7 @@ export const mapPreviousColumnsToNewColumns = (
 
 /**
  * Wrap raw row entries as `{ id, entry }` chunk lines: mint a stable per-row id
- * (`record_<nanoid>`), and scrub U+0000 from the entry (I-NULL). `forcedIds`
+ * (`record_<ksuid>`), and scrub U+0000 from the entry (I-NULL). `forcedIds`
  * pins each new row's id. Shared by the append and born-on-storage paths.
  */
 export const toChunkLines = (
@@ -90,7 +97,7 @@ export const toChunkLines = (
   { forcedIds }: { forcedIds?: (string | undefined)[] } = {},
 ): ChunkLine[] => {
   const lines = entries.map((entry, i) => ({
-    id: forcedIds?.[i] ?? `record_${nanoid()}`,
+    id: forcedIds?.[i] ?? generate(RECORD_KSUID_RESOURCE).toString(),
     entry: stripNullBytes(entry),
   }));
   // I-PG: row ids are unique within a dataset (the legacy PG PK). Minted ids can't

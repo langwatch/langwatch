@@ -10,7 +10,7 @@ import {
   MANAGEMENT_API_VERSION,
 } from "@langwatch/api/rest";
 import { moduleApi } from "@langwatch/runtime-composition";
-import { nanoid } from "nanoid";
+import { generate } from "@langwatch/ksuid";
 import { z } from "zod";
 
 import { GatewaySpendCursorAdapter } from "../adapters/gateway-spend-cursor.adapter.ts";
@@ -468,6 +468,8 @@ const spendSummariesQuerySchema = z
 const REPLAY_MAX_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 const REPLAY_MAX_ENVELOPES = 10_000;
 const REPLAY_PAGE_SIZE = 200;
+/** Salts the batch and inbox-source ids a replay writes; never read back by kind. */
+const REPLAY_KSUID_RESOURCE = "replay";
 
 /** Refuses as soon as the cap is passed, BEFORE any envelope is queued: no partial ships. */
 async function assertReplayWindowWithinCap({
@@ -832,7 +834,7 @@ export const gatewaySpendRest = defineRestRouter(GatewaySpendApi)
       toMs: input.to,
     });
 
-    const replayId = nanoid(10);
+    const replayId = generate(REPLAY_KSUID_RESOURCE).toString();
     const replayed = await appendWindowToEndpointStream({
       events,
       endpoint,

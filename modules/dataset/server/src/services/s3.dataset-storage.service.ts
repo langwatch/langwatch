@@ -11,7 +11,7 @@ import {
   PutObjectCommand,
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
-import { nanoid } from "nanoid";
+import { generate } from "@langwatch/ksuid";
 import {
   assertKeyWithinProject,
   assertNoTraversal,
@@ -36,6 +36,14 @@ import {
   StagedUploadNotFoundError,
 } from "@langwatch/dataset-contract";
 import { stagingUploadKey, UPLOAD_TTL_SECONDS } from "../rules/presigned-upload.rules.ts";
+
+/**
+ * The app's KSUID resource for a staged upload's tracking id
+ * (`KSUID_RESOURCES.PRESIGNED_UPLOAD`). The literal, not the constant table:
+ * the value is only ever a staging-key path segment, but the kind still
+ * says what it is for.
+ */
+const PRESIGNED_UPLOAD_KSUID_RESOURCE = "presignedupload";
 
 export class S3DatasetStorageAdapter implements DatasetStorage {
   static create(resolver: DatasetS3ClientResolver): S3DatasetStorageAdapter {
@@ -211,7 +219,7 @@ export class S3DatasetStorageAdapter implements DatasetStorage {
   }
 
   async createPresignedUpload({ projectId }: { projectId: string }): Promise<PresignedUpload> {
-    const uploadId = nanoid();
+    const uploadId = generate(PRESIGNED_UPLOAD_KSUID_RESOURCE).toString();
     const key = stagingUploadKey(projectId, uploadId);
     const url = await this.withClient(projectId, ({ s3Client, s3Bucket }) =>
       getSignedUrl(s3Client, new PutObjectCommand({ Bucket: s3Bucket, Key: key }), {

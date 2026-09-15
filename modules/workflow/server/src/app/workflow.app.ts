@@ -54,7 +54,7 @@ import { NlpLambdaCleanupService } from "../services/nlp-lambda-cleanup.service.
 import { WorkflowService } from "../services/workflow.service.ts";
 import type { FeatureSetup } from "@langwatch/runtime-composition";
 import type { Instant } from "@langwatch/time";
-import { nanoid } from "nanoid";
+import { generate } from "@langwatch/ksuid";
 import type { WorkflowRowRepository } from "../repositories/workflow-row.repository.ts";
 import type { WorkflowStudioDispatchService } from "../services/workflow-studio-dispatch.service.ts";
 import { WorkflowStudioCopyService } from "../services/workflow-studio-copy.service.ts";
@@ -324,16 +324,16 @@ type WorkflowSetup = FeatureSetup<
   WorkflowRepositories
 >;
 
-/** The module's own id generator - the same nanoid the worker's copy used. */
-class NanoidWorkflowId implements WorkflowId {
-  static create(): NanoidWorkflowId {
-    return new NanoidWorkflowId();
+/** The module's own id generator - the same ksuid the worker's copy used. */
+class KsuidWorkflowId implements WorkflowId {
+  static create(): KsuidWorkflowId {
+    return new KsuidWorkflowId();
   }
 
   private constructor() {}
 
-  next(): string {
-    return nanoid();
+  next(kind: string): string {
+    return generate(kind).toString();
   }
 }
 
@@ -433,7 +433,7 @@ export class WorkflowApp implements WorkflowApi {
           staging: setup.members.nlpPayloadStaging,
         })
       : UnconfiguredWorkflowNlpRuntimeAdapter.create();
-    const ids = NanoidWorkflowId.create();
+    const ids = KsuidWorkflowId.create();
     const workflows = WorkflowService.create({
       repository: setup.repositories.workflows,
       datasets,
@@ -1127,7 +1127,7 @@ export interface WorkflowStudioStream {
 }
 
 export interface WorkflowId {
-  next(): string;
+  next(kind: string): string;
 }
 
 /** Upgrades a persisted graph before it becomes the workflow's current version. */

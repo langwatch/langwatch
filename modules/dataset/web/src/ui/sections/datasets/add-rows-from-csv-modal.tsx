@@ -1,5 +1,5 @@
 import { Box, Button, HStack, NativeSelect, Spacer, Text } from "@chakra-ui/react";
-import { nanoid } from "nanoid";
+import { generate } from "@langwatch/ksuid";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ArrowRight } from "react-feather";
 import { Dialog } from "@langwatch/design-system/studio-dialog";
@@ -13,6 +13,13 @@ import {
 import { convertDatasetRecordsToColumnTypes } from "../../../model/convert-record-values.ts";
 import { api } from "@langwatch/workflow-web/surfaces/workflow-api";
 import { CSVReaderComponent } from "./upload-csv-drawer.tsx";
+
+/**
+ * The app's KSUID resource for a dataset record row (`KSUID_RESOURCES.RECORD`).
+ * The literal, not the constant table: the id this widget mints is sent to
+ * the server as-is and persisted, so it belongs with the writer.
+ */
+const RECORD_KSUID_RESOURCE = "record";
 
 export function AddRowsFromCSVModal({
   isOpen,
@@ -59,7 +66,7 @@ export function AddRowsFromCSVModal({
 
     csvUploaded.slice(1).forEach((row: any) => {
       const entry: DatasetRecordEntry = {
-        id: nanoid(),
+        id: generate(RECORD_KSUID_RESOURCE).toString(),
       };
 
       for (const { name } of columnTypes) {

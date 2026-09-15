@@ -34,7 +34,7 @@ import {
   type WorkflowLlmParameterResolution,
   type WorkflowNlpRuntime,} from "@langwatch/workflow-server";
 import { instantiateRepositories } from "@langwatch/runtime-composition";
-import { nanoid } from "nanoid";
+import { generate } from "@langwatch/ksuid";
 import type { LLMConfig, WorkflowApi } from "@langwatch/workflow-contract";
 import type { TraceApi } from "@langwatch/trace-contract";
 import { getProjectModelProviders } from "@langwatch/model-provider-server";
@@ -61,16 +61,16 @@ export type WorkerEvaluationWorkflows = Readonly<{
   nlpRuntime: WorkflowNlpRuntime;
 }>;
 
-/** The worker's own workflow-id generator, over the same nanoid the module used. */
-class WorkerNanoidWorkflowId implements WorkflowId {
-  static create(): WorkerNanoidWorkflowId {
-    return new WorkerNanoidWorkflowId();
+/** The worker's own workflow-id generator, over the same ksuid the module used. */
+class WorkerKsuidWorkflowId implements WorkflowId {
+  static create(): WorkerKsuidWorkflowId {
+    return new WorkerKsuidWorkflowId();
   }
 
   private constructor() {}
 
-  next(): string {
-    return nanoid();
+  next(kind: string): string {
+    return generate(kind).toString();
   }
 }
 
@@ -104,7 +104,7 @@ export function createWorkerEvaluationWorkflows(
     projectEnvironment,
     llmParameters,
   });
-  const ids = WorkerNanoidWorkflowId.create();
+  const ids = WorkerKsuidWorkflowId.create();
   const workflows = WorkflowService.create({
     repository: repositories.workflows,
     datasets: input.datasets,

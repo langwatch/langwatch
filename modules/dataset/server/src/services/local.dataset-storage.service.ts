@@ -8,7 +8,7 @@ import { pipeline } from "node:stream/promises";
 import { createLogger } from "@langwatch/observability";
 import { createReadStream, createWriteStream } from "fs";
 import fs from "fs/promises";
-import { nanoid } from "nanoid";
+import { generate } from "@langwatch/ksuid";
 import path from "path";
 import {
   assertKeyWithinProject,
@@ -34,6 +34,17 @@ import { localStagingUploadPath, stagingUploadKey } from "../rules/presigned-upl
 
 const logger = createLogger("langwatch:datasets:local-storage");
 
+/**
+ * The app's KSUID resource for a staged upload's tracking id
+ * (`KSUID_RESOURCES.PRESIGNED_UPLOAD`). The literal, not the constant table:
+ * the value is only ever a staging-key path segment, but the kind still
+ * says what it is for.
+ */
+const PRESIGNED_UPLOAD_KSUID_RESOURCE = "presignedupload";
+
+/** A throwaway suffix for the atomic-write temp sibling; never read back by name. */
+const TMP_FILE_KSUID_RESOURCE = "tmp";
+
 export class LocalDatasetStorageAdapter implements DatasetStorage {
   static create(root: string): LocalDatasetStorageAdapter {
     return new LocalDatasetStorageAdapter(root);
@@ -53,7 +64,7 @@ export class LocalDatasetStorageAdapter implements DatasetStorage {
    * Write a chunk file atomically: write a unique temp sibling, then `rename` it into place.
    */
   private async atomicWriteFile(filePath: string, data: string): Promise<void> {
-    const tmpPath = `${filePath}.tmp-${nanoid()}`;
+    const tmpPath = `${filePath}.tmp-${generate(TMP_FILE_KSUID_RESOURCE).toString()}`;
     try {
       await fs.writeFile(tmpPath, data, "utf-8");
       await fs.rename(tmpPath, filePath);
@@ -224,7 +235,7 @@ export class LocalDatasetStorageAdapter implements DatasetStorage {
    * `/direct-upload/staging/:uploadId`, which streams it back here via `putStaged`.
    */
   createPresignedUpload({ projectId }: { projectId: string }): Promise<PresignedUpload> {
-    const uploadId = nanoid();
+    const uploadId = generate(PRESIGNED_UPLOAD_KSUID_RESOURCE).toString();
     return Promise.resolve({
       uploadId,
       key: stagingUploadKey(projectId, uploadId),

@@ -126,7 +126,6 @@
     "lodash-es": "catalog:",
     "lucide-react": "catalog:",
     "mustache": "^4.2.0",
-    "nanoid": "^6.0.0",
     "numeral": "catalog:",
     "papaparse": "catalog:",
     "posthog-js": "catalog:",

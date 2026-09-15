@@ -3,7 +3,7 @@
  * Lifts only the shared decisions — one `assertEntitled` gate, one optional
  * events log — and reaches the rest through {@link endpoints}/{@link health}.
  */
-import { randomUUID } from "node:crypto";
+import { generate } from "@langwatch/ksuid";
 
 import { WebhookApi, type WebhookDestinationKind, type WebhookApi as WebhookApiContract } from "@langwatch/webhook-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
@@ -20,12 +20,16 @@ import { WebhookHealthService } from "../services/webhook-health.service.ts";
 import { WebhookEndpointStreamService } from "../services/webhook-endpoint-stream.service.ts";
 import { buildWebhookComposition } from "./webhook-composition.build.ts";
 
+/** Synthetic test-fire ids; sent once and never read back by kind. */
+const TEST_EVENT_KSUID_RESOURCE = "evttest";
+const TEST_DISPATCH_KSUID_RESOURCE = "testdispatch";
+
 /** The single-envelope batch a test fire sends. */
 function testFireBody(now: Instant): string {
   return JSON.stringify({
     batch: [
       {
-        id: `evt_test_${randomUUID()}`,
+        id: generate(TEST_EVENT_KSUID_RESOURCE).toString(),
         type: "test.ping",
         created: now.toString({ fractionalSecondDigits: 3 }),
         schema_version: "1",
@@ -170,7 +174,7 @@ export class WebhookApp implements WebhookApiContract {
       endpoints.getSigningSecrets({ organizationId, endpointId }),
       endpoints.getDestinationConfig({ organizationId, endpointId }),
     ]);
-    const dispatchId = `test:${randomUUID()}`;
+    const dispatchId = generate(TEST_DISPATCH_KSUID_RESOURCE).toString();
 
     try {
       // Reaches exactly what real delivery reaches, including the transport:

@@ -1,4 +1,4 @@
-import { nanoid } from "nanoid";
+import { generate } from "@langwatch/ksuid";
 import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
 import { fromDate, toDate, type Instant } from "@langwatch/time";
 
@@ -55,6 +55,9 @@ export type PrismaGithubPullRequestsDatabase = Pick<
   PrismaClient,
   "githubPullRequest" | "githubBranchPullRequestCheck" | "$executeRaw"
 >;
+
+/** The ksuid kind a branch pull-request check row is minted under. */
+const GITHUB_BRANCH_CHECK_KSUID_RESOURCE = "githubbranchcheck";
 
 export class PrismaGithubPullRequestsRepository extends GithubPullRequestsRepository {
   static create(database: PrismaGithubPullRequestsDatabase): PrismaGithubPullRequestsRepository {
@@ -339,7 +342,7 @@ export class PrismaGithubPullRequestsRepository extends GithubPullRequestsReposi
         "recheckAfter", "attempts", "lastRequestedAt", "createdAt", "updatedAt"
       )
       VALUES (
-        ${nanoid()}, ${organizationId}, ${host}, ${fullName},
+        ${generate(GITHUB_BRANCH_CHECK_KSUID_RESOURCE).toString()}, ${organizationId}, ${host}, ${fullName},
         ${headBranch}, ${at}::timestamp, 0, NULL,
         ${leaseUntil}::timestamp, 0, ${at}::timestamp, ${at}::timestamp, ${at}::timestamp
       )

@@ -1,7 +1,7 @@
 import { type Instant, nowInstant } from "@langwatch/time";
 import { createLogger } from "@langwatch/observability";
 import { Task } from "@langwatch/task";
-import { nanoid } from "nanoid";
+import { generate } from "@langwatch/ksuid";
 import type {
   BackfillJsonObject,
   BackfillJsonValue,
@@ -125,6 +125,9 @@ export async function backfillVirtualKeyConfig({
   return outcome;
 }
 
+/** The ksuid kind an auto-migrated routing policy is minted under. */
+const ROUTING_POLICY_MIGRATION_KSUID_RESOURCE = "rpmigr";
+
 /**
  * One policy at the same scope SET as the source key: every VirtualKeyScope
  * row is cloned to a RoutingPolicyScope row. Main also wrote the legacy
@@ -143,7 +146,7 @@ async function mintRoutingPolicy({
   config: LegacyVirtualKeyConfig;
   now: () => Instant;
 }): Promise<string> {
-  const id = `rp_migr_${nanoid()}`;
+  const id = generate(ROUTING_POLICY_MIGRATION_KSUID_RESOURCE).toString();
   if (!execute) return id;
   return repository.mintRoutingPolicy({
     id,

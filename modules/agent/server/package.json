@@ -34,6 +34,7 @@
     "@langwatch/audit-log-contract": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
+    "@langwatch/ksuid": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",
     "@langwatch/project-contract": "workspace:*",
@@ -45,7 +46,6 @@
     "@langwatch/trace-contract": "workspace:*",
     "@langwatch/user-contract": "workspace:*",
     "@langwatch/workflow-contract": "workspace:*",
-    "nanoid": "^6.0.0",
     "zod": "catalog:"
   },
   "devDependencies": {
