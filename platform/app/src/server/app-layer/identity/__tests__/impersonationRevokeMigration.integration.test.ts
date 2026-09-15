@@ -97,8 +97,22 @@ const readersOfTheLegacyPayload = (): string[] => {
       const source = readFileSync(full, "utf8")
         // Comments still discuss the column, and should.
         .replace(/\/\*[\s\S]*?\*\//g, "")
-        .replace(/\/\/[^\n]*/g, "");
-      if (/(^|[.{,\s])impersonating\s*[:.]/.test(source)) found.push(relative);
+        .replace(/\/\/[^\n]*/g, "")
+        // Neither is prose a reader. "Credentials cannot be changed while
+        // impersonating." is a sentence somebody reads on a screen, and it
+        // ends in a full stop, which is exactly what the pattern below looks
+        // for after the word. The claim is about CODE reaching for the
+        // column, so the strings come out the same way the comments did.
+        .replace(/`(?:\\.|[^`\\])*`/g, "``")
+        .replace(/"(?:\\.|[^"\\\n])*"/g, '""')
+        .replace(/'(?:\\.|[^'\\\n])*'/g, "''");
+      // An object key a Prisma call could pass (`impersonating:`), a property
+      // read off a row (`row.impersonating`). The second half was missing, so
+      // the claim "nothing READS it" rested on a pattern that only ever saw
+      // writes.
+      if (/(^|[.{,\s])impersonating\s*[:.]|\.\s*impersonating\b/.test(source)) {
+        found.push(relative);
+      }
     }
   };
   for (const root of roots) walk(root);

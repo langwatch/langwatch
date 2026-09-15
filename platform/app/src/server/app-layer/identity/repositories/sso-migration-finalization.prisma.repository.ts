@@ -32,25 +32,16 @@ interface MatchingLegacyAccount {
 export class PrismaSsoMigrationFinalizationRepository
   implements SsoMigrationFinalizationReadPort
 {
-  private readonly progress: PrismaSsoMigrationProgressRepository;
-
   constructor(
     private readonly prisma: PrismaClient,
     private readonly recovery: SsoBreakGlassBindingRepository,
-    /** The progress read's own two seams, passed straight through: it is what
-     *  counts the ways back in, and it may only count the ones somebody can
-     *  actually walk. */
-    reads: {
-      now?: () => number;
-      holdsPassword?: (args: { userId: string }) => Promise<boolean>;
-    } = {},
-  ) {
-    this.progress = new PrismaSsoMigrationProgressRepository(
-      prisma,
-      reads.now ?? Date.now,
-      reads.holdsPassword,
-    );
-  }
+    /** The customer-visible progress read this one layers finalization-only
+     *  evidence over. Handed in rather than built here: a repository that
+     *  constructs another repository owns wiring, and wiring belongs to the
+     *  composition root. It is what counts the ways back in, and it may only
+     *  count the ones somebody can actually walk. */
+    private readonly progress: PrismaSsoMigrationProgressRepository,
+  ) {}
 
   async inspect({
     organizationId,
