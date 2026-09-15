@@ -21,6 +21,14 @@ export const GATEWAY_OVERRIDES: Record<string, Partial<DatasetOverride>> = {
     dedup: { versionColumn: "EventTimestamp" },
     columnGates: {
       CostNanoUSD: ["costs"],
+      // MetadataMap (migration 00076) is Map(String, String) materialised from
+      // the free-form `Metadata` JSON, which the default classifier gates
+      // `output`. The content filter applied to every exposed map only strips
+      // known LLM-content keys (gen_ai.prompt, …), never arbitrary
+      // customer-supplied metadata keys/values, so the map re-exposes the same
+      // captured content its own source column is gated for. It must carry the
+      // same gate.
+      MetadataMap: ["output"],
     },
   },
   gateway_budget_scope_totals: {
