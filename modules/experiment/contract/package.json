@@ -13,6 +13,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./src/index.ts"
+    },
+    "./mapping-validation": {
+      "types": "./dist/workbench/mapping-validation.d.ts",
+      "default": "./src/workbench/mapping-validation.ts"
     }
   },
   "scripts": {

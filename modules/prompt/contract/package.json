@@ -13,6 +13,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./src/index.ts"
+    },
+    "./llm-config-constants": {
+      "types": "./dist/llm-config-constants.d.ts",
+      "default": "./src/llm-config-constants.ts"
     }
   },
   "scripts": {

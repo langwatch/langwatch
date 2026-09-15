@@ -11,7 +11,7 @@ import type {
   GovernanceIngestionPullMetrics,
   GovernanceIngestionPullSchedule,
 } from "@langwatch/enterprise-api/governance/governance-eventing.adapter";
-import type { GovernanceEncryption } from "@langwatch/enterprise-api/governance/governance-members.adapter";
+import type { GovernanceEncryption } from "@langwatch/enterprise-api/governance/governance-infrastructure.adapter";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { computeNextRunAt } from "@langwatch/eventing/server";
 import {
