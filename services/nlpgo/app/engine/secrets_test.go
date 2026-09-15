@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/langwatch/langwatch/services/nlpgo/app/engine/blocks/httpblock"
 )
@@ -57,4 +58,37 @@ func TestResolveAuthSecrets(t *testing.T) {
 	t.Run("when auth is nil it returns nil", func(t *testing.T) {
 		assert.Nil(t, resolveAuthSecrets(nil, secrets))
 	})
+}
+
+// A project with two secrets where one value contains the other is the shape
+// that breaks a naive replace loop: Go randomizes map iteration, so roughly
+// nine runs in ten the SHORTER value was substituted first, chopping the longer
+// one into "[redacted]" + a surviving tail. The pass for the longer value then
+// found no intact match left to replace.
+//
+// That failure is worse than no redaction at all — the "[redacted]" tag reads
+// as proof the value was scrubbed while a fragment of the other secret sits in
+// the clear right beside it. Versioned and paired keys (live/test, v1/v2) are
+// exactly the shape that produces the substring relationship, so this is an
+// ordinary configuration, not a contrived one.
+//
+// Iterated because the defect is nondeterministic: one pass would pass by luck
+// about 12% of the time.
+func TestRedactSecrets_DoesNotFragmentASecretThatContainsAnother(t *testing.T) {
+	const shortVal = "sk-abc123"
+	const longVal = "sk-abc123456"
+	secrets := map[string]string{"API_KEY": shortVal, "API_KEY_V2": longVal}
+
+	for i := 0; i < 200; i++ {
+		got := redactSecrets("upstream rejected key "+longVal+" for project", secrets)
+
+		require.NotContains(t, got, "456",
+			"iteration %d: the tail of the longer secret survived — %q", i, got)
+		require.NotContains(t, got, shortVal, "iteration %d: %q", i, got)
+		require.NotContains(t, got, longVal, "iteration %d: %q", i, got)
+		// Anti-vacuity: the surrounding message must still be there, so this
+		// cannot pass by the whole string having been blanked.
+		require.Contains(t, got, "upstream rejected key ")
+		require.Contains(t, got, " for project")
+	}
 }
