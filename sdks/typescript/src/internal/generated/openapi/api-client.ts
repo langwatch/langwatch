@@ -130,63 +130,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/agents": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * List agents; superseded by /api/v1/agents
-         * @deprecated
-         * @description superseded by /api/v1/agents
-         */
-        get: operations["listLegacyAgents"];
-        put?: never;
-        /**
-         * Create an agent; superseded by /api/v1/agents
-         * @deprecated
-         * @description superseded by /api/v1/agents
-         */
-        post: operations["createLegacyAgent"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/agents/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Get an agent; superseded by /api/v1/agents
-         * @deprecated
-         * @description superseded by /api/v1/agents
-         */
-        get: operations["getLegacyAgent"];
-        put?: never;
-        post?: never;
-        /**
-         * Archive an agent; superseded by /api/v1/agents
-         * @deprecated
-         * @description superseded by /api/v1/agents
-         */
-        delete: operations["archiveLegacyAgent"];
-        options?: never;
-        head?: never;
-        /**
-         * Update an agent; superseded by /api/v1/agents
-         * @deprecated
-         * @description superseded by /api/v1/agents
-         */
-        patch: operations["updateLegacyAgent"];
-        trace?: never;
-    };
     "/api/v1/analytics/timeseries": {
         parameters: {
             query?: never;
@@ -197,7 +140,7 @@ export interface paths {
         get?: never;
         put?: never;
         /** @description Query analytics timeseries data with metrics, aggregations, and filters */
-        post: operations["queryAnalyticsTimeseries"];
+        post: operations["postApiAnalyticsTimeseries"];
         delete?: never;
         options?: never;
         head?: never;
@@ -217,7 +160,7 @@ export interface paths {
          * Query analytics timeseries (legacy path)
          * @description Query analytics timeseries with metrics, aggregations and filters. Identical to `POST /api/analytics/timeseries`, which is the path to use in new integrations; this one stays for callers written against it.
          */
-        post: operations["queryAnalyticsTimeseriesLegacy"];
+        post: operations["postApiAnalytics"];
         delete?: never;
         options?: never;
         head?: never;
@@ -526,6 +469,54 @@ export interface paths {
         patch: operations["updateApiKey"];
         trace?: never;
     };
+    "/api/auth/validate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["validateProjectAuthToken"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/session": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["readBrowserAuthSession"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/logout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["endBrowserSessionAndRedirect"];
+        put?: never;
+        post: operations["endBrowserSession"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/role-bindings": {
         parameters: {
             query?: never;
@@ -570,10 +561,10 @@ export interface paths {
             cookie?: never;
         };
         /** @description List all active triggers (automations) for the project */
-        get: operations["listTriggers"];
+        get: operations["getApiTriggers"];
         put?: never;
         /** @description Create a new trigger (automation) */
-        post: operations["createTrigger"];
+        post: operations["postApiTriggers"];
         delete?: never;
         options?: never;
         head?: never;
@@ -588,15 +579,15 @@ export interface paths {
             cookie?: never;
         };
         /** @description Get a trigger by its ID */
-        get: operations["getTrigger"];
+        get: operations["getApiTriggersById"];
         put?: never;
         post?: never;
         /** @description Delete (soft-delete) a trigger */
-        delete: operations["deleteTrigger"];
+        delete: operations["deleteApiTriggersById"];
         options?: never;
         head?: never;
         /** @description Update a trigger (name, active state, message, filters) */
-        patch: operations["updateTrigger"];
+        patch: operations["patchApiTriggersById"];
         trace?: never;
     };
     "/api/v1/trigger/slack": {
@@ -612,7 +603,7 @@ export interface paths {
          * Create a Slack alert trigger
          * @description Create a trigger that posts to a Slack incoming webhook when traces match its filters. The `/api/triggers` family supersedes this narrower form, which stays for callers written against it.
          */
-        post: operations["createSlackTrigger"];
+        post: operations["postApiTriggerSlack"];
         delete?: never;
         options?: never;
         head?: never;
@@ -650,7 +641,7 @@ export interface paths {
          * List coding agent session events
          * @description List a coding-agent session's events (model calls, compactions, rate limits, tool runs, prompts) in time order, keyset-paginated. Pass the previous response's nextCursor to continue; filter with kinds (comma-separated).
          */
-        get: operations["listCodingAgentSessionEvents"];
+        get: operations["getApiCodingAgentSessionsBySessionIdEvents"];
         put?: never;
         post?: never;
         delete?: never;
@@ -670,7 +661,7 @@ export interface paths {
          * Get pull request coding agent usage
          * @description Assistant usage for one pull request: sessions, tokens and cost, grouped by contributor and agent, plus per-model totals, over the pull request's whole lifetime rather than a time window. Every row and the totals split cost three ways: the part priced per token, the part a bundled subscription already covers, and the list-price total of both. Per-model totals carry the list price only. Cost is calculated from the tokens the agent reported and LangWatch's model prices, so it estimates spend rather than restating a provider invoice. Requires a personal-project API key; rows appear only for projects the calling user may view, and cost only for those they may price.
          */
-        get: operations["getCodingAgentPullRequestUsage"];
+        get: operations["getApiCodingAgentPullRequestUsage"];
         put?: never;
         post?: never;
         delete?: never;
@@ -707,10 +698,10 @@ export interface paths {
             cookie?: never;
         };
         /** @description List all dashboards for the project with graph counts */
-        get: operations["listDashboards"];
+        get: operations["getApiDashboards"];
         put?: never;
         /** @description Create a new dashboard */
-        post: operations["createDashboard"];
+        post: operations["postApiDashboards"];
         delete?: never;
         options?: never;
         head?: never;
@@ -726,7 +717,7 @@ export interface paths {
         };
         get?: never;
         /** @description Reorder dashboards by providing an ordered list of IDs */
-        put: operations["reorderDashboards"];
+        put: operations["putApiDashboardsReorder"];
         post?: never;
         delete?: never;
         options?: never;
@@ -742,15 +733,15 @@ export interface paths {
             cookie?: never;
         };
         /** @description Get a dashboard by its id, including its graphs */
-        get: operations["getDashboard"];
+        get: operations["getApiDashboardsById"];
         put?: never;
         post?: never;
         /** @description Delete a dashboard and its graphs (hard delete, cascade) */
-        delete: operations["deleteDashboard"];
+        delete: operations["deleteApiDashboardsById"];
         options?: never;
         head?: never;
         /** @description Rename a dashboard */
-        patch: operations["renameDashboard"];
+        patch: operations["patchApiDashboardsById"];
         trace?: never;
     };
     "/api/v1/graphs": {
@@ -761,10 +752,10 @@ export interface paths {
             cookie?: never;
         };
         /** @description List all custom graphs, optionally filtered by dashboard */
-        get: operations["listGraphs"];
+        get: operations["getApiGraphs"];
         put?: never;
         /** @description Create a custom graph on a dashboard */
-        post: operations["createGraph"];
+        post: operations["postApiGraphs"];
         delete?: never;
         options?: never;
         head?: never;
@@ -779,15 +770,15 @@ export interface paths {
             cookie?: never;
         };
         /** @description Get a custom graph by its ID */
-        get: operations["getGraph"];
+        get: operations["getApiGraphsById"];
         put?: never;
         post?: never;
         /** @description Delete a custom graph */
-        delete: operations["deleteGraph"];
+        delete: operations["deleteApiGraphsById"];
         options?: never;
         head?: never;
         /** @description Update a custom graph's name, definition, or filters */
-        patch: operations["updateGraph"];
+        patch: operations["patchApiGraphsById"];
         trace?: never;
     };
     "/api/v1/dataset": {
@@ -991,10 +982,10 @@ export interface paths {
             cookie?: never;
         };
         /** @description Get all evaluators for a project */
-        get: operations["listEvaluators"];
+        get: operations["getApiEvaluators"];
         put?: never;
         /** @description Create a new evaluator */
-        post: operations["createEvaluator"];
+        post: operations["postApiEvaluators"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1009,7 +1000,7 @@ export interface paths {
             cookie?: never;
         };
         /** @description Get a specific evaluator by ID or slug */
-        get: operations["getEvaluator"];
+        get: operations["getApiEvaluatorsByIdOrSlug"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1027,10 +1018,10 @@ export interface paths {
         };
         get?: never;
         /** @description Update an existing evaluator */
-        put: operations["updateEvaluator"];
+        put: operations["putApiEvaluatorsById"];
         post?: never;
         /** @description Archive (soft-delete) an evaluator */
-        delete: operations["archiveEvaluator"];
+        delete: operations["deleteApiEvaluatorsById"];
         options?: never;
         head?: never;
         patch?: never;
@@ -1047,13 +1038,13 @@ export interface paths {
          * List experiments for the project
          * @description List experiments for the project. Includes a runs count and last-run timestamp per experiment.
          */
-        get: operations["listExperiments"];
+        get: operations["getApiExperiments"];
         put?: never;
         /**
          * Create an experiment and its setup
          * @description Create an evaluations experiment. Send a setup to start from, or send none and get a blank workbench with one inline dataset. The slug it answers with is what every other experiment endpoint takes.
          */
-        post: operations["createExperiment"];
+        post: operations["postApiExperiments"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1071,7 +1062,7 @@ export interface paths {
          * Read one experiment
          * @description Read a single experiment by its slug, in the same shape the list returns. Accepts the experiment id as well, so either identifier the list hands back can be used.
          */
-        get: operations["getExperiment"];
+        get: operations["getApiExperimentsBySlug"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1093,7 +1084,7 @@ export interface paths {
          * Create an experiment
          * @description Create an experiment, or return the existing one when the slug is already taken. This is the first call in an experiment run: take the slug back, report results against it, and every run under that slug groups together in the app. The SDKs call this endpoint for you. The body carries `experiment_type` and at least one of `experiment_slug` (the stable slug you choose, which is what makes repeated runs land together) or `experiment_id`; `experiment_name` names it on creation and `workflowId` ties it to an Optimization Studio workflow.
          */
-        post: operations["initExperiment"];
+        post: operations["postApiExperimentInit"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1113,7 +1104,7 @@ export interface paths {
          * Report DSPy optimizer steps
          * @description Report the steps of a DSPy optimizer run against an experiment, so the run's progress and scores show up in the app. Send the steps as an array; the optimizer typically posts each batch as it finishes. Bodies up to 20MB are accepted.
          */
-        post: operations["logDspySteps"];
+        post: operations["postApiDspyLogSteps"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1133,7 +1124,7 @@ export interface paths {
          * Run an experiment
          * @description Start a run of a saved experiment, addressed by slug. Returns a runId to poll straight away. Send `Accept: text/event-stream` instead to stream progress events until the run finishes.
          */
-        post: operations["runExperiment"];
+        post: operations["postApiExperimentsBySlugRun"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1151,7 +1142,7 @@ export interface paths {
          * List runs of an experiment
          * @description Runs recorded for one experiment, newest first. Page through them with `page` and `pageSize`.
          */
-        get: operations["listExperimentRuns"];
+        get: operations["getApiExperimentsRuns"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1171,7 +1162,7 @@ export interface paths {
          * Poll a run
          * @description Current state of one run. Returns progress while it is going and a summary once it finishes, so a CI job can poll this until `status` leaves `running`.
          */
-        get: operations["getExperimentRunStatus"];
+        get: operations["getApiExperimentsRunsByRunId"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1191,7 +1182,7 @@ export interface paths {
          * Read run results
          * @description Every dataset row of a run with what the target predicted, plus one entry per evaluator per row. Runs older than the status cache need `experimentSlug` as well, since a run id is only unique within its experiment.
          */
-        get: operations["getExperimentRunResults"];
+        get: operations["getApiExperimentsRunsByRunIdResults"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1211,12 +1202,12 @@ export interface paths {
          * Read an experiment's setup
          * @description The experiment's datasets, targets and evaluators, with the version to send back when you save. Ask for `fields=version` to check for changes without transferring the setup.
          */
-        get: operations["getExperimentWorkbenchState"];
+        get: operations["getApiExperimentsBySlugWorkbenchState"];
         /**
          * Save an experiment's setup
          * @description Replace the experiment's setup. Send `expectedVersion` with the version you read and the save is refused with a 409 when someone else wrote first, instead of overwriting their work.
          */
-        put: operations["saveExperimentWorkbenchState"];
+        put: operations["putApiExperimentsBySlugWorkbenchState"];
         post?: never;
         delete?: never;
         options?: never;
@@ -1235,7 +1226,7 @@ export interface paths {
          * List an experiment's versions
          * @description Every saved version of the experiment's setup, newest first. A commit, an agent write and a restore each add a numbered version. Ordinary typing rewrites one autosave row, which is the entry with `autoSaved` true. Page through them with `limit` and `cursor`.
          */
-        get: operations["listExperimentWorkbenchVersions"];
+        get: operations["getApiExperimentsBySlugVersions"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1257,7 +1248,7 @@ export interface paths {
          * Restore an experiment version
          * @description Bring an old setup back by writing it forward as a new save. History is never rewritten: the version you restored from stays in the list, and the restore is one more entry after it.
          */
-        post: operations["restoreExperimentWorkbenchVersion"];
+        post: operations["postApiExperimentsBySlugVersionsByVersionRestore"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1275,18 +1266,18 @@ export interface paths {
          * Read an agent cache entry
          * @description Read a cache entry by name. An absent or expired entry answers 404. The value is returned only to a caller that can manage the project's agent cache.
          */
-        get: operations["getAgentCacheEntry"];
+        get: operations["getApiAgentCacheByName"];
         /**
          * Store an agent cache entry
          * @description Store or replace an encrypted value. It expires after ttl_seconds, which defaults to 900.
          */
-        put: operations["putAgentCacheEntry"];
+        put: operations["putApiAgentCacheByName"];
         post?: never;
         /**
          * Delete an agent cache entry
          * @description Delete by name. Removing a name the project does not hold still succeeds.
          */
-        delete: operations["deleteAgentCacheEntry"];
+        delete: operations["deleteApiAgentCacheByName"];
         options?: never;
         head?: never;
         patch?: never;
@@ -1305,7 +1296,7 @@ export interface paths {
          * Claim an agent cache entry
          * @description Store the value only while the name is free. The claimed field reports whether this caller took it.
          */
-        post: operations["claimAgentCacheEntry"];
+        post: operations["postApiAgentCacheByNameClaim"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1339,13 +1330,13 @@ export interface paths {
          * List virtual keys
          * @description Returns the virtual keys visible to the caller's project credential: keys scoped to this project, to its team, or to the whole organization. Newest first, paged by cursor.
          */
-        get: operations["listVirtualKeys"];
+        get: operations["getApiGatewayV1VirtualKeys"];
         put?: never;
         /**
          * Create virtual key
          * @description Mints a new virtual key and returns the secret exactly once. scopes defaults to the caller's project; org- and team-scoped keys require virtualKeys:manage at each requested scope.
          */
-        post: operations["createVirtualKey"];
+        post: operations["postApiGatewayV1VirtualKeys"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1360,7 +1351,7 @@ export interface paths {
             cookie?: never;
         };
         /** Get virtual key */
-        get: operations["getVirtualKey"];
+        get: operations["getApiGatewayV1VirtualKeysById"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1370,7 +1361,7 @@ export interface paths {
          * Update virtual key
          * @description Partial update: send only the fields you want to change.
          */
-        patch: operations["updateVirtualKey"];
+        patch: operations["patchApiGatewayV1VirtualKeysById"];
         trace?: never;
     };
     "/api/gateway/v1/virtual-keys/{id}/spend": {
@@ -1384,7 +1375,7 @@ export interface paths {
          * Read a virtual key's spend
          * @description Aggregate spend and request count for one key over a window given in epoch milliseconds (default: current UTC calendar month). Returns 412 spend_source_unavailable on deploys without a ClickHouse spend source.
          */
-        get: operations["getVirtualKeySpend"];
+        get: operations["getApiGatewayV1VirtualKeysByIdSpend"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1406,7 +1397,7 @@ export interface paths {
          * Rotate virtual key secret
          * @description Mints a fresh secret for an existing VK. The old secret remains valid for 24h.
          */
-        post: operations["rotateVirtualKey"];
+        post: operations["postApiGatewayV1VirtualKeysByIdRotate"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1426,7 +1417,7 @@ export interface paths {
          * Disable virtual key
          * @description Reversible stop: requests on the key are rejected with virtual_key_disabled until it is enabled again. Idempotent.
          */
-        post: operations["disableVirtualKey"];
+        post: operations["postApiGatewayV1VirtualKeysByIdDisable"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1446,7 +1437,7 @@ export interface paths {
          * Enable virtual key
          * @description Reverses disable: the key returns to active exactly as it was. Idempotent.
          */
-        post: operations["enableVirtualKey"];
+        post: operations["postApiGatewayV1VirtualKeysByIdEnable"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1466,7 +1457,7 @@ export interface paths {
          * Revoke virtual key
          * @description Marks the virtual key as revoked and archives its own budgets. Idempotent.
          */
-        post: operations["revokeVirtualKey"];
+        post: operations["postApiGatewayV1VirtualKeysByIdRevoke"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1484,13 +1475,13 @@ export interface paths {
          * List budgets
          * @description Returns the non-archived budgets in the caller's organization across all seven scope types, with live spent_usd from the spend ledger.
          */
-        get: operations["listBudgets"];
+        get: operations["getApiGatewayV1Budgets"];
         put?: never;
         /**
          * Create budget
          * @description Creates an organization-owned budget across all seven scope types.
          */
-        post: operations["createBudget"];
+        post: operations["postApiGatewayV1Budgets"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1505,21 +1496,21 @@ export interface paths {
             cookie?: never;
         };
         /** Get budget */
-        get: operations["getBudget"];
+        get: operations["getApiGatewayV1BudgetsById"];
         put?: never;
         post?: never;
         /**
          * Archive budget
          * @description Soft-delete: the row is marked archived and no longer counted by the budget engine.
          */
-        delete: operations["archiveBudget"];
+        delete: operations["deleteApiGatewayV1BudgetsById"];
         options?: never;
         head?: never;
         /**
          * Update budget
          * @description Partial update. Scope, window and cycle_anchor_at are immutable after create.
          */
-        patch: operations["updateBudget"];
+        patch: operations["patchApiGatewayV1BudgetsById"];
         trace?: never;
     };
     "/api/gateway/v1/budgets/{id}/reset": {
@@ -1535,7 +1526,7 @@ export interface paths {
          * Reset budget period
          * @description Moves the budget's period boundary to now; recorded spend is never mutated.
          */
-        post: operations["resetBudget"];
+        post: operations["postApiGatewayV1BudgetsByIdReset"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1553,13 +1544,13 @@ export interface paths {
          * List cache-control rules
          * @description Organization-scoped operator-authored rules, priority-ordered, archived rules excluded.
          */
-        get: operations["listCacheRules"];
+        get: operations["getApiGatewayV1CacheRules"];
         put?: never;
         /**
          * Create a cache rule
          * @description Matchers are ANDed across non-null fields; at least one matcher is required.
          */
-        post: operations["createCacheRule"];
+        post: operations["postApiGatewayV1CacheRules"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1577,21 +1568,101 @@ export interface paths {
          * Get a cache rule
          * @description Returns the rule if it belongs to the caller's organisation; 404 otherwise.
          */
-        get: operations["getCacheRule"];
+        get: operations["getApiGatewayV1CacheRulesById"];
         put?: never;
         post?: never;
         /**
          * Archive a cache rule
          * @description Soft-delete: sets archivedAt. The rule stops matching new requests.
          */
-        delete: operations["archiveCacheRule"];
+        delete: operations["deleteApiGatewayV1CacheRulesById"];
         options?: never;
         head?: never;
         /**
          * Update a cache rule
          * @description Partial update. matchers and action REPLACE the stored value when provided.
          */
-        patch: operations["updateCacheRule"];
+        patch: operations["patchApiGatewayV1CacheRulesById"];
+        trace?: never;
+    };
+    "/api/gateway/v1/spend-summaries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List spend summaries
+         * @description Reconciliation checksum fast path: spend rollups with token classes and integer nano-USD cost. Settled (unpriced) requests are counted separately as settled_count and never included in cost sums. Diff individual items via /spend-events only when a checksum diverges. `group_by` takes one or two of virtual_key, end_user, project, model, provider, principal and request_type, comma-separated, and `bucket` adds an hour or day column in the `timezone` you name. `key` stays the first dimension's value for consumers written against the single-dimension surface; read `group` to tell two dimensions apart. Paged by group key ascending: follow next_cursor until it comes back null, because a page that is full does not mean the window held nothing more. Grouping by model or provider, or into time buckets, is refused with `gateway_spend_group_by_unstable` while the window is recent enough that outcomes can still arrive, because those groups can move under a page walk and the totals would double-count some requests and miss others; ask for an older range, or send `allow_unstable` when an approximate shape is enough. Every filter here is accepted by /spend-events too, and the reverse holds apart from `status=admitted`: a rollup sums the cost of requests past admission, so an admitted request has none to contribute and that narrowing is refused rather than answered with a zero. Ask /spend-events for those.
+         */
+        get: operations["listGatewaySpendSummaries"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/gateway/v1/spend-events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List spend events
+         * @description Cursor-paged pull over the per-request spend record, ascending by insert order so rows folded late are never skipped by an in-flight cursor. Events are the same canonical objects webhook deliveries carry. Retention is a fixed 13 months, which bounds reconciliation and replay. When feeding a downstream biller, mind its dedup window (Metronome 34 days and Stripe meters 24h+ at the time of writing; both vendors own those numbers, so confirm the current one before you rely on it): re-pulling older ranges into a biller past its window can double-bill. Every filter here is accepted by /spend-summaries too, so a checksum that disagrees can be diffed on exactly the same narrowing; the one difference is `status=admitted`, which only this read answers, because an admitted request is still in flight and contributes no cost to a rollup. Repeat a filter to widen it (`model=a&model=b` matches either); name two different filters to narrow. `metadata` is written `key:value`, split on the first colon, and repeating a key widens that key. `team_id` and `external_id` name Postgres records and are resolved to the projects and keys they cover, so a team with no projects or an external id nobody minted answers with no spend rather than with everything.
+         */
+        get: operations["listGatewaySpendEvents"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/gateway/v1/end-users/{id}/spend": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read one end user's spend
+         * @description Windowed spend rollup for one external end user across the organization (the /customer/info-style read a rebilling integration polls). `caps` lists every attributed-user budget that applies to this end user, each with its limit and the spend against it. It is an empty array until such a budget template applies, never null.
+         */
+        get: operations["getGatewayEndUserSpend"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/gateway/v1/spend-events/replay": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Replay spend events to an endpoint
+         * @description Re-delivers the window's spend envelopes to ONE endpoint through the normal delivery path (per-endpoint stream, retry ladder, delivery log), honoring the endpoint's event subscriptions. Envelope ids are UNCHANGED: your consumer's event-id dedup decides what a redelivery means. Mind your downstream billing system's finite dedup window (Metronome 34 days, Stripe 24h+): replaying older than that window can double-bill on your side, so prefer pull-and-diff for old ranges. The window is capped at 7 days and 10,000 envelopes per call; both caps are checked before any delivery is queued, so a refused replay ships nothing.
+         */
+        post: operations["replayGatewaySpendEvents"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/api/v1/langy/conversations": {
@@ -1636,7 +1707,7 @@ export interface paths {
             cookie?: never;
         };
         /** @description List all model providers for a project with masked API keys */
-        get: operations["listModelProviders"];
+        get: operations["getApiModelProviders"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1654,7 +1725,7 @@ export interface paths {
         };
         get?: never;
         /** @description Create or update a model provider */
-        put: operations["upsertModelProvider"];
+        put: operations["putApiModelProvidersByProvider"];
         post?: never;
         delete?: never;
         options?: never;
@@ -1722,10 +1793,10 @@ export interface paths {
             cookie?: never;
         };
         /** @description List all online evaluation monitors for the project */
-        get: operations["listMonitors"];
+        get: operations["getApiMonitors"];
         put?: never;
         /** @description Create a new online evaluation monitor */
-        post: operations["createMonitor"];
+        post: operations["postApiMonitors"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1740,15 +1811,15 @@ export interface paths {
             cookie?: never;
         };
         /** @description Get a monitor by its ID */
-        get: operations["getMonitor"];
+        get: operations["getApiMonitorsById"];
         put?: never;
         post?: never;
         /** @description Delete a monitor */
-        delete: operations["deleteMonitor"];
+        delete: operations["deleteApiMonitorsById"];
         options?: never;
         head?: never;
         /** @description Update a monitor (name, enabled state, settings, etc.) */
-        patch: operations["updateMonitor"];
+        patch: operations["patchApiMonitorsById"];
         trace?: never;
     };
     "/api/v1/monitors/{id}/toggle": {
@@ -1761,7 +1832,7 @@ export interface paths {
         get?: never;
         put?: never;
         /** @description Enable or disable a monitor */
-        post: operations["toggleMonitor"];
+        post: operations["postApiMonitorsByIdToggle"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1989,10 +2060,10 @@ export interface paths {
             cookie?: never;
         };
         /** @description List all groups for the organization */
-        get: operations["listGroups"];
+        get: operations["getApiGroups"];
         put?: never;
         /** @description Create a new group */
-        post: operations["createGroup"];
+        post: operations["postApiGroups"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2007,15 +2078,15 @@ export interface paths {
             cookie?: never;
         };
         /** @description Get a group with members and bindings */
-        get: operations["getGroup"];
+        get: operations["getApiGroupsById"];
         put?: never;
         post?: never;
         /** @description Delete a group */
-        delete: operations["deleteGroup"];
+        delete: operations["deleteApiGroupsById"];
         options?: never;
         head?: never;
         /** @description Rename a group */
-        patch: operations["renameGroup"];
+        patch: operations["patchApiGroupsById"];
         trace?: never;
     };
     "/api/v1/groups/{id}/members": {
@@ -2026,10 +2097,10 @@ export interface paths {
             cookie?: never;
         };
         /** @description List members of a group */
-        get: operations["listGroupMembers"];
+        get: operations["getApiGroupsByIdMembers"];
         put?: never;
         /** @description Add a member to a group */
-        post: operations["addGroupMember"];
+        post: operations["postApiGroupsByIdMembers"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2047,7 +2118,7 @@ export interface paths {
         put?: never;
         post?: never;
         /** @description Remove a member from a group */
-        delete: operations["removeGroupMember"];
+        delete: operations["deleteApiGroupsByIdMembersByUserId"];
         options?: never;
         head?: never;
         patch?: never;
@@ -2061,10 +2132,10 @@ export interface paths {
             cookie?: never;
         };
         /** @description List role bindings for a group */
-        get: operations["listGroupBindings"];
+        get: operations["getApiGroupsByIdBindings"];
         put?: never;
         /** @description Add a role binding to a group */
-        post: operations["addGroupBinding"];
+        post: operations["postApiGroupsByIdBindings"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2082,7 +2153,96 @@ export interface paths {
         put?: never;
         post?: never;
         /** @description Remove a role binding from a group */
-        delete: operations["removeGroupBinding"];
+        delete: operations["deleteApiGroupsByIdBindingsByBindingId"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/teams": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description List all non-archived teams for the organization (paginated) */
+        get: operations["listTeams"];
+        put?: never;
+        /** @description Create a new team that can group projects and members */
+        post: operations["createTeam"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/teams/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description Get a team by its id */
+        get: operations["getTeam"];
+        put?: never;
+        post?: never;
+        /** @description Archive a team (soft-delete) */
+        delete: operations["archiveTeam"];
+        options?: never;
+        head?: never;
+        /** @description Update a team by its id */
+        patch: operations["updateTeam"];
+        trace?: never;
+    };
+    "/api/v1/teams/{id}/members": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description List members of a team */
+        get: operations["listTeamMembers"];
+        put?: never;
+        /** @description Add a member to a team */
+        post: operations["addTeamMember"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/teams/{id}/members/{userId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** @description Remove a member from a team */
+        delete: operations["removeTeamMember"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/teams/{id}/projects": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** @description List projects in a team */
+        get: operations["listTeamProjects"];
+        put?: never;
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -2189,7 +2349,7 @@ export interface paths {
         };
         /**
          * Get the project API key
-         * @description Read the project's API key, the credential SDKs and the ingestion endpoints authenticate with. Requires an admin API key holding project:update on this project.
+         * @description Deprecated. Project base keys can be revealed only by a signed-in project administrator in the browser or an approved device flow. Organization API keys are always refused with 403.
          */
         get: operations["getProjectApiKey"];
         put?: never;
@@ -2211,7 +2371,7 @@ export interface paths {
         put?: never;
         /**
          * Regenerate the project API key
-         * @description Issue a new API key for the project and invalidate the previous one immediately. Anything still sending the old key starts failing authentication as soon as this returns, so roll it out before calling this. Requires an admin API key holding project:manage.
+         * @description Deprecated. Project base keys can be rotated only by a signed-in project administrator in the browser. Organization API keys are always refused with 403.
          */
         post: operations["regenerateProjectApiKey"];
         delete?: never;
@@ -2228,10 +2388,10 @@ export interface paths {
             cookie?: never;
         };
         /** @description Get all prompts for a project */
-        get: operations["listPrompts"];
+        get: operations["getApiPrompts"];
         put?: never;
         /** @description Create a new prompt with default initial version */
-        post: operations["createPrompt"];
+        post: operations["postApiPrompts"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2247,7 +2407,7 @@ export interface paths {
         };
         get?: never;
         /** @description Assign a tag (e.g. "production", "staging") to a specific prompt version */
-        put: operations["assignPromptTag"];
+        put: operations["putApiPromptsByIdTagsByTag"];
         post?: never;
         delete?: never;
         options?: never;
@@ -2263,10 +2423,10 @@ export interface paths {
             cookie?: never;
         };
         /** @description List all prompt tag definitions for the organization */
-        get: operations["listPromptTags"];
+        get: operations["getApiPromptsTags"];
         put?: never;
         /** @description Create a custom prompt tag definition for the organization */
-        post: operations["createPromptTag"];
+        post: operations["postApiPromptsTags"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2282,10 +2442,10 @@ export interface paths {
         };
         get?: never;
         /** @description Rename a prompt tag definition */
-        put: operations["renamePromptTag"];
+        put: operations["putApiPromptsTagsByTag"];
         post?: never;
         /** @description Delete a prompt tag definition and cascade to assignments */
-        delete: operations["deletePromptTag"];
+        delete: operations["deleteApiPromptsTagsByTag"];
         options?: never;
         head?: never;
         patch?: never;
@@ -2299,7 +2459,7 @@ export interface paths {
             cookie?: never;
         };
         /** @description Get all versions for a prompt. Does not include base prompt data, only versioned data. */
-        get: operations["listPromptVersions"];
+        get: operations["getApiPromptsByIdVersions"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2318,7 +2478,7 @@ export interface paths {
         get?: never;
         put?: never;
         /** @description Restore a prompt to a previous version. Creates a new version with the same config data as the specified version. */
-        post: operations["restorePromptVersion"];
+        post: operations["postApiPromptsByIdVersionsByVersionIdRestore"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2333,12 +2493,12 @@ export interface paths {
             cookie?: never;
         };
         /** @description Get a specific prompt by slug, with optional shorthand syntax for tags and versions. Pass a bare slug like "pizza-prompt" to get the latest version, "pizza-prompt:production" to resolve a tagged version, or "pizza-prompt:2" to fetch version 2. Alternatively, use the tag or version query parameters with a bare slug. */
-        get: operations["getPrompt"];
+        get: operations["getApiPromptsById"];
         /** @description Update a prompt */
-        put: operations["updatePrompt"];
+        put: operations["putApiPromptsById"];
         post?: never;
         /** @description Delete a prompt */
-        delete: operations["deletePrompt"];
+        delete: operations["deleteApiPromptsById"];
         options?: never;
         head?: never;
         patch?: never;
@@ -2354,7 +2514,7 @@ export interface paths {
         get?: never;
         put?: never;
         /** @description Sync/upsert a prompt with local content */
-        post: operations["syncPrompt"];
+        post: operations["postApiPromptsByIdSync"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2423,10 +2583,10 @@ export interface paths {
             cookie?: never;
         };
         /** @description Get all scenarios for a project */
-        get: operations["listScenarios"];
+        get: operations["getApiScenarios"];
         put?: never;
         /** @description Create a new scenario */
-        post: operations["createScenario"];
+        post: operations["postApiScenarios"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2441,16 +2601,16 @@ export interface paths {
             cookie?: never;
         };
         /** @description Get a specific scenario by ID */
-        get: operations["getScenario"];
+        get: operations["getApiScenariosById"];
         /** @description Update an existing scenario */
-        put: operations["updateScenario"];
+        put: operations["putApiScenariosById"];
         post?: never;
         /** @description Archive (soft-delete) a scenario */
-        delete: operations["archiveScenario"];
+        delete: operations["deleteApiScenariosById"];
         options?: never;
         head?: never;
         /** @description Update an existing scenario */
-        patch: operations["patchScenario"];
+        patch: operations["patchApiScenariosById"];
         trace?: never;
     };
     "/api/v1/scenarios/{id}/versions": {
@@ -2461,7 +2621,7 @@ export interface paths {
             cookie?: never;
         };
         /** @description List the saved versions of a scenario, newest first. A scenario saved before versions were recorded closes its history with a synthesized Created entry. */
-        get: operations["listScenarioVersions"];
+        get: operations["getApiScenariosByIdVersions"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2478,7 +2638,7 @@ export interface paths {
             cookie?: never;
         };
         /** @description Get one saved version of a scenario, with the name, situation, criteria, labels and parameters as that version saved them. */
-        get: operations["getScenarioVersion"];
+        get: operations["getApiScenariosByIdVersionsByVersion"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2495,7 +2655,7 @@ export interface paths {
             cookie?: never;
         };
         /** @description List simulation runs, optionally filtered by scenarioSetId or batchRunId */
-        get: operations["listSimulationRuns"];
+        get: operations["getApiSimulationRuns"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2512,7 +2672,7 @@ export interface paths {
             cookie?: never;
         };
         /** @description Get a single simulation run by its ID */
-        get: operations["getSimulationRun"];
+        get: operations["getApiSimulationRunsByScenarioRunId"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2529,7 +2689,7 @@ export interface paths {
             cookie?: never;
         };
         /** @description List batch summaries for a scenario set (pass/fail counts per batch) */
-        get: operations["listSimulationRunBatches"];
+        get: operations["getApiSimulationRunsBatchesList"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2546,7 +2706,7 @@ export interface paths {
             cookie?: never;
         };
         /** @description Get the summary of a single batch run, including its completion flag */
-        get: operations["getSimulationRunBatch"];
+        get: operations["getApiSimulationRunsBatchesByBatchRunId"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2612,13 +2772,13 @@ export interface paths {
          * List project secrets
          * @description Lists metadata only. Secret values are never returned. Requests have 16 KiB inputs; the service enforces the 50-secret cap. Responses are not cached.
          */
-        get: operations["listSecretsPluralAlias"];
+        get: operations["getApiSecrets"];
         put?: never;
         /**
          * Create a project secret
          * @description Encrypts the value at rest and never returns it. Requests have 16 KiB inputs.
          */
-        post: operations["createSecretPluralAlias"];
+        post: operations["postApiSecrets"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2633,15 +2793,15 @@ export interface paths {
             cookie?: never;
         };
         /** Get project-secret metadata */
-        get: operations["getSecretPluralAlias"];
+        get: operations["getApiSecretsById"];
         /**
          * Replace a project secret value
          * @description Requests have 16 KiB inputs.
          */
-        put: operations["updateSecretPluralAlias"];
+        put: operations["putApiSecretsById"];
         post?: never;
         /** Delete a project secret */
-        delete: operations["deleteSecretPluralAlias"];
+        delete: operations["deleteApiSecretsById"];
         options?: never;
         head?: never;
         patch?: never;
@@ -2841,13 +3001,13 @@ export interface paths {
          * @deprecated
          * @description List all non-archived suites for the project. By default only custom run plans are returned; pass kind=folder for test suites. Deprecated: use /api/v1/run-plans and /api/v1/test-suites.
          */
-        get: operations["listSuites"];
+        get: operations["getApiSuites"];
         put?: never;
         /**
          * @deprecated
          * @description Create a new suite (run plan). Deprecated: use /api/v1/run-plans and /api/v1/test-suites.
          */
-        post: operations["createSuite"];
+        post: operations["postApiSuites"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2865,21 +3025,21 @@ export interface paths {
          * @deprecated
          * @description Get a suite (run plan) by its ID. Deprecated: use /api/v1/run-plans and /api/v1/test-suites.
          */
-        get: operations["getSuite"];
+        get: operations["getApiSuitesById"];
         put?: never;
         post?: never;
         /**
          * @deprecated
          * @description Archive (soft-delete) a suite. Archiving a test suite also archives every scenario filed in it, in one transaction. Deprecated: use /api/v1/run-plans and /api/v1/test-suites.
          */
-        delete: operations["archiveSuite"];
+        delete: operations["deleteApiSuitesById"];
         options?: never;
         head?: never;
         /**
          * @deprecated
          * @description Update a suite (run plan). Deprecated: use /api/v1/run-plans and /api/v1/test-suites.
          */
-        patch: operations["updateSuite"];
+        patch: operations["patchApiSuitesById"];
         trace?: never;
     };
     "/api/v1/suites/{id}/duplicate": {
@@ -2895,7 +3055,7 @@ export interface paths {
          * @deprecated
          * @description Duplicate a suite (run plan). Deprecated: use /api/v1/run-plans and /api/v1/test-suites.
          */
-        post: operations["duplicateSuite"];
+        post: operations["postApiSuitesByIdDuplicate"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2915,7 +3075,7 @@ export interface paths {
          * @deprecated
          * @description Trigger a suite run. Schedules scenario executions for all active scenarios x targets x repeatCount. When the id names a test suite, the targets are read from the body. Deprecated: use /api/v1/run-plans and /api/v1/test-suites.
          */
-        post: operations["runSuite"];
+        post: operations["postApiSuitesByIdRun"];
         delete?: never;
         options?: never;
         head?: never;
@@ -2964,7 +3124,7 @@ export interface paths {
             cookie?: never;
         };
         /** @description Personal AI usage for the current month (or an explicit window): spend, billed spend, request + token counts, per-day buckets, and per-model breakdown. Requires a personal-project API key. */
-        get: operations["getMyUsage"];
+        get: operations["getApiMeUsage"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2981,7 +3141,7 @@ export interface paths {
             cookie?: never;
         };
         /** @description Identity of the project the calling API key belongs to: id, name, slug and whether it is a personal workspace project. Lets a client (the CLI's identity notice, a widget) say which project a key targets without any further access. */
-        get: operations["getMyProject"];
+        get: operations["getApiMeProject"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3001,13 +3161,13 @@ export interface paths {
          * List webhook endpoints
          * @description List the organization's webhook endpoints
          */
-        get: operations["listWebhookEndpoints"];
+        get: operations["getApiWebhooksV1Endpoints"];
         put?: never;
         /**
          * Create a webhook endpoint
          * @description Create a webhook endpoint. Name one destination: `url` for `destination_kind: http`, `sqs` for `destination_kind: sqs`. Naming the other kind's field is a 400 that says which field does not belong, rather than a 201 that saved half the body. `destination_kind` may be omitted and then means `http`. The signing secret is returned ONCE in this response and never again; roll it to get a new one. Send `Idempotency-Key` to make a retry safe: a replay returns the original response including its `secret`, which is the only way to recover a secret whose response was lost in transit.
          */
-        post: operations["createWebhookEndpoint"];
+        post: operations["postApiWebhooksV1Endpoints"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3025,21 +3185,21 @@ export interface paths {
          * Get a webhook endpoint
          * @description Get one webhook endpoint
          */
-        get: operations["getWebhookEndpoint"];
+        get: operations["getApiWebhooksV1EndpointsById"];
         put?: never;
         post?: never;
         /**
          * Archive a webhook endpoint
          * @description Archive a webhook endpoint
          */
-        delete: operations["archiveWebhookEndpoint"];
+        delete: operations["deleteApiWebhooksV1EndpointsById"];
         options?: never;
         head?: never;
         /**
          * Update a webhook endpoint
          * @description Update a webhook endpoint's address, event subscriptions, or status (`active` re-enables, `disabled` pauses; re-enabling does not re-send the gap, replay covers it). `destination_kind` cannot change: batches already planned against the old transport are in flight, so a move means a new endpoint alongside this one until it has drained.
          */
-        patch: operations["updateWebhookEndpoint"];
+        patch: operations["patchApiWebhooksV1EndpointsById"];
         trace?: never;
     };
     "/api/webhooks/v1/endpoints/{id}/roll-secret": {
@@ -3055,7 +3215,7 @@ export interface paths {
          * Roll an endpoint's signing secret
          * @description Roll the endpoint's signing secret. The new secret is returned ONCE; deliveries sign with it immediately.
          */
-        post: operations["rollWebhookEndpointSecret"];
+        post: operations["postApiWebhooksV1EndpointsByIdRollSecret"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3075,7 +3235,7 @@ export interface paths {
          * Send a test event to an endpoint
          * @description Send a signed test event through the full delivery path. Contract: the route answers 200 whenever the test itself ran; delivered says whether the receiver accepted it, so clients must read the body, not the status code.
          */
-        post: operations["testWebhookEndpoint"];
+        post: operations["postApiWebhooksV1EndpointsByIdTest"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3093,7 +3253,7 @@ export interface paths {
          * List an endpoint's delivery attempts
          * @description The endpoint's delivery log: every attempt with the receiver's HTTP status, latency, and error
          */
-        get: operations["listWebhookEndpointDeliveries"];
+        get: operations["getApiWebhooksV1EndpointsByIdDeliveries"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3113,7 +3273,7 @@ export interface paths {
          * Read an endpoint's delivery health
          * @description Delivery health. The headline number is oldest_undelivered_age_ms, the feed's staleness: age of the oldest envelope still buffered or retrying. Also: DLQ depth, failure streak, sends/min, success rate, and p95 latency over the last hour.
          */
-        get: operations["getWebhookEndpointHealth"];
+        get: operations["getApiWebhooksV1EndpointsByIdHealth"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3133,7 +3293,7 @@ export interface paths {
          * List subscribable event types
          * @description The event catalog: every subscribable type, grouped by family; types marked emitting=false are declared contracts whose producers have not shipped yet
          */
-        get: operations["listWebhookEventTypes"];
+        get: operations["getApiWebhooksV1EventTypes"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3153,7 +3313,7 @@ export interface paths {
          * List emitted events
          * @description The organization's emitted-events log for the request families: cursor-paged, newest first, filter by type. `from` and `to` bound the created range in epoch milliseconds, are REQUIRED, and `from` must not be later than `to` - a range that ends before it starts is rejected rather than answered with an empty page. They are required because the log is a ranged read over the 13-month spend table and an unbounded walk sorts all of it on every page. Webhooks are push over this log, never the only copy of it. SERVES `gateway.request.completed` and `gateway.request.settled` ONLY. The governance families (`gateway.budget.*`, `gateway.virtual_key.*`) are delivered by webhook but are not retained in a queryable log, so they cannot be listed or replayed here; any other type returns an empty page rather than an error, so a client can probe forward-compatibly.
          */
-        get: operations["listWebhookEvents"];
+        get: operations["getApiWebhooksV1Events"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3173,7 +3333,7 @@ export interface paths {
          * Get one emitted event
          * @description One emitted event by its id, as it was delivered. Serves the same families the events log serves. A 404 covers every reason the log cannot answer -- never emitted, past the retention horizon, or belonging to another organization -- because telling those apart would confirm the existence of another tenant's request ids.
          */
-        get: operations["getWebhookEvent"];
+        get: operations["getApiWebhooksV1EventsById"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3190,7 +3350,7 @@ export interface paths {
             cookie?: never;
         };
         /** @description List all non-archived workflows for the project */
-        get: operations["listWorkflows"];
+        get: operations["getApiWorkflows"];
         put?: never;
         post?: never;
         delete?: never;
@@ -3207,15 +3367,15 @@ export interface paths {
             cookie?: never;
         };
         /** @description Get a workflow by its ID */
-        get: operations["getWorkflow"];
+        get: operations["getApiWorkflowsById"];
         put?: never;
         post?: never;
         /** @description Archive (soft-delete) a workflow */
-        delete: operations["archiveWorkflow"];
+        delete: operations["deleteApiWorkflowsById"];
         options?: never;
         head?: never;
         /** @description Update a workflow's metadata (name, icon, description) */
-        patch: operations["updateWorkflow"];
+        patch: operations["patchApiWorkflowsById"];
         trace?: never;
     };
     "/api/v1/workflows/{id}/evaluate": {
@@ -3228,7 +3388,7 @@ export interface paths {
         get?: never;
         put?: never;
         /** @description Trigger an evaluation run of a workflow's committed version through the evaluations pipeline. Evaluate the workflow's attached dataset, inline data, or a platform dataset id; parameters bind as constant entry inputs on every row. Returns a run id and a results URL to poll or open in the browser. */
-        post: operations["evaluateWorkflow"];
+        post: operations["postApiWorkflowsByIdEvaluate"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3248,7 +3408,7 @@ export interface paths {
          * Run a workflow version (legacy path)
          * @description Run one pinned version of an Optimization Studio workflow synchronously. Identical to `POST /api/workflows/{workflowId}/{versionId}/run`, which is the path to use in new integrations; this one stays for callers written against it. The body is the workflow's own input fields, named as its entry node names them.
          */
-        post: operations["runOptimizationWorkflowVersion"];
+        post: operations["postApiOptimizationByWorkflowIdByVersionId"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3268,7 +3428,7 @@ export interface paths {
          * Run a workflow
          * @description Run an Optimization Studio workflow synchronously and return its output. Runs the workflow's published version; address a specific version with the `{versionId}` form of this path. The body is the workflow's own input fields, named as its entry node names them.
          */
-        post: operations["runWorkflow"];
+        post: operations["postApiWorkflowsByWorkflowIdRun"];
         delete?: never;
         options?: never;
         head?: never;
@@ -3288,7 +3448,7 @@ export interface paths {
          * Run a specific workflow version
          * @description Run one pinned version of an Optimization Studio workflow synchronously and return its output. Use this when a caller must keep hitting the same version as the workflow is edited. The body is the workflow's own input fields, named as its entry node names them.
          */
-        post: operations["runWorkflowVersion"];
+        post: operations["postApiWorkflowsByWorkflowIdByVersionIdRun"];
         delete?: never;
         options?: never;
         head?: never;
@@ -4513,616 +4673,7 @@ export interface operations {
             };
         };
     };
-    listLegacyAgents: {
-        parameters: {
-            query?: {
-                page?: number;
-                limit?: number;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Success */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        data: {
-                            id: string;
-                            name: string;
-                            /**
-                             * @description The kind of agent. A connected agent is registered from code by the SDK and cannot be created or reconfigured through this API.
-                             * @enum {string}
-                             */
-                            type: "signature" | "code" | "workflow" | "http" | "connected";
-                            config: {
-                                [key: string]: unknown;
-                            } | null;
-                            /** Format: date-time */
-                            createdAt: string;
-                            /** Format: date-time */
-                            updatedAt: string;
-                            /** Format: uri */
-                            platformUrl: string;
-                        }[];
-                        pagination: {
-                            page: number;
-                            limit: number;
-                            total: number;
-                            totalPages: number;
-                        };
-                    };
-                };
-            };
-        };
-    };
-    createLegacyAgent: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    name: string;
-                    workflowId?: string;
-                    copiedFromAgentId?: string;
-                    /** @constant */
-                    type: "signature";
-                    config: {
-                        _library_ref?: string;
-                        name?: string;
-                        description?: string;
-                        cls?: string;
-                        parameters?: {
-                            identifier: string;
-                            /** @enum {string} */
-                            type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
-                            optional?: boolean;
-                            value?: unknown;
-                            desc?: string;
-                            prefix?: string;
-                            hidden?: boolean;
-                            json_schema?: {
-                                [key: string]: unknown;
-                            };
-                        }[];
-                        inputs?: {
-                            identifier: string;
-                            /** @enum {string} */
-                            type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
-                            optional?: boolean;
-                            value?: unknown;
-                            desc?: string;
-                            prefix?: string;
-                            hidden?: boolean;
-                            json_schema?: {
-                                [key: string]: unknown;
-                            };
-                        }[];
-                        outputs?: {
-                            identifier: string;
-                            /** @enum {string} */
-                            type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
-                            optional?: boolean;
-                            value?: unknown;
-                            desc?: string;
-                            prefix?: string;
-                            hidden?: boolean;
-                            json_schema?: {
-                                [key: string]: unknown;
-                            };
-                        }[];
-                        isCustom?: boolean;
-                        /** @constant */
-                        behave_as?: "evaluator";
-                        configId?: string;
-                        handle?: string | null;
-                        versionMetadata?: {
-                            versionId: string;
-                            versionNumber: number;
-                            versionCreatedAt: string;
-                        };
-                        llm?: {
-                            model: string;
-                            temperature?: number;
-                            max_tokens?: number;
-                            top_p?: number;
-                            frequency_penalty?: number;
-                            presence_penalty?: number;
-                            seed?: number;
-                            top_k?: number;
-                            min_p?: number;
-                            repetition_penalty?: number;
-                            reasoning?: string;
-                            reasoning_effort?: string;
-                            thinkingLevel?: string;
-                            effort?: string;
-                            verbosity?: string;
-                            litellm_params?: {
-                                [key: string]: string;
-                            };
-                        };
-                        prompt?: string;
-                        messages?: {
-                            /** @enum {string} */
-                            role?: "system" | "user" | "assistant";
-                            content?: string;
-                        }[];
-                        promptDraft?: boolean;
-                    };
-                } | {
-                    name: string;
-                    workflowId?: string;
-                    copiedFromAgentId?: string;
-                    /** @constant */
-                    type: "code";
-                    config: {
-                        _library_ref?: string;
-                        name?: string;
-                        description?: string;
-                        cls?: string;
-                        parameters: ({
-                            /** @constant */
-                            identifier: "code";
-                            /** @constant */
-                            type: "code";
-                            value: string;
-                            optional?: boolean;
-                            desc?: string;
-                            prefix?: string;
-                            hidden?: boolean;
-                        } | {
-                            identifier: string;
-                            /** @enum {string} */
-                            type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
-                            optional?: boolean;
-                            value?: unknown;
-                            desc?: string;
-                            prefix?: string;
-                            hidden?: boolean;
-                            json_schema?: {
-                                [key: string]: unknown;
-                            };
-                        })[];
-                        inputs?: {
-                            identifier: string;
-                            /** @enum {string} */
-                            type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
-                            optional?: boolean;
-                            value?: unknown;
-                            desc?: string;
-                            prefix?: string;
-                            hidden?: boolean;
-                            json_schema?: {
-                                [key: string]: unknown;
-                            };
-                        }[];
-                        outputs?: {
-                            identifier: string;
-                            /** @enum {string} */
-                            type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
-                            optional?: boolean;
-                            value?: unknown;
-                            desc?: string;
-                            prefix?: string;
-                            hidden?: boolean;
-                            json_schema?: {
-                                [key: string]: unknown;
-                            };
-                        }[];
-                        isCustom?: boolean;
-                        /** @constant */
-                        behave_as?: "evaluator";
-                        scenarioMappings?: {
-                            [key: string]: {
-                                /** @constant */
-                                type: "source";
-                                sourceId: string;
-                                path: string[];
-                            } | {
-                                /** @constant */
-                                type: "value";
-                                value: string;
-                            };
-                        };
-                        scenarioOutputField?: string;
-                    };
-                } | {
-                    name: string;
-                    workflowId?: string;
-                    copiedFromAgentId?: string;
-                    /** @constant */
-                    type: "workflow";
-                    config: {
-                        _library_ref?: string;
-                        name?: string;
-                        description?: string;
-                        cls?: string;
-                        parameters?: {
-                            identifier: string;
-                            /** @enum {string} */
-                            type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
-                            optional?: boolean;
-                            value?: unknown;
-                            desc?: string;
-                            prefix?: string;
-                            hidden?: boolean;
-                            json_schema?: {
-                                [key: string]: unknown;
-                            };
-                        }[];
-                        inputs?: {
-                            identifier: string;
-                            /** @enum {string} */
-                            type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
-                            optional?: boolean;
-                            value?: unknown;
-                            desc?: string;
-                            prefix?: string;
-                            hidden?: boolean;
-                            json_schema?: {
-                                [key: string]: unknown;
-                            };
-                        }[];
-                        outputs?: {
-                            identifier: string;
-                            /** @enum {string} */
-                            type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
-                            optional?: boolean;
-                            value?: unknown;
-                            desc?: string;
-                            prefix?: string;
-                            hidden?: boolean;
-                            json_schema?: {
-                                [key: string]: unknown;
-                            };
-                        }[];
-                        isCustom?: boolean;
-                        /** @constant */
-                        behave_as?: "evaluator";
-                        workflow_id?: string;
-                        publishedId?: string;
-                        version_id?: string;
-                        versions?: {
-                            [key: string]: unknown;
-                        };
-                        scenarioMappings?: {
-                            [key: string]: {
-                                /** @constant */
-                                type: "source";
-                                sourceId: string;
-                                path: string[];
-                            } | {
-                                /** @constant */
-                                type: "value";
-                                value: string;
-                            };
-                        };
-                        scenarioOutputField?: string;
-                    };
-                } | {
-                    name: string;
-                    workflowId?: string;
-                    copiedFromAgentId?: string;
-                    /** @constant */
-                    type: "http";
-                    config: {
-                        _library_ref?: string;
-                        name?: string;
-                        description?: string;
-                        cls?: string;
-                        parameters?: {
-                            identifier: string;
-                            /** @enum {string} */
-                            type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
-                            optional?: boolean;
-                            value?: unknown;
-                            desc?: string;
-                            prefix?: string;
-                            hidden?: boolean;
-                            json_schema?: {
-                                [key: string]: unknown;
-                            };
-                        }[];
-                        inputs?: {
-                            identifier: string;
-                            /** @enum {string} */
-                            type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
-                            optional?: boolean;
-                            value?: unknown;
-                            desc?: string;
-                            prefix?: string;
-                            hidden?: boolean;
-                            json_schema?: {
-                                [key: string]: unknown;
-                            };
-                        }[];
-                        outputs?: {
-                            identifier: string;
-                            /** @enum {string} */
-                            type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
-                            optional?: boolean;
-                            value?: unknown;
-                            desc?: string;
-                            prefix?: string;
-                            hidden?: boolean;
-                            json_schema?: {
-                                [key: string]: unknown;
-                            };
-                        }[];
-                        isCustom?: boolean;
-                        /** @constant */
-                        behave_as?: "evaluator";
-                        url: string;
-                        /**
-                         * @default POST
-                         * @enum {string}
-                         */
-                        method?: "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
-                        headers?: {
-                            key: string;
-                            value: string;
-                        }[];
-                        auth?: {
-                            /** @constant */
-                            type: "none";
-                        } | {
-                            /** @constant */
-                            type: "bearer";
-                            token: string;
-                        } | {
-                            /** @constant */
-                            type: "api_key";
-                            header: string;
-                            value: string;
-                        } | {
-                            /** @constant */
-                            type: "basic";
-                            username: string;
-                            password: string;
-                        };
-                        bodyTemplate?: string;
-                        outputPath?: string;
-                        sessionPath?: string;
-                        timeoutMs?: number;
-                        scenarioMappings?: {
-                            [key: string]: {
-                                /** @constant */
-                                type: "source";
-                                sourceId: string;
-                                path: string[];
-                            } | {
-                                /** @constant */
-                                type: "value";
-                                value: string;
-                            };
-                        };
-                        devTunnel?: {
-                            previousUrl?: string;
-                            connectedAt?: string;
-                        };
-                    };
-                } | {
-                    name: string;
-                    workflowId?: string;
-                    copiedFromAgentId?: string;
-                    /** @constant */
-                    type: "connected";
-                    config: {
-                        _library_ref?: string;
-                        name?: string;
-                        cls?: string;
-                        /** @default [] */
-                        parameters?: {
-                            name: string;
-                            description?: string;
-                            defaultValue?: string | number | boolean;
-                            secret?: boolean;
-                            /** @enum {string} */
-                            type?: "string" | "number" | "boolean";
-                            options?: (string | number | boolean)[];
-                            required?: boolean;
-                        }[];
-                        inputs?: {
-                            identifier: string;
-                            /** @enum {string} */
-                            type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
-                            optional?: boolean;
-                            value?: unknown;
-                            desc?: string;
-                            prefix?: string;
-                            hidden?: boolean;
-                            json_schema?: {
-                                [key: string]: unknown;
-                            };
-                        }[];
-                        outputs?: {
-                            identifier: string;
-                            /** @enum {string} */
-                            type: "str" | "image" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
-                            optional?: boolean;
-                            value?: unknown;
-                            desc?: string;
-                            prefix?: string;
-                            hidden?: boolean;
-                            json_schema?: {
-                                [key: string]: unknown;
-                            };
-                        }[];
-                        isCustom?: boolean;
-                        /** @constant */
-                        behave_as?: "evaluator";
-                        timeoutMs?: number;
-                        concurrency?: number;
-                        sticky?: boolean;
-                        sdk: {
-                            name: string;
-                            version: string;
-                            language: string;
-                        };
-                    };
-                };
-            };
-        };
-        responses: {
-            /** @description Success */
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        id: string;
-                        name: string;
-                        /**
-                         * @description The kind of agent. A connected agent is registered from code by the SDK and cannot be created or reconfigured through this API.
-                         * @enum {string}
-                         */
-                        type: "signature" | "code" | "workflow" | "http" | "connected";
-                        config: {
-                            [key: string]: unknown;
-                        } | null;
-                        /** Format: date-time */
-                        createdAt: string;
-                        /** Format: date-time */
-                        updatedAt: string;
-                        /** Format: uri */
-                        platformUrl: string;
-                    };
-                };
-            };
-        };
-    };
-    getLegacyAgent: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description The agent id. */
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Success */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        id: string;
-                        name: string;
-                        /**
-                         * @description The kind of agent. A connected agent is registered from code by the SDK and cannot be created or reconfigured through this API.
-                         * @enum {string}
-                         */
-                        type: "signature" | "code" | "workflow" | "http" | "connected";
-                        config: {
-                            [key: string]: unknown;
-                        } | null;
-                        /** Format: date-time */
-                        createdAt: string;
-                        /** Format: date-time */
-                        updatedAt: string;
-                        /** Format: uri */
-                        platformUrl: string;
-                    };
-                };
-            };
-        };
-    };
-    archiveLegacyAgent: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description The agent id. */
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Success */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        id: string;
-                        name: string;
-                        /** @enum {string} */
-                        type: "signature" | "code" | "workflow" | "http" | "connected";
-                        archivedAt: string | null;
-                    };
-                };
-            };
-        };
-    };
-    updateLegacyAgent: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description The agent id. */
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    name?: string;
-                    /** @enum {string} */
-                    type?: "signature" | "code" | "workflow" | "http" | "connected";
-                    config?: {
-                        [key: string]: unknown;
-                    };
-                    workflowId?: string | null;
-                };
-            };
-        };
-        responses: {
-            /** @description Success */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        id: string;
-                        name: string;
-                        /**
-                         * @description The kind of agent. A connected agent is registered from code by the SDK and cannot be created or reconfigured through this API.
-                         * @enum {string}
-                         */
-                        type: "signature" | "code" | "workflow" | "http" | "connected";
-                        config: {
-                            [key: string]: unknown;
-                        } | null;
-                        /** Format: date-time */
-                        createdAt: string;
-                        /** Format: date-time */
-                        updatedAt: string;
-                        /** Format: uri */
-                        platformUrl: string;
-                    };
-                };
-            };
-        };
-    };
-    queryAnalyticsTimeseries: {
+    postApiAnalyticsTimeseries: {
         parameters: {
             query?: never;
             header?: never;
@@ -5244,7 +4795,7 @@ export interface operations {
             };
         };
     };
-    queryAnalyticsTimeseriesLegacy: {
+    postApiAnalytics: {
         parameters: {
             query?: never;
             header?: never;
@@ -5330,11 +4881,11 @@ export interface operations {
                 };
                 content: {
                     "application/json": {
-                        columns: {
+                        readonly columns: {
                             name: string;
                             type: string;
                         }[];
-                        rows: {
+                        readonly rows: {
                             [key: string]: unknown;
                         }[];
                         statistics: {
@@ -5348,7 +4899,7 @@ export interface operations {
                         followsGranularity: boolean;
                         granularitySeconds?: number;
                         coarsenedFromSeconds?: number;
-                        diagnostics: {
+                        readonly diagnostics: {
                             /** @enum {string} */
                             code: "RESULT_TRUNCATED" | "POSSIBLE_FANOUT" | "UNBOUNDED_TIME_RANGE" | "MISSING_TIME_BUCKETS" | "INCOMPLETE_COMPARISON_PERIOD";
                             message: string;
@@ -5508,19 +5059,19 @@ export interface operations {
                 content: {
                     "application/json": {
                         database: string;
-                        datasets: {
+                        readonly datasets: {
                             name: string;
                             description: string;
                             grain: string;
-                            joinKeys: string[];
+                            readonly joinKeys: string[];
                             timeColumn: string;
                             freshness: string;
-                            columns: {
+                            readonly columns: {
                                 name: string;
                                 type: string;
                                 description: string;
-                                unit: ("ms" | "USD" | "tokens" | "tokens/s") | null;
-                                gates: ("input" | "output" | "costs")[];
+                                unit: string | null;
+                                readonly gates: string[];
                                 available: boolean;
                             }[];
                             exampleSql: string;
@@ -8476,6 +8027,78 @@ export interface operations {
             };
         };
     };
+    validateProjectAuthToken: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    readBrowserAuthSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    endBrowserSessionAndRedirect: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    endBrowserSession: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     listRoleBindings: {
         parameters: {
             query?: {
@@ -8651,7 +8274,7 @@ export interface operations {
             };
         };
     };
-    listTriggers: {
+    getApiTriggers: {
         parameters: {
             query?: never;
             header?: never;
@@ -8689,7 +8312,7 @@ export interface operations {
             };
         };
     };
-    createTrigger: {
+    postApiTriggers: {
         parameters: {
             query?: never;
             header?: never;
@@ -8745,7 +8368,7 @@ export interface operations {
             };
         };
     };
-    getTrigger: {
+    getApiTriggersById: {
         parameters: {
             query?: never;
             header?: never;
@@ -8797,7 +8420,7 @@ export interface operations {
             };
         };
     };
-    deleteTrigger: {
+    deleteApiTriggersById: {
         parameters: {
             query?: never;
             header?: never;
@@ -8834,7 +8457,7 @@ export interface operations {
             };
         };
     };
-    updateTrigger: {
+    patchApiTriggersById: {
         parameters: {
             query?: never;
             header?: never;
@@ -8901,7 +8524,7 @@ export interface operations {
             };
         };
     };
-    createSlackTrigger: {
+    postApiTriggerSlack: {
         parameters: {
             query?: never;
             header?: never;
@@ -9022,7 +8645,7 @@ export interface operations {
             };
         };
     };
-    listCodingAgentSessionEvents: {
+    getApiCodingAgentSessionsBySessionIdEvents: {
         parameters: {
             query?: {
                 limit?: number;
@@ -9147,7 +8770,7 @@ export interface operations {
             };
         };
     };
-    getCodingAgentPullRequestUsage: {
+    getApiCodingAgentPullRequestUsage: {
         parameters: {
             query: {
                 /** @description The repository as "owner/name". Case is folded by the mapping store. */
@@ -9401,7 +9024,7 @@ export interface operations {
             };
         };
     };
-    listDashboards: {
+    getApiDashboards: {
         parameters: {
             query?: never;
             header?: never;
@@ -9433,7 +9056,7 @@ export interface operations {
             };
         };
     };
-    createDashboard: {
+    postApiDashboards: {
         parameters: {
             query?: never;
             header?: never;
@@ -9468,7 +9091,7 @@ export interface operations {
             };
         };
     };
-    reorderDashboards: {
+    putApiDashboardsReorder: {
         parameters: {
             query?: never;
             header?: never;
@@ -9497,7 +9120,7 @@ export interface operations {
             };
         };
     };
-    getDashboard: {
+    getApiDashboardsById: {
         parameters: {
             query?: never;
             header?: never;
@@ -9548,7 +9171,7 @@ export interface operations {
             };
         };
     };
-    deleteDashboard: {
+    deleteApiDashboardsById: {
         parameters: {
             query?: never;
             header?: never;
@@ -9573,7 +9196,7 @@ export interface operations {
             };
         };
     };
-    renameDashboard: {
+    patchApiDashboardsById: {
         parameters: {
             query?: never;
             header?: never;
@@ -9610,7 +9233,7 @@ export interface operations {
             };
         };
     };
-    listGraphs: {
+    getApiGraphs: {
         parameters: {
             query?: {
                 dashboardId?: string;
@@ -9648,7 +9271,7 @@ export interface operations {
             };
         };
     };
-    createGraph: {
+    postApiGraphs: {
         parameters: {
             query?: never;
             header?: never;
@@ -9701,7 +9324,7 @@ export interface operations {
             };
         };
     };
-    getGraph: {
+    getApiGraphsById: {
         parameters: {
             query?: never;
             header?: never;
@@ -9739,7 +9362,7 @@ export interface operations {
             };
         };
     };
-    deleteGraph: {
+    deleteApiGraphsById: {
         parameters: {
             query?: never;
             header?: never;
@@ -9764,7 +9387,7 @@ export interface operations {
             };
         };
     };
-    updateGraph: {
+    patchApiGraphsById: {
         parameters: {
             query?: never;
             header?: never;
@@ -10872,7 +10495,7 @@ export interface operations {
             };
         };
     };
-    listEvaluators: {
+    getApiEvaluators: {
         parameters: {
             query?: never;
             header?: never;
@@ -10921,7 +10544,7 @@ export interface operations {
             };
         };
     };
-    createEvaluator: {
+    postApiEvaluators: {
         parameters: {
             query?: never;
             header?: never;
@@ -10979,7 +10602,7 @@ export interface operations {
             };
         };
     };
-    getEvaluator: {
+    getApiEvaluatorsByIdOrSlug: {
         parameters: {
             query?: never;
             header?: never;
@@ -11043,7 +10666,7 @@ export interface operations {
             };
         };
     };
-    updateEvaluator: {
+    putApiEvaluatorsById: {
         parameters: {
             query?: never;
             header?: never;
@@ -11128,7 +10751,7 @@ export interface operations {
             };
         };
     };
-    archiveEvaluator: {
+    deleteApiEvaluatorsById: {
         parameters: {
             query?: never;
             header?: never;
@@ -11165,7 +10788,7 @@ export interface operations {
             };
         };
     };
-    listExperiments: {
+    getApiExperiments: {
         parameters: {
             query?: {
                 /** @description 1-based page number */
@@ -11208,7 +10831,7 @@ export interface operations {
             };
         };
     };
-    createExperiment: {
+    postApiExperiments: {
         parameters: {
             query?: never;
             header?: never;
@@ -11253,7 +10876,7 @@ export interface operations {
             };
         };
     };
-    getExperiment: {
+    getApiExperimentsBySlug: {
         parameters: {
             query?: never;
             header?: never;
@@ -11293,7 +10916,7 @@ export interface operations {
             };
         };
     };
-    initExperiment: {
+    postApiExperimentInit: {
         parameters: {
             query?: never;
             header?: never;
@@ -11336,7 +10959,7 @@ export interface operations {
             };
         };
     };
-    logDspySteps: {
+    postApiDspyLogSteps: {
         parameters: {
             query?: never;
             header?: never;
@@ -11379,7 +11002,7 @@ export interface operations {
             };
         };
     };
-    runExperiment: {
+    postApiExperimentsBySlugRun: {
         parameters: {
             query?: never;
             header?: never;
@@ -11424,7 +11047,7 @@ export interface operations {
             };
         };
     };
-    listExperimentRuns: {
+    getApiExperimentsRuns: {
         parameters: {
             query?: {
                 /** @description Slug of the experiment whose runs you want */
@@ -11470,7 +11093,7 @@ export interface operations {
             };
         };
     };
-    getExperimentRunStatus: {
+    getApiExperimentsRunsByRunId: {
         parameters: {
             query?: never;
             header?: never;
@@ -11504,7 +11127,7 @@ export interface operations {
             };
         };
     };
-    getExperimentRunResults: {
+    getApiExperimentsRunsByRunIdResults: {
         parameters: {
             query?: {
                 /** @description Owning experiment. Required once the run has aged out of the status cache. */
@@ -11541,7 +11164,7 @@ export interface operations {
             };
         };
     };
-    getExperimentWorkbenchState: {
+    getApiExperimentsBySlugWorkbenchState: {
         parameters: {
             query?: {
                 /** @description Set to `version` to answer with the version and timestamp only */
@@ -11585,7 +11208,7 @@ export interface operations {
             };
         };
     };
-    saveExperimentWorkbenchState: {
+    putApiExperimentsBySlugWorkbenchState: {
         parameters: {
             query?: never;
             header?: never;
@@ -11643,7 +11266,7 @@ export interface operations {
             };
         };
     };
-    listExperimentWorkbenchVersions: {
+    getApiExperimentsBySlugVersions: {
         parameters: {
             query?: {
                 /** @description Versions per page, capped at 100 */
@@ -11689,7 +11312,7 @@ export interface operations {
             };
         };
     };
-    restoreExperimentWorkbenchVersion: {
+    postApiExperimentsBySlugVersionsByVersionRestore: {
         parameters: {
             query?: never;
             header?: never;
@@ -11731,7 +11354,7 @@ export interface operations {
             };
         };
     };
-    getAgentCacheEntry: {
+    getApiAgentCacheByName: {
         parameters: {
             query?: never;
             header?: never;
@@ -11860,7 +11483,7 @@ export interface operations {
             };
         };
     };
-    putAgentCacheEntry: {
+    putApiAgentCacheByName: {
         parameters: {
             query?: never;
             header?: never;
@@ -11996,7 +11619,7 @@ export interface operations {
             };
         };
     };
-    deleteAgentCacheEntry: {
+    deleteApiAgentCacheByName: {
         parameters: {
             query?: never;
             header?: never;
@@ -12125,7 +11748,7 @@ export interface operations {
             };
         };
     };
-    claimAgentCacheEntry: {
+    postApiAgentCacheByNameClaim: {
         parameters: {
             query?: never;
             header?: never;
@@ -12286,7 +11909,7 @@ export interface operations {
             };
         };
     };
-    listVirtualKeys: {
+    getApiGatewayV1VirtualKeys: {
         parameters: {
             query?: {
                 cursor?: string;
@@ -12456,7 +12079,7 @@ export interface operations {
             };
         };
     };
-    createVirtualKey: {
+    postApiGatewayV1VirtualKeys: {
         parameters: {
             query?: never;
             header?: never;
@@ -12745,7 +12368,7 @@ export interface operations {
             };
         };
     };
-    getVirtualKey: {
+    getApiGatewayV1VirtualKeysById: {
         parameters: {
             query?: never;
             header?: never;
@@ -12910,7 +12533,7 @@ export interface operations {
             };
         };
     };
-    updateVirtualKey: {
+    patchApiGatewayV1VirtualKeysById: {
         parameters: {
             query?: never;
             header?: never;
@@ -13170,7 +12793,7 @@ export interface operations {
             };
         };
     };
-    getVirtualKeySpend: {
+    getApiGatewayV1VirtualKeysByIdSpend: {
         parameters: {
             query?: {
                 from?: number;
@@ -13307,7 +12930,7 @@ export interface operations {
             };
         };
     };
-    rotateVirtualKey: {
+    postApiGatewayV1VirtualKeysByIdRotate: {
         parameters: {
             query?: never;
             header?: never;
@@ -13473,7 +13096,7 @@ export interface operations {
             };
         };
     };
-    disableVirtualKey: {
+    postApiGatewayV1VirtualKeysByIdDisable: {
         parameters: {
             query?: never;
             header?: never;
@@ -13644,7 +13267,7 @@ export interface operations {
             };
         };
     };
-    enableVirtualKey: {
+    postApiGatewayV1VirtualKeysByIdEnable: {
         parameters: {
             query?: never;
             header?: never;
@@ -13809,7 +13432,7 @@ export interface operations {
             };
         };
     };
-    revokeVirtualKey: {
+    postApiGatewayV1VirtualKeysByIdRevoke: {
         parameters: {
             query?: never;
             header?: never;
@@ -13974,7 +13597,7 @@ export interface operations {
             };
         };
     };
-    listBudgets: {
+    getApiGatewayV1Budgets: {
         parameters: {
             query?: {
                 cursor?: string;
@@ -14144,7 +13767,7 @@ export interface operations {
             };
         };
     };
-    createBudget: {
+    postApiGatewayV1Budgets: {
         parameters: {
             query?: never;
             header?: never;
@@ -14381,7 +14004,7 @@ export interface operations {
             };
         };
     };
-    getBudget: {
+    getApiGatewayV1BudgetsById: {
         parameters: {
             query?: never;
             header?: never;
@@ -14544,7 +14167,7 @@ export interface operations {
             };
         };
     };
-    archiveBudget: {
+    deleteApiGatewayV1BudgetsById: {
         parameters: {
             query?: never;
             header?: never;
@@ -14706,7 +14329,7 @@ export interface operations {
             };
         };
     };
-    updateBudget: {
+    patchApiGatewayV1BudgetsById: {
         parameters: {
             query?: never;
             header?: never;
@@ -14883,7 +14506,7 @@ export interface operations {
             };
         };
     };
-    resetBudget: {
+    postApiGatewayV1BudgetsByIdReset: {
         parameters: {
             query?: {
                 end_user_id?: string;
@@ -15053,7 +14676,7 @@ export interface operations {
             };
         };
     };
-    listCacheRules: {
+    getApiGatewayV1CacheRules: {
         parameters: {
             query?: {
                 cursor?: string;
@@ -15205,7 +14828,7 @@ export interface operations {
             };
         };
     };
-    createCacheRule: {
+    postApiGatewayV1CacheRules: {
         parameters: {
             query?: never;
             header?: never;
@@ -15403,7 +15026,7 @@ export interface operations {
             };
         };
     };
-    getCacheRule: {
+    getApiGatewayV1CacheRulesById: {
         parameters: {
             query?: never;
             header?: never;
@@ -15552,7 +15175,7 @@ export interface operations {
             };
         };
     };
-    archiveCacheRule: {
+    deleteApiGatewayV1CacheRulesById: {
         parameters: {
             query?: never;
             header?: never;
@@ -15701,7 +15324,7 @@ export interface operations {
             };
         };
     };
-    updateCacheRule: {
+    patchApiGatewayV1CacheRulesById: {
         parameters: {
             query?: never;
             header?: never;
@@ -15875,6 +15498,682 @@ export interface operations {
             };
         };
     };
+    listGatewaySpendSummaries: {
+        parameters: {
+            query: {
+                /** @description One or two dimensions, comma separated: virtual_key, end_user, project, model, provider, principal, request_type. A dimension may not repeat. Each row's `key` is the first dimension's value and `group` names them all, so two rows may share a key. */
+                group_by: string;
+                bucket?: "none" | "hour" | "day";
+                timezone?: string;
+                /** @description true, 1, yes for yes; false, 0, no or omitted for no. Case does not matter, so a Python True is accepted as sent. */
+                allow_unstable?: string;
+                /** @description Milliseconds since the Unix epoch, not seconds. An epoch in seconds is a valid integer here and answers for 1970, so a mismatched unit reads as an empty window rather than as an error. */
+                from: number;
+                /** @description Milliseconds since the Unix epoch, not seconds. An epoch in seconds is a valid integer here and answers for 1970, so a mismatched unit reads as an empty window rather than as an error. */
+                to: number;
+                cursor?: string;
+                limit?: number;
+                project_id?: string | string[];
+                team_id?: string | string[];
+                external_id?: string | string[];
+                virtual_key_id?: string | string[];
+                end_user_id?: string | string[];
+                principal_user_id?: string | string[];
+                model?: string | string[];
+                provider_key?: string | string[];
+                request_type?: string | string[];
+                label?: string | string[];
+                metadata?: string | string[];
+                /** @description Narrow to one lifecycle status. `admitted` is not accepted here: a rollup sums the cost of requests past admission, and an admitted request is still in flight with no cost of its own yet. Ask /spend-events for those. */
+                status?: "success" | "error" | "confirmed" | "failed" | "settled";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: {
+                            key: string;
+                            group: {
+                                [key: string]: string;
+                            };
+                            bucket_start: string | null;
+                            event_count: number;
+                            settled_count: number;
+                            usage: {
+                                input_tokens: number;
+                                output_tokens: number;
+                                cache_read_input_tokens: number;
+                                cache_creation_input_tokens: number;
+                                reasoning_tokens: number;
+                                /** @description Image tokens billed on the input side, 0 when no image was used. Priced at its own rate and disjoint from input_tokens, which never includes it. */
+                                input_image_tokens: number;
+                                /** @description Image tokens the answer was billed for, 0 when no answer held one. Priced at its own rate and disjoint from output_tokens: an image_generation row reports output_tokens 0 and its render here, so a reconciler reading output_tokens alone sees none of the image traffic. */
+                                output_image_tokens: number;
+                                /** @description Images carried, 0 when none were. Display only: no rate prices it, so it never belongs in a cost sum. */
+                                image_count: number;
+                            };
+                            cost: {
+                                /** @description Display value. Decimal string, up to 9 fractional digits, trailing zeros trimmed, never exponent notation. Use nano_usd for arithmetic. */
+                                total_usd: string;
+                                /** @description Canonical integer cost, nano-USD. Rated as an integer and summed as one, so this is the figure to reconcile against. */
+                                nano_usd: number;
+                            };
+                        }[];
+                        next_cursor: string | null;
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            retryable: boolean;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
+                        };
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            retryable: boolean;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
+                        };
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            retryable: boolean;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
+                        };
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            retryable: boolean;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
+                        };
+                    };
+                };
+            };
+        };
+    };
+    listGatewaySpendEvents: {
+        parameters: {
+            query: {
+                /** @description Milliseconds since the Unix epoch, not seconds. An epoch in seconds is a valid integer here and answers for 1970, so a mismatched unit reads as an empty window rather than as an error. */
+                from: number;
+                /** @description Milliseconds since the Unix epoch, not seconds. An epoch in seconds is a valid integer here and answers for 1970, so a mismatched unit reads as an empty window rather than as an error. */
+                to: number;
+                cursor?: string;
+                limit?: number;
+                project_id?: string | string[];
+                team_id?: string | string[];
+                external_id?: string | string[];
+                virtual_key_id?: string | string[];
+                end_user_id?: string | string[];
+                principal_user_id?: string | string[];
+                model?: string | string[];
+                provider_key?: string | string[];
+                request_type?: string | string[];
+                label?: string | string[];
+                metadata?: string | string[];
+                status?: "success" | "error" | "admitted" | "confirmed" | "failed" | "settled";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: {
+                            id: string;
+                            type: string;
+                            created: string;
+                            schema_version: string;
+                            data: {
+                                event_id: string;
+                                event_type: string;
+                                gateway_request_id: string;
+                                occurred_at: string;
+                                usage: {
+                                    input_tokens: number;
+                                    output_tokens: number;
+                                    cache_read_input_tokens: number;
+                                    cache_creation_input_tokens: number;
+                                    reasoning_tokens: number;
+                                } | null;
+                                cost: {
+                                    /** @description Display value. Decimal string, up to 9 fractional digits, trailing zeros trimmed, never exponent notation. Use nano_usd for arithmetic. */
+                                    total_usd: string;
+                                    /** @description Canonical integer cost, nano-USD. Rated as an integer and summed as one, so this is the figure to reconcile against. */
+                                    nano_usd: number;
+                                } | null;
+                                status: string;
+                                needs_reconciliation: boolean | null;
+                                settle_reason: string | null;
+                                error: {
+                                    class: string;
+                                    http_status: number | null;
+                                } | null;
+                                duration_ms: number | null;
+                                labels: string[];
+                                metadata: {
+                                    [key: string]: unknown;
+                                };
+                            } & {
+                                [key: string]: unknown;
+                            };
+                        }[];
+                        next_cursor: string | null;
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            retryable: boolean;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
+                        };
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            retryable: boolean;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
+                        };
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            retryable: boolean;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
+                        };
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            retryable: boolean;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
+                        };
+                    };
+                };
+            };
+        };
+    };
+    getGatewayEndUserSpend: {
+        parameters: {
+            query?: {
+                window?: "day" | "week" | "month";
+                from?: number;
+                to?: number;
+                virtual_key_id?: string;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: {
+                            end_user_id: string;
+                            window: string;
+                            from: string;
+                            to: string;
+                            cost: {
+                                /** @description Display value. Decimal string, up to 9 fractional digits, trailing zeros trimmed, never exponent notation. Use nano_usd for arithmetic. */
+                                total_usd: string;
+                                /** @description Canonical integer cost, nano-USD. Rated as an integer and summed as one, so this is the figure to reconcile against. */
+                                nano_usd: number;
+                            };
+                            request_count: number;
+                            usage: {
+                                input_tokens: number;
+                                output_tokens: number;
+                                cache_read_input_tokens: number;
+                                cache_creation_input_tokens: number;
+                                reasoning_tokens: number;
+                                /** @description Image tokens billed on the input side, 0 when no image was used. Priced at its own rate and disjoint from input_tokens, which never includes it. */
+                                input_image_tokens: number;
+                                /** @description Image tokens the answer was billed for, 0 when no answer held one. Priced at its own rate and disjoint from output_tokens: an image_generation row reports output_tokens 0 and its render here, so a reconciler reading output_tokens alone sees none of the image traffic. */
+                                output_image_tokens: number;
+                                /** @description Images carried, 0 when none were. Display only: no rate prices it, so it never belongs in a cost sum. */
+                                image_count: number;
+                            };
+                            caps: {
+                                budget_id: string;
+                                anchor_id: string;
+                                window: string;
+                                /** @enum {string} */
+                                on_breach: "block" | "warn";
+                                /** @description The cap for this end user. Decimal string, up to 9 fractional digits, trailing zeros trimmed, never exponent notation. */
+                                limit_usd: string;
+                                /** @description Spend against that cap. Decimal string, up to 9 fractional digits, trailing zeros trimmed, never exponent notation. */
+                                spent_usd: string;
+                                period_started_at: string;
+                            }[];
+                        };
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            retryable: boolean;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
+                        };
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            retryable: boolean;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
+                        };
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            retryable: boolean;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
+                        };
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            retryable: boolean;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
+                        };
+                    };
+                };
+            };
+        };
+    };
+    replayGatewaySpendEvents: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    from: number;
+                    to: number;
+                    endpoint_id: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: {
+                            endpoint_id: string;
+                            replay_id: string;
+                            replayed: number;
+                            window: {
+                                from: string;
+                                to: string;
+                            };
+                        };
+                    };
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            retryable: boolean;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
+                        };
+                    };
+                };
+            };
+            /** @description Unauthorized */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            retryable: boolean;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
+                        };
+                    };
+                };
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            retryable: boolean;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
+                        };
+                    };
+                };
+            };
+            /** @description Internal Server Error */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        error: {
+                            type: string;
+                            code: string;
+                            message: string;
+                            retryable: boolean;
+                            meta?: {
+                                [key: string]: unknown;
+                            };
+                            trace_id?: string;
+                            span_id?: string;
+                            tips?: string[];
+                            docs_url?: string;
+                            /** @enum {string} */
+                            fault?: "customer" | "platform" | "provider";
+                            reasons?: unknown[];
+                        };
+                    };
+                };
+            };
+        };
+    };
     startLangyConversationTurn: {
         parameters: {
             query?: never;
@@ -15921,7 +16220,7 @@ export interface operations {
             };
         };
     };
-    listModelProviders: {
+    getApiModelProviders: {
         parameters: {
             query?: never;
             header?: never;
@@ -16024,7 +16323,7 @@ export interface operations {
             };
         };
     };
-    upsertModelProvider: {
+    putApiModelProvidersByProvider: {
         parameters: {
             query?: never;
             header?: never;
@@ -16553,7 +16852,7 @@ export interface operations {
             };
         };
     };
-    listMonitors: {
+    getApiMonitors: {
         parameters: {
             query?: never;
             header?: never;
@@ -16592,7 +16891,7 @@ export interface operations {
             };
         };
     };
-    createMonitor: {
+    postApiMonitors: {
         parameters: {
             query?: never;
             header?: never;
@@ -16667,7 +16966,7 @@ export interface operations {
             };
         };
     };
-    getMonitor: {
+    getApiMonitorsById: {
         parameters: {
             query?: never;
             header?: never;
@@ -16721,7 +17020,7 @@ export interface operations {
             };
         };
     };
-    deleteMonitor: {
+    deleteApiMonitorsById: {
         parameters: {
             query?: never;
             header?: never;
@@ -16759,7 +17058,7 @@ export interface operations {
             };
         };
     };
-    updateMonitor: {
+    patchApiMonitorsById: {
         parameters: {
             query?: never;
             header?: never;
@@ -16841,7 +17140,7 @@ export interface operations {
             };
         };
     };
-    toggleMonitor: {
+    postApiMonitorsByIdToggle: {
         parameters: {
             query?: never;
             header?: never;
@@ -17523,7 +17822,7 @@ export interface operations {
             };
         };
     };
-    listGroups: {
+    getApiGroups: {
         parameters: {
             query?: {
                 page?: number;
@@ -17572,7 +17871,7 @@ export interface operations {
             };
         };
     };
-    createGroup: {
+    postApiGroups: {
         parameters: {
             query?: never;
             header?: never;
@@ -17614,7 +17913,7 @@ export interface operations {
             };
         };
     };
-    getGroup: {
+    getApiGroupsById: {
         parameters: {
             query?: never;
             header?: never;
@@ -17657,7 +17956,7 @@ export interface operations {
             };
         };
     };
-    deleteGroup: {
+    deleteApiGroupsById: {
         parameters: {
             query?: never;
             header?: never;
@@ -17681,7 +17980,7 @@ export interface operations {
             };
         };
     };
-    renameGroup: {
+    patchApiGroupsById: {
         parameters: {
             query?: never;
             header?: never;
@@ -17713,7 +18012,7 @@ export interface operations {
             };
         };
     };
-    listGroupMembers: {
+    getApiGroupsByIdMembers: {
         parameters: {
             query?: never;
             header?: never;
@@ -17741,7 +18040,7 @@ export interface operations {
             };
         };
     };
-    addGroupMember: {
+    postApiGroupsByIdMembers: {
         parameters: {
             query?: never;
             header?: never;
@@ -17771,7 +18070,7 @@ export interface operations {
             };
         };
     };
-    removeGroupMember: {
+    deleteApiGroupsByIdMembersByUserId: {
         parameters: {
             query?: never;
             header?: never;
@@ -17796,7 +18095,7 @@ export interface operations {
             };
         };
     };
-    listGroupBindings: {
+    getApiGroupsByIdBindings: {
         parameters: {
             query?: never;
             header?: never;
@@ -17829,7 +18128,7 @@ export interface operations {
             };
         };
     };
-    addGroupBinding: {
+    postApiGroupsByIdBindings: {
         parameters: {
             query?: never;
             header?: never;
@@ -17869,7 +18168,7 @@ export interface operations {
             };
         };
     };
-    removeGroupBinding: {
+    deleteApiGroupsByIdBindingsByBindingId: {
         parameters: {
             query?: never;
             header?: never;
@@ -17889,6 +18188,288 @@ export interface operations {
                 content: {
                     "application/json": {
                         success: boolean;
+                    };
+                };
+            };
+        };
+    };
+    listTeams: {
+        parameters: {
+            query?: {
+                page?: number;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: {
+                            id: string;
+                            name: string;
+                            slug: string;
+                            organizationId: string;
+                            /** Format: date-time */
+                            createdAt: string;
+                            /** Format: date-time */
+                            updatedAt: string;
+                        }[];
+                        pagination: {
+                            page: number;
+                            limit: number;
+                            total: number;
+                        };
+                    };
+                };
+            };
+        };
+    };
+    createTeam: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    name: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Success */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: string;
+                        name: string;
+                        slug: string;
+                        organizationId: string;
+                        /** Format: date-time */
+                        createdAt: string;
+                        /** Format: date-time */
+                        updatedAt: string;
+                    };
+                };
+            };
+        };
+    };
+    getTeam: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: string;
+                        name: string;
+                        slug: string;
+                        organizationId: string;
+                        /** Format: date-time */
+                        createdAt: string;
+                        /** Format: date-time */
+                        updatedAt: string;
+                    };
+                };
+            };
+        };
+    };
+    archiveTeam: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: string;
+                        name: string;
+                        archivedAt: string | null;
+                    };
+                };
+            };
+        };
+    };
+    updateTeam: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    name?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        id: string;
+                        name: string;
+                        slug: string;
+                        organizationId: string;
+                        /** Format: date-time */
+                        createdAt: string;
+                        /** Format: date-time */
+                        updatedAt: string;
+                    };
+                };
+            };
+        };
+    };
+    listTeamMembers: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: {
+                            userId: string;
+                            name: string | null;
+                            email: string | null;
+                            /** @enum {string} */
+                            role: "ADMIN" | "MEMBER" | "VIEWER" | "CUSTOM";
+                        }[];
+                    };
+                };
+            };
+        };
+    };
+    addTeamMember: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    userId: string;
+                    /**
+                     * @default MEMBER
+                     * @enum {string}
+                     */
+                    role?: "ADMIN" | "MEMBER" | "VIEWER";
+                };
+            };
+        };
+        responses: {
+            /** @description Success */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        success: boolean;
+                    };
+                };
+            };
+        };
+    };
+    removeTeamMember: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                userId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        success: boolean;
+                    };
+                };
+            };
+        };
+    };
+    listTeamProjects: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Success */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: unknown[];
                     };
                 };
             };
@@ -18278,14 +18859,13 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description The project's API key */
+            /** @description Success */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": {
-                        /** @description Send as X-Auth-Token, Bearer, or Basic */
                         apiKey: string;
                     };
                 };
@@ -18297,15 +18877,8 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description Insufficient permissions for this operation */
+            /** @description A signed-in project administrator is required; API-key principals cannot reveal base keys */
             403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description No project with that id in this organization */
-            404: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -18324,14 +18897,13 @@ export interface operations {
         };
         requestBody?: never;
         responses: {
-            /** @description The new API key. The previous one no longer authenticates. */
+            /** @description Success */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
                     "application/json": {
-                        /** @description Send as X-Auth-Token, Bearer, or Basic */
                         apiKey: string;
                     };
                 };
@@ -18343,15 +18915,8 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description Insufficient permissions for this operation */
+            /** @description A signed-in project administrator is required; API-key principals cannot rotate base keys */
             403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description No project with that id in this organization */
-            404: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -18359,7 +18924,7 @@ export interface operations {
             };
         };
     };
-    listPrompts: {
+    getApiPrompts: {
         parameters: {
             query?: never;
             header?: never;
@@ -18523,7 +19088,7 @@ export interface operations {
             };
         };
     };
-    createPrompt: {
+    postApiPrompts: {
         parameters: {
             query?: never;
             header?: never;
@@ -18743,7 +19308,7 @@ export interface operations {
             };
         };
     };
-    assignPromptTag: {
+    putApiPromptsByIdTagsByTag: {
         parameters: {
             query?: never;
             header?: never;
@@ -18838,7 +19403,7 @@ export interface operations {
             };
         };
     };
-    listPromptTags: {
+    getApiPromptsTags: {
         parameters: {
             query?: never;
             header?: never;
@@ -18911,7 +19476,7 @@ export interface operations {
             };
         };
     };
-    createPromptTag: {
+    postApiPromptsTags: {
         parameters: {
             query?: never;
             header?: never;
@@ -18990,7 +19555,7 @@ export interface operations {
             };
         };
     };
-    renamePromptTag: {
+    putApiPromptsTagsByTag: {
         parameters: {
             query?: never;
             header?: never;
@@ -19071,7 +19636,7 @@ export interface operations {
             };
         };
     };
-    deletePromptTag: {
+    deleteApiPromptsTagsByTag: {
         parameters: {
             query?: never;
             header?: never;
@@ -19148,7 +19713,7 @@ export interface operations {
             };
         };
     };
-    listPromptVersions: {
+    getApiPromptsByIdVersions: {
         parameters: {
             query?: never;
             header?: never;
@@ -19326,7 +19891,7 @@ export interface operations {
             };
         };
     };
-    restorePromptVersion: {
+    postApiPromptsByIdVersionsByVersionIdRestore: {
         parameters: {
             query?: never;
             header?: never;
@@ -19505,7 +20070,7 @@ export interface operations {
             };
         };
     };
-    getPrompt: {
+    getApiPromptsById: {
         parameters: {
             query?: {
                 version?: number;
@@ -19686,7 +20251,7 @@ export interface operations {
             };
         };
     };
-    updatePrompt: {
+    putApiPromptsById: {
         parameters: {
             query?: never;
             header?: never;
@@ -19917,7 +20482,7 @@ export interface operations {
             };
         };
     };
-    deletePrompt: {
+    deleteApiPromptsById: {
         parameters: {
             query?: never;
             header?: never;
@@ -20001,7 +20566,7 @@ export interface operations {
             };
         };
     };
-    syncPrompt: {
+    postApiPromptsByIdSync: {
         parameters: {
             query?: never;
             header?: never;
@@ -20547,7 +21112,7 @@ export interface operations {
             };
         };
     };
-    listScenarios: {
+    getApiScenarios: {
         parameters: {
             query?: never;
             header?: never;
@@ -20599,7 +21164,7 @@ export interface operations {
             };
         };
     };
-    createScenario: {
+    postApiScenarios: {
         parameters: {
             query?: never;
             header?: never;
@@ -20687,7 +21252,7 @@ export interface operations {
             };
         };
     };
-    getScenario: {
+    getApiScenariosById: {
         parameters: {
             query?: never;
             header?: never;
@@ -20752,7 +21317,7 @@ export interface operations {
             };
         };
     };
-    updateScenario: {
+    putApiScenariosById: {
         parameters: {
             query?: never;
             header?: never;
@@ -20851,7 +21416,7 @@ export interface operations {
             };
         };
     };
-    archiveScenario: {
+    deleteApiScenariosById: {
         parameters: {
             query?: never;
             header?: never;
@@ -20887,7 +21452,7 @@ export interface operations {
             };
         };
     };
-    patchScenario: {
+    patchApiScenariosById: {
         parameters: {
             query?: never;
             header?: never;
@@ -20986,7 +21551,7 @@ export interface operations {
             };
         };
     };
-    listScenarioVersions: {
+    getApiScenariosByIdVersions: {
         parameters: {
             query?: {
                 limit?: number;
@@ -21041,7 +21606,7 @@ export interface operations {
             };
         };
     };
-    getScenarioVersion: {
+    getApiScenariosByIdVersionsByVersion: {
         parameters: {
             query?: never;
             header?: never;
@@ -21112,7 +21677,7 @@ export interface operations {
             };
         };
     };
-    listSimulationRuns: {
+    getApiSimulationRuns: {
         parameters: {
             query?: {
                 scenarioSetId?: string;
@@ -21175,9 +21740,9 @@ export interface operations {
                             durationInMs: number;
                             totalCost?: number;
                             /** @description One short line saying why the run was started, as given when it was queued. Null on a run started without one. */
-                            note: string | null;
+                            note?: string | null;
                             /** @description The version of the scenario at the moment the run was queued. Null on runs recorded before versions existed. */
-                            scenarioVersion: number | null;
+                            scenarioVersion?: number | null;
                             /** Format: uri */
                             platformUrl: string;
                         }[];
@@ -21188,7 +21753,7 @@ export interface operations {
             };
         };
     };
-    getSimulationRun: {
+    getApiSimulationRunsByScenarioRunId: {
         parameters: {
             query?: never;
             header?: never;
@@ -21247,9 +21812,9 @@ export interface operations {
                         durationInMs: number;
                         totalCost?: number;
                         /** @description One short line saying why the run was started, as given when it was queued. Null on a run started without one. */
-                        note: string | null;
+                        note?: string | null;
                         /** @description The version of the scenario at the moment the run was queued. Null on runs recorded before versions existed. */
-                        scenarioVersion: number | null;
+                        scenarioVersion?: number | null;
                         /** Format: uri */
                         platformUrl: string;
                     };
@@ -21268,7 +21833,7 @@ export interface operations {
             };
         };
     };
-    listSimulationRunBatches: {
+    getApiSimulationRunsBatchesList: {
         parameters: {
             query: {
                 scenarioSetId: string;
@@ -21307,7 +21872,7 @@ export interface operations {
                             /** @description True when every run of the batch reached a terminal status. */
                             isComplete: boolean;
                             /** @description One short line saying why the batch was run, as given when it was queued. Null on a batch run without one. */
-                            note: string | null;
+                            note?: string | null;
                         }[];
                         hasMore?: boolean;
                         nextCursor?: string;
@@ -21316,7 +21881,7 @@ export interface operations {
             };
         };
     };
-    getSimulationRunBatch: {
+    getApiSimulationRunsBatchesByBatchRunId: {
         parameters: {
             query?: never;
             header?: never;
@@ -21352,7 +21917,7 @@ export interface operations {
                         /** @description True when every run of the batch reached a terminal status. */
                         isComplete: boolean;
                         /** @description One short line saying why the batch was run, as given when it was queued. Null on a batch run without one. */
-                        note: string | null;
+                        note?: string | null;
                     };
                 };
             };
@@ -21536,7 +22101,7 @@ export interface operations {
             };
         };
     };
-    listSecretsPluralAlias: {
+    getApiSecrets: {
         parameters: {
             query: {
                 projectId: string;
@@ -21566,7 +22131,7 @@ export interface operations {
             };
         };
     };
-    createSecretPluralAlias: {
+    postApiSecrets: {
         parameters: {
             query?: never;
             header?: never;
@@ -21602,7 +22167,7 @@ export interface operations {
             };
         };
     };
-    getSecretPluralAlias: {
+    getApiSecretsById: {
         parameters: {
             query: {
                 projectId: string;
@@ -21634,7 +22199,7 @@ export interface operations {
             };
         };
     };
-    updateSecretPluralAlias: {
+    putApiSecretsById: {
         parameters: {
             query?: never;
             header?: never;
@@ -21671,7 +22236,7 @@ export interface operations {
             };
         };
     };
-    deleteSecretPluralAlias: {
+    deleteApiSecretsById: {
         parameters: {
             query?: never;
             header?: never;
@@ -22984,7 +23549,7 @@ export interface operations {
             };
         };
     };
-    listSuites: {
+    getApiSuites: {
         parameters: {
             query?: {
                 /** @description Which kind of suite to list. Defaults to custom, so callers that predate test suites keep seeing exactly the run plans they always did. */
@@ -23007,13 +23572,13 @@ export interface operations {
                         name: string;
                         slug: string;
                         /**
-                         * @description custom is a hand-assembled run plan; folder is a test suite that groups scenarios filed into it.
+                         * @description custom is a hand-assembled run plan; folder is a test suite that groups scenarios filed into it. Absent on servers that predate test suites.
                          * @enum {string}
                          */
-                        kind: "custom" | "folder";
+                        kind?: "custom" | "folder";
                         description: string | null;
                         scenarioIds: string[];
-                        scope: ({
+                        scope?: ({
                             /** @constant */
                             mode: "all";
                         } | {
@@ -23060,7 +23625,7 @@ export interface operations {
             };
         };
     };
-    createSuite: {
+    postApiSuites: {
         parameters: {
             query?: never;
             header?: never;
@@ -23136,13 +23701,13 @@ export interface operations {
                         name: string;
                         slug: string;
                         /**
-                         * @description custom is a hand-assembled run plan; folder is a test suite that groups scenarios filed into it.
+                         * @description custom is a hand-assembled run plan; folder is a test suite that groups scenarios filed into it. Absent on servers that predate test suites.
                          * @enum {string}
                          */
-                        kind: "custom" | "folder";
+                        kind?: "custom" | "folder";
                         description: string | null;
                         scenarioIds: string[];
-                        scope: ({
+                        scope?: ({
                             /** @constant */
                             mode: "all";
                         } | {
@@ -23189,7 +23754,7 @@ export interface operations {
             };
         };
     };
-    getSuite: {
+    getApiSuitesById: {
         parameters: {
             query?: never;
             header?: never;
@@ -23211,13 +23776,13 @@ export interface operations {
                         name: string;
                         slug: string;
                         /**
-                         * @description custom is a hand-assembled run plan; folder is a test suite that groups scenarios filed into it.
+                         * @description custom is a hand-assembled run plan; folder is a test suite that groups scenarios filed into it. Absent on servers that predate test suites.
                          * @enum {string}
                          */
-                        kind: "custom" | "folder";
+                        kind?: "custom" | "folder";
                         description: string | null;
                         scenarioIds: string[];
-                        scope: ({
+                        scope?: ({
                             /** @constant */
                             mode: "all";
                         } | {
@@ -23276,7 +23841,7 @@ export interface operations {
             };
         };
     };
-    archiveSuite: {
+    deleteApiSuitesById: {
         parameters: {
             query?: never;
             header?: never;
@@ -23313,7 +23878,7 @@ export interface operations {
             };
         };
     };
-    updateSuite: {
+    patchApiSuitesById: {
         parameters: {
             query?: never;
             header?: never;
@@ -23382,13 +23947,13 @@ export interface operations {
                         name: string;
                         slug: string;
                         /**
-                         * @description custom is a hand-assembled run plan; folder is a test suite that groups scenarios filed into it.
+                         * @description custom is a hand-assembled run plan; folder is a test suite that groups scenarios filed into it. Absent on servers that predate test suites.
                          * @enum {string}
                          */
-                        kind: "custom" | "folder";
+                        kind?: "custom" | "folder";
                         description: string | null;
                         scenarioIds: string[];
-                        scope: ({
+                        scope?: ({
                             /** @constant */
                             mode: "all";
                         } | {
@@ -23447,7 +24012,7 @@ export interface operations {
             };
         };
     };
-    duplicateSuite: {
+    postApiSuitesByIdDuplicate: {
         parameters: {
             query?: never;
             header?: never;
@@ -23469,13 +24034,13 @@ export interface operations {
                         name: string;
                         slug: string;
                         /**
-                         * @description custom is a hand-assembled run plan; folder is a test suite that groups scenarios filed into it.
+                         * @description custom is a hand-assembled run plan; folder is a test suite that groups scenarios filed into it. Absent on servers that predate test suites.
                          * @enum {string}
                          */
-                        kind: "custom" | "folder";
+                        kind?: "custom" | "folder";
                         description: string | null;
                         scenarioIds: string[];
-                        scope: ({
+                        scope?: ({
                             /** @constant */
                             mode: "all";
                         } | {
@@ -23534,7 +24099,7 @@ export interface operations {
             };
         };
     };
-    runSuite: {
+    postApiSuitesByIdRun: {
         parameters: {
             query?: never;
             header?: never;
@@ -23877,7 +24442,7 @@ export interface operations {
             };
         };
     };
-    getMyUsage: {
+    getApiMeUsage: {
         parameters: {
             query?: {
                 windowStartMs?: number;
@@ -23972,7 +24537,7 @@ export interface operations {
             };
         };
     };
-    getMyProject: {
+    getApiMeProject: {
         parameters: {
             query?: never;
             header?: never;
@@ -24045,7 +24610,7 @@ export interface operations {
             };
         };
     };
-    listWebhookEndpoints: {
+    getApiWebhooksV1Endpoints: {
         parameters: {
             query?: never;
             header?: never;
@@ -24113,7 +24678,7 @@ export interface operations {
             };
         };
     };
-    createWebhookEndpoint: {
+    postApiWebhooksV1Endpoints: {
         parameters: {
             query?: never;
             header?: never;
@@ -24202,7 +24767,7 @@ export interface operations {
             };
         };
     };
-    getWebhookEndpoint: {
+    getApiWebhooksV1EndpointsById: {
         parameters: {
             query?: never;
             header?: never;
@@ -24272,7 +24837,7 @@ export interface operations {
             };
         };
     };
-    archiveWebhookEndpoint: {
+    deleteApiWebhooksV1EndpointsById: {
         parameters: {
             query?: never;
             header?: never;
@@ -24297,7 +24862,7 @@ export interface operations {
             };
         };
     };
-    updateWebhookEndpoint: {
+    patchApiWebhooksV1EndpointsById: {
         parameters: {
             query?: never;
             header?: never;
@@ -24388,7 +24953,7 @@ export interface operations {
             };
         };
     };
-    rollWebhookEndpointSecret: {
+    postApiWebhooksV1EndpointsByIdRollSecret: {
         parameters: {
             query?: never;
             header?: never;
@@ -24460,7 +25025,7 @@ export interface operations {
             };
         };
     };
-    testWebhookEndpoint: {
+    postApiWebhooksV1EndpointsByIdTest: {
         parameters: {
             query?: never;
             header?: never;
@@ -24487,7 +25052,7 @@ export interface operations {
             };
         };
     };
-    listWebhookEndpointDeliveries: {
+    getApiWebhooksV1EndpointsByIdDeliveries: {
         parameters: {
             query?: {
                 cursor?: string;
@@ -24527,7 +25092,7 @@ export interface operations {
             };
         };
     };
-    getWebhookEndpointHealth: {
+    getApiWebhooksV1EndpointsByIdHealth: {
         parameters: {
             query?: never;
             header?: never;
@@ -24561,7 +25126,7 @@ export interface operations {
             };
         };
     };
-    listWebhookEventTypes: {
+    getApiWebhooksV1EventTypes: {
         parameters: {
             query?: never;
             header?: never;
@@ -24587,7 +25152,7 @@ export interface operations {
             };
         };
     };
-    listWebhookEvents: {
+    getApiWebhooksV1Events: {
         parameters: {
             query: {
                 type?: string;
@@ -24625,7 +25190,7 @@ export interface operations {
             };
         };
     };
-    getWebhookEvent: {
+    getApiWebhooksV1EventsById: {
         parameters: {
             query?: never;
             header?: never;
@@ -24655,593 +25220,7 @@ export interface operations {
             };
         };
     };
-    getApiGatewayV1SpendSummaries: {
-        parameters: {
-            query: {
-                /** @description One or two dimensions, comma separated: virtual_key, end_user, project, model, provider, principal, request_type. A dimension may not repeat. Each row's `key` is the first dimension's value and `group` names them all, so two rows may share a key. */
-                group_by: string;
-                bucket?: "none" | "hour" | "day";
-                timezone?: string;
-                /** @description true, 1, yes for yes; false, 0, no or omitted for no. Case does not matter, so a Python True is accepted as sent. */
-                allow_unstable?: string;
-                /** @description Milliseconds since the Unix epoch, not seconds. An epoch in seconds is a valid integer here and answers for 1970, so a mismatched unit reads as an empty window rather than as an error. */
-                from: number;
-                /** @description Milliseconds since the Unix epoch, not seconds. An epoch in seconds is a valid integer here and answers for 1970, so a mismatched unit reads as an empty window rather than as an error. */
-                to: number;
-                cursor?: string;
-                limit?: number;
-                project_id?: string | string[];
-                team_id?: string | string[];
-                external_id?: string | string[];
-                virtual_key_id?: string | string[];
-                end_user_id?: string | string[];
-                principal_user_id?: string | string[];
-                model?: string | string[];
-                provider_key?: string | string[];
-                request_type?: string | string[];
-                label?: string | string[];
-                metadata?: string | string[];
-                /** @description Narrow to one lifecycle status. `admitted` is not accepted here: a rollup sums the cost of requests past admission, and an admitted request is still in flight with no cost of its own yet. Ask /spend-events for those. */
-                status?: "success" | "error" | "confirmed" | "failed" | "settled";
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Per-key spend rollups */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        data: {
-                            key: string;
-                            group: {
-                                [key: string]: string;
-                            };
-                            bucket_start: string | null;
-                            event_count: number;
-                            settled_count: number;
-                            usage: {
-                                input_tokens: number;
-                                output_tokens: number;
-                                cache_read_input_tokens: number;
-                                cache_creation_input_tokens: number;
-                                reasoning_tokens: number;
-                                /** @description Image tokens billed on the input side, 0 when the request carried no image. Priced at its own rate and disjoint from input_tokens, which never includes it. */
-                                input_image_tokens: number;
-                                /** @description Image tokens the answer was billed for, 0 when the answer held no image. Priced at its own rate and disjoint from output_tokens: an image_generation row reports output_tokens 0 and its render here, so a reconciler reading output_tokens alone sees none of the image traffic. */
-                                output_image_tokens: number;
-                                /** @description Images the request carried, 0 when it carried none. Display only: no rate prices it, so it never belongs in a cost sum. */
-                                image_count: number;
-                            };
-                            cost: {
-                                /** @description Display value. Decimal string, up to 9 fractional digits, trailing zeros trimmed, never exponent notation. Use nano_usd for arithmetic. */
-                                total_usd: string;
-                                /** @description Canonical integer cost, nano-USD. Rated as an integer and summed as one, so this is the figure to reconcile against. */
-                                nano_usd: number;
-                            };
-                        }[];
-                        next_cursor: string | null;
-                    };
-                };
-            };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: {
-                            type: string;
-                            code: string;
-                            message: string;
-                            meta?: {
-                                [key: string]: unknown;
-                            };
-                            trace_id?: string;
-                            span_id?: string;
-                        };
-                    };
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: {
-                            type: string;
-                            code: string;
-                            message: string;
-                            meta?: {
-                                [key: string]: unknown;
-                            };
-                            trace_id?: string;
-                            span_id?: string;
-                        };
-                    };
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: {
-                            type: string;
-                            code: string;
-                            message: string;
-                            meta?: {
-                                [key: string]: unknown;
-                            };
-                            trace_id?: string;
-                            span_id?: string;
-                        };
-                    };
-                };
-            };
-            /** @description Internal Server Error */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: {
-                            type: string;
-                            code: string;
-                            message: string;
-                            meta?: {
-                                [key: string]: unknown;
-                            };
-                            trace_id?: string;
-                            span_id?: string;
-                        };
-                    };
-                };
-            };
-        };
-    };
-    getApiGatewayV1SpendEvents: {
-        parameters: {
-            query: {
-                /** @description Milliseconds since the Unix epoch, not seconds. An epoch in seconds is a valid integer here and answers for 1970, so a mismatched unit reads as an empty window rather than as an error. */
-                from: number;
-                /** @description Milliseconds since the Unix epoch, not seconds. An epoch in seconds is a valid integer here and answers for 1970, so a mismatched unit reads as an empty window rather than as an error. */
-                to: number;
-                cursor?: string;
-                limit?: number;
-                project_id?: string | string[];
-                team_id?: string | string[];
-                external_id?: string | string[];
-                virtual_key_id?: string | string[];
-                end_user_id?: string | string[];
-                principal_user_id?: string | string[];
-                model?: string | string[];
-                provider_key?: string | string[];
-                request_type?: string | string[];
-                label?: string | string[];
-                metadata?: string | string[];
-                status?: "success" | "error" | "admitted" | "confirmed" | "failed" | "settled";
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description One page of billing envelopes */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        data: {
-                            id: string;
-                            type: string;
-                            created: string;
-                            schema_version: string;
-                            data: {
-                                event_id: string;
-                                event_type: string;
-                                gateway_request_id: string;
-                                occurred_at: string;
-                                usage: {
-                                    input_tokens: number;
-                                    output_tokens: number;
-                                    cache_read_input_tokens: number;
-                                    cache_creation_input_tokens: number;
-                                    reasoning_tokens: number;
-                                    /** @description Image tokens billed on the input side, 0 when the request carried no image. Priced at its own rate and disjoint from input_tokens, which never includes it. */
-                                    input_image_tokens: number;
-                                    /** @description Image tokens the answer was billed for, 0 when the answer held no image. Priced at its own rate and disjoint from output_tokens: an image_generation row reports output_tokens 0 and its render here, so a reconciler reading output_tokens alone sees none of the image traffic. */
-                                    output_image_tokens: number;
-                                    /** @description Images the request carried, 0 when it carried none. Display only: no rate prices it, so it never belongs in a cost sum. */
-                                    image_count: number;
-                                } | null;
-                                cost: {
-                                    /** @description Display value. Decimal string, up to 9 fractional digits, trailing zeros trimmed, never exponent notation. Use nano_usd for arithmetic. */
-                                    total_usd: string;
-                                    /** @description Canonical integer cost, nano-USD. Rated as an integer and summed as one, so this is the figure to reconcile against. */
-                                    nano_usd: number;
-                                } | null;
-                                status: string;
-                                needs_reconciliation: boolean | null;
-                                settle_reason: string | null;
-                                error: {
-                                    class: string;
-                                    http_status: number | null;
-                                } | null;
-                                duration_ms: number | null;
-                                labels: string[];
-                                metadata: {
-                                    [key: string]: unknown;
-                                };
-                            } & {
-                                [key: string]: unknown;
-                            };
-                        }[];
-                        next_cursor: string | null;
-                    };
-                };
-            };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: {
-                            type: string;
-                            code: string;
-                            message: string;
-                            meta?: {
-                                [key: string]: unknown;
-                            };
-                            trace_id?: string;
-                            span_id?: string;
-                        };
-                    };
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: {
-                            type: string;
-                            code: string;
-                            message: string;
-                            meta?: {
-                                [key: string]: unknown;
-                            };
-                            trace_id?: string;
-                            span_id?: string;
-                        };
-                    };
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: {
-                            type: string;
-                            code: string;
-                            message: string;
-                            meta?: {
-                                [key: string]: unknown;
-                            };
-                            trace_id?: string;
-                            span_id?: string;
-                        };
-                    };
-                };
-            };
-            /** @description Internal Server Error */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: {
-                            type: string;
-                            code: string;
-                            message: string;
-                            meta?: {
-                                [key: string]: unknown;
-                            };
-                            trace_id?: string;
-                            span_id?: string;
-                        };
-                    };
-                };
-            };
-        };
-    };
-    getApiGatewayV1EndUsersByIdSpend: {
-        parameters: {
-            query?: {
-                window?: "day" | "week" | "month";
-                from?: number;
-                to?: number;
-                virtual_key_id?: string;
-            };
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Spend and standing for one end user */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        data: {
-                            end_user_id: string;
-                            window: string;
-                            from: string;
-                            to: string;
-                            cost: {
-                                /** @description Display value. Decimal string, up to 9 fractional digits, trailing zeros trimmed, never exponent notation. Use nano_usd for arithmetic. */
-                                total_usd: string;
-                                /** @description Canonical integer cost, nano-USD. Rated as an integer and summed as one, so this is the figure to reconcile against. */
-                                nano_usd: number;
-                            };
-                            request_count: number;
-                            usage: {
-                                input_tokens: number;
-                                output_tokens: number;
-                                cache_read_input_tokens: number;
-                                cache_creation_input_tokens: number;
-                                reasoning_tokens: number;
-                                /** @description Image tokens billed on the input side, 0 when the request carried no image. Priced at its own rate and disjoint from input_tokens, which never includes it. */
-                                input_image_tokens: number;
-                                /** @description Image tokens the answer was billed for, 0 when the answer held no image. Priced at its own rate and disjoint from output_tokens: an image_generation row reports output_tokens 0 and its render here, so a reconciler reading output_tokens alone sees none of the image traffic. */
-                                output_image_tokens: number;
-                                /** @description Images the request carried, 0 when it carried none. Display only: no rate prices it, so it never belongs in a cost sum. */
-                                image_count: number;
-                            };
-                            caps: {
-                                budget_id: string;
-                                anchor_id: string;
-                                window: string;
-                                /** @enum {string} */
-                                on_breach: "block" | "warn";
-                                /** @description The cap for this end user. Decimal string, up to 9 fractional digits, trailing zeros trimmed, never exponent notation. */
-                                limit_usd: string;
-                                /** @description Spend against that cap. Decimal string, up to 9 fractional digits, trailing zeros trimmed, never exponent notation. */
-                                spent_usd: string;
-                                period_started_at: string;
-                            }[];
-                        };
-                    };
-                };
-            };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: {
-                            type: string;
-                            code: string;
-                            message: string;
-                            meta?: {
-                                [key: string]: unknown;
-                            };
-                            trace_id?: string;
-                            span_id?: string;
-                        };
-                    };
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: {
-                            type: string;
-                            code: string;
-                            message: string;
-                            meta?: {
-                                [key: string]: unknown;
-                            };
-                            trace_id?: string;
-                            span_id?: string;
-                        };
-                    };
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: {
-                            type: string;
-                            code: string;
-                            message: string;
-                            meta?: {
-                                [key: string]: unknown;
-                            };
-                            trace_id?: string;
-                            span_id?: string;
-                        };
-                    };
-                };
-            };
-            /** @description Internal Server Error */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: {
-                            type: string;
-                            code: string;
-                            message: string;
-                            meta?: {
-                                [key: string]: unknown;
-                            };
-                            trace_id?: string;
-                            span_id?: string;
-                        };
-                    };
-                };
-            };
-        };
-    };
-    postApiGatewayV1SpendEventsReplay: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": {
-                    from: number;
-                    to: number;
-                    endpoint_id: string;
-                };
-            };
-        };
-        responses: {
-            /** @description Replay accepted */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        data: {
-                            endpoint_id: string;
-                            replay_id: string;
-                            replayed: number;
-                            window: {
-                                from: string;
-                                to: string;
-                            };
-                        };
-                    };
-                };
-            };
-            /** @description Bad Request */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: {
-                            type: string;
-                            code: string;
-                            message: string;
-                            meta?: {
-                                [key: string]: unknown;
-                            };
-                            trace_id?: string;
-                            span_id?: string;
-                        };
-                    };
-                };
-            };
-            /** @description Unauthorized */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: {
-                            type: string;
-                            code: string;
-                            message: string;
-                            meta?: {
-                                [key: string]: unknown;
-                            };
-                            trace_id?: string;
-                            span_id?: string;
-                        };
-                    };
-                };
-            };
-            /** @description Forbidden */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: {
-                            type: string;
-                            code: string;
-                            message: string;
-                            meta?: {
-                                [key: string]: unknown;
-                            };
-                            trace_id?: string;
-                            span_id?: string;
-                        };
-                    };
-                };
-            };
-            /** @description Internal Server Error */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": {
-                        error: {
-                            type: string;
-                            code: string;
-                            message: string;
-                            meta?: {
-                                [key: string]: unknown;
-                            };
-                            trace_id?: string;
-                            span_id?: string;
-                        };
-                    };
-                };
-            };
-        };
-    };
-    listWorkflows: {
+    getApiWorkflows: {
         parameters: {
             query?: never;
             header?: never;
@@ -25272,7 +25251,7 @@ export interface operations {
             };
         };
     };
-    getWorkflow: {
+    getApiWorkflowsById: {
         parameters: {
             query?: never;
             header?: never;
@@ -25316,7 +25295,7 @@ export interface operations {
             };
         };
     };
-    archiveWorkflow: {
+    deleteApiWorkflowsById: {
         parameters: {
             query?: never;
             header?: never;
@@ -25352,7 +25331,7 @@ export interface operations {
             };
         };
     };
-    updateWorkflow: {
+    patchApiWorkflowsById: {
         parameters: {
             query?: never;
             header?: never;
@@ -25404,7 +25383,7 @@ export interface operations {
             };
         };
     };
-    evaluateWorkflow: {
+    postApiWorkflowsByIdEvaluate: {
         parameters: {
             query?: never;
             header?: never;
@@ -25483,7 +25462,7 @@ export interface operations {
             };
         };
     };
-    runOptimizationWorkflowVersion: {
+    postApiOptimizationByWorkflowIdByVersionId: {
         parameters: {
             query?: never;
             header?: never;
@@ -25529,7 +25508,7 @@ export interface operations {
             };
         };
     };
-    runWorkflow: {
+    postApiWorkflowsByWorkflowIdRun: {
         parameters: {
             query?: never;
             header?: never;
@@ -25574,7 +25553,7 @@ export interface operations {
             };
         };
     };
-    runWorkflowVersion: {
+    postApiWorkflowsByWorkflowIdByVersionIdRun: {
         parameters: {
             query?: never;
             header?: never;

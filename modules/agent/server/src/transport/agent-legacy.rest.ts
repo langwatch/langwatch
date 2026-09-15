@@ -1,7 +1,7 @@
 /**
- * `/api/agents` - the bare-path predecessor of `/api/v1/agents`, kept as a
- * deprecated twin so existing callers keep working. Superseded field set: no
- * presence, no owner, no parameters.
+ * `/api/agents` - the bare-path predecessor of `/api/v1/agents`, a deprecated
+ * twin so existing callers keep working: no presence, no owner, no parameters,
+ * and hidden from the document, since these are the successor's own operations.
  */
 import {
   AgentApi,
@@ -67,7 +67,7 @@ export const agentLegacyRest: Readonly<{
   .withQuery(agentRestQuerySchema)
   .withPermission("project:view")
   .withOutput(legacyListResponse)
-  .withDocs({ summary: "List agents; superseded by /api/v1/agents" })
+  .withDocs({ summary: "List agents; superseded by /api/v1/agents", hide: true })
   .withMiddleware(projectRestFacts)
   .handle(async ({ app, input, scope }, facts) => {
     const page = await app.list({ ...input, projectId: scope.id });
@@ -83,7 +83,7 @@ export const agentLegacyRest: Readonly<{
   .withPermission("project:update")
   .withOutput(legacyResponse)
   .withStatus(201)
-  .withDocs({ summary: "Create an agent; superseded by /api/v1/agents" })
+  .withDocs({ summary: "Create an agent; superseded by /api/v1/agents", hide: true })
   .withMiddleware(projectRestFacts)
   .handle(async ({ app, input, scope }, facts) => {
     const agent = await app.create({ ...input, projectId: scope.id });
@@ -95,7 +95,7 @@ export const agentLegacyRest: Readonly<{
   .withParams(agentRestParamsSchema)
   .withPermission("project:view")
   .withOutput(legacyResponse)
-  .withDocs({ summary: "Get an agent; superseded by /api/v1/agents" })
+  .withDocs({ summary: "Get an agent; superseded by /api/v1/agents", hide: true })
   .withMiddleware(projectRestFacts)
   .handle(async ({ app, input, scope }, facts) =>
     response(await app.getById({ ...input, projectId: scope.id }), app, facts.projectSlug),
@@ -106,7 +106,7 @@ export const agentLegacyRest: Readonly<{
   .withInput(updateAgentRequestSchema)
   .withPermission("project:update")
   .withOutput(legacyResponse)
-  .withDocs({ summary: "Update an agent; superseded by /api/v1/agents" })
+  .withDocs({ summary: "Update an agent; superseded by /api/v1/agents", hide: true })
   .withMiddleware(projectRestFacts)
   .handle(async ({ app, input, scope }, facts) =>
     response(await app.update({ ...input, projectId: scope.id }), app, facts.projectSlug),
@@ -116,7 +116,7 @@ export const agentLegacyRest: Readonly<{
   .withParams(agentRestParamsSchema)
   .withPermission("project:delete")
   .withOutput(archiveResultSchema)
-  .withDocs({ summary: "Archive an agent; superseded by /api/v1/agents" })
+  .withDocs({ summary: "Archive an agent; superseded by /api/v1/agents", hide: true })
   .handle(async ({ app, input, scope }) => {
     const agent = await app.archive({ ...input, projectId: scope.id });
 
