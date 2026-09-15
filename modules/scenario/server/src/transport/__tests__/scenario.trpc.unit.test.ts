@@ -1,8 +1,7 @@
 /**
  * @vitest-environment node
- *
- * scenarios.* transport through real runtime: read-only reaches, run refuses queueing.
- * See simulation-runner.feature and related scenario versioning/restore/suite features.
+ * scenarios.* transport through real runtime: read-only reaches, run
+ * refuses queueing. See simulation-runner.feature and related suite features.
  */
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import {

@@ -49,10 +49,9 @@ export interface ComputeRunMetricsDeps {
   traceSummaryStore: FoldProjectionStore<TraceSummaryData>;
   scheduleRetry: (payload: ComputeRunMetricsCommandData) => Promise<void>;
   /**
-   * Derives per-role cost/latency for a trace from stored_spans. Replaces the
-   * old per-span fold accumulation: role costs are no longer carried on the
-   * trace summary, so they are computed here (once per trace, when its metrics
-   * are needed) instead of on the hot fold path for every span of every trace.
+   * Derives per-role cost/latency for a trace from stored_spans, replacing
+   * per-span fold accumulation: computed once per trace when metrics are
+   * needed, instead of on the hot fold path for every span.
    */
   deriveScenarioRoleMetrics: (params: {
     tenantId: string;
@@ -129,11 +128,8 @@ export class ComputeRunMetricsAdapter implements CommandHandler<
           });
         } else {
           // Error, not warn: giving up here means this run's cost and
-          // latency never exist. No later event repairs it — the retry was
-          // the only path — so a run silently carries no metrics forever.
-          // Logged with everything needed to find it, and with the window
-          // that was actually waited, because "the trace was slower than the
-          // budget" and "the trace never arrived" need different responses.
+          // latency never exist, with no later event to repair it. Logged
+          // with the waited window, since "too slow" and "never arrived" differ.
           logger.error(
             {
               tenantId,

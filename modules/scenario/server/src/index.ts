@@ -136,10 +136,9 @@ export {
     type StalledRunFinder
 } from "./tasks/stalled-runs-backfill.task.ts";
 /**
- * The two repository bundles themselves, for the two compositions that still
- * build a `ScenarioService` by hand (`apps/api/src/features/scenario` and
- * `apps/worker`'s scenario-execution composition) rather than through
- * `installApiScenario`. `PrismaScenarioRepository` itself stays private.
+ * The two repository bundles themselves, for the two compositions that
+ * still build a `ScenarioService` by hand (api's `features/scenario`,
+ * worker's scenario-execution) rather than `installApiScenario`.
  */
 export { MemoryScenarioRepositories } from "./repositories/memory/memory.scenario.repositories.ts";
 export { PostgresScenarioRepositories } from "./repositories/prisma/prisma.scenario.repositories.ts";

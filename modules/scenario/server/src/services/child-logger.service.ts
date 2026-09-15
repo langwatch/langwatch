@@ -25,10 +25,9 @@ const scenarioLogContextSchema = z.object({
 });
 
 /**
- * Encode a logger context for transport across a process boundary.
- *
- * Returns a JSON string suitable for an env var. Keys whose value is
- * `undefined` are dropped so the child only inherits real bindings.
+ * Encode a logger context for transport across a process boundary, as a
+ * JSON string suitable for an env var. Keys whose value is `undefined` are
+ * dropped so the child only inherits real bindings.
  */
 export class ChildLoggerAdapter {
   static create(): ChildLoggerAdapter {
@@ -48,11 +47,9 @@ export class ChildLoggerAdapter {
   }
 
   /**
-   * Decode an env var value into a logger context object.
-   *
-   * Returns an empty object when the env var is unset or malformed; never
-   * throws. Malformed JSON triggers a stderr warning so it's still visible
-   * during incident response.
+   * Decode an env var value into a logger context object. Returns an empty
+   * object when unset or malformed, never throwing; malformed JSON warns on
+   * stderr so it's still visible during incident response.
    */
   static decode(raw: string | undefined): ScenarioLogContext {
     if (!raw) {
@@ -70,11 +67,9 @@ export class ChildLoggerAdapter {
   }
 
   /**
-   * Build the base logger for a scenario child process.
-   *
-   * Reads the context env var, decodes it, and returns a child logger bound
-   * to those fields. Use this once at the top of `scenario-child-process.ts`
-   * and pass the returned logger down to anything emitting structured events.
+   * Build the base logger for a scenario child process: reads the context
+   * env var, decodes it, and returns a child logger bound to those fields.
+   * Call once at the top of `scenario-child-process.ts`.
    */
   static createLogger(name: string, env: NodeJS.ProcessEnv): Logger {
     const context = ChildLoggerAdapter.decode(env[SCENARIO_LOG_CONTEXT_ENV]);

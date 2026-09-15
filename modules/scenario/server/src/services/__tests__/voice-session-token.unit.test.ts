@@ -1,8 +1,7 @@
 /**
- * The signed session token round-trips its claims, and every tamper — a bad
- * signature, an edited payload, a wrong shape, an elapsed expiry — verifies to
- * null. A secret is passed explicitly so no environment is read.
- *
+ * The signed session token round-trips its claims, and every tamper — bad
+ * signature, edited payload, wrong shape, elapsed expiry — verifies to
+ * null. A secret is passed explicitly, so no environment is read.
  * @see specs/features/agents/voice-agents-v1.feature
  */
 import { describe, expect, it } from "vitest";

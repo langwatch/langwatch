@@ -9,10 +9,8 @@ export const scenarioEventBrowserTabBodySchema = z.object({
 
 /**
  * The archive response, as one object schema `.withOutput()` can publish: a
- * set-scoped archive reports the set id and whether more runs remain, a
- * run-scoped one reports the single run id. The union the contract answers
- * with (`archiveResponseSchema`) is the wire type; this is only how the
- * declaration documents it, since `.withOutput()` takes no plain union.
+ * set-scoped archive reports the set id and remaining-runs flag, a run-scoped
+ * one the single run id. `archiveResponseSchema`'s union is the real wire type.
  */
 export const scenarioEventArchiveOutputSchema = z.object({
   archived: z.number().int().nonnegative(),

@@ -1,9 +1,7 @@
 /**
  * @vitest-environment node
  * @unit
- *
- * Redelivery contract for traceMetricsSync: contract holds but violates schema.
- * OccurredAt drifts on retry across calendar months; fix is use event.occurredAt.
+ * traceMetricsSync redelivery: OccurredAt drifts across months on retry; fix is event.occurredAt.
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -42,10 +40,9 @@ function makeMetricsPipeline() {
       );
     },
     /**
-     * Rows the fact table would physically retain. `simulation_run_metrics` is
-     * `ReplacingMergeTree(OccurredAt) PARTITION BY toYYYYMM(OccurredAt)`, and a
-     * replacement only ever collapses rows inside one partition, so the
-     * partition is part of the retained-row key.
+     * Rows the fact table would physically retain: `simulation_run_metrics`
+     * is `ReplacingMergeTree(OccurredAt) PARTITION BY toYYYYMM`, so a
+     * replacement only collapses rows inside one partition, the retained-row key.
      */
     retainedFactRows(): Set<string> {
       return new Set(
@@ -94,10 +91,9 @@ describe("traceMetricsSync subscriber redelivery", () => {
     });
 
     /**
-     * `occurredAt` rides on the event, so the redelivered command is the same
-     * command. A clock reading here would travel all the way to the fact
-     * table, where it is both the ReplacingMergeTree version and the monthly
-     * partition key: the month-crossing case below is what that costs.
+     * `occurredAt` rides on the event, so the redelivered command is the
+     * same. A clock reading here would reach the fact table as both the
+     * ReplacingMergeTree version and the monthly partition key.
      */
     it("dispatches the same command a month later", async () => {
       vi.useFakeTimers();

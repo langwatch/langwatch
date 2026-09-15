@@ -110,10 +110,9 @@ const batchesSchema = z.object({
 });
 
 /**
- * Archive operation response schema
- * Returned by the DELETE /api/scenario-events endpoint. Set-scoped archives
- * report the set id plus whether more runs remain; run-scoped archives
- * report the single run id.
+ * Archive operation response schema, returned by DELETE /api/scenario-events:
+ * set-scoped archives report the set id plus a remaining-runs flag;
+ * run-scoped archives report the single run id.
  */
 export const archiveResponseSchema = z.union([
   z.object({

@@ -41,12 +41,9 @@ export const simulationRunQueuedEventDataSchema = z.object({
   description: z.string().optional(),
   metadata: z.record(z.string(), z.unknown()).optional(),
   /**
-   * The run's secret parameter values, encrypted, keyed by name.
-   *
-   * A sibling of `metadata`, not a member of it: the fold projection copies
-   * the metadata object into the runs store, so a worker on an older build
-   * would carry anything inside it into that store and a sibling is dropped
-   * instead. The names, in clear, ride `metadata.secretParameterNames`.
+   * The run's secret parameter values, encrypted, keyed by name. A sibling of
+   * `metadata`, not a member of it, so an older worker copying `metadata` into
+   * the runs store cannot carry it; names ride in clear on `secretParameterNames`.
    */
   secretParameters: runSecretCiphertextSchema.optional(),
   /** Target the event-driven execution runs against. */
@@ -64,10 +61,9 @@ export const simulationRunQueuedEventDataSchema = z.object({
     })
     .optional(),
   /**
-   * The evaluators the run is graded with, resolved from its suite and its
-   * plan when it was queued. Absent on a run scheduled before this was
-   * recorded and on a run driven from code, which never queues here; those
-   * resolve their evaluators when they finish instead.
+   * The evaluators the run is graded with, resolved from its suite and plan
+   * when queued. Absent before this was recorded, and on a code-driven run,
+   * which never queues here and resolves evaluators when it finishes instead.
    */
   evaluators: runEvaluatorsSchema.optional(),
 });
@@ -130,22 +126,17 @@ export const simulationRunFinishedEventDataSchema = z.object({
   durationMs: z.number().optional(),
   status: z.string().optional(),
   // Identity + traceIds are event-carried state (ECST) so downstream
-  // subscribers never read fold state.
-  //
-  // Optional because the CALLER need not supply them — FinishRunCommand
-  // backfills from the run's prior events when they are absent. Not for
-  // backwards compatibility: this schema pins `version` to a literal, so an
-  // event written under an older version fails that check before reaching
-  // these fields at all.
+  // subscribers never read fold state. Optional because FinishRunCommand
+  // backfills them from prior events; not for back-compat, since `version`
+  // is pinned to a literal that already rejects an older event.
   scenarioId: z.string().optional(),
   batchRunId: z.string().optional(),
   scenarioSetId: z.string().optional(),
   traceIds: z.array(z.string()).optional(),
   /**
    * The evaluators the run is graded with, carried forward from its queued
-   * event so nothing downstream reads the suite or the plan again. Backfilled
-   * by FinishRunCommand, which resolves them live for a run whose events carry
-   * none.
+   * event so nothing downstream re-reads the suite or plan. Backfilled live
+   * by FinishRunCommand for a run whose events carry none.
    */
   evaluators: runEvaluatorsSchema.optional(),
 });
@@ -251,10 +242,9 @@ export type SimulationRunMetricsComputedEvent = z.infer<
 >;
 
 /**
- * CancelRequested event - emitted when a user requests cancellation of a run.
- * Sets CancellationRequestedAt in the fold projection without changing Status.
- * The simulationRunExecution process manager's cancel intent broadcasts this
- * to all worker pods via Redis pub/sub.
+ * CancelRequested: sets CancellationRequestedAt in the fold without changing
+ * Status. The simulationRunExecution process manager's cancel intent
+ * broadcasts this to all worker pods via Redis pub/sub.
  */
 export const simulationRunCancelRequestedEventDataSchema = z.object({
   scenarioRunId: z.string(),
@@ -273,11 +263,9 @@ export type SimulationRunCancelRequestedEvent = z.infer<
 >;
 
 /**
- * AgentInstanceRecorded event - emitted once the run knows which connected
- * agent instance answered it. The fold writes it into the run's metadata
- * under `langwatch.agentInstance`, so the results page can show where the
- * run was served. It arrives after the run finished: the child learns the
- * instance during the run and the parent records it when the child exits.
+ * AgentInstanceRecorded: the fold writes it into the run's metadata under
+ * `langwatch.agentInstance` for the results page. Arrives after the run
+ * finished — the child learns the instance and the parent records it on exit.
  */
 export const simulationRunAgentInstanceRecordedEventDataSchema = z.object({
   scenarioRunId: z.string(),

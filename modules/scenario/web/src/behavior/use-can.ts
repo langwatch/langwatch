@@ -5,9 +5,8 @@ import { useOrganizationTeamProject } from "./use-organization-team-project.ts";
 
 /**
  * The registry types are shared, so a typo'd permission string fails the
- * build; the hierarchy helper is the same pure function the engine uses.
- * ADR-092 §5 — the client asks the server what it may do, once per
- * org+project, instead of re-deriving decisions from bundled role bags.
+ * build; the hierarchy helper is the engine's own pure function. ADR-092
+ * §5: the client asks the server once per org+project, not re-deriving decisions.
  */
 export function useCan() {
   const { project, organization } = useOrganizationTeamProject();

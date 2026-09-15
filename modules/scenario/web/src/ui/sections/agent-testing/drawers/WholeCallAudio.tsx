@@ -1,9 +1,8 @@
 /**
  * The whole-call audio player in the run drawer, streamed back through
- * `/api/voice/run/:scenarioRunId/audio`. The recording lands with the
- * provider shortly after the call ends, so the first load can fail: rather
- * than a player parked at zero seconds, a "not ready yet" line with a Retry
- * replaces it. @see specs/features/agents/voice-phone.feature
+ * `/api/voice/run/:scenarioRunId/audio`. A failed first load (the provider
+ * can lag) shows "not ready yet" with Retry, not a player stuck at zero.
+ * @see specs/features/agents/voice-phone.feature
  */
 
 import { Button, HStack, Text, VStack } from "@chakra-ui/react";
@@ -14,10 +13,9 @@ import { useState } from "react";
 type RunLangwatchMetadata = { targetType?: string } | null | undefined;
 
 /**
- * Whether the run drawer shows the whole-call player: the run targeted a voice
- * agent (both phone and ElevenLabs stamp `targetType: "voice"`), and it carries
- * the ids the route needs. This is the one reliable signal that works for a
- * phone run too, whose turns may carry no per-turn audio of their own.
+ * Whether the run drawer shows the whole-call player: the run targeted a
+ * voice agent (`targetType: "voice"`) and carries the ids the route needs —
+ * reliable even for a phone run, whose turns may carry no per-turn audio.
  */
 export function shouldShowWholeCallAudio({
   langwatch,

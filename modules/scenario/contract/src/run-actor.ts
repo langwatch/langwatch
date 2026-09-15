@@ -21,12 +21,9 @@ export const runActorSchema = z
 export type RunActor = z.infer<typeof runActorSchema>;
 
 /**
- * The `actorId` and `actorLabel` entries of the reserved namespace, or nothing
- * at all.
- *
- * Both fields are written together or neither is: a surface with no person
- * behind it says nothing, rather than recording a label every reader would
- * have to filter out.
+ * The `actorId` and `actorLabel` entries of the reserved namespace, or
+ * nothing at all: both are written together, since a surface with no
+ * person behind it should say nothing rather than a label to filter out.
  */
 export function withActor(
   actor: RunActor | undefined,
@@ -35,10 +32,8 @@ export function withActor(
 }
 
 /**
- * The actor of a REST call, or nothing when the credential names no person.
- *
- * A project key belongs to no user, so it records no actor. The `langwatch`
- * CLI declares itself with `X-LangWatch-Surface: cli`; only that value is
+ * The actor of a REST call, or nothing when the credential names no person
+ * — a project key records no actor. Only `X-LangWatch-Surface: cli` is
  * honored, so a caller cannot claim an in-app surface over the wire.
  */
 export function runActorFromRequest(params: {

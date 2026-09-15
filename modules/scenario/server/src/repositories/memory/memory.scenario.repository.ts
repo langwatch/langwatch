@@ -1,9 +1,7 @@
 /**
- * The Scenario aggregate's memory twin: the same `ScenarioRepository` port the
- * Prisma repository answers, held in a map. Selected by `scenarioRepositories`
- * (`defineRepositories`) when a process boots over memory persistence, and
- * reused directly by the package's own tests that need a working
- * `ScenarioService` without a real database.
+ * The Scenario aggregate's memory twin: the same `ScenarioRepository` port
+ * the Prisma repository answers, held in a map. Selected when booting over
+ * memory persistence, and reused by tests needing no real database.
  */
 import {
   ScenarioNotFoundError,

@@ -13,11 +13,9 @@ import {
 } from "@langwatch/scenario-contract";
 
 /**
- * What the write reaches outside itself: the project's agent rows, to confirm
- * the row a finish names exists, and the simulation run lifecycle the call is
- * written through. Both arrive from the module's composition rather than a
- * global locator, so a unit test composes the writer against in-memory fakes
- * and nothing here knows about Prisma or ClickHouse.
+ * What the write reaches outside itself: the project's agent rows and the
+ * simulation run lifecycle, both from the module's composition, not a
+ * global locator — so a unit test composes it against in-memory fakes.
  */
 export interface VoiceCallRunWriterCollaborators {
   agents: {
@@ -36,10 +34,9 @@ export interface VoiceCallRunWriterCollaborators {
 export const HUMAN_CALLER_KIND = "human";
 
 /**
- * Message ids derive from the run id and the turn index, not from anything
- * random, so a re-driven snapshot (a retried hang-up completing a half-written
- * run — #7973) carries the identical ids and overwrites the same messages
- * rather than duplicating them.
+ * Message ids derive from the run id and turn index, not anything random,
+ * so a re-driven snapshot (a retried hang-up completing a half-written run
+ * — #7973) overwrites the same messages instead of duplicating them.
  */
 function toMessages(
   record: CallRecord,

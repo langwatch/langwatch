@@ -1,9 +1,7 @@
 /**
- * The seed mapping the Agent Testing scenario editor uses to read a stored
- * scenario's `callerVoice` column into the draft: absent or exactly-default
- * reads as `null` (block closed), anything else reads as the config (block
- * open with those values).
- *
+ * The seed mapping the scenario editor uses to read a stored `callerVoice`
+ * column into the draft: absent or exactly-default reads `null` (closed),
+ * anything else reads the config (open with those values).
  * @see specs/features/agents/voice-agents-v1.feature
  */
 import { describe, expect, it } from "vitest";

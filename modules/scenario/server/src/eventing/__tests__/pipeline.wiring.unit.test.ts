@@ -9,13 +9,9 @@ import { FinishRunCommand } from "../finish-run.commands.ts";
 import { QueueRunCommand } from "../queueRun.command.ts";
 import { RecordEvaluationsCommand } from "../recordEvaluations.command.ts";
 // DANGLING: `createSimulationProcessingPipeline` is not exported anywhere in
-// this tree. Main's `../pipeline.ts` had it; the new
-// `simulation-processing.pipeline.ts` replaces it with the
-// `SimulationProcessingPipelineAdapter` class, whose deps shape (no
-// `recordEvaluationsCommand`, `simulationRunExecution` -> `scenarioRunExecution`,
-// `simulations` in place of `scenarioEvaluations`) does not match what this
-// test builds. This whole test looks half-ported - see handoff
-// merge-scenario-dangling-imports.
+// this tree. `SimulationProcessingPipelineAdapter` replaces it with a
+// different deps shape this test doesn't build against — half-ported. See
+// handoff merge-scenario-dangling-imports.
 import { createSimulationProcessingPipeline } from "./pipeline.wiring.unit.test.ts";
 
 vi.mock("@langwatch/observability", () => ({

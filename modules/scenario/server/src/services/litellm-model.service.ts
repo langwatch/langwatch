@@ -1,7 +1,6 @@
 /**
- * Factory for creating Vercel AI models from LiteLLM parameters.
- *
- * Extracted to a shared module to eliminate duplication between
+ * Factory for creating Vercel AI models from LiteLLM parameters. Extracted
+ * to a shared module to eliminate duplication between
  * standalone-adapters.ts and scenario-worker.ts.
  */
 
@@ -77,9 +76,8 @@ function rejectionAsksForReasoningOff(body: string): boolean {
 
 /**
  * The parsed request body, when the request is one the retry may rewrite: a
- * tool-carrying JSON body with no reasoning effort of its own. A caller that
- * asked for a specific effort keeps it and gets the endpoint's own error,
- * rather than having its intent silently rewritten.
+ * tool-carrying JSON body with no reasoning effort of its own. A caller
+ * that asked for a specific effort keeps it and gets the endpoint's error.
  */
 function retryEligibleRequestBody(
   init: RequestInit | undefined,

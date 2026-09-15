@@ -103,10 +103,9 @@ export function createScenarioRestTestRuntime(
   options: {
     authenticated?: boolean;
     /**
-     * Who the door names beyond "is there a request": defaults to a person,
-     * signed in as themself. A legacy project key names no person - pass
-     * `viewerUserId: null` with an `actorId` that is not a `User` row (a
-     * project id is what the real door falls back to) to exercise that case.
+     * Who the door names beyond "is there a request": defaults to a signed
+     * in person. A legacy project key names none — pass `viewerUserId: null`
+     * with an `actorId` that isn't a `User` row to exercise that case.
      */
     viewerUserId?: string | null;
     actorId?: string;

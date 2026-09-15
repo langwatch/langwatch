@@ -141,10 +141,9 @@ function StopRunButton({
 }
 
 /**
- * One pill per evaluator that ran on the scenario. A row still waiting for
- * its evaluators says it is grading, in muted text, so it does not read as a
- * row on which no check ran. A skipped evaluator keeps its pill, muted, so a
- * row that skipped a check reads differently from one the check never ran on.
+ * One pill per evaluator that ran on the scenario. A row still waiting says
+ * it is grading, in muted text, distinct from no check having run. A
+ * skipped evaluator keeps its pill, muted, distinct from never having run.
  */
 function RowEvaluators({ scenarioRun }: { scenarioRun: ScenarioRunData }) {
   const evaluations = evaluationsOf(scenarioRun);

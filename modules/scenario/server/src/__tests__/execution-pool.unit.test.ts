@@ -66,12 +66,9 @@ describe("ScenarioExecutionPoolService", () => {
 
   describe("when a job arrives before the processor has connected", () => {
     /**
-     * `connect` is late — `ScenarioProcessorService.create` calls it during
-     * worker boot — so a job can land on an unconnected pool. `startJob` has
-     * always thrown there, which is what lets the execute intent's outbox
-     * retry (`startWorkers.ts`). The two CANCELLED branches used to reach for
-     * `this.runner?.skipCancelled(...)` and return, so the same window
-     * silently dropped the terminal event and left the run at QUEUED.
+     * `connect` is late, so a job can land on an unconnected pool. `startJob`
+     * always throws there, letting the execute intent's outbox retry. This
+     * guards against the CANCELLED branch silently dropping the terminal event.
      */
     it("refuses a cancelled submission loudly rather than dropping its terminal event", () => {
       const unconnected = ScenarioExecutionPoolService.create({ concurrency: 2 });

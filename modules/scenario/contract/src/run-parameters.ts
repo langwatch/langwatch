@@ -25,10 +25,9 @@ import {
 import type { ScenarioRunConfig } from "./scenario.ts";
 
 /**
- * What one scenario in the run resolved.
- *
- * The two records never overlap: a name is either plain or secret for the whole
- * run, which is what the conflict check below guarantees.
+ * What one scenario in the run resolved. The two records never overlap: a
+ * name is either plain or secret for the whole run, which is what the
+ * conflict check below guarantees.
  */
 export type ResolvedScenarioParameters = {
   /** Values the scenario text renders against and the child reads as `params`. */
@@ -85,12 +84,9 @@ function assertEveryValueIsAnOption({
 }
 
 /**
- * Refuses the run when a parameter declared required resolved no value.
- *
- * A connected agent declares required every function parameter its own code
- * gives no default, and the SDK refuses a call that carries none. Read on the
- * merged values rather than on the supplied ones, so a default declared by
- * the scenario answers the agent's requirement.
+ * Refuses the run when a required parameter resolved no value. A connected
+ * agent requires every function parameter with no code default. Read on
+ * merged values so a scenario default can answer the requirement.
  */
 function assertEveryRequiredHasAValue({
   definitions,
@@ -111,10 +107,8 @@ function assertEveryRequiredHasAValue({
 
 /**
  * Refuses the run when one name is secret in one scenario and plain in
- * another.
- *
- * The run supplies one value per name, so the pair cannot both be honoured:
- * the plain scenario would render a credential into its own text.
+ * another. The run supplies one value per name, so honouring both would
+ * render a credential into the plain scenario's own text.
  */
 function assertNoSecretConflict({
   secretNames,
@@ -129,12 +123,9 @@ function assertNoSecretConflict({
 }
 
 /**
- * Refuses the run when a declared secret has no text value for this run.
- *
- * A secret carries no default, so there is nothing to fall back to, and a
- * number or a boolean is not a credential. An empty string is refused with
- * them: the run dialog cannot send one, but a caller that goes straight to the
- * API can, and it would reach the target as a credential of no length.
+ * Refuses the run when a declared secret has no text value; secrets have no
+ * default to fall back to. An empty string is refused too — the dialog
+ * can't send one, but a direct API caller can, as a zero-length credential.
  */
 function assertEverySecretHasAValue({
   secretNames,
@@ -215,10 +206,9 @@ export async function resolveRunParameters({
 }: {
   scenarios: readonly ScenarioRunConfig[];
   /**
-   * The parameters the run's target declares on its own, a connected agent's
-   * function parameters. Every scenario of the run reads them after its own
-   * declarations, so a scenario's default wins over the agent's. They are
-   * never secret: a secret stays scenario-declared and run-level.
+   * The parameters the run's target declares on its own, a connected
+   * agent's function parameters. Read after each scenario's own declarations,
+   * so a scenario default wins. Never secret; secrets stay scenario-level.
    */
   targetDefinitions?: readonly ScenarioParameterDefinition[];
   /** What the target is called, for a refusal that names it. */

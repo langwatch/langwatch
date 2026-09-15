@@ -489,11 +489,9 @@ function tracePathIssue(path: readonly string[]): string | null {
 }
 
 /**
- * Why a mapping path cannot be read, or null when it can.
- *
- * Checked when an attachment is saved, so a run never meets a path it does
- * not know. The field a scenario path names must be one the suite declares;
- * a plan level attachment names no field at all.
+ * Why a mapping path cannot be read, or null when it can. Checked when an
+ * attachment is saved, so a run never meets an unknown path — a scenario
+ * path's field must be one the suite declares; a plan-level names none.
  */
 export function scenarioMappingPathIssue({
   mapping,

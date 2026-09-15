@@ -126,11 +126,9 @@ export class VoiceNonceRegistrationNoChannelError extends Error {
 }
 
 /**
- * Parent side: handle one child's registration request — register the nonce
- * with `registry` against `child`, and build the ack the caller sends back.
- * Pure apart from the registry mutation, so it is unit-testable without a
- * real spawned child process or IPC channel; the caller (scenario.processor.ts)
- * owns actually calling `child.send(ack)`.
+ * Parent side: handle one child's registration request — register the
+ * nonce with `registry`, build the ack. Pure apart from that mutation, so
+ * it is unit-testable with no real child process or IPC channel.
  */
 export function handleVoiceNonceRegisterMessage(params: {
   message: VoiceNonceRegisterMessage;
@@ -164,11 +162,9 @@ interface NonceRegistrationSettlement {
 }
 
 /**
- * Build the ack listener for one in-flight nonce-registration request: on a
- * matching, not-yet-settled ack it marks the wait settled, cancels the timer
- * and unsubscribes itself via `onSettle`, then resolves or rejects per the
- * parent's verdict. Extracted so {@link requestNonceRegistration} does not
- * carry this nesting in its own executor.
+ * Build the ack listener for one in-flight nonce-registration request: a
+ * matching, unsettled ack marks it settled, cancels the timer, then
+ * resolves or rejects. Extracted out of `requestNonceRegistration`'s executor.
  */
 function createNonceAckListener(params: {
   requestId: string;
@@ -196,11 +192,9 @@ function createNonceAckListener(params: {
 }
 
 /**
- * Child side: ask the parent to register `nonce` against this child, and wait
- * for the ack. Rejects if there is no IPC channel, the parent does not
- * respond within `timeoutMs`, or the parent acks with `ok: false`. Resolves
- * once the parent confirms the nonce is registered — the point at which it is
- * safe to dial, since any subsequent Twilio upgrade can now be authenticated.
+ * Child side: ask the parent to register `nonce`, and wait for the ack.
+ * Rejects with no IPC channel, on timeout, or `ok: false`. Resolves once
+ * registered — the point it is safe to dial, since Twilio can now be authenticated.
  */
 export function requestNonceRegistration(params: {
   nonce: string;

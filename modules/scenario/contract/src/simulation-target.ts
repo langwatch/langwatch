@@ -1,9 +1,7 @@
 /**
- * What a simulation run points at.
- *
- * The target is domain shape rather than transport shape, so the services
- * that resolve it and the router that accepts it read the same definition.
- * Extensible: add a new type as the platform grows one.
+ * What a simulation run points at: domain shape, not transport shape, so
+ * the services that resolve it and the router that accepts it read the
+ * same definition. Extensible as the platform grows a new type.
  */
 
 import { z } from "zod";

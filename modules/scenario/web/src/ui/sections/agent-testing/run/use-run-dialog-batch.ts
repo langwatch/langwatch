@@ -54,12 +54,9 @@ function rememberTarget({
 }
 
 /**
- * What the caller learns once a plan run is queued.
- *
- * The run set is the plan's own, so the drawer and the runs rail read the run
- * back under that plan, and the plan's address segment is what the Results
- * tab opens on. A run of one scenario also names it and the agent, so the
- * drawer can open on the run before the run has an id.
+ * What the caller learns once a plan run is queued: the run set is the
+ * plan's own, so the drawer and runs rail read it back under that plan.
+ * A one-scenario run also names it and the agent, opening before it has an id.
  */
 function runStartedInfoOf({
   batchRunId,

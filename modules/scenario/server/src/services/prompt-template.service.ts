@@ -34,10 +34,8 @@ const DEFAULT_SCENARIO_THREAD_ID = "scenario-test";
 
 /**
  * Every context name `buildPromptTemplateContext` binds the conversation to.
- *
  * ⚠ Both spellings must stay listed: a caller uses this to decide whether the
- * template already places the history, and a name missing here is history
- * appended a second time.
+ * template already places history, or appends it a second time.
  */
 const CONVERSATION_VARIABLES = ["messages", "messagesJson"] as const;
 
@@ -54,12 +52,9 @@ export class PromptTemplateAdapter {
   }
 
   /**
-   * The conversation as the model should see it: role and content only.
-   *
-   * `ScenarioState.addMessage` stamps every message with `id` and `traceId`, and
-   * serialising the message objects wholesale put both into prompt text (#6590).
-   * Stripping here covers the base `messages` binding and every mapping that
-   * resolves to it, since both read from this value.
+   * The conversation as the model should see it: role and content only, since
+   * `ScenarioState.addMessage`'s `id`/`traceId` stamps leaked into prompt text
+   * when serialised wholesale (#6590). Covers `messages` and every mapping to it.
    */
   private static conversationForPrompt(messages: AgentInput["messages"]): AgentInput["messages"] {
     return messages.map((message) => {
@@ -140,12 +135,9 @@ export class PromptTemplateAdapter {
       agentInput: sanitized,
     });
     for (const [identifier, value] of Object.entries(resolved)) {
-      // The shared resolver serialises the conversation as JSON, which is right
-      // for an HTTP body and wrong for prompt text. Same substitution as the base
-      // `messages` binding, so a declared input mapped to the conversation reads
-      // the same way. `threadId` likewise reads the base binding: the resolver
-      // answers "" when the runner supplies no thread id, which would render
-      // blank while `{{threadId}}` renders the sentinel.
+      // The shared resolver serialises the conversation as JSON, right for an
+      // HTTP body but wrong for prompt text, so mapped inputs substitute the
+      // same as the base `messages`/`threadId` bindings for consistency.
       const sourceField = sourceFieldOf(effectiveMappings[identifier]!);
       context[identifier] =
         sourceField === "messages" ? transcript : sourceField === "threadId" ? threadId : value;
@@ -173,12 +165,9 @@ export class PromptTemplateAdapter {
   }
 
   /**
-   * Whether a template reads the named variable.
-   *
-   * The check this replaces tested `/\bmessages\b/` against the raw template, so
-   * a system prompt using the ordinary word "messages" in prose suppressed the
-   * conversation history entirely — the model was told to discuss a conversation
-   * it was never shown. Only a reference inside a Liquid expression counts now.
+   * Whether a template reads the named variable. The prior check tested
+   * `/\bmessages\b/` against raw text, so the word "messages" in prose alone
+   * suppressed history entirely. Only a Liquid-expression reference counts now.
    */
   static referencesVariable(template: string, variable: string): boolean {
     const reference = new RegExp(`\\b${variable}\\b`);

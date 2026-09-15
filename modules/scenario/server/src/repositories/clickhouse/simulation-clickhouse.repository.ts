@@ -42,9 +42,8 @@ const DEFAULT_SET_ID = "default";
 const INTERNAL_SET_PREFIX = "__internal__";
 
 /**
- * Simulation's boundary to the shared partition-window read policy.
- *
- * The feature chooses when it can use a partition hint. Application
+ * Simulation's boundary to the shared partition-window read policy: the
+ * feature chooses when it can use a partition hint, and application
  * composition supplies the shared policy and its telemetry implementation.
  */
 export type SimulationWindowFragment = {
@@ -103,11 +102,9 @@ const RUNNING_STATUSES =
   "'IN_PROGRESS','PENDING','PENDING_EVALUATION','QUEUED','RUNNING'";
 
 /**
- * Leaves out runs that are not results of a scenario: the "Test agent" one-off
- * checks, and the legacy `voice-calls` set that pre-#8020 drawer "Talk to it"
- * calls landed in (a drawer call no longer writes a run at all). No set list,
- * batch list or last-result summary shows them. A run is still read by its own
- * id, so a direct link to an old voice-call run still opens.
+ * Leaves out runs that are not results of a scenario: "Test agent" one-off
+ * checks, and the legacy `voice-calls` set pre-#8020 drawer calls landed in.
+ * Hidden from every list; a direct link to an old run still opens by id.
  */
 const AGENT_TEST_SET_EXCLUSION = `AND NOT endsWith(ScenarioSetId, '${AGENT_TEST_SET_SUFFIX}') AND ScenarioSetId != '${VOICE_CALL_SCENARIO_SET_ID}'`;
 

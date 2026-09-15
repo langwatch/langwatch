@@ -93,12 +93,9 @@ export class ClickHouseSimulationRunMetricsRepository implements SimulationRunMe
   }
 
   /**
-   * Future read path (not yet wired into services): aggregates all per-trace
-   * metric rows for a run. Reads the dedupe-safe rollup (migration 00079):
-   * the inner query merges each trace's argMax states (retry duplicates —
-   * same EventId/OccurredAt — collapse to one value, whether or not the
-   * AggregatingMergeTree parts have merged); the outer query rolls traces up
-   * into run-level totals with per-role map sums.
+   * Future read path (not yet wired into services): aggregates per-trace
+   * metric rows for a run via the dedupe-safe rollup (migration 00079) —
+   * argMax collapses retry duplicates per trace, then rolls up to run totals.
    */
   async getRunMetrics(params: {
     tenantId: string;

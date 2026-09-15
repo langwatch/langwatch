@@ -1,8 +1,6 @@
 /**
  * @vitest-environment node
- *
- * Covers the @unit scenarios in
- * specs/scenarios/prompt-agent-input-binding.feature.
+ * Covers the @unit scenarios in specs/scenarios/prompt-agent-input-binding.feature.
  */
 
 import {

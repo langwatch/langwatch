@@ -1,9 +1,7 @@
 /**
- * The saved evaluators of the project, keyed by id, which is how an
- * attachment names the evaluator it runs.
- *
- * One read for every pill and every editor: the suite editor, the header
- * line and the run dialog all resolve an attachment through it.
+ * The saved evaluators of the project, keyed by id — how an attachment
+ * names the evaluator it runs. One read for every pill and editor: suite
+ * editor, header line and run dialog all resolve an attachment through it.
  */
 
 import { useMemo } from "react";

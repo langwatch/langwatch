@@ -132,10 +132,9 @@ export const archiveSetCommandDataSchema = simulationArchiveSetSchema;
 export type ArchiveSetCommandData = SimulationArchiveSet;
 
 /**
- * Records the evaluator results of a finished run. The verdict after the
- * gate, the identity and the verdict the run held before are all read from
- * the run's prior events by RecordEvaluationsCommand, so the caller sends
- * only the results.
+ * Records the evaluator results of a finished run. Post-gate verdict,
+ * identity and prior verdict are all read from the run's prior events by
+ * RecordEvaluationsCommand, so the caller sends only the results.
  */
 export const recordEvaluationsCommandDataSchema = z.object({
   tenantId: z.string(),

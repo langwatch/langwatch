@@ -1,9 +1,7 @@
 /**
  * Resolving the voice-call the run dialog's "Call it myself" action opens.
- * Offered only when exactly one scenario is in scope: a `plan` subject (many
- * scenarios) or an empty scope has no single scenario to score the call
- * under, so no target is resolved and the dialog gates the action off (#8019
- * AC9) — a resolved target always names the scenario it is scored under.
+ * Offered only when exactly one scenario is in scope — a `plan` subject or
+ * empty scope has none to score under, so the dialog gates the action off (#8019 AC9).
  * @see specs/features/agents/voice-agents-v1.feature
  */
 
@@ -27,10 +25,9 @@ export type VoiceCallTarget = {
 };
 
 /**
- * The voice-call the "Call it myself" action opens, resolved from the selected
- * target. Null unless the target is a saved voice agent whose config names a
- * transport and an agent id, so the action is offered for voice targets alone
- * and never for HTTP, Code, Workflow or prompt targets (AC25).
+ * The voice-call the "Call it myself" action opens, resolved from the
+ * selected target. Null unless it's a saved voice agent with a transport
+ * and agent id, so it's offered only for voice targets, never others (AC25).
  */
 export function voiceCallTargetOf({
   form,

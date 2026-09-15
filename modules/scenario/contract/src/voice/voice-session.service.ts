@@ -83,10 +83,9 @@ export class VoiceAgentRowNotFoundError extends HandledError {
 }
 
 /**
- * A "Call it myself" finish named a scenario that no longer resolves to a set:
- * archived, removed, or from another project. A human call can only be scored
- * against a real scenario, so nothing is written rather than silently
- * downgrading the run to an unjudged drawer call (#8019).
+ * A "Call it myself" finish named a scenario that no longer resolves to a
+ * set: archived, removed, or another project's. Nothing is written rather
+ * than silently downgrading to an unjudged drawer call (#8019).
  */
 export class VoiceScenarioNotFoundError extends HandledError {
   declare readonly code: "scenario_not_found";
@@ -134,10 +133,9 @@ export class VoiceAgentsGateDisabledError extends HandledError {
 }
 
 /**
- * The audio proxy found no run for this conversation in the project, or the
- * provider had nothing to stream back. Kept 404 (not 400) so it reads like
- * the resource itself is missing, matching the flag-off and row-not-found
- * responses on the same door.
+ * The audio proxy found no run for this conversation, or the provider had
+ * nothing to stream back. Kept 404, not 400, matching the flag-off and
+ * row-not-found responses on the same door.
  */
 export class VoiceRecordingUnavailableError extends HandledError {
   declare readonly code: "voice_recording_unavailable";
@@ -357,9 +355,8 @@ export interface FinishResult {
 
 /**
  * Read the provider's record for a conversation, or fall back. Returns the
- * record (null when the provider has none yet or there is no key) and whether
- * the fetch itself failed (as opposed to "not ready"), so the caller can mark
- * the fetch-failed notice (AC15).
+ * record (null when none yet or no key) and whether the fetch itself failed,
+ * as opposed to "not ready", so the caller can mark the notice (AC15).
  */
 async function fetchProviderRecord(
   ports: VoiceSessionInfrastructure,
@@ -432,11 +429,9 @@ async function resolveAgentRow(
 }
 
 /**
- * Resolve the scenario a "Call it myself" run is written under and the set it
- * shares with that scenario's simulated runs (AC23). A named scenario that
- * cannot be resolved throws {@link VoiceScenarioNotFoundError}: writing it as
- * an unscored run would lose the verdict the caller asked for (#8019). Called
- * only on the scenario branch, so `scenarioId` is always present.
+ * Resolve the scenario a "Call it myself" run is written under and the set
+ * it shares with its simulated runs (AC23). An unresolved name throws
+ * VoiceScenarioNotFoundError rather than write an unscored run (#8019).
  */
 async function resolveScenarioContext(
   ports: VoiceSessionInfrastructure,
@@ -452,11 +447,8 @@ type ExistingRun = NonNullable<
 >;
 
 /**
- * The result for a terminal run returned untouched: a duplicate finish writes
- * nothing (AC14, #7973 AC1). The agent id comes from the token when it names
- * one, else from the run that already landed; the transcript source, recording
- * and scenario set all come from that run, so a retry keeps the Play control
- * and the deep link to the set (AC14) — the scenario is deliberately not
+ * The result for a terminal run returned untouched: a duplicate finish
+ * writes nothing (AC14, #7973 AC1). The scenario is deliberately not
  * re-resolved, so an archived scenario cannot break the retry (#7973 AC1).
  */
 function terminalRunResult({
@@ -551,11 +543,9 @@ const WRITTEN_STATUSES: ReadonlySet<ScenarioRunStatus> = new Set([
   ScenarioRunStatus.FAILED,
 ]);
 /**
- * The shared tail of a finished call: read the provider record (or fall back to
- * the live transcript), reject a conversation the token has no claim to,
- * resolve the agent row and record one trace per exchange. Returns the record
- * and agent id both branches build their result from. A drawer call runs only
- * this much; a scenario call goes on to write the run.
+ * The shared tail of a finished call: read the provider record (or fall
+ * back to the transcript), reject an unclaimed token, resolve the agent row
+ * and record one trace per exchange. A drawer call stops here; a scenario goes on.
  */
 async function ingestFinishedCall(
   input: {

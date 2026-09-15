@@ -342,14 +342,10 @@ export class ClickHouseSimulationRunStateRepository<
         table: TABLE_NAME,
         values: [projectionRecord],
         format: "JSONEachRow",
-        // The fold reads this row back through `tryGetProjection` when the state
-        // store misses, so the write has to be visible before it returns.
-        // Without the wait, the next event for the same run folds from an
-        // empty state and rewrites the row without the identity the first
-        // event carried: a finished run then holds no ScenarioId, BatchRunId
-        // or ScenarioSetId, which drops it out of every set and batch listing
-        // while it stays reachable by run id. `storeProjectionBatch` below
-        // already waits.
+        // The fold reads this row back via `tryGetProjection` on a state-store
+        // miss, so the write must be visible before returning — without the
+        // wait, the next event folds from empty and drops the run's identity
+        // fields (ScenarioId, BatchRunId, ScenarioSetId) from set/batch listings.
         clickhouse_settings: {
           async_insert: 1,
           wait_for_async_insert: 1,

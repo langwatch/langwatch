@@ -1,10 +1,7 @@
 /**
- * The wall-clock timer that ends a voice call at VOICE_CALL_MAX_SECONDS.
- *
- * When the limit elapses the call is ended gracefully (the child disconnects the
- * transport) so the judge still runs on what was said, and the run is marked as
- * cut at the limit (AC28). Kept as a tiny injectable helper so the fire-once and
- * clear semantics are unit-tested without real time.
+ * The wall-clock timer that ends a voice call at VOICE_CALL_MAX_SECONDS. On
+ * elapse the child disconnects gracefully, judged on what was said and
+ * marked cut (AC28). Injectable, so fire-once/clear are unit-tested without real time.
  */
 
 export interface CallLimitTimer {

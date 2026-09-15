@@ -1,8 +1,7 @@
 /**
  * The evaluator that blocks a run: the first attachment whose required
- * input still reads nothing, and where a person is sent to fix it or the
+ * input still reads nothing — where a person is sent to fix it, or the
  * mappings-missing refusal a run reports.
- *
  * @see specs/features/agent-testing/run-dialog.feature
  */
 

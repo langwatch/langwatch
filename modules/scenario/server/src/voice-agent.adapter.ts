@@ -8,11 +8,9 @@ import { voiceTransportRegistry } from "../../contract/src/voice/voice-transport
 import type { VoiceAgentData } from "../../contract/src/evaluations/types.ts";
 
 /**
- * Shown on a voice run whose project has no OpenAI key. The SDK builds its own
- * OpenAI client for the caller's text-to-speech AND for the transcription the
- * judge reads, so this key is required for every voice run regardless of caller
- * provider. Failing here — before the transport connects — keeps the run from
- * hitting the SDK's cryptic "Missing credentials" error mid-call.
+ * Shown on a voice run whose project has no OpenAI key: the SDK builds its
+ * own client for TTS and judge transcription, so this is required regardless
+ * of caller provider. Fails before connecting, not mid-call.
  */
 export const NO_OPENAI_KEY_MESSAGE =
   "The caller voice needs an OpenAI key. Add one in Settings > Model Providers.";

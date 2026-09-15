@@ -1,7 +1,10 @@
 /**
  * @vitest-environment jsdom
- * @see specs/features/agent-testing/run-dialog.feature, specs/features/agent-testing/comparison-mode.feature,
- *   specs/suites/run-notes.feature, specs/suites/test-suite-run-plan-reuse.feature, specs/features/agent-testing/results-tabs.feature
+ * @see specs/features/agent-testing/run-dialog.feature
+ * @see specs/features/agent-testing/comparison-mode.feature
+ * @see specs/suites/run-notes.feature
+ * @see specs/suites/test-suite-run-plan-reuse.feature
+ * @see specs/features/agent-testing/results-tabs.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, waitFor, within } from "@testing-library/react";

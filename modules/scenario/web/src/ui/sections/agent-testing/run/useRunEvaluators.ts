@@ -1,8 +1,7 @@
 /**
- * The evaluators of an open run dialog: inherited from suites in scope, the
- * plan's own extras, the editors both open, and the guard blocking Run when
- * an evaluator's input still reads nothing. Extras live in the plan fields so
- * they reset with the subject; inherited ones are read-only here.
+ * The evaluators of an open run dialog: inherited from suites in scope,
+ * the plan's own extras, both editors, and the guard blocking Run when an
+ * input still reads nothing. Extras reset with the subject; inherited ones are read-only.
  */
 
 import { useCallback } from "react";

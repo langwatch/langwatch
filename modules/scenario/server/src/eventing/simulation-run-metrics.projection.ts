@@ -25,12 +25,9 @@ export interface SimulationRunMetricsProjectionRecord {
 const metricsEvents = [SimulationRunMetricsComputedEventSchema] as const;
 
 /**
- * One `simulation_run_metrics` ClickHouse row per metrics_computed event.
- * This projection is a pure map: metrics are already computed upstream
- * (ComputeRunMetricsCommand) and carried on the event via ECST, so it never
- * reads a prior row or projection. Retry re-deliveries are collapsed by the
- * dedupe-safe rollup (simulation_run_metrics_rollup, migration 00079) and at
- * read time via argMaxMerge per trace.
+ * One `simulation_run_metrics` ClickHouse row per metrics_computed event, a
+ * pure map: metrics are computed upstream and carried via ECST, so it never
+ * reads a prior row. Retries collapse via the rollup (migration 00079) and argMaxMerge.
  */
 export class SimulationRunMetricsMapProjection
   extends AbstractMapProjection<SimulationRunMetricsProjectionRecord, typeof metricsEvents>

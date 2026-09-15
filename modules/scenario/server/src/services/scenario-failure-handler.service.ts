@@ -30,9 +30,8 @@ export class ScenarioFailureHandlerService {
 
   /**
    * Whether the failed target is an HTTP agent whose config carries the
-   * `devTunnel` marker. Only consulted for transport-level failures, so the
-   * common failure paths never pay for the agent lookup; a lookup failure
-   * degrades to the generic classification rather than blocking the event.
+   * `devTunnel` marker. Only consulted for transport-level failures, so
+   * common paths skip the lookup; a lookup failure degrades to generic.
    */
   private async targetHasDevTunnel(params: ScenarioUnsuccessfulExecutionInput): Promise<boolean> {
     if (params.cancelled) {

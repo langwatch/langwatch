@@ -1,8 +1,7 @@
 /**
  * The evaluators a run carries: those the test suites in scope attach
- * (edited in the suite), plus the plan's own extras (read only the
- * conversation and trace). Pure, so the dialog, footer and tests read one
- * answer for one scope.
+ * (edited in the suite), plus the plan's own extras. Pure, so the dialog,
+ * footer and tests read one answer for one scope.
  * @see specs/features/agent-testing/run-dialog.feature
  */
 

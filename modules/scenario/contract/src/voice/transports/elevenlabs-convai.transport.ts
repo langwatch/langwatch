@@ -1,10 +1,7 @@
 /**
- * The ElevenLabs Conversational AI transport.
- *
- * This is the ONE module in the codebase that names ElevenLabs or touches the
- * ElevenLabs SDK. Everything above it speaks of a `VoiceTransport` and a
- * `VoiceTransportRunner`; the vendor coupling — the SDK adapter, the connect
- * handshake, the two customer-facing failure strings — is sealed in here.
+ * The ElevenLabs Conversational AI transport — the ONE module naming
+ * ElevenLabs or touching its SDK. Everything above speaks of
+ * `VoiceTransport`; the vendor coupling is sealed in here.
  */
 
 import { createLogger } from "@langwatch/observability";
@@ -21,9 +18,8 @@ const logger = createLogger("langwatch:scenarios:voice:elevenlabs");
 
 /**
  * How long to wait for the socket to open before failing the run. ElevenLabs
- * can reject a bad agent id by closing the socket, or a network fault can hang
- * the connect; either way the run must fail well inside the AC's 60 seconds
- * rather than sit until the child's 15-minute outer timeout.
+ * can reject a bad agent id or hang on a network fault; either way the run
+ * must fail inside the AC's 60s rather than the child's 15-minute timeout.
  */
 export const ELEVENLABS_CONNECT_TIMEOUT_MS = 45_000;
 
@@ -174,11 +170,9 @@ function authHeaders(credential: { apiKey: string }): Record<string, string> {
 }
 
 /**
- * A malicious or compromised upstream could hand back a `signed_url` pointing
- * anywhere; the browser connects to it directly with no further checks, so it
- * is validated here before it ever reaches the client. Accepts only a secure
- * websocket on ElevenLabs' own domain, or the project's configured (regional)
- * base host.
+ * A compromised upstream could hand back a `signed_url` pointing anywhere
+ * the browser then connects to unchecked, so it is validated here: only a
+ * secure websocket on ElevenLabs' domain or the project's base host is accepted.
  */
 export function isAcceptableSignedUrl({
   signedUrl,
@@ -286,12 +280,9 @@ export const elevenLabsConvaiTransport: VoiceTransportRunner = {
       );
     }
     const body = (await response.json()) as ElevenLabsConversationResponse;
-    // Right after hang-up ElevenLabs answers 200 with an unfinished status
-    // (`initiated`/`in-progress`/`processing`) or `failed`, and the transcript
-    // in that body can still be empty. Only a `done` record may replace the
-    // live transcript, so anything else reads as not-ready: return null and let
-    // the caller keep the browser transcript. A missing status keeps today's
-    // behaviour for older payloads (#8019).
+    // Right after hang-up ElevenLabs can answer 200 with a not-yet-`done`
+    // status and an empty transcript; only `done` replaces the live
+    // transcript. A missing status (older payloads) keeps today's behaviour.
     if (typeof body.status === "string" && body.status !== "done") {
       logger.info(
         { conversationId, status: body.status },

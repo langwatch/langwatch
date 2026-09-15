@@ -46,10 +46,8 @@ export abstract class ScenarioTabRegistry {
 
 /**
  * Keep a browser tab claimable for as long as its subscription lives.
- *
- * Presence is refreshed from the server rather than the browser: a background
- * tab's timers get throttled to once a minute, which would expire presence on
- * exactly the tab this feature exists to reuse.
+ * Refreshed from the server, not the browser: a background tab's timers
+ * throttle to once a minute, which would expire presence on that tab.
  */
 export async function startScenarioTabPresence({
   registration,

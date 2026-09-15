@@ -1,9 +1,7 @@
 /**
  * @vitest-environment node
- *
- * `isHumanCallerRun` reads the same metadata field the results-table caller
- * badge and message renderer read, so live and stored views agree on
- * whether the caller was a real person (#8020, decision 5).
+ * `isHumanCallerRun` reads the same metadata field the caller badge and
+ * message renderer read, agreeing whether the caller was real (#8020, decision 5).
  * @see specs/features/agents/voice-agents-v1.feature
  */
 import { describe, expect, it } from "vitest";

@@ -125,12 +125,9 @@ describe("prefetchWithFixture", () => {
 
     const modelResolver = {
       // Distinguish every feature key so simulator/judge/agent-under-test
-      // selection can be asserted independently of one another.
-      // "scenarios.generator" (the FAST-role authoring assist, used only by
-      // scenario generation, not by a run) is deliberately given its OWN
-      // distinguishable value so a resolver call against the WRONG key
-      // (the pre-#6634 bug) is observable rather than accidentally
-      // matching the agent-under-test value.
+      // selection can be asserted independently. "scenarios.generator" gets
+      // its own value so a resolver call against the wrong key (#6634) is
+      // observable rather than silently matching agent-under-test.
       resolve: vi.fn().mockImplementation(async (featureKey: string) => {
         const modelByFeatureKey: Record<string, string> = {
           "scenarios.user_simulator": "openai/sim-default",
@@ -1221,14 +1218,9 @@ describe("prefetchWithFixture", () => {
           });
         });
 
-        // "uses project defaultModel (code agents have no model)" removed
-        // (issue #6634): it asserted a code target resolves an
-        // adapter-role model at all, which was the defect this issue
-        // fixes. Superseded by the describe.each("given a workflow,
-        // code, or HTTP target") block above (AC2 / AC-N8), which pins
-        // the correct contract for code targets: the agent-under-test
-        // resolver is never called, and model params are prepared
-        // exactly twice — simulator and judge, never an adapter model.
+        // Superseded by the describe.each("given a workflow, code, or HTTP
+        // target") block above (AC2 / AC-N8): agent-under-test is never
+        // called, and model params are prepared exactly twice.
 
         it("includes decrypted project secrets on the prefetched adapter data", async () => {
           const projectSecretsFetcher: ProjectSecretsFetcher = {
@@ -1716,11 +1708,9 @@ describe("prefetchWithFixture", () => {
       };
 
       /**
-       * Refuses exactly the codex model and nothing else, and builds the
-       * refusal FROM the model it was asked about. A blanket-failure stub
-       * stays green with the codex pin removed from the DSL — the simulator
-       * and judge preparations fail on their own, and its hard-coded message
-       * still names a model nothing in the workflow pinned.
+       * Refuses exactly the codex model, building the refusal from the model
+       * asked about — a blanket-failure stub stays green even with the codex pin
+       * removed, since its hard-coded message names a model nothing pinned.
        */
       const modelAwarePrepare = vi.fn(
         async (_projectId: string, model: string): Promise<ModelParamsResult> =>

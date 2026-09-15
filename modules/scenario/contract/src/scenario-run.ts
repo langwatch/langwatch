@@ -42,11 +42,9 @@ export const TERMINAL_STATUSES = new Set<ScenarioRunStatus>([
 ]);
 
 /**
- * Whether a run has reached a state it will never leave.
- *
- * Not the negation of `isCancellableStatus`: RUNNING is neither cancellable
- * (it has no queued job to drop) nor terminal, so the two sets do not
- * partition the enum between them.
+ * Whether a run has reached a state it will never leave. Not the negation
+ * of `isCancellableStatus`: RUNNING is neither cancellable (no queued job
+ * to drop) nor terminal, so the two sets don't partition the enum.
  */
 export function isTerminalStatus(status: ScenarioRunStatus): boolean {
   return TERMINAL_STATUSES.has(status);

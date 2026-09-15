@@ -27,10 +27,9 @@ export const scenarioRunExportRequestSchema = z.object({
 export type ScenarioRunExportRequest = z.infer<typeof scenarioRunExportRequestSchema>;
 
 /**
- * Progress is counted in runs *visited*, not rows written. A criteria-mode
- * export emits several rows per run and a category filter drops some runs
- * entirely, so rows-written can never be compared against a total known up
- * front — runs visited can.
+ * Progress is counted in runs *visited*, not rows written: a criteria-mode
+ * export emits several rows per run, and a category filter drops some runs
+ * entirely, so only runs-visited can compare against a total known up front.
  */
 export const scenarioRunExportProgressSchema = z.object({
   exported: z.number(),

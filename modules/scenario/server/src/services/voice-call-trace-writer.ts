@@ -21,9 +21,8 @@ import { HUMAN_CALLER_KIND } from "./voice-run-writer.ts";
 
 /**
  * What recording a call's traces reaches outside itself: the trace ingress
- * command the platform records every span through — the same one a simulated
- * run's spans take. Injected rather than located globally, so a unit test
- * records against an in-memory collector.
+ * command every span goes through, injected rather than located globally,
+ * so a unit test records against an in-memory collector.
  */
 export interface VoiceCallTraceRecorderCollaborators {
   traces: { recordSpan(input: RecordSpanCommandData): Promise<void> };
@@ -39,10 +38,9 @@ export interface VoiceTraceScenario {
 }
 
 /**
- * One exchange: a single caller utterance and the agent utterances that answer
- * it. `callerText` is absent for a leading agent greeting; `agentText` is absent
- * when the caller spoke and the agent has not answered yet (two caller turns in
- * a row).
+ * One exchange: a caller utterance and the agent utterances answering it.
+ * `callerText` is absent for a leading agent greeting; `agentText` is absent
+ * when the caller spoke and the agent has not answered yet.
  */
 export interface VoiceExchange {
   index: number;

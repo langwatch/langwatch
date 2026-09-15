@@ -363,12 +363,9 @@ function evaluationVerdict(evaluation: RunEvaluation): { word: string; color: st
 }
 
 /**
- * One evaluator's line: what it said, and why.
- *
- * A score carries its number in the marker, where the pass and fail icons
- * sit, so the row states the number once. An evaluator that had nothing to
- * read is muted end to end: it is not a verdict, and it must not read as one
- * next to the criteria.
+ * One evaluator's line: what it said, and why. A score carries its number
+ * in the marker, where pass/fail icons sit, stating it once. An evaluator
+ * with nothing to read is muted end to end — not a verdict, must not read as one.
  */
 function EvaluationRow({ evaluation }: { evaluation: RunEvaluation }) {
   const isSkipped = evaluation.status === "skipped";

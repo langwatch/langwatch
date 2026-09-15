@@ -41,9 +41,7 @@ export function createSnapshotUpdateBroadcastSubscriber(
       try {
         // TEXT_MESSAGE_START is excluded from `events` (the API route owns
         // streaming broadcasts), so every delivery here is a settled-state
-        // nudge for the refetch path.
-        //
-        // Identity/status ride on the event when present: queued/started
+        // nudge. Identity/status ride on the event when present: queued/started
         // carry the ids; finished carries them post-enrichment plus status.
         const data = event.data as {
           batchRunId?: string;

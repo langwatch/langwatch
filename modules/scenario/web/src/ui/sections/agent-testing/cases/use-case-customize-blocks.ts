@@ -1,8 +1,7 @@
 /**
- * The optional blocks of the scenario dialog: parameters, turn limits, model
- * overrides, caller voice — offered as chips (like the run dialog); a chip
- * opens its block, its x closes and clears it. A stored scenario opens
- * whatever blocks it already uses, so nothing it carries is hidden.
+ * The optional blocks of the scenario dialog: parameters, turn limits,
+ * model overrides, caller voice — offered as chips; a chip opens its
+ * block, its x clears it. A stored scenario opens whichever blocks it uses.
  * @see specs/features/agent-testing/cases-table.feature
  */
 

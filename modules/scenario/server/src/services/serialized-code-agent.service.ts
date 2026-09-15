@@ -154,10 +154,9 @@ export class SerializedCodeAgentAdapter extends SerializedAgent {
   }
 
   /**
-   * Scrub a failure on its way out of the adapter.
-   *
-   * Applied at the single exit point rather than at each of the six throw
-   * sites, so a future seventh cannot forget it.
+   * Scrub a failure on its way out of the adapter. Applied at the single
+   * exit point rather than at each of the six throw sites, so a future
+   * seventh cannot forget it.
    */
   private scrubFailure(
     error: SerializedCodeAgentAdapterError,
@@ -582,11 +581,9 @@ export class SerializedCodeAgentAdapter extends SerializedAgent {
   }
 
   /**
-   * Parse a 2xx body into the engine's WorkflowResult.
-   *
-   * A 200 that is not JSON means something is answering on the NLP service's
-   * behalf (a proxy, a captive portal). Surfacing that as a structured infra
-   * failure keeps a raw `SyntaxError` from escaping the service unwrapped.
+   * Parse a 2xx body into the engine's WorkflowResult. A 200 that is not
+   * JSON means something answers on the NLP service's behalf (a proxy, a
+   * captive portal); surfaced as a structured infra failure, not a raw `SyntaxError`.
    */
   private parseExecutionResult({
     rawBody,

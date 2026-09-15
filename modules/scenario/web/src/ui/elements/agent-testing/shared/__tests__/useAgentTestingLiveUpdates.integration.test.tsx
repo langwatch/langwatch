@@ -1,8 +1,7 @@
 // @vitest-environment jsdom
 /**
- * The live-run subscription refreshes the page's reads, including results:
- * with the stream connected the page does not poll, so the evaluator
- * update after a run finishes is what fills the evaluator pills in.
+ * The live-run subscription refreshes the page's reads: connected, the
+ * page does not poll, so the evaluator update after a run fills pills in.
  * @see specs/features/agent-testing/results-tabs.feature
  */
 import { renderHook } from "@testing-library/react";

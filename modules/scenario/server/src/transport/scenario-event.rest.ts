@@ -1,10 +1,7 @@
 /**
  * `/api/scenario-events` - the events an SDK reports while a scenario runs.
- * Everything needed from the process arrives as a port: services, tenant
- * broadcast, and media externalisation. The plan's trace-usage guard and the
- * report route's own larger body cap are the MOUNT's own concern
- * (`ApiRestMountOptions.middleware`), applied under this family's paths by
- * the process, not declared here.
+ * Everything from the process arrives as a port: services, tenant broadcast,
+ * media externalisation. Trace-usage and body-cap middleware are the mount's own concern.
  */
 import { createLogger } from "@langwatch/observability";
 import {

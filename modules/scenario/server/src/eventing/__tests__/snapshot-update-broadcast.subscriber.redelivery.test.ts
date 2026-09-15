@@ -1,9 +1,7 @@
 /**
  * @vitest-environment node
  * @unit
- *
- * Redelivery contract: one event twice leaves ONE visible result.
- * Payload is pure function (idempotent); client refetch on nudge converges to same view.
+ * Redelivery: one event twice leaves ONE result — pure-function payload, so refetch converges.
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 

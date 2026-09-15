@@ -23,6 +23,7 @@ export const goErrorEnvelopeSchema = z.object({
  * Maps AI SDK call failure to HandledError when response carries nlpgo's envelope.
  * Returns null for other failures; unwraps RetryError to last attempt for generateObject.
  */
+
 /**
  * True when error is an abort; e.g., AbortSignal.timeout() — a DOMException.
  * Match on name property. Mirrors @ai-sdk/provider-utils isAbortError.

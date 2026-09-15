@@ -1,8 +1,7 @@
 /**
- * Opens the evaluator editor drawer on one attachment of a suite or run plan
- * — the same drawer the evaluations workbench opens. Every edit writes
- * straight back into the attachment through flow callbacks, so the chip
- * behind the drawer follows as the person maps.
+ * Opens the evaluator editor drawer on one attachment of a suite or run
+ * plan — the same drawer the evaluations workbench opens. Every edit writes
+ * straight back through flow callbacks, so the chip follows as the person maps.
  */
 
 import { useCallback } from "react";
@@ -43,9 +42,8 @@ export type OpenScenarioEvaluatorEditorParams = {
 
 /**
  * A mapping as the picker reports it, checked against the grammar the run
- * reads. The picker only offers the sources it was handed, so a mapping that
- * fails here is a picker bug rather than a person's mistake, and it is
- * dropped rather than stored.
+ * reads. The picker only offers sources it was handed, so a failure here is
+ * a picker bug, not a person's mistake, and is dropped rather than stored.
  */
 function toScenarioMapping(
   mapping: UIFieldMapping | undefined,

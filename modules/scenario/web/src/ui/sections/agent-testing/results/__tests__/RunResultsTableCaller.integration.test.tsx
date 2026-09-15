@@ -1,9 +1,7 @@
 /**
  * @vitest-environment jsdom
- *
- * The results table shows a Caller column only when a run in the table has a
- * caller, reading "Simulated" for a pool run and "You" for a panel run.
- *
+ * The results table shows a Caller column only when a run has one, reading
+ * "Simulated" for a pool run and "You" for a panel run.
  * @see specs/features/agents/voice-agents-v1.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

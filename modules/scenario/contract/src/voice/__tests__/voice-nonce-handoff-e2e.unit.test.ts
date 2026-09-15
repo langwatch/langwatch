@@ -4,12 +4,10 @@
 
 import type { ChildProcess } from "node:child_process";
 import { describe, expect, it } from "vitest";
-// DANGLING - CROSS-PACKAGE DECISION, not a mechanical fix: `routeVoiceUpgrade`
-// was ported to apps/worker/src/platform/liveness/voice-ws-listener.ts, not
-// anywhere modules/scenario/contract can reach (a contract package must not
-// depend on an application). Either this test moves to apps/worker, or the
-// function is extracted to a shared package. See handoff
-// merge-scenario-dangling-imports.
+// DANGLING - CROSS-PACKAGE DECISION: `routeVoiceUpgrade` was ported to
+// apps/worker, unreachable from modules/scenario/contract. This test should
+// move to apps/worker, or the function should be extracted to a shared
+// package. See handoff merge-scenario-dangling-imports.
 import { routeVoiceUpgrade } from "../../../workers/voice-ws-listener";
 import {
   handleVoiceNonceRegisterMessage,

@@ -15,12 +15,9 @@ export const UNKNOWN_TARGET_KEY = "unknown";
 export type AtomCostSource = "run" | "traces" | "none" | "unknown";
 
 /**
- * How an atom's status reads once categorised.
- *
- * Read off the run's status, which already holds the evaluator gate: a
- * required evaluator that failed turned the run's status to failed when its
- * results were recorded, so an atom never reads as passed past a failed
- * required check.
+ * How an atom's status reads once categorised: read off the run's status,
+ * which already holds the evaluator gate — a failed required evaluator
+ * already turned it failed, so an atom never reads passed past that.
  */
 export type AtomOutcome = "passed" | "failed" | "pending";
 
@@ -42,6 +39,7 @@ export interface AtomEvaluation {
 /** Atom grain: one scenario run against one target, maps 1:1 to deduped
  * simulation_runs rows.
  */
+
 /**
  * The most atoms one page may carry. The read clamps to it, and the Results
  * tab's own request schema refuses a larger page rather than silently
@@ -82,17 +80,15 @@ export interface ResultAtom {
   /** The name the run carries, or null when it carries none. */
   scenarioName: string | null;
   /**
-   * The key the platform stamped (the reference id, or the reference id and a
-   * hash of the target's parameter overrides), the bare `targetReferenceId`
-   * of a run recorded before that stamp, `code:` and the slug of the agent
-   * name a run from code reported, or {@link UNKNOWN_TARGET_KEY}.
+   * The key the platform stamped (reference id, or with a parameter-override
+   * hash), the bare `targetReferenceId` from before that stamp, `code:` plus
+   * the agent slug for a code-reported run, or {@link UNKNOWN_TARGET_KEY}.
    */
   targetKey: string;
   /**
-   * The parameter overrides of the run's target alone, or null when the
-   * target carried none. What tells `prod-agent · model=gpt-5-mini` from
-   * `prod-agent`; the client names the agent through its own target map and
-   * appends these.
+   * The parameter overrides of the run's target alone, or null when it
+   * carried none — what tells `prod-agent · model=gpt-5-mini` from
+   * `prod-agent`; the client appends these to its own target map.
    */
   targetParameters: RunParameterValues | null;
   /**

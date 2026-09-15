@@ -1,8 +1,7 @@
 /**
- * The instance that served a finished run, as the run detail reads it back:
- * the fold writes it into the reserved langwatch namespace, the state
- * repository stores that row, and the run read is what a drawer shows.
- *
+ * The instance that served a finished run, as the run detail reads it
+ * back: the fold writes it into the reserved langwatch namespace, the
+ * state repository stores it, and the run read is what a drawer shows.
  * @see specs/scenarios/served-agent-instance-on-runs.feature
  */
 

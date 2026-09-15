@@ -275,12 +275,9 @@ describe("ScenarioService cancellation", () => {
 
     describe("when the batch is large", () => {
       /**
-       * `cancelBatchRun` used to call `cancelJob` per run, and `cancelJob`
-       * re-read the same batch to check a status `cancelBatchRun` had already
-       * filtered on — so a 100-run batch issued 101 ClickHouse reads. The
-       * re-read guarded nothing: `handleSimulationRunCancelRequested` only
-       * stamps `CancellationRequestedAt` and never changes a run's status, so a
-       * cancel landing on a run that has since finished is inert.
+       * `cancelBatchRun` reads the batch once, not once per job: the re-read
+       * `cancelJob` used to do guarded nothing, since a cancel request only
+       * stamps `CancellationRequestedAt` and never changes status.
        */
       it("reads the batch once, whatever the run count", async () => {
         const { deps, mockGetRunsForBatch, mockDispatchCancelRequested } = createMockDeps();

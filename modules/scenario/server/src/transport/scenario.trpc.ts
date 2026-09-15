@@ -38,12 +38,9 @@ const resultsWindow = <Filter extends { startDate?: number }>(filter: Filter) =>
 });
 
 /**
- * Refuses a run addressed into a set the platform reserves for itself.
- *
- * The internal namespace holds this project's one-off bucket and every run
- * plan's address. A run written into a plan's address is read back as that
- * plan's own history, so it would move its pass rate, its cost and its trend.
- * Only this project's own one-off address is writable here.
+ * Refuses a run addressed into a set the platform reserves for itself. The
+ * internal namespace holds the one-off bucket and every plan's address; a
+ * run written into a plan's address would move its pass rate, cost and trend.
  */
 function assertWritableSetId(params: { setId: string; projectId: string }): void {
   if (!isInternalSetId(params.setId)) return;

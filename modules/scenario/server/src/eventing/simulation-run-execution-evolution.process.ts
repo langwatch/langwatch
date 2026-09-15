@@ -70,12 +70,9 @@ export const handleRunQueued: EventHandler<
     phase: "queued",
     // Business time: a record of when the run was queued, not a deadline.
     queuedAtMs: ctx.at,
-    // Scheduling time, the same clock `handleRunActivity` stamps and the same
-    // one the wake measures against. Storing `ctx.at` here would reintroduce
-    // exactly what schedulingRef exists to stop: a backed-up subscriber
-    // delivers a queued event whose business time is already older than the
-    // stall threshold, and the first wake declares a run that just started
-    // stalled.
+    // Scheduling time, the same clock `handleRunActivity` stamps and the wake
+    // measures against. Storing `ctx.at` here would let a backed-up subscriber's
+    // stale business time make a run that just started look already stalled.
     lastActivityAtMs: refMs,
     cancelRequestedAtMs: state.cancelRequestedAtMs,
     finishedAtMs: null,
@@ -274,9 +271,8 @@ export const handleRunFinished: EventHandler<
 
 /**
  * EVALUATED: the results are in. A run waiting on them goes terminal and its
- * deadline is cleared. A run that has not finished yet (business time can land
- * the evaluated event first) records that they are in, so its finished event
- * goes terminal instead of waiting on nothing.
+ * deadline clears. A run not yet finished (business time can land this event
+ * first) records that they arrived, so its finished event goes terminal too.
  */
 export const handleRunEvaluated: EventHandler<
   SimulationRunExecutionProcessState,
@@ -384,21 +380,17 @@ export class SimulationRunExecutionEvolution {
 
   /**
    * Clamp the scheduling reference to the present. `ctx.at` is business time,
-   * so a backed-up subscriber can deliver an event whose stall deadline has
-   * ALREADY passed; scheduling from it writes a nextWakeAt in the past and the
-   * run is declared stalled the moment the wake worker sees it.
+   * so a backed-up subscriber's event can already be past its stall deadline;
+   * scheduling from it would stall the run the moment the wake worker looks.
    */
   static schedulingRef(ctx: Ctx): number {
     return Math.max(ctx.at, ctx.now);
   }
 
   /**
-   * The declared secret names the queued event carries no usable ciphertext for.
-   *
-   * An event that declares nothing secret returns nothing, which is the shape
-   * every run had before secret parameters and the shape an older event has.
-   * A name is missing when the ciphertext record has no entry for it, or holds
-   * an empty one.
+   * The declared secret names the queued event has no usable ciphertext for:
+   * missing when the ciphertext record has no entry, or an empty one. An
+   * event declaring nothing secret returns nothing, same as before secrets.
    */
   static declaredSecretsWithoutCiphertext(view: SimulationRunProcessEventView): string[] {
     if (view.secretParameterNames === null) return [];
@@ -431,12 +423,9 @@ export class SimulationRunExecutionEvolution {
   }
 
   /**
-   * The wake of a run waiting on its evaluators. Past the deadline the
-   * evaluated event never came: the grading job was lost outright, since a job
-   * that runs records a result for every evaluator on its final attempt.
-   * Recording one errored result per evaluator hands the decision to the gate:
-   * a required evaluator fails the run, an optional one leaves the judge's
-   * verdict.
+   * The wake of a run waiting on its evaluators. Past the deadline with no
+   * evaluated event, the job was lost outright, so one errored result per
+   * evaluator hands the decision to the gate: required fails, optional leaves it.
    */
   static wakeEvaluating(
     state: SimulationRunExecutionProcessState,
@@ -464,9 +453,8 @@ export class SimulationRunExecutionEvolution {
 
   /**
    * The evaluators a finished event says the run is graded with, narrowed to
-   * ids and required flags. Null when the event carries none, or a shape this
-   * version cannot read: the fold and the job read the same field with the same
-   * schema, so a run the process cannot watch is one the job is not queued for.
+   * ids and required flags. Null when absent or unreadable: the fold and the
+   * job share a schema, so what the process can't watch isn't queued for it.
    */
   static pendingEvaluatorsOf(data: Record<string, unknown>): PendingEvaluator[] | null {
     const parsedEvaluators = z.record(z.string(), z.unknown()).safeParse(data.evaluators);
@@ -489,11 +477,9 @@ export class SimulationRunExecutionEvolution {
     const parsedTarget = simulationRunProcessEventViewSchema.shape.target.safeParse(data.target);
     const target = parsedTarget.success ? parsedTarget.data : null;
     // The queued event is the only place the run's resolved parameter values
-    // cross into execution: the pool job is otherwise built from ids, which do
-    // not carry them. A shape this version cannot read is dropped rather than
-    // failing the run — all or nothing, because half a record would run the
-    // scenario against a value the caller never chose — and a run without
-    // parameters is the behaviour every run had before them.
+    // cross into execution: an unreadable shape is dropped rather than failing
+    // the run, since a run without parameters is the behaviour every run had
+    // before them.
     const parsedMetadata = z.record(z.string(), z.unknown()).safeParse(data.metadata);
     const metadata = parsedMetadata.success ? parsedMetadata.data : {};
     const parsedParameters = runParameterValuesSchema.safeParse(metadata.parameters);

@@ -158,11 +158,10 @@ export type RunTargetResponse = z.infer<typeof runTargetSchema>;
 
 /**
  * Every configuration a project's run plans already ran with, newest first.
- *
- * `configuration` embeds the suite feature's own target shape untouched, so it
- * is stated as opaque data here rather than duplicating `SuiteTarget`'s parser
- * from `@langwatch/suite-contract` into a package that does not depend on it.
+ * `configuration` embeds the suite feature's own target shape untouched, kept
+ * opaque here rather than duplicating `SuiteTarget`'s parser into this package.
  */
+
 /** The most configurations one history read may carry back. */
 export const MAX_RUN_CONFIGURATIONS = 200;
 

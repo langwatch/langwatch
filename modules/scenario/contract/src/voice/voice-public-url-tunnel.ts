@@ -7,10 +7,9 @@ import { ensureCloudflaredOnPath } from "./voice-cloudflared-binary.ts";
 type OpenedTunnel = Awaited<ReturnType<typeof scenarioVoice.openTwilioTunnel>>;
 
 /**
- * The SDK helper this module falls back to when no opener is injected. Exported
- * only so a test can assert it is actually callable: every other test injects
- * `openTunnel`, so a broken import here would otherwise surface for the first
- * time at worker boot in production.
+ * The SDK helper this module falls back to when no opener is injected.
+ * Exported so a test can assert it's callable — every other test injects
+ * `openTunnel`, so a broken import would otherwise surface first in production.
  */
 export const defaultOpenTunnel: (
   // Written out rather than inferred: the SDK reaches this helper through a
@@ -22,11 +21,9 @@ export const defaultOpenTunnel: (
   scenarioVoice.openTwilioTunnel;
 
 /**
- * How long to wait for the fresh hostname to become globally resolvable.
- *
- * Matches the SDK's own equivalent gate. Propagation is usually seconds, but a
- * short cap turns a slow-but-working tunnel into a failed worker boot, and the
- * cost of waiting is paid once per worker rather than once per call.
+ * How long to wait for the fresh hostname to become globally resolvable,
+ * matching the SDK's own gate. Propagation is usually seconds, but a short
+ * cap turns a slow-but-working tunnel into a failed worker boot.
  */
 export const TUNNEL_READY_TIMEOUT_MS_DEFAULT = 300_000;
 /** Delay between resolution attempts while DNS propagates. */
@@ -95,9 +92,8 @@ async function defaultResolveHost(host: string): Promise<boolean> {
 
 /**
  * Poll `resolveHost` until `url`'s host resolves, or throw
- * {@link VoiceTunnelNotReadyError} once `timeoutMs` elapses. Exported
- * separately from {@link openVoicePublicUrlTunnel} so the readiness gate can
- * be unit-tested without opening a real tunnel.
+ * VoiceTunnelNotReadyError once `timeoutMs` elapses. Exported separately
+ * from `openVoicePublicUrlTunnel` so the gate can be unit-tested standalone.
  */
 export async function waitUntilTunnelResolvable(params: {
   url: string;
@@ -123,11 +119,9 @@ export async function waitUntilTunnelResolvable(params: {
 }
 
 /**
- * Open a cloudflared quick tunnel to `port` and wait until it is globally
- * resolvable. Throws (after closing the tunnel) if it never becomes
- * reachable within `timeoutMs` - a call dialled into an unresolvable tunnel
- * fails silently with a ~1 second duration, so failing fast at boot is the
- * cheaper failure.
+ * Open a cloudflared quick tunnel to `port`, waiting until globally
+ * resolvable; throws (closing the tunnel) if not within `timeoutMs` — an
+ * unresolvable tunnel otherwise fails silently in ~1s, costlier than failing fast.
  */
 export async function openVoicePublicUrlTunnel(params: {
   port: number;
@@ -144,12 +138,9 @@ export async function openVoicePublicUrlTunnel(params: {
   ensureBinaryOnPath?: () => Promise<void>;
 }): Promise<VoicePublicUrlTunnel> {
   const openTunnel = params.openTunnel ?? defaultOpenTunnel;
-  // The SDK's cloudflared provider opens the tunnel with a BARE `spawn(
-  // "cloudflared", ...)` — a PATH lookup — so the binary's directory must be on
-  // PATH BEFORE openTunnel runs (see voice-cloudflared-binary.ts). A failure
-  // here (binary missing and the fallback install failed) throws
-  // VoiceTunnelBinaryError, which the worker boot catches and threads into the
-  // run's error.
+  // The SDK's cloudflared provider opens the tunnel with a bare
+  // `spawn("cloudflared", ...)`, a PATH lookup, so the binary's directory
+  // must be on PATH before openTunnel runs (see voice-cloudflared-binary.ts).
   const ensureBinaryOnPath =
     params.ensureBinaryOnPath ?? (() => ensureCloudflaredOnPath());
   await ensureBinaryOnPath();

@@ -1,9 +1,7 @@
 /**
  * @vitest-environment node
- *
- * Unit tests for {@link writeVoiceCallRun}'s `metadata` shape — the piece
- * downstream readers (results table, run header) key off, so a field landing
- * in the wrong place silently breaks them without a type error.
+ * Unit tests for `writeVoiceCallRun`'s `metadata` shape — downstream
+ * readers key off it, so a field landing wrong silently breaks them.
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";

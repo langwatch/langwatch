@@ -85,12 +85,9 @@ function isBundleCurrent({
 }
 
 /**
- * Whether any child source is newer than `thresholdMs`.
- *
- * The answer is a single boolean, so the scan stops at the first match rather
- * than costing a full stat of the execution tree on every spawn — this runs on
- * the path between a run being queued and its child starting. `__tests__` is
- * skipped because editing a test never changes what the bundle would contain.
+ * Whether any child source is newer than `thresholdMs`. Stops at the first
+ * match rather than a full stat of the tree, since this runs between a run
+ * queuing and its child starting. `__tests__` is skipped: it can't affect the bundle.
  */
 function hasFileNewerThan(dir: string, thresholdMs: number): boolean {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {

@@ -17,11 +17,9 @@ export const scenarioRestResponseSchema = z.object({
   labels: z.array(z.string()),
   parameters: z.array(scenarioParameterDefinitionSchema),
   /**
-   * The five fields below are optional in the document, not in the answer:
-   * every server sends them. They arrived after clients were generated from
-   * this family, and a client that reads one as required fails against a
-   * server that predates it.
-   *
+   * The five fields below are optional in the document, not the answer —
+   * every server sends them. They arrived after clients were generated, and
+   * a client reading one as required fails against an older server.
    * @see specs/api-reference/legacy-response-fields-optional.feature
    */
   simulatorModel: z

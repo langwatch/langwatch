@@ -1,9 +1,7 @@
 /**
  * Wire shape of the "follow this run" nudge the SDK sends to an already-open
- * simulations tab. Rides the existing `simulation_updated` tenant broadcast so
- * the page needs no second SSE connection.
- *
- * Kept free of server-only imports: the browser parses this too.
+ * simulations tab, riding the existing `simulation_updated` tenant broadcast
+ * so the page needs no second SSE connection. Kept free of server-only imports.
  */
 
 export const SCENARIO_TAB_NAVIGATE_EVENT = "scenario_tab_navigate";

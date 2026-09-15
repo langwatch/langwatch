@@ -1,9 +1,7 @@
 /**
  * @vitest-environment jsdom
- *
- * The whole-call audio player: shown for a voice run, streaming the run's own
- * recording, and offering a Retry when the recording is not ready yet.
- *
+ * The whole-call audio player: shown for a voice run, streaming its own
+ * recording, offering a Retry when not ready yet.
  * @see specs/features/agents/voice-phone.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

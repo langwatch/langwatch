@@ -1,9 +1,7 @@
 /**
- * Every `scenarios.*` procedure, declared once. The namespace is flat on
- * purpose: it is one wire name the browser has always called, covering the
- * cases a project defines, their version history, the runs those cases
- * produced, the live stream of those runs, cancellation, the Results tab and
- * the run dialog's configuration history.
+ * Every `scenarios.*` procedure, declared once. Flat on purpose: one wire
+ * name the browser has always called, covering cases, version history,
+ * runs, their live stream, cancellation, Results and configuration history.
  */
 
 import { simulationTargetSchema } from "./simulation-target.ts";

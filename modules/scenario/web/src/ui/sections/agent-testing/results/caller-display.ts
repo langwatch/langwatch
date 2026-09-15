@@ -1,9 +1,7 @@
 /**
- * Reading the caller of a run for the results table and the run header (AC24).
- *
- * A voice run records `callerKind` on its LangWatch metadata: "simulated" for a
- * pool run's simulated caller, "human" for a panel run someone spoke on
- * themselves. A text run records none, so the column stays hidden.
+ * Reading the caller of a run for the results table and header (AC24). A
+ * voice run records `callerKind`: "simulated" for a pool run, "human" for a
+ * panel run someone spoke on themselves. A text run records none, hiding the column.
  */
 
 import type { ScenarioRunData } from "@langwatch/scenario-contract";
@@ -25,10 +23,9 @@ export function runCallerKind(run: ScenarioRunData): CallerKind | null {
 }
 
 /**
- * True when a run's caller is a real person (a voice "Call it myself" call),
- * so their turns render as "You" rather than the LLM "User Simulator"
- * (#8020). Takes just the metadata slice so both a run row and a live
- * drawer's scenario-state stream can call it directly.
+ * True when a run's caller is a real person (a voice "Call it myself"
+ * call), rendering their turns "You" not "User Simulator" (#8020). Takes
+ * just the metadata slice so a run row or a live drawer stream can call it.
  */
 export function isHumanCallerRun(metadata: CallerMetadata): boolean {
   return callerKindOf(metadata) === "human";

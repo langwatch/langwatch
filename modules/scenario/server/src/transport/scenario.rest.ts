@@ -39,10 +39,9 @@ const logger = createLogger("langwatch:api:scenarios");
 export class ScenarioRestNotThereError extends Error {}
 
 /**
- * The surface a write declares itself through, bound off the
- * X-LangWatch-Surface header. Only "cli" is honoured; every other value -
- * absent included - reads as "api", so a caller cannot claim an in-process
- * surface over the wire.
+ * The surface a write declares itself through, off the X-LangWatch-Surface
+ * header. Only "cli" is honoured; every other value, absent included, reads
+ * as "api", so a caller cannot claim an in-process surface over the wire.
  */
 export const scenarioRestSurface = defineRestMiddleware(
   "scenarioRestSurface",
@@ -303,11 +302,9 @@ export function createScenarioRest() {
     })
 
     /**
-     * One version of a scenario with the content it saved.
-     *
-     * A version number that names nothing refuses with the
-     * `scenario_version_not_found` code, which the synthesized Created entry
-     * also answers: it has no stored snapshot to serve.
+     * One version of a scenario with the content it saved. A version number
+     * that names nothing refuses `scenario_version_not_found`, the same
+     * code the synthesized Created entry answers: it has no stored snapshot.
      */
     .get("/:id/versions/:version", "getApiScenariosByIdVersionsByVersion")
     .withParams(scenarioRestIdVersionParamsSchema)

@@ -50,12 +50,9 @@ export interface VoiceTransportRunner {
     credential: VoiceTransportCredential;
   }): Promise<VoiceSessionConnect>;
   /**
-   * Read the finished conversation back as a normalised {@link CallRecord}.
-   * Returns `null` when the provider has no record yet (the caller falls back
-   * to the browser transcript); throws when the fetch itself fails, so the
-   * caller can tell "not ready" from "could not be fetched" (AC15). When the
-   * conversation has audio, the record's `audioUrl` is set to `audioProxyUrl`
-   * — the provider bytes are streamed through the app, never with the key.
+   * Read the finished conversation back as a normalised `CallRecord`. Null
+   * means no record yet (falls back to the browser transcript); throws on a
+   * failed fetch, distinguishing "not ready" from "could not fetch" (AC15).
    */
   fetchCallRecord(input: {
     conversationId: string;
@@ -63,10 +60,9 @@ export interface VoiceTransportRunner {
     audioProxyUrl: string;
   }): Promise<CallRecord | null>;
   /**
-   * End the live call now. Called when the whole-call limit elapses, so the
-   * drained transcript is still judged (AC28). The "hang up" verb lives on the
-   * runner contract rather than being cast out of the adapter at the call site,
-   * so a later transport ends its call its own way.
+   * End the live call now, when the whole-call limit elapses, so the
+   * drained transcript is still judged (AC28). "Hang up" lives on the runner
+   * contract, not cast at the call site, so a later transport ends it its own way.
    */
   endCall(adapter: AgentAdapter): Promise<void>;
   /** Customer-facing failure when the project has no key for this transport. */

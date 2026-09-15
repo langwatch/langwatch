@@ -39,10 +39,9 @@ const INTERNAL_MARKERS = [
 ] as const;
 
 /**
- * Nothing a user reads may carry a stack frame, an interpreter source
- * location, or a path from inside our container. Asserted on the message
- * rather than the input, so it holds whichever classification rule matched,
- * and reported by label so a failure names what leaked.
+ * Nothing a user reads may carry a stack frame, source location, or an
+ * internal path. Asserted on the message, not the input, so it holds
+ * whichever rule matched, and reported by label so a failure names what leaked.
  */
 function expectNoInternals(message: string): void {
   const leaked = INTERNAL_MARKERS.filter(({ pattern }) => pattern.test(message)).map(
@@ -306,11 +305,9 @@ describe("classifyScenarioInfraError", () => {
     /** @scenario "A customer's own module error is not blamed on our runner" */
     it("does not blame our runner for the agent's missing dependency", () => {
       // The real shape, not a toy: http-agent.adapter.ts embeds the customer's
-      // HTTP response body verbatim, so their agent's own boot crash arrives
-      // here looking exactly like ours — frames, Require stack and all. What
-      // separates them is the child-exit wrapper, which only our dead child
-      // gets. Telling them the fault is on our side would send them looking in
-      // the wrong place for their own missing `stripe`.
+      // HTTP body verbatim, so their agent's boot crash looks exactly like
+      // ours. Only the child-exit wrapper tells them apart — blaming our side
+      // would send them looking for the wrong `stripe`.
       const agentBodyThroughAdapter = [
         "HTTP 500: Internal Server Error from https://acme.example.com/agent (request-id: abc-123): Error: Cannot find module 'stripe'",
         "Require stack:",
@@ -396,12 +393,10 @@ describe("classifyScenarioInfraError", () => {
       ],
       ["a UNC share", "Error thrown in \\\\build\\share\\dist\\server\\workers.cjs:12"],
     ])("suppresses our bundle path when %s", (_label, raw) => {
-      // The guard keys on our artefacts (dist, node_modules, .cjs, the runner
-      // bundle's name) with either separator, rather than on path shape — so
-      // the drive letter and the UNC prefix are beside the point. A bare
-      // `C:\app\runner.js` is deliberately NOT suppressed: it names nothing of
-      // ours, and blanket path suppression is what cost the customer their own
-      // diagnostics in the case above.
+      // The guard keys on our artefacts (dist, node_modules, .cjs, the
+      // runner bundle name) with either separator, not on path shape. A bare
+      // `C:\app\runner.js` is deliberately NOT suppressed — blanket path
+      // suppression is what cost the customer their own diagnostics before.
       expect(raw).toContain("\\");
       expectNoInternals(classifyScenarioInfraError(raw).message);
     });
@@ -649,13 +644,9 @@ describe("resolveScenarioError", () => {
 
     /** @scenario A user-code failure with no readable detail still never leaks internals */
     it("falls back to the generic unreadable-failure sentence rather than the raw blob when every candidate exposes internals", () => {
-      // No line here matches the exception-class regex, and there is no
-      // `type: X` header, so every extractUserCodeDetail candidate collapses
-      // to this one stack-frame line — which exposesInternals vetoes. Before
-      // this fix the function fell through to `raw.trim()`, returning this
-      // frame (container path and all) verbatim in the customer-facing
-      // message; it must now render the same safe sentence every other
-      // unreadable failure does instead.
+      // No exception-class or `type: X` header matches, so every candidate
+      // collapses to a stack-frame line, which exposesInternals vetoes — it
+      // must render the same safe sentence every other unreadable failure does.
       const result = classifyScenarioInfraError(
         [
           "SerializedCodeAgentAdapter: user code raised an error during execution.",

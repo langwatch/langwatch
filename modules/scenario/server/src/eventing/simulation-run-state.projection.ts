@@ -69,12 +69,9 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 /**
- * The stored metadata with `fields` merged into its reserved `langwatch`
- * namespace, written back as one JSON string. The column holds the metadata as
- * a JSON string, so the object is parsed, the namespace merged and
- * re-stringified. Metadata that does not parse as an object is replaced by one
- * holding the merged namespace alone: the run's other metadata was already
- * unreadable, and these fields are what the event records.
+ * The stored metadata with `fields` merged into its `langwatch` namespace,
+ * written back as JSON. An object that fails to parse is replaced by one
+ * holding the merged namespace alone — these fields are what the event records.
  */
 function mergeLangwatchNamespace(
   metadata: string | null,
@@ -354,9 +351,8 @@ export class SimulationRunStateFoldProjection
 
   /**
    * The stored metadata with the call-limit cutoff flag written into its
-   * reserved `langwatch` namespace, mirroring {@link withAgentInstance}. The
-   * marker is always `true`: the event's existence is the fact, so folding it a
-   * second time produces byte-identical metadata (idempotent).
+   * `langwatch` namespace, mirroring `withAgentInstance`. The marker is
+   * always `true`, so folding it twice produces byte-identical metadata.
    */
   static withCutAtLimit(metadata: string | null): string {
     return mergeLangwatchNamespace(metadata, { isCutAtLimit: true });
@@ -674,14 +670,9 @@ export class SimulationRunStateFoldProjection
       // event. An evaluated event that folded before this one (business time
       // can land it first) already wrote its results, which stay.
       Evaluations: results?.evaluations ?? state.Evaluations,
-      // Derived when the event does not carry it, which is every real run:
-      // the SDK ingest path dispatches finishRun with results and status only.
-      // Left underived, DurationMs was null for every run a customer actually
-      // executed, and populated only for runs seeded with a synthetic event.
-      //
-      // The fold already holds both ends, so this needs no new field on the
-      // wire. A supplied value still wins — the runner knows its own elapsed
-      // time better than two projected timestamps do.
+      // Derived because the SDK ingest path never carries it — every real run
+      // derives DurationMs; only a synthetic event supplies one. The fold
+      // already holds both ends, so a supplied value still wins when present.
       DurationMs:
         event.data.durationMs ??
         (state.StartedAt !== null && event.occurredAt >= state.StartedAt

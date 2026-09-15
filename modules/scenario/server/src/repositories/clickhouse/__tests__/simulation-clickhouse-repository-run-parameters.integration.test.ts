@@ -1,8 +1,7 @@
 /**
  * The target key and its overrides, as the run detail reads them back: the
- * metadata the execution service queues is what gets stored, and the run read
- * is what a drawer actually shows.
- *
+ * metadata the execution service queues is what gets stored, and the run
+ * read is what a drawer actually shows.
  * @see specs/scenarios/scenario-run-parameters.feature
  */
 

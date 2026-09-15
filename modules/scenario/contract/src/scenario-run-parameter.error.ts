@@ -14,12 +14,9 @@ type ScenarioParameterErrorCode =
   | "scenario_secret_parameter_missing";
 
 /**
- * Base for the ways a run's parameters can be wrong (ADR-045).
- *
- * `code` and `httpStatus` are required rather than defaulted: every one of
- * these is a distinct thing to tell the customer, and a base class that
- * guesses is a base class that eventually tells them the wrong one. `code` is
- * narrowed to this feature's public parameter error codes.
+ * Base for the ways a run's parameters can be wrong (ADR-045). `code` and
+ * `httpStatus` are required, not defaulted, so each subclass names its own
+ * customer-facing case; `code` narrows to this feature's parameter codes.
  */
 export class ScenarioParameterError extends HandledError {
   constructor({
@@ -70,11 +67,9 @@ export class ScenarioParameterUnknownError extends ScenarioParameterError {
 }
 
 /**
- * Thrown when a run supplies a value outside the closed option list a
- * parameter declares.
- *
- * The options are on `meta` because the run dialog renders them: the customer
- * reads what the parameter accepts next to the value that was refused.
+ * Thrown when a run's value falls outside a parameter's closed option list.
+ * The options live on `meta` because the run dialog renders them, so the
+ * customer sees what was accepted next to the value that was refused.
  */
 export class ScenarioParameterOptionInvalidError extends ScenarioParameterError {
   declare readonly code: "scenario_parameter_option_invalid";
@@ -118,12 +113,9 @@ export class ScenarioParameterRequiredError extends ScenarioParameterError {
 }
 
 /**
- * Thrown when the scenario's own text references a parameter the run resolved
- * no value for.
- *
- * `field` says which piece of the scenario read it, so the dialog can point at
- * the situation or at the criterion by position instead of asking the customer
- * to search their own text.
+ * Thrown when the scenario's own text references a parameter with no
+ * resolved value. `field` says which piece read it, so the dialog can point
+ * at the situation or criterion instead of making the customer search for it.
  */
 export class ScenarioParameterMissingError extends ScenarioParameterError {
   declare readonly code: "scenario_parameter_missing";
@@ -140,12 +132,9 @@ export class ScenarioParameterMissingError extends ScenarioParameterError {
 }
 
 /**
- * Thrown when a scenario declares a secret parameter and the run supplied no
- * text value for it.
- *
- * A secret parameter has no default by design, so there is nothing to fall
- * back to. Only the names travel on the error: the value is the thing this
- * whole path exists to keep out of messages, logs and stores.
+ * Thrown when a scenario declares a secret parameter with no supplied value.
+ * Secret parameters have no default; only the names travel on the error, to
+ * keep the value out of messages, logs and stores.
  */
 export class ScenarioSecretParameterMissingError extends ScenarioParameterError {
   declare readonly code: "scenario_secret_parameter_missing";
@@ -162,12 +151,9 @@ export class ScenarioSecretParameterMissingError extends ScenarioParameterError 
 }
 
 /**
- * Thrown when one run covers a scenario that declares a name as secret and
- * another that declares the same name as plain.
- *
- * A run supplies one value per name. Accepting the pair would send a credential
- * to the plain scenario's `params` namespace, where it is rendered into the
- * scenario text and recorded on the run.
+ * Thrown when one run covers a scenario declaring a name as secret and
+ * another as plain: accepting one value would send a credential into the
+ * plain scenario's rendered text and recorded run.
  */
 export class ScenarioSecretParameterConflictError extends ScenarioParameterError {
   declare readonly code: "scenario_secret_parameter_conflict";
@@ -185,9 +171,8 @@ export class ScenarioSecretParameterConflictError extends ScenarioParameterError
 
 /**
  * Thrown when a scenario's own situation or criteria read a secret parameter.
- *
- * The rendered text is handed to the simulated user and the judge and is
- * recorded with the run, so a secret read there is a secret written down.
+ * The rendered text goes to the simulated user and the judge and is recorded
+ * with the run, so a secret read there is a secret written down.
  */
 export class ScenarioSecretParameterInTextError extends ScenarioParameterError {
   declare readonly code: "scenario_secret_parameter_in_text";
@@ -204,12 +189,9 @@ export class ScenarioSecretParameterInTextError extends ScenarioParameterError {
 }
 
 /**
- * Thrown when a scenario that declares parameters has text the template engine
- * cannot render, either because it is malformed or because it exhausts the
- * render limits.
- *
- * Only `field` is on `meta`: the engine's own message names its internals, so
- * it stays in the log line next to the throw.
+ * Thrown when a scenario's text fails to render, malformed or over the
+ * render limits. Only `field` is on `meta` — the engine's own message names
+ * its internals, so it stays in the log line next to the throw.
  */
 export class ScenarioParameterTemplateInvalidError extends ScenarioParameterError {
   declare readonly code: "scenario_parameter_template_invalid";

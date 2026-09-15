@@ -17,11 +17,9 @@ export const CALLER_VOICE_EFFECTS = [
 export type CallerVoiceEffect = (typeof CALLER_VOICE_EFFECTS)[number];
 
 /**
- * The shape a caller `voiceModel` must take: `"provider/voice"`, one non-empty
- * segment each side of a single slash (e.g. `"openai/nova"`). Validated by
- * shape, NOT against a catalog — the SDK reads the second segment as its TTS
- * voice name, so any well-formed `provider/voice` string is acceptable and the
- * offered set is a UI concern (`CALLER_VOICES`), not a schema one.
+ * The shape a caller `voiceModel` must take: `"provider/voice"`, one
+ * non-empty segment each side of a slash. Validated by shape, not against a
+ * catalog — the offered set is a UI concern (`CALLER_VOICES`), not a schema one.
  */
 export const CALLER_VOICE_PATTERN = /^[^/\s]+\/[^/\s]+$/;
 
@@ -42,11 +40,9 @@ export const DEFAULT_CALLER_VOICE: CallerVoiceConfig = {
 };
 
 /**
- * Parse a stored `callerVoice` JSON value into a config, tolerating the shapes
- * a real column carries: `null`/`undefined` (never set) and partial objects
- * (queued before a field existed) both fall back to defaults rather than
- * throwing. An outright malformed object is coerced to defaults too, so a run
- * queued against a scenario is never blocked by a bad caller-voice blob.
+ * Parse a stored `callerVoice` JSON value, tolerating the shapes a real
+ * column carries — `null`/`undefined`, partial objects, even malformed
+ * ones — all falling back to defaults rather than blocking the run.
  */
 export const parseCallerVoiceConfig = (raw: unknown): CallerVoiceConfig => {
   if (raw === null || raw === undefined) return { ...DEFAULT_CALLER_VOICE };
@@ -55,10 +51,9 @@ export const parseCallerVoiceConfig = (raw: unknown): CallerVoiceConfig => {
 };
 
 /**
- * The voice the simulated caller speaks with when the scenario leaves it on the
- * project default. The SDK's user simulator falls back to an OpenAI TTS voice
- * when none is set; naming it here keeps the effective voice recorded on the
- * run (AC20) instead of an empty "default" the reader cannot interpret.
+ * The voice a simulated caller speaks with when a scenario leaves it on
+ * project default. Naming it here keeps the effective voice recorded on the
+ * run (AC20), instead of an empty "default" the reader cannot interpret.
  */
 export const DEFAULT_CALLER_VOICE_MODEL = "openai/nova";
 

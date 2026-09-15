@@ -53,11 +53,9 @@ const SCHEMA = defineCommandSchema(
 );
 
 /**
- * A short, stable digest of one set of results.
- *
- * The idempotency key carries it so a retry of the same results records one
- * event, while a different set of results (the evaluators ran again) records
- * a new event that replaces the first.
+ * A short, stable digest of one set of results. The idempotency key carries
+ * it so a retry of the same results records one event, while a different
+ * set (the evaluators ran again) records a new one that replaces the first.
  */
 export function evaluationsFingerprint(
   evaluations: ScenarioEvaluationResult[],
@@ -69,10 +67,9 @@ export function evaluationsFingerprint(
 }
 
 /**
- * Finds the run's finished event among its prior events.
- *
- * A run that has not finished cannot take evaluations, so its absence is a
- * validation error the queue does not retry.
+ * Finds the run's finished event among its prior events. A run that has
+ * not finished cannot take evaluations, so its absence is a validation
+ * error the queue does not retry.
  */
 function getFinishedEventOrThrow({
   priorEvents,
@@ -127,10 +124,9 @@ function derivePriorGateState(params: {
 }
 
 /**
- * Builds the RunEvaluated event data: the results, the verdict and status
- * the run holds after the gate, the ones it held before, and the run's
- * identity, falling back from the finished event to the queued event for
- * whichever identity fields the finished event does not carry.
+ * Builds the RunEvaluated event data: results, post-gate verdict and
+ * status, the prior ones, and the run's identity — falling back from the
+ * finished event to the queued event for whichever field is missing.
  */
 function buildEvaluatedEventData(params: {
   scenarioRunId: string;

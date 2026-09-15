@@ -30,12 +30,9 @@ export class AgentTestScriptAdapter {
   }
 
   /**
-   * The agents and the steps of an agent test run: the user says the message,
-   * the agent under test answers, the run succeeds.
-   *
-   * When the target greets on connect (`isAgentSpeaksFirst`), the run opens with
-   * the agent's own turn so the greeting is captured before the written user
-   * line, giving `[agent(), user(msg), agent(), succeed()]`.
+   * The agents and steps of an agent test run: user says the message, agent
+   * answers, run succeeds. When the target greets on connect
+   * (`isAgentSpeaksFirst`), it opens with the agent's turn first instead.
    */
   build({
     adapter,

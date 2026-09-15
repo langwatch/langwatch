@@ -1,10 +1,9 @@
 import { ScenarioRunStatus } from "./scenario-run.ts";
 
 /**
- * The outcome bucket a run falls into, independent of which specific status
- * produced it. ERROR and FAILED both mean "this run did not pass", but the
- * distinction between them still matters when reading a single run, so the
- * category is derived rather than replacing the status.
+ * The outcome bucket a run falls into, independent of which status produced
+ * it. ERROR and FAILED both mean "did not pass", but the distinction still
+ * matters reading a single run, so the category is derived, not a replacement.
  */
 export type RunStatusCategory =
   | "success"

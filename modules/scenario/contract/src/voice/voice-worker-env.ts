@@ -30,10 +30,9 @@ const publicBaseUrlSchema = z
   .optional();
 
 /**
- * Parse and validate the voice worker env. Throws when VOICE_WORKER_ONLY is on
- * but VOICE_PUBLIC_BASE_URL is missing or malformed - the "refuses to start"
- * clause of the env contract - so the worker fails loud at boot rather than
- * coming up with a listener Twilio can never reach.
+ * Parse and validate the voice worker env. Throws when VOICE_WORKER_ONLY is
+ * on but VOICE_PUBLIC_BASE_URL is missing or malformed, so the worker fails
+ * loud at boot rather than coming up with a listener Twilio can never reach.
  */
 export function readVoiceWorkerEnv(
   env: NodeJS.ProcessEnv = process.env,

@@ -9,8 +9,7 @@ import { scenarioTrpcTransport } from "./transport/scenario.trpc.ts";
 /**
  * `scenarios.*`: repositories, the app, its tRPC namespace, and the two REST
  * families whose only process port was `platformUrl` (now `ScenarioApi`'s).
- * The other three REST families still need process ports `ScenarioApi` has
- * no members for; see the module handover.
+ * The other three still need ports `ScenarioApi` lacks; see the module handover.
  */
 export const scenarioServer = defineServerModule("scenario")
   .withRepositories(scenarioRepositories)

@@ -1,8 +1,6 @@
 /**
- * Opens the evaluator list for a pick, without the evaluators a run plan
- * cannot feed, and the toggles that show or clear the plan's evaluators
- * block.
- *
+ * Opens the evaluator list for a pick, without evaluators a run plan
+ * cannot feed, and the toggles that show or clear the plan's evaluators block.
  * @see specs/features/agent-testing/run-dialog.feature
  */
 

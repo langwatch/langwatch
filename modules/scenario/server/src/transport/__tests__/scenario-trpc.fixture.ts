@@ -1,8 +1,7 @@
 /**
  * The declared `scenarios.*` path, as these tests need it: a runtime whose
- * authorization answers only the permissions a test grants, an audit port that
- * records rather than writes, and a stub application that fails loudly on any
- * member a test did not stub.
+ * authorization answers only granted permissions, an audit port that
+ * records not writes, and a stub app that fails loudly on any unstubbed member.
  */
 import type { Actor } from "@langwatch/actor";
 import type { TrpcContract } from "@langwatch/api/contract";

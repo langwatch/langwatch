@@ -1,9 +1,7 @@
 /**
- * Which runs of a batch a conditional fetch still has to send.
- *
- * The client holds a per-run timestamp map from its last answer. A run it
- * already holds at the same version is dropped here, so a poll over a large
- * batch answers with the handful that moved rather than the whole batch.
+ * Which runs of a batch a conditional fetch still has to send. The client
+ * holds a per-run timestamp map from its last answer; a run already held at
+ * the same version is dropped, so a poll answers with only what moved.
  */
 import type { SimulationBatchRunData } from "@langwatch/scenario-contract";
 

@@ -17,11 +17,9 @@ import {
 } from "./suite-fields.ts";
 
 /**
- * The values to store, in the field's own type, with blanks dropped.
- *
- * A key the suite does not declare is refused rather than stored: a value
- * nothing reads is a typo waiting to be found later. A value that cannot be
- * read as the field's type is refused too; a blank one is simply no value.
+ * The values to store, in the field's own type, with blanks dropped. A key
+ * the suite does not declare is refused, not stored — a typo waiting to be
+ * found; a value unreadable as its type is refused too, blank is no value.
  */
 export function readScenarioFieldValues({
   values,

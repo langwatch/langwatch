@@ -1,7 +1,6 @@
 /**
- * The small pieces every Agent Testing surface shares: what the last run
- * said, what it cost, which version of a scenario ran, and the row that
- * opens a test suite of scenarios.
+ * The small pieces every Agent Testing surface shares: last-run result,
+ * cost, scenario version, and the row that opens a test suite.
  * @vitest-environment jsdom
  * @see specs/features/agent-testing/cases-table.feature
  */

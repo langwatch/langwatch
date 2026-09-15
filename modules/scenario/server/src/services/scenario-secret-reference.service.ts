@@ -35,23 +35,18 @@ export class ScenarioSecretReferenceAdapter {
   private constructor() {}
 
   /**
-   * The stand-in one reference is rendered as.
-   *
-   * Letters, digits and dashes only, so it survives both engines untouched: the
-   * url engine encodes interpolated output rather than literal text, and a
-   * placeholder is literal text. The nonce is what makes it unguessable, so no
-   * authored template can spell one by accident.
+   * The stand-in one reference is rendered as: letters, digits and dashes
+   * only, so it survives the url engine's encoding untouched (it encodes
+   * interpolated output, not literal text). The nonce keeps it unguessable.
    */
   private static placeholderFor({ nonce, index }: { nonce: string; index: number }): string {
     return `lw-secret-${nonce}-${index}`;
   }
 
   /**
-   * Replaces every `{{ secrets.NAME }}` in `value` with the project's secret.
-   *
-   * A reference to a name the project does not have is left verbatim: a missing
-   * secret is a configuration error the author should see, not a silent blank
-   * that masks the problem by sending an unauthenticated request upstream.
+   * Replaces every `{{ secrets.NAME }}` in `value` with the project's
+   * secret. A name the project lacks is left verbatim — a missing secret is
+   * a configuration error the author should see, not a silent blank.
    */
   static resolve({ value, secrets }: { value: string; secrets: Record<string, string> }): string {
     if (value === "" || Object.keys(secrets).length === 0) return value;
@@ -107,12 +102,9 @@ export class ScenarioSecretReferenceAdapter {
   }
 
   /**
-   * Resolves references in the credential-bearing auth fields, on a copy.
-   *
-   * `type` and the api-key header *name* are left alone: they are not secrets.
-   * The copy matters because the adapter's config outlives one turn, and
-   * substituting in place would bake a rotated-away value into every turn after
-   * the first.
+   * Resolves references in the credential-bearing auth fields, on a copy —
+   * `type` and the api-key header name are left alone, not secrets. The copy
+   * matters: in-place substitution would bake a rotated-away value into every later turn.
    */
   static resolveAuth({
     auth,

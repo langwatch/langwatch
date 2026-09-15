@@ -14,12 +14,9 @@ import type {
 const logger = createLogger("langwatch:simulation-processing:run-execution-effects");
 
 /**
- * The `execute` intent executor: submit the run to this pod's pool.
- *
- * A null pool THROWS instead of dropping the run silently (the old
- * subscriber's failure mode): the outbox retries with backoff, so a run queued
- * while no worker is up is dispatched when one is, rather than vanishing.
- * If the pod genuinely never executes, the stall wake is the backstop.
+ * The `execute` intent executor: submit the run to this pod's pool. A null
+ * pool THROWS rather than dropping the run silently, so the outbox retries
+ * it when a worker comes up; the stall wake backstops a pod that never does.
  */
 export function createExecuteRunHandler(
   execution: ScenarioExecutionService,
@@ -46,10 +43,9 @@ export function createExecuteRunHandler(
 }
 
 /**
- * The `cancel` intent executor: broadcast the cancellation. Every worker pod
- * subscribed to the channel checks whether it owns the child and kills it.
- * A throw hands the message back to the outbox for retry; the cancel-grace
- * wake force-terminates the run if no pod ever confirms.
+ * The `cancel` intent executor: broadcasts the cancellation so every
+ * subscribed pod checks whether it owns the child and kills it. A throw
+ * retries via the outbox; the cancel-grace wake backstops an unconfirmed pod.
  */
 export function createCancelExecutionHandler(
   execution: ScenarioExecutionService,

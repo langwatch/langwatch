@@ -8,10 +8,9 @@ import { describe, expect, it } from "vitest";
 
 describe("Worker integration behavior (documented contract)", () => {
   /**
-   * These tests document how the worker.on("completed") handler should use
-   * ScenarioFailureHandlerService.finishUnsuccessfulRun. The actual worker
-   * catches errors from it to prevent crashing. This contract is tested in
-   * integration tests.
+   * These tests document how worker.on("completed") should use
+   * ScenarioFailureHandlerService.finishUnsuccessfulRun, catching its errors
+   * to avoid crashing. Actual contract is tested in integration tests.
    */
 
   /** @scenario Failure handler errors do not crash worker */

@@ -5,9 +5,8 @@ import { VOICE_HTTP_TIMEOUT_MS } from "./voice-limits.ts";
 
 /**
  * The subset of the stored Twilio account credential this file reads to
- * authenticate a REST call. The full shape (also carrying the origination
- * number) lives server-side in `modules/gateway/server`, which has no
- * contract-legal home to publish it from yet — see the handoff's Risks.
+ * authenticate a REST call. The full shape lives server-side in
+ * `modules/gateway/server`, with no contract-legal home yet (handoff Risks).
  */
 export interface TwilioCredential {
   accountSid: string;

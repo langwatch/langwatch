@@ -1,9 +1,7 @@
 /**
- * The run dialog offers "Call it myself" for a voice target alone: it resolves
- * a voice-call from the selected agent's transport config, and resolves nothing
- * for an HTTP, Code, Workflow or prompt target, so those flows keep their one
- * Run action unchanged (AC25).
- *
+ * The run dialog offers "Call it myself" for a voice target alone: it
+ * resolves a voice-call from the agent's transport config, resolving
+ * nothing for HTTP/Code/Workflow/prompt, whose one Run action is unchanged.
  * @see specs/features/agents/voice-agents-v1.feature
  */
 

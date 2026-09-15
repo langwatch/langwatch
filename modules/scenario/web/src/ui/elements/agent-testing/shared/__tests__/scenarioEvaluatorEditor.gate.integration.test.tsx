@@ -1,8 +1,6 @@
 /**
  * @vitest-environment jsdom
- *
  * The evaluator editor's Required to pass switch and its remove action.
- *
  * @see specs/features/agent-testing/suite-editor.feature
  */
 import { cleanup, render, screen } from "@testing-library/react";

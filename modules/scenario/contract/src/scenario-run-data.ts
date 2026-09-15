@@ -67,18 +67,16 @@ export type BatchSummary = {
   firstCompletedAt: number | null; // earliest completion timestamp
   allCompletedAt: number | null; // max UpdatedAt once no run is running
   /**
-   * The one short line the person left with this batch, or null when the batch
-   * was started without one. Every run of a batch carries the same note, so it
-   * is read back off the runs themselves.
-   *
+   * The one short line the person left with this batch, or null when
+   * started without one. Every run carries the same note, read back off
+   * the runs themselves.
    * @see specs/suites/run-notes.feature
    */
   note: string | null;
   /**
-   * The person who started this batch, or null when the batch names none.
-   * Every run of a batch carries the same actor, so it is read back off the
-   * runs themselves, the same way the note is.
-   *
+   * The person who started this batch, or null when it names none. Every
+   * run carries the same actor, read back off the runs the same way the
+   * note is.
    * @see specs/scenarios/run-actor-on-runs.feature
    */
   startedBy: RunActor | null;

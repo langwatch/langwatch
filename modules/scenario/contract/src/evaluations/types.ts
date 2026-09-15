@@ -17,10 +17,9 @@ export const scenarioEvaluationsJobPayloadSchema = z.object({
    */
   attachments: evaluatorAttachmentsSchema.optional(),
   /**
-   * The scenario's field values as they stood when the run was queued, so an
-   * edit to the scenario while the run executes, or between two attempts,
-   * never changes what it is graded against. A job queued before they were
-   * carried reads the scenario when it runs.
+   * The scenario's field values as they stood when queued, so an edit while
+   * the run executes, or between attempts, never changes what it is graded
+   * against. A job queued before they were carried reads the scenario live.
    */
   fieldValues: scenarioFieldValuesSchema.optional(),
   /**

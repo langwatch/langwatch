@@ -1,10 +1,7 @@
 /**
  * @vitest-environment node
- *
- * The child's last act. A simulation child is a short-lived process, so
- * anything still sitting in the span exporter's queue when it exits is lost —
- * the run looks untraced. This drives the flush the child performs before it
- * returns its result.
+ * The child's last act: a short-lived process loses anything still queued
+ * in the span exporter on exit, driving the flush before it returns its result.
  */
 import type { Logger } from "@langwatch/observability";
 import { trace } from "@opentelemetry/api";

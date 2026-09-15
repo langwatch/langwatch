@@ -44,12 +44,9 @@ export async function resolveRunModels({
 }
 
 /**
- * The resolved-model entries of the reserved `langwatch` namespace, or nothing
- * at all.
- *
- * A run whose models could not be resolved records none of these. It reads
- * back the way every run recorded before this field existed reads back, so one
- * fallback in the UI covers both.
+ * The resolved-model entries of the reserved `langwatch` namespace, or
+ * nothing at all. An unresolved run records none, reading back the same
+ * way a run from before this field existed does, so one UI fallback covers both.
  */
 export function withResolvedModels(
   models: Partial<ResolvedRunModels> | undefined | null,

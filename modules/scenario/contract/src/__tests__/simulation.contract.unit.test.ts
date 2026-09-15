@@ -18,11 +18,9 @@ describe("Simulation contract", () => {
   });
 
   /**
-   * `ScenarioApp.queueSimulationRun` records the scenario version a run was
-   * queued from under the reserved namespace, and the REST door answers it.
-   * The namespace is a strict object, so a field it does not declare is
-   * dropped here rather than at either end — which is what happened to this
-   * one, leaving the API answering `scenarioVersion: null` for every run.
+   * `ScenarioApp.queueSimulationRun` records the scenario version under the
+   * reserved namespace, and the REST door answers it. The namespace is
+   * strict, so an undeclared field is silently dropped rather than surfaced.
    */
   it("keeps the queued scenario version on the reserved namespace", () => {
     const run = simulationRunDataSchema.parse({

@@ -1,9 +1,7 @@
 /**
  * @vitest-environment node
- *
- * The identity of an agent test run: its set id, its scenario id and the
+ * The identity of an agent test run: its set id, scenario id and the
  * scenario the child receives.
- *
  * @see specs/agents/agent-test-run.feature
  */
 

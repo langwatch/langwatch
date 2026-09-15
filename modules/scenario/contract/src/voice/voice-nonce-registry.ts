@@ -9,11 +9,9 @@ import type { ChildProcess } from "node:child_process";
 export const VOICE_NONCE_DEFAULT_TTL_MS = 60_000;
 
 /**
- * The outcome of consuming a nonce: the owning child, or why it was refused.
- * An "expired" refusal still carries the child that owned it — the caller (the
- * listener) notifies that specific child of the refused dial-back so it stops
- * waiting for the full connect timeout, whereas an "unknown" nonce never
- * belonged to any live child to notify.
+ * The outcome of consuming a nonce: the owning child, or why it was
+ * refused. An "expired" refusal still carries the child, so the listener
+ * can stop it waiting for the connect timeout; "unknown" has no child to notify.
  */
 export type VoiceNonceLookup =
   | { ok: true; child: ChildProcess }
@@ -56,10 +54,9 @@ export class VoiceNonceRegistry {
   }
 
   /**
-   * Consume a nonce: single-use, so a matched nonce is removed whether or not
-   * it had expired. Returns the owning child on a hit within the window, or the
-   * reason it was refused. An expired hit is still removed, so a later replay
-   * reads as unknown rather than expired.
+   * Consume a nonce: single-use, so a match is removed whether or not it had
+   * expired. Returns the owning child on a hit, or the refusal reason. An
+   * expired hit is still removed, so a replay reads as unknown, not expired.
    */
   consume(nonce: string): VoiceNonceLookup {
     const entry = this._byNonce.get(nonce);

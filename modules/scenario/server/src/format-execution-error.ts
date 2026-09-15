@@ -83,10 +83,9 @@ function asDetailString(value: unknown): string | undefined {
 }
 
 /**
- * Parse a non-2xx body into the fields the classifier needs.
- *
- * Accepts the herr envelope (primary), the legacy FastAPI `{ detail }` shape
- * (fallback), and anything else (opaque — the raw text is rendered as-is).
+ * Parse a non-2xx body into the fields the classifier needs. Accepts the
+ * herr envelope (primary), the legacy FastAPI `{ detail }` shape (fallback),
+ * and anything else (opaque — the raw text is rendered as-is).
  */
 export function parseErrorEnvelope(rawBody: string): ParsedErrorEnvelope {
   let parsed: unknown;
@@ -212,13 +211,9 @@ export function formatEngineError(args: {
   rawDetail: string;
 } {
   const { engineError } = args;
-  // `status: "error"` with no `error` object at all is not a customer's
-  // Python raising nothing — the 200-failure contract promises `error:
-  // { node_id, type, message, traceback }` whenever the run failed, so an
-  // absent object is the engine breaking its own protocol. Defaulting this
-  // to `{}` and classifying it through the same path as a present-but-
-  // unrecognized exception type would blame the customer for an empty
-  // message that is entirely our fault to explain.
+  // `status: "error"` with no `error` object is the engine breaking its own
+  // 200-failure contract, not a customer's Python raising nothing. Defaulting
+  // it to `{}` would blame the customer for a message that is entirely ours.
   if (!engineError) {
     return {
       source: "nlp_service",
@@ -338,10 +333,9 @@ const ENGINE_HARNESS_FRAME =
   /^[ \t]*File "\/tmp\/nlpgo-codeblock-[^"]*",.*$\n?(?:^[ \t]{4,}[^ \t\n].*$\n?|^[ \t]*\^+[ \t]*$\n?)*/gm;
 
 /**
- * Remove anything that identifies the internal NLP service from a string that
- * will be shown to a customer. undici's `fetch failed` carries a `cause` of
- * `connect ECONNREFUSED 10.4.2.11:5561`, so without this the host:port the
- * module promises to withhold lands in the persisted run record.
+ * Remove anything identifying the internal NLP service before it reaches a
+ * customer. undici's `fetch failed` carries a `cause` with the host:port,
+ * which would otherwise land in the persisted run record.
  */
 export function redactInternalAddresses(text: string): string {
   return text

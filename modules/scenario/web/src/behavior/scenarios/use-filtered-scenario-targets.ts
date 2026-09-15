@@ -1,7 +1,6 @@
 /**
- * The agents a simulation can be pointed at, and what each of them reads as.
- * A connected agent is one of them (ADR-128): a development agent belonging
- * to another person, or a connected agent no process is holding, can't be
+ * The agents a simulation can be pointed at, and what each reads as. A
+ * connected agent is one of them (ADR-128): unowned or unheld, it can't be
  * run, so the picker draws it disabled and says why on hover.
  * @see specs/features/agents/connected-agents-ui.feature
  */
@@ -78,10 +77,9 @@ export function agentTargetLabel(agent: AgentLike): string {
 }
 
 /**
- * True when this agent is a personal development agent of another person.
- *
- * The same rule the listings mark their rows with and the run refuses on, so
- * the picker never offers a target the run would refuse.
+ * True when this agent is a personal development agent of another person —
+ * the same rule the listings mark rows with and the run refuses on, so the
+ * picker never offers a target the run would refuse.
  */
 export function isTeammateOwned({
   agent,
@@ -153,10 +151,9 @@ export function isAgentTarget(
 }
 
 /**
- * Why an agent cannot be picked as a run target.
- *
- * A development agent of another person can never be run by the reader, so
- * that reason comes first even when the agent is offline too.
+ * Why an agent cannot be picked as a run target. A development agent of
+ * another person can never be run by the reader, so that reason comes
+ * first even when the agent is offline too.
  */
 export function notRunnableCopy(agent: {
   isTeammateOwned?: boolean;

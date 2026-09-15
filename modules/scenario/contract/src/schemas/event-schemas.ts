@@ -72,11 +72,9 @@ export const langwatchMetadataSchema = z.object({
     "voice",
   ]),
   /**
-   * The key the target folds under: the reference id alone, or the reference
-   * id and a hash of the target's parameter overrides when it carries any.
-   * Stamped at queue time. Absent on runs recorded before targets carried
-   * parameters, which read as the reference id alone.
-   *
+   * The key the target folds under: the reference id alone, or with a hash
+   * of its parameter overrides when it carries any. Absent on runs recorded
+   * before targets carried parameters, read as the reference id alone.
    * @see specs/features/agent-testing/results-atoms.feature
    */
   targetKey: z.string().optional(),
@@ -88,10 +86,9 @@ export const langwatchMetadataSchema = z.object({
   targetParameters: runParameterValuesSchema.optional(),
   simulationSuiteId: z.string().optional(),
   /**
-   * The version of the scenario at the moment the run was queued. A later
-   * edit of the scenario never changes what an old run says. Absent on runs
-   * recorded before versions existed.
-   *
+   * The version of the scenario when the run was queued. A later edit never
+   * changes what an old run says; absent on runs recorded before versions
+   * existed.
    * @see specs/scenarios/scenario-version-on-runs.feature
    */
   scenarioVersion: z.number().int().optional(),
@@ -111,10 +108,9 @@ export const langwatchMetadataSchema = z.object({
   actorId: z.string().optional(),
   actorLabel: runActorLabelSchema.optional(),
   /**
-   * The connected agent instance that served the run, recorded when the run
+   * The connected agent instance that served the run, recorded when it
    * finished. Absent for every other kind of target, and for a run recorded
-   * before instances were.
-   *
+   * before instances existed.
    * @see specs/scenarios/served-agent-instance-on-runs.feature
    */
   agentInstance: z
@@ -122,9 +118,8 @@ export const langwatchMetadataSchema = z.object({
     .optional(),
   /**
    * Who phoned a voice agent: "simulated" for a pool run's simulated caller,
-   * "human" for a panel run someone spoke on themselves (slice 3). Absent for
-   * every non-voice run, which the Caller column reads as no caller.
-   *
+   * "human" for a panel run someone spoke on themselves (slice 3). Absent
+   * for every non-voice run, which the Caller column reads as no caller.
    * @see specs/features/agents/voice-agents-v1.feature (AC24)
    */
   callerKind: z.enum(["simulated", "human"]).optional(),
@@ -156,11 +151,8 @@ export const scenarioAgentSchema = z.object({
 });
 
 /**
- * Scenario Run Started Event Schema
- * Captures the initiation of a scenario run with metadata about the scenario being executed.
- * Contains the scenario name and optional description for identification purposes.
- * User-defined metadata fields pass through via .passthrough().
- * The langwatch namespace is strictly validated.
+ * User-defined metadata fields pass through via `.passthrough()`; the
+ * `langwatch` namespace is strictly validated.
  */
 export const scenarioRunStartedSchema = baseScenarioEventSchema.extend({
   type: z.literal(ScenarioEventType.RUN_STARTED),
@@ -236,10 +228,9 @@ const inputAudioContentPartSchema = z.object({
 });
 
 /**
- * A message whose `content` array mixes plain text with `input_audio` parts.
- * Added as a third member of the message union below so existing text / image /
- * tool / binary messages keep validating via `MessageSchema` / `chatMessageSchema`
- * — this is purely additive and rejects no previously-accepted shape.
+ * A message whose `content` array mixes plain text with `input_audio` parts,
+ * added as a third message-union member so `MessageSchema` /
+ * `chatMessageSchema` keep validating unchanged — purely additive.
  */
 const scenarioAudioMessageSchema = z.object({
   role: z.string().optional(),
@@ -249,11 +240,9 @@ const scenarioAudioMessageSchema = z.object({
 });
 
 /**
- * Keep AG-UI's third-party validator runtime out of the application's Zod 4
- * schema graph and
- * describe the small message boundary we consume here instead. The richer
- * LangWatch message schema below remains the primary validator; this branch
- * covers AG-UI-only roles such as `activity` and `reasoning`.
+ * Describes the small message boundary AG-UI needs instead of pulling its
+ * validator into the Zod schema graph. The richer LangWatch schema stays
+ * primary; this branch only covers AG-UI-only roles like `activity`.
  */
 const agUiMessageSchema = z.looseObject({
   id: z.string(),

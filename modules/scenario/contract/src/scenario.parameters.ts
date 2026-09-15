@@ -160,11 +160,8 @@ export type RunParameterValues = z.infer<typeof runParameterValuesSchema>;
 
 /**
  * Reads parameter values back off the raw JSON a run stored them as.
- *
- * Tolerant on purpose: a value the current shape does not understand is
- * dropped rather than taking the whole read down, the same way a stored scope
- * that no longer parses still runs. A run that stored none reads as the empty
- * string, and so does a run recorded before the field existed.
+ * Tolerant on purpose: an unrecognised value is dropped rather than failing
+ * the whole read. A run that stored none, or predates the field, reads empty.
  */
 export function parseRunParametersJson(raw: string): RunParameterValues {
   if (raw === "") return {};

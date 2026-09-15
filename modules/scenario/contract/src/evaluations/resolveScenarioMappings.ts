@@ -45,11 +45,9 @@ export interface RunInputs {
 export type ResolvedValue = string | string[];
 
 /**
- * How one mapping resolved.
- *
- * `pending` means the trace should hold the value but the spans have not
- * arrived yet, so the worker may try again later; `failed` means the run
- * cannot answer at all; `skipped` means the scenario has no value for it.
+ * How one mapping resolved: `pending` means the trace should hold the value
+ * but spans have not arrived, so the worker may retry; `failed` means the
+ * run cannot answer at all; `skipped` means the scenario has no value.
  */
 export type ResolvedInput =
   | { kind: "value"; value: ResolvedValue }
@@ -244,11 +242,8 @@ export function resolveTraceMapping({
 }): ResolvedInput {
   const [head, toolName, part] = path;
   // A trace arrives span by span, so the root span can land before the tool
-  // span an evaluator reads. Evidence a required input needs is therefore
-  // waited for while any attempt is left: one more attempt is cheaper than
-  // failing a run the trace would have answered. An optional input is left
-  // out instead, so an evaluator that merely prefers the contexts is not held
-  // to the last attempt by a trace that carries none.
+  // span an evaluator reads. A required input waits while any attempt is
+  // left; an optional one is left out instead of held to the last attempt.
   const notYet =
     hasTraces && (isRequired || spans.length === 0) ? pending : failed;
 
@@ -319,10 +314,9 @@ type InputResolutionOutcome =
   | { action: "skip" };
 
 /**
- * How one input of an attachment resolves against the run, and what that
- * means for the attachment as a whole: a required input with no mapping or a
- * mapping that resolves to `skipped` ends the attachment outright; an
- * optional input the run cannot give yet, or ever, is left out instead.
+ * How one input of an attachment resolves, and what it means overall: a
+ * required input with no mapping or a `skipped` one ends it outright; an
+ * optional input left unresolved is left out instead.
  */
 function resolveAttachmentInput({
   input,

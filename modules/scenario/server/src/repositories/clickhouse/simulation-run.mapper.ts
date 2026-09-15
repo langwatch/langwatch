@@ -11,10 +11,8 @@ import {
 } from "./simulation-evaluations.columns.ts";
 
 /**
- * ClickHouse row interface for simulation_runs table.
- * Columns are PascalCase matching the CH schema.
- * Timestamp columns are returned as Unix milliseconds via toUnixTimestamp64Milli().
- * Messages are stored as parallel Nested arrays (Messages.id, Messages.role, etc.).
+ * Timestamp columns arrive as Unix milliseconds via toUnixTimestamp64Milli().
+ * Messages are stored as parallel Nested arrays (Messages.id, Messages.role, etc).
  */
 export interface ClickHouseSimulationRunRow extends Partial<ClickHouseEvaluationColumns> {
   ScenarioRunId: string;
@@ -48,8 +46,7 @@ export interface ClickHouseSimulationRunRow extends Partial<ClickHouseEvaluation
   /**
    * How many messages the run actually holds, selected only by the trimmed
    * list projection so a caller can tell a 6-message page from a 6-message
-   * conversation. Absent on the full-column reads, where the row already
-   * carries every message.
+   * conversation. Absent on full-column reads, which already carry every message.
    */
   TotalMessageCount?: string;
 }
@@ -95,12 +92,9 @@ function mapVerdict(verdict: string | null): SimulationVerdict | undefined {
 }
 
 /**
- * Maps a ClickHouse simulation_runs row to ScenarioRunData.
- * Stored status is the only truth: runs without a finish timestamp read as
- * IN_PROGRESS regardless of age — a stalled run reaches terminal ERROR via
- * the process-manager stall watchdog, not a read-time derivation, and a run
- * that finished owing its evaluator results is stored PENDING_EVALUATION by
- * the fold, not derived here.
+ * Maps a ClickHouse row to ScenarioRunData. Stored status is the only
+ * truth: an unfinished run reads IN_PROGRESS regardless of age — ERROR and
+ * PENDING_EVALUATION are set by the watchdog and the fold, not derived here.
  */
 export function mapClickHouseRowToScenarioRunData(
   row: ClickHouseSimulationRunRow,

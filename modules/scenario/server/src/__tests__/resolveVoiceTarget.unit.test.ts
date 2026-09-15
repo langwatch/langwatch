@@ -29,11 +29,9 @@ vi.mock("~/server/gateway/elevenLabsCredential.service", () => ({
 }));
 
 import { PHONE_NO_CREDENTIAL_MESSAGE } from "../../../contract/src/voice/transports/phone.transport.ts";
-// DANGLING: `resolveVoiceTarget` (and the whole data-prefetcher.ts it lived
-// in) was never ported. Main's version is at
-// platform/app/src/server/scenarios/execution/data-prefetcher.ts (MERGE_HEAD).
-// Its replacement, scenario-execution-prefetcher.service.ts, carries no voice
-// resolution at all. Do not invent a replacement here - see handoff
+// DANGLING: `resolveVoiceTarget` (and data-prefetcher.ts) was never ported;
+// its replacement, scenario-execution-prefetcher.service.ts, carries no
+// voice resolution. Do not invent one here — see handoff
 // merge-scenario-dangling-imports.
 import { resolveVoiceTarget } from "../data-prefetcher";
 import { createSerializedVoiceAgentAdapter } from "../voice-agent.adapter.ts";

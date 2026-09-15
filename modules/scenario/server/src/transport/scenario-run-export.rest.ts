@@ -37,9 +37,8 @@ export interface ScenarioRunExport<TRequest> {
 }
 
 /**
- * What the scenario run export download needs from the process.
- *
- * Method syntax throughout, so a host may name its own concrete session and
+ * What the scenario run export download needs from the process. Method
+ * syntax throughout, so a host may name its own concrete session and
  * request types rather than restating the widened ones here.
  */
 export interface ScenarioRunExportRestPorts<
@@ -48,10 +47,9 @@ export interface ScenarioRunExportRestPorts<
   TSession extends Readonly<{ user: Readonly<{ id: string }> }>,
 > {
   /**
-   * The export request as a caller sends it.
-   *
-   * Both the parsed shape and the shape a caller SENDS are carried, because
-   * they can differ, and the 400 body is built off the sent shape.
+   * The export request as a caller sends it. Both the parsed shape and the
+   * sent shape are carried, since they can differ and the 400 body is built
+   * off the sent one.
    */
   requestSchema: z.ZodType<TRequest, TRequestRaw>;
   /** The live session behind this request, or null when there is none. */
@@ -213,12 +211,9 @@ function gzipped(source: ReadableStream<Uint8Array>): ReadableStream<Uint8Array>
 }
 
 /**
- * Drives the export generator into a ReadableStream, broadcasting progress as
- * chunks land.
- *
- * Progress rides the tenant broadcast rather than the response body because
- * the file is a download: the bytes go to disk, so the only way the page can
- * show a count is out of band.
+ * Drives the export generator into a ReadableStream, broadcasting progress
+ * as chunks land. Progress rides the tenant broadcast, not the response
+ * body, since the file downloads to disk and a count can only ride out of band.
  */
 function buildExportStream<TRequest extends ScenarioRunExportRequestFields>({
   service,
@@ -245,14 +240,10 @@ function buildExportStream<TRequest extends ScenarioRunExportRequestFields>({
 
   const runs = service.exportRuns({ request, signal, total: totalCount })[Symbol.asyncIterator]();
 
-  // One page per pull() rather than the whole sweep in start().
-  //
-  // start() runs to completion regardless of controller.desiredSize, so it
-  // would keep querying and enqueuing for a slow client until the whole export
-  // sat in the pod's memory - a full-mode file is every transcript in the
-  // project. pull() is called only when the stream wants more, so a consumer
-  // that stops reading stops the sweep, and gzip's own buffering no longer
-  // hides the producer from backpressure.
+  // One page per pull() rather than the whole sweep in start(): start() runs
+  // to completion regardless of desiredSize, holding a full export (every
+  // transcript) in memory. pull() runs only when the stream wants more, so a
+  // stopped consumer stops the sweep and backpressure reaches the producer.
   return new ReadableStream({
     async pull(controller) {
       try {

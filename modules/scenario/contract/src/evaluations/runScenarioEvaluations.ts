@@ -429,9 +429,8 @@ async function runOne({
 
 /**
  * One attachment after its mappings resolved and before any evaluator runs:
- * settled with the result it records without running (its evaluator is
- * gone, an input is skipped or failed), waiting on trace data that has not
- * arrived, or ready to run with its inputs.
+ * settled with a result recorded without running (evaluator gone, an input
+ * skipped or failed), waiting on trace data, or ready to run with its inputs.
  */
 type PreparedAttachment =
   | { kind: "settled"; result: ScenarioEvaluationResult }
@@ -553,11 +552,9 @@ async function executeAttachment({
 }
 
 /**
- * The results of every attachment, in order. Every attachment is resolved
- * before any evaluator runs: on any attempt but the last, one attachment
- * still waiting on its trace throws before a single evaluator executes, so
- * a retry never runs an evaluator a second time. On the last attempt every
- * attachment is settled or ready and all of them run.
+ * The results of every attachment, in order. Every attachment resolves
+ * before any evaluator runs: one still waiting on its trace throws first on
+ * any attempt but the last, so a retry never re-runs an evaluator.
  */
 async function evaluateAttachments({
   deps,
@@ -593,10 +590,9 @@ async function evaluateAttachments({
 }
 
 /**
- * The context every attachment of one run is graded against: the run's own
- * messages and spans, the scenario's text and field values, and the trace an
- * evaluator that reads one is handed. The spans are loaded only when an
- * attachment reads the trace.
+ * The context every attachment of a run is graded against: its messages and
+ * spans, the scenario's text and field values, and the trace an evaluator
+ * that reads one is handed. Spans load only when something reads the trace.
  */
 async function buildRunContext({
   deps,
@@ -664,12 +660,9 @@ export async function runScenarioEvaluations({
     );
     return [];
   }
-  // The job carries the attachments, the scenario's field values and the
-  // evaluator definitions the run was queued with, so a suite, a plan, a
-  // scenario or an evaluator edited while the run executed does not change
-  // what it is graded against, and a retry grades exactly what the first
-  // attempt would have. A payload written before they were carried reads
-  // them now instead.
+  // The job carries the attachments, field values and evaluator definitions
+  // the run was queued with, so an edit made while the run executed cannot
+  // change what it is graded against, and a retry matches the first attempt.
   const attachments =
     payload.attachments ??
     (await deps.suites.getRunAttachments({

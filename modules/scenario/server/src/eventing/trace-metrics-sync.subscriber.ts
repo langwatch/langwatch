@@ -43,12 +43,10 @@ export function createTraceMetricsSyncSubscriber(
             scenarioRunId,
             traceId,
             retryCount: 0,
-            // The run's own time, never the dispatch time. This value becomes
-            // the emitted event's `occurredAt`, and that is both the version
-            // and the partition key of `simulation_run_metrics`. A clock
-            // reading here means a redelivery lands in a different month's
-            // partition, where a ReplacingMergeTree cannot collapse it, and
-            // one trace keeps two rows forever.
+            // The run's own time, never the dispatch time: this becomes the
+            // emitted event's `occurredAt`, both the version and partition
+            // key of `simulation_run_metrics`. A clock reading here would
+            // land a redelivery in a different month, keeping two rows forever.
             occurredAt: event.occurredAt,
           });
         } catch (error) {

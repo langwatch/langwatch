@@ -1,9 +1,7 @@
 /**
  * @vitest-environment node
  * @unit
- *
- * Redelivery contract for suiteRunSync: dispatches SAME command twice (byte-identical).
- * Known downstream gap: deduplication not wired, causes double-counting (outside scope).
+ * suiteRunSync redelivery: same command twice; dedup not wired (double-counting, out of scope).
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -140,11 +138,9 @@ describe("suiteRunSync subscriber redelivery", () => {
 
   describe("given two deliveries separated by wall-clock time", () => {
     /**
-     * The load-bearing property, made falsifiable. `occurredAt` rides on the
-     * event, so the second dispatch is byte-identical to the first however
-     * much later it happens. Swapping it for a clock reading would leave the
-     * key stable but the payload different, and the suite item would record a
-     * time that belongs to the retry rather than to the run.
+     * The load-bearing property, made falsifiable: `occurredAt` rides on
+     * the event, so the second dispatch is byte-identical however much
+     * later it happens. A clock reading would record the retry's time, not the run's.
      */
     it("dispatches an identical payload, taking occurredAt from the event", async () => {
       vi.useFakeTimers();

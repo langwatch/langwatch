@@ -1,8 +1,7 @@
 /**
  * Shared harness for the scenario evaluator editor integration tests: the
- * Chakra wrapper, the fixtures, and the real drawer body and footer over a
- * real form with a fully wired controller. The `vi.mock` calls stay in each
- * test file, since they have to hoist above that file's own imports.
+ * Chakra wrapper, fixtures, and the real drawer body/footer over a fully
+ * wired form. `vi.mock` calls stay per test file, needing to hoist above its imports.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import type React from "react";
@@ -10,12 +9,9 @@ import { type FieldValues, useForm } from "react-hook-form";
 import { vi } from "vitest";
 
 // DANGLING: `EvaluatorEditorShared` now lives at
-// @langwatch/evaluator-web/surfaces/evaluator-editor-shared (confirmed real:
-// modules/evaluator/web/src/ui/sections/evaluators/evaluator-editor-shared.tsx
-// exports EvaluatorEditorBody/EvaluatorEditorFooter/EvaluatorEditorController/
-// EvaluatorGateConfig), but @langwatch/scenario-web does not yet depend on
-// @langwatch/evaluator-web - needs that dependency added before this import
-// can be repointed. See handoff merge-scenario-dangling-imports.
+// @langwatch/evaluator-web/surfaces/evaluator-editor-shared, but
+// @langwatch/scenario-web does not yet depend on it — needs that dependency
+// added before this import can be repointed. See handoff merge-scenario-dangling-imports.
 import {
   EvaluatorEditorBody,
   type EvaluatorEditorController,

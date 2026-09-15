@@ -1,9 +1,7 @@
 /**
- * Subscriber and worker together, over real Prisma rows: a test suite with a
- * field and an attached evaluator, a scenario carrying the field, a finished
- * event. The evaluation runner, the run state and the span store are stubbed;
- * what is recorded and reported is captured.
- *
+ * Subscriber and worker together, over real Prisma rows: a test suite with
+ * a field and an evaluator, a scenario carrying the field, a finished
+ * event. The runner, run state and span store are stubbed; what's recorded is captured.
  * @see specs/scenarios/scenario-evaluators.feature
  */
 
@@ -17,12 +15,9 @@ import { createScenarioEvaluationsSubscriber } from "~/server/event-sourcing/pip
 import { SuiteService } from "~/server/suites/suite.service";
 import { getSuiteSetId } from "~/server/suites/suite-set-id";
 import { getTestUser } from "../../../../../../sdks/typescript/src/observability-sdk/__tests__/test-utils.ts";
-// DANGLING - CROSS-PACKAGE DECISION: `ScenarioService` now lives at
-// modules/scenario/server/src/services/scenario.service.ts (package
-// @langwatch/scenario-server), which @langwatch/scenario-contract does not
-// and should not depend on. This whole integration test (subscriber + suite
-// service + scenario service) looks misfiled under contract/src/evaluations
-// rather than moved to the server package during the split. See handoff
+// DANGLING - CROSS-PACKAGE DECISION: `ScenarioService` now lives in
+// @langwatch/scenario-server, which @langwatch/scenario-contract must not
+// depend on. This test looks misfiled here; see handoff
 // merge-scenario-dangling-imports.
 import { ScenarioService } from "../../scenario.service";
 import {

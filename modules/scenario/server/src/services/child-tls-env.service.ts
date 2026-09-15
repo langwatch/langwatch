@@ -1,8 +1,7 @@
 /**
- * Resolves child TLS configuration without reading ambient environment.
- * A configured local CA preserves verification and always wins. Disabling
- * verification is permitted only for local, non-SaaS development; production
- * and hosted children receive neither override.
+ * Resolves child TLS configuration without reading ambient environment. A
+ * configured local CA preserves verification and always wins; disabling
+ * verification is permitted only for local, non-SaaS development.
  */
 
 export interface ChildTlsEnvInput {

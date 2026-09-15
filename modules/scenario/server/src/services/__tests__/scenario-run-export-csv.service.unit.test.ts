@@ -469,10 +469,9 @@ describe("scenario run CSV serializers", () => {
     });
 
     /**
-     * Identifiers look machine-generated and safe, but a scenario set id, run
-     * id, batch id and target reference all arrive from the SDK as arbitrary
-     * strings — so a caller can choose one. A formula in the id column
-     * evaluates exactly like one in the prose column.
+     * Identifiers look machine-generated and safe, but a set id, run id,
+     * batch id and target reference all arrive from the SDK as arbitrary
+     * strings — a formula there evaluates just like one in a prose column.
      */
     it("neutralizes identifiers, which callers also control", () => {
       const rows = parse(

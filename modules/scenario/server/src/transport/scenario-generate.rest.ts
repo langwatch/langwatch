@@ -1,10 +1,7 @@
 /**
- * `POST /api/scenario/generate` - the scenario editor's author-assist. The
- * caller's session is resolved and probed for `scenarios:manage` in the
- * handler rather than at the door, because the permission is asked against a
- * `projectId` the BODY names, not one the credential already scoped - so the
- * route declares `deferredScope` and answers its own JSON bodies (ADR-045:
- * the browser keys its own copy off `error.code`).
+ * `POST /api/scenario/generate` - the scenario editor's author-assist.
+ * Probed for `scenarios:manage` in the handler, not the door, since the
+ * permission is asked against the BODY's `projectId` (`deferredScope`, ADR-045).
  */
 import { deferredScope } from "@langwatch/api/access";
 import { defineRestRouter, MANAGEMENT_API_VERSION } from "@langwatch/api/rest";

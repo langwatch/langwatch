@@ -40,10 +40,9 @@ export type ScenarioExecutionPrefetchResult =
       data: ChildProcessJobData;
       telemetry: { endpoint: string; apiKey: string };
       /**
-       * The models this run resolved. A sibling of `data` rather than a member
-       * of it: the child process builds its models from the prepared params,
-       * so it needs no name, while the caller that queues the run records the
-       * names on it. Null for a run that resolves no model.
+       * The models this run resolved. A sibling of `data`, not a member: the
+       * child builds its models from the prepared params needing no name,
+       * while the queuing caller records the names. Null if none resolved.
        */
       resolvedModels: ResolvedRunModels | null;
     }

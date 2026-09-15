@@ -1,10 +1,7 @@
 /**
- * Unit tests for scenario-run merge and deduplication logic.
- *
- * Covers:
- * - Stored entries win when both sources share a scenarioRunId
- * - Non-overlapping entries from both sources are preserved
- * - Edge cases: no queued jobs, no stored data
+ * Unit tests for scenario-run merge and deduplication: stored entries win
+ * on a shared scenarioRunId, non-overlapping entries from both sources are
+ * kept, and no-queued/no-stored edge cases are covered.
  */
 
 import { describe, expect, it } from "vitest";

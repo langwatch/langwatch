@@ -58,11 +58,8 @@ export const parseVoiceAgentConfig = (config: unknown): VoiceAgentConfig =>
 
 /**
  * The transport's own external identifier for a voice agent: the ElevenLabs
- * agent id, or the phone number for a phone target. This is the value that
- * forms the identity key ({@link voiceAgentIdentityKey}), so a phone target
- * keys on its number (voice:phone:+14155550123). Narrows on the transport with
- * an exhaustive switch, so a new transport member is a compile error here until
- * it says which field carries its identity.
+ * agent id, or the phone number for a phone target, the value forming the
+ * identity key. An exhaustive switch makes a new transport a compile error here.
  */
 export const voiceAgentExternalId = (config: VoiceAgentConfig): string => {
   switch (config.transport) {
@@ -74,10 +71,9 @@ export const voiceAgentExternalId = (config: VoiceAgentConfig): string => {
 };
 
 /**
- * The natural key that folds every "Talk to it" against the same vendor agent
- * onto one row, so a first hang-up before the agent is saved cannot create a
- * second agent row on a retry (or from two browser tabs racing). Shares the
- * `(projectId, identityKey)` unique constraint the connected agents use.
+ * The natural key that folds every "Talk to it" against the same vendor
+ * agent onto one row, so a retry or two racing tabs cannot create a second
+ * row. Shares the `(projectId, identityKey)` constraint connected agents use.
  */
 export const voiceAgentIdentityKey = ({
   transport,

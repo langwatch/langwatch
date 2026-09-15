@@ -15,11 +15,9 @@ export const MAX_RUN_NOTE_LENGTH = 200;
 export const runNoteSchema = z.string().trim().max(MAX_RUN_NOTE_LENGTH).optional();
 
 /**
- * The `note` entry for a queued run's metadata, or nothing at all.
- *
- * A run without a note, and a run whose note is only spaces, record the
- * metadata they always did rather than an empty string every reader would have
- * to filter out.
+ * The `note` entry for a queued run's metadata, or nothing at all. A run
+ * with no note, or one that is only spaces, records what it always did
+ * rather than an empty string every reader would have to filter out.
  */
 export function withNote(note: string | undefined): { note: string } | Record<string, never> {
   const trimmed = note?.trim();

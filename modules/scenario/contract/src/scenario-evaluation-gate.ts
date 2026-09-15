@@ -31,11 +31,9 @@ export function gatedVerdict({
 }
 
 /**
- * The status a run reads with after the gate.
- *
- * Only a run the judge graded moves: SUCCESS and FAILURE follow the gated
- * verdict. A run that errored, was cancelled or stalled never reached a
- * judgement, so its status stays what it was whatever the evaluators said.
+ * The status a run reads with after the gate. Only a judged run moves:
+ * SUCCESS and FAILURE follow the gated verdict. An errored, cancelled or
+ * stalled run never reached judgement, so its status stays as it was.
  */
 export function gatedStatus({
   status,

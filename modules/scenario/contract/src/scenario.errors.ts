@@ -79,11 +79,9 @@ export class ScenarioReservedSetIdError extends HandledError {
 }
 
 /**
- * Why a run was refused before anything was queued. Both reasons are the
- * caller's to fix - an unknown scenario, an unsatisfiable parameter, a target
- * the prefetch could not validate - so this answers at the status the
- * surface has always answered them with rather than degrading to an unknown
- * failure.
+ * Why a run was refused before anything was queued: an unknown scenario, an
+ * unsatisfiable parameter, or a target the prefetch could not validate —
+ * all the caller's to fix, answered at the status the surface always used.
  */
 export class ScenarioRunRejectedError extends HandledError {
   declare readonly code: "scenario_run_rejected";
@@ -120,10 +118,8 @@ export class ScenarioFieldUnknownError extends HandledError {
 }
 
 /**
- * Thrown when a scenario field value cannot be read as the type the test suite
- * declares for it: text where a number was declared, a word that is neither
- * true nor false for a boolean.
- *
+ * Thrown when a scenario field value cannot be read as its declared type:
+ * text where a number was declared, neither true nor false for a boolean.
  * @see specs/scenarios/scenario-fields.feature
  */
 export class ScenarioFieldTypeInvalidError extends HandledError {

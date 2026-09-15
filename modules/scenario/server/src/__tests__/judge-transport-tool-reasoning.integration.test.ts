@@ -1,9 +1,7 @@
 /**
  * @vitest-environment node
- *
- * Exercises the production model and AI SDK against a local endpoint. A
- * provider rejection that explicitly requires reasoning to be disabled is
- * retried with reasoning off; unrelated rejections still propagate.
+ * Exercises the production model and AI SDK: a provider rejection requiring
+ * reasoning disabled retries with it off; unrelated rejections propagate.
  */
 
 import { APICallError, generateText, tool } from "ai";

@@ -538,13 +538,10 @@ describe("format-execution-error helpers (lw#3439)", () => {
     });
 
     it("completes in linear time on the input that made the old pattern exponential", () => {
-      // Guards the CodeQL js/redos finding (high). The previous host pattern
-      // let a `-` be consumed by either of two adjacent quantifiers, so a
-      // dash-separated run that ultimately FAILS to match backtracks
-      // exponentially: measured on the old pattern, 20 repeats took 37ms,
-      // 24 took 570ms and 26 took 2276ms — a ~60-character string. Upstream
-      // error bodies are attacker-influenceable, so this was reachable.
-      // 200 repeats would not terminate this decade under the old pattern.
+      // Guards the CodeQL js/redos finding (high): the old host pattern let
+      // a `-` be consumed by either of two adjacent quantifiers, so a
+      // dash-separated non-match backtracked exponentially (26 repeats took
+      // 2276ms) — reachable, since upstream error bodies are attacker-influenceable.
       const evil = `a${"-a".repeat(200)}!`;
       const started = performance.now();
       redactInternalAddresses(evil);

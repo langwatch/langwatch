@@ -24,10 +24,9 @@ export const SIMULATION_RUN_EXECUTION_INTENT_TYPES = {
 } as const;
 
 /**
- * Force-terminal backstop when a cancel broadcast never lands: the pod
- * owning the child was down, or the Redis pub/sub message was lost. The
- * cancel-grace wake fires this long after the cancel was requested and
- * finishes the run CANCELLED so it cannot hang in "cancelling" forever.
+ * Force-terminal backstop when a cancel broadcast never lands (pod down, or
+ * Redis message lost): fires long after the request and finishes the run
+ * CANCELLED, so it cannot hang in "cancelling" forever.
  */
 export const CANCEL_GRACE_MS = 60_000;
 
@@ -92,10 +91,9 @@ export interface SimulationRunExecutionProcessState {
    */
   pendingEvaluators: PendingEvaluator[] | null;
   /**
-   * Whether an evaluated event has been seen. Kept even before the finished
-   * event, since business time can land the evaluated event first, so the
-   * finished event then goes terminal instead of waiting on results that are
-   * already in.
+   * Whether an evaluated event has been seen, even before the finished
+   * event: business time can land it first, so the finished event then goes
+   * terminal instead of waiting on results already in.
    */
   evaluationsRecorded: boolean;
 }
@@ -113,11 +111,9 @@ export const INITIAL_SIMULATION_RUN_EXECUTION_STATE: SimulationRunExecutionProce
 };
 
 /**
- * The execute intent payload — the identity, execution target and resolved
- * parameter values `pool.submit` needs, and nothing else; no conversation
- * content. It is close to `ExecutionJobData` (execution-pool.ts) but not
- * identical: the handler renames `scenarioSetId` to `setId` and `name` to
- * `scenarioName` on the way through.
+ * The execute intent payload: identity, execution target and resolved
+ * parameter values `pool.submit` needs. Close to `ExecutionJobData`, but the
+ * handler renames `scenarioSetId` to `setId` and `name` to `scenarioName`.
  */
 export const executeRunIntentSchema = z.object({
   scenarioRunId: z.string(),
@@ -204,9 +200,8 @@ export const simulationRunProcessEventViewSchema = z.object({
   hasOwnEvaluations: z.boolean().default(false),
   /**
    * The run's resolved parameter values, as recorded on the queued event —
-   * customer-chosen configuration, not conversation content. Defaulted rather
-   * than required so inbox rows persisted before parameters existed still
-   * parse instead of redelivering forever.
+   * customer-chosen configuration, not conversation content. Defaulted so
+   * inbox rows from before parameters existed still parse.
    */
   parameters: runParameterValuesSchema.nullable().default(null),
   /**

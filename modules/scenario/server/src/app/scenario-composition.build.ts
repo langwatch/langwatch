@@ -55,9 +55,8 @@ class ApiScenarioSecretCipher implements ScenarioSecretCipher {
 
 /**
  * A scenario secret this deployment can neither write nor read. Kept for a
- * process that reads no `encryption` member at all; a process that DOES
- * declare the read is handed a real one by boot, per the closed member set's
- * own contract (ADR: a declared read either resolves or refuses the module).
+ * process reading no `encryption` member; one that DOES declare the read
+ * gets a real one at boot, per the closed member set's own contract.
  */
 class UnavailableScenarioSecretCipher implements ScenarioSecretCipher {
   encrypt(): string {

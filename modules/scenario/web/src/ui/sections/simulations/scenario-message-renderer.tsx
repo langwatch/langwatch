@@ -24,10 +24,9 @@ export interface ScenarioMessageRendererProps {
 }
 
 /**
- * A scenario run's transcript. Flattening and rendering both live in the
- * shared conversation renderer now — this component's remaining job is roles
- * being swapped (`user` turns come from the simulated user, `assistant` from
- * the agent under test) and owning media, turn separators and audio playback.
+ * A scenario run's transcript. Flattening and rendering live in the shared
+ * conversation renderer; this component's job is swapped roles (`user` is
+ * the simulated user, `assistant` the agent) plus media and turn separators.
  */
 export function ScenarioMessageRenderer({
   messages,
@@ -67,10 +66,8 @@ export function ScenarioMessageRenderer({
 
 /**
  * Sequential audio playback for a thread's parts: one clip finishing starts
- * the next. The ordered ids are filtered to audio so a sibling video or
- * attachment cannot offset the hook's idea of "next", and the returned
- * accessor answers `undefined` for any part that is not audio, so the thread
- * hands it every part without re-testing the kind.
+ * the next. Ordered ids are filtered to audio so a sibling video can't
+ * offset "next"; the accessor answers `undefined` for any non-audio part.
  */
 function useConversationAudio(parts: DisplayPart[]) {
   const orderedIds = useMemo(() => parts.filter(isAudioPart).map((part) => part.id), [parts]);

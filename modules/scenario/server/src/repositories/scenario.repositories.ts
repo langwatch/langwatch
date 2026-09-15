@@ -1,12 +1,9 @@
 import type { ScenarioRepository } from "./scenario.repository.ts";
 
 /**
- * The persistence one Scenario application is built over. One aggregate
- * today: the test case and its test suites. Simulation run state, results and
- * run configurations are ClickHouse-backed and keep their own repositories
- * (see `simulation.repository.ts`, `simulation-run-state.repository.ts`,
- * `simulation-run-metrics.repository.ts`), unregistered here because they are
- * not selected by this feature's `.withPersistence(...)` choice.
+ * The persistence one Scenario application is built over: one aggregate
+ * today, the test case and its suites. Run state, results and
+ * configurations are ClickHouse-backed, unregistered here (not selected).
  */
 export interface ScenarioRepositories {
   readonly scenarios: ScenarioRepository;

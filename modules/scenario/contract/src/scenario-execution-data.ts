@@ -154,11 +154,9 @@ export const CodeAgentDataSchema = z.object({
    */
   secrets: z.record(z.string(), z.string()).default({}),
   /**
-   * The run's own LangWatch credential, minted once for the run. It reaches
-   * the project's agent cache and nothing else, and expires by itself, so the
-   * code under test can keep state between turns without the project key ever
-   * entering the sandbox. Absent when the platform could not mint one, which
-   * leaves every turn doing its own work.
+   * The run's own LangWatch credential, minted once, reaching only the
+   * project's agent cache and self-expiring, so the sandbox never sees the
+   * project key. Absent when minting failed, leaving each turn on its own.
    */
   sandboxApiKey: z.string().optional(),
   /** Wall-clock budget (ms) for agent Python, clamped to engine ceiling if

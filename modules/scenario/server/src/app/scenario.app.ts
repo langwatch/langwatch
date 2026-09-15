@@ -150,9 +150,8 @@ export interface ScenarioAppInfrastructure {
 
 /**
  * This App's own config: the deployment's public origin, for `platformUrl`.
- * Optional — not every install serves REST — and defaulted to `{}` so a
- * deployment that names no `scenario` slice in its process config still
- * boots rather than failing to parse an absent object.
+ * Optional, since not every install serves REST, and defaulted to `{}` so a
+ * config naming no `scenario` slice still boots.
  */
 const scenarioAppConfigSchema = z.object({ publicBaseUrl: z.string().optional() }).default({});
 export type ScenarioAppConfig = z.infer<typeof scenarioAppConfigSchema>;
@@ -162,9 +161,8 @@ export const scenarioAppDependencyTokens = { users: UserApi };
 
 /**
  * What `ScenarioApp.create` is handed as `setup.members`: the one platform
- * member the module reads directly, plus the collaborators the deleted
- * `scenario.composition.ts` still hands over whole (see the
- * scenario-composition-green handover for the remaining triage).
+ * member read directly, plus the collaborators still handed over whole from
+ * the deleted `scenario.composition.ts` (scenario-composition-green handover).
  */
 type ScenarioAppMembers = MembersRead<typeof ScenarioApp.reads> &
   Omit<ScenarioAppInfrastructure, "ids" | "testSuiteIds" | "clock" | "secretCipher">;
@@ -230,10 +228,9 @@ export class ScenarioApp implements ScenarioApi {
   }
 
   /**
-   * The author a versioned write is recorded under. One spelling, in one place. Two doors built
-   * this literal for themselves - the CRUD update and the version restore - which is two chances
-   * for a saved version to name the wrong author or none. The label is the caller's own: tRPC
-   * always names "user", REST names "cli" or "api" off the X-LangWatch-Surface header.
+   * The author a versioned write is recorded under, in one place: two doors
+   * used to build this literal themselves, letting a version name the wrong
+   * author. tRPC always names "user"; REST reads "cli" or "api" from the header.
    */
   private authorFor(by: ScenarioCaller): { userId: string; label: ScenarioAuthorLabel } {
     return { userId: by.id, label: by.label };
@@ -334,12 +331,9 @@ export class ScenarioApp implements ScenarioApi {
   ): Promise<Scenario> {
     const scenario = await this.#dependencies.scenarios.create({
       ...input,
-      // A door that named an explicit actor (REST, where a credential can
-      // name no person) knows better than `by.id` whether anyone is really
-      // behind this write - `by.id` alone answers "the key" or "the project"
-      // for a caller with nobody behind it, and neither is a `User` row.
-      // A door that named none (tRPC, always a signed-in person) keeps the
-      // old behavior.
+      // REST can name an explicit actor when its credential names no person;
+      // `by.id` alone would answer "the key" or "the project", neither a
+      // `User` row. tRPC, always a signed-in person, keeps the old behavior.
       lastUpdatedById: input.actor ? input.actor.userId : by.id,
     });
 
@@ -813,11 +807,9 @@ export interface ScenarioHttpResponse {
 }
 
 /**
- * Named egress boundary for an HTTP scenario target.
- *
- * The application composition supplies the SSRF-safe implementation; the
- * scenario server never imports an application fetch helper or weakens its
- * policy with a native-fetch fallback.
+ * Named egress boundary for an HTTP scenario target. The application
+ * composition supplies the SSRF-safe implementation; the scenario server
+ * never imports an application fetch helper or a native-fetch fallback.
  */
 export interface ScenarioHttp {
   fetch(input: {

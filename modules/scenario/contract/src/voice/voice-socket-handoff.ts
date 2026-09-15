@@ -8,10 +8,9 @@ import type { Socket } from "node:net";
 export const VOICE_MEDIA_SOCKET_MESSAGE = "voice:twilio-media-socket" as const;
 
 /**
- * The handoff message. Carries everything the child needs to finish the
- * WebSocket handshake itself: the request line, the headers, and the bytes the
- * parent already consumed off the socket during the upgrade (base64, since IPC
- * JSON cannot carry a Buffer intact).
+ * The handoff message: everything the child needs to finish the WebSocket
+ * handshake itself — request line, headers, and the bytes the parent already
+ * consumed (base64, since IPC JSON cannot carry a Buffer intact).
  */
 export interface VoiceMediaSocketMessage {
   type: typeof VOICE_MEDIA_SOCKET_MESSAGE;
@@ -44,10 +43,9 @@ function isVoiceMediaSocketHeaders(
 }
 
 /**
- * Narrows an arbitrary IPC message to the voice handoff message. Validates
- * every required field, not just the discriminator - a message with the right
- * `type` but a missing or malformed `headBase64` would otherwise reach
- * `Buffer.from`, which throws and can kill the scenario child.
+ * Narrows an arbitrary IPC message to the voice handoff message, validating
+ * every field, not just the discriminator — a malformed `headBase64` would
+ * otherwise reach `Buffer.from`, which throws and can kill the child.
  */
 export function isVoiceMediaSocketMessage(
   message: unknown,

@@ -1,8 +1,8 @@
 /**
- * The line under the suite name: the fields its scenarios carry, and the evaluators every run
- * in it gets. A group is shown only when it has something to list, and a suite with neither
- * shows no line at all. Every chip opens the suite editor; an evaluator pill opens it on that
- * attachment. @see specs/features/agent-testing/suite-editor.feature
+ * The line under the suite name: fields its scenarios carry, and evaluators
+ * every run gets. Shown only when there's something to list; every chip
+ * opens the suite editor on that attachment.
+ * @see specs/features/agent-testing/suite-editor.feature
  */
 
 import { chakra, HStack, Icon, Text } from "@chakra-ui/react";

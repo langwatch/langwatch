@@ -1,7 +1,6 @@
 /**
- * Lightweight HTTP echo server for OTEL trace context propagation tests.
- *
- * Captures incoming request headers and returns canned JSON responses
+ * Lightweight HTTP echo server for OTEL trace context propagation tests:
+ * captures incoming request headers and returns canned JSON responses
  * compatible with the HTTP agent adapter's expected format.
  */
 

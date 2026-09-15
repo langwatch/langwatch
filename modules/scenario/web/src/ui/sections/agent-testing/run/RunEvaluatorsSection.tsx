@@ -1,8 +1,7 @@
 /**
- * The Evaluators block of the run dialog: the evaluators the suites in scope
- * carry, muted and edited in the suite, and under them the plan's own, as
- * pills with an Add evaluator button.
- *
+ * The Evaluators block of the run dialog: the evaluators the suites in
+ * scope carry, muted and edited in the suite, and under them the plan's
+ * own, as pills with an Add evaluator button.
  * @see specs/features/agent-testing/run-dialog.feature
  */
 

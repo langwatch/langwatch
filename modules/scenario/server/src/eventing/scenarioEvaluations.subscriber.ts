@@ -26,10 +26,9 @@ export interface ScenarioEvaluationsSubscriberDeps {
 }
 
 /**
- * The scenario id a finished run should be evaluated under, or `null` when
- * it should not be evaluated at all: its own results already carry
- * evaluations, its status has no conversation to grade, or it names no
- * scenario.
+ * The scenario id a finished run should be evaluated under, or `null`:
+ * its results already carry evaluations, its status has no conversation to
+ * grade, or it names no scenario.
  */
 function scenarioIdToEvaluate(params: {
   tenantId: string;

@@ -1,9 +1,7 @@
 /**
  * What the last run of a scenario said, in one line: "Passed (3/3)". The
- * verdict carries its own dot rather than an icon, so a column of rows reads
- * as one line of coloured text. A case that never ran says so; a running case
- * shows a spinner. A run that met every criterion but failed a required
- * evaluator reads "Failed", and hovering it names the evaluator.
+ * verdict's own dot replaces an icon, so a column of rows reads as coloured
+ * text. Met-every-criterion-but-failed-required reads "Failed"; hover names it.
  */
 import { Badge, Box, HStack, Spinner, Text } from "@chakra-ui/react";
 import { SCENARIO_RUN_STATUS_CONFIG } from "../../../../model/scenario-run-status-config.ts";

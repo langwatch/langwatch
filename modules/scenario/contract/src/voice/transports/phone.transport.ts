@@ -33,12 +33,9 @@ export const PHONE_NO_BROWSER_CALL_MESSAGE =
 export const PHONE_CONNECT_REJECTED_PREFIX = "Twilio rejected the call";
 
 /**
- * The SDK's hard cap on an a-leg call's duration, in seconds
- * (`MAX_CALL_DURATION_CAP_SECONDS` in the 1.7.0-dev scenario SDK). The SDK does
- * NOT export the constant, and `placeCall` throws when `maxCallDurationSeconds`
- * exceeds it, so a project whose `VOICE_CALL_MAX_SECONDS` is higher must be
- * clamped to this before the dial. Mirrored here with this comment; keep it in
- * step with the SDK on a version bump.
+ * The SDK's hard cap on an a-leg call duration, in seconds
+ * (`MAX_CALL_DURATION_CAP_SECONDS`, unexported). `placeCall` throws above
+ * it, so a higher `VOICE_CALL_MAX_SECONDS` must clamp to this; keep in step.
  */
 export const TWILIO_MAX_CALL_DURATION_CAP_SECONDS = 300;
 
@@ -50,10 +47,9 @@ export const TWILIO_MAX_CALL_DURATION_CAP_SECONDS = 300;
 export const PHONE_RESPONSE_TAIL_SILENCE_SECONDS = 0.8;
 
 /**
- * A phone target was exercised on a path it has no meaning on (a browser mint
- * or record, or an availability guard). One code, so the failure reads the same
- * wherever it surfaces. Extends the same {@link HandledError} base the
- * voice-session errors use, with the base's default customer fault.
+ * A phone target was exercised on a path it has no meaning on (a browser
+ * mint, record, or availability guard). One code, so the failure reads the
+ * same everywhere; extends the same HandledError base as voice-session.
  */
 export class VoicePhoneTransportUnavailableError extends HandledError {
   declare readonly code: "voice_phone_transport_unavailable";
@@ -244,10 +240,9 @@ export function resolvePublicBaseUrlWithSource(
 }
 
 /**
- * The port the SDK's local media-stream server binds. `VOICE_WS_PORT` when it
- * is a valid port number, otherwise `0` (OS-assigned), the SDK's own default.
- * A fixed port lets an operator route a public HTTPS origin to the child in a
- * single-worker deployment; slice 3's listener handoff supersedes it.
+ * The port the SDK's local media-stream server binds: `VOICE_WS_PORT` when
+ * valid, else `0` (OS-assigned). Lets an operator route a public origin to
+ * the child in a single-worker deployment; slice 3's handoff supersedes it.
  */
 export function resolveHttpPort(
   processEnv: NodeJS.ProcessEnv = process.env,
@@ -364,12 +359,9 @@ export function createPhoneTransport(
         TWILIO_MAX_CALL_DURATION_CAP_SECONDS,
       );
       const resolvedBaseUrl = resolvePublicBaseUrlWithSource(deps.processEnv);
-      // A phone call MUST route Twilio's media stream to a URL the WORKER's own
-      // listener answers. That is only ever VOICE_PUBLIC_BASE_URL (an explicit
-      // config, or the worker's minted quick tunnel). BASE_HOST is the app's
-      // origin, which runs no voice media listener, so dialling it hands Twilio
-      // a dead URL — the exact prod 31920 failure. Refuse to build the adapter
-      // rather than dial into a 120s timeout.
+      // A phone call must route Twilio's media stream to VOICE_PUBLIC_BASE_URL,
+      // the worker's own listener; BASE_HOST is the app's origin, which runs
+      // none, and dialling it hands Twilio a dead URL (prod 31920 failure).
       if (!resolvedBaseUrl || resolvedBaseUrl.source === "BASE_HOST") {
         const source = resolvedBaseUrl?.source ?? "none";
         // The worker threads WHY its tunnel mint failed through this env var

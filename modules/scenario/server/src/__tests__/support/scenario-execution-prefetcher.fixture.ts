@@ -121,12 +121,9 @@ export interface ScenarioPrefetchFixture {
   traceWaitBudgetResolver: TraceWaitBudgetResolver;
   disabledProviders?: ReadonlySet<string>;
   /**
-   * A real model-provider service in place of the in-memory stand-in.
-   *
-   * The stand-in answers from `modelResolver` / `modelParamsProvider`, which
-   * is what a unit case wants. A case whose subject IS the model-provider
-   * boundary — the codex execution backstop, say — has to be handed the real
-   * service or it proves the stand-in instead.
+   * A real model-provider service in place of the in-memory stand-in. A
+   * case whose subject IS the model-provider boundary (the codex execution
+   * backstop) needs the real service, or it proves the stand-in instead.
    */
   modelProviders?: ModelProviderApi;
 }

@@ -1,9 +1,7 @@
 /**
- * What is behind a target: the kind of agent a run points at.
- *
- * The mark draws it, the results tables group by it and the name map resolves
- * to it, so the union is the family's vocabulary rather than one component's
- * prop type.
+ * What is behind a target: the kind of agent a run points at. The mark
+ * draws it, results tables group by it, the name map resolves it — the
+ * family's vocabulary, not one component's prop type.
  */
 export type TargetKind =
   | "signature"

@@ -1,9 +1,7 @@
 /**
  * @vitest-environment node
- *
  * Unit tests for child-logger — the bridge that propagates the parent's
  * structured logger context across the parent → child process boundary.
- *
  * @see specs/scenarios/observability-context.feature
  */
 

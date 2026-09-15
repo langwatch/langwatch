@@ -1,10 +1,7 @@
 /**
  * The one shape a finished voice call is normalised into, whatever transport
- * ran it. The transport turns its vendor payload into this; everything above —
- * the run writer, the panel's post-call view — reads only this, so a later
- * transport (phone) adds a normaliser rather than a new run shape.
- *
- * Server-only: it derives the idempotency run id with `node:crypto`.
+ * ran it; a later transport (phone) adds a normaliser rather than a new run
+ * shape. Server-only: it derives the idempotency run id with `node:crypto`.
  */
 
 import { createHash } from "node:crypto";
@@ -85,12 +82,9 @@ export function browserTranscriptToCallRecord({
 export const VOICE_RUN_ID_PREFIX = "voicecall_";
 
 /**
- * The run id a conversation writes to, derived from the conversation id alone.
- *
- * Ingestion is idempotent on this: hanging up twice, a mid-call reload, or a
- * late webhook all resolve to the same id, so the writer can check whether the
- * run already exists before writing it again (AC14). Two attempts for the same
- * conversation always produce the same id; two conversations never collide.
+ * The run id a conversation writes to, derived from the conversation id
+ * alone. Idempotent: hanging up twice, a reload, or a late webhook all
+ * resolve to the same id, so the writer can check it already exists (AC14).
  */
 export function scenarioRunIdForConversation(conversationId: string): string {
   const digest = createHash("sha256")

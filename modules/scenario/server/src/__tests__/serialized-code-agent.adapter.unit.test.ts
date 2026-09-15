@@ -116,9 +116,8 @@ describe("SerializedCodeAgentAdapter", () => {
 
   /**
    * NLP service /studio/execute_sync success response. The adapter reads the
-   * body once via `response.text()` and JSON-parses it itself, so `text` must
-   * carry the real serialized body — not the empty string a `.json()`-only
-   * mock could get away with before the adapter stopped calling `.json()`.
+   * body once via `response.text()` and parses it itself, so `text` must
+   * carry the real body, not the empty string a `.json()`-only mock allowed.
    */
   const nlpResponse = (result: Record<string, unknown> | null) => {
     const body = { trace_id: "trace_abc123", status: "success", result };
@@ -138,10 +137,9 @@ describe("SerializedCodeAgentAdapter", () => {
     });
 
   /**
-   * A 200 whose run the engine finalized as FAILED — the shape a user's
-   * Python exception actually arrives in. Asserted against the live engine in
-   * `services/nlpgo/tests/integration/code_block_spec_test.go`, which requires
-   * HTTP 200 and reads `status: "error"` + `error.type` = the exception class.
+   * A 200 whose run the engine finalized as FAILED — the shape a Python
+   * exception actually arrives in. Asserted against the live engine in
+   * `code_block_spec_test.go`, which requires HTTP 200 with `status: "error"`.
    */
   const engineFailureResponse = (error: {
     node_id?: string;
@@ -1512,12 +1510,9 @@ describe("SerializedCodeAgentAdapter", () => {
     });
 
     /**
-     * Recorded-contract tests. The bodies below are REAL bytes captured from a
-     * running nlpgo engine (Go + Python subprocess) — see the fixture's
-     * `_comment` for how to re-record. Hand-written mocks are what let this
-     * adapter classify against a FastAPI contract the engine never served, so
-     * the contract itself is now pinned by recorded evidence rather than by
-     * an author's belief about it (lw#3439).
+     * Recorded-contract tests: the bodies below are REAL bytes captured from
+     * a running nlpgo engine — see the fixture's `_comment` to re-record.
+     * Pins the contract by recorded evidence, not an author's belief (lw#3439).
      */
     describe("when replaying responses recorded from a live nlpgo engine", () => {
       /** @scenario adapter classifies a response recorded from the live engine */

@@ -1,9 +1,7 @@
 /**
  * One scenario resource's platform address: the app's `publicBaseUrl`, the
- * project's slug, and the path the caller already resolved. Mirrors
- * `agent-platform-url.rules.ts` and `suite-platform-url.rules.ts` — the REST
- * declarations are static objects with no request-scoped builder, so the app
- * composes the link itself.
+ * project's slug, and the resolved path. Mirrors the agent/suite platform-url
+ * rules — REST declarations are static, with no request-scoped builder.
  */
 export function scenarioPlatformUrl({
   publicBaseUrl,
