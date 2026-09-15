@@ -24,11 +24,6 @@
  */
 import type { ClickHouseClient } from "@clickhouse/client";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { CODING_TOOL_RESULTS } from "../overrides/coding";
-import {
-  lwqlViewSetupStatements,
-  SHIPPED_LWQL_DEDUP,
-} from "../../provisioning/catalogStatements";
 import {
   type LangWatchQLClickHouseHarness,
   measureQuery,
@@ -36,6 +31,11 @@ import {
   selectScalar,
   startLangWatchQLClickHouse,
 } from "../../__tests__/lwqlClickHouseHarness";
+import {
+  lwqlViewSetupStatements,
+  SHIPPED_LWQL_DEDUP,
+} from "../../provisioning/catalogStatements";
+import { CODING_TOOL_RESULTS } from "../overrides/coding";
 
 /** `now` minus `weeksAgo` whole weeks, as a ClickHouse-parseable timestamp. */
 function weeksAgo(weeksAgoCount: number): string {
@@ -146,8 +146,16 @@ function toolResultBody({
       {
         role: "user",
         content: [
-          { type: "tool_result", tool_use_id: "unrelated-tool-use", content: "unrelated output" },
-          { type: "tool_result", tool_use_id: targetToolUseId, content: targetText },
+          {
+            type: "tool_result",
+            tool_use_id: "unrelated-tool-use",
+            content: "unrelated output",
+          },
+          {
+            type: "tool_result",
+            tool_use_id: targetToolUseId,
+            content: targetText,
+          },
         ],
       },
     ],
@@ -268,7 +276,11 @@ describe("given coding_tool_results provisioned over the shipped migrations (#80
   describe("when a tool call's request body was captured", () => {
     /** @scenario "Read what a tool call printed" */
     it("returns the matching tool_result block's text, not the unrelated one in the same body", async () => {
-      const rows = await selectRows<{ ToolUseId: string; OutputText: string; Success: number }>(
+      const rows = await selectRows<{
+        ToolUseId: string;
+        OutputText: string;
+        Success: number;
+      }>(
         tenantA,
         `SELECT ToolUseId, OutputText, Success FROM ${database}.coding_tool_results ` +
           `WHERE TraceId = '${traceWithBody}'`,

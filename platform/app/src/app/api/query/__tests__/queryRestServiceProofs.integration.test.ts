@@ -1373,23 +1373,20 @@ describe("given the /api/v1/query REST family's service, isolation and policy pr
       ["logs", "BodyText"],
       ["langy_conversation_messages", "Parts"],
       ["experiment_items", "DatasetEntry"],
-    ] as const)(
-      "refuses %s.%s for the gated caller, and answers it for the permitted one",
-      async (view, column) => {
-        // Built here, not in the table above: the table is evaluated once at
-        // collection time, before `beforeAll` assigns `database`.
-        const sql = `SELECT ${column} FROM ${database}.${view} LIMIT 1`;
-        const body = await refuse(gatedProject, sql);
-        expect(body.code, sql).toBe("lwql_not_permitted");
-        expect(
-          body.meta.violations.map((violation: any) => violation.code),
-          sql,
-        ).toContain("GATED_COLUMN");
+    ] as const)("refuses %s.%s for the gated caller, and answers it for the permitted one", async (view, column) => {
+      // Built here, not in the table above: the table is evaluated once at
+      // collection time, before `beforeAll` assigns `database`.
+      const sql = `SELECT ${column} FROM ${database}.${view} LIMIT 1`;
+      const body = await refuse(gatedProject, sql);
+      expect(body.code, sql).toBe("lwql_not_permitted");
+      expect(
+        body.meta.violations.map((violation: any) => violation.code),
+        sql,
+      ).toContain("GATED_COLUMN");
 
-        const response = await post({ sql }, { token: openProject.apiKey });
-        expect(response.status, sql).toBe(200);
-      },
-    );
+      const response = await post({ sql }, { token: openProject.apiKey });
+      expect(response.status, sql).toBe(200);
+    });
 
     /**
      * The `costs` gate is structurally the same mechanism (`GATED_COLUMN`,

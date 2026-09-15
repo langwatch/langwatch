@@ -261,9 +261,9 @@ describe("given a LangWatchQL query that ran", () => {
 
       // Only one direction: evaluations repeat a trace, a trace never repeats
       // an evaluation.
-      expect(diagnostics.map((diagnostic) => diagnostic.meta?.view)).toEqual(
-        ["analytics.traces"],
-      );
+      expect(diagnostics.map((diagnostic) => diagnostic.meta?.view)).toEqual([
+        "analytics.traces",
+      ]);
     });
 
     it("stays quiet when the datasets are joined through a common table expression it cannot resolve", () => {
