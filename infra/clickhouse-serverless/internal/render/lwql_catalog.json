@@ -18,6 +18,8 @@
     "prompts_pg",
     "prompt_versions_pg"
   ],
+  "_tenantColumns_comment": "Sparse override of the project column each source table's row filter is applied to, keyed by table. Only tables whose column is not the default 'TenantId' appear (e.g. stored_objects carries 'project_id'). Derived from the application catalog's LangWatchQLViewDefinition.tenantColumn and asserted equal by manifestParity.unit.test.ts. An absent table, an absent map, and an empty value all render 'TenantId', so an older manifest is unchanged.",
+  "tenantColumns": {},
   "viewNames": [
     "traces",
     "spans",

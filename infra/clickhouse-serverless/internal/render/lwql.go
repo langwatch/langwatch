@@ -50,6 +50,12 @@ var lwqlCatalogJSON []byte
 type lwqlCatalog struct {
 	SourceTables []string `json:"sourceTables"`
 	ViewNames    []string `json:"viewNames"`
+	// TenantColumns overrides the project column a source table's row filter
+	// is applied to, keyed by table name. Optional and sparse: only tables
+	// whose column is not the default "TenantId" appear (stored_objects carries
+	// "project_id"). An absent table, an absent map, and an empty value all
+	// mean the default, so an older manifest renders exactly as before.
+	TenantColumns map[string]string `json:"tenantColumns"`
 }
 
 // lwqlSourceTables is the fixed set of tables the langwatch_lwql user may read,
@@ -66,8 +72,9 @@ type lwqlCatalog struct {
 // own SELECT grant. Grant only, no filter: the views are SQL SECURITY INVOKER,
 // so every read through them hits the source tables' row filters above.
 var (
-	lwqlSourceTables []string
-	lwqlViewNames    []string
+	lwqlSourceTables  []string
+	lwqlViewNames     []string
+	lwqlTenantColumns map[string]string
 )
 
 func init() {
@@ -80,6 +87,18 @@ func init() {
 	}
 	lwqlSourceTables = catalog.SourceTables
 	lwqlViewNames = catalog.ViewNames
+	lwqlTenantColumns = catalog.TenantColumns
+}
+
+// lwqlTenantColumnFor is the project column a source table's row filter applies
+// to: the manifest override when one is set, and the default "TenantId"
+// otherwise. Keeping the default here is what lets a manifest carry only the
+// tables that differ and every other table render unchanged.
+func lwqlTenantColumnFor(table string) string {
+	if col, ok := lwqlTenantColumns[table]; ok && col != "" {
+		return col
+	}
+	return "TenantId"
 }
 
 // lwqlUsersFile is users.d/lwql.yaml: the restricted profile beside its only
@@ -171,17 +190,23 @@ func renderLWQL(input *config.Input, usersD, configD string) error {
 		return fmt.Errorf("lwql: database name is not a plain identifier: %q", db)
 	}
 
-	// One fixed tenant filter for every source table. The tenant SET is supplied
+	// The tenant filter is rendered per source table because the project column
+	// it filters on is per table: almost every source names it "TenantId", but
+	// one (stored_objects) carries "project_id" and its filter must name that or
+	// it would police the wrong column. The tenant SET itself is still supplied
 	// per query by custom_api_key_hash (a comma-joined set of the caller's
-	// per-project key hashes), never baked in here — nothing is per-tenant, so
-	// this string is identical on every node and every tenant.
-	tenantFilter := renderLWQLPredicate(lwqlTenantPredicateTemplate, map[string]string{
-		"tenantColumn":  "TenantId",
-		"tenantId":      "TenantId",
-		"keyHash":       "KeyHash",
-		"keyMap":        fmt.Sprintf("%s.lwql_api_key_tenant_map", db),
-		"tenantSetting": "custom_api_key_hash",
-	})
+	// per-project key hashes) and never baked in — only the column varies, and
+	// only for the tables the manifest overrides. `tenantId` is the key map's
+	// own column and stays "TenantId" regardless of the source column.
+	tenantFilterFor := func(table string) string {
+		return renderLWQLPredicate(lwqlTenantPredicateTemplate, map[string]string{
+			"tenantColumn":  lwqlTenantColumnFor(table),
+			"tenantId":      "TenantId",
+			"keyHash":       "KeyHash",
+			"keyMap":        fmt.Sprintf("%s.lwql_api_key_tenant_map", db),
+			"tenantSetting": "custom_api_key_hash",
+		})
+	}
 	keyMapSelfFilter := renderLWQLPredicate(lwqlKeyMapSelfFilterTemplate, map[string]string{
 		"keyHash":       "KeyHash",
 		"tenantSetting": "custom_api_key_hash",
@@ -198,7 +223,7 @@ func renderLWQL(input *config.Input, usersD, configD string) error {
 	}
 	for _, table := range lwqlSourceTables {
 		grants = append(grants, fmt.Sprintf("GRANT SELECT ON %s.%s", db, table))
-		tableFilters[table] = lwqlRowFilter{Filter: tenantFilter}
+		tableFilters[table] = lwqlRowFilter{Filter: tenantFilterFor(table)}
 	}
 	for _, view := range lwqlViewNames {
 		grants = append(grants, fmt.Sprintf("GRANT SELECT ON %s.%s", db, view))

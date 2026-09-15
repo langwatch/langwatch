@@ -660,12 +660,15 @@ export function lwqlSourceTables({
     // readable across tenants by the restricted identity.
     byTable.set(`${database}.${view.sourceTable}`, {
       table: view.sourceTable,
-      // Every source names the owning project the same way — the fact tables
-      // because that is their column, the PostgreSQL-engine tables because the
-      // approved view renamed the application's `projectId` to match. The
-      // catalog would have to grow a per-view tenant column if that ever
-      // stopped being true; today asserting it here is what would catch it.
-      tenantColumn: TENANT_COLUMN,
+      // Almost every source names the owning project `TenantId` — the fact
+      // tables because that is their column, the PostgreSQL-engine tables
+      // because the approved view renamed the application's `projectId` to
+      // match. A ClickHouse fact table that spells it differently
+      // (`stored_objects` carries `project_id`) declares the real column on
+      // {@link LangWatchQLViewDefinition.tenantColumn}, and the row policy must
+      // filter *that* column or it would police the wrong one and read zero
+      // rows. Default preserved so every untouched source is unchanged.
+      tenantColumn: view.tenantColumn ?? TENANT_COLUMN,
       database,
     });
     // A joined view reads a second fact table, which must be policed too or the

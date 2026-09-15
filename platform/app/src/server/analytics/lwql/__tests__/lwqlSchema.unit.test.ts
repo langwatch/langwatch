@@ -16,7 +16,11 @@ import { describe, expect, it } from "vitest";
 
 import type { Protections } from "../../../traces/protections";
 import { LWQL_VIEW_CATALOG } from "../catalog/lwqlViews";
-import { lwqlAllowedTables, lwqlGatedColumns } from "../catalog/types";
+import {
+  isPostgresResident,
+  lwqlAllowedTables,
+  lwqlGatedColumns,
+} from "../catalog/types";
 import { describeLangWatchQLSchema } from "../schema";
 import { validateLangWatchQL } from "../validation/validate";
 import {
@@ -100,6 +104,39 @@ describe("given the LangWatchQL schema catalog", () => {
         expect(tenantColumn?.gates, dataset.name).toEqual([]);
         expect(tenantColumn?.available, dataset.name).toBe(true);
         expect(dataset.joinKeys, dataset.name).toContain("TenantId");
+      }
+    });
+
+    /**
+     * The exposed `TenantId` column is an alias, not the physical column name.
+     * Almost every ClickHouse source names its project column `TenantId` and the
+     * alias is an identity; a source that spells it differently (`stored_objects`
+     * carries `project_id`, declared on
+     * {@link LangWatchQLViewDefinition.tenantColumn}) still publishes `TenantId`
+     * so a caller writes the same predicate — and its row policy filters the
+     * declared physical column, not the alias. This asserts the two agree: the
+     * published `TenantId` reads from whatever column the dataset declares as its
+     * tenant column.
+     *
+     * PostgreSQL-resident datasets are excluded: their `projectId → TenantId`
+     * rename happens one layer down in the approved view, so their exposed
+     * `TenantId` reads the base relation's own column name rather than the
+     * ClickHouse row-policy column this field governs.
+     */
+    /** @scenario "Every dataset publishes a project identifier column to filter on" */
+    it("aliases each ClickHouse dataset's declared tenant column to TenantId", () => {
+      for (const view of LWQL_VIEW_CATALOG) {
+        if (isPostgresResident(view)) continue;
+        const tenantColumn = view.columns.find(
+          (column) => column.name === "TenantId",
+        );
+        expect(
+          tenantColumn,
+          `${view.name} has no exposed TenantId column`,
+        ).toBeDefined();
+        expect(tenantColumn?.sourceColumns, view.name).toEqual([
+          view.tenantColumn ?? "TenantId",
+        ]);
       }
     });
 
