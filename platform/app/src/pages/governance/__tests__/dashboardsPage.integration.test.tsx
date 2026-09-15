@@ -258,6 +258,9 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   vi.restoreAllMocks();
+  // `restoreAllMocks` puts spies back but leaves stubbed globals in place, and
+  // the run test stubs two of them.
+  vi.unstubAllGlobals();
 });
 
 describe("given the billed-cost flag is off for a permitted viewer", () => {
@@ -596,7 +599,28 @@ describe("given a member who wants to see what one chart asks", () => {
 
   /** @scenario "Running a statement in the editor answers from the invented figures" */
   it("runs the statement against the invented figures and asks nobody", async () => {
-    const fetchSpy = vi.spyOn(globalThis, "fetch");
+    // Every way out of the page jsdom gives it, not just `fetch`: the scenario
+    // says no request leaves the browser, and a watch on one door only proves
+    // that one door stayed shut.
+    const doors = {
+      fetch: vi.spyOn(globalThis, "fetch"),
+      xhr: vi.spyOn(XMLHttpRequest.prototype, "open"),
+      beacon: vi.fn(),
+      socket: vi.fn(),
+    };
+    vi.stubGlobal("navigator", {
+      ...navigator,
+      sendBeacon: doors.beacon,
+    });
+    vi.stubGlobal(
+      "WebSocket",
+      class {
+        constructor(...args: unknown[]) {
+          doors.socket(...args);
+        }
+      },
+    );
+
     renderPage();
     await openQueryDrawer("Cost by department");
 
@@ -607,7 +631,9 @@ describe("given a member who wants to see what one chart asks", () => {
     await waitFor(() =>
       expect(screen.getAllByText(/\d+ rows?/).length).toBeGreaterThan(0),
     );
-    expect(fetchSpy).not.toHaveBeenCalled();
+    for (const [name, door] of Object.entries(doors)) {
+      expect(door, `${name} was used`).not.toHaveBeenCalled();
+    }
   });
 
   /**
