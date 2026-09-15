@@ -3,9 +3,11 @@ import { platformSSOAllowed, resolveAuthProvider } from "@ee/sso/sso-gate";
 import type { SignInMethod, SignInMethodPolicy } from "@langwatch/identity";
 import type { SignInMethodPolicyPort } from "@langwatch/identity-server";
 import { env } from "~/env.mjs";
-import { isEmailPasswordEnabled } from "~/server/auth/email-password-mounted";
 import { auth0BridgeActive, auth0BridgeRailIds } from "~/utils/auth0-bridge";
-import { deploymentIssuesOwnPasswords } from "../../better-auth/config/email-and-password";
+import {
+  deploymentIssuesOwnPasswords,
+  isEmailPasswordEnabled,
+} from "../../better-auth/config/email-and-password";
 
 /**
  * The instance's method-set policy (ADR-117 §4) — the module ADR-027's
