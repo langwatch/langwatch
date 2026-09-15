@@ -383,6 +383,11 @@ const presentations = {
     describe: () =>
       "Declare dashboard_context_period_start and dashboard_context_period_end as DateTime, for example {dashboard_context_period_start:DateTime}, and run the query again.",
   },
+  lwql_result_too_large: {
+    title: "This result is too large to return",
+    describe: () =>
+      "The answer is bigger than one response can carry. Select fewer columns, or use a smaller LIMIT, and run it again.",
+  },
   // `LangWatchQLReservedGranularityTypeError` carries a `granularityFault` of
   // either `"declared-type"` or `"step-value"`, but the three doors that can
   // reach this code (REST, the ad-hoc tRPC query, run-by-chart-id) now reject

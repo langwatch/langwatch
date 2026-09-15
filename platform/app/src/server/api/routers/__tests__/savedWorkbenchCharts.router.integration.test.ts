@@ -11,7 +11,7 @@
  * force-enables the very flag under test — so consulting the real one would
  * make the switched-off case answer "on" and pass vacuously.
  *
- * @see specs/analytics/lwql-saved-charts.feature
+ * @see specs/lwql/saved-charts.feature
  */
 
 import { nanoid } from "nanoid";
@@ -520,8 +520,12 @@ describe("the saved workbench chart router", () => {
             where: { id: PROJECT },
             select: { lwqlKey: true },
           });
-          expect(call.project.id).toBe(PROJECT);
-          expect(call.project.lwqlKey).toBe(project.lwqlKey);
+          expect(call.projects).toHaveLength(1);
+          const first = call.projects[0];
+          expect(first).toBeDefined();
+          if (!first) throw new Error("call.projects[0] is undefined");
+          expect(first.id).toBe(PROJECT);
+          expect(first.lwqlKey).toBe(project.lwqlKey);
         });
       });
     });

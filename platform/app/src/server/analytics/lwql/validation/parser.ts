@@ -17,7 +17,7 @@
  *    quotes the input and names grammar internals; the caller gets a fixed
  *    sentence and the position, and the detail stays in the log.
  *
- * @see specs/analytics/lwql-api.feature
+ * @see specs/lwql/api.feature
  */
 import { parse } from "@clickhouse/parser";
 

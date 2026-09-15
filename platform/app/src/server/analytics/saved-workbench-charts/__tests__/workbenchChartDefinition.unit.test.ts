@@ -4,7 +4,7 @@
  * The schema is the only way a row is ever read, so these are the claims that
  * decide whether a `Json` column can be trusted.
  *
- * @see specs/analytics/lwql-saved-charts.feature
+ * @see specs/lwql/saved-charts.feature
  */
 
 import { describe, expect, it } from "vitest";
