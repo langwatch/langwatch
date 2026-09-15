@@ -9,6 +9,8 @@ import {
   parseDataplaneS3RoutingTable,
   postgresConfigDefinition,
   redisConfigDefinition,
+  requestBoundsConfigDefinition,
+  resolveRequestBoundsOverrides,
   resolveTelemetryConfiguration,
   runtimeIdentityConfigDefinition,
   RuntimeConfig,
@@ -74,6 +76,7 @@ import type {
   AzureInjectedIdentity,
 } from "@langwatch/stored-object-server";
 import { buildStudioLambdaConfig, type StudioLambdaConfig } from "@langwatch/workflow-server";
+import type { RequestBoundsOverrides } from "@langwatch/plans";
 import { z } from "zod";
 
 const optionalEnvironmentString = z.string().optional();
@@ -254,6 +257,12 @@ export const apiConfigDefinition = RuntimeConfig.define({
   billing: { ...billingServerConfigDefinition },
   /** The retention every tenant is stamped with when its cascade names none. */
   dataRetention: { ...dataRetentionServerConfigDefinition },
+  /**
+   * Boot overrides for the central request-bounds registry, read at the one
+   * spelling `@langwatch/config` validates: unknown keys and non-positive
+   * values refuse this process's boot, and both processes project one record.
+   */
+  requestBounds: { ...requestBoundsConfigDefinition },
   /** The studio's per-project Lambda fleet, and the engine's staging bounds. */
   workflow: { ...workflowServerConfigDefinition },
   infrastructure: {
@@ -564,11 +573,18 @@ export type ApiConfig = Readonly<
     | "infrastructure"
     | "langy"
     | "mail"
+    | "requestBounds"
     | "shutdown"
     | "validateTrpcOutput"
     | "workflow"
   > & {
     authz: ApiAuthzConfig;
+    /**
+     * Boot overrides for the central request-bounds registry (`@langwatch/plans`),
+     * validated against its keys at parse time. Empty when the deployment
+     * named none; the entitlement module merges them over the tier values.
+     */
+    requestBounds: RequestBoundsOverrides;
     /**
      * The payment provider, present only when this deployment can both call
      * Stripe and verify what Stripe calls back with. Absent everywhere else,
@@ -651,9 +667,15 @@ export function resolveApiConfig(source: Readonly<Record<string, unknown>>): Api
   // unresolved gateway on a deployment that named no `BASE_HOST`.
   const { mail: mailSource, ...rest } = value;
   const mail = resolveApiMailConfig(mailSource, value.infrastructure.execution.publicBaseUrl);
-  const { billing: billingSource, langy, ...withoutBilling } = rest;
+  const {
+    billing: billingSource,
+    langy,
+    requestBounds: requestBoundsConfig,
+    ...withoutBilling
+  } = rest;
   return {
     ...withoutBilling,
+    requestBounds: resolveRequestBoundsOverrides(requestBoundsConfig),
     langyInternalSecret: langy.internalSecret,
     ...(mail ? { mail } : {}),
     billing: resolveApiBillingConfig(billingSource),

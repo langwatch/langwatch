@@ -3,11 +3,21 @@
  * api-usage.composition.ts; handles absences for subscription, mail, and usage
  * counting on core-tier deployments that cannot compose Enterprise features.
  */
-import type { Plan, SendUsageLimitWarningInput, UsageLimitWarning } from "@langwatch/entitlement-contract";
+import type {
+  Plan,
+  SendUsageLimitWarningInput,
+  UsageLimitWarning,
+} from "@langwatch/entitlement-contract";
+import type { EntitlementApi as EntitlementApiContract } from "@langwatch/entitlement-contract";
 import type { EntitlementSource } from "@langwatch/entitlement-contract";
 import { EntitlementNotifierUnavailableError } from "@langwatch/entitlement-contract";
 import type { Logger } from "@langwatch/observability";
-import { BASELINES, quotedLimitsOfPlan, type Plan as CataloguePlan } from "@langwatch/plans";
+import {
+  BASELINES,
+  findRequestBound,
+  quotedLimitsOfPlan,
+  type Plan as CataloguePlan,
+} from "@langwatch/plans";
 import { USAGE_UNKNOWN, type UsageCounter, type UsageWarning } from "./entitlement.members.ts";
 import type { EntitlementAppConfig, EntitlementInfrastructure } from "./entitlement.app.ts";
 
@@ -102,6 +112,23 @@ function coreBaseline(isSaas: boolean): Plan {
     name: plan.name,
     free: plan.free,
     ...quotedLimitsOfPlan(plan),
+  };
+}
+
+/**
+ * The request-bound seam for a process that composes no entitlement graph at
+ * all: every bound answers its free-tier value — the same fail-open answer
+ * an unknown plan type gets from `resolveRequestBound`.
+ */
+export function createAbsentRequestBound(): Pick<EntitlementApiContract, "requestBound"> {
+  return {
+    async requestBound({ key }) {
+      const bound = findRequestBound(key);
+      if (bound === undefined) {
+        throw new Error(`Unknown request bound: ${key}.`);
+      }
+      return bound.free;
+    },
   };
 }
 

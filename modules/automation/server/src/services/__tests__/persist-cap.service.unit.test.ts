@@ -21,7 +21,13 @@ const DAY_TWO = Temporal.Instant.from("2026-08-10T00:00:01.000Z");
 const projects = new SettlementProjectService();
 const persistCapDependencies = {
   projects,
-  planProvider: { getActivePlan: planMock.getActivePlan },
+  planProvider: {
+    getActivePlan: planMock.getActivePlan,
+    getUsage: vi.fn(),
+    sendUsageLimitWarning: vi.fn(),
+    listOrganizationSpend: vi.fn(),
+    requestBound: vi.fn(),
+  },
   config: {
     free: 100,
     paid: 1_000,

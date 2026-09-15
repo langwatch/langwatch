@@ -91,6 +91,10 @@ describe("API process configuration", () => {
         demoProjectId: undefined,
         demoProjectUserId: undefined,
       },
+      // A deployment that named no registry override runs on the registry
+      // defaults: an empty record, not an absent one, so a consumer never has
+      // to ask which it is holding.
+      requestBounds: {},
       // The rollout switches this deployment set, which is none: an empty
       // override map and an empty force-enable set, so every flag answers from
       // the registry default.

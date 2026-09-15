@@ -7,15 +7,12 @@ import type {
 } from "@langwatch/entitlement-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { UserApi } from "@langwatch/user-contract";
-import {
-  USAGE_UNKNOWN,
-  type UsageCounter,
-  type UsageCount,
-} from "../entitlement.members.ts";
+import { USAGE_UNKNOWN, type UsageCounter, type UsageCount } from "../entitlement.members.ts";
 import type { UsageWarning } from "../entitlement.members.ts";
 import type { EntitlementRepositories } from "../../repositories/entitlement.repositories.ts";
 import { MemoryEntitlementRepositories } from "../../repositories/memory/memory.entitlement.repositories.ts";
-import { EntitlementApp, type EntitlementInfrastructure } from "../entitlement.app.ts";
+import { EntitlementApp } from "../entitlement.app.ts";
+import type { EntitlementAppConfig, EntitlementInfrastructure } from "../entitlement.app.ts";
 
 /** A source that always answers the same plan, or none at all. */
 export function fixedEntitlementSource(plan: Plan | null): EntitlementSource {
@@ -34,8 +31,7 @@ export class TestUsageCounter implements UsageCounter {
   private constructor(
     private readonly count: UsageCount,
     private readonly usageUnit: UsageUnit,
-  ) {
-  }
+  ) {}
 
   async getCurrentMonthCountForDisplay(): Promise<UsageCount> {
     return this.count;
@@ -54,8 +50,7 @@ export class TestUsageWarnings implements UsageWarning {
     return new TestUsageWarnings(answer);
   }
 
-  private constructor(private readonly answer: UsageLimitWarning) {
-  }
+  private constructor(private readonly answer: UsageLimitWarning) {}
 
   async sendWarning(input: SendUsageLimitWarningInput): Promise<UsageLimitWarning> {
     this.sent.push(input);
@@ -74,6 +69,7 @@ export function createEntitlementTestApp(
     members: Omit<EntitlementInfrastructure, "counter" | "warnings"> &
       Partial<Pick<EntitlementInfrastructure, "counter" | "warnings">>;
     dependencies?: Partial<{ users: UserApi }>;
+    config?: Pick<EntitlementAppConfig, "requestBounds">;
   }>,
 ): EntitlementApp {
   return EntitlementApp.createForTesting({
@@ -84,5 +80,6 @@ export function createEntitlementTestApp(
       warnings: input.members.warnings ?? TestUsageWarnings.create(),
     },
     dependencies: { users: input.dependencies?.users ?? createEntitlementTestUsers() },
+    config: input.config,
   });
 }

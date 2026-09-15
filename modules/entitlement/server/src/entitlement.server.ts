@@ -22,6 +22,7 @@ import { planTrpcTransport } from "./transport/plan.trpc.ts";
 import { usageLimitsTrpcTransport } from "./transport/usage-limits.trpc.ts";
 
 export type { EntitlementInfrastructure } from "./app/entitlement.app.ts";
+export { createAbsentRequestBound } from "./app/entitlement-composition.build.ts";
 
 export const entitlementServer = defineServerModule("entitlement")
   .withRepositories(entitlementRepositories)

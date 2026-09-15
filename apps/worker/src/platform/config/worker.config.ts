@@ -8,6 +8,8 @@ import {
   parseDataplaneS3RoutingTable,
   postgresConfigDefinition,
   redisConfigDefinition,
+  requestBoundsConfigDefinition,
+  resolveRequestBoundsOverrides,
   resolveTelemetryConfiguration,
   runtimeIdentityConfigDefinition,
   RuntimeConfig,
@@ -55,6 +57,7 @@ import { getLatestOpenAIChatFlagship } from "@langwatch/model-provider-contract"
 import { resolveGroupQueuePolicyFromEnv, type GroupQueuePolicy } from "@langwatch/group-queue";
 import { EmailProviderService, type MailerConfiguration } from "@langwatch/notification-server";
 import { RedisConfigService, type RedisConfigResolution } from "@langwatch/redis-client";
+import type { RequestBoundsOverrides } from "@langwatch/plans";
 import { z } from "zod";
 import { resolveWorkerEvaluationEnvironment } from "./worker-evaluation.config.ts";
 
@@ -149,6 +152,12 @@ export const workerConfigDefinition = RuntimeConfig.define({
    */
   authz: { ...authzServerConfigDefinition },
   automation: { ...automationServerConfigDefinition },
+  /**
+   * Boot overrides for the central request-bounds registry, read at the one
+   * spelling `@langwatch/config` validates: unknown keys and non-positive
+   * values refuse this process's boot, and both processes project one record.
+   */
+  requestBounds: { ...requestBoundsConfigDefinition },
   /** The stored-credential cipher key; automation decrypts with the same one. */
   secret: { ...secretServerConfigDefinition },
   /**
@@ -570,6 +579,12 @@ export type WorkerConfig = Readonly<{
   logger: WorkerConfigProjection["logger"];
   observability: WorkerConfigProjection["observability"];
   /**
+   * Boot overrides for the central request-bounds registry, validated against
+   * the registry keys at parse time. Empty when the deployment named none;
+   * handed to the entitlement module, which merges them over the tier values.
+   */
+  requestBounds: RequestBoundsOverrides;
+  /**
    * This process serves an empty Prometheus exposition — every series
    * goes out over OTLP — so until an exporter is wired, its instruments
    * write into a no-op meter and the metrics exist nowhere.
@@ -649,6 +664,7 @@ export function resolveWorkerConfig(source: Readonly<Record<string, unknown>>): 
     }),
     deployment: value.deployment,
     ...(mail ? { mail } : {}),
+    requestBounds: resolveRequestBoundsOverrides(value.requestBounds),
     automation: resolveWorkerAutomationConfig(
       value.automation,
       value.secret.encryptionKey ?? value.browserSession.sessionSecret,

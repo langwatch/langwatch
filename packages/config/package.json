@@ -33,6 +33,7 @@
     "test:unit": "vitest run"
   },
   "dependencies": {
+    "@langwatch/plans": "workspace:*",
     "zod": "catalog:",
     "zod-validation-error": "catalog:"
   },

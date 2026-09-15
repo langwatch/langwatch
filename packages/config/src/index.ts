@@ -37,6 +37,11 @@ export {
   type SkippedClickHousePrivateRoute,
 } from "./clickhouse.config.ts";
 export { groupQueueConfigDefinition } from "./queue.config.ts";
+export {
+  requestBoundsConfigDefinition,
+  resolveRequestBoundsOverrides,
+  type RequestBoundsConfig,
+} from "./request-bounds.config.ts";
 export { observabilityConfigDefinition } from "./observability.config.ts";
 export { loggerConfigDefinition } from "./logger.config.ts";
 export { runtimeIdentityConfigDefinition } from "./runtime-identity.config.ts";

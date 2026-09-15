@@ -56,6 +56,10 @@ describe("resolveWorkerConfig", () => {
       // from a cache on one process and not the other is one organization with
       // two answers.
       authz: { epochCacheEnabled: false, demoProjectId: undefined },
+      // A deployment that named no registry override runs on the registry
+      // defaults: the projection is an empty record, not an absent one, so a
+      // consumer never has to ask which it is holding.
+      requestBounds: {},
       // Redaction is DEFAULT-ON without any of the four variables: the native
       // floor enforces, and the analysis service is simply absent. The one
       // knob that turns the floor off has to be spelled `off` to do it.

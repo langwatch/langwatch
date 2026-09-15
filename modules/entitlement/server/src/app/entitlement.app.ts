@@ -19,6 +19,11 @@ import {
 } from "@langwatch/entitlement-contract";
 import type { PricingModel } from "@langwatch/entitlement-contract";
 import { reads, type MembersRead } from "@langwatch/infrastructure/members";
+import {
+  resolveRequestBound,
+  type RequestBoundKey,
+  type RequestBoundsOverrides,
+} from "@langwatch/plans";
 import type { FeatureSetup } from "@langwatch/runtime-composition";
 import { nowInstant } from "@langwatch/time";
 import { UserApi } from "@langwatch/user-contract";
@@ -84,15 +89,24 @@ export type EntitlementInfrastructure = Readonly<{
 const RECENT_SPEND_WINDOW_MS = 1000 * 60 * 60;
 
 /**
- * Config schema: whether this is the hosted deployment, which picks the
- * baseline (cloud free vs. self-hosted open-source) and whether a missing
- * subscription is worth reporting; and this process's own name, which every
- * refused capability names as the reason it cannot answer. Both default to
- * the deleted composition's own absent-config answer.
+ * Config schema: the hosted flag (picks the baseline plan and whether a
+ * missing subscription is worth reporting), this process's name in refusals,
+ * and optional boot overrides for the request-bounds registry.
  */
 const entitlementAppConfigSchema = z.object({
   isSaas: z.boolean().default(false),
   processName: z.string().default("langwatch"),
+  /**
+   * Only registry keys and the tier names free/paid/enterprise are ever read
+   * off this record, so the schema validates shapes here and leaves the key
+   * and tier spelling checks to config time.
+   */
+  requestBounds: z
+    .record(
+      z.string(),
+      z.union([z.number().int().positive(), z.record(z.string(), z.number().int().positive())]),
+    )
+    .optional(),
 });
 export type EntitlementAppConfig = z.infer<typeof entitlementAppConfigSchema>;
 
@@ -136,11 +150,13 @@ export class EntitlementApp implements EntitlementApiContract {
   #warnings: UsageWarning;
   #spend: EntitlementRepositories["spend"];
   #users: UserApi;
+  #requestBoundOverrides: RequestBoundsOverrides;
 
   private constructor(
     repositories: EntitlementRepositories,
     members: EntitlementInfrastructure,
     dependencies: EntitlementCallerLookup,
+    config: Pick<EntitlementAppConfig, "requestBounds">,
   ) {
     this.#plans = EntitlementService.create(members);
     this.#usage = UsageStatsService.create({
@@ -151,6 +167,7 @@ export class EntitlementApp implements EntitlementApiContract {
     this.#warnings = members.warnings;
     this.#spend = repositories.spend;
     this.#users = dependencies.users;
+    this.#requestBoundOverrides = config.requestBounds ?? {};
   }
 
   static create({ repositories, members, dependencies, config }: EntitlementSetup): EntitlementApp {
@@ -160,7 +177,7 @@ export class EntitlementApp implements EntitlementApiContract {
       license: dependencies.license,
     });
 
-    return new EntitlementApp(repositories, infrastructure, dependencies);
+    return new EntitlementApp(repositories, infrastructure, dependencies, config);
   }
 
   /**
@@ -174,8 +191,11 @@ export class EntitlementApp implements EntitlementApiContract {
     repositories: EntitlementRepositories;
     members: EntitlementInfrastructure;
     dependencies: EntitlementCallerLookup;
+    config?: Pick<EntitlementAppConfig, "requestBounds">;
   }): EntitlementApp {
-    return new EntitlementApp(setup.repositories, setup.members, setup.dependencies);
+    return new EntitlementApp(setup.repositories, setup.members, setup.dependencies, {
+      requestBounds: setup.config?.requestBounds,
+    });
   }
 
   async getActivePlan(input: ResolvePlanInput): Promise<Plan> {
@@ -183,6 +203,20 @@ export class EntitlementApp implements EntitlementApiContract {
       organizationId: input.organizationId,
       user: await this.#resolveCaller(input),
     });
+  }
+
+  /**
+   * A plain-number override answers on every tier without a plan lookup;
+   * otherwise the active plan resolves through the same path `getActivePlan`
+   * uses, and its tier's bound answers — per-tier overrides included.
+   */
+  async requestBound(input: { key: RequestBoundKey; organizationId: string }): Promise<number> {
+    const override = this.#requestBoundOverrides[input.key];
+    if (typeof override === "number") return override;
+
+    const plan = await this.#plans.getActivePlan({ organizationId: input.organizationId });
+
+    return resolveRequestBound(input.key, plan.type, this.#requestBoundOverrides);
   }
 
   async getUsage(input: GetUsageInput): Promise<UsageStats> {

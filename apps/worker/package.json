@@ -129,6 +129,7 @@
     "@langwatch/ops-server": "workspace:*",
     "@langwatch/organization-contract": "workspace:*",
     "@langwatch/organization-server": "workspace:*",
+    "@langwatch/plans": "workspace:*",
     "@langwatch/presence-server": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",
     "@langwatch/project-contract": "workspace:*",

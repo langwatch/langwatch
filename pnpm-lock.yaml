@@ -820,6 +820,9 @@ importers:
       '@langwatch/otlp':
         specifier: workspace:*
         version: link:../../packages/otlp
+      '@langwatch/plans':
+        specifier: workspace:*
+        version: link:../../packages/plans
       '@langwatch/platform-health-contract':
         specifier: workspace:*
         version: link:../../modules/platform-health/contract
@@ -1733,6 +1736,9 @@ importers:
       '@langwatch/organization-server':
         specifier: workspace:*
         version: link:../../modules/organization/server
+      '@langwatch/plans':
+        specifier: workspace:*
+        version: link:../../packages/plans
       '@langwatch/presence-server':
         specifier: workspace:*
         version: link:../../modules/presence/server
@@ -4697,6 +4703,9 @@ importers:
       '@langwatch/observability':
         specifier: workspace:*
         version: link:../../../packages/observability
+      '@langwatch/plans':
+        specifier: workspace:*
+        version: link:../../../packages/plans
       '@langwatch/prisma-client':
         specifier: workspace:*
         version: link:../../../packages/prisma-client
@@ -11870,6 +11879,9 @@ importers:
 
   packages/config:
     dependencies:
+      '@langwatch/plans':
+        specifier: workspace:*
+        version: link:../plans
       zod:
         specifier: 'catalog:'
         version: 4.4.3

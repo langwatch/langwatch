@@ -178,7 +178,9 @@ export function createCanonicalAutomationApp(): {
     heartbeat: { findClickHouseClient: vi.fn() },
     redis: null,
     providers: {
-      actionParamsSchemaFor: vi.fn(() => ({ safeParse: (data: unknown) => ({ success: true, data }) })),
+      actionParamsSchemaFor: vi.fn(() => ({
+        safeParse: (data: unknown) => ({ success: true, data }),
+      })),
       persistActionParamsFor: vi.fn(async (_action, args) => args.incoming),
       redactActionParamsFor: vi.fn((_action, params) => params),
       findSlackBotToken: vi.fn(() => null),
@@ -206,11 +208,19 @@ export function createCanonicalAutomationApp(): {
         projects,
         entitlement: {
           getActivePlan: vi.fn<EntitlementApiContract["getActivePlan"]>(),
+          getUsage: vi.fn<EntitlementApiContract["getUsage"]>(),
+          sendUsageLimitWarning: vi.fn<EntitlementApiContract["sendUsageLimitWarning"]>(),
+          listOrganizationSpend: vi.fn<EntitlementApiContract["listOrganizationSpend"]>(),
+          requestBound: vi.fn<EntitlementApiContract["requestBound"]>(),
         },
         auditLog,
       },
       infrastructure: members,
-      config: { ...automationServerConfigSchema.parse({}), baseHost: "", unsubscribeSecret: undefined },
+      config: {
+        ...automationServerConfigSchema.parse({}),
+        baseHost: "",
+        unsubscribeSecret: undefined,
+      },
     }),
     triggerCreate,
     resources,

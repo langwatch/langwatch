@@ -5,6 +5,7 @@ export {
   isViewOnlyCustomRole,
   createEntitlementService,
   createPlanNextStepService,
+  createAbsentRequestBound,
 } from "./entitlement.server.ts";
 export type { EntitlementInfrastructure } from "./app/entitlement.app.ts";
 export { planTrpcTransport } from "./transport/plan.trpc.ts";
@@ -43,10 +44,7 @@ export type {
 export type { UsageDeployment } from "./services/usage-limit-message.service.ts";
 export { InProcessUsageCache, NoUsageCache } from "./services/usage-cache.service.ts";
 export { type UsageCache } from "./app/entitlement.members.ts";
-export {
-  type UsageOrganization,
-  type UsageMeterReading,
-} from "./app/entitlement.members.ts";
+export { type UsageOrganization, type UsageMeterReading } from "./app/entitlement.members.ts";
 export type { CataloguePlan, PlanCatalogueReader } from "./app/entitlement.app.ts";
 export { PlanNextStepService } from "./services/plan-next-step.service.ts";
 export {

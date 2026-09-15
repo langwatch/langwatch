@@ -33,10 +33,7 @@ import {
   type EntitlementSource,
 } from "@langwatch/entitlement-contract";
 import { createActivatedLicenseSource } from "@langwatch/enterprise-api";
-import {
-  composeApiTrpcSession,
-  type ApiBrowserSessionTransport,
-} from "./api-auth.composition.ts";
+import { composeApiTrpcSession, type ApiBrowserSessionTransport } from "./api-auth.composition.ts";
 import {
   ApiTrpcHost,
   type ApiTrpcNamespace,
@@ -105,6 +102,8 @@ function apiModuleConfig(config: ApiConfig): Readonly<Record<string, unknown>> {
     entitlement: {
       processName: config.serviceName,
       isSaas: config.infrastructure.modelProvider.isSaas,
+      /** The boot overrides record, already validated against the registry at config time. */
+      requestBounds: config.requestBounds,
     },
     /** Suite deep links build under the same public origin. */
     ...(config.infrastructure.execution.publicBaseUrl
@@ -115,9 +114,9 @@ function apiModuleConfig(config: ApiConfig): Readonly<Record<string, unknown>> {
       ? { dataset: { publicBaseUrl: config.infrastructure.execution.publicBaseUrl } }
       : {}),
     /** Evaluator link addresses build under the same public origin. */
-    evaluator: (config.infrastructure.execution.publicBaseUrl
-        ? { publicBaseUrl: config.infrastructure.execution.publicBaseUrl }
-        : {}),
+    evaluator: config.infrastructure.execution.publicBaseUrl
+      ? { publicBaseUrl: config.infrastructure.execution.publicBaseUrl }
+      : {},
     /** Scenario deep links (`platformUrl`) build under the same public origin. */
     ...(config.infrastructure.execution.publicBaseUrl
       ? { scenario: { publicBaseUrl: config.infrastructure.execution.publicBaseUrl } }
@@ -480,7 +479,7 @@ export async function bootApiProcess(options: {
         }),
         trpc: (trpc = ApiTrpcHost.create({
           peers,
-          config: (trpcSession ? { browserSession: trpcSession } : {}),
+          config: trpcSession ? { browserSession: trpcSession } : {},
         })),
       };
     })

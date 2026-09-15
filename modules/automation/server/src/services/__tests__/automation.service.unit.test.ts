@@ -289,7 +289,21 @@ const makeService = (
     const persistCaps = AutomationPersistCapService.create({
       projects: runtime.projects,
       planProvider: {
-        getActivePlan: async () => ({ type: "FREE", free: true }),
+        getActivePlan: async () => ({
+          planSource: "free",
+          type: "FREE",
+          name: "Free",
+          free: true,
+          maxMembers: 100,
+          maxMembersLite: 0,
+          maxMessagesPerMonth: 1_000,
+          canPublish: true,
+          prices: { USD: 0, EUR: 0 },
+        }),
+        getUsage: vi.fn(),
+        sendUsageLimitWarning: vi.fn(),
+        listOrganizationSpend: vi.fn(),
+        requestBound: vi.fn(),
       },
       config: { free: 100, paid: 1_000, enterprise: 10_000 },
       redis: null,

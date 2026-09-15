@@ -141,6 +141,8 @@ export async function createWorkerFoundationApps(options: {
       entitlement: {
         processName: options.config.serviceName,
         isSaas: options.config.deployment.saas,
+        /** The boot overrides record, already validated against the registry at config time. */
+        requestBounds: options.config.requestBounds,
       },
       ops: {
         adminEmails: adminEmails(options.config),

@@ -6,6 +6,7 @@ import type {
 } from "@langwatch/automation-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
+import { ENTERPRISE_PLAN_TYPES, FREE_PLAN_TYPES } from "@langwatch/plans";
 import { nowInstant, type Instant } from "@langwatch/time";
 
 const logger = createLogger("langwatch:automations:persist-cap");
@@ -17,11 +18,11 @@ const EXPIRE_SECONDS = 90_000;
 const CAP_CACHE_TTL_MS = 10 * 60 * 1000;
 const capCache = new Map<string, { value: number; expiresAt: number }>();
 
-/** Plan type is provider-owned string data, so unknown paid plans use the paid cap. */
-const ENTERPRISE_PLAN_TYPES = new Set<string>(["ENTERPRISE"]);
-
-const FREE_PLAN_TYPES = new Set<string>(["FREE", "LAUNCH"]);
-
+/**
+ * Plan type is provider-owned string data, so unknown paid plans use the paid
+ * cap. The tier sets live in `@langwatch/plans`, the one table every tier
+ * test reads.
+ */
 export type PersistCapConfig = AutomationPersistCapConfig;
 
 export interface PersistCapDependencies {
