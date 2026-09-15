@@ -24,6 +24,19 @@
     "langwatch/conditional-type-depth": "error",
     "langwatch/zod-object-composition": "error",
     "langwatch/fallible-result-naming": "error",
+    // Measured 2026-09-15 over apps/ui/src, modules, enterprise/modules: 224
+    // reports across 122 files of shipped customer copy carrying an em dash
+    // that dev/docs/best_practices/copywriting.md bans. No fixer: the right
+    // replacement is a comma, a colon, a parenthetical or a rewritten
+    // sentence, which is an editorial choice. The 122 files are baselined.
+    "langwatch/em-dash-in-copy": "error",
+    // Measured 2026-09-15: 85 files. A .unit.test file that imports a renderer
+    // is an integration test by this repository's own definition.
+    "langwatch/unit-test-does-not-render": "error",
+    // Measured 2026-09-15: 11 reports across 8 files, gated on the Prisma seam.
+    // Encodes the incident CLAUDE.md records: _count inside findMany becomes an
+    // uncorrelated join the planner may re-run per listed row (2.3s per call).
+    "langwatch/prisma-count-in-list-query": "error",
     "langwatch/no-try-prefix": "error",
     "langwatch/return-await-outside-try": "error",
     // NOT enabled: `positional-parameter-list` is registered in the plugin

@@ -86,3 +86,6 @@ export { bannedTestModelNamesRule } from "./rules/banned-test-model-names.rule.m
 export { noInlineDynamicImportRule } from "./rules/no-inline-dynamic-import.rule.mjs";
 export { returnAwaitOutsideTryRule } from "./rules/return-await-outside-try.rule.mjs";
 export { positionalParameterListRule } from "./rules/positional-parameter-list.rule.mjs";
+export { emDashInCopyRule } from "./rules/em-dash-in-copy.rule.mjs";
+export { unitTestDoesNotRenderRule } from "./rules/unit-test-does-not-render.rule.mjs";
+export { prismaCountInListQueryRule } from "./rules/prisma-count-in-list-query.rule.mjs";

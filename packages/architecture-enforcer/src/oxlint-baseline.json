@@ -6279,6 +6279,494 @@
       "measured": "2026-09-10"
     },
     {
+      "key": "em-dash-in-copy|enterprise/modules/governance/web/src/features/ai-tools/ui/sections/ingestion-templates-editor.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "em-dash-in-copy|enterprise/modules/governance/web/src/features/ingestion-sources/AnomalyRulesTab.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "em-dash-in-copy|enterprise/modules/governance/web/src/features/ottl/ui/elements/ottl-editor.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "em-dash-in-copy|enterprise/modules/governance/web/src/features/overview/ui/elements/quarantine-fill-alert.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "em-dash-in-copy|enterprise/modules/governance/web/src/features/source-events/ui/sections/source-event-detail-panels.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "em-dash-in-copy|enterprise/modules/governance/web/src/ui/sections/governance/agents.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "em-dash-in-copy|enterprise/modules/governance/web/src/ui/sections/governance/governance-inventory.screen.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "em-dash-in-copy|enterprise/modules/governance/web/src/ui/sections/governance/governance-people.screen.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "em-dash-in-copy|modules/analytics/web/src/ui/blocks/langwatch-ql-result-pane.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "em-dash-in-copy|modules/analytics/web/src/ui/elements/langwatch-ql-parameters-editor.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "em-dash-in-copy|modules/analytics/web/src/ui/elements/langwatch-ql-schema-browser.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "em-dash-in-copy|modules/analytics/web/src/ui/elements/langwatch-ql-time-window-editor.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "em-dash-in-copy|modules/analytics/web/src/ui/sections/DashboardWidgetQueryResultView.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "em-dash-in-copy|modules/analytics/web/src/ui/sections/DashboardWidgetQueryRow.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "em-dash-in-copy|modules/analytics/web/src/ui/sections/custom-graph.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "em-dash-in-copy|modules/analytics/web/src/ui/sections/fields-filters.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "em-dash-in-copy|modules/analytics/web/src/ui/sections/filters/fields-filters.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "em-dash-in-copy|modules/analytics/web/src/ui/sections/langwatch-ql-chart-mode.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "em-dash-in-copy|modules/api-key/web/src/ui/sections/token-created-dialog.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "em-dash-in-copy|modules/auth/web/src/behavior/auth-client.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "em-dash-in-copy|modules/auth/web/src/ui/sections/signin-screen.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "em-dash-in-copy|modules/auth/web/src/ui/sections/signup-screen.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "em-dash-in-copy|modules/authz/web/src/ui/sections/scope-picker/provider-scope-chips.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "em-dash-in-copy|modules/automation/web/src/features/authoring/ui/blocks/cadence-section.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "em-dash-in-copy|modules/automation/web/src/features/authoring/ui/sections/email.client.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "em-dash-in-copy|modules/automation/web/src/features/authoring/ui/sections/slack.client.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "em-dash-in-copy|modules/automation/web/src/features/authoring/ui/sections/subject-section.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "em-dash-in-copy|modules/automation/web/src/features/authoring/ui/sections/template-authoring.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "em-dash-in-copy|modules/automation/web/src/features/authoring/ui/sections/webhook.client.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "em-dash-in-copy|modules/automation/web/src/features/slack-templates/ui/blocks/template-picker.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "em-dash-in-copy|modules/coding-agent/web/src/trace/session-view.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "em-dash-in-copy|modules/data-retention/web/src/ui/blocks/add-override-drawer.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "em-dash-in-copy|modules/data-retention/web/src/ui/blocks/apply-to-existing-confirm-dialog.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "em-dash-in-copy|modules/data-retention/web/src/ui/blocks/remove-scope-confirm-dialog.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "em-dash-in-copy|modules/dataset/web/src/ui/elements/dataset-dropzone-styles.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "em-dash-in-copy|modules/dataset/web/src/ui/sections/bulk-upload-drawer.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "em-dash-in-copy|modules/evaluator/web/src/ui/sections/checks/dynamic-zod-form.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "em-dash-in-copy|modules/experiment/web/src/ui/sections/batch-results/comparison-leaderboard-chart.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "em-dash-in-copy|modules/experiment/web/src/ui/sections/batch-results/comparison-leaderboard-drawer.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "em-dash-in-copy|modules/experiment/web/src/ui/sections/batch-results/leaderboard-trust-panel.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "em-dash-in-copy|modules/experiment/web/src/ui/sections/batch-results/leaderboard-verdict-panel.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "em-dash-in-copy|modules/experiment/web/src/ui/sections/batch-results/pairwise-leaderboard.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "em-dash-in-copy|modules/experiment/web/src/ui/sections/batch-results/pareto-scatter-chart.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "em-dash-in-copy|modules/experiment/web/src/ui/sections/experiments-v3/EvaluatorPanel/comparison-config-form.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "em-dash-in-copy|modules/experiment/web/src/ui/sections/experiments-v3/comparison-cell.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "em-dash-in-copy|modules/experiment/web/src/ui/sections/experiments-v3/comparison-column-header.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "em-dash-in-copy|modules/gateway/web/src/features/cache-rules/ui/blocks/cache-rule-form.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "em-dash-in-copy|modules/gateway/web/src/ui/sections/gateway/gateway-cache-rules.screen.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "em-dash-in-copy|modules/gateway/web/src/ui/sections/gateway/gateway-virtual-key.screen.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "em-dash-in-copy|modules/gateway/web/src/ui/sections/gateway/gateway-virtual-keys.screen.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "em-dash-in-copy|modules/github/web/src/ui/elements/github-installation-row.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "em-dash-in-copy|modules/langy/web/src/features/langy/ui/sections/capabilities/langy-dataset-card.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "em-dash-in-copy|modules/langy/web/src/features/langy/ui/sections/capabilities/langy-trace-sample-card.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "em-dash-in-copy|modules/langy/web/src/features/langy/ui/sections/derived-cards/langy-derived-cards-testing-ground.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "em-dash-in-copy|modules/langy/web/src/features/langy/ui/sections/langy-card-gallery.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "em-dash-in-copy|modules/langy/web/src/ui/sections/derived-cards/langy-derived-card-frame.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "em-dash-in-copy|modules/langy/web/src/ui/sections/model-provider-setup.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "em-dash-in-copy|modules/navigation/web/src/ui/elements/page-error-fallback.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "em-dash-in-copy|modules/navigation/web/src/ui/sections/app-header-user-menu.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "em-dash-in-copy|modules/onboarding/web/src/ui/sections/welcome/api-card.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "em-dash-in-copy|modules/ops/web/src/features/backoffice/ui/sections/organizations-view.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "em-dash-in-copy|modules/ops/web/src/features/backoffice/ui/sections/projects-view.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "em-dash-in-copy|modules/ops/web/src/features/event-store/ui/blocks/parked-groups-view.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "em-dash-in-copy|modules/ops/web/src/features/event-store/ui/blocks/parked-tenants-section.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "em-dash-in-copy|modules/ops/web/src/features/event-store/ui/elements/dead-letter-attempt-history.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "em-dash-in-copy|modules/ops/web/src/features/event-store/ui/sections/event-sourcing-overview.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "em-dash-in-copy|modules/ops/web/src/features/event-store/ui/sections/outbox-message-card.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "em-dash-in-copy|modules/ops/web/src/features/event-store/ui/sections/process-instance-content.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "em-dash-in-copy|modules/ops/web/src/features/event-store/ui/sections/scheduler-row-actions.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "em-dash-in-copy|modules/ops/web/src/features/event-store/ui/sections/stat-strip.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "em-dash-in-copy|modules/ops/web/src/features/foundry/ui/sections/foundry-drawer.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "em-dash-in-copy|modules/ops/web/src/features/queue/ui/sections/anomalies-card.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "em-dash-in-copy|modules/ops/web/src/features/queue/ui/sections/blocked-card.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "em-dash-in-copy|modules/ops/web/src/features/queue/ui/sections/dlq-card.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "em-dash-in-copy|modules/ops/web/src/features/queue/ui/sections/groups-card.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "em-dash-in-copy|modules/ops/web/src/features/queue/ui/sections/queue-group-detail-content.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "em-dash-in-copy|modules/organization/web/src/ui/sections/organization/audit-log.screen.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "em-dash-in-copy|modules/project/web/src/ui/sections/home/briefing/components/home-briefing-section.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "em-dash-in-copy|modules/project/web/src/ui/sections/home/components/docs-guides.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "em-dash-in-copy|modules/project/web/src/ui/sections/home/components/home-fortune.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "em-dash-in-copy|modules/project/web/src/ui/sections/home/components/traces-overview.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "em-dash-in-copy|modules/project/web/src/ui/sections/project-settings/project-settings-screen.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "em-dash-in-copy|modules/scenario/web/src/ui/sections/shared/ai-create-modal.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "em-dash-in-copy|modules/suite/web/src/ui/elements/dialogs/scenario-run-export-dialog.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "em-dash-in-copy|modules/trace/web/src/screens/traces/shared-trace.screen.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "em-dash-in-copy|modules/trace/web/src/ui/elements/explorer/filter-sidebar/sidebar-section.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "em-dash-in-copy|modules/trace/web/src/ui/elements/explorer/onboarding/effects/drawer-glow.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "em-dash-in-copy|modules/trace/web/src/ui/elements/explorer/onboarding/outro-panel.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "em-dash-in-copy|modules/trace/web/src/ui/elements/explorer/onboarding/returning-user-hub.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "em-dash-in-copy|modules/trace/web/src/ui/elements/explorer/onboarding/sample-data-banner.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "em-dash-in-copy|modules/trace/web/src/ui/elements/explorer/trace-drawer/scope-chip.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "em-dash-in-copy|modules/trace/web/src/ui/elements/explorer/traces-page/aurora-svg.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "em-dash-in-copy|modules/trace/web/src/ui/sections/conversation/error-message.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "em-dash-in-copy|modules/trace/web/src/ui/sections/dialog.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "em-dash-in-copy|modules/trace/web/src/ui/sections/explorer/ai/ask-ai-button.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "em-dash-in-copy|modules/trace/web/src/ui/sections/explorer/filter-sidebar/facet-section.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "em-dash-in-copy|modules/trace/web/src/ui/sections/explorer/filter-sidebar/range-section.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "em-dash-in-copy|modules/trace/web/src/ui/sections/explorer/search-bar/placeholder-editor.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "em-dash-in-copy|modules/trace/web/src/ui/sections/explorer/search-bar/search-bar-indicators.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "em-dash-in-copy|modules/trace/web/src/ui/sections/explorer/search-bar/search-bar.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "em-dash-in-copy|modules/trace/web/src/ui/sections/explorer/toolbar/live-indicator.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "em-dash-in-copy|modules/trace/web/src/ui/sections/explorer/trace-drawer/conversation-view/conversation-view.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "em-dash-in-copy|modules/trace/web/src/ui/sections/explorer/trace-drawer/keyboard-shortcuts-help.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "em-dash-in-copy|modules/trace/web/src/ui/sections/explorer/trace-drawer/prompt-accordion.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "em-dash-in-copy|modules/trace/web/src/ui/sections/explorer/trace-drawer/trace-accordions/span-accordions.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "em-dash-in-copy|modules/trace/web/src/ui/sections/explorer/trace-drawer/trace-accordions/trace-summary-accordions.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "em-dash-in-copy|modules/trace/web/src/ui/sections/explorer/trace-drawer/trace-header-chips.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "em-dash-in-copy|modules/trace/web/src/ui/sections/explorer/trace-drawer/viz-placeholder.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "em-dash-in-copy|modules/trace/web/src/ui/sections/explorer/trace-drawer/waterfall-view/group-row.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "em-dash-in-copy|modules/trace/web/src/ui/sections/explorer/trace-drawer/waterfall-view/tree-row.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "em-dash-in-copy|modules/trace/web/src/ui/sections/explorer/trace-table/column-education-dialog.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "em-dash-in-copy|modules/trace/web/src/ui/sections/explorer/trace-table/empty-filter-state.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "em-dash-in-copy|modules/trace/web/src/ui/sections/explorer/trace-table/io-preview.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "em-dash-in-copy|modules/trace/web/src/ui/sections/explorer/trace-table/new-traces-scroll-up-indicator.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "em-dash-in-copy|modules/trace/web/src/ui/sections/explorer/trace-table/query-breakdown-chips.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "em-dash-in-copy|modules/trace/web/src/ui/sections/flame/flame-canvas.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "em-dash-in-copy|modules/user/web/src/ui/blocks/personal-traces-empty-state.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "em-dash-in-copy|modules/user/web/src/ui/sections/home-page-picker.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "em-dash-in-copy|modules/user/web/src/ui/sections/model-provider-tile.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "em-dash-in-copy|modules/user/web/src/ui/sections/personal-workspace/personal-budget-request.screen.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "em-dash-in-copy|modules/user/web/src/ui/sections/personal-workspace/personal-configure.screen.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "em-dash-in-copy|modules/workflow/web/src/ui/elements/code/liquid-condition-editor.tsx",
+      "measured": "2026-09-15"
+    },
+    {
       "key": "empty-catch|apps/api/src/app-static/__tests__/app-static-handler.unit.test.ts",
       "measured": "2026-09-10"
     },
@@ -18919,6 +19407,38 @@
       "measured": "2026-09-15"
     },
     {
+      "key": "prisma-count-in-list-query|modules/agent/server/src/repositories/prisma/prisma.agent.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "prisma-count-in-list-query|modules/dashboard/server/src/repositories/prisma/prisma.dashboard.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "prisma-count-in-list-query|modules/dataset/server/src/repositories/prisma/prisma.dataset.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "prisma-count-in-list-query|modules/evaluator/server/src/repositories/prisma/prisma.evaluator.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "prisma-count-in-list-query|modules/gateway/server/src/repositories/prisma/prisma.gateway-budget-scope-target.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "prisma-count-in-list-query|modules/gateway/server/src/repositories/prisma/prisma.gateway-organization-directory.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "prisma-count-in-list-query|modules/organization/server/src/repositories/prisma/prisma.group.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "prisma-count-in-list-query|modules/user/server/src/repositories/prisma/prisma.user-data-erase.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
       "key": "redis-containment|modules/agent/server/src/services/connected-agent.service.ts",
       "measured": "2026-09-15"
     },
@@ -21221,6 +21741,346 @@
     {
       "key": "unbounded-loop|modules/workflow/server/src/services/workflow-studio-dispatch.service.ts",
       "measured": "2026-09-08"
+    },
+    {
+      "key": "unit-test-does-not-render|apps/ui/src/behavior/__tests__/ui-organization-facts-plan-loading.unit.test.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "unit-test-does-not-render|apps/ui/src/ui/blocks/__tests__/ui-project-switcher.create-project-wiring.unit.test.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "unit-test-does-not-render|apps/ui/tests/gtag-readiness.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "unit-test-does-not-render|apps/ui/tests/posthog-analytics.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "unit-test-does-not-render|apps/ui/tests/ui-application.unit.test.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "unit-test-does-not-render|apps/ui/tests/ui-feature-shell.unit.test.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "unit-test-does-not-render|apps/ui/tests/ui-page-guard.unit.test.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "unit-test-does-not-render|apps/ui/tests/ui-prefix-redirect.unit.test.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "unit-test-does-not-render|apps/ui/tests/ui-route-objects.unit.test.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "unit-test-does-not-render|apps/ui/tests/ui-route-port.unit.test.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "unit-test-does-not-render|apps/ui/tests/ui-router-navigation.unit.test.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "unit-test-does-not-render|apps/ui/tests/ui-scope-route.unit.test.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "unit-test-does-not-render|modules/analytics/web/src/behavior/__tests__/use-analytics-period.unit.test.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "unit-test-does-not-render|modules/analytics/web/src/ui/elements/__tests__/use-period-selector.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "unit-test-does-not-render|modules/annotation/web/src/behavior/__tests__/use-annotation-period.unit.test.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "unit-test-does-not-render|modules/auth/web/src/ui/sections/__tests__/sign-in-error.unit.test.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "unit-test-does-not-render|modules/evaluator/web/src/ui/blocks/__tests__/evaluator-type-picker.unit.test.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "unit-test-does-not-render|modules/feature-flag/web/src/__tests__/experiment-catalogue-watermark.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "unit-test-does-not-render|modules/gateway/web/src/behavior/__tests__/use-rolling-window.unit.test.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "unit-test-does-not-render|modules/github/web/src/behavior/__tests__/github-connect-popup.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "unit-test-does-not-render|modules/langy/web/src/behavior/__tests__/use-langy-context-target.unit.test.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "unit-test-does-not-render|modules/langy/web/src/behavior/__tests__/use-langy-orb-proximity.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "unit-test-does-not-render|modules/langy/web/src/behavior/__tests__/use-lingering-dodge.unit.test.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "unit-test-does-not-render|modules/langy/web/src/behavior/__tests__/use-scrolled-from-top.unit.test.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "unit-test-does-not-render|modules/langy/web/src/features/langy/ui/sections/__tests__/animated-conversation-title.unit.test.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "unit-test-does-not-render|modules/langy/web/src/features/langy/ui/sections/__tests__/langy-conversation-deep-link.unit.test.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "unit-test-does-not-render|modules/langy/web/src/features/langy/ui/sections/__tests__/use-langy-messages.unit.test.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "unit-test-does-not-render|modules/langy/web/src/model/__tests__/langy-thinking-line.unit.test.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "unit-test-does-not-render|modules/langy/web/src/ui/sections/__tests__/langy-context-arming.unit.test.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "unit-test-does-not-render|modules/langy/web/src/ui/sections/derived-cards/__tests__/langy-derived-cards.unit.test.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "unit-test-does-not-render|modules/model-provider/web/src/behavior/__tests__/use-model-provider-api-key-validation.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "unit-test-does-not-render|modules/model-provider/web/src/behavior/__tests__/use-model-provider-connection-test.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "unit-test-does-not-render|modules/model-provider/web/src/behavior/__tests__/useAnnotationQueueWalk.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "unit-test-does-not-render|modules/model-provider/web/src/ui/elements/__tests__/provider-model-selector.inherit-option.unit.test.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "unit-test-does-not-render|modules/navigation/web/src/behavior/__tests__/use-project-pick-groups.unit.test.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "unit-test-does-not-render|modules/navigation/web/src/behavior/__tests__/use-recent-items.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "unit-test-does-not-render|modules/navigation/web/src/behavior/__tests__/use-settings-menu.unit.test.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "unit-test-does-not-render|modules/onboarding/web/src/behavior/__tests__/use-attribution-capture.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "unit-test-does-not-render|modules/onboarding/web/src/behavior/__tests__/use-onboarding-flow.unit.test.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "unit-test-does-not-render|modules/onboarding/web/src/behavior/__tests__/use-product-flow.unit.test.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "unit-test-does-not-render|modules/project/web/src/ui/sections/home/components/__tests__/home-dev-state.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "unit-test-does-not-render|modules/scenario/web/src/behavior/__tests__/use-can.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "unit-test-does-not-render|modules/scenario/web/src/behavior/__tests__/use-new-scenario-flow.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "unit-test-does-not-render|modules/scenario/web/src/behavior/__tests__/use-simulation-update-listener.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "unit-test-does-not-render|modules/scenario/web/src/behavior/suites/__tests__/use-suite-routing.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "unit-test-does-not-render|modules/suite/web/src/__tests__/message-preview.message-shapes.unit.test.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "unit-test-does-not-render|modules/suite/web/src/__tests__/message-preview.unit.test.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "unit-test-does-not-render|modules/suite/web/src/__tests__/use-auto-expansion.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "unit-test-does-not-render|modules/suite/web/src/__tests__/use-suite-form.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "unit-test-does-not-render|modules/trace/web/src/behavior/__tests__/view.store.effective-lens.unit.test.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "unit-test-does-not-render|modules/trace/web/src/behavior/explorer/trace-drawer/__tests__/use-trace-switch-overlay.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "unit-test-does-not-render|modules/trace/web/src/behavior/explorer/trace-drawer/drawer-header/__tests__/use-retained-trace-header.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "unit-test-does-not-render|modules/trace/web/src/behavior/flame/__tests__/flame-viewport.unit.test.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "unit-test-does-not-render|modules/trace/web/src/ui/sections/__tests__/find-match-cycling.unit.test.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "unit-test-does-not-render|modules/trace/web/src/ui/sections/__tests__/find-search-index.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "unit-test-does-not-render|modules/trace/web/src/ui/sections/explorer/hooks/__tests__/use-conversation-annotations.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "unit-test-does-not-render|modules/trace/web/src/ui/sections/explorer/hooks/__tests__/use-conversation-prefetch.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "unit-test-does-not-render|modules/trace/web/src/ui/sections/explorer/hooks/__tests__/use-evaluator-options.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "unit-test-does-not-render|modules/trace/web/src/ui/sections/explorer/hooks/__tests__/use-span-tree.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "unit-test-does-not-render|modules/trace/web/src/ui/sections/explorer/hooks/__tests__/use-trace-freshness.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "unit-test-does-not-render|modules/trace/web/src/ui/sections/explorer/hooks/__tests__/use-trace-header.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "unit-test-does-not-render|modules/trace/web/src/ui/sections/explorer/hooks/__tests__/use-trace-new-count.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "unit-test-does-not-render|modules/trace/web/src/ui/sections/explorer/hooks/__tests__/use-trace-span-tree.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "unit-test-does-not-render|modules/trace/web/src/ui/sections/explorer/hooks/__tests__/use-url-sync.pagination.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "unit-test-does-not-render|modules/trace/web/src/ui/sections/explorer/hooks/__tests__/use-url-sync.time-range.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "unit-test-does-not-render|modules/trace/web/src/ui/sections/explorer/hooks/__tests__/use-view-switching-dim.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "unit-test-does-not-render|modules/trace/web/src/ui/sections/explorer/onboarding/__tests__/api-key-integration-info-card.unit.test.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "unit-test-does-not-render|modules/trace/web/src/ui/sections/explorer/onboarding/__tests__/integration-cta-card.unit.test.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "unit-test-does-not-render|modules/trace/web/src/ui/sections/explorer/onboarding/hooks/__tests__/use-first-trace-spotlight-trigger.unit.test.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "unit-test-does-not-render|modules/trace/web/src/ui/sections/explorer/onboarding/hooks/__tests__/use-tour-entry-points.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "unit-test-does-not-render|modules/trace/web/src/ui/sections/explorer/onboarding/spotlights/__tests__/drawer-spotlights.unit.test.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "unit-test-does-not-render|modules/trace/web/src/ui/sections/explorer/onboarding/spotlights/__tests__/spotlight-overlay.unit.test.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "unit-test-does-not-render|modules/trace/web/src/ui/sections/explorer/onboarding/spotlights/__tests__/spotlights.url-sync.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "unit-test-does-not-render|modules/trace/web/src/ui/sections/explorer/trace-drawer/conversation-view/__tests__/use-rail-layout.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "unit-test-does-not-render|modules/trace/web/src/ui/sections/explorer/trace-table/registry/addons/trace/__tests__/io-preview-addon.position.unit.test.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "unit-test-does-not-render|modules/trace/web/src/ui/sections/explorer/trace-table/registry/cells/trace/__tests__/ttft-cell.unit.test.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "unit-test-does-not-render|modules/workflow/web/src/__tests__/workflow-node-selection-panel.unit.test.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "unit-test-does-not-render|modules/workflow/web/src/ui/sections/optimization_studio/__tests__/use-evaluation-execution.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "unit-test-does-not-render|modules/workflow/web/src/ui/sections/optimization_studio/__tests__/use-post-event.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "unit-test-does-not-render|packages/design-system/tests/color-mode-reduced-motion.unit.test.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "unit-test-does-not-render|packages/design-system/tests/search-input.unit.test.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "unit-test-does-not-render|packages/design-system/tests/story-color-modes.unit.test.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "unit-test-does-not-render|packages/design-system/tests/use-copy-to-clipboard.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "unit-test-does-not-render|packages/ui-drawer/src/behavior/__tests__/drawer-preloader.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "unit-test-does-not-render|packages/ui-host/src/__tests__/use-period-selector.unit.test.ts",
+      "measured": "2026-09-15"
     }
   ]
 }
