@@ -137,7 +137,7 @@ describe("afterUserCreate", () => {
     it("tracks the signed_up analytics event with the user id", async () => {
       await afterUserCreate({
         repo: organizationRepo(null),
-        user: { id: "user_1", email: "u@other.com", name: "User" },
+        user: { id: "user_1", email: "u@other.com", name: "User", emailVerified: true },
         collaborators: collaborators(),
       });
 
@@ -152,7 +152,7 @@ describe("afterUserCreate", () => {
     it("tracks signed_up even when the SSO auto-add path runs", async () => {
       await afterUserCreate({
         repo: organizationRepo({ id: "org_1", ssoDomain: "acme.com" }),
-        user: { id: "user_2", email: "new@acme.com", name: "New User" },
+        user: { id: "user_2", email: "new@acme.com", name: "New User", emailVerified: true },
         collaborators: collaborators(),
       });
 
@@ -167,12 +167,27 @@ describe("afterUserCreate", () => {
     it("tracks signed_up even when the user has no parsable email domain", async () => {
       await afterUserCreate({
         repo: organizationRepo(null),
-        user: { id: "user_3", email: "", name: "User" },
+        user: { id: "user_3", email: "", name: "User", emailVerified: true },
         collaborators: collaborators(),
       });
 
       expect(announcements.trackServerEvent).toHaveBeenCalledWith({
         userId: "user_3",
+        event: "signed_up",
+      });
+    });
+
+    /** @scenario PostHog signed_up still fires when the signup is unverified */
+    it("tracks signed_up even when the verified-email gate skips org admission", async () => {
+      await afterUserCreate({
+        repo: organizationRepo({ id: "org_1", ssoDomain: "acme.com" }),
+        user: { id: "user_4", email: "new@acme.com", name: "New User", emailVerified: false },
+        collaborators: collaborators(),
+      });
+
+      expect(announcements.trackServerEvent).toHaveBeenCalledTimes(1);
+      expect(announcements.trackServerEvent).toHaveBeenCalledWith({
+        userId: "user_4",
         event: "signed_up",
       });
     });

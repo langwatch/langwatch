@@ -66,7 +66,12 @@ describe("the ssoDomain auto-join on an unlicensed deployment", () => {
 
     await afterUserCreate({
       repo,
-      user: { id: "user_1", email: "new@acme.com", name: "New User" },
+      user: {
+        id: "user_1",
+        email: "new@acme.com",
+        name: "New User",
+        emailVerified: true,
+      },
       collaborators: {
         federation,
         invites: new StubInvites(),

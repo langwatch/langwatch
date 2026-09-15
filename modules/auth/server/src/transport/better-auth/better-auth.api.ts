@@ -328,7 +328,12 @@ export const createAuthOptions = ({
         after: async (user) => {
           await afterUserCreate({
             repo,
-            user: user as { id: string; email: string; name: string },
+            user: {
+              id: user.id,
+              email: user.email,
+              name: user.name,
+              emailVerified: user.emailVerified,
+            },
             collaborators: hooks,
           });
         },

@@ -35,6 +35,14 @@ class NoInvites implements BetterAuthPendingInvite {
   }
 }
 
+class StubPendingInvites implements BetterAuthPendingInvite {
+  readonly applyInvite = vi.fn().mockResolvedValue(undefined);
+  constructor(private readonly pending: { id: string } | null) {}
+  tryFindPendingByOrganizationAndEmail(): Promise<{ id: string } | null> {
+    return Promise.resolve(this.pending);
+  }
+}
+
 class RecordingAnnouncements implements BetterAuthAnnouncements {
   readonly trackServerEvent = vi.fn();
   readonly reportError = vi.fn();
@@ -78,7 +86,7 @@ describe("signing in through a domain-matched organization's identity provider",
 
       await afterUserCreate({
         repo,
-        user: { id: "user_new", email: "new@acme.com", name: "New User" },
+        user: { id: "user_new", email: "new@acme.com", name: "New User", emailVerified: true },
         collaborators: {
           federation: new LicensedFederation(),
           invites: new NoInvites(),
@@ -94,6 +102,61 @@ describe("signing in through a domain-matched organization's identity provider",
       expect(attachBindings).toHaveBeenCalledWith(
         expect.objectContaining({ organizationId: "org_acme" }),
       );
+    });
+  });
+
+  describe("given a credential signup whose email nobody has verified", () => {
+    /** @scenario Unverified signup with a matching ssoDomain does not auto-join the SSO org */
+    it("creates no membership and no grant at the domain-matched organization", async () => {
+      const repo = signupRepo(ACME);
+      const attachBindings = vi.fn().mockResolvedValue(undefined);
+
+      await afterUserCreate({
+        repo,
+        user: {
+          id: "user_new",
+          email: "new@acme.com",
+          name: "New User",
+          emailVerified: false,
+        },
+        collaborators: {
+          federation: new LicensedFederation(),
+          invites: new NoInvites(),
+          announcements: new RecordingAnnouncements(),
+          authzGrants: { attachBindings } as never,
+        },
+      });
+
+      expect(repo.tryFindOrganizationBySsoDomain).not.toHaveBeenCalled();
+      expect(repo.createOrganizationMembership).not.toHaveBeenCalled();
+      expect(attachBindings).not.toHaveBeenCalled();
+    });
+
+    /** @scenario Unverified signup does not claim a pending invite addressed to its email */
+    it("leaves the pending invite unapplied and grants nothing", async () => {
+      const repo = signupRepo(ACME);
+      const invites = new StubPendingInvites({ id: "invite_1" });
+      const attachBindings = vi.fn().mockResolvedValue(undefined);
+
+      await afterUserCreate({
+        repo,
+        user: {
+          id: "user_new",
+          email: "invited@acme.com",
+          name: "New User",
+          emailVerified: false,
+        },
+        collaborators: {
+          federation: new LicensedFederation(),
+          invites,
+          announcements: new RecordingAnnouncements(),
+          authzGrants: { attachBindings } as never,
+        },
+      });
+
+      expect(invites.applyInvite).not.toHaveBeenCalled();
+      expect(repo.createOrganizationMembership).not.toHaveBeenCalled();
+      expect(attachBindings).not.toHaveBeenCalled();
     });
   });
 

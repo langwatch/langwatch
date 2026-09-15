@@ -192,12 +192,19 @@ export const afterUserCreate = async ({
   collaborators,
 }: {
   repo: BetterAuthHooksRepository;
-  user: { id: string; email: string; name: string };
+  user: { id: string; email: string; name: string; emailVerified: boolean };
   collaborators: BetterAuthHookCollaborators;
 }): Promise<void> => {
   // Same distinct_id posthog-js identifies with client-side (the user id),
   // so this server event joins the browser person.
   collaborators.announcements.trackServerEvent({ userId: user.id, event: "signed_up" });
+
+  // Only a verified email proves the signup controls the mailbox an ssoDomain
+  // or invite match would admit; credential signups are always created
+  // emailVerified=false, so without this gate a mailbox guess at a staff-set
+  // ssoDomain would win a membership. The join-request flow demands the same
+  // proof (provenDomainOrRefuse) and remains the unverified user's path in.
+  if (user.emailVerified !== true) return;
 
   const domain = extractEmailDomain(user.email);
   if (!domain) return;
