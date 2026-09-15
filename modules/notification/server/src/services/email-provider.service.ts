@@ -1,9 +1,10 @@
 import {
   EMAIL_PROVIDER_NAMES,
   EmailProviderConfigurationError,
+  resolveDefaultFrom,
   type EmailProviderName,
   type MailerConfiguration,
-} from "./email-gateway.service.ts";
+} from "../channels/email-delivery.channel.ts";
 
 /** What an operator must set to finish configuring a half-configured gateway. */
 const MISSING_SETTING_HINT: Record<EmailProviderName, string> = {
@@ -23,32 +24,13 @@ export class EmailProviderService {
   }
 
   /**
-   * Default sender address; identical to app's derivation to maintain SPF
-   * consistency.
+   * Default sender address. The derivation itself lives in
+   * `channels/email-delivery.channel.ts`, where a configuration parser can reach it without
+   * naming a service; this static stands only until the two config parsers call
+   * it there.
    */
   static resolveDefaultFrom(input: { emailDefaultFrom?: string; baseHost: string }): string {
-    if (input.emailDefaultFrom) {
-      return input.emailDefaultFrom;
-    }
-
-    const hostname = EmailProviderService.hostnameOf(input.baseHost);
-
-    if (hostname.includes("app.langwatch.ai") || hostname.includes("localhost")) {
-      return "LangWatch <contact@langwatch.ai>";
-    }
-
-    return `LangWatch <mailer@${hostname}>`;
-  }
-
-  private static hostnameOf(baseHost: string): string {
-    try {
-      return new URL(baseHost).hostname;
-    } catch {
-      const withoutProtocol = baseHost.replace(/^[a-z]+:\/\//i, "");
-      const hostname = withoutProtocol.split("/")[0]?.trim() ?? "";
-
-      return hostname !== "" ? hostname : "localhost";
-    }
+    return resolveDefaultFrom(input);
   }
 
   private constructor(private readonly configuration: MailerConfiguration) {}

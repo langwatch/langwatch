@@ -1,8 +1,4 @@
-export {
-  PostgresAutomationRepositories,
-  type AutomationDatabase,
-} from "./repositories/prisma/prisma.automation.repositories.ts";
-export { automationRepositories } from "./repositories/automation-repositories.registry.ts";
+export type { AutomationDatabase } from "./repositories/prisma/prisma.automation.repositories.ts";
 export type { AutomationRepositories } from "./repositories/automation.repositories.ts";
 export { automationServer } from "./automation.server.ts";
 export { PrismaAutomationGraphDeliveryRepository as PostgresAutomationGraphDeliveryAdapter } from "./repositories/prisma/prisma.automation-graph-delivery.repository.ts";
@@ -172,24 +168,8 @@ export {
   PrismaWebhookDeliveryRepository,
   type WebhookDeliveryDatabase,
 } from "./repositories/prisma/prisma.webhook-delivery.repository.ts";
-export {
-  PrismaEmailSuppressionRepository,
-  type EmailSuppressionDatabase,
-} from "./repositories/prisma/prisma.email-suppression.repository.ts";
-export {
-  AutomationGraphActivityService,
-} from "./services/automation-graph-activity.service.ts";
-export {
-  AutomationGraphDeliveryService,
-} from "./services/automation-graph-delivery.service.ts";
-export {
-  AutomationSettlementLedgerService,
-} from "./services/automation-settlement-ledger.service.ts";
-export {
-  AutomationTraceTriggerCatalogueService,
-} from "./services/automation-trace-trigger-catalogue.service.ts";
+export type { EmailSuppressionDatabase } from "./repositories/prisma/prisma.email-suppression.repository.ts";
 export { AutomationSettlementMatchConfirmationService } from "./services/automation-settlement-match-confirmation.service.ts";
-export { GraphAlertDispatchService } from "./services/graph-alert-dispatch.service.ts";
 export type { AutomationClock } from "./app/automation.members.ts";
 export type {
   AutomationGraphActivity,
@@ -204,15 +184,10 @@ export {
   PrismaAutomationTraceTriggerCatalogueRepository,
   type AutomationTraceTriggerCatalogueDatabase,
 } from "./repositories/prisma/prisma.automation-trace-trigger-catalogue.repository.ts";
-export { ActiveTriggerCacheService } from "./services/active-trigger-cache.service.ts";
+export type { UnsubscribeTokenPayload } from "./services/unsubscribe-token.service.ts";
+export { TEST_FIRE_TRIGGER_ID_SENTINEL } from "./channels/automation-test-fire.channel.ts";
+export { UnsubscribeTokenService } from "./services/unsubscribe-token.service.ts";
 export {
-  HmacUnsubscribeTokenAdapter,
-  UnsubscribeTokenService,
-  UnsubscribeTokenVerifier,
-  type UnsubscribeTokenPayload,
-} from "./services/unsubscribe-token.service.ts";
-export {
-  TEST_FIRE_TRIGGER_ID_SENTINEL,
   TriggerNoReplyService,
   TriggerNoReplyWarning,
 } from "./services/trigger-no-reply.service.ts";
@@ -227,23 +202,21 @@ export {
 } from "./channels/automation-test-fire.channel.ts";
 export { SchedulerWake } from "./channels/automation-scheduler-wake.channel.ts";
 export { AutomationScheduledJobRepository, type ScheduledJobRecord } from "./repositories/automation-scheduled-job.repository.ts";
-export { buildRetryAfterMessage } from "./rules/retry-after-message.rules.ts";
 
 /**
  * The feature's application: the one object all five of its doors call, and the
  * technical members a process supplies it with. Its refusals are the
  * contract's, beside every other error this feature names.
  */
-export {
-  AutomationApp,
-  type AutomationActionParamsParse,
-  type AutomationActionParamsSchema,
-  type AutomationAuditSink,
-  type AutomationCallCounter,
-  type AutomationProjectIdentity,
-  type AutomationProviderSecrets,
-  type AutomationSlackDirectory,
-  type AutomationTraceFilterCompiler,
+export type {
+  AutomationActionParamsParse,
+  AutomationActionParamsSchema,
+  AutomationAuditSink,
+  AutomationCallCounter,
+  AutomationProjectIdentity,
+  AutomationProviderSecrets,
+  AutomationSlackDirectory,
+  AutomationTraceFilterCompiler,
 } from "./app/automation.app.ts";
 
 /**
@@ -295,5 +268,28 @@ export {
   NoopAutomationRunawayMetrics,
   OtelAutomationRunawayMetricsAdapter,
 } from "./services/automation-runaway-metrics.service.ts";
+
+/**
+ * What a process composes this feature through. Each takes the substrates the
+ * process owns and returns the contribution behind the ports it already names;
+ * which class does the work, and which table it reads, stay in here.
+ */
+export {
+  createAutomationEmailCaps,
+  createAutomationEvaluationSubscriber,
+  createAutomationGraphActivity,
+  createAutomationMailEnvelope,
+  createAutomationReportCalendar,
+  createAutomationSettlement,
+  type AutomationMailEnvelope,
+  type AutomationPersistCeiling,
+  type AutomationReportCalendar,
+  type AutomationReportCalendarDatabase,
+  type AutomationRunawayCollaborator,
+  type AutomationSettlement,
+  type AutomationSettlementDatabase,
+} from "./automation.server.ts";
+/** The ledger a late-built containment collaborator filters its notice through. */
+export type { AutomationSettlementLedgerService } from "./services/automation-settlement-ledger.service.ts";
 
 export { SlackAlertTask } from "./tasks/slack-alert.task.ts";

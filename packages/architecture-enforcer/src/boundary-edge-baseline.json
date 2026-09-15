@@ -773,16 +773,6 @@
       "expires": "2026-10-01"
     },
     {
-      "key": "private-runtime-export|modules/automation/server/src/index.ts|./app/automation.app.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/automation/server/src/index.ts|./repositories/automation-repositories.registry.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
       "key": "private-runtime-export|modules/automation/server/src/index.ts|./repositories/prisma/prisma.automation-graph-activity.repository.ts",
       "measured": "2026-09-10",
       "expires": "2026-10-01"
@@ -793,17 +783,7 @@
       "expires": "2026-10-01"
     },
     {
-      "key": "private-runtime-export|modules/automation/server/src/index.ts|./repositories/prisma/prisma.automation.repositories.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
       "key": "private-runtime-export|modules/automation/server/src/index.ts|./repositories/prisma/prisma.custom-graph.repository.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/automation/server/src/index.ts|./repositories/prisma/prisma.email-suppression.repository.ts",
       "measured": "2026-09-10",
       "expires": "2026-10-01"
     },
@@ -828,16 +808,6 @@
       "expires": "2026-10-01"
     },
     {
-      "key": "private-runtime-export|modules/automation/server/src/index.ts|./rules/retry-after-message.rules.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/automation/server/src/index.ts|./services/active-trigger-cache.service.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
       "key": "private-runtime-export|modules/automation/server/src/index.ts|./services/automation-evaluation-subscriber.service.ts",
       "measured": "2026-09-10",
       "expires": "2026-10-01"
@@ -848,37 +818,12 @@
       "expires": "2026-10-01"
     },
     {
-      "key": "private-runtime-export|modules/automation/server/src/index.ts|./services/automation-graph-activity.service.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/automation/server/src/index.ts|./services/automation-graph-delivery.service.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/automation/server/src/index.ts|./services/automation-settlement-ledger.service.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
       "key": "private-runtime-export|modules/automation/server/src/index.ts|./services/automation-settlement-match-confirmation.service.ts",
       "measured": "2026-09-10",
       "expires": "2026-10-01"
     },
     {
-      "key": "private-runtime-export|modules/automation/server/src/index.ts|./services/automation-trace-trigger-catalogue.service.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
       "key": "private-runtime-export|modules/automation/server/src/index.ts|./services/email-cap.service.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/automation/server/src/index.ts|./services/graph-alert-dispatch.service.ts",
       "measured": "2026-09-10",
       "expires": "2026-10-01"
     },
@@ -934,11 +879,6 @@
     },
     {
       "key": "private-runtime-export|modules/automation/server/src/index.ts|./services/unsubscribe-token.service.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/automation/server/src/testing.ts|AutomationPersistCapService",
       "measured": "2026-09-10",
       "expires": "2026-10-01"
     },
@@ -1323,47 +1263,12 @@
       "expires": "2026-10-01"
     },
     {
-      "key": "private-runtime-export|modules/notification/server/src/index.ts|./repositories/tenant-broadcast.repository.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
       "key": "private-runtime-export|modules/notification/server/src/index.ts|./services/email-delivery.service.ts",
       "measured": "2026-09-10",
       "expires": "2026-10-01"
     },
     {
-      "key": "private-runtime-export|modules/notification/server/src/index.ts|./services/email-gateway.service.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/notification/server/src/index.ts|./services/email-mime.service.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
       "key": "private-runtime-export|modules/notification/server/src/index.ts|./services/email-provider.service.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/notification/server/src/index.ts|./services/resend.email-gateway.service.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/notification/server/src/index.ts|./services/sendgrid.email-gateway.service.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/notification/server/src/index.ts|./services/ses.email-gateway.service.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/notification/server/src/index.ts|./services/smtp.email-gateway.service.ts",
       "measured": "2026-09-10",
       "expires": "2026-10-01"
     },

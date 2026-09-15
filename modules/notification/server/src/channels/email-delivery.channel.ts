@@ -112,3 +112,38 @@ export class EmailProviderConfigurationError extends Error {
     this.name = "EmailProviderConfigurationError";
   }
 }
+
+/**
+ * The address a deployment's mail leaves from when the operator named none.
+ * The api and the worker each derive it while parsing their own configuration,
+ * and must land on the same answer or one of them fails SPF.
+ */
+export function resolveDefaultFrom(input: {
+  emailDefaultFrom?: string;
+  baseHost: string;
+}): string {
+  if (input.emailDefaultFrom) {
+    return input.emailDefaultFrom;
+  }
+
+  const hostname = hostnameOf(input.baseHost);
+  const sendsAsLangWatch =
+    hostname.includes("app.langwatch.ai") || hostname.includes("localhost");
+
+  if (sendsAsLangWatch) {
+    return "LangWatch <contact@langwatch.ai>";
+  }
+
+  return `LangWatch <mailer@${hostname}>`;
+}
+
+function hostnameOf(baseHost: string): string {
+  try {
+    return new URL(baseHost).hostname;
+  } catch {
+    const withoutProtocol = baseHost.replace(/^[a-z]+:\/\//i, "");
+    const hostname = withoutProtocol.split("/")[0]?.trim() ?? "";
+
+    return hostname !== "" ? hostname : "localhost";
+  }
+}

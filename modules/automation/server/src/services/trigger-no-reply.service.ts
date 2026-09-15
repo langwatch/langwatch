@@ -8,9 +8,6 @@ import { createHmac } from "node:crypto";
 /** Bytes of HMAC in the local part, rendered as twice as many hex characters. */
 const HMAC_BYTES = 6;
 
-/** Test fires use this id so they never pollute a bounce stream keyed on the hash. */
-export const TEST_FIRE_TRIGGER_ID_SENTINEL = "preview";
-
 /** Reports an absent signing key. Never carries the key or the address. */
 export abstract class TriggerNoReplyWarning {
   abstract unguessabilityUnavailable(message: string): void;

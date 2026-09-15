@@ -4,7 +4,7 @@ import {
   type EmailContent,
   EmailGateway,
   type MailerConfiguration,
-} from "./email-gateway.service.ts";
+} from "../channels/email-delivery.channel.ts";
 import { EmailMimeService } from "./email-mime.service.ts";
 
 const logger = createLogger("langwatch:mailer:sendgrid");

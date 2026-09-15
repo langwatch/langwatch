@@ -6,7 +6,7 @@ import {
   type EmailOutboundProxyConfig,
   type EmailProviderName,
   type MailerConfiguration,
-} from "./email-gateway.service.ts";
+} from "../channels/email-delivery.channel.ts";
 import { EmailProviderService } from "./email-provider.service.ts";
 import { ResendEmailGatewayAdapter } from "./resend.email-gateway.service.ts";
 import { SendgridEmailGatewayAdapter } from "./sendgrid.email-gateway.service.ts";

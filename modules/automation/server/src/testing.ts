@@ -9,10 +9,7 @@ import {
   AutomationRunawaySignals,
   AutomationSlackBotTokenDecryptor,
   AutomationTestFire,
-  AutomationPersistCapService,
 } from "./index.ts";
-
-export { AutomationPersistCapService };
 
 /**
  * The graph-alert vertical's fixtures, so a composition root can prove its own

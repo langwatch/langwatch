@@ -1,5 +1,11 @@
 import type { SlackPayload } from "@langwatch/automation-contract";
 
+/**
+ * The trigger id a test fire carries, so delivery can tell a preview from a
+ * real fire and never pollute a bounce stream keyed on the trigger hash.
+ */
+export const TEST_FIRE_TRIGGER_ID_SENTINEL = "preview";
+
 export interface TestFireEmail {
   recipients: string[];
   subject: string;

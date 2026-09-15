@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   TENANT_BROADCAST_EVENT_TYPES,
   TenantBroadcastPublisher,
-} from "../../tenant-broadcast.repository.ts";
+} from "../../../channels/tenant-broadcast.channel.ts";
 import { RedisTenantBroadcastRepository } from "../redis.tenant-broadcast.repository.ts";
 
 /**

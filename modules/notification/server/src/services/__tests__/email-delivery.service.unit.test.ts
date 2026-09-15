@@ -4,7 +4,7 @@ import {
   type EmailContent,
   type EmailProviderName,
   type MailerConfiguration,
-} from "../email-gateway.service.ts";
+} from "../../channels/email-delivery.channel.ts";
 import { EmailDeliveryAdapter } from "../email-delivery.service.ts";
 import { ResendEmailGatewayAdapter } from "../resend.email-gateway.service.ts";
 import { SendgridEmailGatewayAdapter } from "../sendgrid.email-gateway.service.ts";

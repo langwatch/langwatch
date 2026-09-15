@@ -2,21 +2,19 @@ import type { TriggerSummary } from "@langwatch/automation-contract";
 import type { IntentContext } from "@langwatch/eventing";
 import type { Project } from "@langwatch/project-contract";
 import { TestProjectApi } from "./test-project-api.ts";
-import {
-  TraceService,
-  type DerivedTraceEvent,
-  type TraceRecord,
-  type TraceSummaryData,
+import type {
+  DerivedTraceEvent,
+  TraceRecord,
+  TraceSummaryData,
 } from "@langwatch/trace-contract";
 import { AutomationSlackSecretsService } from "../services/automation-slack-secrets.service.ts";
 import { AutomationWebhookSecretsService } from "../services/automation-webhook-secrets.service.ts";
 import type { AutomationClock } from "../app/automation.members.ts";
 import { AutomationEmailCapRepository } from "../repositories/automation-email-cap.repository.ts";
 import { AutomationNotificationDelivery } from "../channels/automation-notification-delivery.channel.ts";
-import {
-  AutomationDatasetMapper,
-  AutomationPersistActionWriter,
-} from "../repositories/automation-persist-action.repository.ts";
+import { AutomationDatasetMapper } from "../services/automation-dataset-mapper.service.ts";
+import { AutomationPersistActionWriter } from "../repositories/automation-persist-action.repository.ts";
+import { AutomationSettlementTraceReader } from "../repositories/automation-settlement-read.repository.ts";
 import { AutomationSettlementMatchConfirmation } from "../services/automation-settlement-policy.service.ts";
 import { AutomationSettlementObservability } from "../services/automation-settlement-observability.service.ts";
 import type { AutomationSettlementLedger } from "../repositories/automation-settlement-ledger.repository.ts";
@@ -266,41 +264,18 @@ export class SettlementProjectService extends TestProjectApi {
   }
 }
 
-class SettlementTraceService extends TraceService {
-  // `TraceService` grew these and the fakes did not follow. A member left
-  // off a double is a method the real service has that no test here would
-  // notice going wrong.
-  getFullRecord(): never {
-    return unavailable();
-  }
-
-  getFullThread(): never {
-    return unavailable();
-  }
-
+/**
+ * The traces a settlement re-reads, as this feature's own port declares them.
+ * Based on that port and not on Trace's service: a double that inherits the
+ * whole trace surface grows a new `never` member every time Trace adds one,
+ * and none of them is a call settlement makes.
+ */
+class SettlementTraceService extends AutomationSettlementTraceReader {
   readonly summaries = new Map<string, TraceSummaryData>();
   readonly records = new Map<string, TraceRecord>();
   readonly recordErrors = new Map<string, unknown>();
 
   classifyQuery(): never {
-    return unavailable();
-  }
-  getEvaluationSpans(): never {
-    return unavailable();
-  }
-  getEvaluationEvents(): never {
-    return unavailable();
-  }
-  getSpanTreePage(): never {
-    return unavailable();
-  }
-  getSpanTreeDelta(): never {
-    return unavailable();
-  }
-  buildQueryFieldCatalogue(): never {
-    return unavailable();
-  }
-  resolveIngestWaitTimeout(): never {
     return unavailable();
   }
 
