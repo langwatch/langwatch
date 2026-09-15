@@ -20,9 +20,21 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { createInnerTRPCContext } from "../../trpc";
 import { userRouter } from "../user";
 
-vi.mock("../../../../env.mjs", () => ({
-  env: { NEXTAUTH_PROVIDER: "email", BASE_HOST: "http://localhost:5560" },
+// Mutable, because whether the deployment issues its OWN passwords beside a
+// provider is read off the environment (D09) and one scenario below turns it
+// on. `beforeEach` puts it back.
+const { envMock } = vi.hoisted(() => ({
+  envMock: {
+    NEXTAUTH_PROVIDER: "email",
+    BASE_HOST: "http://localhost:5560",
+    LOCAL_PASSWORDS_ENABLED: "off",
+  } as {
+    NEXTAUTH_PROVIDER: string;
+    BASE_HOST: string;
+    LOCAL_PASSWORDS_ENABLED: string;
+  },
 }));
+vi.mock("../../../../env.mjs", () => ({ env: envMock }));
 
 vi.mock("~/server/rateLimit", () => ({
   rateLimit: vi.fn().mockResolvedValue({ allowed: true }),
@@ -34,9 +46,14 @@ vi.mock("@ee/audit-log/auditLog", () => ({
   auditLog: vi.fn().mockResolvedValue(undefined),
 }));
 
-const { resolveAuthProviderMock, setFirstPasswordMock } = vi.hoisted(() => ({
+const {
+  resolveAuthProviderMock,
+  setFirstPasswordMock,
+  addressRoutesToConnectionMock,
+} = vi.hoisted(() => ({
   resolveAuthProviderMock: vi.fn(),
   setFirstPasswordMock: vi.fn(),
+  addressRoutesToConnectionMock: vi.fn(),
 }));
 vi.mock("@ee/sso/sso-gate", () => ({
   resolveAuthProvider: resolveAuthProviderMock,
@@ -48,6 +65,10 @@ vi.mock("~/server/app-layer/identity/runtime", async (importOriginal) => ({
     typeof import("~/server/app-layer/identity/runtime")
   >()),
   credentialAccounts: () => ({ setFirstPassword: setFirstPasswordMock }),
+  // No organization routes this suite's address. The real one asks the
+  // router, which reaches Prisma — and the question it answers has its own
+  // scenario; here it must simply not be the thing under test.
+  addressRoutesToConnection: addressRoutesToConnectionMock,
 }));
 
 describe("userRouter.setPassword", () => {
@@ -55,6 +76,8 @@ describe("userRouter.setPassword", () => {
     vi.clearAllMocks();
     resolveAuthProviderMock.mockResolvedValue("email");
     setFirstPasswordMock.mockResolvedValue("set");
+    addressRoutesToConnectionMock.mockResolvedValue(false);
+    envMock.LOCAL_PASSWORDS_ENABLED = "off";
   });
 
   const createCaller = ({
@@ -153,6 +176,39 @@ describe("userRouter.setPassword", () => {
 
       await expect(call()).rejects.toMatchObject({ code: "BAD_REQUEST" });
       expect(setFirstPasswordMock).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given an address an organization routes through its own provider", () => {
+    /** @scenario "An organization's own connection still refuses a local password" */
+    it("refuses even where the deployment issues its own passwords", async () => {
+      // The mode this has to be asserted in, and the only one where the
+      // refusal is load-bearing: a broker deployment that ALSO issues its own
+      // passwords. The provider gate above lets that through by design, so
+      // without this the address would reach a password.
+      //
+      // Which is the bypass: a company mandating SSO gets session lifetime,
+      // conditional access and revocation from its own connection, and a
+      // local password beside it answers none of them. Widening WHO may hold
+      // a password never overrules whose company has already said otherwise.
+      resolveAuthProviderMock.mockResolvedValue("auth0");
+      envMock.LOCAL_PASSWORDS_ENABLED = "on";
+      addressRoutesToConnectionMock.mockResolvedValue(true);
+
+      await expect(call()).rejects.toMatchObject({ code: "BAD_REQUEST" });
+      expect(setFirstPasswordMock).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "An organization's own connection still refuses a local password" */
+    it("lets an ordinary address through on that same deployment", async () => {
+      // The control. Without it the test above passes on a deployment that
+      // refuses everybody, which is exactly what the provider gate did before
+      // the switch existed and would prove nothing about the connection.
+      resolveAuthProviderMock.mockResolvedValue("auth0");
+      envMock.LOCAL_PASSWORDS_ENABLED = "on";
+
+      await expect(call()).resolves.toMatchObject({ success: true });
+      expect(setFirstPasswordMock).toHaveBeenCalled();
     });
   });
 });

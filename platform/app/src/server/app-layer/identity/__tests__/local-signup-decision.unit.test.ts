@@ -127,4 +127,44 @@ describe("decideLocalSignUp", () => {
       })("sam@acme.com"),
     ).resolves.toMatchObject({ outcome: "unavailable", methodSet: [] });
   });
+
+  describe("when the deployment federates and issues its own passwords", () => {
+    const federated: SignInMethod = {
+      id: "auth0",
+      kind: "federated",
+      connectionId: null,
+    };
+    // What `resolveSignInMethodPolicy` builds with the switch on: the
+    // provider leads, the password stands behind it.
+    const withLocalPasswords: SignInMethodPolicy = {
+      ...policy,
+      defaultMethods: [federated, password, passkey],
+      selfHosted: false,
+    };
+
+    /** @scenario "Sign-up offers a password where the deployment issues its own" */
+    it("offers a password among the ways an unknown address may enroll", async () => {
+      await expect(
+        fixture({ currentPolicy: withLocalPasswords, passwordAllowed: true })(),
+      ).resolves.toMatchObject({
+        outcome: "enroll",
+        methodSet: [federated, password, passkey],
+      });
+    });
+
+    /** @scenario "Sign-up offers a password where the deployment issues its own" */
+    it("still hands a domain routed to a connection straight to that provider", async () => {
+      // The switch widens what a deployment offers; it never overrules a
+      // domain whose organization routes through its own provider. That
+      // account is made at the provider, and a password created here is the
+      // exact thing the connection exists to prevent.
+      await expect(
+        fixture({
+          byDomain: active,
+          currentPolicy: withLocalPasswords,
+          passwordAllowed: true,
+        })("sam@acme.com"),
+      ).resolves.toMatchObject({ outcome: "redirect", methodSet: [okta] });
+    });
+  });
 });

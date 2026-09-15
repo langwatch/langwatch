@@ -61,6 +61,9 @@ vi.mock("@ee/governance/services/personalWorkspace.service", () => ({
 const verifiedEmailsOfMock = vi.hoisted(() => vi.fn().mockResolvedValue(null));
 vi.mock("~/server/app-layer/identity/runtime", () => ({
   identityEmail: () => ({ verifiedEmailsOf: verifiedEmailsOfMock }),
+  // The credential boundary asks this before it lets a password through; no
+  // organization routes this suite's addresses.
+  addressRoutesToConnection: async () => false,
   // `betterAuth()` builds its adapter EAGERLY at module load, and this
   // suite's import graph reaches it through the router. It has to be real
   // enough to initialise; better-auth's own memory engine over an empty

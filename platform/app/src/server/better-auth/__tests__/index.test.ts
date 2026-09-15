@@ -272,6 +272,7 @@ describe("better-auth config", () => {
         OKTA_CLIENT_SECRET: undefined,
         OKTA_ISSUER: undefined,
         NEXTAUTH_URL: "http://localhost:3000",
+        LOCAL_PASSWORDS_ENABLED: "off" as const,
       };
       const configs = buildGenericOAuthConfigs(e);
       const providerIds = configs.map(
@@ -304,8 +305,38 @@ describe("better-auth config", () => {
       // reset reachable; the `before` hook is what refuses the email routes
       // when the gate allows.
       expect(
-        isEmailPasswordEnabled({ NEXTAUTH_PROVIDER: "auth0", IS_SAAS: false }),
+        isEmailPasswordEnabled({
+          NEXTAUTH_PROVIDER: "auth0",
+          IS_SAAS: false,
+          LOCAL_PASSWORDS_ENABLED: "off",
+        }),
       ).toBe(true);
+    });
+
+    /** @scenario "The credential routes answer on a deployment that offers a password" */
+    it("mounts them on SaaS once the deployment issues its own passwords", async () => {
+      const { isEmailPasswordEnabled } = await import(
+        "../config/email-and-password"
+      );
+
+      // D09: the broker's own screen already offers a password box, so this
+      // relocates that door rather than opening one. Mounting is still not
+      // the gate — `refusesCredentialRoute` reads the resolved policy, and
+      // stands down on exactly the deployments that offer a password.
+      expect(
+        isEmailPasswordEnabled({
+          NEXTAUTH_PROVIDER: "auth0",
+          IS_SAAS: true,
+          LOCAL_PASSWORDS_ENABLED: "on",
+        }),
+      ).toBe(true);
+      expect(
+        isEmailPasswordEnabled({
+          NEXTAUTH_PROVIDER: "auth0",
+          IS_SAAS: true,
+          LOCAL_PASSWORDS_ENABLED: "off",
+        }),
+      ).toBe(false);
     });
   });
 

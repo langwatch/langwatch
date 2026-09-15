@@ -349,6 +349,28 @@ export function createEnvConfig() {
       // Off is not a deletion. Passkeys already registered are left alone and
       // nobody is signed out, so turning it back on finds them still there.
       PASSKEYS_ENABLED: z.enum(["off", "on"]).optional().default("on"),
+      // Whether THIS deployment issues and verifies its own passwords while a
+      // federated provider is also configured (D09).
+      //
+      // The rule it relaxes came from NextAuth and held everywhere until now:
+      // a deployment mounted EITHER a social provider OR credentials, never
+      // both, so nobody could sidestep the configured identity provider. Five
+      // sites say it — the sign-up method set, `user.register`,
+      // `user.setPassword`, the credential-route refusal and whether
+      // better-auth mounts the routes at all — and each reads "on this
+      // deployment, passwords live at the identity provider".
+      //
+      // On LangWatch Cloud that sentence is already false. Auth0's own
+      // Universal Login offers a password box and a sign-up link, so the
+      // password door exists; it is simply hosted at the broker. Turning this
+      // on RELOCATES that door rather than opening a new one, and it is what
+      // stops every new password account being minted inside the tenant we
+      // are trying to leave.
+      //
+      // Shipped `off`, so merging the wiring changes no deployment. A
+      // deployment already in email mode needs nothing from this: it issues
+      // its own passwords by definition, and every site reads that first.
+      LOCAL_PASSWORDS_ENABLED: z.enum(["off", "on"]).optional().default("off"),
       // ADR-117 §5: where the router's DOMAIN LOOKUP reads from. Three-valued
       // and shipped `off` for the same reason the router's own flag is: the
       // front door is the highest-risk flip in the identity program.
@@ -715,6 +737,7 @@ export function createEnvConfig() {
       LANGWATCH_LICENSE_KEY: process.env.LANGWATCH_LICENSE_KEY,
       MFA_ENROLLMENT_OPEN: process.env.MFA_ENROLLMENT_OPEN,
       PASSKEYS_ENABLED: process.env.PASSKEYS_ENABLED,
+      LOCAL_PASSWORDS_ENABLED: process.env.LOCAL_PASSWORDS_ENABLED,
       SSOCONN_ROUTING: process.env.SSOCONN_ROUTING,
       SCIM_V2_GRANTS: process.env.SCIM_V2_GRANTS,
       TRIGGER_EMAIL_HOURLY_CAP: process.env.TRIGGER_EMAIL_HOURLY_CAP,

@@ -135,6 +135,7 @@ function buildHarness() {
       afterDisable: async () => {},
     }),
     signInAfterPasswordReset: async () => {},
+    addressRoutesToConnection: async () => false,
   });
   const beforeHook = configuredHooks?.before;
   if (!beforeHook) {

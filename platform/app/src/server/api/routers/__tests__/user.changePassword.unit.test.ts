@@ -38,10 +38,12 @@ const {
   resolveAuthProviderMock,
   changePasswordMock,
   changeFederatedPasswordMock,
+  hasPasswordMock,
 } = vi.hoisted(() => ({
   resolveAuthProviderMock: vi.fn(),
   changePasswordMock: vi.fn(),
   changeFederatedPasswordMock: vi.fn(),
+  hasPasswordMock: vi.fn(),
 }));
 vi.mock("@ee/sso/sso-gate", () => ({
   resolveAuthProvider: resolveAuthProviderMock,
@@ -53,6 +55,7 @@ vi.mock("~/server/app-layer/identity/runtime", async (importOriginal) => ({
   credentialAccounts: () => ({
     changePassword: changePasswordMock,
     changeFederatedPassword: changeFederatedPasswordMock,
+    hasPassword: hasPasswordMock,
   }),
 }));
 
@@ -61,6 +64,10 @@ describe("userRouter.changePassword", () => {
     vi.clearAllMocks();
     changePasswordMock.mockResolvedValue("changed");
     changeFederatedPasswordMock.mockResolvedValue("changed");
+    // Nobody holds a password of this deployment's own unless a scenario says
+    // so. That is the state every deployment shipping today is in, and it is
+    // what keeps the broker branch answering exactly as it did before.
+    hasPasswordMock.mockResolvedValue(false);
   });
 
   const createCaller = ({
@@ -172,6 +179,30 @@ describe("userRouter.changePassword", () => {
       changeFederatedPasswordMock.mockResolvedValue("no_federated_account");
 
       await expect(call()).rejects.toMatchObject({ code: "NOT_FOUND" });
+    });
+  });
+
+  describe("given a broker deployment where the person holds a password of ours", () => {
+    /** @scenario "A change targets the password the person actually signs in with" */
+    it("changes our own password rather than the broker's copy", async () => {
+      // The failure this is here for: reading the provider alone sent
+      // somebody holding one of OUR passwords to the broker, which looks for
+      // an `auth0|` row, finds none, and refuses — set a password, then be
+      // told no Auth0 account is linked. For somebody holding both it was
+      // worse, rewriting the broker's copy and reporting success for a change
+      // their next sign-in would not see.
+      resolveAuthProviderMock.mockResolvedValue("auth0");
+      hasPasswordMock.mockResolvedValue(true);
+
+      await expect(call()).resolves.toMatchObject({ success: true });
+
+      expect(changePasswordMock).toHaveBeenCalledWith({
+        userId: "user-1",
+        currentPassword: "current-password",
+        newPassword: "brand-new-password-1",
+        keepSessionId: "sess-1",
+      });
+      expect(changeFederatedPasswordMock).not.toHaveBeenCalled();
     });
   });
 });

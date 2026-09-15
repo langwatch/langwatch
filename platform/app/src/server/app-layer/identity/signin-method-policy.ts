@@ -4,6 +4,7 @@ import type { SignInMethod, SignInMethodPolicy } from "@langwatch/identity";
 import type { SignInMethodPolicyPort } from "@langwatch/identity-server";
 import { env } from "~/env.mjs";
 import { auth0BridgeActive, auth0BridgeRailIds } from "~/utils/auth0-bridge";
+import { deploymentIssuesOwnPasswords } from "../../better-auth/config/email-and-password";
 
 /**
  * The instance's method-set policy (ADR-117 §4) — the module ADR-027's
@@ -239,11 +240,23 @@ export async function resolveSignInMethodPolicy(): Promise<SignInMethodPolicy> {
     ...(federated ? [federated] : []),
     ...social,
   ]);
+  // The local set is what a deployment with no federated method falls back
+  // to. A deployment that federates AND issues its own passwords (D09) offers
+  // both — the federated methods still lead, because on a deployment that has
+  // one it is THE way in, and the password stands behind them rather than
+  // moving the button anybody reaches for.
+  //
+  // Without this the switch would be half-thrown: `user.register` would mint
+  // a password account and `/sign-in/email` would accept it, while the door
+  // offered no password to type and `rankAccountMethods` — which intersects
+  // what an account holds with exactly this set — would drop the password of
+  // everyone who had one.
+  const local =
+    federatedMethods.length === 0 || deploymentIssuesOwnPasswords(env)
+      ? LOCAL_METHOD_SET
+      : [];
   return {
-    defaultMethods: [
-      ...(federatedMethods.length > 0 ? federatedMethods : LOCAL_METHOD_SET),
-      ...passkeys,
-    ],
+    defaultMethods: [...federatedMethods, ...local, ...passkeys],
     // NOT the passkeys. Break-glass is the door somebody reaches for when the
     // identity provider cannot be answered, and the whole reason it exists is
     // that anybody can use it from any machine — which is exactly what a
