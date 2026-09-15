@@ -8,9 +8,13 @@ Feature: Governance dashboards — four cost widgets, sample answers only
   The hard rule: this page never writes. Not a widget, not a dashboard,
   not a layout, not a preference, not a seeded row, and not a demo
   project standing in for a real one. A reader who opens it leaves no
-  trace behind, in either state of the sample choice. There is nothing
-  on the page to press that would save anything, because nothing that
-  saves is offered.
+  trace behind, in either state of the sample choice.
+
+  That rule is about rows, not about controls. The editor behind each
+  widget is the product's own and is offered whole — Save included —
+  because a stripped copy of it would teach the reader that this page is
+  a mock-up rather than the product. What an edit cannot do is outlive
+  the visit: it is kept in the open page and the reload takes it away.
 
   Real reads are deferred, and for one reason: the cost rollup the
   widgets want is not in the query catalog yet, so no query written
@@ -96,11 +100,15 @@ Feature: Governance dashboards — four cost widgets, sample answers only
     When the page renders
     Then no chart is drawn on any widget
     And each widget names what would appear in it and what has to happen first
-    And each widget offers the sample choice
+    And the sample choice is offered once, in the page header
     And no error alert is on the page
     # Nothing failed, so nothing may claim to have failed. The figures are
     # simply not readable yet, and the widget says that in as many words
     # rather than rendering a chart of nothing or a red card.
+    #
+    # The choice is one choice, so it is offered in one place. A button on
+    # every empty card repeats the same section-wide switch four times over
+    # and reads as four separate decisions.
 
   @integration
   Scenario: Every widget is drawn in the colour mode the reader is in
@@ -112,20 +120,64 @@ Feature: Governance dashboards — four cost widgets, sample answers only
     # no way of its own to see the page around it. A chart fixed to one mode
     # paints white panels down a dark page.
 
+  @integration
+  Scenario: The member can open the query behind one widget from its own card
+    When the member opens the query behind one widget from that widget's card
+    Then the product's own widget editor opens on that widget
+    And it carries that widget's name and previews that widget's chart
+    And its queries tab shows the statement that widget asks
+    # The figures on this page are invented, and the page says so. What it
+    # cannot say in a banner is WHICH question each chart is a picture of.
+    # The statement is the answer, and it is offered on the card it belongs
+    # to rather than in one list of four, so the chart and the question
+    # behind it are read side by side.
+    #
+    # The editor is the product's own, whole, rather than a look-alike that
+    # only displays. A surface that shows a Run it cannot honour, or hides
+    # the controls the same editor offers everywhere else, teaches the
+    # reader that this page is a mock-up of the product rather than the
+    # product.
+
+  @integration
+  Scenario: Running a statement in the editor answers from the invented figures
+    Given the member has the widget editor open on a widget
+    When the member runs that widget's statement
+    Then the answer is the same invented figures that widget's chart draws
+    And no request leaves the browser
+    # Run is honoured rather than removed, and it is honoured by the only
+    # source of figures this page has. The alternative — a Run that reaches
+    # for a catalog entry that does not exist — fails in a way that reads as
+    # a broken page rather than as an unbuilt one.
+
   # ---------------------------------------------------------------------------
   # Honesty — the page is a picture, not a workspace
   # ---------------------------------------------------------------------------
 
   @integration
-  Scenario: Nothing on the page can save a widget or a dashboard
+  Scenario: Nothing on the page itself can save a widget or a dashboard
     When the member opens "/governance/dashboards" in either sample state
-    Then no control is offered to add, edit, rename, duplicate or delete
-      a widget or a dashboard
+    Then no control on the page is offered to add, rename, duplicate or
+      delete a widget or a dashboard
     And no control is offered to save or share the page
     And nothing the member does on the page writes a row
-    # A dashboard surface that can be edited but never saves is worse than
-    # one that cannot be edited: the reader loses work and learns the
-    # product is lying. So the affordances are absent, not disabled.
+    # The page is the picture; the editor behind a widget is the product's
+    # own and is covered by its own scenarios. What the page itself must
+    # never grow is a second, half-built set of the same controls.
+
+  @integration
+  Scenario: An edit made in the editor lasts the visit and no longer
+    Given the member has changed a widget in the editor and saved it
+    When the widget is read again during the same visit
+    Then it carries the change
+    And the next visit opens on the widget the repository authored
+    And nothing the member did wrote a row
+    # The editor is whole, so Save is honoured rather than disabled — a
+    # button that looks live and does nothing is the lie this page is built
+    # to avoid. What Save cannot do here is outlive the visit: the four
+    # widgets are authored in the repository and there is no row behind
+    # them, so the change is kept where every other unsaved thing on this
+    # page is kept, in the open page, and the reload says plainly that it
+    # was never written.
 
   @unit
   Scenario: Every widget definition is a valid dashboard widget

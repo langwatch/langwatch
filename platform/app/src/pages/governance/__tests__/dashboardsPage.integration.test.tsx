@@ -114,6 +114,34 @@ vi.mock("~/features/custom-chart-playground/SandboxedChartFrame", () => ({
 }));
 
 /**
+ * The real editor pane is Monaco behind a lazy import, which jsdom neither
+ * loads nor lays out — a page rendered against it would show no statement at
+ * all and every assertion about one below would pass for the wrong reason. The
+ * stub is a plain box with the same value/onChange contract, which is the whole
+ * of what this page depends on.
+ */
+vi.mock("~/features/custom-chart-playground/DashboardWidgetCodeEditor", () => ({
+  DashboardWidgetCodeEditor: ({
+    language,
+    value,
+    onChange,
+  }: {
+    language: string;
+    value: string;
+    onChange: (next: string) => void;
+  }) => (
+    // Named by language: the editor mounts one pane for the widget's file and
+    // one for each statement, and an assertion that could not tell them apart
+    // would read the wrong one.
+    <textarea
+      data-testid={`widget-editor-${language}`}
+      value={value}
+      onChange={(event) => onChange(event.target.value)}
+    />
+  ),
+}));
+
+/**
  * The real grid measures its container through a `ResizeObserver` and renders
  * nothing until it has a width, neither of which jsdom provides — so a page
  * rendered against the real one would show no cards at all and every absence
@@ -372,26 +400,39 @@ describe("given the page is open with sample data off", () => {
     expect(cards).toHaveLength(4);
     for (const card of cards) {
       expect(
-        within(card as HTMLElement).getByText(/turn on sample data/i),
+        within(card as HTMLElement).getByText(/nothing measured yet/i),
       ).toBeInTheDocument();
     }
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
-  /** @scenario "Sample off shows an empty widget that says what would fill it" */
-  it("fills every widget when the sample choice is taken from a card", async () => {
+  /**
+   * The switch is section-wide and there is one of it, so it is offered in
+   * one place. Four empty cards each carrying their own copy read as four
+   * separate decisions over a single choice.
+   *
+   * @scenario "Sample off shows an empty widget that says what would fill it"
+   */
+  it("offers the sample choice once, in the header, and not on any card", () => {
     renderPage();
 
-    fireEvent.click(
-      screen.getAllByRole("button", { name: /turn on sample data/i })[0]!,
-    );
+    const cards = screen
+      .getAllByTestId("chart-grid")
+      .flatMap((grid) => Array.from(grid.children));
+    for (const card of cards) {
+      expect(
+        within(card as HTMLElement).queryByRole("button", {
+          name: /sample data/i,
+        }),
+      ).not.toBeInTheDocument();
+    }
 
-    await waitFor(() =>
-      expect(screen.getAllByTestId("chart-frame")).toHaveLength(4),
-    );
+    expect(
+      screen.getAllByRole("button", { name: /sample data/i }),
+    ).toHaveLength(1);
   });
 
-  /** @scenario "Nothing on the page can save a widget or a dashboard" */
+  /** @scenario "Nothing on the page itself can save a widget or a dashboard" */
   it("offers no control that would add, edit or save anything", () => {
     renderPage();
 
@@ -461,7 +502,7 @@ describe("given the page is open with sample data on", () => {
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
-  /** @scenario "Nothing on the page can save a widget or a dashboard" */
+  /** @scenario "Nothing on the page itself can save a widget or a dashboard" */
   it("offers no control that would add, edit or save anything", () => {
     renderPage();
 
@@ -499,6 +540,104 @@ describe("given a reader who has chosen a colour mode", () => {
   });
 });
 
+describe("given a member who wants to see what one chart asks", () => {
+  beforeEach(() => {
+    writeSampleChoice(true);
+  });
+
+  const cardTitled = (name: string) =>
+    screen
+      .getAllByTestId("governance-widget-card")
+      .find((card) => within(card).queryByText(name) !== null)!;
+
+  /**
+   * The drawer mounts through a portal, so nothing inside it is in the
+   * document on the tick the click returns. Resolves on the statement itself,
+   * which is the first thing inside the drawer this page is answerable for.
+   */
+  const openQueryDrawer = async (widgetName: string) => {
+    fireEvent.click(
+      within(cardTitled(widgetName)).getByRole("button", { name: /query/i }),
+    );
+    return (await screen.findByTestId(
+      "widget-editor-sql",
+    )) as HTMLTextAreaElement;
+  };
+
+  /** @scenario "The member can open the query behind one widget from its own card" */
+  it("offers the query behind each widget on that widget's own card", () => {
+    renderPage();
+
+    const cards = screen.getAllByTestId("governance-widget-card");
+    expect(cards).toHaveLength(4);
+    for (const card of cards) {
+      expect(
+        within(card).getByRole("button", { name: /query/i }),
+      ).toBeInTheDocument();
+    }
+  });
+
+  /** @scenario "The member can open the query behind one widget from its own card" */
+  it("opens the product's own editor on that widget, statement and all", async () => {
+    renderPage();
+    const editor = await openQueryDrawer("Cost by department");
+
+    // That widget's own statement, not a placeholder and not a sibling's: the
+    // rollup table names the page, the grouping names the widget.
+    expect(editor.value).toContain("governance_cost_rollup_1d");
+    expect(editor.value).toContain("AS department");
+
+    // The editor is the product's own, whole: it carries the widget's name,
+    // the tab switcher, and a Save.
+    expect(screen.getAllByText("Cost by department").length).toBeGreaterThan(0);
+    expect(screen.getByRole("tab", { name: /code/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^save$/i })).toBeInTheDocument();
+  });
+
+  /** @scenario "Running a statement in the editor answers from the invented figures" */
+  it("runs the statement against the invented figures and asks nobody", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+    renderPage();
+    await openQueryDrawer("Cost by department");
+
+    fireEvent.click(screen.getByRole("button", { name: /^run$/i }));
+
+    // The invented department answer is a handful of rows; the point is that
+    // the Run is honoured at all, by the only figures this page has.
+    await waitFor(() =>
+      expect(screen.getAllByText(/\d+ rows?/).length).toBeGreaterThan(0),
+    );
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  /** @scenario "An edit made in the editor lasts the visit and no longer" */
+  it("keeps a saved change for the visit and loses it on the next one", async () => {
+    renderPage();
+    const editor = await openQueryDrawer("Cost by department");
+
+    fireEvent.change(editor, {
+      target: { value: "SELECT 1 FROM governance_cost_rollup_1d" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /^save$/i }));
+
+    await waitFor(() =>
+      expect(screen.queryByTestId("widget-editor-sql")).not.toBeInTheDocument(),
+    );
+
+    const reopened = await openQueryDrawer("Cost by department");
+    expect(reopened.value).toBe("SELECT 1 FROM governance_cost_rollup_1d");
+
+    // Nothing was written, so the next visit opens on what the repository
+    // authored — which is the whole of what Save means on this page.
+    cleanup();
+    frameProps.length = 0;
+    renderPage();
+    const fresh = await openQueryDrawer("Cost by department");
+    expect(fresh.value).not.toBe("SELECT 1 FROM governance_cost_rollup_1d");
+    expect(fresh.value).toContain("governance_cost_rollup_1d");
+  });
+});
+
 describe("given the page's own source", () => {
   const sourceFiles = () => {
     const files = [PAGE_FILE];
@@ -526,7 +665,7 @@ describe("given the page's own source", () => {
    * client, or any of the widget-authoring pieces whose whole purpose is to
    * persist a dashboard.
    *
-   * @scenario "Nothing on the page can save a widget or a dashboard"
+   * @scenario "Nothing on the page itself can save a widget or a dashboard"
    */
   it("imports nothing that could write a row", () => {
     const files = sourceFiles();

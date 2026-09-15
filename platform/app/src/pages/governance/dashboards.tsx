@@ -4,11 +4,17 @@
  *
  * It is a PICTURE OF A DASHBOARD, not a dashboard workspace. The widgets are
  * written in the repository (`components/governance/dashboards/governanceWidgets.ts`)
- * rather than composed by the reader, so the page carries nothing that adds,
- * renames, deletes or saves a widget — there is no row behind any of it to
- * write to. That absence is the page's whole contract, and
+ * rather than composed by the reader, so the page itself carries nothing that
+ * adds, renames, deletes or duplicates a widget — there is no row behind any of
+ * it to write to. That absence is the page's whole contract, and
  * `__tests__/dashboardsPage.integration.test.tsx` holds it from both sides: by
  * what renders, and by reading this source for anything that could persist.
+ *
+ * Each card does open the product's own widget editor, whole, Save included —
+ * offering a stripped copy of it would teach a reader that this page is a
+ * mock-up of the dashboard feature rather than a picture drawn with it. A Save
+ * lands in `widgets` below and nowhere else, so it lasts the visit and the
+ * reload takes it away. The reasoning is in `useGovernanceWidgetEditor.ts`.
  *
  * NOTHING HERE READS A ROW EITHER. The four queries ask
  * `governance_cost_rollup_1d`, which is not in the LangWatchQL catalog, so
@@ -27,10 +33,11 @@
  */
 import { Heading, HStack, Spacer, VStack } from "@chakra-ui/react";
 import { CalendarDays } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 
 import { ChartGrid } from "~/components/analytics/reports/ChartGrid";
 import { GovernanceWidgetCard } from "~/components/governance/dashboards/GovernanceWidgetCard";
+import type { GovernanceWidget } from "~/components/governance/dashboards/governanceWidgets";
 import { GOVERNANCE_WIDGETS } from "~/components/governance/dashboards/governanceWidgets";
 import { createSampleExecuteQuery } from "~/components/governance/dashboards/sampleWidgetAnswers";
 import {
@@ -98,12 +105,22 @@ function DashboardsFilterBar({
 }
 
 function DashboardsPage() {
-  const {
-    active: showSample,
-    toggle: toggleSample,
-    show: showSampleData,
-  } = useSampleMode();
+  const { active: showSample, toggle: toggleSample } = useSampleMode();
   const [frame, setFrame] = useState<TimeFrame>(DEFAULT_TIME_FRAME);
+
+  // The four widgets as they stand RIGHT NOW, which is the authored four until
+  // somebody saves an edit in a widget's editor. Held here and nowhere else:
+  // there is no row behind any of them, so the reload is what takes an edit
+  // away, and that is the honest behaviour rather than a missing feature. See
+  // `useGovernanceWidgetEditor.ts`.
+  const [widgets, setWidgets] =
+    useState<readonly GovernanceWidget[]>(GOVERNANCE_WIDGETS);
+
+  const saveWidget = useCallback((edited: GovernanceWidget) => {
+    setWidgets((current) =>
+      current.map((widget) => (widget.id === edited.id ? edited : widget)),
+    );
+  }, []);
 
   // The grid is draggable by construction, so a card the reader drags has to
   // stay where it was dropped — a card that springs back reads as a bug, not
@@ -149,7 +166,7 @@ function DashboardsPage() {
           placements={placements}
           onPlacementsCommit={setPlacements}
           renderCard={(placement) => {
-            const widget = GOVERNANCE_WIDGETS.find(
+            const widget = widgets.find(
               (candidate) => candidate.placement.graphId === placement.graphId,
             );
             if (!widget) return null;
@@ -159,7 +176,7 @@ function DashboardsPage() {
                 showSample={showSample}
                 executeQuery={executeQuery}
                 timeWindow={timeWindow}
-                onShowSample={showSampleData}
+                onSave={saveWidget}
               />
             );
           }}
