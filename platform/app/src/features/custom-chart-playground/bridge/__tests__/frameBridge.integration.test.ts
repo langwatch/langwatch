@@ -21,17 +21,20 @@ const MAX_CONCURRENT = 8;
  */
 function mountBridge(
   executeQuery: Parameters<typeof createFrameBridge>[0]["executeQuery"],
+  source = "export default function Widget() { return null; }",
 ) {
   const iframe = document.createElement("iframe");
   let transferredPort: MessagePort | undefined;
+  const initMessages: Array<Record<string, unknown>> = [];
   Object.defineProperty(iframe, "contentWindow", {
     configurable: true,
     value: {
       postMessage: (
-        _msg: unknown,
+        msg: Record<string, unknown>,
         _origin: string,
         transfer: Transferable[],
       ) => {
+        initMessages.push(msg);
         transferredPort = transfer?.[0] as MessagePort;
       },
     },
@@ -48,17 +51,36 @@ function mountBridge(
       theme: "light",
       projectId: "project_1",
     },
+    params: { threshold: 3 },
+    source,
     onLog: vi.fn(),
     onHeightChange: vi.fn(),
     onTeardown: vi.fn(),
   });
   iframe.dispatchEvent(new Event("load"));
 
-  return { bridge, framePort: transferredPort! };
+  return { bridge, framePort: transferredPort!, initMessages };
 }
 
 afterEach(() => {
   document.body.innerHTML = "";
+});
+
+describe("given a sandboxed chart frame is mounted with widget source", () => {
+  describe("when the frame document loads", () => {
+    /** @scenario "The parent delivers the widget source on init" */
+    it("posts exactly one lw:init carrying the widget source, dashboard context and params", () => {
+      const source = "export default () => null;";
+      const { initMessages } = mountBridge(vi.fn(), source);
+
+      expect(initMessages).toHaveLength(1);
+      const init = initMessages[0]!;
+      expect(init.type).toBe("lw:init");
+      expect(init.source).toBe(source);
+      expect(init.dashboardContext).toMatchObject({ projectId: "project_1" });
+      expect(init.params).toEqual({ threshold: 3 });
+    });
+  });
 });
 
 describe("given a frame that keeps opening queries without them settling", () => {

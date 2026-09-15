@@ -1,0 +1,174 @@
+/**
+ * Composes the sandboxed chart-frame document.
+ *
+ * No longer an iframe `srcdoc`: the document is served as a static response
+ * from `CHART_FRAME_PATH` (see `~/server/chartSandboxFrame`), which gives it
+ * its own permissive Content-Security-Policy instead of inheriting the
+ * app-wide one — that inheritance is exactly what blocked the CDN scripts in
+ * production. Because the document is shared by every widget and carries no
+ * author code, the widget's own source now arrives over the `lw:init`
+ * postMessage (see `bridge/shimSource.ts`) rather than being embedded here.
+ *
+ * The frame loads React, ReactDOM, Recharts and Babel standalone from a CDN
+ * as plain UMD `<script>` tags — render-blocking, so by the time the shim and
+ * author runtime run, the globals they read (`window.React`, and so on) are
+ * already there. An import map (built from those same UMD globals) is inserted
+ * after Babel so any esm.sh package the widget imports resolves "react"/
+ * "react-dom" to that single instance.
+ */
+
+import { buildAuthorRuntimeScript } from "./bridge/authorRuntime";
+import { buildChartsLibScript } from "./bridge/chartsLibSource";
+import { buildShimScript } from "./bridge/shimSource";
+
+/**
+ * Pinned versions so a CDN release never silently changes what a saved
+ * widget compiles against. Exact versions (not major-only ranges), so UNPKG
+ * can never resolve a newer release out from under a saved widget.
+ *
+ * These majors are pinned lower than this app's own React/Recharts
+ * dependency on purpose: React 19 dropped the UMD build these `<script>`
+ * tags need (no `umd/` directory in the published package), so the sandbox
+ * stays on the last UMD-shipping majors — react/react-dom 18, recharts 2 —
+ * independent of what the app itself resolves. React 18's UMD build is the
+ * one that added `ReactDOM.createRoot`, and Recharts' UMD reads
+ * `window.PropTypes` as a plain global rather than requiring it — hence
+ * prop-types loading first.
+ *
+ * Split around the `@langwatch/charts` library script: it needs
+ * `window.React`/`window.Recharts` already loaded (hence after Recharts) but
+ * itself needs nothing from Babel, so it lands ahead of that CDN script too —
+ * still satisfying "after Recharts, before the author runtime" with room to
+ * spare.
+ */
+const CDN_SCRIPTS_BEFORE_CHARTS_LIB = [
+  "https://unpkg.com/react@18.3.1/umd/react.production.min.js",
+  "https://unpkg.com/prop-types@15.8.1/prop-types.min.js",
+  "https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js",
+  "https://unpkg.com/recharts@2.15.4/umd/Recharts.js",
+];
+const CDN_SCRIPTS_AFTER_CHARTS_LIB = [
+  "https://unpkg.com/@babel/standalone@7.29.8/babel.min.js",
+];
+
+/**
+ * Builds the frame's import map from the UMD globals already loaded above, so
+ * an esm.sh package that `import`s "react"/"react-dom" resolves to the SAME
+ * React instance the author's own component tree renders against — a bundled
+ * second copy would violate the rules of hooks the moment the two render
+ * together (the same single-instance reason `chartsLib/index.ts` reads
+ * `window.React` directly). Each mapped module is a `data:` module that
+ * re-exports the global's own enumerable members plus a default, so both
+ * `import React from "react"` and `import { useState } from "react"` work.
+ *
+ * Also provides "react/jsx-runtime" and "react/jsx-dev-runtime" as shimmed
+ * modules that re-export the JSX runtime functions (jsx, jsxs, jsxDEV, Fragment)
+ * from the UMD React global, so any esm.sh package built with the automatic
+ * JSX runtime resolves to the same React instance.
+ *
+ * A missing global is skipped rather than mapped, so the map never throws
+ * during construction if a CDN script failed to load.
+ */
+function buildImportMapScript(): string {
+  return `
+(function () {
+  function moduleFor(globalName) {
+    var g = window[globalName];
+    var names = Object.keys(g).filter(function (n) { return /^[A-Za-z_$][\\w$]*$/.test(n) && n !== "default"; });
+    var src = "const m = window." + globalName + ";\\nexport default m;\\n" +
+      names.map(function (n) { return "export const " + n + " = m." + n + ";"; }).join("\\n");
+    return "data:text/javascript;charset=utf-8," + encodeURIComponent(src);
+  }
+  function jsxRuntimeFor(globalName) {
+    var src;
+    if (typeof window[globalName] === "undefined") {
+      return null;
+    }
+    src = "const React = window." + globalName + ";\\n" +
+      "export const Fragment = React.Fragment;\\n" +
+      "export function jsx(type, props, key) {\\n" +
+      "  var p = props || {};\\n" +
+      "  var children = p.children;\\n" +
+      "  var rest = {};\\n" +
+      "  for (var prop in p) {\\n" +
+      "    if (prop !== 'children' && Object.prototype.hasOwnProperty.call(p, prop)) {\\n" +
+      "      rest[prop] = p[prop];\\n" +
+      "    }\\n" +
+      "  }\\n" +
+      "  if (key !== undefined) rest.key = key;\\n" +
+      "  return Array.isArray(children) ? React.createElement.apply(React, [type, rest].concat(children)) : (children === undefined ? React.createElement(type, rest) : React.createElement(type, rest, children));\\n" +
+      "}\\n" +
+      "export function jsxs(type, props, key) {\\n" +
+      "  return jsx(type, props, key);\\n" +
+      "}\\n" +
+      "export function jsxDEV(type, props, key) {\\n" +
+      "  return jsx(type, props, key);\\n" +
+      "}";
+    return "data:text/javascript;charset=utf-8," + encodeURIComponent(src);
+  }
+  var globals = {
+    "react": "React",
+    "react-dom": "ReactDOM",
+    "react-dom/client": "ReactDOM",
+    "recharts": "Recharts",
+    "@langwatch/charts": "LWCharts"
+  };
+  var imports = {};
+  Object.keys(globals).forEach(function (specifier) {
+    var globalName = globals[specifier];
+    if (window[globalName]) {
+      imports[specifier] = moduleFor(globalName);
+    }
+  });
+  var jsxRuntime = jsxRuntimeFor("React");
+  if (jsxRuntime) {
+    imports["react/jsx-runtime"] = jsxRuntime;
+    imports["react/jsx-dev-runtime"] = jsxRuntime;
+  }
+  var s = document.createElement("script");
+  s.type = "importmap";
+  s.textContent = JSON.stringify({ imports: imports });
+  document.head.appendChild(s);
+})();
+`;
+}
+
+export function buildChartFrameHtml(): string {
+  return [
+    "<!doctype html>",
+    '<html><head><meta charset="utf-8">',
+    "<style>",
+    "  html, body { height: 100%; }",
+    "  body {",
+    "    margin: 0; padding: 8px; box-sizing: border-box;",
+    "    font-family: system-ui, sans-serif; font-size: 13px;",
+    "  }",
+    // The widget's root fills whatever height the parent gave the iframe —
+    // a widget wraps its own layout in height: 100% (and, for a chart,
+    // ResponsiveContainer height="100%") to actually fill it rather than
+    // being sized to a fixed pixel guess.
+    "  #lw-root { height: 100%; }",
+    "  #lw-compile-error {",
+    "    display: none; white-space: pre-wrap; font-family: ui-monospace, monospace;",
+    "    font-size: 12px; color: #b91c1c; background: #fef2f2;",
+    "    border: 1px solid #fecaca; border-radius: 6px; padding: 8px; margin: 0;",
+    "  }",
+    "</style>",
+    ...CDN_SCRIPTS_BEFORE_CHARTS_LIB.map(
+      (src) => `<script src="${src}" crossorigin></script>`,
+    ),
+    `<script>${buildChartsLibScript()}</script>`,
+    ...CDN_SCRIPTS_AFTER_CHARTS_LIB.map(
+      (src) => `<script src="${src}" crossorigin></script>`,
+    ),
+    // After Babel, before the shim: the import map must exist before the
+    // author runtime's dynamic import() runs (which is later, on lw:init).
+    `<script>${buildImportMapScript()}</script>`,
+    "</head><body>",
+    '<div id="lw-root"></div>',
+    '<pre id="lw-compile-error"></pre>',
+    `<script>${buildShimScript()}</script>`,
+    `<script>${buildAuthorRuntimeScript()}</script>`,
+    "</body></html>",
+  ].join("\n");
+}

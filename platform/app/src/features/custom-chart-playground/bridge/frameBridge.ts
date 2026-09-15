@@ -57,6 +57,12 @@ export interface CreateFrameBridgeOptions {
   readonly dashboardContext: ChartFrameDashboardContext;
   /** Author-declared parameter defaults, delivered once on `lw:init`. */
   readonly params?: ChartFrameParamsSnapshot;
+  /**
+   * The widget's React/TSX source, delivered once on `lw:init`. The frame
+   * document carries no author code, so this is how each frame receives its
+   * own widget.
+   */
+  readonly source: string;
   readonly onLog: (entry: ChartFrameLogEntry) => void;
   readonly onHeightChange: (px: number) => void;
   /**
@@ -132,8 +138,8 @@ export function createFrameBridge(
 
   const teardown = () => {
     stop();
-    // Clearing srcdoc is what actually kills a busy-looping frame.
-    iframe.removeAttribute("srcdoc");
+    // Pointing the frame at about:blank is what actually kills a busy-looping
+    // frame — it discards the loaded document (and its author code) entirely.
     iframe.src = "about:blank";
     onTeardown();
   };
@@ -225,13 +231,15 @@ export function createFrameBridge(
     const channel = new MessageChannel();
     port = channel.port1;
     port.onmessage = onPortMessage;
-    // Sandboxed srcdoc frames have the opaque origin "null" — "*" is the only
-    // targetOrigin that reaches them. Nothing sensitive rides on init.
+    // The sandboxed frame has the opaque origin "null" — "*" is the only
+    // targetOrigin that reaches it. Nothing sensitive rides on init; the
+    // widget source is author code the frame will run anyway.
     iframe.contentWindow.postMessage(
       {
         type: "lw:init",
         dashboardContext: options.dashboardContext,
         params: options.params ?? {},
+        source: options.source,
       },
       "*",
       [channel.port2],

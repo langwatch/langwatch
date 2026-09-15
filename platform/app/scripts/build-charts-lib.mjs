@@ -6,16 +6,16 @@
  * `buildShimScript()`.
  *
  * `chartsLib/index.ts` reads `window.React` / `window.Recharts` directly
- * instead of `import`-ing "react"/"recharts" — the sandboxed frame's srcdoc
+ * instead of `import`-ing "react"/"recharts" — the sandboxed frame document
  * already loaded both as CDN UMD globals before this script runs (see
- * `buildSrcdoc.ts`) — so there is nothing to mark `external` or alias here:
+ * `buildFrameHtml.ts`) — so there is nothing to mark `external` or alias here:
  * the bundle is just the library's own code, sharing the frame's single
  * React/Recharts instance rather than shipping a second copy.
  *
  * Run manually after editing chartsLib: `node scripts/build-charts-lib.mjs`.
  * The output is a committed file, not built at app-build time — same
  * treatment `shimSource.ts` gets, since both are plain strings injected into
- * an iframe srcdoc rather than app code esbuild would otherwise bundle.
+ * the frame document rather than app code esbuild would otherwise bundle.
  */
 
 import { writeFileSync } from "node:fs";
@@ -51,7 +51,7 @@ async function main() {
  * GENERATED — do not hand-edit. Produced by \`node scripts/build-charts-lib.mjs\`
  * from \`bridge/chartsLib/index.ts\`. Mirrors \`bridge/shimSource.ts\`'s
  * \`buildShimScript()\` shape: a plain-JS string injected into the sandboxed
- * frame's srcdoc (see \`buildSrcdoc.ts\`), immediately after the Recharts UMD
+ * frame document (see \`buildFrameHtml.ts\`), immediately after the Recharts UMD
  * script tag and before the author-runtime script. Bundled by esbuild in IIFE
  * format under the global name "LWCharts"; the library reads
  * \`window.React\` / \`window.Recharts\` directly rather than importing them as

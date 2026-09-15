@@ -13,6 +13,15 @@
 export type ChartFrameTheme = "light" | "dark";
 
 /**
+ * The app route the sandboxed chart-frame document is served from. Its own
+ * permissive CSP replaces the app-wide one for that response (see
+ * `~/server/chartSandboxFrame`), so a widget may `import` any https origin.
+ * Lives here — framework-free, client-safe — so both the React component that
+ * points the iframe at it and the server that serves it share one source.
+ */
+export const CHART_FRAME_PATH = "/sandbox/chart-frame";
+
+/**
  * Host-supplied, read-only context the frame is notified about — the
  * dashboard's own state, never something author code can set. Delivered on
  * `lw:init` and again on every `lw:dashboard-context-change`.
@@ -95,6 +104,12 @@ export interface LwInitMessage {
   readonly dashboardContext: ChartFrameDashboardContext;
   /** Author-declared parameters and their current (default) values. */
   readonly params: ChartFrameParamsSnapshot;
+  /**
+   * The widget's React/TSX source. Delivered here rather than baked into the
+   * frame document: the document is a static, cacheless route shared by every
+   * widget, so each frame receives its own author code over this message.
+   */
+  readonly source: string;
 }
 
 export interface LwQueryResultMessage {
