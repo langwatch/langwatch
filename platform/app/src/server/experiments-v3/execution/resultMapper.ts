@@ -261,6 +261,16 @@ const persistableInputs = (
 };
 
 /**
+ * What the evaluator spent, as the result carries it. An absent cost is not a
+ * zero cost: an evaluator that reports 0 says it spent nothing, one that
+ * reports nothing says it does not know, and the stored row keeps them apart.
+ */
+const billedCost = (
+  cost: number | undefined,
+): { currency: "USD"; amount: number } | undefined =>
+  typeof cost === "number" ? { currency: "USD", amount: cost } : undefined;
+
+/**
  * The result of an evaluator that declined the row. The reason travels in
  * the details, and whatever the judge spent before declining is kept, since
  * a skip is not an error: it may have cost something without scoring.
@@ -268,16 +278,17 @@ const persistableInputs = (
 const skippedResult = (executionState: {
   outputs?: Record<string, unknown>;
   cost?: number;
-}): SingleEvaluationResult => ({
-  status: "skipped",
-  ...(typeof executionState.outputs?.details === "string" &&
-  executionState.outputs.details
-    ? { details: executionState.outputs.details }
-    : {}),
-  ...(executionState.cost
-    ? { cost: { currency: "USD", amount: executionState.cost } }
-    : {}),
-});
+}): SingleEvaluationResult => {
+  const cost = billedCost(executionState.cost);
+  return {
+    status: "skipped",
+    ...(typeof executionState.outputs?.details === "string" &&
+    executionState.outputs.details
+      ? { details: executionState.outputs.details }
+      : {}),
+    ...(cost ? { cost } : {}),
+  };
+};
 
 /**
  * Maps an evaluator completion event to an evaluator_result SSE event.
@@ -365,9 +376,7 @@ export const mapEvaluatorResult = (
               executionState.outputs.details
                 ? executionState.outputs.details
                 : undefined,
-            cost: executionState.cost
-              ? { currency: "USD", amount: executionState.cost }
-              : undefined,
+            cost: billedCost(executionState.cost),
           };
 
   return {
@@ -603,9 +612,7 @@ export const mapWorkflowEvaluatorResult = (
               executionState.outputs.details
                 ? executionState.outputs.details
                 : undefined,
-            cost: executionState.cost
-              ? { currency: "USD", amount: executionState.cost }
-              : undefined,
+            cost: billedCost(executionState.cost),
           };
 
   return {

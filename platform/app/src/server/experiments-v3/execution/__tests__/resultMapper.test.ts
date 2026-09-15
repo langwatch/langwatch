@@ -343,6 +343,21 @@ describe("resultMapper", () => {
       });
     });
 
+    it("keeps a reported zero cost on a processed verdict", () => {
+      const result = mapEvaluatorResult("target-1.eval-1", 0, {
+        status: "success",
+        outputs: { passed: true, score: 1.0 },
+        cost: 0,
+      });
+
+      if (result.type === "evaluator_result") {
+        expect(result.result).toHaveProperty("cost", {
+          currency: "USD",
+          amount: 0,
+        });
+      }
+    });
+
     it("includes duration when timestamps are present", () => {
       const result = mapEvaluatorResult("target-1.eval-1", 0, {
         status: "success",
@@ -1234,6 +1249,28 @@ describe("mapThrownErrorEvent", () => {
           details: "the two passes disagreed",
           cost: { currency: "USD", amount: 0.002 },
         });
+      }
+    });
+
+    it("keeps a reported zero cost apart from an unreported one", () => {
+      const reportedZero = mapEvaluatorResult("target-1.eval-1", 0, {
+        status: "success",
+        outputs: { status: "skipped", details: "nothing to evaluate" },
+        cost: 0,
+      });
+      const unreported = mapEvaluatorResult("target-1.eval-1", 1, {
+        status: "success",
+        outputs: { status: "skipped", details: "nothing to evaluate" },
+      });
+
+      if (reportedZero.type === "evaluator_result") {
+        expect(reportedZero.result).toHaveProperty("cost", {
+          currency: "USD",
+          amount: 0,
+        });
+      }
+      if (unreported.type === "evaluator_result") {
+        expect(unreported.result).not.toHaveProperty("cost");
       }
     });
   });
