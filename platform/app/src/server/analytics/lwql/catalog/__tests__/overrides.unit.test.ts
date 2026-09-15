@@ -19,98 +19,141 @@ const ALL_OVERRIDES = {
   ...GOVERNANCE_OVERRIDES,
 };
 
+/** Narrows an optional override lookup to defined, failing loudly if absent. */
+function overrideFor<T>(
+  overrides: Record<string, T | undefined>,
+  name: string,
+): T {
+  const override = overrides[name];
+  if (!override) {
+    throw new Error(`expected override "${name}" to exist`);
+  }
+  return override;
+}
+
 describe("Dataset overrides", () => {
   describe("column gates", () => {
     it("experiment_run_items.Predicted is gated output", () => {
-      const override = EXPERIMENTS_OVERRIDES.experiment_run_items;
+      const override = overrideFor(
+        EXPERIMENTS_OVERRIDES,
+        "experiment_run_items",
+      );
       expect(override.columnGates?.Predicted).toEqual(["output"]);
     });
 
     it("experiment_run_items.TargetError is gated output", () => {
-      const override = EXPERIMENTS_OVERRIDES.experiment_run_items;
+      const override = overrideFor(
+        EXPERIMENTS_OVERRIDES,
+        "experiment_run_items",
+      );
       expect(override.columnGates?.TargetError).toEqual(["output"]);
     });
 
     it("experiment_run_items.EvaluationDetails is gated output", () => {
-      const override = EXPERIMENTS_OVERRIDES.experiment_run_items;
+      const override = overrideFor(
+        EXPERIMENTS_OVERRIDES,
+        "experiment_run_items",
+      );
       expect(override.columnGates?.EvaluationDetails).toEqual(["output"]);
     });
 
     it("experiment_run_items.EvaluationInputs is gated input", () => {
-      const override = EXPERIMENTS_OVERRIDES.experiment_run_items;
+      const override = overrideFor(
+        EXPERIMENTS_OVERRIDES,
+        "experiment_run_items",
+      );
       expect(override.columnGates?.EvaluationInputs).toEqual(["input"]);
     });
 
     it("experiment_run_items.DatasetEntry is gated input", () => {
-      const override = EXPERIMENTS_OVERRIDES.experiment_run_items;
+      const override = overrideFor(
+        EXPERIMENTS_OVERRIDES,
+        "experiment_run_items",
+      );
       expect(override.columnGates?.DatasetEntry).toEqual(["input"]);
     });
 
     it("experiment_run_items.TargetCost is gated costs", () => {
-      const override = EXPERIMENTS_OVERRIDES.experiment_run_items;
+      const override = overrideFor(
+        EXPERIMENTS_OVERRIDES,
+        "experiment_run_items",
+      );
       expect(override.columnGates?.TargetCost).toEqual(["costs"]);
     });
 
     it("experiment_run_items.EvaluationCost is gated costs", () => {
-      const override = EXPERIMENTS_OVERRIDES.experiment_run_items;
+      const override = overrideFor(
+        EXPERIMENTS_OVERRIDES,
+        "experiment_run_items",
+      );
       expect(override.columnGates?.EvaluationCost).toEqual(["costs"]);
     });
 
     it("experiment_runs.TotalCost is gated costs", () => {
-      const override = EXPERIMENTS_OVERRIDES.experiment_runs;
+      const override = overrideFor(EXPERIMENTS_OVERRIDES, "experiment_runs");
       expect(override.columnGates?.TotalCost).toEqual(["costs"]);
     });
 
     it("dspy_steps.Predictors is gated output", () => {
-      const override = EXPERIMENTS_OVERRIDES.dspy_steps;
+      const override = overrideFor(EXPERIMENTS_OVERRIDES, "dspy_steps");
       expect(override.columnGates?.Predictors).toEqual(["output"]);
     });
 
     it("dspy_steps.Examples is gated output", () => {
-      const override = EXPERIMENTS_OVERRIDES.dspy_steps;
+      const override = overrideFor(EXPERIMENTS_OVERRIDES, "dspy_steps");
       expect(override.columnGates?.Examples).toEqual(["output"]);
     });
 
     it("dspy_steps.LlmCalls is gated output", () => {
-      const override = EXPERIMENTS_OVERRIDES.dspy_steps;
+      const override = overrideFor(EXPERIMENTS_OVERRIDES, "dspy_steps");
       expect(override.columnGates?.LlmCalls).toEqual(["output"]);
     });
 
     it("dspy_steps.OptimizerParameters is gated output", () => {
-      const override = EXPERIMENTS_OVERRIDES.dspy_steps;
+      const override = overrideFor(EXPERIMENTS_OVERRIDES, "dspy_steps");
       expect(override.columnGates?.OptimizerParameters).toEqual(["output"]);
     });
 
     it("dspy_steps.LlmCallsTotalCost is gated costs", () => {
-      const override = EXPERIMENTS_OVERRIDES.dspy_steps;
+      const override = overrideFor(EXPERIMENTS_OVERRIDES, "dspy_steps");
       expect(override.columnGates?.LlmCallsTotalCost).toEqual(["costs"]);
     });
 
     it("gateway_spend.CostNanoUSD is gated costs", () => {
-      const override = GATEWAY_OVERRIDES.gateway_spend;
+      const override = overrideFor(GATEWAY_OVERRIDES, "gateway_spend");
       expect(override.columnGates?.CostNanoUSD).toEqual(["costs"]);
     });
 
     it("gateway_budget_ledger_events.AmountUSD is gated costs", () => {
-      const override = GATEWAY_OVERRIDES.gateway_budget_ledger_events;
+      const override = overrideFor(
+        GATEWAY_OVERRIDES,
+        "gateway_budget_ledger_events",
+      );
       expect(override.columnGates?.AmountUSD).toEqual(["costs"]);
     });
 
     it("gateway_budget_ledger_events.AmountNanoUSD is gated costs", () => {
-      const override = GATEWAY_OVERRIDES.gateway_budget_ledger_events;
+      const override = overrideFor(
+        GATEWAY_OVERRIDES,
+        "gateway_budget_ledger_events",
+      );
       expect(override.columnGates?.AmountNanoUSD).toEqual(["costs"]);
     });
 
     it("governance_cost_rollup_1d.AmountNanoMinor is gated costs", () => {
-      const override = GOVERNANCE_OVERRIDES.governance_cost_rollup_1d;
-      expect(override).toBeDefined();
-      expect(override?.columnGates?.AmountNanoMinor).toEqual(["costs"]);
+      const override = overrideFor(
+        GOVERNANCE_OVERRIDES,
+        "governance_cost_rollup_1d",
+      );
+      expect(override.columnGates?.AmountNanoMinor).toEqual(["costs"]);
     });
 
     it("governance_ocsf_events.RawOcsfJson is gated output", () => {
-      const override = GOVERNANCE_OVERRIDES.governance_ocsf_events;
-      expect(override).toBeDefined();
-      expect(override?.columnGates?.RawOcsfJson).toEqual(["output"]);
+      const override = overrideFor(
+        GOVERNANCE_OVERRIDES,
+        "governance_ocsf_events",
+      );
+      expect(override.columnGates?.RawOcsfJson).toEqual(["output"]);
     });
   });
 
