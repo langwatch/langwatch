@@ -38,17 +38,15 @@ describe("the outcome of a status", () => {
         const category = categorizeRunStatus(mapStatus(raw));
         const sqlSaysPassed = (PASSED_STATUS_VALUES as readonly string[]).includes(raw);
         const sqlSaysFailed = (FAILED_STATUS_VALUES as readonly string[]).includes(raw);
+        const isFailureLike =
+          category === "failure" || category === "stalled" || category === "cancelled";
 
-        if (category === "success") {
-          expect(sqlSaysPassed, `${raw} should read as passed`).toBe(true);
-          expect(sqlSaysFailed).toBe(false);
-        } else if (category === "failure" || category === "stalled" || category === "cancelled") {
-          expect(sqlSaysFailed, `${raw} should read as failed`).toBe(true);
-          expect(sqlSaysPassed).toBe(false);
-        } else {
-          expect(sqlSaysPassed, `${raw} should read as pending`).toBe(false);
-          expect(sqlSaysFailed, `${raw} should read as pending`).toBe(false);
-        }
+        expect(sqlSaysPassed, `${raw} (category "${category}") passed-membership`).toBe(
+          category === "success",
+        );
+        expect(sqlSaysFailed, `${raw} (category "${category}") failed-membership`).toBe(
+          isFailureLike,
+        );
       }
     });
   });

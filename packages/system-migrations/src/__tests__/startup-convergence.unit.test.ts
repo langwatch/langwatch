@@ -190,7 +190,10 @@ describe("runSystemMigrationsAtStartup", () => {
       failure = error;
     }
     expect(failure).toBeInstanceOf(SystemMigrationStartupIncompleteError);
-    if (failure instanceof SystemMigrationStartupIncompleteError) expect(failure.cause).toBe(cause);
+    if (!(failure instanceof SystemMigrationStartupIncompleteError)) {
+      throw new Error("expected a SystemMigrationStartupIncompleteError");
+    }
+    expect(failure.cause).toBe(cause);
   });
 
   /** @scenario "Cancelling startup stops the loop between passes" */
@@ -222,8 +225,10 @@ describe("runSystemMigrationsAtStartup", () => {
       failure = error;
     }
     expect(failure).toBeInstanceOf(SystemMigrationStartupIncompleteError);
-    if (failure instanceof SystemMigrationStartupIncompleteError)
-      expect(failure.cause).toBe(reason);
+    if (!(failure instanceof SystemMigrationStartupIncompleteError)) {
+      throw new Error("expected a SystemMigrationStartupIncompleteError");
+    }
+    expect(failure.cause).toBe(reason);
   });
 
   it("does not trust a finalized pass summary without durable state", async () => {

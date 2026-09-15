@@ -56,10 +56,7 @@ describe("ChildProcessJobDataSchema", () => {
     /** @scenario "A worker prepares a run through canonical services" */
     it("names the missing fields in the parse error", () => {
       const result = ChildProcessJobDataSchema.safeParse(basePayload);
-      if (result.success) {
-        expect.fail("expected parsing to fail");
-        return;
-      }
+      if (result.success) throw new Error("expected parsing to fail");
       const paths = result.error.issues.map((issue) => issue.path.join("."));
       // Both roles genuinely need a model. With no own params AND no
       // adapter-role params to fall back to, neither can be built — that
@@ -119,10 +116,7 @@ describe("ChildProcessJobDataSchema", () => {
     it("parses, and both the simulator and the judge fall back to it", () => {
       const result = ChildProcessJobDataSchema.safeParse(legacyPayload);
       expect(result.success).toBe(true);
-      if (!result.success) {
-        expect.fail("expected the legacy payload to parse");
-        return;
-      }
+      if (!result.success) throw new Error("expected the legacy payload to parse");
 
       // The payload genuinely carries neither split field — the fallback is
       // what makes the run possible, not a value the fixture smuggled in.
@@ -146,10 +140,7 @@ describe("ChildProcessJobDataSchema", () => {
 
       const result = ChildProcessJobDataSchema.safeParse(splitPayload);
       expect(result.success).toBe(true);
-      if (!result.success) {
-        expect.fail("expected the split payload to parse");
-        return;
-      }
+      if (!result.success) throw new Error("expected the split payload to parse");
 
       const roleModelParams = selectRoleModelParams(result.data);
       expect(roleModelParams.simulator.model).toBe("openai/sim-model");
@@ -168,10 +159,7 @@ describe("ChildProcessJobDataSchema", () => {
       const result = ChildProcessJobDataSchema.safeParse(withoutParameters);
 
       expect(result.success).toBe(true);
-      if (!result.success) {
-        expect.fail("expected a payload without parameters to parse");
-        return;
-      }
+      if (!result.success) throw new Error("expected a payload without parameters to parse");
       // The child reads Object.keys(parameters) to decide whether to record
       // them, so an absent field has to arrive as a record rather than as
       // undefined; otherwise a job queued across the deploy takes the process

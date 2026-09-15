@@ -123,7 +123,7 @@ describe("EventSourcedQueueProcessorMemory", () => {
       };
 
       const processor = new EventSourcedQueueProcessorMemory(definition);
-      await processor.close();
+      await expect(processor.close()).resolves.toBeUndefined();
     });
 
     it("can be called multiple times safely", async () => {
@@ -134,9 +134,9 @@ describe("EventSourcedQueueProcessorMemory", () => {
       };
 
       const processor = new EventSourcedQueueProcessorMemory(definition);
-      await processor.close();
-      await processor.close();
-      await processor.close();
+      await expect(processor.close()).resolves.toBeUndefined();
+      await expect(processor.close()).resolves.toBeUndefined();
+      await expect(processor.close()).resolves.toBeUndefined();
     });
 
     it("allows send after close (memory implementation has no state)", async () => {

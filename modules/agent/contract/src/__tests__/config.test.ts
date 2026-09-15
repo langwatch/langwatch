@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { ZodError } from "zod";
 import {
   AgentNotFoundError,
   agentProblemSchema,
@@ -18,7 +19,7 @@ describe("agent config contract", () => {
   });
 
   it("rejects a code agent without a code parameter", () => {
-    expect(() => parseAgentConfig("code", { parameters: [] })).toThrow();
+    expect(() => parseAgentConfig("code", { parameters: [] })).toThrow(ZodError);
   });
 
   it.each([42, null, {}, []])(
@@ -28,7 +29,7 @@ describe("agent config contract", () => {
         parseAgentConfig("code", {
           parameters: [{ identifier: "code", type: "code", value }],
         }),
-      ).toThrow();
+      ).toThrow(ZodError);
     },
   );
 
@@ -40,7 +41,7 @@ describe("agent config contract", () => {
           { identifier: "code", type: "str", value: 42 },
         ],
       }),
-    ).toThrow();
+    ).toThrow(ZodError);
   });
 
   it("keeps HTTP defaults and base fields while stripping unknown fields", () => {
@@ -79,7 +80,7 @@ describe("agent config contract", () => {
         parameters: [{ name: "temperature", unexpected: true }],
         sdk: { name: "langwatch", version: "1", language: "python" },
       }),
-    ).toThrow();
+    ).toThrow(ZodError);
   });
 });
 

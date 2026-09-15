@@ -311,35 +311,36 @@ describe("the skills installer, given a temp install root", () => {
   describe("when a write cannot complete", () => {
     // Root ignores directory permissions, so the write would succeed and the
     // assertions below would be meaningless rather than wrong.
-    const asNonRoot = it.skipIf(process.getuid?.() === 0);
+    it.skipIf(process.getuid?.() === 0)(
+      "leaves the existing file whole, and no temp file behind",
+      () => {
+        const { path: managed } = installSkill({ skill: skill("tracing"), root });
+        const stale = `# stale\n\n<!-- managed-by: langwatch-skills v0.0.1 -->\n`;
+        writeFile(managed, stale);
 
-    asNonRoot("leaves the existing file whole, and no temp file behind", () => {
-      const { path: managed } = installSkill({ skill: skill("tracing"), root });
-      const stale = `# stale\n\n<!-- managed-by: langwatch-skills v0.0.1 -->\n`;
-      writeFile(managed, stale);
+        // A read-only directory: the temp write fails, exactly where a crash or
+        // a full disk would leave a plain writeFileSync half-done.
+        const dir = path.dirname(managed);
+        fs.chmodSync(dir, 0o555);
+        let result;
+        try {
+          result = updateSkill({ skill: skill("tracing"), root });
+        } finally {
+          fs.chmodSync(dir, 0o755);
+        }
 
-      // A read-only directory: the temp write fails, exactly where a crash or
-      // a full disk would leave a plain writeFileSync half-done.
-      const dir = path.dirname(managed);
-      fs.chmodSync(dir, 0o555);
-      let result;
-      try {
-        result = updateSkill({ skill: skill("tracing"), root });
-      } finally {
-        fs.chmodSync(dir, 0o755);
-      }
+        expect(result.action).toBe("skipped");
+        expect(result.failed).toBe(true);
+        expect(result.reason).toMatch(/EACCES|EPERM|EROFS/);
 
-      expect(result.action).toBe("skipped");
-      expect(result.failed).toBe(true);
-      expect(result.reason).toMatch(/EACCES|EPERM|EROFS/);
-
-      // The file still holds COMPLETE, marker-carrying content — never the
-      // truncated remains that would make the CLI disown its own file.
-      const after = fs.readFileSync(managed, "utf8");
-      expect(after).toBe(stale);
-      expect(isManagedContent(after)).toBe(true);
-      expect(fs.readdirSync(dir)).toEqual(["SKILL.md"]);
-    });
+        // The file still holds COMPLETE, marker-carrying content — never the
+        // truncated remains that would make the CLI disown its own file.
+        const after = fs.readFileSync(managed, "utf8");
+        expect(after).toBe(stale);
+        expect(isManagedContent(after)).toBe(true);
+        expect(fs.readdirSync(dir)).toEqual(["SKILL.md"]);
+      },
+    );
 
     it("leaves no temp files behind on a successful write", () => {
       const { path: managed } = installSkill({ skill: skill("tracing"), root });

@@ -43,6 +43,7 @@ function expectHandledWire(
 
 describe("model provider handled errors", () => {
   it("preserves provider write, routing, and connection error wires", () => {
+    expect(() => {
     expectHandledWire(new ModelProviderInvalidError("Unknown provider: legacy"), {
       code: "model_provider_invalid",
       message: "Unknown provider: legacy",
@@ -108,9 +109,11 @@ describe("model provider handled errors", () => {
       httpStatus: 409,
       meta: { handle: "eu" },
     });
+    }).not.toThrow();
   });
 
   it("preserves default and credential refusal wires", () => {
+    expect(() => {
     expectHandledWire(
       new ModelDefaultScopeForbiddenError({
         scopeType: "ORGANIZATION",
@@ -212,6 +215,7 @@ describe("model provider handled errors", () => {
         },
       },
     );
+    }).not.toThrow();
   });
 
   it("words the execution refusal for whichever path caught it", () => {
@@ -219,6 +223,7 @@ describe("model provider handled errors", () => {
     // classifier, which turns them into simulation copy. They are one code
     // because the remedy is the same; they are two sentences because the
     // gateway knows the feature it was running and the litellm path does not.
+    expect(() => {
     expectHandledWire(
       new ModelRestrictedForExecutionError({
         model: "openai_codex/gpt-5.6-terra",
@@ -250,5 +255,6 @@ describe("model provider handled errors", () => {
         meta: { model: "openai_codex/gpt-5.6-terra", provider: "openai_codex" },
       },
     );
+    }).not.toThrow();
   });
 });

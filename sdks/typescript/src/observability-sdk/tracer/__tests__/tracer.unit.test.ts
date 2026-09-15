@@ -274,7 +274,9 @@ describe("tracer.ts", () => {
           throw new Error("Null error");
         });
 
-        await expect(langwatchTracer.withActiveSpan("error-span", callback)).rejects.toThrow();
+        await expect(langwatchTracer.withActiveSpan("error-span", callback)).rejects.toThrow(
+          Error,
+        );
         expect(callback).toHaveBeenCalled();
       });
 
@@ -383,7 +385,7 @@ describe("tracer.ts", () => {
           throw new Error("Null error");
         });
 
-        expect(() => langwatchTracer.withActiveSpan("sync-error-span", callback)).toThrow();
+        expect(() => langwatchTracer.withActiveSpan("sync-error-span", callback)).toThrow(Error);
         expect(callback).toHaveBeenCalled();
       });
     });
@@ -570,11 +572,12 @@ describe("tracer.ts", () => {
 
       const customLangwatchTracer = getLangWatchTracerFromProvider(customProvider, "custom-tracer");
 
-      // Test that custom methods can be called
-      if (typeof (customLangwatchTracer as any).customMethod === "function") {
-        (customLangwatchTracer as any).customMethod("test");
-        expect((customMockTracer as any).customMethod).toHaveBeenCalledWith("test");
-      }
+      // Test that custom methods can be called. The proxy's default handler
+      // binds and forwards any property that resolves to a function, so this
+      // always holds for the vi.fn() assigned above.
+      expect(typeof (customLangwatchTracer as any).customMethod).toBe("function");
+      (customLangwatchTracer as any).customMethod("test");
+      expect((customMockTracer as any).customMethod).toHaveBeenCalledWith("test");
     });
   });
 
@@ -708,7 +711,7 @@ describe("tracer.ts", () => {
 
       expect(() => {
         (langwatchTracer as any).withActiveSpan("span-name");
-      }).toThrow(); // Should throw some validation error
+      }).toThrow(Error); // Should throw some validation error
     });
 
     it("handles edge cases in span context", () => {

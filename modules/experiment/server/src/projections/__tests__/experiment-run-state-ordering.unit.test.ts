@@ -217,7 +217,7 @@ describe("experiment run fold — event ordering invariants", () => {
         })),
       )("$name → final state is correct", async ({ name, perm }) => {
         const state = await processFold(perm, store, projection);
-        assertCorrectFinalState(state, name);
+        expect(() => assertCorrectFinalState(state, name)).not.toThrow();
       });
     });
   });
@@ -239,7 +239,7 @@ describe("experiment run fold — event ordering invariants", () => {
         store,
         projection,
       );
-      assertCorrectFinalState(state, "completed lower occurredAt");
+      expect(() => assertCorrectFinalState(state, "completed lower occurredAt")).not.toThrow();
     });
 
     it("started → completed → targets → evals (completed before results)", async () => {
@@ -257,7 +257,7 @@ describe("experiment run fold — event ordering invariants", () => {
         store,
         projection,
       );
-      assertCorrectFinalState(state, "completed before results");
+      expect(() => assertCorrectFinalState(state, "completed before results")).not.toThrow();
     });
   });
 });

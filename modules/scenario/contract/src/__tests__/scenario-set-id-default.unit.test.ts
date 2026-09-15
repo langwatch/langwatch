@@ -27,10 +27,8 @@ describe('scenarioSetId defaults to "default" on ingestion', () => {
     it('is accepted, with scenarioSetId set to "default"', () => {
       const result = scenarioRunStartedSchema.safeParse(runStartedEvent());
 
-      expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data.scenarioSetId).toBe("default");
-      }
+      if (!result.success) throw result.error;
+      expect(result.data.scenarioSetId).toBe("default");
     });
   });
 
@@ -39,10 +37,8 @@ describe('scenarioSetId defaults to "default" on ingestion', () => {
     it('is accepted, with scenarioSetId coerced to "default"', () => {
       const result = scenarioRunStartedSchema.safeParse(runStartedEvent({ scenarioSetId: "" }));
 
-      expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data.scenarioSetId).toBe("default");
-      }
+      if (!result.success) throw result.error;
+      expect(result.data.scenarioSetId).toBe("default");
     });
   });
 
@@ -53,10 +49,8 @@ describe('scenarioSetId defaults to "default" on ingestion', () => {
         runStartedEvent({ scenarioSetId: "my-set" }),
       );
 
-      expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data.scenarioSetId).toBe("my-set");
-      }
+      if (!result.success) throw result.error;
+      expect(result.data.scenarioSetId).toBe("my-set");
     });
   });
 
@@ -72,10 +66,8 @@ describe('scenarioSetId defaults to "default" on ingestion', () => {
         messages: [],
       });
 
-      expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data.scenarioSetId).toBe("default");
-      }
+      if (!result.success) throw result.error;
+      expect(result.data.scenarioSetId).toBe("default");
     });
   });
 
@@ -87,10 +79,8 @@ describe('scenarioSetId defaults to "default" on ingestion', () => {
       // downstream re-derives it.
       const result = scenarioRunStartedSchema.safeParse(runStartedEvent({ scenarioSetId: "" }));
 
-      expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data.scenarioSetId).toBe("default");
-      }
+      if (!result.success) throw result.error;
+      expect(result.data.scenarioSetId).toBe("default");
     });
   });
 });

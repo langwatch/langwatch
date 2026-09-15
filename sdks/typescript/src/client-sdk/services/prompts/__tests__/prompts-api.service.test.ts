@@ -176,83 +176,97 @@ describe("PromptsApiService.handleApiError", () => {
   it("extracts string error", () => {
     expect(() => handleApiError("test operation", "simple error")).toThrow(PromptsApiError);
 
+    let caught: unknown;
     try {
       handleApiError("test operation", "simple error");
     } catch (error) {
-      expect(error).toBeInstanceOf(PromptsApiError);
-      expect((error as PromptsApiError).message).toBe("Failed to test operation: simple error");
-      expect((error as PromptsApiError).operation).toBe("test operation");
+      caught = error;
     }
+    expect(caught).toBeInstanceOf(PromptsApiError);
+    expect((caught as PromptsApiError).message).toBe("Failed to test operation: simple error");
+    expect((caught as PromptsApiError).operation).toBe("test operation");
   });
 
   it("extracts nested error.error as string", () => {
     const error = { error: "nested error string" };
 
+    let caught: unknown;
     try {
       handleApiError("test operation", error);
     } catch (e) {
-      expect(e).toBeInstanceOf(PromptsApiError);
-      expect((e as PromptsApiError).message).toBe("Failed to test operation: nested error string");
+      caught = e;
     }
+    expect(caught).toBeInstanceOf(PromptsApiError);
+    expect((caught as PromptsApiError).message).toBe("Failed to test operation: nested error string");
   });
 
   it("extracts error.error.message", () => {
     const error = { error: { message: "nested error message" } };
 
+    let caught: unknown;
     try {
       handleApiError("test operation", error);
     } catch (e) {
-      expect(e).toBeInstanceOf(PromptsApiError);
-      expect((e as PromptsApiError).message).toBe("Failed to test operation: nested error message");
+      caught = e;
     }
+    expect(caught).toBeInstanceOf(PromptsApiError);
+    expect((caught as PromptsApiError).message).toBe("Failed to test operation: nested error message");
   });
 
   it("serializes error.error object when no message", () => {
     const error = { error: { code: 404, detail: "not found" } };
 
+    let caught: unknown;
     try {
       handleApiError("test operation", error);
     } catch (e) {
-      expect(e).toBeInstanceOf(PromptsApiError);
-      expect((e as PromptsApiError).message).toContain("404");
-      expect((e as PromptsApiError).message).toContain("not found");
+      caught = e;
     }
+    expect(caught).toBeInstanceOf(PromptsApiError);
+    expect((caught as PromptsApiError).message).toContain("404");
+    expect((caught as PromptsApiError).message).toContain("not found");
   });
 
   it("extracts error.message when no error.error", () => {
     const error = { message: "direct error message" };
 
+    let caught: unknown;
     try {
       handleApiError("test operation", error);
     } catch (e) {
-      expect(e).toBeInstanceOf(PromptsApiError);
-      expect((e as PromptsApiError).message).toBe("Failed to test operation: direct error message");
+      caught = e;
     }
+    expect(caught).toBeInstanceOf(PromptsApiError);
+    expect((caught as PromptsApiError).message).toBe("Failed to test operation: direct error message");
   });
 
   it("uses unknown error when no extractable message", () => {
     const error = {};
 
+    let caught: unknown;
     try {
       handleApiError("test operation", error);
     } catch (e) {
-      expect(e).toBeInstanceOf(PromptsApiError);
-      expect((e as PromptsApiError).message).toBe(
-        "Failed to test operation: Unknown error occurred",
-      );
+      caught = e;
     }
+    expect(caught).toBeInstanceOf(PromptsApiError);
+    expect((caught as PromptsApiError).message).toBe(
+      "Failed to test operation: Unknown error occurred",
+    );
   });
 
   it("serializes Error objects properly (not [object Object])", () => {
     const error = { error: new Error("native error") };
 
+    let caught: unknown;
     try {
       handleApiError("test operation", error);
     } catch (e) {
-      expect(e).toBeInstanceOf(PromptsApiError);
-      expect((e as PromptsApiError).message).not.toContain("[object Object]");
-      expect((e as PromptsApiError).message).toContain("native error");
+      caught = e;
     }
+    expect(caught).toBeInstanceOf(PromptsApiError);
+    expect((caught as PromptsApiError).message).not.toContain("[object Object]");
+    expect((caught as PromptsApiError).message).toContain("native error");
   });
 
   it("serializes objects with non-enumerable properties", () => {
@@ -267,15 +281,17 @@ describe("PromptsApiService.handleApiError", () => {
     });
     const error = { error: errorObj };
 
+    let caught: unknown;
     try {
       handleApiError("test operation", error);
     } catch (e) {
-      expect(e).toBeInstanceOf(PromptsApiError);
-      expect((e as PromptsApiError).message).not.toContain("[object Object]");
-      // Should contain the properties thanks to Object.getOwnPropertyNames
-      expect((e as PromptsApiError).message).toContain("ERR_BAD_REQUEST");
-      expect((e as PromptsApiError).message).toContain("400");
+      caught = e;
     }
+    expect(caught).toBeInstanceOf(PromptsApiError);
+    expect((caught as PromptsApiError).message).not.toContain("[object Object]");
+    // Should contain the properties thanks to Object.getOwnPropertyNames
+    expect((caught as PromptsApiError).message).toContain("ERR_BAD_REQUEST");
+    expect((caught as PromptsApiError).message).toContain("400");
   });
 
   it("handles complex nested objects without [object Object]", () => {
@@ -286,12 +302,14 @@ describe("PromptsApiService.handleApiError", () => {
       },
     };
 
+    let caught: unknown;
     try {
       handleApiError("test operation", error);
     } catch (e) {
-      expect(e).toBeInstanceOf(PromptsApiError);
-      expect((e as PromptsApiError).message).not.toContain("[object Object]");
-      expect((e as PromptsApiError).message).toContain("500");
+      caught = e;
     }
+    expect(caught).toBeInstanceOf(PromptsApiError);
+    expect((caught as PromptsApiError).message).not.toContain("[object Object]");
+    expect((caught as PromptsApiError).message).toContain("500");
   });
 });

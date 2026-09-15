@@ -129,16 +129,18 @@ describe("TaskHost", () => {
     /** @scenario "A task whose infrastructure handle is absent refuses by name" */
     it("refuses requireClickhouse with a named, non-stack-trace HandledError", () => {
       const host = new NoClickhouseHost();
+      let caught: unknown;
       try {
         host.requireClickhouse();
-        expect.unreachable("expected TaskInfrastructureUnavailableError");
       } catch (error) {
-        expect(error).toBeInstanceOf(TaskInfrastructureUnavailableError);
-        expect((error as TaskInfrastructureUnavailableError).code).toBe(
-          "task_infrastructure_unavailable",
-        );
-        expect((error as TaskInfrastructureUnavailableError).message).toContain("ClickHouse");
+        caught = error;
       }
+
+      expect(caught).toBeInstanceOf(TaskInfrastructureUnavailableError);
+      expect((caught as TaskInfrastructureUnavailableError).code).toBe(
+        "task_infrastructure_unavailable",
+      );
+      expect((caught as TaskInfrastructureUnavailableError).message).toContain("ClickHouse");
     });
   });
 });

@@ -1,5 +1,6 @@
 import { HandledError } from "@langwatch/handled-error";
 import { describe, expect, expectTypeOf, it } from "vitest";
+import { ZodError } from "zod";
 import {
   DirectUploadUnavailableError,
   IdempotencyConflictError,
@@ -60,7 +61,7 @@ describe("Stored Objects validation contract", () => {
         byteLength: 12,
         sha256: SHA256,
       }),
-    ).toThrow();
+    ).toThrow(ZodError);
   });
 
   it.each([
@@ -81,7 +82,7 @@ describe("Stored Objects validation contract", () => {
         sha256: SHA256,
         ...overrides,
       }),
-    ).toThrow();
+    ).toThrow(ZodError);
   });
 
   it("normalizes filenames before enforcing their UTF-8 byte ceiling", () => {
@@ -103,7 +104,7 @@ describe("Stored Objects validation contract", () => {
         byteLength: 12,
         sha256: SHA256,
       }),
-    ).toThrow();
+    ).toThrow(ZodError);
   });
 
   it("applies the runtime maximum through the contract schema factory", () => {
@@ -128,7 +129,9 @@ describe("Stored Objects IDs and references", () => {
         id: "prod_so_1",
       }),
     ).toEqual({ projectId: "project_1", id: "prod_so_1" });
-    expect(() => storedObjectIdentitySchema.parse({ projectId: "project_1", id: "" })).toThrow();
+    expect(() => storedObjectIdentitySchema.parse({ projectId: "project_1", id: "" })).toThrow(
+      ZodError,
+    );
   });
 
   it("keeps presentation metadata and audience but rejects persisted URLs", () => {

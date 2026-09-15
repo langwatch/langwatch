@@ -261,9 +261,8 @@ describe("parseOtlpTraces", () => {
     it("returns ok with empty resourceSpans", () => {
       const result = parseOtlpTraces(new ArrayBuffer(0), "application/x-protobuf");
       expect(result.ok).toBe(true);
-      if (result.ok) {
-        expect(result.request.resourceSpans).toEqual([]);
-      }
+      if (!result.ok) return;
+      expect(result.request.resourceSpans).toEqual([]);
     });
   });
 
@@ -273,9 +272,8 @@ describe("parseOtlpTraces", () => {
       const body = buildJsonBody(payload);
       const result = parseOtlpTraces(body, "application/json");
       expect(result.ok).toBe(true);
-      if (result.ok) {
-        expect(spanCountOf(result.request)).toBe(1);
-      }
+      if (!result.ok) return;
+      expect(spanCountOf(result.request)).toBe(1);
     });
   });
 
@@ -285,9 +283,8 @@ describe("parseOtlpTraces", () => {
       const body = buildProtobufBody(payload);
       const result = parseOtlpTraces(body, "application/x-protobuf");
       expect(result.ok).toBe(true);
-      if (result.ok) {
-        expect(spanCountOf(result.request)).toBe(1);
-      }
+      if (!result.ok) return;
+      expect(spanCountOf(result.request)).toBe(1);
     });
   });
 
@@ -298,9 +295,8 @@ describe("parseOtlpTraces", () => {
       // No content-type header — protobuf decode will fail, then JSON fallback wins.
       const result = parseOtlpTraces(body, undefined);
       expect(result.ok).toBe(true);
-      if (result.ok) {
-        expect(spanCountOf(result.request)).toBe(1);
-      }
+      if (!result.ok) return;
+      expect(spanCountOf(result.request)).toBe(1);
     });
 
     it("falls back when content-type lies (says protobuf but body is JSON)", () => {
@@ -308,9 +304,8 @@ describe("parseOtlpTraces", () => {
       const body = buildJsonBody(payload);
       const result = parseOtlpTraces(body, "application/x-protobuf");
       expect(result.ok).toBe(true);
-      if (result.ok) {
-        expect(spanCountOf(result.request)).toBe(1);
-      }
+      if (!result.ok) return;
+      expect(spanCountOf(result.request)).toBe(1);
     });
   });
 
@@ -319,9 +314,8 @@ describe("parseOtlpTraces", () => {
       const garbage = new TextEncoder().encode("this is not OTLP").buffer as ArrayBuffer;
       const result = parseOtlpTraces(garbage, "application/json");
       expect(result.ok).toBe(false);
-      if (!result.ok) {
-        expect(result.error).toMatch(/Failed to parse OTLP body/);
-      }
+      if (result.ok) return;
+      expect(result.error).toMatch(/Failed to parse OTLP body/);
     });
   });
 });
@@ -388,9 +382,8 @@ describe("parseOtlpLogs", () => {
     it("returns ok with empty resourceLogs", () => {
       const result = parseOtlpLogs(new ArrayBuffer(0), "application/x-protobuf");
       expect(result.ok).toBe(true);
-      if (result.ok) {
-        expect(result.request.resourceLogs).toEqual([]);
-      }
+      if (!result.ok) return;
+      expect(result.request.resourceLogs).toEqual([]);
     });
   });
 
@@ -425,12 +418,11 @@ describe("parseOtlpLogs", () => {
       const body = new TextEncoder().encode(JSON.stringify(logsPayload)).buffer as ArrayBuffer;
       const result = parseOtlpLogs(body, "application/json");
       expect(result.ok).toBe(true);
-      if (result.ok) {
-        const records = (result.request.resourceLogs ?? []).flatMap((rl) =>
-          (rl.scopeLogs ?? []).flatMap((sl) => sl.logRecords ?? []),
-        );
-        expect(records).toHaveLength(1);
-      }
+      if (!result.ok) return;
+      const records = (result.request.resourceLogs ?? []).flatMap((rl) =>
+        (rl.scopeLogs ?? []).flatMap((sl) => sl.logRecords ?? []),
+      );
+      expect(records).toHaveLength(1);
     });
   });
 });
@@ -440,9 +432,8 @@ describe("parseOtlpMetrics", () => {
     it("returns ok with empty resourceMetrics", () => {
       const result = parseOtlpMetrics(new ArrayBuffer(0), "application/x-protobuf");
       expect(result.ok).toBe(true);
-      if (result.ok) {
-        expect(result.request.resourceMetrics).toEqual([]);
-      }
+      if (!result.ok) return;
+      expect(result.request.resourceMetrics).toEqual([]);
     });
   });
 });

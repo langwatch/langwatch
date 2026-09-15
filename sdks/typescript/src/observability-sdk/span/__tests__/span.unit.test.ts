@@ -429,31 +429,33 @@ describe("span.ts", () => {
     it("maintains proper span lifecycle", () => {
       const { mockSpan, langwatchSpan } = testScenarios.createSpanTest();
 
-      // Initially recording
-      testScenarios.validateSpanLifecycle(mockSpan, {
-        shouldBeRecording: true,
-        shouldBeEnded: false,
-      });
+      expect(() => {
+        // Initially recording
+        testScenarios.validateSpanLifecycle(mockSpan, {
+          shouldBeRecording: true,
+          shouldBeEnded: false,
+        });
 
-      // Set some attributes and events
-      langwatchSpan.setType("llm").setInput("test input");
+        // Set some attributes and events
+        langwatchSpan.setType("llm").setInput("test input");
 
-      // Still recording with data
-      testScenarios.validateSpanLifecycle(mockSpan, {
-        shouldBeRecording: true,
-        shouldHaveAttributes: {
-          [intSemconv.ATTR_LANGWATCH_SPAN_TYPE]: "llm",
-        },
-      });
+        // Still recording with data
+        testScenarios.validateSpanLifecycle(mockSpan, {
+          shouldBeRecording: true,
+          shouldHaveAttributes: {
+            [intSemconv.ATTR_LANGWATCH_SPAN_TYPE]: "llm",
+          },
+        });
 
-      // End the span
-      langwatchSpan.end();
+        // End the span
+        langwatchSpan.end();
 
-      // Should be ended
-      testScenarios.validateSpanLifecycle(mockSpan, {
-        shouldBeRecording: false,
-        shouldBeEnded: true,
-      });
+        // Should be ended
+        testScenarios.validateSpanLifecycle(mockSpan, {
+          shouldBeRecording: false,
+          shouldBeEnded: true,
+        });
+      }).not.toThrow();
     });
 
     it("handles duplicate end() calls gracefully", () => {
@@ -482,7 +484,7 @@ describe("span.ts", () => {
       });
 
       // Should complete within reasonable time (1ms per operation max)
-      performanceUtils.expectPerformance(duration, { maxDuration: 1000 });
+      expect(() => performanceUtils.expectPerformance(duration, { maxDuration: 1000 })).not.toThrow();
     });
 
     it("handles concurrent method calls", async () => {

@@ -74,71 +74,79 @@ describe("given the committed ast-grep rules and fixtures", () => {
   describe("when the gate reads the test-shape rules", () => {
     /** @scenario "The tautological assertion rule keeps a fixture and says the assertion cannot fail" */
     it("pins no-tautological-assertion", () => {
-      expectFixturePins("no-tautological-assertion", "cannot fail");
+      expect(() => expectFixturePins("no-tautological-assertion", "cannot fail")).not.toThrow();
     });
 
     /** @scenario "The action-based name rule keeps a fixture and names the word it refuses" */
     it("pins use-action-based-test-name", () => {
-      expectFixturePins("use-action-based-test-name", "should");
+      expect(() => expectFixturePins("use-action-based-test-name", "should")).not.toThrow();
     });
 
     /** @scenario "The describe context rule keeps a fixture and names the given form" */
     it("pins require-bdd-describe-context", () => {
-      expectFixturePins("require-bdd-describe-context", "given");
+      expect(() => expectFixturePins("require-bdd-describe-context", "given")).not.toThrow();
     });
 
     /** @scenario "The form watch rule keeps a fixture and names the call it refuses" */
     it("pins no-form-watch-in-child", () => {
-      expectFixturePins("no-form-watch-in-child", "form.watch()");
+      expect(() => expectFixturePins("no-form-watch-in-child", "form.watch()")).not.toThrow();
     });
 
     /** @scenario "The submit disable rule keeps a fixture and names the in-flight shape" */
     it("pins no-form-disable-on-isvalid", () => {
-      expectFixturePins("no-form-disable-on-isvalid", "isPending");
+      expect(() => expectFixturePins("no-form-disable-on-isvalid", "isPending")).not.toThrow();
     });
   });
 
   describe("when the gate reads the platform-invariant rules", () => {
     /** @scenario "The dynamic import rule keeps a fixture and offers the top-level import" */
     it("pins no-inline-dynamic-import", () => {
-      expectFixturePins("no-inline-dynamic-import", "top-level");
+      expect(() => expectFixturePins("no-inline-dynamic-import", "top-level")).not.toThrow();
     });
 
     /** @scenario "The localhost fallback rule keeps a fixture and names the env schema" */
     it("pins no-localhost-fallback", () => {
-      expectFixturePins("no-localhost-fallback", "Zod env schema");
+      expect(() => expectFixturePins("no-localhost-fallback", "Zod env schema")).not.toThrow();
     });
 
     /** @scenario "The fetch timeout rule keeps a fixture and names the signal to pass" */
     it("pins require-fetch-timeout", () => {
-      expectFixturePins("require-fetch-timeout", "AbortSignal.timeout");
+      expect(() =>
+        expectFixturePins("require-fetch-timeout", "AbortSignal.timeout"),
+      ).not.toThrow();
     });
 
     /** @scenario "The re-export rule keeps a fixture and says to update the consumers" */
     it("pins no-export-star-shim", () => {
-      expectFixturePins("no-export-star-shim", "re-export shim");
+      expect(() => expectFixturePins("no-export-star-shim", "re-export shim")).not.toThrow();
     });
 
     /** @scenario "The double assertion rule keeps a fixture and names the shape it refuses" */
     it("pins no-double-type-assertion", () => {
-      expectFixturePins("no-double-type-assertion", "as unknown as");
+      expect(() =>
+        expectFixturePins("no-double-type-assertion", "as unknown as"),
+      ).not.toThrow();
     });
 
     /** @scenario "The skip guard rule keeps a fixture and says what the inversion means" */
     it("pins no-clickhouse-env-skip-guard", () => {
-      expectFixturePins("no-clickhouse-env-skip-guard", "always skip");
+      expect(() =>
+        expectFixturePins("no-clickhouse-env-skip-guard", "always skip"),
+      ).not.toThrow();
     });
   });
 
   describe("when the gate reads the naming rules", () => {
     /** @scenario "The boolean prefix rule keeps a fixture and names the prefixes it accepts" */
     it("pins require-boolean-name-prefix", () => {
-      expectFixturePins("require-boolean-name-prefix", "prefix");
+      expect(() => expectFixturePins("require-boolean-name-prefix", "prefix")).not.toThrow();
     });
 
     /** @scenario "The identity function rule keeps a fixture and says it adds no behaviour" */
     it("pins no-identity-function", () => {
-      expectFixturePins("no-identity-function", "identity function");
+      expect(() =>
+        expectFixturePins("no-identity-function", "identity function"),
+      ).not.toThrow();
     });
   });
 });

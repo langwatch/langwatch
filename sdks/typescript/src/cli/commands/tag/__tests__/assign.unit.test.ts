@@ -107,7 +107,7 @@ describe("tagAssignCommand", () => {
     it("prints an error message", async () => {
       mockGet.mockRejectedValue(new Error("Prompt not found"));
 
-      await expect(tagAssignCommand("nonexistent", "production")).rejects.toThrow();
+      await expect(tagAssignCommand("nonexistent", "production")).rejects.toThrow(Error);
 
       // The error propagates, command doesn't silently pass
     });
@@ -126,7 +126,7 @@ describe("tagAssignCommand", () => {
     it("prints an error about invalid version", async () => {
       await expect(
         tagAssignCommand("my-prompt", "production", { version: "abc" }),
-      ).rejects.toThrow();
+      ).rejects.toMatchObject({ code: 1 });
 
       expect(console.error).toHaveBeenCalledWith(
         expect.stringContaining("--version must be a positive integer"),

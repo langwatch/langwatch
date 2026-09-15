@@ -39,6 +39,13 @@ const application: KeyApi = {
 };
 
 /**
+ * The identity the create and read handlers below observed, for the
+ * dispatching test to assert on — a handler runs outside the test's own body.
+ */
+let createHandlerSawIdentity: { actor: unknown; scope: unknown } | undefined;
+let readHandlerSawScope: unknown;
+
+/**
  * The family answers behind an organization credential; its create raises the
  * instance administrator's door for itself, and both writes leave a trail.
  */
@@ -54,8 +61,7 @@ const keys = defineRestRouter(KeyApi)
   .withPermission("organization:manage")
   .withOutput(z.object({ id: z.string() }))
   .handle(async ({ app, input, actor, scope }) => {
-    expect(actor).toBeNull();
-    expect(scope).toBeNull();
+    createHandlerSawIdentity = { actor, scope };
 
     return app.create({ name: input.name });
   })
@@ -65,7 +71,7 @@ const keys = defineRestRouter(KeyApi)
   .withPermission("organization:view")
   .withOutput(z.object({ id: z.string(), door: z.string() }))
   .handle(async ({ app, input, scope }) => {
-    expect(scope).toEqual({ tier: "organization", id: "organization-1" });
+    readHandlerSawScope = scope;
 
     return app.read({ id: input.id });
   })
@@ -128,6 +134,7 @@ describe("given a route that raises a credential kind of its own", () => {
 
       expect(answer.status).toBe(200);
       await expect(answer.json()).resolves.toEqual({ id: "key-one" });
+      expect(createHandlerSawIdentity).toEqual({ actor: null, scope: null });
     });
   });
 
@@ -137,6 +144,7 @@ describe("given a route that raises a credential kind of its own", () => {
       const answer = await call(mounted({ audit: recordingSink() }), "GET", "/api/api-keys/key-one");
 
       await expect(answer.json()).resolves.toEqual({ id: "key-one", door: "read" });
+      expect(readHandlerSawScope).toEqual({ tier: "organization", id: "organization-1" });
     });
   });
 

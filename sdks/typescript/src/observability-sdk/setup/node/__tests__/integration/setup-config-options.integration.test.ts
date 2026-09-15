@@ -340,6 +340,9 @@ describe("setupObservability Integration - Configuration Options", () => {
       },
     };
     const handle = setupObservability(options);
+    expect(logger.debug).toHaveBeenCalledWith(
+      "Console tracing enabled; adding console span exporter",
+    );
     await handle.shutdown();
   });
 
@@ -352,6 +355,7 @@ describe("setupObservability Integration - Configuration Options", () => {
       debug: { logger },
     };
     const handle = setupObservability(options);
+    expect(logger.debug).toHaveBeenCalledWith("Added user-provided SpanProcessor to SDK");
     await handle.shutdown();
   });
 
@@ -409,6 +413,12 @@ describe("setupObservability Integration - Configuration Options", () => {
       },
     };
     const handle = setupObservability(options);
+    // Neither option displaces the other — both processors are wired in
+    // rather than one silently winning over the other.
+    expect(logger.debug).toHaveBeenCalledWith(
+      "Console tracing enabled; adding console span exporter",
+    );
+    expect(logger.debug).toHaveBeenCalledWith("Added user-provided 1 SpanProcessors to SDK");
     await handle.shutdown();
   });
 

@@ -36,19 +36,15 @@ describe("ScenarioConfigSchema turn config", () => {
   /** @scenario "Run with maxTurns limits conversation length" */
   it("accepts maxTurns as an optional integer", () => {
     const result = ScenarioConfigSchema.safeParse({ ...base, maxTurns: 5 });
-    expect(result.success).toBe(true);
-    if (result.success) {
-      expect(result.data.maxTurns).toBe(5);
-    }
+    if (!result.success) throw result.error;
+    expect(result.data.maxTurns).toBe(5);
   });
 
   /** @scenario "Run with minTurns guarantees minimum conversation length" */
   it("accepts minTurns as an optional integer", () => {
     const result = ScenarioConfigSchema.safeParse({ ...base, minTurns: 2 });
-    expect(result.success).toBe(true);
-    if (result.success) {
-      expect(result.data.minTurns).toBe(2);
-    }
+    if (!result.success) throw result.error;
+    expect(result.data.minTurns).toBe(2);
   });
 
   /** @scenario "Run with both turn fields applies both constraints" */
@@ -58,21 +54,17 @@ describe("ScenarioConfigSchema turn config", () => {
       maxTurns: 5,
       minTurns: 2,
     });
-    expect(result.success).toBe(true);
-    if (result.success) {
-      expect(result.data.maxTurns).toBe(5);
-      expect(result.data.minTurns).toBe(2);
-    }
+    if (!result.success) throw result.error;
+    expect(result.data.maxTurns).toBe(5);
+    expect(result.data.minTurns).toBe(2);
   });
 
   /** @scenario "Run with no turn config uses SDK defaults" */
   it("parses without turn fields (backward compat)", () => {
     const result = ScenarioConfigSchema.safeParse(base);
-    expect(result.success).toBe(true);
-    if (result.success) {
-      expect(result.data.maxTurns).toBeUndefined();
-      expect(result.data.minTurns).toBeUndefined();
-    }
+    if (!result.success) throw result.error;
+    expect(result.data.maxTurns).toBeUndefined();
+    expect(result.data.minTurns).toBeUndefined();
   });
 });
 
@@ -120,10 +112,8 @@ describe("ChildProcessJobDataSchema turn config threading", () => {
       ...basePayload,
       scenario: { ...basePayload.scenario, maxTurns: 5 },
     });
-    expect(result.success).toBe(true);
-    if (result.success) {
-      expect(result.data.scenario.maxTurns).toBe(5);
-    }
+    if (!result.success) throw result.error;
+    expect(result.data.scenario.maxTurns).toBe(5);
   });
 
   it("preserves minTurns through the serialization boundary", () => {
@@ -131,10 +121,8 @@ describe("ChildProcessJobDataSchema turn config threading", () => {
       ...basePayload,
       scenario: { ...basePayload.scenario, minTurns: 3 },
     });
-    expect(result.success).toBe(true);
-    if (result.success) {
-      expect(result.data.scenario.minTurns).toBe(3);
-    }
+    if (!result.success) throw result.error;
+    expect(result.data.scenario.minTurns).toBe(3);
   });
 
   /** @scenario "In-flight job without turn config still parses" */
@@ -176,11 +164,9 @@ describe("fetchScenario turn config mapping", () => {
       target: { type: "prompt", referenceId: "prompt_1" },
     });
 
-    expect(result.success).toBe(true);
-    if (result.success) {
-      expect(result.data.scenario.maxTurns).toBe(5);
-      expect(result.data.scenario.minTurns).toBe(2);
-    }
+    if (!result.success) throw new Error(result.error);
+    expect(result.data.scenario.maxTurns).toBe(5);
+    expect(result.data.scenario.minTurns).toBe(2);
   });
 
   it("maps null turn fields as undefined", async () => {
@@ -210,10 +196,8 @@ describe("fetchScenario turn config mapping", () => {
       target: { type: "prompt", referenceId: "prompt_1" },
     });
 
-    expect(result.success).toBe(true);
-    if (result.success) {
-      expect(result.data.scenario.maxTurns).toBeUndefined();
-      expect(result.data.scenario.minTurns).toBeUndefined();
-    }
+    if (!result.success) throw new Error(result.error);
+    expect(result.data.scenario.maxTurns).toBeUndefined();
+    expect(result.data.scenario.minTurns).toBeUndefined();
   });
 });

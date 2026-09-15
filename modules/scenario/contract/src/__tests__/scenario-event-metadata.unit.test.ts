@@ -3,6 +3,7 @@
  * Extensible metadata on scenario run events: passthrough, validation, defaults.
  */
 import { describe, expect, it } from "vitest";
+import { ZodError } from "zod";
 import {
   ScenarioEventType,
   scenarioEventSchema,
@@ -153,7 +154,7 @@ describe("extensible scenario metadata", () => {
           },
         };
 
-        expect(() => scenarioRunStartedSchema.parse(event)).toThrow();
+        expect(() => scenarioRunStartedSchema.parse(event)).toThrow(ZodError);
       });
     });
 
@@ -174,7 +175,7 @@ describe("extensible scenario metadata", () => {
           },
         };
 
-        expect(() => scenarioRunStartedSchema.parse(event)).toThrow();
+        expect(() => scenarioRunStartedSchema.parse(event)).toThrow(ZodError);
       });
     });
 
@@ -241,10 +242,8 @@ describe("extensible scenario metadata", () => {
 
         const result = scenarioEventSchema.safeParse(event);
 
-        expect(result.success).toBe(true);
-        if (result.success) {
-          expect(result.data.scenarioSetId).toBe("default");
-        }
+        if (!result.success) throw result.error;
+        expect(result.data.scenarioSetId).toBe("default");
       });
 
       it("coerces to 'default' in the individual run started schema", () => {
@@ -252,10 +251,8 @@ describe("extensible scenario metadata", () => {
 
         const result = scenarioRunStartedSchema.safeParse(event);
 
-        expect(result.success).toBe(true);
-        if (result.success) {
-          expect(result.data.scenarioSetId).toBe("default");
-        }
+        if (!result.success) throw result.error;
+        expect(result.data.scenarioSetId).toBe("default");
       });
     });
 
@@ -265,10 +262,8 @@ describe("extensible scenario metadata", () => {
 
         const result = scenarioEventSchema.safeParse(event);
 
-        expect(result.success).toBe(true);
-        if (result.success) {
-          expect(result.data.scenarioSetId).toBe("default");
-        }
+        if (!result.success) throw result.error;
+        expect(result.data.scenarioSetId).toBe("default");
       });
     });
 
@@ -278,10 +273,8 @@ describe("extensible scenario metadata", () => {
 
         const result = scenarioEventSchema.safeParse(event);
 
-        expect(result.success).toBe(true);
-        if (result.success) {
-          expect(result.data.scenarioSetId).toBe("my-set");
-        }
+        if (!result.success) throw result.error;
+        expect(result.data.scenarioSetId).toBe("my-set");
       });
     });
 
@@ -296,10 +289,8 @@ describe("extensible scenario metadata", () => {
           messages: [],
         });
 
-        expect(result.success).toBe(true);
-        if (result.success) {
-          expect(result.data.scenarioSetId).toBe("default");
-        }
+        if (!result.success) throw result.error;
+        expect(result.data.scenarioSetId).toBe("default");
       });
     });
   });

@@ -311,10 +311,8 @@ describe.skipIf(!DB_URL)("loadExecutionData", () => {
         { ...services(), agents: agentService },
       );
 
-      expect("error" in result).toBe(true);
-      if ("error" in result) {
-        expect(result.error).toContain("no committed version");
-      }
+      if (!("error" in result)) throw new Error("expected loadExecutionData to fail");
+      expect(result.error).toContain("no committed version");
     });
   });
 
@@ -336,11 +334,9 @@ describe.skipIf(!DB_URL)("loadExecutionData", () => {
           services(),
         );
 
-        expect("error" in result).toBe(true);
-        if ("error" in result) {
-          expect(result.error).toBe(`Agent "${missingAgentId}" not found`);
-          expect(result.status).toBe(404);
-        }
+        if (!("error" in result)) throw new Error("expected loadExecutionData to fail");
+        expect(result.error).toBe(`Agent "${missingAgentId}" not found`);
+        expect(result.status).toBe(404);
       });
     });
   });
@@ -424,11 +420,9 @@ describe.skipIf(!DB_URL)("loadExecutionData", () => {
           services(),
         );
 
-        expect("error" in result).toBe(true);
-        if ("error" in result) {
-          expect(result.error).toBe(`Evaluator "${missingEvaluatorId}" not found`);
-          expect(result.status).toBe(404);
-        }
+        if (!("error" in result)) throw new Error("expected loadExecutionData to fail");
+        expect(result.error).toBe(`Evaluator "${missingEvaluatorId}" not found`);
+        expect(result.status).toBe(404);
       });
     });
   });

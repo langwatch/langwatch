@@ -2,7 +2,7 @@
  * @vitest-environment node
  */
 import { describe, expect, it } from "vitest";
-import type { z } from "zod";
+import { ZodError, type z } from "zod";
 
 import { MAX_FILTER_VALUES, SPEND_STATUS_FILTERS, spendFiltersSchema } from "@langwatch/gateway-contract";
 import { GatewaySpendFiltersAdapter, spendFilterQueryShape } from "../index.ts";
@@ -51,18 +51,18 @@ describe("given the shared spend filter vocabulary", () => {
     });
 
     it("refuses a pair with no key", () => {
-      expect(() => spendFilterQueryShape.metadata.parse(":gold")).toThrow();
+      expect(() => spendFilterQueryShape.metadata.parse(":gold")).toThrow(ZodError);
     });
 
     it("refuses a pair with no value", () => {
       // ClickHouse answers a missing Map key with the value type's default,
       // so `tier:` would read as '' IN ('') and match every row that has no
       // `tier` at all: the exact opposite of the narrowing asked for.
-      expect(() => spendFilterQueryShape.metadata.parse("tier:")).toThrow();
+      expect(() => spendFilterQueryShape.metadata.parse("tier:")).toThrow(ZodError);
     });
 
     it("refuses a pair with no colon at all", () => {
-      expect(() => spendFilterQueryShape.metadata.parse("tier")).toThrow();
+      expect(() => spendFilterQueryShape.metadata.parse("tier")).toThrow(ZodError);
     });
 
     /** @scenario "A metadata pair with no colon is refused, not re-cut" */
@@ -70,9 +70,9 @@ describe("given the shared spend filter vocabulary", () => {
       // Slicing on an absent colon is silently wrong rather than empty:
       // indexOf answers -1, so `tier` would become key `tie` with value
       // `tier`, and the caller would read spend for a filter nobody wrote.
-      expect(() => spendFilters.parseMetadataFilters(["tier"])).toThrow();
-      expect(() => spendFilters.parseMetadataFilters([":gold"])).toThrow();
-      expect(() => spendFilters.parseMetadataFilters(["tier:"])).toThrow();
+      expect(() => spendFilters.parseMetadataFilters(["tier"])).toThrow(Error);
+      expect(() => spendFilters.parseMetadataFilters([":gold"])).toThrow(Error);
+      expect(() => spendFilters.parseMetadataFilters(["tier:"])).toThrow(Error);
     });
 
     /** @scenario "One filter may not name unbounded values" */
@@ -81,7 +81,7 @@ describe("given the shared spend filter vocabulary", () => {
       // metadata entry a predicate of its own, so an unbounded repeat is an
       // unbounded query on a billing read.
       const tooMany = Array.from({ length: MAX_FILTER_VALUES + 1 }, (_, index) => `m${index}`);
-      expect(() => spendFilterQueryShape.model.parse(tooMany)).toThrow();
+      expect(() => spendFilterQueryShape.model.parse(tooMany)).toThrow(ZodError);
       expect(issuePaths(spendFiltersSchema.safeParse({ models: tooMany }))).toEqual(["models"]);
     });
   });
@@ -182,13 +182,13 @@ describe("given the shared spend filter vocabulary", () => {
       // separately, a status added to the published list would pass the door
       // and then throw inside, turning a validated request into a 500.
       for (const status of SPEND_STATUS_FILTERS) {
-        expect(() => spendFilters.normalizeStatusFilter(status), status).not.toThrow();
-        expect(spendFilters.normalizeStatusFilter(status), status).toBeDefined();
+        expect(() => spendFilters.normalizeStatusFilter(status)).not.toThrow();
+        expect(spendFilters.normalizeStatusFilter(status)).toBeDefined();
       }
-      expect(() => spendFilters.normalizeStatusFilter("pending")).toThrow();
+      expect(() => spendFilters.normalizeStatusFilter("pending")).toThrow(Error);
       // An object lookup would answer this with a function off the prototype
       // and hand it back as if it were a status.
-      expect(() => spendFilters.normalizeStatusFilter("constructor")).toThrow();
+      expect(() => spendFilters.normalizeStatusFilter("constructor")).toThrow(Error);
     });
   });
 

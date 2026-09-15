@@ -185,7 +185,9 @@ describe.skipIf(!DB_URL)("given a personal workspace in an organization", () => 
 
     /** @scenario Adding a member to a personal team is refused */
     it("leaves the personal team holding its owner alone", async () => {
-      await expect(addColleague()).rejects.toThrow();
+      await expect(addColleague()).rejects.toMatchObject({
+        code: "personal_workspace_not_managed_here",
+      });
 
       await expect(teamBindings(personalTeamId)).resolves.toEqual([
         { userId: ownerUserId, role: "ADMIN" },
@@ -194,7 +196,9 @@ describe.skipIf(!DB_URL)("given a personal workspace in an organization", () => 
 
     /** @scenario Adding a member to a personal team is refused */
     it("does not turn the workspace into an ordinary shared team", async () => {
-      await expect(addColleague()).rejects.toThrow();
+      await expect(addColleague()).rejects.toMatchObject({
+        code: "personal_workspace_not_managed_here",
+      });
 
       await expect(personalTeamRow()).resolves.toMatchObject({ isPersonal: true });
     });
@@ -212,14 +216,18 @@ describe.skipIf(!DB_URL)("given a personal workspace in an organization", () => 
 
     /** @scenario Archiving a personal team is refused */
     it("leaves the team unarchived", async () => {
-      await expect(archive()).rejects.toThrow();
+      await expect(archive()).rejects.toMatchObject({
+        code: "personal_workspace_not_managed_here",
+      });
 
       await expect(personalTeamRow()).resolves.toMatchObject({ archivedAt: null });
     });
 
     /** @scenario Archiving a personal team is refused */
     it("leaves provisioning able to find the workspace it would have orphaned", async () => {
-      await expect(archive()).rejects.toThrow();
+      await expect(archive()).rejects.toMatchObject({
+        code: "personal_workspace_not_managed_here",
+      });
 
       // The lookup provisioning uses on the next login: an archived team keeps
       // the one slot per (organization, owner), so an invisible row here is a
