@@ -26,7 +26,7 @@ import {
 import {
   type GrantProjectionWrite,
   GrantProjectionWriteStore,
-} from "../../projections/authz-grant.projection.ts";
+} from "../authz-grant.projection.ts";
 
 const ORGANIZATION_ID = "org_acme";
 const OCCURRED_AT = 1_755_000_000_000;

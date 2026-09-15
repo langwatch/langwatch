@@ -1,5 +1,5 @@
 import { TraceAnalyticsRollupRepository } from "../projection/trace-analytics-rollup.repository.ts";
-import type { TraceAnalyticsRollupRow } from "../../projections/trace-rollup.projection.ts";
+import type { TraceAnalyticsRollupRow } from "../../eventing/trace-rollup.projection.ts";
 
 /**
  * The trace_analytics_rollup twin for a process with no ClickHouse: it accepts

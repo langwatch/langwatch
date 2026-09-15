@@ -25,15 +25,15 @@ import {
 import { createLogger } from "@langwatch/observability";
 import { generateOtelSpanId, generateOtelTraceId } from "@langwatch/trace-contract";
 
-import { buildEvaluatorCellWorkflow } from "../processes/experiment-cell-workflow.process.ts";
+import { buildEvaluatorCellWorkflow } from "../eventing/experiment-cell-workflow.process.ts";
 import {
   buildConnectedCall,
   CONNECTED_BUSY_RETRY_BUDGET_MS,
   CONNECTED_REQUEST_SLACK_MS,
   connectedCallFailure,
   connectedOutputText,
-} from "../processes/experiment-connected-target.process.ts";
-import type { ResultMapperConfig } from "../processes/experiment-result-mapping.process.ts";
+} from "../eventing/experiment-connected-target.process.ts";
+import type { ResultMapperConfig } from "../eventing/experiment-result-mapping.process.ts";
 import { ExperimentEvaluatorInputService } from "./experiment-evaluator-input.service.ts";
 import type { ExperimentCellExecutionService } from "./experiment-cell-execution.service.ts";
 import type { ExperimentRunCollaborators } from "../rules/experiment-run-input.rules.ts";

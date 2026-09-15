@@ -4,7 +4,7 @@ import { nowInstant } from "@langwatch/time";
 import type {
   TopicClusteringPageOutcome,
   TopicClusteringRun,
-} from "../intents/topic-clustering.intent.ts";
+} from "../eventing/topic-clustering.intent.ts";
 
 const logger = createLogger("langwatch:tasks:topic-clustering-run");
 

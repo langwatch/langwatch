@@ -14,7 +14,7 @@ import { SimulationRunStateStoreAdapter } from "../clickhouse.simulation-eventin
 import {
   type SimulationRunStateData,
   SimulationRunStateFoldProjection,
-} from "../../../projections/simulation-run-state.projection.ts";
+} from "../../../eventing/simulation-run-state.projection.ts";
 
 const TENANT_ID = createTenantId("project-acme");
 const RUN_ID = "scenariorun_0005FFcHZ7IBvPE1OSWymml0ikKqB";

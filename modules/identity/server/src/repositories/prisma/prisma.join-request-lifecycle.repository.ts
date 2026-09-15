@@ -2,7 +2,7 @@ import { SYSTEM_ACTORS } from "@langwatch/actor";
 import type { JoinRequestService } from "../../services/join-request.service.ts";
 import { newJoinRequestCommandId } from "../../rules/join-request-id.rules.ts";
 import type { JoinRequestNotificationService } from "../../services/join-request-notification.service.ts";
-import type { JoinRequestLifecycle } from "../../processes/join-request-lifecycle.process.ts";
+import type { JoinRequestLifecycle } from "../../eventing/join-request-lifecycle.process.ts";
 import type { PrismaJoinRequestReadRepository } from "./prisma.join-request.repository.ts";
 
 export type EventingJoinRequestLifecycleOptions = {

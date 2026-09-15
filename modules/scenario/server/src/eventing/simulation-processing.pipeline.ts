@@ -14,24 +14,24 @@ import { ComputeRunMetricsCommand } from "./compute-run-metrics.commands.ts";
 import {
   SimulationRunMetricsMapProjection,
   type SimulationRunMetricsProjectionRecord,
-} from "../projections/simulation-run-metrics.projection.ts";
+} from "./simulation-run-metrics.projection.ts";
 import {
   type SimulationRunStateData,
   SimulationRunStateFoldProjection,
-} from "../projections/simulation-run-state.projection.ts";
+} from "./simulation-run-state.projection.ts";
 import { SIMULATION_PROCESSING_EVENT_TYPES } from "@langwatch/scenario-contract";
 import {
   createSnapshotUpdateBroadcastSubscriber,
   type SnapshotUpdateBroadcastSubscriberDeps,
-} from "../subscribers/snapshot-update-broadcast.subscriber.ts";
+} from "./snapshot-update-broadcast.subscriber.ts";
 import {
   createSuiteRunSyncSubscriber,
   type SuiteRunSyncSubscriberDeps,
-} from "../subscribers/suite-run-sync.subscriber.ts";
+} from "./suite-run-sync.subscriber.ts";
 import {
   createTraceMetricsSyncSubscriber,
   type TraceMetricsSyncSubscriberDeps,
-} from "../subscribers/trace-metrics-sync.subscriber.ts";
+} from "./trace-metrics-sync.subscriber.ts";
 
 export interface SimulationProcessingPipelineDeps {
   simulationRunStore: FoldProjectionStore<SimulationRunStateData>;

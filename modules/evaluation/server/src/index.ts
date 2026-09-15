@@ -70,7 +70,7 @@ export {
   EVAL_INPUTS_PREVIEW_BYTES,
   EVAL_INPUTS_STORED_OBJECT_PURPOSE,
 } from "./services/evaluation-inputs-offload.service.ts";
-export { ExecuteEvaluationCommand } from "./intents/evaluation-execution.intent.ts";
+export { ExecuteEvaluationCommand } from "./eventing/evaluation-execution.intent.ts";
 export type { EvaluationServiceOptions } from "./services/evaluation.service.ts";
 export {
   EvaluationExecutionIntentService,

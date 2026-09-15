@@ -11,8 +11,8 @@ import { EventStoreMemory } from "@langwatch/eventing/testing";
 import { describe, expect, it, vi } from "vitest";
 
 import type { ApiKeyApp } from "../../app/api-key.app.ts";
-import { AGENT_SANDBOX_KEY_REAP_PROCESS_NAME } from "../../processes/agent-sandbox-key-reap.process.ts";
-import { CLI_LOGIN_KEY_REAP_PROCESS_NAME } from "../../processes/cli-login-key-reap.process.ts";
+import { AGENT_SANDBOX_KEY_REAP_PROCESS_NAME } from "../agent-sandbox-key-reap.process.ts";
+import { CLI_LOGIN_KEY_REAP_PROCESS_NAME } from "../cli-login-key-reap.process.ts";
 import { MemoryApiKeyRepositories } from "../../repositories/memory/memory.api-key.repositories.ts";
 import { apiKeyServer } from "../../api-key.server.ts";
 import { apiKeyEventing } from "../api-key.pipeline.ts";

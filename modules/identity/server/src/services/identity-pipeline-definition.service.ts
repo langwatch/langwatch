@@ -7,10 +7,10 @@ import {
   type StateProjectionStore,
 } from "@langwatch/eventing";
 import { IDENTITY_EVENT_TYPES, MFA_EVENT_TYPES } from "@langwatch/identity-contract";
-import { AttachIdentifierCommand } from "../intents/attach-identifier.intent.ts";
-import { DetachIdentifierCommand } from "../intents/detach-identifier.intent.ts";
-import { EraseUserCommand } from "../intents/erase-user.intent.ts";
-import { MarkPrimaryCommand } from "../intents/mark-primary.intent.ts";
+import { AttachIdentifierCommand } from "../eventing/attach-identifier.intent.ts";
+import { DetachIdentifierCommand } from "../eventing/detach-identifier.intent.ts";
+import { EraseUserCommand } from "../eventing/erase-user.intent.ts";
+import { MarkPrimaryCommand } from "../eventing/mark-primary.intent.ts";
 import {
   ConfirmMfaCommand,
   ConsumeBackupCodeCommand,
@@ -19,19 +19,19 @@ import {
   ExpireMfaEnrollmentCommand,
   RecordMfaVerificationFailureCommand,
   RegenerateBackupCodesCommand,
-} from "../intents/mfa.intent.ts";
-import { ProposeLinkCommand } from "../intents/propose-link.intent.ts";
-import { VerifyIdentifierCommand } from "../intents/verify-identifier.intent.ts";
+} from "../eventing/mfa.intent.ts";
+import { ProposeLinkCommand } from "../eventing/propose-link.intent.ts";
+import { VerifyIdentifierCommand } from "../eventing/verify-identifier.intent.ts";
 import {
   type IdentityEvent,
   type IdentityFoldState,
   IdentityStateFoldProjection,
-} from "../projections/identity-state.projection.ts";
+} from "../eventing/identity-state.projection.ts";
 import {
   MfaEnrollmentStateFoldProjection,
   type MfaEvent,
   type MfaFoldState,
-} from "../projections/mfa-enrollment-state.projection.ts";
+} from "../eventing/mfa-enrollment-state.projection.ts";
 import { IDENTITY_PIPELINE_NAME, USER_IDENTITY_AGGREGATE_TYPE } from "@langwatch/identity-contract";
 
 export interface IdentityPipelineDeps {

@@ -18,11 +18,11 @@ import {
   classifyClusteringError,
   type TopicClusteringMetrics,
   type TopicClusteringRun,
-} from "../../intents/topic-clustering.intent.ts";
+} from "../../eventing/topic-clustering.intent.ts";
 import {
   TopicClusteringRunner,
   type TopicClusteringRunnerDeps,
-} from "../../intents/topic-clustering-runner.intent.ts";
+} from "../../eventing/topic-clustering-runner.intent.ts";
 import { LegacyImportTopicClusteringMigration } from "../../migrations/legacy-import.topic-clustering.migration.ts";
 import type { TopicClusteringClickHouseResolver } from "../../app/topic.members.ts";
 import type {
@@ -36,9 +36,9 @@ import { PrismaTopicClusteringRunProjectionRepository } from "./prisma.topic-clu
 import { PrismaTopicModelProjectionRepository } from "./prisma.topic-model-projection.repository.ts";
 import { PostgresTopicRepositories } from "./prisma.topic.repositories.ts";
 import type { TopicClusteringRepository } from "../topic-clustering.repository.ts";
-import type { TopicClusteringRunHistoryData } from "../../projections/topic-clustering-run-history.projection.ts";
-import type { TopicClusteringRunStatusData } from "../../projections/topic-clustering-run-status.projection.ts";
-import type { TopicModelData } from "../../projections/topic-model.projection.ts";
+import type { TopicClusteringRunHistoryData } from "../../eventing/topic-clustering-run-history.projection.ts";
+import type { TopicClusteringRunStatusData } from "../../eventing/topic-clustering-run-status.projection.ts";
+import type { TopicModelData } from "../../eventing/topic-model.projection.ts";
 import { TopicService } from "../../services/topic.service.ts";
 import { nowInstant } from "@langwatch/time";
 

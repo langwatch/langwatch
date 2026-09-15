@@ -1,8 +1,8 @@
 import { SYSTEM_ACTORS } from "@langwatch/actor";
 import { createLogger } from "@langwatch/observability";
 import { newJoinRequestCommandId } from "../rules/join-request-id.rules.ts";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import type { JoinRequestLifecycle } from "../processes/join-request-lifecycle.process.ts";
+import type { PrismaJoinRequestReadRepository } from "../repositories/prisma/prisma.join-request.repository.ts";
+import type { JoinRequestLifecycle } from "../eventing/join-request-lifecycle.process.ts";
 import type { JoinRequestNotifier } from "../rules/join-requests-contract.rules.ts";
 import type { JoinRequestService } from "./join-request.service.ts";
 
@@ -15,15 +15,15 @@ const logger = createLogger("langwatch:identity:join-request-lifecycle");
 
 export class JoinRequestLifecycleDispatcherAdapter implements JoinRequestLifecycle {
   static create(
-    prisma: PrismaClient,
+    reads: Pick<PrismaJoinRequestReadRepository, "tryFindRequest">,
     notifier: JoinRequestNotifier,
     joinRequests: () => JoinRequestService,
   ): JoinRequestLifecycleDispatcherAdapter {
-    return new JoinRequestLifecycleDispatcherAdapter(prisma, notifier, joinRequests);
+    return new JoinRequestLifecycleDispatcherAdapter(reads, notifier, joinRequests);
   }
 
   private constructor(
-    private readonly prisma: PrismaClient,
+    private readonly reads: Pick<PrismaJoinRequestReadRepository, "tryFindRequest">,
     private readonly notifier: JoinRequestNotifier,
     private readonly joinRequests: () => JoinRequestService,
   ) {}
@@ -52,10 +52,7 @@ export class JoinRequestLifecycleDispatcherAdapter implements JoinRequestLifecyc
     // tell" question independent of when the projection catches up. The state
     // read alongside it is the BEFORE half of the one transition this wake is
     // allowed to announce.
-    const before = await this.prisma.joinRequest.findUnique({
-      where: { id: joinRequestId },
-      select: { userId: true, state: true },
-    });
+    const before = await this.reads.tryFindRequest({ joinRequestId });
 
     await this.joinRequests().expireJoin({
       tenantId: organizationId,
@@ -87,10 +84,7 @@ export class JoinRequestLifecycleDispatcherAdapter implements JoinRequestLifecyc
     // expired an hour ago and was already announced then.
     if (before?.state !== "PENDING") return;
 
-    const recorded = await this.prisma.joinRequest.findUnique({
-      where: { id: joinRequestId },
-      select: { state: true },
-    });
+    const recorded = await this.reads.tryFindRequest({ joinRequestId });
     if (recorded?.state === "EXPIRED") {
       await this.notifier.requestExpired({
         joinRequestId,

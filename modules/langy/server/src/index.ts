@@ -76,7 +76,7 @@ export {
 // exported from the package root so the application never couples itself to
 // the feature's private repository/service layout.
 export type { LangyToolFrame } from "./services/langy-cli-envelope.service.ts";
-export type { LangyConversationProcessingEvent } from "./projections/langy-conversation-state.projection.ts";
+export type { LangyConversationProcessingEvent } from "./eventing/langy-conversation-state.projection.ts";
 export {
   computeFrameMac,
   mintRunToken,
@@ -84,7 +84,7 @@ export {
   signFrame,
   verifyFrame,
 } from "./rules/langy-frame-auth.rules.ts";
-export { LANGY_AGENT_DISPATCH_TIMEOUT_MS } from "./processes/langy-conversation-process.types.ts";
+export { LANGY_AGENT_DISPATCH_TIMEOUT_MS } from "./eventing/langy-conversation-process.schemas.ts";
 export {
   AGENT_DISPATCH_TIMEOUT_MS,
   HttpLangyWorkerAdapter,
@@ -139,12 +139,12 @@ export {
   LANGY_SESSION_KEY_REAP_PROCESS_NAME,
   langySessionKeyReapWake,
   type LangySessionKeyReapState,
-} from "./processes/langy-session-key-reap.process.ts";
+} from "./eventing/langy-session-key-reap.process.ts";
 export {
   runLangySessionKeyReap,
   type LangySessionKeyReapDeps,
-} from "./intents/langy-session-key-reap.intent.ts";
-export type { LangyAnalyticsEventProjectionRecord } from "./projections/langy-analytics-event.projection.ts";
+} from "./eventing/langy-session-key-reap.intent.ts";
+export type { LangyAnalyticsEventProjectionRecord } from "./eventing/langy-analytics-event.projection.ts";
 export { LangyAnalyticsEventStorageAdapter } from "./services/langy-analytics-event-storage.service.ts";
 export type { LangyRepositories } from "./repositories/langy-repositories.registry.ts";
 export {
@@ -167,7 +167,7 @@ export {
   createLangyConversationUpdateBroadcastSubscriber,
   createLangyTurnAdmissionLifecycleSubscriber,
   LANGY_HEARTBEAT_GRACE_MS,
-} from "./subscribers/langy-conversation.subscriber.ts";
+} from "./eventing/langy-conversation.subscriber.ts";
 export type {
   AgentTurnLivenessSubscriberDeps,
   LangyConversationFreshnessReader,
@@ -177,7 +177,7 @@ export type {
   LangyConversationUpdateChannel,
   LangyConversationUpdateBroadcastSubscriberDeps,
   LangyFailTurnCommand,
-} from "./subscribers/langy-conversation.subscriber.ts";
+} from "./eventing/langy-conversation.subscriber.ts";
 export type {
   LangyGenerateTitleIntent,
   LangyWorkerDispatchIntent,

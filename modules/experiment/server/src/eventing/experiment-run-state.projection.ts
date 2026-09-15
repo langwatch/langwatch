@@ -1,0 +1,294 @@
+import type { FoldProjectionStore, Projection } from "@langwatch/eventing";
+import { AbstractFoldProjection, type FoldEventHandlers } from "@langwatch/eventing";
+import { EXPERIMENT_RUN_PROJECTION_VERSIONS } from "../rules/experiment-run-event-types.rules.ts";
+import type {
+  EvaluatorResultEvent,
+  ExperimentRunCompletedEvent,
+  ExperimentRunStartedEvent,
+  TargetResultEvent,
+  TraceMetricsComputedEvent,
+} from "./experiment-run-events.process.ts";
+import {
+  evaluatorResultEventSchema,
+  experimentRunCompletedEventSchema,
+  experimentRunStartedEventSchema,
+  targetResultEventSchema,
+  traceMetricsComputedEventSchema,
+} from "./experiment-run-events.process.ts";
+import { normalizeDurationMs } from "./experiment-run-duration.process.ts";
+
+/**
+ * State data for an experiment run. Matches the experiment_runs ClickHouse
+ * table schema.
+ */
+export interface ExperimentRunStateData {
+  RunId: string;
+  ExperimentId: string;
+  WorkflowVersionId: string | null;
+  Total: number;
+  Progress: number;
+  CompletedCount: number;
+  FailedCount: number;
+  TotalCost: number | null;
+  TotalDurationMs: number | null;
+  AvgScoreBps: number | null;
+  PassRateBps: number | null;
+  Targets: string;
+  CreatedAt: number;
+  UpdatedAt: number;
+  LastEventOccurredAt: number;
+  StartedAt: number | null;
+  FinishedAt: number | null;
+  StoppedAt: number | null;
+
+  // Raw counters for incremental aggregation
+  TotalScoreSum: number;
+  ScoreCount: number;
+  PassedCount: number;
+  GradedCount: number;
+
+  // Per-trace cost breakdown from ECST (Event-Carried State Transfer)
+  TraceMetrics: Record<string, { totalCost: number }>;
+}
+
+export interface ExperimentRunState extends Projection<ExperimentRunStateData> {
+  data: ExperimentRunStateData;
+}
+
+// Keep in sync with the target-merging logic in the ClickHouse experiment_runs projection store.
+function mergeTargetsJson(
+  existingJson: string,
+  incoming: { id: string; [k: string]: unknown }[],
+): string {
+  if (incoming.length === 0) return existingJson;
+
+  let existing: { id: string; [k: string]: unknown }[] = [];
+  try {
+    existing = JSON.parse(existingJson);
+  } catch {
+    // keep empty
+  }
+
+  const byId = new Map(existing.map((t) => [t.id, t]));
+  for (const t of incoming) {
+    byId.set(t.id, t);
+  }
+
+  return JSON.stringify(Array.from(byId.values()));
+}
+
+const experimentRunEvents = [
+  experimentRunStartedEventSchema,
+  targetResultEventSchema,
+  evaluatorResultEventSchema,
+  traceMetricsComputedEventSchema,
+  experimentRunCompletedEventSchema,
+] as const;
+
+/**
+ * Type-safe fold projection for experiment run state.
+ */
+export class ExperimentRunStateFoldProjection
+  extends AbstractFoldProjection<ExperimentRunStateData, typeof experimentRunEvents>
+  implements FoldEventHandlers<typeof experimentRunEvents, ExperimentRunStateData>
+{
+  readonly name = "experimentRunState";
+  readonly version = EXPERIMENT_RUN_PROJECTION_VERSIONS.RUN_STATE;
+  readonly store: FoldProjectionStore<ExperimentRunStateData>;
+
+  /**
+   * Order-insensitive fold: all handlers are idempotent counters, sums, max operations, or
+   * keyed maps (last-write-wins). Re-folding on out-of-order events is O(n²) amplification
+   * with no benefit. See specs/trace-processing/hot-trace-fold-amplification.feature.
+   */
+  readonly options = { refoldOnOutOfOrder: false } as const;
+
+  protected readonly events = experimentRunEvents;
+
+  static create(deps: {
+    store: FoldProjectionStore<ExperimentRunStateData>;
+  }): ExperimentRunStateFoldProjection {
+    return new ExperimentRunStateFoldProjection(deps);
+  }
+
+  private constructor(deps: { store: FoldProjectionStore<ExperimentRunStateData> }) {
+    super();
+    this.store = deps.store;
+  }
+
+  protected initState() {
+    return {
+      RunId: "",
+      ExperimentId: "",
+      WorkflowVersionId: null,
+      Total: 0,
+      Progress: 0,
+      CompletedCount: 0,
+      FailedCount: 0,
+      TotalCost: null,
+      TotalDurationMs: null,
+      AvgScoreBps: null,
+      PassRateBps: null,
+      Targets: "[]",
+      StartedAt: null,
+      FinishedAt: null,
+      StoppedAt: null,
+      TotalScoreSum: 0,
+      ScoreCount: 0,
+      PassedCount: 0,
+      GradedCount: 0,
+      TraceMetrics: {},
+    };
+  }
+
+  handleExperimentRunStarted(
+    event: ExperimentRunStartedEvent,
+    state: ExperimentRunStateData,
+  ): ExperimentRunStateData {
+    return {
+      ...state,
+      RunId: event.data.runId,
+      ExperimentId: event.data.experimentId,
+      WorkflowVersionId: event.data.workflowVersionId ?? null,
+      Total: Math.max(state.Total, event.data.total),
+      Targets: mergeTargetsJson(state.Targets, event.data.targets ?? []),
+      StartedAt: state.StartedAt ?? event.occurredAt,
+    };
+  }
+
+  /**
+   * A cell the run produced moves every counter. A cell the run CARRIED from the
+   * board moves none of them.
+   */
+  handleExperimentRunTargetResult(
+    event: TargetResultEvent,
+    state: ExperimentRunStateData,
+  ): ExperimentRunStateData {
+    if (event.data.carriedOver) {
+      return {
+        ...state,
+        Targets: mergeTargetsJson(state.Targets, event.data.targets ?? []),
+      };
+    }
+
+    let completedCount = state.CompletedCount;
+    let failedCount = state.FailedCount;
+
+    if (event.data.error) {
+      failedCount += 1;
+    } else {
+      completedCount += 1;
+    }
+
+    let totalCost = state.TotalCost;
+    if (event.data.cost != null) {
+      totalCost = (totalCost ?? 0) + event.data.cost;
+    }
+
+    let totalDurationMs = state.TotalDurationMs;
+    const clampedDuration = normalizeDurationMs(event.data.duration);
+    if (clampedDuration != null) {
+      totalDurationMs = (totalDurationMs ?? 0) + clampedDuration;
+    }
+
+    const progress = completedCount + failedCount;
+
+    return {
+      ...state,
+      CompletedCount: completedCount,
+      FailedCount: failedCount,
+      Progress: progress,
+      TotalCost: totalCost,
+      TotalDurationMs: totalDurationMs,
+      Targets: mergeTargetsJson(state.Targets, event.data.targets ?? []),
+    };
+  }
+
+  /**
+   * A verdict counts toward what the run scored whether the run produced it or
+   * carried it, because the run stands for the whole board. Its cost counts
+   * only when the run produced it.
+   */
+  handleExperimentRunEvaluatorResult(
+    event: EvaluatorResultEvent,
+    state: ExperimentRunStateData,
+  ): ExperimentRunStateData {
+    let {
+      TotalScoreSum: totalScoreSum,
+      ScoreCount: scoreCount,
+      PassedCount: passedCount,
+      GradedCount: gradedCount,
+      TotalCost: totalCost,
+    } = state;
+
+    if (event.data.status === "processed") {
+      if (event.data.score != null) {
+        totalScoreSum += Math.round(event.data.score * 10000);
+        scoreCount += 1;
+      }
+      if (event.data.passed != null) {
+        gradedCount += 1;
+        if (event.data.passed) passedCount += 1;
+      }
+    }
+
+    // The verdict counts, its money does not. A carried verdict describes the
+    // board the run stands for, so a reader comparing two columns sees both
+    // sides; the money was spent by the run that produced it.
+    if (event.data.cost != null && !event.data.carriedOver) {
+      totalCost = (totalCost ?? 0) + event.data.cost;
+    }
+
+    const avgScoreBps = scoreCount > 0 ? Math.round(totalScoreSum / scoreCount) : null;
+    const passRateBps = gradedCount > 0 ? Math.round((passedCount / gradedCount) * 10000) : null;
+
+    return {
+      ...state,
+      TotalScoreSum: totalScoreSum,
+      ScoreCount: scoreCount,
+      PassedCount: passedCount,
+      GradedCount: gradedCount,
+      TotalCost: totalCost,
+      AvgScoreBps: avgScoreBps,
+      PassRateBps: passRateBps,
+    };
+  }
+
+  handleExperimentRunTraceMetricsComputed(
+    event: TraceMetricsComputedEvent,
+    state: ExperimentRunStateData,
+  ): ExperimentRunStateData {
+    const traceMetrics = {
+      ...state.TraceMetrics,
+      [event.data.traceId]: {
+        totalCost: event.data.totalCost,
+      },
+    };
+
+    // Recompute TotalCost from all trace metrics
+    let totalCost = state.TotalCost ?? 0;
+    // If this trace was already counted, subtract the old value
+    const existingEntry = state.TraceMetrics[event.data.traceId];
+    if (existingEntry) {
+      totalCost -= existingEntry.totalCost;
+    }
+    totalCost += event.data.totalCost;
+
+    return {
+      ...state,
+      TraceMetrics: traceMetrics,
+      TotalCost: totalCost > 0 ? Number(totalCost.toFixed(6)) : null,
+    };
+  }
+
+  handleExperimentRunCompleted(
+    event: ExperimentRunCompletedEvent,
+    state: ExperimentRunStateData,
+  ): ExperimentRunStateData {
+    return {
+      ...state,
+      FinishedAt: event.data.finishedAt ?? null,
+      StoppedAt: event.data.stoppedAt ?? null,
+    };
+  }
+}

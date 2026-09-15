@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { estimateModelCost, getStaticModelCostRates } from "@langwatch/model-provider-contract";
-import { EMPTY_SPEND_USAGE } from "../../processes/gateway-spend-commands.process.ts";
+import { EMPTY_SPEND_USAGE } from "../../eventing/gateway-spend-commands.process.ts";
 import {
   ModelCatalogGatewaySpendRatingAdapter,
   NANO_USD_PER_USD,

@@ -26,7 +26,7 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { ModelCatalogGatewaySpendRatingAdapter } from "../adapters/model-catalog.gateway-spend-rating.adapter.ts";
 import type { GatewaySpanIngestion } from "../app/gateway.members.ts";
 import type { GatewaySpendConfirmation } from "../app/gateway.members.ts";
-import type { ConfirmSpendCommandData } from "../processes/gateway-spend-commands.process.ts";
+import type { ConfirmSpendCommandData } from "../eventing/gateway-spend-commands.process.ts";
 import {
   GatewayRealtimeSessionService,
   REALTIME_OPEN_SESSION_WINDOW_MS,

@@ -20,10 +20,10 @@ import { createLogger } from "@langwatch/observability";
 import { type IdentityEventing } from "../app/identity.members.ts";
 import { createTenantId, type StateProjectionStore } from "@langwatch/eventing";
 import { IDENTITY_PIPELINE_NAME } from "@langwatch/identity-contract";
-import type { IdentityEvent } from "../projections/identity-state.projection.ts";
-import type { IdentityFoldState } from "../projections/identity-state.projection.ts";
+import type { IdentityEvent } from "../eventing/identity-state.projection.ts";
+import type { IdentityFoldState } from "../eventing/identity-state.projection.ts";
 import { MetricsIdentityLedgerAdapter } from "./metrics-identity-ledger.service.ts";
-import { identityEventsFor } from "../intents/identity-events.intent.ts";
+import { identityEventsFor } from "../eventing/identity-events.intent.ts";
 import { nowInstant } from "@langwatch/time";
 
 const logger = createLogger("langwatch:identity:ledger");

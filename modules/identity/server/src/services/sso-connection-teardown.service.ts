@@ -9,7 +9,7 @@ export interface ConnectionDirectoryRevocation {
     connectionId: string;
   }): Promise<{ revoked: number }>;
 }
-import type { ConnectionTeardown } from "../processes/connection-teardown.process.ts";
+import type { ConnectionTeardown } from "../eventing/connection-teardown.process.ts";
 import { newSsoConnectionCommandId } from "../rules/sso-connection-id.rules.ts";
 import type { SsoConnectionService } from "./sso-connection.service.ts";
 import { createLogger } from "@langwatch/observability";

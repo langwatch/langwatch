@@ -8,11 +8,11 @@ import type { IdentityHeadsRepository } from "../../repositories/identity-heads.
 import { describe, expect, it } from "vitest";
 import { inMemoryIdentityReservations, inMemoryIdentityUsers } from "../../testing.ts";
 import { type Command, createTenantId, validateEventAggregateType } from "@langwatch/eventing";
-import { AttachIdentifierCommand } from "../../intents/attach-identifier.intent.ts";
-import { DetachIdentifierCommand } from "../../intents/detach-identifier.intent.ts";
-import { EraseUserCommand } from "../../intents/erase-user.intent.ts";
-import { MarkPrimaryCommand } from "../../intents/mark-primary.intent.ts";
-import { VerifyIdentifierCommand } from "../../intents/verify-identifier.intent.ts";
+import { AttachIdentifierCommand } from "../../eventing/attach-identifier.intent.ts";
+import { DetachIdentifierCommand } from "../../eventing/detach-identifier.intent.ts";
+import { EraseUserCommand } from "../../eventing/erase-user.intent.ts";
+import { MarkPrimaryCommand } from "../../eventing/mark-primary.intent.ts";
+import { VerifyIdentifierCommand } from "../../eventing/verify-identifier.intent.ts";
 import { IdentityPipelineDefinitionAdapter } from "../identity-pipeline-definition.service.ts";
 import { CryptoIdentifierIdentityAdapter } from "../crypto-identifier-identity.service.ts";
 

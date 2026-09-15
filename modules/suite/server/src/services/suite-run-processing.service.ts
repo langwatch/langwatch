@@ -6,7 +6,7 @@ import {
 } from "@langwatch/eventing";
 import type { SuiteRunStateData } from "@langwatch/suite-contract";
 import { SuiteRunCommandsAdapter } from "./suite-run-commands.service.ts";
-import { SuiteRunStateFoldProjection } from "../projections/suite-run-state.projection.ts";
+import { SuiteRunStateFoldProjection } from "../eventing/suite-run-state.projection.ts";
 import { SUITE_RUN_PROCESSING_EVENT_TYPES } from "@langwatch/suite-contract";
 import type { SuiteRunProcessingEvent } from "@langwatch/suite-contract";
 

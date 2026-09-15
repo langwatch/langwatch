@@ -8,7 +8,7 @@
  */
 import { instantiateRepositories } from "@langwatch/runtime-composition";
 import { describe, expect, it } from "vitest";
-import { createInitState } from "../../projections/__tests__/fixtures/trace-summary-test.fixtures.ts";
+import { createInitState } from "../../eventing/__tests__/trace-summary-test.fixtures.ts";
 
 import { traceRepositories } from "../trace-repositories.registry.ts";
 

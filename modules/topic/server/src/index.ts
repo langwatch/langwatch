@@ -40,7 +40,7 @@ export {
   type TopicClusteringPageOutcome,
   type TopicClusteringRunIntent,
   type TopicClusteringRun,
-} from "./intents/topic-clustering.intent.ts";
+} from "./eventing/topic-clustering.intent.ts";
 export {
   batchClusterTraces,
   type ClusteringPageOutcome,
@@ -57,7 +57,7 @@ export {
   type TopicClusteringRunnerDeps,
   type TopicClusteringWritePathSeed,
   TopicClusteringRunner,
-} from "./intents/topic-clustering-runner.intent.ts";
+} from "./eventing/topic-clustering-runner.intent.ts";
 export {
   LegacyImportTopicClusteringMigration,
   type TopicClusteringBackfillSummary,
@@ -84,12 +84,12 @@ export {
   type TopicClusteringLangevalsKind,
   type TopicClusteringLangevalsResponse,
 } from "./app/topic.members.ts";
-export { RequestTopicClusteringTask } from "./intents/run-topic-clustering.intent.ts";
+export { RequestTopicClusteringTask } from "./eventing/run-topic-clustering.intent.ts";
 export { TopicClusteringRunTask } from "./tasks/topic-clustering-run.task.ts";
 export type { TopicClusteringScheduleReader } from "./app/topic.app.ts";
 export {
   TOPIC_CLUSTERING_PROCESS_NAME,
   TopicClusteringProcess,
   type TopicClusteringProcessState,
-} from "./processes/topic-clustering.process.ts";
+} from "./eventing/topic-clustering.process.ts";
 export { topicTrpcTransport } from "./transport/topic.trpc.ts";

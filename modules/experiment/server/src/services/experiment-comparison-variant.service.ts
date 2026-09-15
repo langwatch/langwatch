@@ -18,11 +18,11 @@ import {
   evaluatorScoresBlock,
   pickOutputPath,
   toCandidateText,
-} from "../processes/experiment-comparison-candidates.process.ts";
+} from "../eventing/experiment-comparison-candidates.process.ts";
 import {
   type ComparisonSetupSkip,
   type ComparisonSkipReason,
-} from "../processes/experiment-comparison-skip.process.ts";
+} from "../eventing/experiment-comparison-skip.process.ts";
 import type { LoadedEvaluators } from "./experiment-execution-data.service.ts";
 import type { VariantEvaluatorScore } from "./experiment-comparison-plan.service.ts";
 

@@ -15,7 +15,7 @@ import {
 import { getRunUrl } from "../rules/experiment-run-url.rules.ts";
 import type { ExperimentRunErrorReporting } from "./experiment-run-results-writer.service.ts";
 import type { ExperimentRunProgressRepository } from "../repositories/experiment-run-progress.repository.ts";
-import { mapThrownErrorEvent } from "../processes/experiment-result-mapping.process.ts";
+import { mapThrownErrorEvent } from "../eventing/experiment-result-mapping.process.ts";
 import {
   ExperimentRunResultsWriterService,
   type RunResultsPersistence,

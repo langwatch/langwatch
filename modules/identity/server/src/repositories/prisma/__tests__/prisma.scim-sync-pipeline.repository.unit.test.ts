@@ -5,7 +5,7 @@ import {
   PostgresScimSyncPipelineAdapter,
   type ScimSyncPipelineDatabase,
 } from "../prisma.scim-sync-pipeline.repository.ts";
-import type { ScimSyncFoldState } from "../../../projections/scim-sync-state.projection.ts";
+import type { ScimSyncFoldState } from "../../../eventing/scim-sync-state.projection.ts";
 import type { ScimSyncPipeline } from "../../../services/scim-sync-pipeline-definition.service.ts";
 
 const ORGANIZATION = "organization_acme";

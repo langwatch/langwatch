@@ -3,7 +3,7 @@ import { ATTR_KEYS } from "@langwatch/trace-contract";
 import {
   createInitState,
   createTestSpan,
-} from "../../../projections/__tests__/fixtures/trace-summary-test.fixtures.ts";
+} from "../../../eventing/__tests__/trace-summary-test.fixtures.ts";
 import { TraceAttributeAccumulationService } from "../trace-attribute-accumulation.service.ts";
 import { TraceOriginService } from "../../read/trace-origin.service.ts";
 

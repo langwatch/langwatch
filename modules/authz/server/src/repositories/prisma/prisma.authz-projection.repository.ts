@@ -4,7 +4,7 @@ import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import {
   type GrantProjectionWrite,
   GrantProjectionWriteStore,
-} from "../../projections/authz-grant.projection.ts";
+} from "../../eventing/authz-grant.projection.ts";
 import { AuthzMigrationOwnershipMapper } from "../../migrations/legacy-import.authz-grant.migration.ts";
 import { AuthzGrantMapper } from "./prisma.authz-grant.mapper.ts";
 import { toDate } from "@langwatch/time";

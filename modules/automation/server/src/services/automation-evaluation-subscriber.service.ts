@@ -4,8 +4,8 @@ import {
   type AutomationEvaluationSubscriberContext,
   type AutomationEvaluationSubscriberEvent,
 } from "@langwatch/automation-contract";
-import { handleEvaluationAlertTriggerMatch } from "../subscribers/evaluation-alert-trigger-match.subscriber.ts";
-import { handleGraphTriggerActivity } from "../subscribers/graph-trigger-activity.subscriber.ts";
+import { handleEvaluationAlertTriggerMatch } from "../eventing/evaluation-alert-trigger-match.subscriber.ts";
+import { handleGraphTriggerActivity } from "../eventing/graph-trigger-activity.subscriber.ts";
 import type { AutomationGraphActivity } from "../app/automation.members.ts";
 import type { AutomationTraceTriggerCatalogue } from "../repositories/automation-trace-trigger-catalogue.repository.ts";
 import type {

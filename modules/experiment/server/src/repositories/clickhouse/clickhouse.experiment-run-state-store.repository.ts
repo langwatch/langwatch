@@ -7,8 +7,8 @@ import type {
   ExperimentEventingClickHouseClient,
 } from "../experiment-clickhouse.repository.ts";
 import { ClickHouseExperimentRunStateRepository } from "./clickhouse.experiment-run-state.repository.ts";
-import { ExperimentRunStateStore } from "../../stores/eventing/eventing.experiment-run-state.store.ts";
-import type { ExperimentRunStateData } from "../../projections/experiment-run-state.projection.ts";
+import { ExperimentRunStateStore } from "../../eventing/experiment-run-state.store.ts";
+import type { ExperimentRunStateData } from "../../eventing/experiment-run-state.projection.ts";
 
 export class ClickhouseExperimentRunStateStoreRepository {
   /**

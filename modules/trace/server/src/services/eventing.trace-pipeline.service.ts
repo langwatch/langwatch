@@ -22,13 +22,13 @@ import { type TraceSpanNormalization } from "../app/trace.members.ts";
 import {
   type TraceAnalyticsData,
   TraceAnalyticsFoldProjection,
-} from "../projections/trace-derived.projection.ts";
+} from "../eventing/trace-derived.projection.ts";
 import {
   type TraceAnalyticsRollupRow,
   TraceAnalyticsRollupMapProjection,
-} from "../projections/trace-rollup.projection.ts";
-import { SpanStorageMapProjection } from "../projections/span-storage.projection.ts";
-import { TraceSummaryFoldProjection } from "../projections/trace-summary.projection.ts";
+} from "../eventing/trace-rollup.projection.ts";
+import { SpanStorageMapProjection } from "../eventing/span-storage.projection.ts";
+import { TraceSummaryFoldProjection } from "../eventing/trace-summary.projection.ts";
 import { TraceProjectionRuntimeService } from "./projection/trace-projection-runtime.service.ts";
 import {
   EventingRecordSpanAdapter,

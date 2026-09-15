@@ -62,12 +62,12 @@ export type {
   AutomationsPipelineDeps,
   TriggerMatchRecordedEvent,
 } from "./eventing/automation.pipeline.ts";
-export { TriggerSettlement } from "./processes/trigger-settlement.process.ts";
+export { TriggerSettlement } from "./eventing/trigger-settlement.process.ts";
 export {
   GRAPH_TRIGGER_REAL_TIME_DEBOUNCE_MS,
   createGraphTriggerActivityHandler,
   graphTriggerActivityGroupKey,
-} from "./subscribers/graph-trigger-activity.subscriber.ts";
+} from "./eventing/graph-trigger-activity.subscriber.ts";
 export { AutomationEvaluationSubscriberService } from "./services/automation-evaluation-subscriber.service.ts";
 export { AutomationEvaluationTriggerFilterService } from "./services/automation-evaluation-trigger-filter.service.ts";
 export type {
@@ -80,10 +80,10 @@ export type {
   LogOverflowIntent,
   NotifyDigestIntent,
   PersistMatchIntent,
-} from "./intents/trigger-settlement.intent.ts";
-export { TRIGGER_SETTLEMENT_INTENT_TYPES } from "./intents/trigger-settlement.intent.ts";
-export type { SettlementState } from "./processes/trigger-settlement.process.ts";
-export { GRAPH_ALERT_SWEEP_INTERVAL_MS } from "./processes/graph-alert-sweep.process.ts";
+} from "./eventing/trigger-settlement.intent.ts";
+export { TRIGGER_SETTLEMENT_INTENT_TYPES } from "./eventing/trigger-settlement.intent.ts";
+export type { SettlementState } from "./eventing/trigger-settlement.process.ts";
+export { GRAPH_ALERT_SWEEP_INTERVAL_MS } from "./eventing/graph-alert-sweep.process.ts";
 export {
   AutomationEmailCapService,
   type ConsumeDailyEmailCapInput,

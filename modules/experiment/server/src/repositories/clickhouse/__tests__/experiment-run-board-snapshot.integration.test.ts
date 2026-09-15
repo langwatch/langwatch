@@ -24,13 +24,13 @@ import {
   targetResultEventSchema,
   type EvaluatorResultEventData,
   type TargetResultEventData,
-} from "../../../processes/experiment-run-events.process.ts";
+} from "../../../eventing/experiment-run-events.process.ts";
 import {
   ExperimentClickHouseRepository,
   type ExperimentEventingClickHouseClient,
 } from "../../experiment-clickhouse.repository.ts";
-import { ExperimentRunResultStorageMapProjection } from "../../../projections/experiment-run-result-storage.projection.ts";
-import { ExperimentRunItemStore } from "../../../stores/eventing/eventing.experiment-run-item.store.ts";
+import { ExperimentRunResultStorageMapProjection } from "../../../eventing/experiment-run-result-storage.projection.ts";
+import { ExperimentRunItemStore } from "../../../eventing/experiment-run-item.store.ts";
 import { ClickHouseExperimentRunRepository } from "../clickhouse.experiment-run.repository.ts";
 
 const tenantId = `test-run-snapshot-${nanoid()}`;

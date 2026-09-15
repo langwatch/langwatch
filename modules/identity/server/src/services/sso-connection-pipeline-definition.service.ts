@@ -26,7 +26,7 @@ import {
   ResumeConnectionCommand,
   SuspendConnectionCommand,
   VerifyDomainCommand,
-} from "../intents/sso-connection.intent.ts";
+} from "../eventing/sso-connection.intent.ts";
 import {
   CONNECTION_TEARDOWN_INITIAL_STATE,
   CONNECTION_TEARDOWN_PROCESS_NAME,
@@ -36,17 +36,17 @@ import {
   connectionTeardownWake,
   onTeardownRequested,
   onTornDown,
-} from "../processes/connection-teardown.process.ts";
+} from "../eventing/connection-teardown.process.ts";
 import {
   type SsoConnectionEvent,
   type SsoConnectionFoldState,
   SsoConnectionStateFoldProjection,
-} from "../projections/sso-connection-state.projection.ts";
+} from "../eventing/sso-connection-state.projection.ts";
 import {
   SSO_CONNECTION_AGGREGATE_TYPE,
   SSO_CONNECTION_PIPELINE_NAME,
 } from "@langwatch/identity-contract";
-import { runCompleteTeardown } from "../intents/connection-teardown.intent.ts";
+import { runCompleteTeardown } from "../eventing/connection-teardown.intent.ts";
 
 /**
  * Every verb the aggregate has, and the name its queue sender is resolved by (the ledger writer

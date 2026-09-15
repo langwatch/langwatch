@@ -1,7 +1,7 @@
 import { AUTHZ_GRANTS_EVENT_TYPES } from "@langwatch/authz-contract";
 import { defineAggregate, defineEvents, definePipeline } from "@langwatch/eventing";
-import { AuthzGrantProjection } from "../projections/authz-grant.projection.ts";
-import type { GrantProjectionWriteStore } from "../projections/authz-grant.projection.ts";
+import { AuthzGrantProjection } from "./authz-grant.projection.ts";
+import type { GrantProjectionWriteStore } from "./authz-grant.projection.ts";
 import { AuthzAuditTrailStore } from "../repositories/authz-audit-trail.repository.ts";
 import { AUTHZ_GRANT_AGGREGATE_TYPE, type AuthzGrantsEvent } from "./authz-grant.events.ts";
 import {

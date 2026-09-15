@@ -22,8 +22,8 @@ import { describe, expect, it } from "vitest";
 
 import { EventingRecordSpanAdapter } from "../eventing.record-span.service.ts";
 import { TraceCanonicalisationService } from "../canonicalisers/trace-canonicalisation.service.ts";
-import { TraceSummaryFoldProjection } from "../../projections/trace-summary.projection.ts";
-import { createTestRuntime } from "../../projections/__tests__/fixtures/trace-summary-test.fixtures.ts";
+import { TraceSummaryFoldProjection } from "../../eventing/trace-summary.projection.ts";
+import { createTestRuntime } from "../../eventing/__tests__/trace-summary-test.fixtures.ts";
 import {
   type TraceSpanContentDrop,
   type TraceSpanCostEnrichment,

@@ -12,11 +12,11 @@ import {
   type GithubBranchRecheckState,
   githubBranchRecheckSchema,
   githubBranchRecheckWake,
-} from "../processes/github-branch-recheck.process.ts";
+} from "../eventing/github-branch-recheck.process.ts";
 import {
   runGithubBranchRecheck,
   runGithubRetentionPrune,
-} from "../intents/github-branch-recheck.intent.ts";
+} from "../eventing/github-branch-recheck.intent.ts";
 import type { GithubBranchMaintenance } from "../app/github.members.ts";
 
 export interface GithubMaintenancePipelineDeps {

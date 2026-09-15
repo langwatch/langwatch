@@ -66,6 +66,33 @@ describe("given a repository", () => {
   });
 });
 
+describe("given a repository beside an eventing pipeline", () => {
+  // Event sourcing keeps its stores in `eventing/` beside the pipeline that
+  // names them, and the layer table is keyed by folder -- so the folder has to
+  // answer for a store and a projection differently, or the rule named after
+  // letting a repository take its store is the rule that refuses it.
+  describe("when it names a store in the eventing folder", () => {
+    /** @scenario "A repository takes the store it reads and nothing above it" */
+    it("reports nothing", () => {
+      expect(
+        fromRepository('import { RunItemStore } from "../../eventing/experiment-run-item.store.ts";'),
+      ).toHaveLength(0);
+    });
+  });
+
+  describe("when it names any other artifact in the eventing folder", () => {
+    /** @scenario "A repository takes the store it reads and nothing above it" */
+    it("reports the crossing", () => {
+      const found = fromRepository(
+        'import { TraceDerived } from "../../eventing/trace-derived.projection.ts";',
+      );
+
+      expect(found).toHaveLength(1);
+      expect(found[0].data.crossed).toBe("the eventing pipeline");
+    });
+  });
+});
+
 describe("given a channel", () => {
   describe("when it reads a repository", () => {
     /** @scenario "A channel takes the client it speaks to" */

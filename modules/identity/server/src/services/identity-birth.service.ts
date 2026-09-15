@@ -14,10 +14,10 @@ import { adoptUserEmailCommandId } from "../rules/identity-command-id.rules.ts";
 import { type IdentityReservationRepository } from "../repositories/identity-reservations.repository.ts";
 import { IdentityBirth, type IdentityNewborn } from "../app/identity.members.ts";
 import { createLogger } from "@langwatch/observability";
-import type { IdentityEvent } from "../projections/identity-state.projection.ts";
+import type { IdentityEvent } from "../eventing/identity-state.projection.ts";
 import type { IdentityBirthLedger } from "../app/identity.members.ts";
 import type { IdentityNewbornRepository } from "../repositories/identity-newborn.repository.ts";
-import { identityEventsFor } from "../intents/identity-events.intent.ts";
+import { identityEventsFor } from "../eventing/identity-events.intent.ts";
 
 const logger = createLogger("langwatch:identity:birth");
 

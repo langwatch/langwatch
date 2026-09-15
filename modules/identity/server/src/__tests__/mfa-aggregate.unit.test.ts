@@ -18,7 +18,7 @@ import {
   ExpireMfaEnrollmentCommand,
   RecordMfaVerificationFailureCommand,
   RegenerateBackupCodesCommand,
-} from "../intents/mfa.intent.ts";
+} from "../eventing/mfa.intent.ts";
 import { IdentityPipelineDefinitionAdapter } from "../services/identity-pipeline-definition.service.ts";
 import { USER_IDENTITY_AGGREGATE_TYPE } from "@langwatch/identity-contract";
 

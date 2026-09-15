@@ -43,11 +43,11 @@ export { ExperimentWorkbenchUpdates } from "./services/experiment-workbench.serv
 /**
  * The workbench run loop, moved WHOLE out of the retired application.
  */
-export { createSemaphore } from "./processes/experiment-run-semaphore.process.ts";
+export { createSemaphore } from "./eventing/experiment-run-semaphore.process.ts";
 export {
   buildStripScoreEvaluatorIds,
   shouldStripScore,
-} from "./processes/experiment-evaluator-score-filter.process.ts";
+} from "./eventing/experiment-evaluator-score-filter.process.ts";
 export { ExperimentConnectedDispatch } from "./services/experiment-connected-cell.service.ts";
 export {
   ExperimentConnectedAgentOwnership,
@@ -95,11 +95,11 @@ export {
   mapThrownErrorEvent,
   mapWorkflowEvaluatorResult,
   type ResultMapperConfig,
-} from "./processes/experiment-result-mapping.process.ts";
+} from "./eventing/experiment-result-mapping.process.ts";
 export {
   buildCellWorkflow,
   buildEvaluatorCellWorkflow,
-} from "./processes/experiment-cell-workflow.process.ts";
+} from "./eventing/experiment-cell-workflow.process.ts";
 export {
   ExperimentRunLoopUnavailableError,
   experimentV3Rest,

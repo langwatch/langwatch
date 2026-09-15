@@ -1,5 +1,5 @@
 import type { SpendUsage } from "@langwatch/gateway-contract";
-import type { ConfirmSpendCommandData } from "../processes/gateway-spend-commands.process.ts";
+import type { ConfirmSpendCommandData } from "../eventing/gateway-spend-commands.process.ts";
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import { type ModelProvider, PROVIDER_BUCKET_SEPARATOR, bucketScopeIdFor, budgetPeriodFloorMs, type GatewayBudgetLedgerStatus, type GatewayBudgetResource, type GatewayBudgetScopeType, type GatewayBudgetWindow } from "@langwatch/gateway-contract";
 import type { Instant } from "@langwatch/time";

@@ -12,7 +12,7 @@ import {
 } from "@langwatch/eventing";
 import { EventStoreMemory } from "@langwatch/eventing/testing";
 import { IdentityPipelineDefinitionAdapter } from "../services/identity-pipeline-definition.service.ts";
-import type { IdentityFoldState } from "../projections/identity-state.projection.ts";
+import type { IdentityFoldState } from "../eventing/identity-state.projection.ts";
 import { USER_IDENTITY_AGGREGATE_TYPE } from "@langwatch/identity-contract";
 import { CryptoIdentifierIdentityAdapter } from "../services/crypto-identifier-identity.service.ts";
 

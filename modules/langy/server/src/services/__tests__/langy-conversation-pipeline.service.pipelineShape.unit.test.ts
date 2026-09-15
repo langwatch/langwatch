@@ -9,15 +9,15 @@ import {
   LANGY_CONVERSATION_PROCESSING_EVENT_TYPES,
 } from "@langwatch/langy-contract";
 import { describe, expect, it, vi } from "vitest";
-import { LANGY_CONVERSATION_PROCESS_NAME } from "../../processes/langy-conversation-process.types.ts";
+import { LANGY_CONVERSATION_PROCESS_NAME } from "../../eventing/langy-conversation-process.schemas.ts";
 import { createStubLangyEffectPorts } from "@langwatch/langy-server/testing";
-import { agentRespondedEvent, CONVERSATION_ID, PROJECT_ID } from "../../projections/__tests__/helpers/langyEventFixtures.ts";
+import { agentRespondedEvent, CONVERSATION_ID, PROJECT_ID } from "../../eventing/__tests__/langyEventFixtures.ts";
 import {
   LangyConversationPipelineAdapter,
   type LangyConversationProcessingPipelineDeps,
 } from "../langy-conversation-pipeline.service.ts";
-import type { LangyAnalyticsEventProjectionRecord } from "../../projections/langy-analytics-event.projection.ts";
-import type { LangyConversationProcessingEvent } from "../../projections/langy-conversation-state.projection.ts";
+import type { LangyAnalyticsEventProjectionRecord } from "../../eventing/langy-analytics-event.projection.ts";
+import type { LangyConversationProcessingEvent } from "../../eventing/langy-conversation-state.projection.ts";
 
 /**
  * Proves the FINAL Langy pipeline shape from the public static definition (conversation + turn)

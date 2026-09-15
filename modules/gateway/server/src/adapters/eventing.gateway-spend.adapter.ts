@@ -5,28 +5,28 @@ import {
   type FoldProjectionStore,
   type ProcessManagerApplier,
 } from "@langwatch/eventing";
-import type { SettleSpendCommandData } from "../processes/gateway-spend-commands.process.ts";
-import type { SpendSettlementProcessDeps } from "../intents/gateway-spend-settlement.intent.ts";
+import type { SettleSpendCommandData } from "../eventing/gateway-spend-commands.process.ts";
+import type { SpendSettlementProcessDeps } from "../eventing/gateway-spend-settlement.intent.ts";
 import {
   SPEND_SETTLEMENT_PROCESS_NAME,
   spendSettlementPM,
-} from "../processes/gateway-spend-settlement.process.ts";
-import type { GatewaySpendState } from "../projections/gateway-spend.projection.ts";
+} from "../eventing/gateway-spend-settlement.process.ts";
+import type { GatewaySpendState } from "../eventing/gateway-spend.projection.ts";
 import type { GatewaySpendEvents } from "../ports/gateway-spend-events.port.ts";
 import { GatewaySpendStore } from "../stores/gateway-spend/gateway-spend.store.ts";
 import {
   GATEWAY_SPEND_AGGREGATE_TYPE,
   GATEWAY_SPEND_PIPELINE_NAME,
   GATEWAY_SPEND_PROCESSING_EVENT_TYPES,
-} from "../processes/gateway-spend-commands.process.ts";
+} from "../eventing/gateway-spend-commands.process.ts";
 import {
   AdmitSpendCommand,
   ConfirmSpendCommand,
   FailSpendCommand,
   SettleSpendCommand,
-} from "../intents/gateway-spend.intent.ts";
-import type { GatewaySpendProcessingEvent } from "../intents/gateway-spend.intent.ts";
-import { GatewaySpendFoldProjection } from "../projections/gateway-spend.projection.ts";
+} from "../eventing/gateway-spend.intent.ts";
+import type { GatewaySpendProcessingEvent } from "../eventing/gateway-spend.intent.ts";
+import { GatewaySpendFoldProjection } from "../eventing/gateway-spend.projection.ts";
 
 /**
  * A process manager another feature owns, mounted here under the name its durable rows are already keyed by — renaming loses inbox/state/outbox rows. Webhook delivery (ADR-073) and Governance debits live in packages this one may not depend on.

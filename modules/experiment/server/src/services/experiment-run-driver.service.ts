@@ -13,9 +13,9 @@ import type {
 import { generateHumanReadableId } from "@langwatch/experiment-contract";
 import type { SingleEvaluationResult } from "@langwatch/evaluator-contract";
 import type { RunActor } from "@langwatch/scenario-contract";
-import { buildStripScoreEvaluatorIds } from "../processes/experiment-evaluator-score-filter.process.ts";
-import { createEventStream } from "../processes/experiment-run-event-stream.process.ts";
-import type { ResultMapperConfig } from "../processes/experiment-result-mapping.process.ts";
+import { buildStripScoreEvaluatorIds } from "../eventing/experiment-evaluator-score-filter.process.ts";
+import { createEventStream } from "../eventing/experiment-run-event-stream.process.ts";
+import type { ResultMapperConfig } from "../eventing/experiment-result-mapping.process.ts";
 import type { OrchestratorInput } from "../rules/experiment-run-input.rules.ts";
 import { ExperimentCarriedBoardService } from "./experiment-carried-board.service.ts";
 import { ExperimentResultDispatchService } from "./experiment-result-dispatch.service.ts";

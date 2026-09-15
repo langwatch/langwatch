@@ -19,7 +19,7 @@ import { QueueRunCommand } from "../../../eventing/simulation-processing.command
 import {
   SimulationRunStateFoldProjection,
   type SimulationRunStateData,
-} from "../../../projections/simulation-run-state.projection.ts";
+} from "../../../eventing/simulation-run-state.projection.ts";
 import type { ScenarioPlanRecord, ScenarioRepository } from "../../scenario.repository.ts";
 import { RunConfigurationsService } from "../../../services/run-configurations.service.ts";
 import { RunConfigurationsClickHouseRepository } from "../clickhouse.run-configurations.repository.ts";

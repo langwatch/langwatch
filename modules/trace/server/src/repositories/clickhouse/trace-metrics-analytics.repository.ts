@@ -5,7 +5,7 @@ import type { TraceWindowedReadMetrics } from "../../app/trace.members.ts";
 import {
   TRACE_ANALYTICS_PROJECTION_VERSION_PRE_SPLIT,
   type TraceAnalyticsRow,
-} from "../../projections/trace-derived.projection.ts";
+} from "../../eventing/trace-derived.projection.ts";
 import {
   TraceAnalyticsProjectionRepository,
   type TraceAnalyticsProjectionRead,

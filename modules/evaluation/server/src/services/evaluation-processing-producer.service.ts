@@ -5,10 +5,10 @@
 import type { AutomationEvaluationSubscriberService } from "@langwatch/automation-contract";
 import type { AppendStore, FoldProjectionStore } from "@langwatch/eventing";
 import type { EvaluationRunData } from "@langwatch/evaluation-contract";
-import type { EvaluationAnalyticsData } from "../projections/evaluation-analytics-fold.projection.ts";
-import type { EvaluationAnalyticsRollupRow } from "../projections/evaluation-analytics-rollup.projection.ts";
+import type { EvaluationAnalyticsData } from "../eventing/evaluation-analytics-fold.projection.ts";
+import type { EvaluationAnalyticsRollupRow } from "../eventing/evaluation-analytics-rollup.projection.ts";
 import { type EvaluationExecutionIntent } from "../app/evaluation.members.ts";
-import { ExecuteEvaluationCommand } from "../intents/evaluation-execution.intent.ts";
+import { ExecuteEvaluationCommand } from "../eventing/evaluation-execution.intent.ts";
 import { EvaluationProcessingAdapter } from "./evaluation-processing.service.ts";
 
 /** Why every stand-in below refuses, in the process's own words. */

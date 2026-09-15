@@ -23,22 +23,22 @@ import {
   IdentityPipelineDefinitionAdapter,
   type IdentityPipeline,
 } from "./identity-pipeline-definition.service.ts";
-import type { IdentityFoldState } from "../projections/identity-state.projection.ts";
-import type { MfaFoldState } from "../projections/mfa-enrollment-state.projection.ts";
+import type { IdentityFoldState } from "../eventing/identity-state.projection.ts";
+import type { MfaFoldState } from "../eventing/mfa-enrollment-state.projection.ts";
 import {
   JoinRequestPipelineDefinitionAdapter,
   type JoinRequestPipeline,
 } from "./join-request-pipeline-definition.service.ts";
-import type { JoinRequestLifecycle } from "../processes/join-request-lifecycle.process.ts";
-import type { JoinRequestFoldState } from "../projections/join-request-state.projection.ts";
+import type { JoinRequestLifecycle } from "../eventing/join-request-lifecycle.process.ts";
+import type { JoinRequestFoldState } from "../eventing/join-request-state.projection.ts";
 import {
   ScimSyncPipelineDefinitionAdapter,
   type ScimSyncPipeline,
 } from "./scim-sync-pipeline-definition.service.ts";
-import type { ScimSyncFoldState } from "../projections/scim-sync-state.projection.ts";
+import type { ScimSyncFoldState } from "../eventing/scim-sync-state.projection.ts";
 import { SsoConnectionPipelineDefinitionAdapter } from "./sso-connection-pipeline-definition.service.ts";
-import type { ConnectionTeardown } from "../processes/connection-teardown.process.ts";
-import type { SsoConnectionFoldState } from "../projections/sso-connection-state.projection.ts";
+import type { ConnectionTeardown } from "../eventing/connection-teardown.process.ts";
+import type { SsoConnectionFoldState } from "../eventing/sso-connection-state.projection.ts";
 import { CryptoIdentifierIdentityAdapter } from "./crypto-identifier-identity.service.ts";
 
 /** Why every stand-in below refuses, in the process's own words. */

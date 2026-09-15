@@ -4,7 +4,7 @@ import type { IdentityReservationRepository } from "../identity-reservations.rep
 import { BetterAuthAccountQueriesAdapter } from "../../services/better-auth-account-queries.service.ts";
 import { createLogger } from "@langwatch/observability";
 import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
-import type { IdentityFoldState } from "../../projections/identity-state.projection.ts";
+import type { IdentityFoldState } from "../../eventing/identity-state.projection.ts";
 import type {
   ProjectionStoreContext,
   StateProjectionStore,

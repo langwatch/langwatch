@@ -8,7 +8,7 @@ import {
   type JoinRequestPipeline,
 } from "../../services/join-request-pipeline-definition.service.ts";
 import { JOIN_REQUEST_PIPELINE_NAME } from "@langwatch/identity-contract";
-import type { JoinRequestEvent } from "../../projections/join-request-state.projection.ts";
+import type { JoinRequestEvent } from "../../eventing/join-request-state.projection.ts";
 import {
   EventingJoinRequestLedgerAdapter,
   type JoinRequestStagedSender,

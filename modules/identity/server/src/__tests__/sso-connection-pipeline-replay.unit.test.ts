@@ -19,8 +19,8 @@ import type {
 import {
   type SsoConnectionFoldState,
   SsoConnectionStateFoldProjection,
-} from "../projections/sso-connection-state.projection.ts";
-import type { SsoConnectionEvent } from "../projections/sso-connection-state.projection.ts";
+} from "../eventing/sso-connection-state.projection.ts";
+import type { SsoConnectionEvent } from "../eventing/sso-connection-state.projection.ts";
 
 const ORG = "org_acme";
 const CONNECTION = "ssoc_1";

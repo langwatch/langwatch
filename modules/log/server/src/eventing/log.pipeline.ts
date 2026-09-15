@@ -13,9 +13,9 @@ import {
   LOG_PROCESSING_EVENT_TYPES,
   type RecordCanonicalLogCommandData,
 } from "@langwatch/log-contract";
-import { CanonicalLogStorageMapProjection } from "../projections/canonical-log-storage.projection.ts";
+import { CanonicalLogStorageMapProjection } from "./canonical-log-storage.projection.ts";
 import type { CanonicalLogRecordAppendRepository } from "../repositories/canonical-log-record-append.repository.ts";
-import { CanonicalLogRecordStore } from "../stores/eventing/eventing.canonical-log-record.store.ts";
+import { CanonicalLogRecordStore } from "./canonical-log-record.store.ts";
 import { CanonicalLogAdapter } from "../services/canonical-log.service.ts";
 import { RecordCanonicalLogCommand } from "../services/record-canonical-log.command.ts";
 

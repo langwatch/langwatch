@@ -1,4 +1,4 @@
-import type { TopicClusteringMetrics } from "./intents/topic-clustering.intent.ts";
+import type { TopicClusteringMetrics } from "./eventing/topic-clustering.intent.ts";
 import { defineServerModule } from "@langwatch/runtime-composition";
 import { TopicApp } from "./app/topic.app.ts";
 import { topicRepositories } from "./repositories/topic-repositories.registry.ts";

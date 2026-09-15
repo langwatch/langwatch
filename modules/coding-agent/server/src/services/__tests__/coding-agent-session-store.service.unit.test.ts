@@ -14,8 +14,8 @@ import {
   CodingAgentSessionRowMapper,
   type CodingAgentSessionRow,
   type CodingAgentSessionState,
-} from "../../projections/coding-agent-session.projection.ts";
-import { CodingAgentSessionStateProjection } from "../../projections/coding-agent-session-state.projection.ts";
+} from "../../eventing/coding-agent-session.projection.ts";
+import { CodingAgentSessionStateProjection } from "../../eventing/coding-agent-session-state.projection.ts";
 
 const tenantId = createTenantId("tenant-1");
 

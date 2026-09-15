@@ -4,7 +4,7 @@ import type {} from "@langwatch/langy-contract";
 import { LANGY_CONVERSATION_STATUS } from "@langwatch/langy-contract";
 import { LangyTurnErrors } from "@langwatch/langy-contract";
 import { mintRunToken } from "../rules/langy-frame-auth.rules.ts";
-import { LANGY_ID_RESOURCES } from "../processes/langy-conversation-process.types.ts";
+import { LANGY_ID_RESOURCES } from "../eventing/langy-conversation-process.schemas.ts";
 import {
   LangyConversationNotFoundError,
   LangyConversationNotOwnedError,

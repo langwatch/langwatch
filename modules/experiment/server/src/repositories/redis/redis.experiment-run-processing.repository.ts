@@ -8,10 +8,10 @@ import {
   ClickhouseExperimentClickHouseRepository,
   type ExperimentEventingClickHouseResolver,
 } from "../clickhouse/clickhouse.experiment-clickhouse.repository.ts";
-import type { ExperimentRunStateData } from "../../projections/experiment-run-state.projection.ts";
+import type { ExperimentRunStateData } from "../../eventing/experiment-run-state.projection.ts";
 import { ClickHouseExperimentRunStateRepository } from "../clickhouse/clickhouse.experiment-run-state.repository.ts";
-import { ExperimentRunItemStore } from "../../stores/eventing/eventing.experiment-run-item.store.ts";
-import { ExperimentRunStateStore } from "../../stores/eventing/eventing.experiment-run-state.store.ts";
+import { ExperimentRunItemStore } from "../../eventing/experiment-run-item.store.ts";
+import { ExperimentRunStateStore } from "../../eventing/experiment-run-state.store.ts";
 
 /**
  * The Redis keyspace the experiment-run fold's read-through cache occupies.

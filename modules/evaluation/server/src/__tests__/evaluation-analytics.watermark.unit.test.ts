@@ -5,12 +5,12 @@ import type { EvaluationAnalyticsAttributePolicy } from "../app/evaluation.membe
 import {
   EVALUATION_ANALYTICS_PROJECTION_VERSION_LATEST,
   EvaluationAnalyticsFoldProjection,
-} from "../projections/evaluation-analytics-fold.projection.ts";
+} from "../eventing/evaluation-analytics-fold.projection.ts";
 import type {
   EvaluationAnalyticsData,
   EvaluationAnalyticsRow,
-} from "../projections/evaluation-analytics-row.projection.ts";
-import { EvaluationAnalyticsStore } from "../stores/eventing/evaluation-attributes.store.ts";
+} from "../eventing/evaluation-analytics-row.projection.ts";
+import { EvaluationAnalyticsStore } from "../eventing/evaluation-attributes.store.ts";
 
 /**
  * The write path for the evaluation fold. Two claims the executor's dedup and

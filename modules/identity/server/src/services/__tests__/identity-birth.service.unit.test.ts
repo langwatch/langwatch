@@ -6,7 +6,7 @@
 import { IdentityGuardsService } from "../identity-guards.service.ts";
 import { IdentityEngineUnavailableError } from "@langwatch/identity-contract";
 import { describe, expect, it, vi } from "vitest";
-import type { IdentityEvent } from "../../projections/identity-state.projection.ts";
+import type { IdentityEvent } from "../../eventing/identity-state.projection.ts";
 import { IdentityBirthService } from "../identity-birth.service.ts";
 import type { IdentityBirthLedger } from "../../app/identity.members.ts";
 import type { IdentityNewbornRepository } from "../../repositories/identity-newborn.repository.ts";

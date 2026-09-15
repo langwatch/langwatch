@@ -1,8 +1,8 @@
 import type { AppendStore, BulkAppendContext, ProjectionStoreContext } from "@langwatch/eventing";
 import type { CodingAgentProjectionPersistence } from "@langwatch/coding-agent-contract";
-import type { CodingAgentSessionEventRecord } from "../projections/coding-agent-session-events.projection.ts";
-import type { CodingAgentTraceSessionRecord } from "../projections/coding-agent-trace-sessions.projection.ts";
-import type { SessionMetricSeriesRecord } from "../projections/session-metric-series.projection.ts";
+import type { CodingAgentSessionEventRecord } from "../eventing/coding-agent-session-events.projection.ts";
+import type { CodingAgentTraceSessionRecord } from "../eventing/coding-agent-trace-sessions.projection.ts";
+import type { SessionMetricSeriesRecord } from "../eventing/session-metric-series.projection.ts";
 
 /** Append via projection-persistence adapter; unifies retention fallback logic. */
 abstract class CodingAgentAppendStore<TRecord> implements AppendStore<TRecord> {

@@ -16,26 +16,26 @@ import {
   type GraphAlertSweepState,
   graphAlertSweepWake,
   sweepSchema,
-} from "../processes/graph-alert-sweep.process.ts";
-import { runGraphAlertSweep } from "../intents/graph-alert-sweep.intent.ts";
+} from "./graph-alert-sweep.process.ts";
+import { runGraphAlertSweep } from "./graph-alert-sweep.intent.ts";
 import {
   INITIAL_SETTLEMENT_STATE,
   type SettlementState,
   TriggerSettlement,
-} from "../processes/trigger-settlement.process.ts";
+} from "./trigger-settlement.process.ts";
 import {
   logOverflowIntentSchema,
   notifyDigestIntentSchema,
   persistMatchIntentSchema,
   TRIGGER_SETTLEMENT_INTENT_TYPES,
-} from "../intents/trigger-settlement.intent.ts";
+} from "./trigger-settlement.intent.ts";
 import {
   pruneSchema,
   WEBHOOK_DELIVERY_PRUNE_INTERVAL_MS,
   type WebhookDeliveryPruneState,
   webhookDeliveryPruneWake,
-} from "../processes/webhook-delivery-prune.process.ts";
-import { runWebhookDeliveryPrune } from "../intents/webhook-delivery-prune.intent.ts";
+} from "./webhook-delivery-prune.process.ts";
+import { runWebhookDeliveryPrune } from "./webhook-delivery-prune.intent.ts";
 import { z } from "zod";
 import type { AutomationIntentRetention } from "../repositories/automation-intent-retention.repository.ts";
 import type { AutomationScheduledIntent } from "../services/automation-scheduled-intent.service.ts";

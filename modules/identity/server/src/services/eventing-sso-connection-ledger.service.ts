@@ -32,9 +32,9 @@ import {
   type StateProjectionStore,
 } from "@langwatch/eventing";
 import { SSO_CONNECTION_AGGREGATE_TYPE } from "@langwatch/identity-contract";
-import type { SsoConnectionEvent } from "../projections/sso-connection-state.projection.ts";
-import type { SsoConnectionFoldState } from "../projections/sso-connection-state.projection.ts";
-import { ssoConnectionEventsFor } from "../intents/sso-connection-events.intent.ts";
+import type { SsoConnectionEvent } from "../eventing/sso-connection-state.projection.ts";
+import type { SsoConnectionFoldState } from "../eventing/sso-connection-state.projection.ts";
+import { ssoConnectionEventsFor } from "../eventing/sso-connection-events.intent.ts";
 import { nowInstant } from "@langwatch/time";
 
 const logger = createLogger("langwatch:identity:sso-connection-ledger");

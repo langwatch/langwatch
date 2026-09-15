@@ -23,7 +23,7 @@ import { createApp, membersFrom } from "@langwatch/runtime-composition";
 
 import { ModelCatalogGatewaySpendRatingAdapter } from "../../adapters/model-catalog.gateway-spend-rating.adapter.ts";
 import type { GatewayModelProviderCredentials, GatewaySpendConfirmation } from "../../app/gateway.members.ts";
-import type { ConfirmSpendCommandData } from "../../processes/gateway-spend-commands.process.ts";
+import type { ConfirmSpendCommandData } from "../../eventing/gateway-spend-commands.process.ts";
 import { ELEVENLABS_WEBHOOK_SECRET_KEY } from "../../services/gateway-elevenlabs-credential.service.ts";
 import {
   GatewayRealtimeSessionService,

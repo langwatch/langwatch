@@ -59,6 +59,18 @@ export function crossingFor({ layer, sourcePath, specifier }) {
 
   const target = targetLayer({ sourcePath, specifier });
   if (!target || target === layer) return undefined;
+  if (layer === "repositories" && isEventingStore({ specifier, target })) return undefined;
 
   return LAYER_MAY_TAKE[layer].includes(target) ? undefined : (LAYER_NOUN[target] ?? undefined);
+}
+
+// A store is the one thing a repository is *for*, and event sourcing keeps its
+// stores in `eventing/` beside the pipeline that names them rather than in a
+// folder of their own. The table is keyed by folder, so without this the
+// eventing folder answers for all eight of its artifact kinds at once and a
+// repository naming the store it reads is refused by the rule named after
+// letting it. Only the store kind passes: a projection, process, subscriber,
+// intent or pipeline in the same folder is a real crossing and still reports.
+function isEventingStore({ specifier, target }) {
+  return target === "eventing" && /\.store\.ts$/.test(specifier);
 }

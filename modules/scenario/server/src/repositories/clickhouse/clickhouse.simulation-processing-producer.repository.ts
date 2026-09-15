@@ -10,12 +10,12 @@ import type {
 import { ScenarioExecutionService } from "@langwatch/scenario-contract";
 import type { TraceSummaryData } from "@langwatch/trace-contract";
 import { SimulationExecutionRepository } from "./simulation-clickhouse.repository.ts";
-import type { SimulationRunMetricsProjectionRecord } from "../../projections/simulation-run-metrics.projection.ts";
-import type { SimulationRunStateData } from "../../projections/simulation-run-state.projection.ts";
+import type { SimulationRunMetricsProjectionRecord } from "../../eventing/simulation-run-metrics.projection.ts";
+import type { SimulationRunStateData } from "../../eventing/simulation-run-state.projection.ts";
 import {
   SIMULATION_RUN_EXECUTION_PROCESS_NAME,
   simulationRunExecutionPM,
-} from "../../processes/simulation-run-execution.process.ts";
+} from "../../eventing/simulation-run-execution.process.ts";
 import { ComputeRunMetricsCommand } from "../../eventing/compute-run-metrics.commands.ts";
 import { FinishRunCommand } from "../../eventing/finish-run.commands.ts";
 import { RecordEvaluationsCommand } from "../../eventing/recordEvaluations.command.ts";

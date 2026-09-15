@@ -6,7 +6,7 @@ import { LangyTurnDispatchRetry } from "@langwatch/langy-contract";
 import type { LangyWorker } from "../../app/langy.members.ts";
 import type { LangyTurnHandoffRedisRepository } from "./redis.langy-turn-handoff.repository.ts";
 import type { LangyTurnHandoff } from "../langy-live-turn.repository.ts";
-import type { LangyFailTurnCommand } from "../../subscribers/langy-conversation.subscriber.ts";
+import type { LangyFailTurnCommand } from "../../eventing/langy-conversation.subscriber.ts";
 
 const logger = createLogger("langwatch:langy:process-effects");
 

@@ -79,10 +79,10 @@ export type {
   ScenarioSecretCipher,
   ScenarioTabStore,
 } from "./app/scenario.app.ts";
-export { STALL_THRESHOLD_MS } from "./processes/simulation-run-execution-evolution.process.ts";
-export * from "./processes/simulation-run-execution.process.ts";
-export { SIMULATION_RUN_EXECUTION_PROCESS_NAME, simulationRunExecutionPM } from "./processes/simulation-run-execution.process.ts";
-export type { SimulationRunStateData } from "./projections/simulation-run-state.projection.ts";
+export { STALL_THRESHOLD_MS } from "./eventing/simulation-run-execution-evolution.process.ts";
+export * from "./eventing/simulation-run-execution.process.ts";
+export { SIMULATION_RUN_EXECUTION_PROCESS_NAME, simulationRunExecutionPM } from "./eventing/simulation-run-execution.process.ts";
+export type { SimulationRunStateData } from "./eventing/simulation-run-state.projection.ts";
 export {
     MAX_CODE_SCENARIOS,
     MAX_RUN_TARGETS,

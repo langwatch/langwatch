@@ -4,8 +4,8 @@ import { TraceCanonicalisationService } from "@langwatch/trace-contract";
 import { RedisCodingAgentProcessingRepository } from "../redis.coding-agent-processing.repository.ts";
 import { ModelCatalogCostEstimatorAdapter } from "../../../services/model-catalog-cost-estimator.service.ts";
 import type { CodingAgentProcessingPipeline } from "../redis.coding-agent-session-pipeline.repository.ts";
-import { type CodingAgentSessionState } from "../../../projections/coding-agent-session.projection.ts";
-import { CodingAgentSessionStateProjection } from "../../../projections/coding-agent-session-state.projection.ts";
+import { type CodingAgentSessionState } from "../../../eventing/coding-agent-session.projection.ts";
+import { CodingAgentSessionStateProjection } from "../../../eventing/coding-agent-session-state.projection.ts";
 import type { CodingAgentProjectActivity, CodingAgentPullRequestMapping } from "../../../app/coding-agent.members.ts";
 
 /**

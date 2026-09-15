@@ -1,7 +1,7 @@
 import { classifyClickHouseError, StoreError } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import type { ClickHouseClient } from "@clickhouse/client";
-import type { SimulationRunMetricsProjectionRecord } from "../../projections/simulation-run-metrics.projection.ts";
+import type { SimulationRunMetricsProjectionRecord } from "../../eventing/simulation-run-metrics.projection.ts";
 import type { SimulationRunMetricsRepository } from "../simulation-run-metrics.repository.ts";
 
 const TABLE_NAME = "simulation_run_metrics" as const;

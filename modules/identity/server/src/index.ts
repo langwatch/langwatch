@@ -6,7 +6,7 @@
 export { identityServer } from "./identity.server.ts";
 export type { IdentityInfrastructure } from "./app/identity-members.ts";
 export { SsoConnectionLedgerWriterAdapter } from "./services/eventing-sso-connection-ledger.service.ts";
-export type { SsoConnectionEvent } from "./projections/sso-connection-state.projection.ts";
+export type { SsoConnectionEvent } from "./eventing/sso-connection-state.projection.ts";
 export { CryptoIdentifierIdentityAdapter } from "./services/crypto-identifier-identity.service.ts";
 export { type DeriveIdentifierIdInput, type IdentifierIdentity } from "./app/identity.members.ts";
 export type {
@@ -55,7 +55,7 @@ export type { JoinRequestPipeline } from "./services/join-request-pipeline-defin
 export type { ScimSyncPipeline } from "./services/scim-sync-pipeline-definition.service.ts";
 /** The day-7-reminder/day-14-expiry process manager's registered name, named
  *  by a caller that asserts on which process a wake dispatched through. */
-export { JOIN_REQUEST_LIFECYCLE_PROCESS_NAME } from "./processes/join-request-lifecycle.process.ts";
+export { JOIN_REQUEST_LIFECYCLE_PROCESS_NAME } from "./eventing/join-request-lifecycle.process.ts";
 export {
   type IdentityGuardsComposition,
   type IdentityGuardsDatabase,

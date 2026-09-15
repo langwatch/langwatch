@@ -41,7 +41,7 @@ import type { ExperimentRunProgressRepository } from "../repositories/experiment
 import { ExperimentRunOrchestratorService } from "../services/experiment-run-orchestrator.service.ts";
 import type { ExperimentRunCollaborators } from "../rules/experiment-run-input.rules.ts";
 import { ExperimentSavedStateExecutionService } from "../services/experiment-saved-state-execution.service.ts";
-import { mapThrownErrorEvent } from "../processes/experiment-result-mapping.process.ts";
+import { mapThrownErrorEvent } from "../eventing/experiment-result-mapping.process.ts";
 import { workbenchActorFrom } from "../rules/experiment-workbench-actor.rules.ts";
 
 const logger = createLogger("langwatch:experiments-v3");

@@ -12,8 +12,8 @@ import type {
   LangyMessageProjectionRecord,
 } from "@langwatch/langy-contract";
 import { LANGY_CONVERSATION_PROCESSING_EVENT_TYPES } from "@langwatch/langy-contract";
-import { langyConversationProcess } from "../processes/langy-conversation.process.ts";
-import { LANGY_CONVERSATION_PROCESS_NAME } from "../processes/langy-conversation-process.types.ts";
+import { langyConversationProcess } from "../eventing/langy-conversation.process.ts";
+import { LANGY_CONVERSATION_PROCESS_NAME } from "../eventing/langy-conversation-process.schemas.ts";
 import type { LangyEffectMembers } from "../app/langy.members.ts";
 import {
   AcceptAgentTurnCommand,
@@ -38,15 +38,15 @@ import {
   SucceedToolCallCommand,
   UpdateConversationMetadataCommand,
   UpdatePlanCommand,
-} from "../intents/langy-conversation.intent.ts";
+} from "../eventing/langy-conversation.intent.ts";
 import {
   LangyAnalyticsEventMapProjection,
   type LangyAnalyticsEventProjectionRecord,
-} from "../projections/langy-analytics-event.projection.ts";
-import { LangyConversationStateFoldProjection } from "../projections/langy-conversation-state.projection.ts";
-import { LangyConversationTurnFoldProjection } from "../projections/langy-conversation-turn.projection.ts";
-import { LangyMessageOperationalMapProjection } from "../projections/langy-message-operational.projection.ts";
-import type { LangyConversationProcessingEvent } from "../projections/langy-conversation-state.projection.ts";
+} from "../eventing/langy-analytics-event.projection.ts";
+import { LangyConversationStateFoldProjection } from "../eventing/langy-conversation-state.projection.ts";
+import { LangyConversationTurnFoldProjection } from "../eventing/langy-conversation-turn.projection.ts";
+import { LangyMessageOperationalMapProjection } from "../eventing/langy-message-operational.projection.ts";
+import type { LangyConversationProcessingEvent } from "../eventing/langy-conversation-state.projection.ts";
 
 export interface LangyConversationProcessingPipelineDeps {
   langyConversationProjectionStore: StateProjectionStore<LangyConversationStateData>;

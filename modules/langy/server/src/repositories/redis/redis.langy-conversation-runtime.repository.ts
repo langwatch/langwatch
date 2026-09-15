@@ -12,7 +12,7 @@ import type {
 } from "@langwatch/langy-contract";
 import { RedisLangyEffectRepository } from "./redis.langy-effect.repository.ts";
 import { LangyConversationPipelineAdapter } from "../../services/langy-conversation-pipeline.service.ts";
-import type { LangyAnalyticsEventProjectionRecord } from "../../projections/langy-analytics-event.projection.ts";
+import type { LangyAnalyticsEventProjectionRecord } from "../../eventing/langy-analytics-event.projection.ts";
 import type { LangyTitleGenerator } from "../../app/langy.members.ts";
 import type { LangyWorker } from "../../app/langy.members.ts";
 import type { LangySessionKeyService } from "../../services/langy-session-key.service.ts";
@@ -24,7 +24,7 @@ import {
   createLangyConversationUpdateBroadcastSubscriber,
   createLangyTurnAdmissionLifecycleSubscriber,
   type LangyConversationUpdateChannel,
-} from "../../subscribers/langy-conversation.subscriber.ts";
+} from "../../eventing/langy-conversation.subscriber.ts";
 
 /** The two command senders this pipeline's own effects need back. */
 export interface RedisLangyConversationRuntimeRepository {

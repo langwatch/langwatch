@@ -50,7 +50,7 @@ import {
   admitSpendWireSchema,
   confirmSpendWireSchema,
   failSpendWireSchema,
-} from "../processes/gateway-spend-commands.process.ts";
+} from "../eventing/gateway-spend-commands.process.ts";
 import type { GatewayConfigMaterialiserService } from "../services/gateway-config-materialisation.service.ts";
 import type { GatewayGuardrailEvaluationService } from "../services/gateway-guardrail-evaluation.service.ts";
 import {

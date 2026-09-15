@@ -18,7 +18,7 @@ import {
   workingContextOfFacts,
 } from "@langwatch/coding-agent-contract";
 import type { CodingAgentSessionContextMemoRepository } from "../repositories/session-context-memo.repository.ts";
-import { CodingAgentSessionEventsMapProjection } from "../projections/coding-agent-session-events.projection.ts";
+import { CodingAgentSessionEventsMapProjection } from "../eventing/coding-agent-session-events.projection.ts";
 
 /** Log facts contribution with stamped context; stamping exclusive to this lane. */
 export class EventingContributeLogFactsAdapter implements CommandHandler<

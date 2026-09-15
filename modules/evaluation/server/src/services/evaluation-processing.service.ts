@@ -16,13 +16,13 @@ import {
 import {
   type EvaluationAnalyticsData,
   EvaluationAnalyticsFoldProjection,
-} from "../projections/evaluation-analytics-fold.projection.ts";
+} from "../eventing/evaluation-analytics-fold.projection.ts";
 import {
   EvaluationAnalyticsRollupMapProjection,
   type EvaluationAnalyticsRollupRow,
-} from "../projections/evaluation-analytics-rollup.projection.ts";
-import { EvaluationRunFoldProjection } from "../projections/evaluation-run.projection.ts";
-import { ExecuteEvaluationCommand } from "../intents/evaluation-execution.intent.ts";
+} from "../eventing/evaluation-analytics-rollup.projection.ts";
+import { EvaluationRunFoldProjection } from "../eventing/evaluation-run.projection.ts";
+import { ExecuteEvaluationCommand } from "../eventing/evaluation-execution.intent.ts";
 import { EvaluationCommandAdapter } from "./evaluation-command.service.ts";
 
 const GRAPH_TRIGGER_REAL_TIME_DEBOUNCE_MS = 5_000;

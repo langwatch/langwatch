@@ -19,7 +19,7 @@ import {
   newJoinRequestId,
 } from "../rules/join-request-id.rules.ts";
 import { createLogger } from "@langwatch/observability";
-import { JOIN_REQUEST_EXPIRY_MS } from "../processes/join-request-lifecycle.process.ts";
+import { JOIN_REQUEST_EXPIRY_MS } from "../eventing/join-request-lifecycle.process.ts";
 import { type JoinRequestsServiceDeps } from "../rules/join-requests-contract.rules.ts";
 import { JoinRequestAdmissionGuardsService } from "./join-request-admission-guards.service.ts";
 import { JoinDomainSettingService } from "./join-domain-setting.service.ts";

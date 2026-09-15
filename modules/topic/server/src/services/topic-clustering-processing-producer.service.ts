@@ -14,7 +14,7 @@ import {
   type TopicClusteringOutcomeCommands,
   type TopicClusteringPageOutcome,
   type TopicClusteringRun,
-} from "../intents/topic-clustering.intent.ts";
+} from "../eventing/topic-clustering.intent.ts";
 import {
   TopicClusteringEventingService,
   type TopicClusteringRunHistoryData,

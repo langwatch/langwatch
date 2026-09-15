@@ -9,11 +9,11 @@ import {
 import {
   type ClickHouseExperimentRunResultRecord,
   ExperimentRunResultStorageMapProjection,
-} from "../../projections/experiment-run-result-storage.projection.ts";
+} from "../../eventing/experiment-run-result-storage.projection.ts";
 import {
   type ExperimentRunStateData,
   ExperimentRunStateFoldProjection,
-} from "../../projections/experiment-run-state.projection.ts";
+} from "../../eventing/experiment-run-state.projection.ts";
 import { EXPERIMENT_RUN_PROCESSING_EVENT_TYPES } from "../../rules/experiment-run-event-types.rules.ts";
 import {
   evaluatorResultEventDataSchema,
@@ -22,8 +22,8 @@ import {
   type ExperimentRunProcessingEvent,
   targetResultEventDataSchema,
   traceMetricsComputedEventDataSchema,
-} from "../../processes/experiment-run-events.process.ts";
-import { makeExperimentRunKey } from "../../processes/experiment-run-key.process.ts";
+} from "../../eventing/experiment-run-events.process.ts";
+import { makeExperimentRunKey } from "../../eventing/experiment-run-key.process.ts";
 import type { ExperimentClickHouseRepository } from "../experiment-clickhouse.repository.ts";
 import {
   ClickhouseExperimentClickHouseRepository,
@@ -35,7 +35,7 @@ import type { ExperimentIdLookupRepository } from "../experiment-id-lookup.repos
 import { ClickHouseExperimentRunStateRepository } from "./clickhouse.experiment-run-state.repository.ts";
 import { MemoryExperimentRunStateRepository } from "../memory/memory.experiment-run-state.repository.ts";
 import type { ExperimentRunStateRepository } from "../experiment-run-state.repository.ts";
-import { ExperimentRunItemStore } from "../../stores/eventing/eventing.experiment-run-item.store.ts";
+import { ExperimentRunItemStore } from "../../eventing/experiment-run-item.store.ts";
 
 /**
  * All experiment-run-processing commands defined from event data schemas.

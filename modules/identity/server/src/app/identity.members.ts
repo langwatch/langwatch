@@ -1,6 +1,6 @@
 import type { IdentifierProvider, IdentityCommand } from "@langwatch/identity-contract";
 import type { TenantMigrationRecord } from "@langwatch/system-migrations";
-import type { IdentityEvent } from "../projections/identity-state.projection.ts";
+import type { IdentityEvent } from "../eventing/identity-state.projection.ts";
 
 /**
  * The newborn as the entrance takes them: better-auth's own canonical user row, plus the two

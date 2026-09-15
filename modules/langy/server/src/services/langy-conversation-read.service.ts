@@ -10,7 +10,7 @@ import {
   langyConversationTurnEventSchema,
 } from "@langwatch/langy-contract";
 import { createLogger } from "@langwatch/observability";
-import type { LangyConversationProcessingEvent } from "../projections/langy-conversation-state.projection.ts";
+import type { LangyConversationProcessingEvent } from "../eventing/langy-conversation-state.projection.ts";
 import { LangyConversationNotFoundError } from "@langwatch/langy-contract";
 import type {
   LangyConversationListCursor,

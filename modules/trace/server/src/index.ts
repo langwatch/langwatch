@@ -36,41 +36,41 @@ export {
   defineOriginGuardedTraceSubscriber,
   passesTraceOriginGuards,
   type TraceSummarySubscriber,
-} from "./subscribers/origin-guarded.subscriber.ts";
+} from "./eventing/origin-guarded.subscriber.ts";
 export {
   CUSTOM_EVAL_SYNC_DEDUP_TTL_MS,
   CUSTOM_EVAL_SYNC_DELAY_MS,
   CustomEvaluationSync,
-} from "./subscribers/custom-evaluation-sync.subscriber.ts";
+} from "./eventing/custom-evaluation-sync.subscriber.ts";
 export {
   EXPERIMENT_METRICS_SYNC_DEDUP_TTL_MS,
   EXPERIMENT_METRICS_SYNC_DELAY_MS,
   createExperimentMetricsSyncHandler,
   hasExperimentCostMetrics,
-} from "./subscribers/experiment-metrics-sync.subscriber.ts";
+} from "./eventing/experiment-metrics-sync.subscriber.ts";
 export {
   PROJECT_METADATA_WINDOW_MS,
   ProjectMetadataSync,
-} from "./subscribers/project-metadata.subscriber.ts";
+} from "./eventing/project-metadata.subscriber.ts";
 export {
   SIMULATION_METRICS_SYNC_DEDUP_TTL_MS,
   SIMULATION_METRICS_SYNC_DELAY_MS,
   createSimulationMetricsSyncHandler,
   hasSimulationMetrics,
-} from "./subscribers/simulation-metrics-sync.subscriber.ts";
+} from "./eventing/simulation-metrics-sync.subscriber.ts";
 export {
   SPAN_STORAGE_BROADCAST_DEDUP_TTL_MS,
   createSpanStorageBroadcastHandler,
-} from "./subscribers/span-storage-broadcast.subscriber.ts";
+} from "./eventing/span-storage-broadcast.subscriber.ts";
 export {
   TRACE_UPDATE_BROADCAST_WINDOW_MS,
   createTraceUpdateBroadcastHandler,
-} from "./subscribers/trace-update-broadcast.subscriber.ts";
+} from "./eventing/trace-update-broadcast.subscriber.ts";
 export {
   TRACKED_EVENT_SYNC_DEDUP_TTL_MS,
   TRACKED_EVENT_SYNC_DELAY_MS,
   TrackedEventSync,
-} from "./subscribers/tracked-event-sync.subscriber.ts";
+} from "./eventing/tracked-event-sync.subscriber.ts";
 export { OtlpAttributeFlatteningService } from "./services/attribute/otlp-attribute-flattening.service.ts";
 export { SpanRecordIdentityService } from "./services/span/span-record-identity.service.ts";
 export { TraceListClickHouseRepository } from "./repositories/clickhouse/trace-list.repository.ts";
@@ -162,18 +162,18 @@ export type {
 export {
   MAX_PROCESSED_SPANS,
   TraceSummaryFoldProjection,
-} from "./projections/trace-summary.projection.ts";
+} from "./eventing/trace-summary.projection.ts";
 export {
   TRACE_ANALYTICS_PROJECTION_VERSION_LATEST,
   TRACE_ANALYTICS_PROJECTION_VERSION_PRE_SPLIT,
   type TraceAnalyticsData,
   TraceAnalyticsFoldProjection,
   type TraceAnalyticsRow,
-} from "./projections/trace-derived.projection.ts";
-export { SpanStorageStore } from "./stores/eventing/eventing.span-storage.store.ts";
-export { TraceAnalyticsStore } from "./stores/eventing/eventing.trace-derived.store.ts";
-export { TraceAnalyticsRollupStore } from "./stores/eventing/eventing.trace-rollup.store.ts";
-export { TraceSummaryStore } from "./stores/eventing/eventing.trace-summary.store.ts";
+} from "./eventing/trace-derived.projection.ts";
+export { SpanStorageStore } from "./eventing/span-storage.store.ts";
+export { TraceAnalyticsStore } from "./eventing/trace-derived.store.ts";
+export { TraceAnalyticsRollupStore } from "./eventing/trace-rollup.store.ts";
+export { TraceSummaryStore } from "./eventing/trace-summary.store.ts";
 export { SpanCostService } from "./services/span/span-cost.service.ts";
 export {
   TraceIngestionService,
@@ -300,7 +300,7 @@ export {
   createEvaluationTriggerSubscriber,
   detectCausalityLoop,
   type EvaluationTriggerSubscriberDeps,
-} from "./subscribers/evaluation-trigger.subscriber.ts";
+} from "./eventing/evaluation-trigger.subscriber.ts";
 export { TraceExistenceRepository } from "./repositories/read/trace-existence.repository.ts";
 export { ClickHouseTraceExistenceRepository } from "./repositories/clickhouse/trace-existence.repository.ts";
 export {

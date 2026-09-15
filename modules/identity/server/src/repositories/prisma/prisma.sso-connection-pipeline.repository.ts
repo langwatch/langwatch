@@ -9,7 +9,7 @@ import { SsoConnectionService } from "../../services/sso-connection.service.ts";
 import type { EventSourcing } from "@langwatch/eventing";
 import { SsoConnectionPipelineDefinitionAdapter } from "../../services/sso-connection-pipeline-definition.service.ts";
 import { SSO_CONNECTION_PIPELINE_NAME } from "@langwatch/identity-contract";
-import type { SsoConnectionEvent } from "../../projections/sso-connection-state.projection.ts";
+import type { SsoConnectionEvent } from "../../eventing/sso-connection-state.projection.ts";
 import {
   SsoConnectionLedgerWriterAdapter,
   type SsoConnectionStagedSender,

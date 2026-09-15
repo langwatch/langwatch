@@ -14,23 +14,23 @@ import type { CodingAgentProjectActivity } from "../../app/coding-agent.members.
 import type { CodingAgentPullRequestMapping } from "../../app/coding-agent.members.ts";
 import type { CodingAgentSessionContextMemoRepository } from "../session-context-memo.repository.ts";
 import { RedisSessionContextMemoRepository } from "./redis.session-context-memo.repository.ts";
-import { createCodingAgentCostDriftSubscriber } from "../../subscribers/coding-agent-cost-drift.subscriber.ts";
+import { createCodingAgentCostDriftSubscriber } from "../../eventing/coding-agent-cost-drift.subscriber.ts";
 import { EventingContributeLogFactsAdapter } from "../../services/contribute-log-facts.service.ts";
 import { EventingContributeMetricFactsAdapter } from "../../services/contribute-metric-facts.service.ts";
 import { EventingContributeSpanFactsAdapter } from "../../services/contribute-span-facts.service.ts";
 import {
   CodingAgentSessionFoldProjection,
   type CodingAgentSessionState,
-} from "../../projections/coding-agent-session.projection.ts";
-import { CodingAgentSessionEventsMapProjection } from "../../projections/coding-agent-session-events.projection.ts";
-import { CodingAgentTraceSessionsMapProjection } from "../../projections/coding-agent-trace-sessions.projection.ts";
-import { SessionMetricSeriesMapProjection } from "../../projections/session-metric-series.projection.ts";
+} from "../../eventing/coding-agent-session.projection.ts";
+import { CodingAgentSessionEventsMapProjection } from "../../eventing/coding-agent-session-events.projection.ts";
+import { CodingAgentTraceSessionsMapProjection } from "../../eventing/coding-agent-trace-sessions.projection.ts";
+import { SessionMetricSeriesMapProjection } from "../../eventing/session-metric-series.projection.ts";
 import {
   CODING_AGENT_CONTRIBUTION_COALESCE_MAX_BATCH,
   CODING_AGENT_PROCESSING_EVENT_TYPES,
   type CodingAgentProcessingEvent,
 } from "@langwatch/coding-agent-contract";
-import { createPullRequestMappingSubscriber } from "../../subscribers/pull-request-mapping.subscriber.ts";
+import { createPullRequestMappingSubscriber } from "../../eventing/pull-request-mapping.subscriber.ts";
 import { CodingAgentSessionSeenService } from "../../services/coding-agent-session-seen.service.ts";
 import {
   EventingCodingAgentSessionEventsAppendAdapter,

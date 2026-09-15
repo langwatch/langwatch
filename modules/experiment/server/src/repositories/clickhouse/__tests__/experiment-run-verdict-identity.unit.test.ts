@@ -18,7 +18,7 @@ import {
 import type {
   EvaluatorResultEventData,
   TargetResultEventData,
-} from "../../../processes/experiment-run-events.process.ts";
+} from "../../../eventing/experiment-run-events.process.ts";
 
 const TENANT = createTenantId("project_test");
 const RUN = "bold-jolly-bee";

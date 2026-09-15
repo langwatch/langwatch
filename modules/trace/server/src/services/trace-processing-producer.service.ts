@@ -26,8 +26,8 @@ import {
   type TraceSpanPiiRedaction,
   type TraceSpanTokenEstimation,
 } from "../app/trace.members.ts";
-import type { TraceAnalyticsData } from "../projections/trace-derived.projection.ts";
-import type { TraceAnalyticsRollupRow } from "../projections/trace-rollup.projection.ts";
+import type { TraceAnalyticsData } from "../eventing/trace-derived.projection.ts";
+import type { TraceAnalyticsRollupRow } from "../eventing/trace-rollup.projection.ts";
 import { EventingRecordSpanAdapter } from "./eventing.record-span.service.ts";
 import { EventingTracePipelineAdapter } from "./eventing.trace-pipeline.service.ts";
 

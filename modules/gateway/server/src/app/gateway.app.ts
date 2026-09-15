@@ -79,7 +79,7 @@ import { ClickHouseUnavailableError } from "@langwatch/analytics-server";
 import { FixedGatewaySettlementPolicyAdapter } from "../adapters/fixed-gateway-settlement.adapter.ts";
 import { GatewayEndUserCapsAdapter } from "../adapters/gateway-end-user-caps.adapter.ts";
 import { GatewaySpendScopeAdapter } from "../adapters/postgres.gateway-spend-scope.adapter.ts";
-import { settlementGraceMs } from "../intents/gateway-spend-settlement.intent.ts";
+import { settlementGraceMs } from "../eventing/gateway-spend-settlement.intent.ts";
 
 /**
  * Identity a write authorizes as, opaque on purpose: a caller may be a browser session, scoped

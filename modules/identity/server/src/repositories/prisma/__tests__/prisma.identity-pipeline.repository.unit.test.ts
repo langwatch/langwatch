@@ -6,7 +6,7 @@ import {
   type IdentityPipelineDatabase,
   PostgresIdentityPipelineAdapter,
 } from "../prisma.identity-pipeline.repository.ts";
-import type { IdentityFoldState } from "../../../projections/identity-state.projection.ts";
+import type { IdentityFoldState } from "../../../eventing/identity-state.projection.ts";
 import type { IdentityPipeline } from "../../../services/identity-pipeline-definition.service.ts";
 
 const USER = "user_sam";

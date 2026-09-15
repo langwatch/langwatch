@@ -6,7 +6,7 @@
  */
 import { beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 import { MIGRATION_OWNED_SOURCES } from "../../../migrations/legacy-import.authz-grant.migration.ts";
-import type { GrantProjectionWrite } from "../../../projections/authz-grant.projection.ts";
+import type { GrantProjectionWrite } from "../../../eventing/authz-grant.projection.ts";
 import { PrismaAuthzProjectionRepository } from "../prisma.authz-projection.repository.ts";
 import { Temporal } from "@langwatch/time";
 

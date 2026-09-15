@@ -34,7 +34,7 @@ import {
   langyGenerateTitleIntentSchema,
   langyProcessEventViewSchema,
   langyWorkerDispatchIntentSchema,
-} from "../processes/langy-conversation-process.types.ts";
+} from "../eventing/langy-conversation-process.schemas.ts";
 import type { LangyNavigateResourceKind } from "../rules/langy-navigate-resources.rules.ts";
 
 export interface LangyInfrastructure {

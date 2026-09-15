@@ -1,5 +1,5 @@
 import type { BulkAppendContext, ProjectionStoreContext } from "@langwatch/eventing";
-import type { LangyAnalyticsEventProjectionRecord } from "../projections/langy-analytics-event.projection.ts";
+import type { LangyAnalyticsEventProjectionRecord } from "../eventing/langy-analytics-event.projection.ts";
 import { LangyAnalyticsEventSink } from "../repositories/langy-analytics-event.repository.ts";
 
 export class LangyAnalyticsEventStorageAdapter {

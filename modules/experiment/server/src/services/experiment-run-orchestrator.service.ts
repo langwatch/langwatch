@@ -15,7 +15,7 @@ import {
 import type { ExecutionState, StudioWorkflow } from "@langwatch/workflow-contract";
 import type { VersionedPrompt } from "@langwatch/prompt-contract";
 import type { ExperimentRunAbortRepository } from "../repositories/experiment-run-abort.repository.ts";
-import type { ResultMapperConfig } from "../processes/experiment-result-mapping.process.ts";
+import type { ResultMapperConfig } from "../eventing/experiment-result-mapping.process.ts";
 import { type LoadedEvaluators } from "./experiment-execution-data.service.ts";
 import { ExperimentResultDispatchService } from "./experiment-result-dispatch.service.ts";
 import { ExperimentCarriedBoardService } from "./experiment-carried-board.service.ts";
@@ -39,7 +39,7 @@ import {
   comparisonSkipMessage as processComparisonSkipMessage,
   formatList as processFormatList,
   type ComparisonSkipReason,
-} from "../processes/experiment-comparison-skip.process.ts";
+} from "../eventing/experiment-comparison-skip.process.ts";
 import type {
   ConnectedCellInput,
   ExperimentRunCollaborators,
@@ -75,7 +75,7 @@ const comparisonPlan = ({
 }) => ExperimentComparisonPlanService.create({ loadedPrompts, loadedEvaluators });
 
 /** Re-exported so it moved with its owner without duplicating the type. */
-export type { ComparisonSkipReason } from "../processes/experiment-comparison-skip.process.ts";
+export type { ComparisonSkipReason } from "../eventing/experiment-comparison-skip.process.ts";
 
 const cellExecution = (ports: ExperimentRunCollaborators, workflows: WorkflowService) =>
   ExperimentCellExecutionService.create({ ports, workflows });

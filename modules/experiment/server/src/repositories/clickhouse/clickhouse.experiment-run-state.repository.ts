@@ -16,11 +16,11 @@ import type { ExperimentClickHouseRepository } from "../experiment-clickhouse.re
 import type {
   ExperimentRunState,
   ExperimentRunStateData,
-} from "../../projections/experiment-run-state.projection.ts";
+} from "../../eventing/experiment-run-state.projection.ts";
 import {
   makeExperimentRunKey,
   parseExperimentRunKey,
-} from "../../processes/experiment-run-key.process.ts";
+} from "../../eventing/experiment-run-key.process.ts";
 import type { ExperimentRunStateRepository } from "../experiment-run-state.repository.ts";
 import { Temporal, toDate } from "@langwatch/time";
 

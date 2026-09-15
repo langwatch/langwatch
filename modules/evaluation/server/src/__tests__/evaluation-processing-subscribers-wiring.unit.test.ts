@@ -3,8 +3,8 @@ import { createTenantId } from "@langwatch/eventing";
 import { AutomationEvaluationSubscriberService } from "@langwatch/automation-contract";
 import { describe, expect, it, vi } from "vitest";
 import { createEvaluationProcessingPipeline } from "../services/evaluation-processing.service.ts";
-import { ExecuteEvaluationCommand } from "../intents/evaluation-execution.intent.ts";
-import type { EvaluationAnalyticsData } from "../projections/evaluation-analytics-row.projection.ts";
+import { ExecuteEvaluationCommand } from "../eventing/evaluation-execution.intent.ts";
+import type { EvaluationAnalyticsData } from "../eventing/evaluation-analytics-row.projection.ts";
 import {
   EVALUATION_COMPLETED_EVENT_TYPE,
   EVALUATION_REPORTED_EVENT_TYPE,

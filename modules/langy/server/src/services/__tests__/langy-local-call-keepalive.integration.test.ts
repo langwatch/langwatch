@@ -13,10 +13,10 @@ import { type RedisConnection, RedisConnectionService } from "@langwatch/redis-c
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { LANGY_LIVENESS } from "../../rules/langy-streaming-constants.rules.ts";
 import { LangyTokenBufferRedisRepository } from "../../repositories/redis/redis.langy-token-buffer.repository.ts";
-import { createAgentTurnLivenessSubscriber } from "../../subscribers/langy-conversation.subscriber.ts";
+import { createAgentTurnLivenessSubscriber } from "../../eventing/langy-conversation.subscriber.ts";
 import type { SessionStateStore } from "@langwatch/redis-client/session-state";
 import { SessionStateStoreFactory } from "@langwatch/redis-client";
-import type { LangyConversationProcessingEvent } from "../../projections/langy-conversation-state.projection.ts";
+import type { LangyConversationProcessingEvent } from "../../eventing/langy-conversation-state.projection.ts";
 import { DispatchError } from "@langwatch/eventing";
 import type { EventSubscriberContext } from "@langwatch/eventing";
 import { LocalCallDispatcherService } from "../langy-local-call-dispatcher.service.ts";

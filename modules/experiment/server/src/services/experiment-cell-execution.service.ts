@@ -17,17 +17,17 @@ import type { Agent as TypedAgent } from "@langwatch/agent-contract";
 import type { VersionedPrompt } from "@langwatch/prompt-contract";
 import { createLogger } from "@langwatch/observability";
 import { generateOtelTraceId } from "@langwatch/trace-contract";
-import { buildCellWorkflow } from "../processes/experiment-cell-workflow.process.ts";
+import { buildCellWorkflow } from "../eventing/experiment-cell-workflow.process.ts";
 import {
   mapNlpEvent,
   mapThrownErrorEvent,
   type ResultMapperConfig,
-} from "../processes/experiment-result-mapping.process.ts";
+} from "../eventing/experiment-result-mapping.process.ts";
 import {
   evaluatorErrorResult,
   evaluatorTargetNoInputsResult,
   noInputsResolvedResult,
-} from "../processes/experiment-cell-error-events.process.ts";
+} from "../eventing/experiment-cell-error-events.process.ts";
 import type { ExperimentRunCollaborators } from "../rules/experiment-run-input.rules.ts";
 import { ExperimentEvaluatorInputService } from "./experiment-evaluator-input.service.ts";
 import { ExperimentRunSandboxKeyService } from "./experiment-run-sandbox-key.service.ts";

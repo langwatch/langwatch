@@ -19,9 +19,9 @@ import { createLogger } from "@langwatch/observability";
 import { type IdentityEventing } from "../app/identity.members.ts";
 import { createTenantId, type StateProjectionStore } from "@langwatch/eventing";
 import { JOIN_REQUEST_PIPELINE_NAME } from "@langwatch/identity-contract";
-import type { JoinRequestEvent } from "../projections/join-request-state.projection.ts";
-import type { JoinRequestFoldState } from "../projections/join-request-state.projection.ts";
-import { joinRequestEventsFor } from "../intents/join-request-events.intent.ts";
+import type { JoinRequestEvent } from "../eventing/join-request-state.projection.ts";
+import type { JoinRequestFoldState } from "../eventing/join-request-state.projection.ts";
+import { joinRequestEventsFor } from "../eventing/join-request-events.intent.ts";
 import { nowInstant } from "@langwatch/time";
 
 const logger = createLogger("langwatch:identity:join-request-ledger");

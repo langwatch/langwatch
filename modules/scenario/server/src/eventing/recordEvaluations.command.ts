@@ -9,7 +9,7 @@ import {
 import type { ScenarioEvaluationResult } from "@langwatch/scenario-contract";
 import type { Command, CommandHandler } from "@langwatch/eventing";
 import { createTenantId, defineCommandSchema, EventUtils } from "@langwatch/eventing";
-import { SimulationRunStateFoldProjection } from "../projections/simulation-run-state.projection.ts";
+import { SimulationRunStateFoldProjection } from "./simulation-run-state.projection.ts";
 import type { RecordEvaluationsCommandData } from "@langwatch/scenario-contract";
 import { recordEvaluationsCommandDataSchema } from "@langwatch/scenario-contract";
 import {

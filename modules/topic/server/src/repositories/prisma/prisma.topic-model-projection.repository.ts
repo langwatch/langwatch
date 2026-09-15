@@ -11,7 +11,7 @@ export type TopicModelProjectionDatabase = Pick<
   PrismaClient,
   "$transaction" | "topic" | "topicModelProjection"
 >;
-import type { ProjectedTopic, TopicModelData } from "../../projections/topic-model.projection.ts";
+import type { ProjectedTopic, TopicModelData } from "../../eventing/topic-model.projection.ts";
 
 // KSUID resource for topic-model projection cursor rows (KSUID_RESOURCES.TOPIC_MODEL_PROJECTION).
 const TOPIC_MODEL_PROJECTION_KSUID_RESOURCE = "topicmodel";

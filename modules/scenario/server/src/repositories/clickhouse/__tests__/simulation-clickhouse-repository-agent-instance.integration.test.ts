@@ -14,7 +14,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import {
   SimulationRunStateFoldProjection,
   type SimulationRunState,
-} from "../../../projections/simulation-run-state.projection.ts";
+} from "../../../eventing/simulation-run-state.projection.ts";
 import { SimulationWindowedRepository } from "../simulation-clickhouse.repository.ts";
 import { ClickHouseSimulationRunStateRepository } from "../clickhouse.simulation-run-state.repository.ts";
 import { SimulationClickHouseRepository } from "../simulation-clickhouse.repository.ts";

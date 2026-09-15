@@ -8,7 +8,7 @@ import {
   RecordScimGroupMappingCommand,
   RecordScimUserPushCommand,
   RevokeScimSyncCommand,
-} from "../../intents/scim-sync.intent.ts";
+} from "../../eventing/scim-sync.intent.ts";
 import { ScimSyncPipelineDefinitionAdapter } from "../scim-sync-pipeline-definition.service.ts";
 
 const ORGANIZATION = "org_acme";

@@ -6,8 +6,8 @@ import type {
   LogOverflowIntent,
   NotifyDigestIntent,
   PersistMatchIntent,
-} from "../intents/trigger-settlement.intent.ts";
-import { TRIGGER_SETTLEMENT_INTENT_TYPES } from "../intents/trigger-settlement.intent.ts";
+} from "../eventing/trigger-settlement.intent.ts";
+import { TRIGGER_SETTLEMENT_INTENT_TYPES } from "../eventing/trigger-settlement.intent.ts";
 import type { AutomationClock } from "../app/automation.members.ts";
 import type { AutomationNotificationDelivery } from "../channels/automation-notification-delivery.channel.ts";
 import type { AutomationSlackProvider } from "../services/automation-slack-secrets.service.ts";

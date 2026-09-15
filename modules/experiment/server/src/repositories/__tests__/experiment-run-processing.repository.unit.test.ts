@@ -2,8 +2,8 @@ import { describe, expect, it, vi } from "vitest";
 import { createTenantId, type AppendStore, type FoldProjectionStore } from "@langwatch/eventing";
 import { RedisExperimentRunProcessingRepository } from "../redis/redis.experiment-run-processing.repository.ts";
 import type { ExperimentRunProcessingPipeline } from "../clickhouse/clickhouse.experiment-run-processing.repository.ts";
-import type { ClickHouseExperimentRunResultRecord } from "../../projections/experiment-run-result-storage.projection.ts";
-import type { ExperimentRunStateData } from "../../projections/experiment-run-state.projection.ts";
+import type { ClickHouseExperimentRunResultRecord } from "../../eventing/experiment-run-result-storage.projection.ts";
+import type { ExperimentRunStateData } from "../../eventing/experiment-run-state.projection.ts";
 
 /**
  * The replication-lag floor `RedisCachedFoldStore` clamps every TTL up to.

@@ -5,7 +5,7 @@ import {
   PostgresJoinRequestPipelineAdapter,
   type JoinRequestPipelineDatabase,
 } from "../prisma.join-request-pipeline.repository.ts";
-import type { JoinRequestFoldState } from "../../../projections/join-request-state.projection.ts";
+import type { JoinRequestFoldState } from "../../../eventing/join-request-state.projection.ts";
 import type { JoinRequestPipeline } from "../../../services/join-request-pipeline-definition.service.ts";
 
 /**

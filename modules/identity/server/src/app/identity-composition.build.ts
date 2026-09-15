@@ -6,7 +6,7 @@
  * it reads — `prisma` and `eventing` — plus its own config.
  */
 import type { EventSourcing } from "@langwatch/eventing";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import type { ProcessMembers } from "@langwatch/infrastructure/members";
 import {
   IDENTITY_PIPELINE_NAME,
   JOIN_REQUEST_PIPELINE_NAME,
@@ -30,7 +30,7 @@ import {
 } from "../services/eventing-sso-connection-ledger.service.ts";
 import { IDENTITY_LATCH_CACHE_MAX_USERS, IDENTITY_LATCH_CACHE_TTL_MS } from "../services/per-subject-cached-latch.service.ts";
 import { IdentityProducerPipelinesAdapter } from "../services/producer-identity-pipelines.service.ts";
-import type { SsoConnectionEvent } from "../projections/sso-connection-state.projection.ts";
+import type { SsoConnectionEvent } from "../eventing/sso-connection-state.projection.ts";
 import type { IdentityEventing, PlatformOperator } from "./identity.members.ts";
 import type { IdentityAppConfig } from "./identity.app.ts";
 import type { IdentityInfrastructure } from "./identity-members.ts";
@@ -239,7 +239,7 @@ class ProcessRegisteredIdentityEventing implements IdentityEventing {
  * on this process".
  */
 function ssoConnectionLedger(options: {
-  prisma: PrismaClient;
+  prisma: ProcessMembers["prisma"];
   eventing: EventSourcing;
 }): SsoConnectionLedgerWriterAdapter {
   const { prisma, eventing } = options;
@@ -273,7 +273,7 @@ function ssoConnectionLedger(options: {
 
 /** What this process hands `IdentityApp` at boot, built from its own members and config. */
 export function buildIdentityInfrastructure(input: {
-  prisma: PrismaClient;
+  prisma: ProcessMembers["prisma"];
   eventing: EventSourcing;
   config: IdentityAppConfig;
 }): IdentityInfrastructure {

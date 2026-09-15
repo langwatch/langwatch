@@ -11,7 +11,7 @@ import {
   CANONICAL_LOG_RECORD_RECEIVED_EVENT_TYPE,
   type CanonicalLogRecord,
 } from "@langwatch/log-contract";
-import { CanonicalLogStorageMapProjection } from "../../projections/canonical-log-storage.projection.ts";
+import { CanonicalLogStorageMapProjection } from "../../eventing/canonical-log-storage.projection.ts";
 
 const noRedaction: LogRedaction = {
   redactLog: async () => undefined,

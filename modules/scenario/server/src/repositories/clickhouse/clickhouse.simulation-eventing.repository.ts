@@ -16,16 +16,16 @@ import { ClickHouseSimulationRunMetricsRepository } from "./clickhouse.simulatio
 import { ClickHouseSimulationRunStateRepository } from "./clickhouse.simulation-run-state.repository.ts";
 import { ClickHouseStalledSimulationRunRepository } from "./clickhouse.stalled-simulation-run.repository.ts";
 import { MemorySimulationRunStateRepository } from "../memory/memory.simulation-run-state.repository.ts";
-import type { SimulationRunMetricsProjectionRecord } from "../../projections/simulation-run-metrics.projection.ts";
+import type { SimulationRunMetricsProjectionRecord } from "../../eventing/simulation-run-metrics.projection.ts";
 import {
   SimulationRunStateFoldProjection,
   type SimulationRunStateData,
-} from "../../projections/simulation-run-state.projection.ts";
+} from "../../eventing/simulation-run-state.projection.ts";
 import {
   BACKFILL_STALE_THRESHOLD_MS,
   type StalledHistoricalRun,
 } from "../stalled-simulation-run.repository.ts";
-import { SimulationRunMetricsAppendStore } from "../../stores/eventing/eventing.simulation-run-metrics.store.ts";
+import { SimulationRunMetricsAppendStore } from "../../eventing/simulation-run-metrics.store.ts";
 
 const logger = createLogger("scenario:simulation-run-state-fold-store");
 

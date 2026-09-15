@@ -17,13 +17,13 @@ import {
 } from "@langwatch/experiment-contract";
 import { generateOtelTraceId } from "@langwatch/trace-contract";
 import { createLogger } from "@langwatch/observability";
-import { buildEvaluatorCellWorkflow } from "../processes/experiment-cell-workflow.process.ts";
+import { buildEvaluatorCellWorkflow } from "../eventing/experiment-cell-workflow.process.ts";
 import {
   extractTargetOutput,
   mapThrownErrorEvent,
   mapWorkflowEvaluatorResult,
   type ResultMapperConfig,
-} from "../processes/experiment-result-mapping.process.ts";
+} from "../eventing/experiment-result-mapping.process.ts";
 import { ExperimentEvaluatorInputService } from "./experiment-evaluator-input.service.ts";
 import type { ExperimentCellExecutionService } from "./experiment-cell-execution.service.ts";
 import type { ExperimentRunCollaborators } from "../rules/experiment-run-input.rules.ts";

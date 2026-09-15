@@ -15,8 +15,8 @@ import type { VersionedPrompt } from "@langwatch/prompt-contract";
 import {
   buildVariantDisplayNames,
   buildVariantIdentifiers,
-} from "../processes/experiment-comparison-candidates.process.ts";
-import { type ComparisonSkipReason } from "../processes/experiment-comparison-skip.process.ts";
+} from "../eventing/experiment-comparison-candidates.process.ts";
+import { type ComparisonSkipReason } from "../eventing/experiment-comparison-skip.process.ts";
 import type { LoadedEvaluators } from "./experiment-execution-data.service.ts";
 import { ExperimentComparisonVariantService } from "./experiment-comparison-variant.service.ts";
 

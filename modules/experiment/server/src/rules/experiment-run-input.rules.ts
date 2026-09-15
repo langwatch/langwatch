@@ -28,7 +28,7 @@ import type { ExperimentSandboxCredential } from "../services/experiment-run-san
 import type { ExperimentConnectedDispatch } from "../services/experiment-connected-cell.service.ts";
 import type { ExperimentConnectedAgentOwnership } from "../services/experiment-run-driver.service.ts";
 import type { ExperimentStudioDispatch } from "../services/experiment-cell-execution.service.ts";
-import type { ResultMapperConfig } from "../processes/experiment-result-mapping.process.ts";
+import type { ResultMapperConfig } from "../eventing/experiment-result-mapping.process.ts";
 import type { LoadedWorkflow } from "../services/experiment-execution-data.service.ts";
 
 /**

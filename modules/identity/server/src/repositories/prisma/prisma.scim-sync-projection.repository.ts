@@ -10,7 +10,7 @@ import type {
   PrismaClient,
   ScimSyncState as ScimSyncRow,
 } from "@langwatch/prisma-client/generated";
-import type { ScimSyncFoldState } from "../../projections/scim-sync-state.projection.ts";
+import type { ScimSyncFoldState } from "../../eventing/scim-sync-state.projection.ts";
 import type {
   ProjectionStoreContext,
   StateProjectionStore,

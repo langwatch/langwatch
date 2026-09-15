@@ -6,7 +6,7 @@ import {
   type OpenAdmissionQuery,
 } from "../ports/gateway-open-admissions.port.ts";
 import { ClickHouseGatewayOpenAdmissionsRepository } from "../repositories/clickhouse/clickhouse.gateway-open-admissions.repository.ts";
-import { MAX_OPEN_ADMISSIONS_PER_SWEEP } from "../intents/gateway-spend-settlement.intent.ts";
+import { MAX_OPEN_ADMISSIONS_PER_SWEEP } from "../eventing/gateway-spend-settlement.intent.ts";
 
 export { ClickHouseGatewayOpenAdmissionsRepository };
 

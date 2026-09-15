@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { SpendUsage } from "@langwatch/gateway-contract";
-import { EMPTY_SPEND_USAGE } from "../../processes/gateway-spend-commands.process.ts";
+import { EMPTY_SPEND_USAGE } from "../../eventing/gateway-spend-commands.process.ts";
 import {
   ModelCatalogGatewaySpendRatingAdapter,
   NO_RATE_RULE_CODE,

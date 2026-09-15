@@ -65,7 +65,7 @@ export * from "./adapters/fixed-gateway-settlement.adapter.ts";
 export {
   GatewayBudgetClickHouseRepository,
 } from "./repositories/clickhouse/clickhouse.gateway-budget.repository.ts";
-export * from "./intents/gateway-spend.intent.ts";
+export * from "./eventing/gateway-spend.intent.ts";
 export {
   GatewaySpendEventsRepository,
 } from "./repositories/clickhouse/clickhouse.gateway-spend-events.repository.ts";
@@ -94,9 +94,9 @@ export {
 } from "@langwatch/gateway-contract";
 export * from "./adapters/gateway-spend-filters.adapter.ts";
 export * from "./adapters/gateway-spend-grouping.adapter.ts";
-export * from "./processes/gateway-spend-commands.process.ts";
-export * from "./processes/gateway-spend-settlement.process.ts";
-export * from "./intents/gateway-spend-settlement.intent.ts";
+export * from "./eventing/gateway-spend-commands.process.ts";
+export * from "./eventing/gateway-spend-settlement.process.ts";
+export * from "./eventing/gateway-spend-settlement.intent.ts";
 export * from "./ports/gateway-open-admissions.port.ts";
 export {
   ClickHouseGatewayOpenAdmissionsAdapter,
@@ -110,7 +110,7 @@ export {
   type GatewayBudgetResolutionApi,
   type GatewayBudgetResolutionDatabase,
 } from "./adapters/postgres.gateway-budget-resolution.adapter.ts";
-export type { GatewaySpendState } from "./projections/gateway-spend.projection.ts";
+export type { GatewaySpendState } from "./eventing/gateway-spend.projection.ts";
 export * from "./adapters/gateway-wire-pagination.adapter.ts";
 export * from "./adapters/virtual-key-crypto.adapter.ts";
 export type * from "./services/gateway.service.ts";

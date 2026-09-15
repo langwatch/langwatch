@@ -13,7 +13,7 @@ import {
   type LangyEventCursor,
   type LangyLocalRecordWait,
 } from "@langwatch/langy-contract";
-import type { LangyConversationProcessingEvent } from "../projections/langy-conversation-state.projection.ts";
+import type { LangyConversationProcessingEvent } from "../eventing/langy-conversation-state.projection.ts";
 import type {
   LangyConversationListCursor,
   LangyConversationRow,
