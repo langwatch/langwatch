@@ -14247,6 +14247,10 @@
                             {
                               "type": "string",
                               "const": "image"
+                            },
+                            {
+                              "type": "string",
+                              "const": "file"
                             }
                           ]
                         }
@@ -14278,6 +14282,235 @@
         "operationId": "postApiDatasetUpload",
         "description": "Create a new dataset from an uploaded file (CSV, JSON, JSONL)",
         "responses": {},
+        "security": [
+          {
+            "project_api_key": []
+          }
+        ]
+      }
+    },
+    "/api/dataset/attachments": {
+      "post": {
+        "operationId": "postApiDatasetAttachments",
+        "description": "Upload a file for an image or file column and get the reference a cell holds. The project is named by the `projectId` query parameter; the file goes in the `file` multipart field, with an optional `datasetId` field.",
+        "parameters": [
+          {
+            "name": "projectId",
+            "in": "query",
+            "required": true,
+            "description": "The project the file is stored for.",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": [
+                  "file"
+                ],
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary",
+                    "description": "The file to store."
+                  },
+                  "datasetId": {
+                    "type": "string",
+                    "description": "The dataset that owns the file. Omit it while the dataset is still a draft."
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The reference the cell holds, and the file's metadata.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "url": {
+                      "type": "string",
+                      "description": "The value to write into the cell, and the address the file is served from."
+                    },
+                    "name": {
+                      "type": "string",
+                      "description": "The file name the reference carries."
+                    },
+                    "mediaType": {
+                      "type": "string",
+                      "description": "The media type the file is stored under."
+                    },
+                    "sizeBytes": {
+                      "type": "number",
+                      "description": "The size of the stored file, in bytes."
+                    }
+                  },
+                  "required": [
+                    "url",
+                    "name",
+                    "mediaType",
+                    "sizeBytes"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The file is larger than the upload limit.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "The media type is not accepted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Unprocessable Entity",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many uploads for this project in one minute.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        },
         "security": [
           {
             "project_api_key": []
@@ -14816,6 +15049,10 @@
                             {
                               "type": "string",
                               "const": "image"
+                            },
+                            {
+                              "type": "string",
+                              "const": "file"
                             }
                           ]
                         }
@@ -39234,6 +39471,7 @@
                                 "float",
                                 "bool",
                                 "image",
+                                "file",
                                 "list",
                                 "list[str]",
                                 "list[float]",
@@ -39379,6 +39617,10 @@
                                         {
                                           "type": "string",
                                           "const": "image"
+                                        },
+                                        {
+                                          "type": "string",
+                                          "const": "file"
                                         }
                                       ]
                                     }
@@ -39487,6 +39729,10 @@
                                             {
                                               "type": "string",
                                               "const": "image"
+                                            },
+                                            {
+                                              "type": "string",
+                                              "const": "file"
                                             }
                                           ]
                                         }
@@ -39789,6 +40035,7 @@
                               "float",
                               "bool",
                               "image",
+                              "file",
                               "list",
                               "list[str]",
                               "list[float]",
@@ -39934,6 +40181,10 @@
                                       {
                                         "type": "string",
                                         "const": "image"
+                                      },
+                                      {
+                                        "type": "string",
+                                        "const": "file"
                                       }
                                     ]
                                   }
@@ -40042,6 +40293,10 @@
                                           {
                                             "type": "string",
                                             "const": "image"
+                                          },
+                                          {
+                                            "type": "string",
+                                            "const": "file"
                                           }
                                         ]
                                       }
@@ -40332,6 +40587,7 @@
                             "float",
                             "bool",
                             "image",
+                            "file",
                             "list",
                             "list[str]",
                             "list[float]",
@@ -41237,6 +41493,7 @@
                                 "float",
                                 "bool",
                                 "image",
+                                "file",
                                 "list",
                                 "list[str]",
                                 "list[float]",
@@ -41382,6 +41639,10 @@
                                         {
                                           "type": "string",
                                           "const": "image"
+                                        },
+                                        {
+                                          "type": "string",
+                                          "const": "file"
                                         }
                                       ]
                                     }
@@ -41490,6 +41751,10 @@
                                             {
                                               "type": "string",
                                               "const": "image"
+                                            },
+                                            {
+                                              "type": "string",
+                                              "const": "file"
                                             }
                                           ]
                                         }
@@ -41825,6 +42090,7 @@
                               "float",
                               "bool",
                               "image",
+                              "file",
                               "list",
                               "list[str]",
                               "list[float]",
@@ -41970,6 +42236,10 @@
                                       {
                                         "type": "string",
                                         "const": "image"
+                                      },
+                                      {
+                                        "type": "string",
+                                        "const": "file"
                                       }
                                     ]
                                   }
@@ -42078,6 +42348,10 @@
                                           {
                                             "type": "string",
                                             "const": "image"
+                                          },
+                                          {
+                                            "type": "string",
+                                            "const": "file"
                                           }
                                         ]
                                       }
@@ -42450,6 +42724,7 @@
                               "float",
                               "bool",
                               "image",
+                              "file",
                               "list",
                               "list[str]",
                               "list[float]",
@@ -42595,6 +42870,10 @@
                                       {
                                         "type": "string",
                                         "const": "image"
+                                      },
+                                      {
+                                        "type": "string",
+                                        "const": "file"
                                       }
                                     ]
                                   }
@@ -42703,6 +42982,10 @@
                                           {
                                             "type": "string",
                                             "const": "image"
+                                          },
+                                          {
+                                            "type": "string",
+                                            "const": "file"
                                           }
                                         ]
                                       }
@@ -43025,6 +43308,7 @@
                               "float",
                               "bool",
                               "image",
+                              "file",
                               "list",
                               "list[str]",
                               "list[float]",
@@ -43170,6 +43454,10 @@
                                       {
                                         "type": "string",
                                         "const": "image"
+                                      },
+                                      {
+                                        "type": "string",
+                                        "const": "file"
                                       }
                                     ]
                                   }
@@ -43278,6 +43566,10 @@
                                           {
                                             "type": "string",
                                             "const": "image"
+                                          },
+                                          {
+                                            "type": "string",
+                                            "const": "file"
                                           }
                                         ]
                                       }
@@ -43577,6 +43869,7 @@
                             "float",
                             "bool",
                             "image",
+                            "file",
                             "list",
                             "list[str]",
                             "list[float]",
@@ -43948,6 +44241,7 @@
                                   "float",
                                   "bool",
                                   "image",
+                                  "file",
                                   "list",
                                   "list[str]",
                                   "list[float]",
@@ -44093,6 +44387,10 @@
                                           {
                                             "type": "string",
                                             "const": "image"
+                                          },
+                                          {
+                                            "type": "string",
+                                            "const": "file"
                                           }
                                         ]
                                       }
@@ -44201,6 +44499,10 @@
                                               {
                                                 "type": "string",
                                                 "const": "image"
+                                              },
+                                              {
+                                                "type": "string",
+                                                "const": "file"
                                               }
                                             ]
                                           }
@@ -44366,6 +44668,7 @@
                                       "float",
                                       "bool",
                                       "image",
+                                      "file",
                                       "list",
                                       "list[str]",
                                       "list[float]",
@@ -44547,6 +44850,10 @@
                                               {
                                                 "type": "string",
                                                 "const": "image"
+                                              },
+                                              {
+                                                "type": "string",
+                                                "const": "file"
                                               }
                                             ]
                                           }
@@ -44655,6 +44962,10 @@
                                                   {
                                                     "type": "string",
                                                     "const": "image"
+                                                  },
+                                                  {
+                                                    "type": "string",
+                                                    "const": "file"
                                                   }
                                                 ]
                                               }
@@ -44879,6 +45190,7 @@
                                 "float",
                                 "bool",
                                 "image",
+                                "file",
                                 "list",
                                 "list[str]",
                                 "list[float]",
@@ -45060,6 +45372,10 @@
                                         {
                                           "type": "string",
                                           "const": "image"
+                                        },
+                                        {
+                                          "type": "string",
+                                          "const": "file"
                                         }
                                       ]
                                     }
@@ -45168,6 +45484,10 @@
                                             {
                                               "type": "string",
                                               "const": "image"
+                                            },
+                                            {
+                                              "type": "string",
+                                              "const": "file"
                                             }
                                           ]
                                         }

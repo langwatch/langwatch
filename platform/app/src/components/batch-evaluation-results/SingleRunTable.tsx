@@ -15,7 +15,8 @@ import {
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { Swords } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
-import { ExternalImage, getImageUrl } from "~/components/ExternalImage";
+import { cellPictureUrl } from "~/components/datasets/cellPictureUrl";
+import { ExternalImage } from "~/components/ExternalImage";
 import { ColumnTypeIcon } from "~/components/shared/ColumnTypeIcon";
 import { BatchTargetCell } from "./BatchTargetCell";
 import { BatchTargetHeader } from "./BatchTargetHeader";
@@ -155,21 +156,19 @@ const buildColumns = ({
         cell: ({ getValue }) => {
           const value = getValue();
 
-          // Check each cell for image URLs regardless of column type
-          if (typeof value === "string") {
-            const imageUrl = getImageUrl(value);
-            if (imageUrl) {
-              return (
-                <ExternalImage
-                  src={imageUrl}
-                  minWidth="24px"
-                  minHeight="24px"
-                  maxHeight="80px"
-                  maxWidth="100%"
-                  expandable
-                />
-              );
-            }
+          // Check each cell for a picture regardless of column type.
+          const imageUrl = cellPictureUrl(value);
+          if (imageUrl) {
+            return (
+              <ExternalImage
+                src={imageUrl}
+                minWidth="24px"
+                minHeight="24px"
+                maxHeight="80px"
+                maxWidth="100%"
+                expandable
+              />
+            );
           }
 
           // Use expandable cell for text content

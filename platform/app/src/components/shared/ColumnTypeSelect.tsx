@@ -23,7 +23,8 @@ export const COLUMN_TYPE_OPTIONS: ColumnTypeOption[] = [
   { value: "date", label: "Date" },
   { value: "list", label: "List" },
   { value: "json", label: "JSON" },
-  { value: "image", label: "Image (URL)" },
+  { value: "image", label: "Image" },
+  { value: "file", label: "File" },
 ];
 
 const OptionContent = ({ value, label }: ColumnTypeOption) => (
