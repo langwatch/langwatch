@@ -4318,7 +4318,7 @@
     },
     "/api/agents": {
       "get": {
-        "operationId": "listLegacyAgents",
+        "operationId": "listAgents",
         "responses": {
           "200": {
             "description": "Success",
@@ -4469,7 +4469,7 @@
         }
       },
       "post": {
-        "operationId": "createLegacyAgent",
+        "operationId": "createAgent",
         "responses": {
           "201": {
             "description": "Success",
@@ -6152,7 +6152,7 @@
     },
     "/api/agents/{id}": {
       "get": {
-        "operationId": "getLegacyAgent",
+        "operationId": "getAgent",
         "responses": {
           "200": {
             "description": "Success",
@@ -6250,7 +6250,7 @@
         }
       },
       "patch": {
-        "operationId": "updateLegacyAgent",
+        "operationId": "updateAgent",
         "responses": {
           "200": {
             "description": "Success",
@@ -6392,7 +6392,7 @@
         }
       },
       "delete": {
-        "operationId": "archiveLegacyAgent",
+        "operationId": "archiveAgent",
         "responses": {
           "200": {
             "description": "Success",
@@ -6473,7 +6473,7 @@
     },
     "/api/v1/analytics/timeseries": {
       "post": {
-        "operationId": "queryAnalyticsTimeseries",
+        "operationId": "postApiAnalyticsTimeseries",
         "responses": {
           "200": {
             "description": "Success",
@@ -6911,7 +6911,7 @@
     },
     "/api/v1/analytics": {
       "post": {
-        "operationId": "queryAnalyticsTimeseriesLegacy",
+        "operationId": "postApiAnalytics",
         "responses": {
           "200": {
             "description": "Success",
@@ -7027,6 +7027,7 @@
                   "type": "object",
                   "properties": {
                     "columns": {
+                      "readOnly": true,
                       "type": "array",
                       "items": {
                         "type": "object",
@@ -7045,6 +7046,7 @@
                       }
                     },
                     "rows": {
+                      "readOnly": true,
                       "type": "array",
                       "items": {
                         "type": "object",
@@ -7093,6 +7095,7 @@
                       "type": "number"
                     },
                     "diagnostics": {
+                      "readOnly": true,
                       "type": "array",
                       "items": {
                         "type": "object",
@@ -7631,6 +7634,7 @@
                       "type": "string"
                     },
                     "datasets": {
+                      "readOnly": true,
                       "type": "array",
                       "items": {
                         "type": "object",
@@ -7645,6 +7649,7 @@
                             "type": "string"
                           },
                           "joinKeys": {
+                            "readOnly": true,
                             "type": "array",
                             "items": {
                               "type": "string"
@@ -7657,6 +7662,7 @@
                             "type": "string"
                           },
                           "columns": {
+                            "readOnly": true,
                             "type": "array",
                             "items": {
                               "type": "object",
@@ -7673,13 +7679,7 @@
                                 "unit": {
                                   "anyOf": [
                                     {
-                                      "type": "string",
-                                      "enum": [
-                                        "ms",
-                                        "USD",
-                                        "tokens",
-                                        "tokens/s"
-                                      ]
+                                      "type": "string"
                                     },
                                     {
                                       "type": "null"
@@ -7687,14 +7687,10 @@
                                   ]
                                 },
                                 "gates": {
+                                  "readOnly": true,
                                   "type": "array",
                                   "items": {
-                                    "type": "string",
-                                    "enum": [
-                                      "input",
-                                      "output",
-                                      "costs"
-                                    ]
+                                    "type": "string"
                                   }
                                 },
                                 "available": {
@@ -9967,7 +9963,8 @@
             }
           },
           "204": {
-            "description": "The chart was deleted"
+            "description": "The chart was deleted",
+            "content": {}
           },
           "400": {
             "description": "Bad Request",
@@ -10927,7 +10924,8 @@
             }
           },
           "204": {
-            "description": "The chart is no longer on any dashboard"
+            "description": "The chart is no longer on any dashboard",
+            "content": {}
           },
           "400": {
             "description": "Bad Request",
@@ -13591,7 +13589,8 @@
             }
           },
           "204": {
-            "description": "The widget was deleted"
+            "description": "The widget was deleted",
+            "content": {}
           },
           "400": {
             "description": "Bad Request",
@@ -16358,6 +16357,72 @@
         }
       }
     },
+    "/api/auth/validate": {
+      "post": {
+        "operationId": "validateProjectAuthToken",
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        },
+        "security": [],
+        "x-access-policy": {
+          "kind": "public",
+          "credential": [
+            "none"
+          ]
+        }
+      }
+    },
+    "/api/auth/session": {
+      "get": {
+        "operationId": "readBrowserAuthSession",
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        },
+        "security": [],
+        "x-access-policy": {
+          "kind": "public",
+          "credential": [
+            "none"
+          ]
+        }
+      }
+    },
+    "/api/auth/logout": {
+      "get": {
+        "operationId": "endBrowserSessionAndRedirect",
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        },
+        "security": [],
+        "x-access-policy": {
+          "kind": "public",
+          "credential": [
+            "none"
+          ]
+        }
+      },
+      "post": {
+        "operationId": "endBrowserSession",
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        },
+        "security": [],
+        "x-access-policy": {
+          "kind": "public",
+          "credential": [
+            "none"
+          ]
+        }
+      }
+    },
     "/api/v1/role-bindings": {
       "get": {
         "operationId": "listRoleBindings",
@@ -16559,13 +16624,13 @@
         ],
         "security": [
           {
-            "project_api_key": []
+            "admin_api_key": []
           }
         ],
         "x-access-policy": {
           "kind": "handlerManaged",
           "credential": [
-            "project_api_key"
+            "organization_api_key"
           ],
           "permissions": [
             "organization:manage"
@@ -16750,13 +16815,13 @@
         },
         "security": [
           {
-            "project_api_key": []
+            "admin_api_key": []
           }
         ],
         "x-access-policy": {
           "kind": "handlerManaged",
           "credential": [
-            "project_api_key"
+            "organization_api_key"
           ],
           "permissions": [
             "organization:manage"
@@ -16925,13 +16990,13 @@
         },
         "security": [
           {
-            "project_api_key": []
+            "admin_api_key": []
           }
         ],
         "x-access-policy": {
           "kind": "handlerManaged",
           "credential": [
-            "project_api_key"
+            "organization_api_key"
           ],
           "permissions": [
             "organization:manage"
@@ -16978,13 +17043,13 @@
         ],
         "security": [
           {
-            "project_api_key": []
+            "admin_api_key": []
           }
         ],
         "x-access-policy": {
           "kind": "handlerManaged",
           "credential": [
-            "project_api_key"
+            "organization_api_key"
           ],
           "permissions": [
             "organization:manage"
@@ -16994,7 +17059,7 @@
     },
     "/api/v1/triggers": {
       "get": {
-        "operationId": "listTriggers",
+        "operationId": "getApiTriggers",
         "responses": {
           "200": {
             "description": "Success",
@@ -17112,7 +17177,7 @@
         }
       },
       "post": {
-        "operationId": "createTrigger",
+        "operationId": "postApiTriggers",
         "responses": {
           "201": {
             "description": "Success",
@@ -17284,7 +17349,7 @@
     },
     "/api/v1/triggers/{id}": {
       "get": {
-        "operationId": "getTrigger",
+        "operationId": "getApiTriggersById",
         "responses": {
           "200": {
             "description": "Success",
@@ -17431,7 +17496,7 @@
         }
       },
       "patch": {
-        "operationId": "updateTrigger",
+        "operationId": "patchApiTriggersById",
         "responses": {
           "200": {
             "description": "Success",
@@ -17636,7 +17701,7 @@
         }
       },
       "delete": {
-        "operationId": "deleteTrigger",
+        "operationId": "deleteApiTriggersById",
         "responses": {
           "200": {
             "description": "Success",
@@ -17715,7 +17780,7 @@
     },
     "/api/v1/trigger/slack": {
       "post": {
-        "operationId": "createSlackTrigger",
+        "operationId": "postApiTriggerSlack",
         "responses": {
           "200": {
             "description": "Success",
@@ -17946,7 +18011,7 @@
     },
     "/api/v1/coding-agent/sessions/{sessionId}/events": {
       "get": {
-        "operationId": "listCodingAgentSessionEvents",
+        "operationId": "getApiCodingAgentSessionsBySessionIdEvents",
         "responses": {
           "200": {
             "description": "Success",
@@ -18303,7 +18368,7 @@
     },
     "/api/coding-agent/pull-request-usage": {
       "get": {
-        "operationId": "getCodingAgentPullRequestUsage",
+        "operationId": "getApiCodingAgentPullRequestUsage",
         "responses": {
           "200": {
             "description": "Success",
@@ -19173,7 +19238,7 @@
     },
     "/api/v1/dashboards": {
       "get": {
-        "operationId": "listDashboards",
+        "operationId": "getApiDashboards",
         "responses": {
           "200": {
             "description": "Success",
@@ -19258,7 +19323,7 @@
         }
       },
       "post": {
-        "operationId": "createDashboard",
+        "operationId": "postApiDashboards",
         "responses": {
           "201": {
             "description": "Success",
@@ -19348,7 +19413,7 @@
     },
     "/api/v1/dashboards/reorder": {
       "put": {
-        "operationId": "reorderDashboards",
+        "operationId": "putApiDashboardsReorder",
         "responses": {
           "200": {
             "description": "Success",
@@ -19415,7 +19480,7 @@
     },
     "/api/v1/dashboards/{id}": {
       "get": {
-        "operationId": "getDashboard",
+        "operationId": "getApiDashboardsById",
         "responses": {
           "200": {
             "description": "Success",
@@ -19591,7 +19656,7 @@
         }
       },
       "patch": {
-        "operationId": "renameDashboard",
+        "operationId": "patchApiDashboardsById",
         "responses": {
           "200": {
             "description": "Success",
@@ -19690,7 +19755,7 @@
         }
       },
       "delete": {
-        "operationId": "deleteDashboard",
+        "operationId": "deleteApiDashboardsById",
         "responses": {
           "200": {
             "description": "Success",
@@ -19751,7 +19816,7 @@
     },
     "/api/v1/graphs": {
       "get": {
-        "operationId": "listGraphs",
+        "operationId": "getApiGraphs",
         "responses": {
           "200": {
             "description": "Success",
@@ -19866,7 +19931,7 @@
         }
       },
       "post": {
-        "operationId": "createGraph",
+        "operationId": "postApiGraphs",
         "responses": {
           "201": {
             "description": "Success",
@@ -20027,7 +20092,7 @@
     },
     "/api/v1/graphs/{id}": {
       "get": {
-        "operationId": "getGraph",
+        "operationId": "getApiGraphsById",
         "responses": {
           "200": {
             "description": "Success",
@@ -20141,7 +20206,7 @@
         }
       },
       "patch": {
-        "operationId": "updateGraph",
+        "operationId": "patchApiGraphsById",
         "responses": {
           "200": {
             "description": "Success",
@@ -20285,7 +20350,7 @@
         }
       },
       "delete": {
-        "operationId": "deleteGraph",
+        "operationId": "deleteApiGraphsById",
         "responses": {
           "200": {
             "description": "Success",
@@ -23009,7 +23074,7 @@
     },
     "/api/v1/evaluators": {
       "get": {
-        "operationId": "listEvaluators",
+        "operationId": "getApiEvaluators",
         "responses": {
           "200": {
             "description": "Success",
@@ -23175,7 +23240,7 @@
         }
       },
       "post": {
-        "operationId": "createEvaluator",
+        "operationId": "postApiEvaluators",
         "responses": {
           "200": {
             "description": "Success",
@@ -23368,7 +23433,7 @@
     },
     "/api/v1/evaluators/{idOrSlug}": {
       "get": {
-        "operationId": "getEvaluator",
+        "operationId": "getApiEvaluatorsByIdOrSlug",
         "responses": {
           "200": {
             "description": "Success",
@@ -23566,7 +23631,7 @@
     },
     "/api/v1/evaluators/{id}": {
       "put": {
-        "operationId": "updateEvaluator",
+        "operationId": "putApiEvaluatorsById",
         "responses": {
           "200": {
             "description": "Success",
@@ -23807,7 +23872,7 @@
         }
       },
       "delete": {
-        "operationId": "archiveEvaluator",
+        "operationId": "deleteApiEvaluatorsById",
         "responses": {
           "200": {
             "description": "Success",
@@ -23880,7 +23945,7 @@
     },
     "/api/v1/experiments": {
       "get": {
-        "operationId": "listExperiments",
+        "operationId": "getApiExperiments",
         "responses": {
           "200": {
             "description": "Success",
@@ -24028,7 +24093,7 @@
         }
       },
       "post": {
-        "operationId": "createExperiment",
+        "operationId": "postApiExperiments",
         "responses": {
           "200": {
             "description": "Success",
@@ -24060,7 +24125,8 @@
             }
           },
           "400": {
-            "description": "The setup did not match the schema (experiment_invalid_workbench_state) or points at something that no longer exists (experiment_workbench_missing_reference)"
+            "description": "The setup did not match the schema (experiment_invalid_workbench_state) or points at something that no longer exists (experiment_workbench_missing_reference)",
+            "content": {}
           }
         },
         "description": "Create an evaluations experiment. Send a setup to start from, or send none and get a blank workbench with one inline dataset. The slug it answers with is what every other experiment endpoint takes.",
@@ -24111,7 +24177,7 @@
     },
     "/api/v1/experiments/{slug}": {
       "get": {
-        "operationId": "getExperiment",
+        "operationId": "getApiExperimentsBySlug",
         "responses": {
           "200": {
             "description": "Success",
@@ -24185,7 +24251,8 @@
             }
           },
           "404": {
-            "description": "No experiment with that slug or id in this project"
+            "description": "No experiment with that slug or id in this project",
+            "content": {}
           }
         },
         "description": "Read a single experiment by its slug, in the same shape the list returns. Accepts the experiment id as well, so either identifier the list hands back can be used.",
@@ -24223,19 +24290,22 @@
     },
     "/api/v1/experiment/init": {
       "post": {
-        "operationId": "initExperiment",
+        "operationId": "postApiExperimentInit",
         "responses": {
           "200": {
             "description": "Success"
           },
           "400": {
-            "description": "The body was not valid JSON, or neither experiment_slug nor experiment_id was supplied"
+            "description": "The body was not valid JSON, or neither experiment_slug nor experiment_id was supplied",
+            "content": {}
           },
           "401": {
-            "description": "Missing or invalid API key"
+            "description": "Missing or invalid API key",
+            "content": {}
           },
           "403": {
-            "description": "The API key lacks experiments:manage, or the plan's experiment limit is already reached"
+            "description": "The API key lacks experiments:manage, or the plan's experiment limit is already reached",
+            "content": {}
           }
         },
         "description": "Create an experiment, or return the existing one when the slug is already taken. This is the first call in an experiment run: take the slug back, report results against it, and every run under that slug groups together in the app. The SDKs call this endpoint for you. The body carries `experiment_type` and at least one of `experiment_slug` (the stable slug you choose, which is what makes repeated runs land together) or `experiment_id`; `experiment_name` names it on creation and `workflowId` ties it to an Optimization Studio workflow.",
@@ -24260,19 +24330,22 @@
     },
     "/api/v1/dspy/log_steps": {
       "post": {
-        "operationId": "logDspySteps",
+        "operationId": "postApiDspyLogSteps",
         "responses": {
           "200": {
             "description": "Success"
           },
           "400": {
-            "description": "The body was not valid JSON, failed validation, or carried timestamps in seconds rather than milliseconds"
+            "description": "The body was not valid JSON, failed validation, or carried timestamps in seconds rather than milliseconds",
+            "content": {}
           },
           "401": {
-            "description": "Missing or invalid API key"
+            "description": "Missing or invalid API key",
+            "content": {}
           },
           "500": {
-            "description": "A step could not be stored. The cause is on our side and is logged with the run and step ids; retrying the batch is safe."
+            "description": "A step could not be stored. The cause is on our side and is logged with the run and step ids; retrying the batch is safe.",
+            "content": {}
           }
         },
         "description": "Report the steps of a DSPy optimizer run against an experiment, so the run's progress and scores show up in the app. Send the steps as an array; the optimizer typically posts each batch as it finishes. Bodies up to 20MB are accepted.",
@@ -24297,19 +24370,22 @@
     },
     "/api/v1/experiments/{slug}/run": {
       "post": {
-        "operationId": "runExperiment",
+        "operationId": "postApiExperimentsBySlugRun",
         "responses": {
           "200": {
             "description": "Success"
           },
           "400": {
-            "description": "The body was not valid JSON, failed input validation, or the experiment has no dataset configured"
+            "description": "The body was not valid JSON, failed input validation, or the experiment has no dataset configured",
+            "content": {}
           },
           "401": {
-            "description": "Missing or invalid API key, or the key lacks the permission"
+            "description": "Missing or invalid API key, or the key lacks the permission",
+            "content": {}
           },
           "404": {
-            "description": "No such experiment or run in this project"
+            "description": "No such experiment or run in this project",
+            "content": {}
           }
         },
         "description": "Start a run of a saved experiment, addressed by slug. Returns a runId to poll straight away. Send `Accept: text/event-stream` instead to stream progress events until the run finishes.",
@@ -24352,19 +24428,22 @@
     },
     "/api/v1/experiments/runs": {
       "get": {
-        "operationId": "listExperimentRuns",
+        "operationId": "getApiExperimentsRuns",
         "responses": {
           "200": {
             "description": "Success"
           },
           "400": {
-            "description": "experimentSlug was not supplied"
+            "description": "experimentSlug was not supplied",
+            "content": {}
           },
           "401": {
-            "description": "Missing or invalid API key, or the key lacks the permission"
+            "description": "Missing or invalid API key, or the key lacks the permission",
+            "content": {}
           },
           "404": {
-            "description": "No such experiment in this project"
+            "description": "No such experiment in this project",
+            "content": {}
           }
         },
         "description": "Runs recorded for one experiment, newest first. Page through them with `page` and `pageSize`.",
@@ -24416,16 +24495,18 @@
     },
     "/api/v1/experiments/runs/{runId}": {
       "get": {
-        "operationId": "getExperimentRunStatus",
+        "operationId": "getApiExperimentsRunsByRunId",
         "responses": {
           "200": {
             "description": "Success"
           },
           "401": {
-            "description": "Missing or invalid API key, or the key lacks the permission"
+            "description": "Missing or invalid API key, or the key lacks the permission",
+            "content": {}
           },
           "404": {
-            "description": "No such run in this project"
+            "description": "No such run in this project",
+            "content": {}
           }
         },
         "description": "Current state of one run. Returns progress while it is going and a summary once it finishes, so a CI job can poll this until `status` leaves `running`.",
@@ -24462,16 +24543,18 @@
     },
     "/api/v1/experiments/runs/{runId}/results": {
       "get": {
-        "operationId": "getExperimentRunResults",
+        "operationId": "getApiExperimentsRunsByRunIdResults",
         "responses": {
           "200": {
             "description": "Success"
           },
           "401": {
-            "description": "Missing or invalid API key, or the key lacks the permission"
+            "description": "Missing or invalid API key, or the key lacks the permission",
+            "content": {}
           },
           "404": {
-            "description": "No such run in this project"
+            "description": "No such run in this project",
+            "content": {}
           }
         },
         "description": "Every dataset row of a run with what the target predicted, plus one entry per evaluator per row. Runs older than the status cache need `experimentSlug` as well, since a run id is only unique within its experiment.",
@@ -24516,19 +24599,22 @@
     },
     "/api/v1/experiments/{slug}/workbench-state": {
       "get": {
-        "operationId": "getExperimentWorkbenchState",
+        "operationId": "getApiExperimentsBySlugWorkbenchState",
         "responses": {
           "200": {
             "description": "Success"
           },
           "400": {
-            "description": "The experiment is not an evaluations workbench (experiment_type_mismatch)"
+            "description": "The experiment is not an evaluations workbench (experiment_type_mismatch)",
+            "content": {}
           },
           "401": {
-            "description": "Missing or invalid API key, or the key lacks the permission"
+            "description": "Missing or invalid API key, or the key lacks the permission",
+            "content": {}
           },
           "404": {
-            "description": "No such experiment in this project"
+            "description": "No such experiment in this project",
+            "content": {}
           }
         },
         "description": "The experiment's datasets, targets and evaluators, with the version to send back when you save. Ask for `fields=version` to check for changes without transferring the setup.",
@@ -24571,22 +24657,26 @@
         }
       },
       "put": {
-        "operationId": "saveExperimentWorkbenchState",
+        "operationId": "putApiExperimentsBySlugWorkbenchState",
         "responses": {
           "200": {
             "description": "Success"
           },
           "400": {
-            "description": "The setup did not match the schema (experiment_invalid_workbench_state), points at something that no longer exists (experiment_workbench_missing_reference), or the experiment is not an evaluations workbench (experiment_type_mismatch)"
+            "description": "The setup did not match the schema (experiment_invalid_workbench_state), points at something that no longer exists (experiment_workbench_missing_reference), or the experiment is not an evaluations workbench (experiment_type_mismatch)",
+            "content": {}
           },
           "401": {
-            "description": "Missing or invalid API key, or the key lacks the permission"
+            "description": "Missing or invalid API key, or the key lacks the permission",
+            "content": {}
           },
           "404": {
-            "description": "No such experiment in this project"
+            "description": "No such experiment in this project",
+            "content": {}
           },
           "409": {
-            "description": "Someone else saved since you read this state (experiment_stale_workbench_state). `currentVersion` carries the version to read again."
+            "description": "Someone else saved since you read this state (experiment_stale_workbench_state). `currentVersion` carries the version to read again.",
+            "content": {}
           }
         },
         "description": "Replace the experiment's setup. Send `expectedVersion` with the version you read and the save is refused with a 409 when someone else wrote first, instead of overwriting their work.",
@@ -24653,19 +24743,22 @@
     },
     "/api/v1/experiments/{slug}/versions": {
       "get": {
-        "operationId": "listExperimentWorkbenchVersions",
+        "operationId": "getApiExperimentsBySlugVersions",
         "responses": {
           "200": {
             "description": "Success"
           },
           "400": {
-            "description": "The experiment is not an evaluations workbench (experiment_type_mismatch)"
+            "description": "The experiment is not an evaluations workbench (experiment_type_mismatch)",
+            "content": {}
           },
           "401": {
-            "description": "Missing or invalid API key, or the key lacks the permission"
+            "description": "Missing or invalid API key, or the key lacks the permission",
+            "content": {}
           },
           "404": {
-            "description": "No such experiment in this project"
+            "description": "No such experiment in this project",
+            "content": {}
           }
         },
         "description": "Every saved version of the experiment's setup, newest first. A commit, an agent write and a restore each add a numbered version. Ordinary typing rewrites one autosave row, which is the entry with `autoSaved` true. Page through them with `limit` and `cursor`.",
@@ -24718,19 +24811,22 @@
     },
     "/api/v1/experiments/{slug}/versions/{version}/restore": {
       "post": {
-        "operationId": "restoreExperimentWorkbenchVersion",
+        "operationId": "postApiExperimentsBySlugVersionsByVersionRestore",
         "responses": {
           "200": {
             "description": "Success"
           },
           "401": {
-            "description": "Missing or invalid API key, or the key lacks the permission"
+            "description": "Missing or invalid API key, or the key lacks the permission",
+            "content": {}
           },
           "404": {
-            "description": "No such experiment or version in this project"
+            "description": "No such experiment or version in this project",
+            "content": {}
           },
           "409": {
-            "description": "Someone else saved since you read this state (experiment_stale_workbench_state)."
+            "description": "Someone else saved since you read this state (experiment_stale_workbench_state).",
+            "content": {}
           }
         },
         "description": "Bring an old setup back by writing it forward as a new save. History is never rewritten: the version you restored from stays in the list, and the restore is one more entry after it.",
@@ -24776,7 +24872,7 @@
     },
     "/api/v1/agent-cache/{name}": {
       "get": {
-        "operationId": "getAgentCacheEntry",
+        "operationId": "getApiAgentCacheByName",
         "responses": {
           "200": {
             "description": "Success",
@@ -25120,7 +25216,7 @@
         }
       },
       "put": {
-        "operationId": "putAgentCacheEntry",
+        "operationId": "putApiAgentCacheByName",
         "responses": {
           "200": {
             "description": "Success",
@@ -25488,7 +25584,7 @@
         }
       },
       "delete": {
-        "operationId": "deleteAgentCacheEntry",
+        "operationId": "deleteApiAgentCacheByName",
         "responses": {
           "200": {
             "description": "Success",
@@ -25834,7 +25930,7 @@
     },
     "/api/v1/agent-cache/{name}/claim": {
       "post": {
-        "operationId": "claimAgentCacheEntry",
+        "operationId": "postApiAgentCacheByNameClaim",
         "responses": {
           "200": {
             "description": "Success",
@@ -26241,7 +26337,7 @@
     },
     "/api/gateway/v1/virtual-keys": {
       "get": {
-        "operationId": "listVirtualKeys",
+        "operationId": "getApiGatewayV1VirtualKeys",
         "responses": {
           "200": {
             "description": "Success",
@@ -26811,7 +26907,7 @@
         }
       },
       "post": {
-        "operationId": "createVirtualKey",
+        "operationId": "postApiGatewayV1VirtualKeys",
         "responses": {
           "201": {
             "description": "Success",
@@ -27764,7 +27860,7 @@
     },
     "/api/gateway/v1/virtual-keys/{id}": {
       "get": {
-        "operationId": "getVirtualKey",
+        "operationId": "getApiGatewayV1VirtualKeysById",
         "responses": {
           "200": {
             "description": "Success",
@@ -28300,7 +28396,7 @@
         }
       },
       "patch": {
-        "operationId": "updateVirtualKey",
+        "operationId": "patchApiGatewayV1VirtualKeysById",
         "responses": {
           "200": {
             "description": "Success",
@@ -29185,7 +29281,7 @@
     },
     "/api/gateway/v1/virtual-keys/{id}/spend": {
       "get": {
-        "operationId": "getVirtualKeySpend",
+        "operationId": "getApiGatewayV1VirtualKeysByIdSpend",
         "responses": {
           "200": {
             "description": "Success",
@@ -29573,7 +29669,7 @@
     },
     "/api/gateway/v1/virtual-keys/{id}/rotate": {
       "post": {
-        "operationId": "rotateVirtualKey",
+        "operationId": "postApiGatewayV1VirtualKeysByIdRotate",
         "responses": {
           "200": {
             "description": "Success",
@@ -30116,7 +30212,7 @@
     },
     "/api/gateway/v1/virtual-keys/{id}/disable": {
       "post": {
-        "operationId": "disableVirtualKey",
+        "operationId": "postApiGatewayV1VirtualKeysByIdDisable",
         "responses": {
           "200": {
             "description": "Success",
@@ -30671,7 +30767,7 @@
     },
     "/api/gateway/v1/virtual-keys/{id}/enable": {
       "post": {
-        "operationId": "enableVirtualKey",
+        "operationId": "postApiGatewayV1VirtualKeysByIdEnable",
         "responses": {
           "200": {
             "description": "Success",
@@ -31210,7 +31306,7 @@
     },
     "/api/gateway/v1/virtual-keys/{id}/revoke": {
       "post": {
-        "operationId": "revokeVirtualKey",
+        "operationId": "postApiGatewayV1VirtualKeysByIdRevoke",
         "responses": {
           "200": {
             "description": "Success",
@@ -31749,7 +31845,7 @@
     },
     "/api/gateway/v1/budgets": {
       "get": {
-        "operationId": "listBudgets",
+        "operationId": "getApiGatewayV1Budgets",
         "responses": {
           "200": {
             "description": "Success",
@@ -32349,7 +32445,7 @@
         }
       },
       "post": {
-        "operationId": "createBudget",
+        "operationId": "postApiGatewayV1Budgets",
         "responses": {
           "201": {
             "description": "Success",
@@ -33194,7 +33290,7 @@
     },
     "/api/gateway/v1/budgets/{id}": {
       "get": {
-        "operationId": "getBudget",
+        "operationId": "getApiGatewayV1BudgetsById",
         "responses": {
           "200": {
             "description": "Success",
@@ -33752,7 +33848,7 @@
         }
       },
       "patch": {
-        "operationId": "updateBudget",
+        "operationId": "patchApiGatewayV1BudgetsById",
         "responses": {
           "200": {
             "description": "Success",
@@ -34387,7 +34483,7 @@
         }
       },
       "delete": {
-        "operationId": "archiveBudget",
+        "operationId": "deleteApiGatewayV1BudgetsById",
         "responses": {
           "200": {
             "description": "Success",
@@ -34944,7 +35040,7 @@
     },
     "/api/gateway/v1/budgets/{id}/reset": {
       "post": {
-        "operationId": "resetBudget",
+        "operationId": "postApiGatewayV1BudgetsByIdReset",
         "responses": {
           "200": {
             "description": "Success",
@@ -35525,7 +35621,7 @@
     },
     "/api/gateway/v1/cache-rules": {
       "get": {
-        "operationId": "listCacheRules",
+        "operationId": "getApiGatewayV1CacheRules",
         "responses": {
           "200": {
             "description": "Success",
@@ -35985,7 +36081,7 @@
         }
       },
       "post": {
-        "operationId": "createCacheRule",
+        "operationId": "postApiGatewayV1CacheRules",
         "responses": {
           "201": {
             "description": "Success",
@@ -36584,7 +36680,7 @@
     },
     "/api/gateway/v1/cache-rules/{id}": {
       "get": {
-        "operationId": "getCacheRule",
+        "operationId": "getApiGatewayV1CacheRulesById",
         "responses": {
           "200": {
             "description": "Success",
@@ -37020,7 +37116,7 @@
         }
       },
       "patch": {
-        "operationId": "updateCacheRule",
+        "operationId": "patchApiGatewayV1CacheRulesById",
         "responses": {
           "200": {
             "description": "Success",
@@ -37551,7 +37647,7 @@
         }
       },
       "delete": {
-        "operationId": "archiveCacheRule",
+        "operationId": "deleteApiGatewayV1CacheRulesById",
         "responses": {
           "200": {
             "description": "Success",
@@ -37987,6 +38083,2597 @@
         }
       }
     },
+    "/api/gateway/v1/spend-summaries": {
+      "get": {
+        "operationId": "listGatewaySpendSummaries",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "key": {
+                            "type": "string"
+                          },
+                          "group": {
+                            "type": "object",
+                            "propertyNames": {
+                              "type": "string"
+                            },
+                            "additionalProperties": {
+                              "type": "string"
+                            }
+                          },
+                          "bucket_start": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "event_count": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          "settled_count": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          },
+                          "usage": {
+                            "type": "object",
+                            "properties": {
+                              "input_tokens": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              "output_tokens": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              "cache_read_input_tokens": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              "cache_creation_input_tokens": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              "reasoning_tokens": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991
+                              },
+                              "input_image_tokens": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991,
+                                "description": "Image tokens billed on the input side, 0 when no image was used. Priced at its own rate and disjoint from input_tokens, which never includes it."
+                              },
+                              "output_image_tokens": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991,
+                                "description": "Image tokens the answer was billed for, 0 when no answer held one. Priced at its own rate and disjoint from output_tokens: an image_generation row reports output_tokens 0 and its render here, so a reconciler reading output_tokens alone sees none of the image traffic."
+                              },
+                              "image_count": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991,
+                                "description": "Images carried, 0 when none were. Display only: no rate prices it, so it never belongs in a cost sum."
+                              }
+                            },
+                            "required": [
+                              "input_tokens",
+                              "output_tokens",
+                              "cache_read_input_tokens",
+                              "cache_creation_input_tokens",
+                              "reasoning_tokens",
+                              "input_image_tokens",
+                              "output_image_tokens",
+                              "image_count"
+                            ]
+                          },
+                          "cost": {
+                            "type": "object",
+                            "properties": {
+                              "total_usd": {
+                                "type": "string",
+                                "description": "Display value. Decimal string, up to 9 fractional digits, trailing zeros trimmed, never exponent notation. Use nano_usd for arithmetic."
+                              },
+                              "nano_usd": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991,
+                                "description": "Canonical integer cost, nano-USD. Rated as an integer and summed as one, so this is the figure to reconcile against."
+                              }
+                            },
+                            "required": [
+                              "total_usd",
+                              "nano_usd"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "key",
+                          "group",
+                          "bucket_start",
+                          "event_count",
+                          "settled_count",
+                          "usage",
+                          "cost"
+                        ]
+                      }
+                    },
+                    "next_cursor": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "next_cursor"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "retryable": {
+                          "type": "boolean"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "propertyNames": {
+                            "type": "string"
+                          },
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        },
+                        "tips": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "docs_url": {
+                          "type": "string"
+                        },
+                        "fault": {
+                          "type": "string",
+                          "enum": [
+                            "customer",
+                            "platform",
+                            "provider"
+                          ]
+                        },
+                        "reasons": {
+                          "type": "array",
+                          "items": {}
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message",
+                        "retryable"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "retryable": {
+                          "type": "boolean"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "propertyNames": {
+                            "type": "string"
+                          },
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        },
+                        "tips": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "docs_url": {
+                          "type": "string"
+                        },
+                        "fault": {
+                          "type": "string",
+                          "enum": [
+                            "customer",
+                            "platform",
+                            "provider"
+                          ]
+                        },
+                        "reasons": {
+                          "type": "array",
+                          "items": {}
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message",
+                        "retryable"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "retryable": {
+                          "type": "boolean"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "propertyNames": {
+                            "type": "string"
+                          },
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        },
+                        "tips": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "docs_url": {
+                          "type": "string"
+                        },
+                        "fault": {
+                          "type": "string",
+                          "enum": [
+                            "customer",
+                            "platform",
+                            "provider"
+                          ]
+                        },
+                        "reasons": {
+                          "type": "array",
+                          "items": {}
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message",
+                        "retryable"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "retryable": {
+                          "type": "boolean"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "propertyNames": {
+                            "type": "string"
+                          },
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        },
+                        "tips": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "docs_url": {
+                          "type": "string"
+                        },
+                        "fault": {
+                          "type": "string",
+                          "enum": [
+                            "customer",
+                            "platform",
+                            "provider"
+                          ]
+                        },
+                        "reasons": {
+                          "type": "array",
+                          "items": {}
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message",
+                        "retryable"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "description": "Reconciliation checksum fast path: spend rollups with token classes and integer nano-USD cost. Settled (unpriced) requests are counted separately as settled_count and never included in cost sums. Diff individual items via /spend-events only when a checksum diverges. `group_by` takes one or two of virtual_key, end_user, project, model, provider, principal and request_type, comma-separated, and `bucket` adds an hour or day column in the `timezone` you name. `key` stays the first dimension's value for consumers written against the single-dimension surface; read `group` to tell two dimensions apart. Paged by group key ascending: follow next_cursor until it comes back null, because a page that is full does not mean the window held nothing more. Grouping by model or provider, or into time buckets, is refused with `gateway_spend_group_by_unstable` while the window is recent enough that outcomes can still arrive, because those groups can move under a page walk and the totals would double-count some requests and miss others; ask for an older range, or send `allow_unstable` when an approximate shape is enough. Every filter here is accepted by /spend-events too, and the reverse holds apart from `status=admitted`: a rollup sums the cost of requests past admission, so an admitted request has none to contribute and that narrowing is refused rather than answered with a zero. Ask /spend-events for those.",
+        "summary": "List spend summaries",
+        "tags": [
+          "Gateway Spend"
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "group_by",
+            "schema": {
+              "example": "model,end_user",
+              "type": "string"
+            },
+            "required": true,
+            "description": "One or two dimensions, comma separated: virtual_key, end_user, project, model, provider, principal, request_type. A dimension may not repeat. Each row's `key` is the first dimension's value and `group` names them all, so two rows may share a key."
+          },
+          {
+            "in": "query",
+            "name": "bucket",
+            "schema": {
+              "default": "none",
+              "type": "string",
+              "enum": [
+                "none",
+                "hour",
+                "day"
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "timezone",
+            "schema": {
+              "default": "UTC",
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64
+            }
+          },
+          {
+            "in": "query",
+            "name": "allow_unstable",
+            "schema": {
+              "example": "true",
+              "default": "false",
+              "type": "string"
+            },
+            "description": "true, 1, yes for yes; false, 0, no or omitted for no. Case does not matter, so a Python True is accepted as sent."
+          },
+          {
+            "in": "query",
+            "name": "from",
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991,
+              "example": 1782864000000
+            },
+            "required": true,
+            "description": "Milliseconds since the Unix epoch, not seconds. An epoch in seconds is a valid integer here and answers for 1970, so a mismatched unit reads as an empty window rather than as an error."
+          },
+          {
+            "in": "query",
+            "name": "to",
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991,
+              "example": 1782864000000
+            },
+            "required": true,
+            "description": "Milliseconds since the Unix epoch, not seconds. An epoch in seconds is a valid integer here and answers for 1970, so a mismatched unit reads as an empty window rather than as an error."
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "schema": {
+              "type": "string",
+              "maxLength": 500
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "default": 500,
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 1000
+            }
+          },
+          {
+            "in": "query",
+            "name": "project_id",
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 100
+                },
+                {
+                  "maxItems": 100,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "team_id",
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 100
+                },
+                {
+                  "maxItems": 100,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "external_id",
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                },
+                {
+                  "maxItems": 100,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "virtual_key_id",
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 100
+                },
+                {
+                  "maxItems": 100,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "end_user_id",
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 256
+                },
+                {
+                  "maxItems": 100,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 256
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "principal_user_id",
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 100
+                },
+                {
+                  "maxItems": 100,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "model",
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                },
+                {
+                  "maxItems": 100,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "provider_key",
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 100
+                },
+                {
+                  "maxItems": 100,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "request_type",
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 50
+                },
+                {
+                  "maxItems": 100,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 50
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "label",
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                },
+                {
+                  "maxItems": 100,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "metadata",
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 3,
+                  "maxLength": 640
+                },
+                {
+                  "maxItems": 100,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 640
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "success",
+                "error",
+                "confirmed",
+                "failed",
+                "settled"
+              ]
+            },
+            "description": "Narrow to one lifecycle status. `admitted` is not accepted here: a rollup sums the cost of requests past admission, and an admitted request is still in flight with no cost of its own yet. Ask /spend-events for those."
+          }
+        ],
+        "security": [
+          {
+            "admin_api_key": []
+          }
+        ],
+        "x-access-policy": {
+          "kind": "handlerManaged",
+          "credential": [
+            "organization_api_key"
+          ],
+          "permissions": [
+            "gatewaySpend:view"
+          ]
+        }
+      }
+    },
+    "/api/gateway/v1/spend-events": {
+      "get": {
+        "operationId": "listGatewaySpendEvents",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "type": {
+                            "type": "string"
+                          },
+                          "created": {
+                            "type": "string"
+                          },
+                          "schema_version": {
+                            "type": "string"
+                          },
+                          "data": {
+                            "type": "object",
+                            "properties": {
+                              "event_id": {
+                                "type": "string"
+                              },
+                              "event_type": {
+                                "type": "string"
+                              },
+                              "gateway_request_id": {
+                                "type": "string"
+                              },
+                              "occurred_at": {
+                                "type": "string"
+                              },
+                              "usage": {
+                                "anyOf": [
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "input_tokens": {
+                                        "type": "integer",
+                                        "minimum": -9007199254740991,
+                                        "maximum": 9007199254740991
+                                      },
+                                      "output_tokens": {
+                                        "type": "integer",
+                                        "minimum": -9007199254740991,
+                                        "maximum": 9007199254740991
+                                      },
+                                      "cache_read_input_tokens": {
+                                        "type": "integer",
+                                        "minimum": -9007199254740991,
+                                        "maximum": 9007199254740991
+                                      },
+                                      "cache_creation_input_tokens": {
+                                        "type": "integer",
+                                        "minimum": -9007199254740991,
+                                        "maximum": 9007199254740991
+                                      },
+                                      "reasoning_tokens": {
+                                        "type": "integer",
+                                        "minimum": -9007199254740991,
+                                        "maximum": 9007199254740991
+                                      }
+                                    },
+                                    "required": [
+                                      "input_tokens",
+                                      "output_tokens",
+                                      "cache_read_input_tokens",
+                                      "cache_creation_input_tokens",
+                                      "reasoning_tokens"
+                                    ]
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "cost": {
+                                "anyOf": [
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "total_usd": {
+                                        "type": "string",
+                                        "description": "Display value. Decimal string, up to 9 fractional digits, trailing zeros trimmed, never exponent notation. Use nano_usd for arithmetic."
+                                      },
+                                      "nano_usd": {
+                                        "type": "integer",
+                                        "minimum": -9007199254740991,
+                                        "maximum": 9007199254740991,
+                                        "description": "Canonical integer cost, nano-USD. Rated as an integer and summed as one, so this is the figure to reconcile against."
+                                      }
+                                    },
+                                    "required": [
+                                      "total_usd",
+                                      "nano_usd"
+                                    ]
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "status": {
+                                "type": "string"
+                              },
+                              "needs_reconciliation": {
+                                "anyOf": [
+                                  {
+                                    "type": "boolean"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "settle_reason": {
+                                "anyOf": [
+                                  {
+                                    "type": "string"
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "error": {
+                                "anyOf": [
+                                  {
+                                    "type": "object",
+                                    "properties": {
+                                      "class": {
+                                        "type": "string"
+                                      },
+                                      "http_status": {
+                                        "anyOf": [
+                                          {
+                                            "type": "integer",
+                                            "minimum": -9007199254740991,
+                                            "maximum": 9007199254740991
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      }
+                                    },
+                                    "required": [
+                                      "class",
+                                      "http_status"
+                                    ]
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "duration_ms": {
+                                "anyOf": [
+                                  {
+                                    "type": "integer",
+                                    "minimum": -9007199254740991,
+                                    "maximum": 9007199254740991
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              },
+                              "labels": {
+                                "type": "array",
+                                "items": {
+                                  "type": "string"
+                                }
+                              },
+                              "metadata": {
+                                "type": "object",
+                                "propertyNames": {
+                                  "type": "string"
+                                },
+                                "additionalProperties": {}
+                              }
+                            },
+                            "required": [
+                              "event_id",
+                              "event_type",
+                              "gateway_request_id",
+                              "occurred_at",
+                              "usage",
+                              "cost",
+                              "status",
+                              "needs_reconciliation",
+                              "settle_reason",
+                              "error",
+                              "duration_ms",
+                              "labels",
+                              "metadata"
+                            ],
+                            "additionalProperties": {}
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "type",
+                          "created",
+                          "schema_version",
+                          "data"
+                        ]
+                      }
+                    },
+                    "next_cursor": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "next_cursor"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "retryable": {
+                          "type": "boolean"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "propertyNames": {
+                            "type": "string"
+                          },
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        },
+                        "tips": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "docs_url": {
+                          "type": "string"
+                        },
+                        "fault": {
+                          "type": "string",
+                          "enum": [
+                            "customer",
+                            "platform",
+                            "provider"
+                          ]
+                        },
+                        "reasons": {
+                          "type": "array",
+                          "items": {}
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message",
+                        "retryable"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "retryable": {
+                          "type": "boolean"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "propertyNames": {
+                            "type": "string"
+                          },
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        },
+                        "tips": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "docs_url": {
+                          "type": "string"
+                        },
+                        "fault": {
+                          "type": "string",
+                          "enum": [
+                            "customer",
+                            "platform",
+                            "provider"
+                          ]
+                        },
+                        "reasons": {
+                          "type": "array",
+                          "items": {}
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message",
+                        "retryable"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "retryable": {
+                          "type": "boolean"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "propertyNames": {
+                            "type": "string"
+                          },
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        },
+                        "tips": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "docs_url": {
+                          "type": "string"
+                        },
+                        "fault": {
+                          "type": "string",
+                          "enum": [
+                            "customer",
+                            "platform",
+                            "provider"
+                          ]
+                        },
+                        "reasons": {
+                          "type": "array",
+                          "items": {}
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message",
+                        "retryable"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "retryable": {
+                          "type": "boolean"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "propertyNames": {
+                            "type": "string"
+                          },
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        },
+                        "tips": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "docs_url": {
+                          "type": "string"
+                        },
+                        "fault": {
+                          "type": "string",
+                          "enum": [
+                            "customer",
+                            "platform",
+                            "provider"
+                          ]
+                        },
+                        "reasons": {
+                          "type": "array",
+                          "items": {}
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message",
+                        "retryable"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "description": "Cursor-paged pull over the per-request spend record, ascending by insert order so rows folded late are never skipped by an in-flight cursor. Events are the same canonical objects webhook deliveries carry. Retention is a fixed 13 months, which bounds reconciliation and replay. When feeding a downstream biller, mind its dedup window (Metronome 34 days and Stripe meters 24h+ at the time of writing; both vendors own those numbers, so confirm the current one before you rely on it): re-pulling older ranges into a biller past its window can double-bill. Every filter here is accepted by /spend-summaries too, so a checksum that disagrees can be diffed on exactly the same narrowing; the one difference is `status=admitted`, which only this read answers, because an admitted request is still in flight and contributes no cost to a rollup. Repeat a filter to widen it (`model=a&model=b` matches either); name two different filters to narrow. `metadata` is written `key:value`, split on the first colon, and repeating a key widens that key. `team_id` and `external_id` name Postgres records and are resolved to the projects and keys they cover, so a team with no projects or an external id nobody minted answers with no spend rather than with everything.",
+        "summary": "List spend events",
+        "tags": [
+          "Gateway Spend"
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "from",
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991,
+              "example": 1782864000000
+            },
+            "required": true,
+            "description": "Milliseconds since the Unix epoch, not seconds. An epoch in seconds is a valid integer here and answers for 1970, so a mismatched unit reads as an empty window rather than as an error."
+          },
+          {
+            "in": "query",
+            "name": "to",
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991,
+              "example": 1782864000000
+            },
+            "required": true,
+            "description": "Milliseconds since the Unix epoch, not seconds. An epoch in seconds is a valid integer here and answers for 1970, so a mismatched unit reads as an empty window rather than as an error."
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "schema": {
+              "type": "string",
+              "maxLength": 500
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "default": 50,
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 200
+            }
+          },
+          {
+            "in": "query",
+            "name": "project_id",
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 100
+                },
+                {
+                  "maxItems": 100,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "team_id",
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 100
+                },
+                {
+                  "maxItems": 100,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "external_id",
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                },
+                {
+                  "maxItems": 100,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "virtual_key_id",
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 100
+                },
+                {
+                  "maxItems": 100,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "end_user_id",
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 256
+                },
+                {
+                  "maxItems": 100,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 256
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "principal_user_id",
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 100
+                },
+                {
+                  "maxItems": 100,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "model",
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                },
+                {
+                  "maxItems": 100,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "provider_key",
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 100
+                },
+                {
+                  "maxItems": 100,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "request_type",
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 50
+                },
+                {
+                  "maxItems": 100,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 50
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "label",
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                },
+                {
+                  "maxItems": 100,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "metadata",
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 3,
+                  "maxLength": 640
+                },
+                {
+                  "maxItems": 100,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 3,
+                    "maxLength": 640
+                  }
+                }
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "success",
+                "error",
+                "admitted",
+                "confirmed",
+                "failed",
+                "settled"
+              ]
+            }
+          }
+        ],
+        "security": [
+          {
+            "admin_api_key": []
+          }
+        ],
+        "x-access-policy": {
+          "kind": "handlerManaged",
+          "credential": [
+            "organization_api_key"
+          ],
+          "permissions": [
+            "gatewaySpend:view"
+          ]
+        }
+      }
+    },
+    "/api/gateway/v1/end-users/{id}/spend": {
+      "get": {
+        "operationId": "getGatewayEndUserSpend",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "end_user_id": {
+                          "type": "string"
+                        },
+                        "window": {
+                          "type": "string"
+                        },
+                        "from": {
+                          "type": "string"
+                        },
+                        "to": {
+                          "type": "string"
+                        },
+                        "cost": {
+                          "type": "object",
+                          "properties": {
+                            "total_usd": {
+                              "type": "string",
+                              "description": "Display value. Decimal string, up to 9 fractional digits, trailing zeros trimmed, never exponent notation. Use nano_usd for arithmetic."
+                            },
+                            "nano_usd": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991,
+                              "description": "Canonical integer cost, nano-USD. Rated as an integer and summed as one, so this is the figure to reconcile against."
+                            }
+                          },
+                          "required": [
+                            "total_usd",
+                            "nano_usd"
+                          ]
+                        },
+                        "request_count": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        "usage": {
+                          "type": "object",
+                          "properties": {
+                            "input_tokens": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            "output_tokens": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            "cache_read_input_tokens": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            "cache_creation_input_tokens": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            "reasoning_tokens": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991
+                            },
+                            "input_image_tokens": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991,
+                              "description": "Image tokens billed on the input side, 0 when no image was used. Priced at its own rate and disjoint from input_tokens, which never includes it."
+                            },
+                            "output_image_tokens": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991,
+                              "description": "Image tokens the answer was billed for, 0 when no answer held one. Priced at its own rate and disjoint from output_tokens: an image_generation row reports output_tokens 0 and its render here, so a reconciler reading output_tokens alone sees none of the image traffic."
+                            },
+                            "image_count": {
+                              "type": "integer",
+                              "minimum": -9007199254740991,
+                              "maximum": 9007199254740991,
+                              "description": "Images carried, 0 when none were. Display only: no rate prices it, so it never belongs in a cost sum."
+                            }
+                          },
+                          "required": [
+                            "input_tokens",
+                            "output_tokens",
+                            "cache_read_input_tokens",
+                            "cache_creation_input_tokens",
+                            "reasoning_tokens",
+                            "input_image_tokens",
+                            "output_image_tokens",
+                            "image_count"
+                          ]
+                        },
+                        "caps": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "budget_id": {
+                                "type": "string"
+                              },
+                              "anchor_id": {
+                                "type": "string"
+                              },
+                              "window": {
+                                "type": "string"
+                              },
+                              "on_breach": {
+                                "type": "string",
+                                "enum": [
+                                  "block",
+                                  "warn"
+                                ]
+                              },
+                              "limit_usd": {
+                                "type": "string",
+                                "description": "The cap for this end user. Decimal string, up to 9 fractional digits, trailing zeros trimmed, never exponent notation."
+                              },
+                              "spent_usd": {
+                                "type": "string",
+                                "description": "Spend against that cap. Decimal string, up to 9 fractional digits, trailing zeros trimmed, never exponent notation."
+                              },
+                              "period_started_at": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "budget_id",
+                              "anchor_id",
+                              "window",
+                              "on_breach",
+                              "limit_usd",
+                              "spent_usd",
+                              "period_started_at"
+                            ]
+                          }
+                        }
+                      },
+                      "required": [
+                        "end_user_id",
+                        "window",
+                        "from",
+                        "to",
+                        "cost",
+                        "request_count",
+                        "usage",
+                        "caps"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "retryable": {
+                          "type": "boolean"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "propertyNames": {
+                            "type": "string"
+                          },
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        },
+                        "tips": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "docs_url": {
+                          "type": "string"
+                        },
+                        "fault": {
+                          "type": "string",
+                          "enum": [
+                            "customer",
+                            "platform",
+                            "provider"
+                          ]
+                        },
+                        "reasons": {
+                          "type": "array",
+                          "items": {}
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message",
+                        "retryable"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "retryable": {
+                          "type": "boolean"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "propertyNames": {
+                            "type": "string"
+                          },
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        },
+                        "tips": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "docs_url": {
+                          "type": "string"
+                        },
+                        "fault": {
+                          "type": "string",
+                          "enum": [
+                            "customer",
+                            "platform",
+                            "provider"
+                          ]
+                        },
+                        "reasons": {
+                          "type": "array",
+                          "items": {}
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message",
+                        "retryable"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "retryable": {
+                          "type": "boolean"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "propertyNames": {
+                            "type": "string"
+                          },
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        },
+                        "tips": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "docs_url": {
+                          "type": "string"
+                        },
+                        "fault": {
+                          "type": "string",
+                          "enum": [
+                            "customer",
+                            "platform",
+                            "provider"
+                          ]
+                        },
+                        "reasons": {
+                          "type": "array",
+                          "items": {}
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message",
+                        "retryable"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "retryable": {
+                          "type": "boolean"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "propertyNames": {
+                            "type": "string"
+                          },
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        },
+                        "tips": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "docs_url": {
+                          "type": "string"
+                        },
+                        "fault": {
+                          "type": "string",
+                          "enum": [
+                            "customer",
+                            "platform",
+                            "provider"
+                          ]
+                        },
+                        "reasons": {
+                          "type": "array",
+                          "items": {}
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message",
+                        "retryable"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "description": "Windowed spend rollup for one external end user across the organization (the /customer/info-style read a rebilling integration polls). `caps` lists every attributed-user budget that applies to this end user, each with its limit and the spend against it. It is an empty array until such a budget template applies, never null.",
+        "summary": "Read one end user's spend",
+        "tags": [
+          "Gateway Spend"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true
+          },
+          {
+            "in": "query",
+            "name": "window",
+            "schema": {
+              "default": "month",
+              "type": "string",
+              "enum": [
+                "day",
+                "week",
+                "month"
+              ]
+            }
+          },
+          {
+            "in": "query",
+            "name": "from",
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            }
+          },
+          {
+            "in": "query",
+            "name": "to",
+            "schema": {
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            }
+          },
+          {
+            "in": "query",
+            "name": "virtual_key_id",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            }
+          }
+        ],
+        "security": [
+          {
+            "admin_api_key": []
+          }
+        ],
+        "x-access-policy": {
+          "kind": "handlerManaged",
+          "credential": [
+            "organization_api_key"
+          ],
+          "permissions": [
+            "gatewaySpend:view"
+          ]
+        }
+      }
+    },
+    "/api/gateway/v1/spend-events/replay": {
+      "post": {
+        "operationId": "replayGatewaySpendEvents",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "endpoint_id": {
+                          "type": "string"
+                        },
+                        "replay_id": {
+                          "type": "string"
+                        },
+                        "replayed": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        "window": {
+                          "type": "object",
+                          "properties": {
+                            "from": {
+                              "type": "string"
+                            },
+                            "to": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "from",
+                            "to"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "endpoint_id",
+                        "replay_id",
+                        "replayed",
+                        "window"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Bad Request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "retryable": {
+                          "type": "boolean"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "propertyNames": {
+                            "type": "string"
+                          },
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        },
+                        "tips": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "docs_url": {
+                          "type": "string"
+                        },
+                        "fault": {
+                          "type": "string",
+                          "enum": [
+                            "customer",
+                            "platform",
+                            "provider"
+                          ]
+                        },
+                        "reasons": {
+                          "type": "array",
+                          "items": {}
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message",
+                        "retryable"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Unauthorized",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "retryable": {
+                          "type": "boolean"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "propertyNames": {
+                            "type": "string"
+                          },
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        },
+                        "tips": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "docs_url": {
+                          "type": "string"
+                        },
+                        "fault": {
+                          "type": "string",
+                          "enum": [
+                            "customer",
+                            "platform",
+                            "provider"
+                          ]
+                        },
+                        "reasons": {
+                          "type": "array",
+                          "items": {}
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message",
+                        "retryable"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "retryable": {
+                          "type": "boolean"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "propertyNames": {
+                            "type": "string"
+                          },
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        },
+                        "tips": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "docs_url": {
+                          "type": "string"
+                        },
+                        "fault": {
+                          "type": "string",
+                          "enum": [
+                            "customer",
+                            "platform",
+                            "provider"
+                          ]
+                        },
+                        "reasons": {
+                          "type": "array",
+                          "items": {}
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message",
+                        "retryable"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Internal Server Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "error": {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string"
+                        },
+                        "code": {
+                          "type": "string"
+                        },
+                        "message": {
+                          "type": "string"
+                        },
+                        "retryable": {
+                          "type": "boolean"
+                        },
+                        "meta": {
+                          "type": "object",
+                          "propertyNames": {
+                            "type": "string"
+                          },
+                          "additionalProperties": {}
+                        },
+                        "trace_id": {
+                          "type": "string"
+                        },
+                        "span_id": {
+                          "type": "string"
+                        },
+                        "tips": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "docs_url": {
+                          "type": "string"
+                        },
+                        "fault": {
+                          "type": "string",
+                          "enum": [
+                            "customer",
+                            "platform",
+                            "provider"
+                          ]
+                        },
+                        "reasons": {
+                          "type": "array",
+                          "items": {}
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "code",
+                        "message",
+                        "retryable"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "error"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "description": "Re-delivers the window's spend envelopes to ONE endpoint through the normal delivery path (per-endpoint stream, retry ladder, delivery log), honoring the endpoint's event subscriptions. Envelope ids are UNCHANGED: your consumer's event-id dedup decides what a redelivery means. Mind your downstream billing system's finite dedup window (Metronome 34 days, Stripe 24h+): replaying older than that window can double-bill on your side, so prefer pull-and-diff for old ranges. The window is capped at 7 days and 10,000 envelopes per call; both caps are checked before any delivery is queued, so a refused replay ships nothing.",
+        "summary": "Replay spend events to an endpoint",
+        "tags": [
+          "Gateway Spend"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "from": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "to": {
+                    "type": "integer",
+                    "exclusiveMinimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "endpoint_id": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  }
+                },
+                "required": [
+                  "from",
+                  "to",
+                  "endpoint_id"
+                ]
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "admin_api_key": []
+          }
+        ],
+        "x-access-policy": {
+          "kind": "handlerManaged",
+          "credential": [
+            "organization_api_key"
+          ],
+          "permissions": [
+            "gatewaySpend:manage"
+          ]
+        }
+      }
+    },
     "/api/v1/langy/conversations": {
       "post": {
         "operationId": "startLangyConversationTurn",
@@ -38062,7 +40749,7 @@
     },
     "/api/v1/model-providers": {
       "get": {
-        "operationId": "listModelProviders",
+        "operationId": "getApiModelProviders",
         "responses": {
           "200": {
             "description": "Success",
@@ -38070,9 +40757,7 @@
               "application/json": {
                 "schema": {
                   "type": "object",
-                  "propertyNames": {
-                    "type": "string"
-                  },
+                  "properties": {},
                   "additionalProperties": {
                     "type": "object",
                     "properties": {
@@ -38434,7 +41119,7 @@
     },
     "/api/v1/model-providers/{provider}": {
       "put": {
-        "operationId": "upsertModelProvider",
+        "operationId": "putApiModelProvidersByProvider",
         "responses": {
           "200": {
             "description": "Success",
@@ -38442,9 +41127,7 @@
               "application/json": {
                 "schema": {
                   "type": "object",
-                  "propertyNames": {
-                    "type": "string"
-                  },
+                  "properties": {},
                   "additionalProperties": {
                     "type": "object",
                     "properties": {
@@ -39564,7 +42247,8 @@
             }
           },
           "204": {
-            "description": "Updated"
+            "description": "Updated",
+            "content": {}
           },
           "400": {
             "description": "Bad Request",
@@ -39735,7 +42419,8 @@
             }
           },
           "204": {
-            "description": "Deleted"
+            "description": "Deleted",
+            "content": {}
           },
           "400": {
             "description": "Bad Request",
@@ -39888,7 +42573,7 @@
     },
     "/api/v1/monitors": {
       "get": {
-        "operationId": "listMonitors",
+        "operationId": "getApiMonitors",
         "responses": {
           "200": {
             "description": "Success",
@@ -40013,7 +42698,7 @@
         }
       },
       "post": {
-        "operationId": "createMonitor",
+        "operationId": "postApiMonitors",
         "responses": {
           "201": {
             "description": "Success",
@@ -40248,7 +42933,7 @@
     },
     "/api/v1/monitors/{id}": {
       "get": {
-        "operationId": "getMonitor",
+        "operationId": "getApiMonitorsById",
         "responses": {
           "200": {
             "description": "Success",
@@ -40403,7 +43088,7 @@
         }
       },
       "patch": {
-        "operationId": "updateMonitor",
+        "operationId": "patchApiMonitorsById",
         "responses": {
           "200": {
             "description": "Success",
@@ -40671,7 +43356,7 @@
         }
       },
       "delete": {
-        "operationId": "deleteMonitor",
+        "operationId": "deleteApiMonitorsById",
         "responses": {
           "200": {
             "description": "Success",
@@ -40751,7 +43436,7 @@
     },
     "/api/v1/monitors/{id}/toggle": {
       "post": {
-        "operationId": "toggleMonitor",
+        "operationId": "postApiMonitorsByIdToggle",
         "responses": {
           "200": {
             "description": "Success",
@@ -42837,7 +45522,7 @@
     },
     "/api/v1/groups": {
       "get": {
-        "operationId": "listGroups",
+        "operationId": "getApiGroups",
         "responses": {
           "200": {
             "description": "Success",
@@ -43045,7 +45730,7 @@
         }
       },
       "post": {
-        "operationId": "createGroup",
+        "operationId": "postApiGroups",
         "responses": {
           "201": {
             "description": "Success",
@@ -43175,7 +45860,7 @@
     },
     "/api/v1/groups/{id}": {
       "get": {
-        "operationId": "getGroup",
+        "operationId": "getApiGroupsById",
         "responses": {
           "200": {
             "description": "Success",
@@ -43363,7 +46048,7 @@
         }
       },
       "patch": {
-        "operationId": "renameGroup",
+        "operationId": "patchApiGroupsById",
         "responses": {
           "200": {
             "description": "Success",
@@ -43447,7 +46132,7 @@
         }
       },
       "delete": {
-        "operationId": "deleteGroup",
+        "operationId": "deleteApiGroupsById",
         "responses": {
           "200": {
             "description": "Success",
@@ -43501,7 +46186,7 @@
     },
     "/api/v1/groups/{id}/members": {
       "get": {
-        "operationId": "listGroupMembers",
+        "operationId": "getApiGroupsByIdMembers",
         "responses": {
           "200": {
             "description": "Success",
@@ -43588,7 +46273,7 @@
         }
       },
       "post": {
-        "operationId": "addGroupMember",
+        "operationId": "postApiGroupsByIdMembers",
         "responses": {
           "201": {
             "description": "Success",
@@ -43661,7 +46346,7 @@
     },
     "/api/v1/groups/{id}/members/{userId}": {
       "delete": {
-        "operationId": "removeGroupMember",
+        "operationId": "deleteApiGroupsByIdMembersByUserId",
         "responses": {
           "200": {
             "description": "Success",
@@ -43724,7 +46409,7 @@
     },
     "/api/v1/groups/{id}/bindings": {
       "get": {
-        "operationId": "listGroupBindings",
+        "operationId": "getApiGroupsByIdBindings",
         "responses": {
           "200": {
             "description": "Success",
@@ -43835,7 +46520,7 @@
         }
       },
       "post": {
-        "operationId": "addGroupBinding",
+        "operationId": "postApiGroupsByIdBindings",
         "responses": {
           "201": {
             "description": "Success",
@@ -43958,7 +46643,7 @@
     },
     "/api/v1/groups/{id}/bindings/{bindingId}": {
       "delete": {
-        "operationId": "removeGroupBinding",
+        "operationId": "deleteApiGroupsByIdBindingsByBindingId",
         "responses": {
           "200": {
             "description": "Success",
@@ -44015,6 +46700,766 @@
           ],
           "permissions": [
             "organization:manage"
+          ]
+        }
+      }
+    },
+    "/api/v1/teams": {
+      "get": {
+        "operationId": "listTeams",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "name": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "slug": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "organizationId": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "createdAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "updatedAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "name",
+                          "slug",
+                          "organizationId",
+                          "createdAt",
+                          "updatedAt"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "pagination": {
+                      "type": "object",
+                      "properties": {
+                        "page": {
+                          "type": "integer",
+                          "exclusiveMinimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "limit": {
+                          "type": "integer",
+                          "exclusiveMinimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "total": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        }
+                      },
+                      "required": [
+                        "page",
+                        "limit",
+                        "total"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "data",
+                    "pagination"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "description": "List all non-archived teams for the organization (paginated)",
+        "tags": [
+          "Teams"
+        ],
+        "parameters": [
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "default": 1,
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 9007199254740991
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "default": 50,
+              "type": "integer",
+              "exclusiveMinimum": 0,
+              "maximum": 1000
+            }
+          }
+        ],
+        "security": [
+          {
+            "admin_api_key": []
+          }
+        ],
+        "x-access-policy": {
+          "kind": "handlerManaged",
+          "credential": [
+            "organization_api_key"
+          ],
+          "permissions": [
+            "team:view"
+          ]
+        }
+      },
+      "post": {
+        "operationId": "createTeam",
+        "responses": {
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "name": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "slug": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "organizationId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "slug",
+                    "organizationId",
+                    "createdAt",
+                    "updatedAt"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        },
+        "description": "Create a new team that can group projects and members",
+        "tags": [
+          "Teams"
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 255
+                  }
+                },
+                "required": [
+                  "name"
+                ]
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "admin_api_key": []
+          }
+        ],
+        "x-access-policy": {
+          "kind": "handlerManaged",
+          "credential": [
+            "organization_api_key"
+          ],
+          "permissions": [
+            "team:manage"
+          ]
+        }
+      }
+    },
+    "/api/v1/teams/{id}": {
+      "get": {
+        "operationId": "getTeam",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "name": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "slug": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "organizationId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "slug",
+                    "organizationId",
+                    "createdAt",
+                    "updatedAt"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        },
+        "description": "Get a team by its id",
+        "tags": [
+          "Teams"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "admin_api_key": []
+          }
+        ],
+        "x-access-policy": {
+          "kind": "handlerManaged",
+          "credential": [
+            "organization_api_key"
+          ],
+          "permissions": [
+            "team:view"
+          ]
+        }
+      },
+      "patch": {
+        "operationId": "updateTeam",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "name": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "slug": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "organizationId": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "createdAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "updatedAt": {
+                      "type": "string",
+                      "format": "date-time"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "slug",
+                    "organizationId",
+                    "createdAt",
+                    "updatedAt"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            }
+          }
+        },
+        "description": "Update a team by its id",
+        "tags": [
+          "Teams"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 255
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "admin_api_key": []
+          }
+        ],
+        "x-access-policy": {
+          "kind": "handlerManaged",
+          "credential": [
+            "organization_api_key"
+          ],
+          "permissions": [
+            "team:manage"
+          ]
+        }
+      },
+      "delete": {
+        "operationId": "archiveTeam",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "name": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "archivedAt": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "archivedAt"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "description": "Archive a team (soft-delete)",
+        "tags": [
+          "Teams"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "admin_api_key": []
+          }
+        ],
+        "x-access-policy": {
+          "kind": "handlerManaged",
+          "credential": [
+            "organization_api_key"
+          ],
+          "permissions": [
+            "team:manage"
+          ]
+        }
+      }
+    },
+    "/api/v1/teams/{id}/members": {
+      "get": {
+        "operationId": "listTeamMembers",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "userId": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "name": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "email": {
+                            "anyOf": [
+                              {
+                                "type": "string"
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "role": {
+                            "type": "string",
+                            "enum": [
+                              "ADMIN",
+                              "MEMBER",
+                              "VIEWER",
+                              "CUSTOM"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "userId",
+                          "name",
+                          "email",
+                          "role"
+                        ]
+                      }
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "description": "List members of a team",
+        "tags": [
+          "Teams"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "admin_api_key": []
+          }
+        ],
+        "x-access-policy": {
+          "kind": "handlerManaged",
+          "credential": [
+            "organization_api_key"
+          ],
+          "permissions": [
+            "team:view"
+          ]
+        }
+      },
+      "post": {
+        "operationId": "addTeamMember",
+        "responses": {
+          "201": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "success"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "description": "Add a member to a team",
+        "tags": [
+          "Teams"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "userId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "role": {
+                    "default": "MEMBER",
+                    "type": "string",
+                    "enum": [
+                      "ADMIN",
+                      "MEMBER",
+                      "VIEWER"
+                    ]
+                  }
+                },
+                "required": [
+                  "userId"
+                ]
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "admin_api_key": []
+          }
+        ],
+        "x-access-policy": {
+          "kind": "handlerManaged",
+          "credential": [
+            "organization_api_key"
+          ],
+          "permissions": [
+            "team:manage"
+          ]
+        }
+      }
+    },
+    "/api/v1/teams/{id}/members/{userId}": {
+      "delete": {
+        "operationId": "removeTeamMember",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "success": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "success"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "description": "Remove a member from a team",
+        "tags": [
+          "Teams"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true
+          },
+          {
+            "in": "path",
+            "name": "userId",
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "admin_api_key": []
+          }
+        ],
+        "x-access-policy": {
+          "kind": "handlerManaged",
+          "credential": [
+            "organization_api_key"
+          ],
+          "permissions": [
+            "team:manage"
+          ]
+        }
+      }
+    },
+    "/api/v1/teams/{id}/projects": {
+      "get": {
+        "operationId": "listTeamProjects",
+        "responses": {
+          "200": {
+            "description": "Success",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "data": {
+                      "type": "array",
+                      "items": {}
+                    }
+                  },
+                  "required": [
+                    "data"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "description": "List projects in a team",
+        "tags": [
+          "Teams"
+        ],
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "schema": {
+              "type": "string",
+              "minLength": 1
+            },
+            "required": true
+          }
+        ],
+        "security": [
+          {
+            "admin_api_key": []
+          }
+        ],
+        "x-access-policy": {
+          "kind": "handlerManaged",
+          "credential": [
+            "organization_api_key"
+          ],
+          "permissions": [
+            "team:view"
           ]
         }
       }
@@ -44760,7 +48205,7 @@
         "operationId": "getProjectApiKey",
         "responses": {
           "200": {
-            "description": "The project's API key",
+            "description": "Success",
             "content": {
               "application/json": {
                 "schema": {
@@ -44768,12 +48213,13 @@
                   "properties": {
                     "apiKey": {
                       "type": "string",
-                      "description": "Send as X-Auth-Token, Bearer, or Basic"
+                      "minLength": 1
                     }
                   },
                   "required": [
                     "apiKey"
-                  ]
+                  ],
+                  "additionalProperties": false
                 }
               }
             }
@@ -44783,15 +48229,11 @@
             "content": {}
           },
           "403": {
-            "description": "Insufficient permissions for this operation",
-            "content": {}
-          },
-          "404": {
-            "description": "No project with that id in this organization",
+            "description": "A signed-in project administrator is required; API-key principals cannot reveal base keys",
             "content": {}
           }
         },
-        "description": "Read the project's API key, the credential SDKs and the ingestion endpoints authenticate with. Requires an admin API key holding project:update on this project.",
+        "description": "Deprecated. Project base keys can be revealed only by a signed-in project administrator in the browser or an approved device flow. Organization API keys are always refused with 403.",
         "summary": "Get the project API key",
         "parameters": [
           {
@@ -44814,9 +48256,7 @@
           "credential": [
             "organization_api_key"
           ],
-          "permissions": [
-            "project:update"
-          ]
+          "permissions": []
         }
       }
     },
@@ -44825,7 +48265,7 @@
         "operationId": "regenerateProjectApiKey",
         "responses": {
           "200": {
-            "description": "The new API key. The previous one no longer authenticates.",
+            "description": "Success",
             "content": {
               "application/json": {
                 "schema": {
@@ -44833,12 +48273,13 @@
                   "properties": {
                     "apiKey": {
                       "type": "string",
-                      "description": "Send as X-Auth-Token, Bearer, or Basic"
+                      "minLength": 1
                     }
                   },
                   "required": [
                     "apiKey"
-                  ]
+                  ],
+                  "additionalProperties": false
                 }
               }
             }
@@ -44848,15 +48289,11 @@
             "content": {}
           },
           "403": {
-            "description": "Insufficient permissions for this operation",
-            "content": {}
-          },
-          "404": {
-            "description": "No project with that id in this organization",
+            "description": "A signed-in project administrator is required; API-key principals cannot rotate base keys",
             "content": {}
           }
         },
-        "description": "Issue a new API key for the project and invalidate the previous one immediately. Anything still sending the old key starts failing authentication as soon as this returns, so roll it out before calling this. Requires an admin API key holding project:manage.",
+        "description": "Deprecated. Project base keys can be rotated only by a signed-in project administrator in the browser. Organization API keys are always refused with 403.",
         "summary": "Regenerate the project API key",
         "parameters": [
           {
@@ -44879,15 +48316,13 @@
           "credential": [
             "organization_api_key"
           ],
-          "permissions": [
-            "project:manage"
-          ]
+          "permissions": []
         }
       }
     },
     "/api/v1/prompts": {
       "get": {
-        "operationId": "listPrompts",
+        "operationId": "getApiPrompts",
         "responses": {
           "200": {
             "description": "Success",
@@ -45411,7 +48846,7 @@
         }
       },
       "post": {
-        "operationId": "createPrompt",
+        "operationId": "postApiPrompts",
         "responses": {
           "200": {
             "description": "Success",
@@ -46118,7 +49553,7 @@
     },
     "/api/v1/prompts/{id}/tags/{tag}": {
       "put": {
-        "operationId": "assignPromptTag",
+        "operationId": "putApiPromptsByIdTagsByTag",
         "responses": {
           "200": {
             "description": "Success",
@@ -46312,7 +49747,7 @@
     },
     "/api/v1/prompts/tags": {
       "get": {
-        "operationId": "listPromptTags",
+        "operationId": "getApiPromptsTags",
         "responses": {
           "200": {
             "description": "Success",
@@ -46446,7 +49881,7 @@
         }
       },
       "post": {
-        "operationId": "createPromptTag",
+        "operationId": "postApiPromptsTags",
         "responses": {
           "201": {
             "description": "Tag created",
@@ -46597,7 +50032,7 @@
     },
     "/api/v1/prompts/tags/{tag}": {
       "put": {
-        "operationId": "renamePromptTag",
+        "operationId": "putApiPromptsTagsByTag",
         "responses": {
           "200": {
             "description": "Tag renamed",
@@ -46756,7 +50191,7 @@
         }
       },
       "delete": {
-        "operationId": "deletePromptTag",
+        "operationId": "deleteApiPromptsTagsByTag",
         "responses": {
           "200": {
             "description": "Success",
@@ -46767,7 +50202,8 @@
             }
           },
           "204": {
-            "description": "Tag deleted"
+            "description": "Tag deleted",
+            "content": {}
           },
           "400": {
             "description": "Bad Request",
@@ -46883,7 +50319,7 @@
     },
     "/api/v1/prompts/{id}/versions": {
       "get": {
-        "operationId": "listPromptVersions",
+        "operationId": "getApiPromptsByIdVersions",
         "responses": {
           "200": {
             "description": "Success",
@@ -47440,7 +50876,7 @@
     },
     "/api/v1/prompts/{id}/versions/{versionId}/restore": {
       "post": {
-        "operationId": "restorePromptVersion",
+        "operationId": "postApiPromptsByIdVersionsByVersionIdRestore",
         "responses": {
           "200": {
             "description": "Success",
@@ -48002,7 +51438,7 @@
     },
     "/api/v1/prompts/{id}": {
       "get": {
-        "operationId": "getPrompt",
+        "operationId": "getApiPromptsById",
         "responses": {
           "200": {
             "description": "Success",
@@ -48570,7 +52006,7 @@
         }
       },
       "put": {
-        "operationId": "updatePrompt",
+        "operationId": "putApiPromptsById",
         "responses": {
           "200": {
             "description": "Success",
@@ -49305,7 +52741,7 @@
         }
       },
       "delete": {
-        "operationId": "deletePrompt",
+        "operationId": "deleteApiPromptsById",
         "responses": {
           "200": {
             "description": "Success",
@@ -49460,7 +52896,7 @@
     },
     "/api/v1/prompts/{id}/sync": {
       "post": {
-        "operationId": "syncPrompt",
+        "operationId": "postApiPromptsByIdSync",
         "responses": {
           "200": {
             "description": "Sync result",
@@ -51273,7 +54709,7 @@
     },
     "/api/v1/scenarios": {
       "get": {
-        "operationId": "listScenarios",
+        "operationId": "getApiScenarios",
         "responses": {
           "200": {
             "description": "Success",
@@ -51491,7 +54927,7 @@
         }
       },
       "post": {
-        "operationId": "createScenario",
+        "operationId": "postApiScenarios",
         "responses": {
           "201": {
             "description": "Success",
@@ -51900,7 +55336,7 @@
     },
     "/api/v1/scenarios/{id}": {
       "get": {
-        "operationId": "getScenario",
+        "operationId": "getApiScenariosById",
         "responses": {
           "200": {
             "description": "Success",
@@ -52144,7 +55580,7 @@
         }
       },
       "put": {
-        "operationId": "updateScenario",
+        "operationId": "putApiScenariosById",
         "responses": {
           "200": {
             "description": "Success",
@@ -52574,7 +56010,7 @@
         }
       },
       "patch": {
-        "operationId": "patchScenario",
+        "operationId": "patchApiScenariosById",
         "responses": {
           "200": {
             "description": "Success",
@@ -53004,7 +56440,7 @@
         }
       },
       "delete": {
-        "operationId": "archiveScenario",
+        "operationId": "deleteApiScenariosById",
         "responses": {
           "200": {
             "description": "Success",
@@ -53077,7 +56513,7 @@
     },
     "/api/v1/scenarios/{id}/versions": {
       "get": {
-        "operationId": "listScenarioVersions",
+        "operationId": "getApiScenariosByIdVersions",
         "responses": {
           "200": {
             "description": "Success",
@@ -53246,7 +56682,7 @@
     },
     "/api/v1/scenarios/{id}/versions/{version}": {
       "get": {
-        "operationId": "getScenarioVersion",
+        "operationId": "getApiScenariosByIdVersionsByVersion",
         "responses": {
           "200": {
             "description": "Success",
@@ -53532,7 +56968,7 @@
     },
     "/api/v1/simulation-runs": {
       "get": {
-        "operationId": "listSimulationRuns",
+        "operationId": "getApiSimulationRuns",
         "responses": {
           "200": {
             "description": "Success",
@@ -53733,6 +57169,7 @@
                             "type": "number"
                           },
                           "note": {
+                            "description": "One short line saying why the run was started, as given when it was queued. Null on a run started without one.",
                             "anyOf": [
                               {
                                 "type": "string"
@@ -53740,10 +57177,10 @@
                               {
                                 "type": "null"
                               }
-                            ],
-                            "description": "One short line saying why the run was started, as given when it was queued. Null on a run started without one."
+                            ]
                           },
                           "scenarioVersion": {
+                            "description": "The version of the scenario at the moment the run was queued. Null on runs recorded before versions existed.",
                             "anyOf": [
                               {
                                 "type": "integer",
@@ -53753,8 +57190,7 @@
                               {
                                 "type": "null"
                               }
-                            ],
-                            "description": "The version of the scenario at the moment the run was queued. Null on runs recorded before versions existed."
+                            ]
                           },
                           "platformUrl": {
                             "type": "string",
@@ -53773,8 +57209,6 @@
                           "timestamp",
                           "updatedAt",
                           "durationInMs",
-                          "note",
-                          "scenarioVersion",
                           "platformUrl"
                         ]
                       }
@@ -53846,7 +57280,7 @@
     },
     "/api/v1/simulation-runs/{scenarioRunId}": {
       "get": {
-        "operationId": "getSimulationRun",
+        "operationId": "getApiSimulationRunsByScenarioRunId",
         "responses": {
           "200": {
             "description": "Success",
@@ -54042,6 +57476,7 @@
                       "type": "number"
                     },
                     "note": {
+                      "description": "One short line saying why the run was started, as given when it was queued. Null on a run started without one.",
                       "anyOf": [
                         {
                           "type": "string"
@@ -54049,10 +57484,10 @@
                         {
                           "type": "null"
                         }
-                      ],
-                      "description": "One short line saying why the run was started, as given when it was queued. Null on a run started without one."
+                      ]
                     },
                     "scenarioVersion": {
+                      "description": "The version of the scenario at the moment the run was queued. Null on runs recorded before versions existed.",
                       "anyOf": [
                         {
                           "type": "integer",
@@ -54062,8 +57497,7 @@
                         {
                           "type": "null"
                         }
-                      ],
-                      "description": "The version of the scenario at the moment the run was queued. Null on runs recorded before versions existed."
+                      ]
                     },
                     "platformUrl": {
                       "type": "string",
@@ -54082,8 +57516,6 @@
                     "timestamp",
                     "updatedAt",
                     "durationInMs",
-                    "note",
-                    "scenarioVersion",
                     "platformUrl"
                   ]
                 }
@@ -54139,7 +57571,7 @@
     },
     "/api/v1/simulation-runs/batches/list": {
       "get": {
-        "operationId": "listSimulationRunBatches",
+        "operationId": "getApiSimulationRunsBatchesList",
         "responses": {
           "200": {
             "description": "Success",
@@ -54207,6 +57639,7 @@
                             "description": "True when every run of the batch reached a terminal status."
                           },
                           "note": {
+                            "description": "One short line saying why the batch was run, as given when it was queued. Null on a batch run without one.",
                             "anyOf": [
                               {
                                 "type": "string"
@@ -54214,8 +57647,7 @@
                               {
                                 "type": "null"
                               }
-                            ],
-                            "description": "One short line saying why the batch was run, as given when it was queued. Null on a batch run without one."
+                            ]
                           }
                         },
                         "required": [
@@ -54230,8 +57662,7 @@
                           "lastUpdatedAt",
                           "firstCompletedAt",
                           "allCompletedAt",
-                          "isComplete",
-                          "note"
+                          "isComplete"
                         ]
                       }
                     },
@@ -54296,7 +57727,7 @@
     },
     "/api/v1/simulation-runs/batches/{batchRunId}": {
       "get": {
-        "operationId": "getSimulationRunBatch",
+        "operationId": "getApiSimulationRunsBatchesByBatchRunId",
         "responses": {
           "200": {
             "description": "Success",
@@ -54359,6 +57790,7 @@
                       "description": "True when every run of the batch reached a terminal status."
                     },
                     "note": {
+                      "description": "One short line saying why the batch was run, as given when it was queued. Null on a batch run without one.",
                       "anyOf": [
                         {
                           "type": "string"
@@ -54366,8 +57798,7 @@
                         {
                           "type": "null"
                         }
-                      ],
-                      "description": "One short line saying why the batch was run, as given when it was queued. Null on a batch run without one."
+                      ]
                     }
                   },
                   "required": [
@@ -54382,8 +57813,7 @@
                     "lastUpdatedAt",
                     "firstCompletedAt",
                     "allCompletedAt",
-                    "isComplete",
-                    "note"
+                    "isComplete"
                   ]
                 }
               }
@@ -54871,7 +58301,7 @@
     },
     "/api/v1/secrets": {
       "get": {
-        "operationId": "listSecretsPluralAlias",
+        "operationId": "getApiSecrets",
         "responses": {
           "200": {
             "description": "Success",
@@ -54948,7 +58378,7 @@
         }
       },
       "post": {
-        "operationId": "createSecretPluralAlias",
+        "operationId": "postApiSecrets",
         "responses": {
           "201": {
             "description": "Success",
@@ -55045,7 +58475,7 @@
     },
     "/api/v1/secrets/{id}": {
       "get": {
-        "operationId": "getSecretPluralAlias",
+        "operationId": "getApiSecretsById",
         "responses": {
           "200": {
             "description": "Success",
@@ -55127,7 +58557,7 @@
         }
       },
       "put": {
-        "operationId": "updateSecretPluralAlias",
+        "operationId": "putApiSecretsById",
         "responses": {
           "200": {
             "description": "Success",
@@ -55227,7 +58657,7 @@
         }
       },
       "delete": {
-        "operationId": "deleteSecretPluralAlias",
+        "operationId": "deleteApiSecretsById",
         "responses": {
           "200": {
             "description": "Success",
@@ -59584,7 +63014,7 @@
     },
     "/api/v1/suites": {
       "get": {
-        "operationId": "listSuites",
+        "operationId": "getApiSuites",
         "responses": {
           "200": {
             "description": "Success",
@@ -59605,12 +63035,12 @@
                         "type": "string"
                       },
                       "kind": {
+                        "description": "custom is a hand-assembled run plan; folder is a test suite that groups scenarios filed into it. Absent on servers that predate test suites.",
                         "type": "string",
                         "enum": [
                           "custom",
                           "folder"
-                        ],
-                        "description": "custom is a hand-assembled run plan; folder is a test suite that groups scenarios filed into it."
+                        ]
                       },
                       "description": {
                         "anyOf": [
@@ -59834,10 +63264,8 @@
                       "id",
                       "name",
                       "slug",
-                      "kind",
                       "description",
                       "scenarioIds",
-                      "scope",
                       "targets",
                       "repeatCount",
                       "labels",
@@ -59884,7 +63312,7 @@
         }
       },
       "post": {
-        "operationId": "createSuite",
+        "operationId": "postApiSuites",
         "responses": {
           "201": {
             "description": "Success",
@@ -59903,12 +63331,12 @@
                       "type": "string"
                     },
                     "kind": {
+                      "description": "custom is a hand-assembled run plan; folder is a test suite that groups scenarios filed into it. Absent on servers that predate test suites.",
                       "type": "string",
                       "enum": [
                         "custom",
                         "folder"
-                      ],
-                      "description": "custom is a hand-assembled run plan; folder is a test suite that groups scenarios filed into it."
+                      ]
                     },
                     "description": {
                       "anyOf": [
@@ -60132,10 +63560,8 @@
                     "id",
                     "name",
                     "slug",
-                    "kind",
                     "description",
                     "scenarioIds",
-                    "scope",
                     "targets",
                     "repeatCount",
                     "labels",
@@ -60394,7 +63820,7 @@
     },
     "/api/v1/suites/{id}": {
       "get": {
-        "operationId": "getSuite",
+        "operationId": "getApiSuitesById",
         "responses": {
           "200": {
             "description": "Success",
@@ -60413,12 +63839,12 @@
                       "type": "string"
                     },
                     "kind": {
+                      "description": "custom is a hand-assembled run plan; folder is a test suite that groups scenarios filed into it. Absent on servers that predate test suites.",
                       "type": "string",
                       "enum": [
                         "custom",
                         "folder"
-                      ],
-                      "description": "custom is a hand-assembled run plan; folder is a test suite that groups scenarios filed into it."
+                      ]
                     },
                     "description": {
                       "anyOf": [
@@ -60642,10 +64068,8 @@
                     "id",
                     "name",
                     "slug",
-                    "kind",
                     "description",
                     "scenarioIds",
-                    "scope",
                     "targets",
                     "repeatCount",
                     "labels",
@@ -60708,7 +64132,7 @@
         }
       },
       "patch": {
-        "operationId": "updateSuite",
+        "operationId": "patchApiSuitesById",
         "responses": {
           "200": {
             "description": "Success",
@@ -60727,12 +64151,12 @@
                       "type": "string"
                     },
                     "kind": {
+                      "description": "custom is a hand-assembled run plan; folder is a test suite that groups scenarios filed into it. Absent on servers that predate test suites.",
                       "type": "string",
                       "enum": [
                         "custom",
                         "folder"
-                      ],
-                      "description": "custom is a hand-assembled run plan; folder is a test suite that groups scenarios filed into it."
+                      ]
                     },
                     "description": {
                       "anyOf": [
@@ -60956,10 +64380,8 @@
                     "id",
                     "name",
                     "slug",
-                    "kind",
                     "description",
                     "scenarioIds",
-                    "scope",
                     "targets",
                     "repeatCount",
                     "labels",
@@ -61242,7 +64664,7 @@
         }
       },
       "delete": {
-        "operationId": "archiveSuite",
+        "operationId": "deleteApiSuitesById",
         "responses": {
           "200": {
             "description": "Success",
@@ -61319,7 +64741,7 @@
     },
     "/api/v1/suites/{id}/duplicate": {
       "post": {
-        "operationId": "duplicateSuite",
+        "operationId": "postApiSuitesByIdDuplicate",
         "responses": {
           "201": {
             "description": "Success",
@@ -61338,12 +64760,12 @@
                       "type": "string"
                     },
                     "kind": {
+                      "description": "custom is a hand-assembled run plan; folder is a test suite that groups scenarios filed into it. Absent on servers that predate test suites.",
                       "type": "string",
                       "enum": [
                         "custom",
                         "folder"
-                      ],
-                      "description": "custom is a hand-assembled run plan; folder is a test suite that groups scenarios filed into it."
+                      ]
                     },
                     "description": {
                       "anyOf": [
@@ -61567,10 +64989,8 @@
                     "id",
                     "name",
                     "slug",
-                    "kind",
                     "description",
                     "scenarioIds",
-                    "scope",
                     "targets",
                     "repeatCount",
                     "labels",
@@ -61635,7 +65055,7 @@
     },
     "/api/v1/suites/{id}/run": {
       "post": {
-        "operationId": "runSuite",
+        "operationId": "postApiSuitesByIdRun",
         "responses": {
           "200": {
             "description": "Success",
@@ -62605,7 +66025,7 @@
     },
     "/api/v1/me/usage": {
       "get": {
-        "operationId": "getMyUsage",
+        "operationId": "getApiMeUsage",
         "responses": {
           "200": {
             "description": "Success",
@@ -62853,7 +66273,7 @@
     },
     "/api/v1/me/project": {
       "get": {
-        "operationId": "getMyProject",
+        "operationId": "getApiMeProject",
         "responses": {
           "200": {
             "description": "Success",
@@ -62992,7 +66412,7 @@
     },
     "/api/webhooks/v1/endpoints": {
       "post": {
-        "operationId": "createWebhookEndpoint",
+        "operationId": "postApiWebhooksV1Endpoints",
         "responses": {
           "201": {
             "description": "Success",
@@ -63428,7 +66848,7 @@
         }
       },
       "get": {
-        "operationId": "listWebhookEndpoints",
+        "operationId": "getApiWebhooksV1Endpoints",
         "responses": {
           "200": {
             "description": "Success",
@@ -63770,7 +67190,7 @@
     },
     "/api/webhooks/v1/endpoints/{id}": {
       "get": {
-        "operationId": "getWebhookEndpoint",
+        "operationId": "getApiWebhooksV1EndpointsById",
         "responses": {
           "200": {
             "description": "Success",
@@ -64124,7 +67544,7 @@
         }
       },
       "patch": {
-        "operationId": "updateWebhookEndpoint",
+        "operationId": "patchApiWebhooksV1EndpointsById",
         "responses": {
           "200": {
             "description": "Success",
@@ -64564,7 +67984,7 @@
         }
       },
       "delete": {
-        "operationId": "archiveWebhookEndpoint",
+        "operationId": "deleteApiWebhooksV1EndpointsById",
         "responses": {
           "200": {
             "description": "Success",
@@ -64620,7 +68040,7 @@
     },
     "/api/webhooks/v1/endpoints/{id}/roll-secret": {
       "post": {
-        "operationId": "rollWebhookEndpointSecret",
+        "operationId": "postApiWebhooksV1EndpointsByIdRollSecret",
         "responses": {
           "200": {
             "description": "Success",
@@ -64984,7 +68404,7 @@
     },
     "/api/webhooks/v1/endpoints/{id}/test": {
       "post": {
-        "operationId": "testWebhookEndpoint",
+        "operationId": "postApiWebhooksV1EndpointsByIdTest",
         "responses": {
           "200": {
             "description": "Success",
@@ -65058,7 +68478,7 @@
     },
     "/api/webhooks/v1/endpoints/{id}/deliveries": {
       "get": {
-        "operationId": "listWebhookEndpointDeliveries",
+        "operationId": "getApiWebhooksV1EndpointsByIdDeliveries",
         "responses": {
           "200": {
             "description": "Success",
@@ -65221,7 +68641,7 @@
     },
     "/api/webhooks/v1/endpoints/{id}/health": {
       "get": {
-        "operationId": "getWebhookEndpointHealth",
+        "operationId": "getApiWebhooksV1EndpointsByIdHealth",
         "responses": {
           "200": {
             "description": "Success",
@@ -65371,7 +68791,7 @@
     },
     "/api/webhooks/v1/event-types": {
       "get": {
-        "operationId": "listWebhookEventTypes",
+        "operationId": "getApiWebhooksV1EventTypes",
         "responses": {
           "200": {
             "description": "Success",
@@ -65434,7 +68854,7 @@
     },
     "/api/webhooks/v1/events": {
       "get": {
-        "operationId": "listWebhookEvents",
+        "operationId": "getApiWebhooksV1Events",
         "responses": {
           "200": {
             "description": "Success",
@@ -65570,7 +68990,7 @@
     },
     "/api/webhooks/v1/events/{id}": {
       "get": {
-        "operationId": "getWebhookEvent",
+        "operationId": "getApiWebhooksV1EventsById",
         "responses": {
           "200": {
             "description": "Success",
@@ -65645,7 +69065,7 @@
     },
     "/api/v1/workflows": {
       "get": {
-        "operationId": "listWorkflows",
+        "operationId": "getApiWorkflows",
         "responses": {
           "200": {
             "description": "Success",
@@ -65735,7 +69155,7 @@
     },
     "/api/v1/workflows/{id}": {
       "get": {
-        "operationId": "getWorkflow",
+        "operationId": "getApiWorkflowsById",
         "responses": {
           "200": {
             "description": "Success",
@@ -65849,7 +69269,7 @@
         }
       },
       "patch": {
-        "operationId": "updateWorkflow",
+        "operationId": "patchApiWorkflowsById",
         "responses": {
           "200": {
             "description": "Success",
@@ -65985,7 +69405,7 @@
         }
       },
       "delete": {
-        "operationId": "archiveWorkflow",
+        "operationId": "deleteApiWorkflowsById",
         "responses": {
           "200": {
             "description": "Success",
@@ -66058,7 +69478,7 @@
     },
     "/api/v1/workflows/{id}/evaluate": {
       "post": {
-        "operationId": "evaluateWorkflow",
+        "operationId": "postApiWorkflowsByIdEvaluate",
         "responses": {
           "200": {
             "description": "Success",
@@ -66235,7 +69655,7 @@
     },
     "/api/optimization/{workflowId}/{versionId}": {
       "post": {
-        "operationId": "runOptimizationWorkflowVersion",
+        "operationId": "postApiOptimizationByWorkflowIdByVersionId",
         "responses": {
           "200": {
             "description": "Success",
@@ -66352,7 +69772,7 @@
     },
     "/api/workflows/{workflowId}/run": {
       "post": {
-        "operationId": "runWorkflow",
+        "operationId": "postApiWorkflowsByWorkflowIdRun",
         "responses": {
           "200": {
             "description": "Success",
@@ -66460,7 +69880,7 @@
     },
     "/api/workflows/{workflowId}/{versionId}/run": {
       "post": {
-        "operationId": "runWorkflowVersion",
+        "operationId": "postApiWorkflowsByWorkflowIdByVersionIdRun",
         "responses": {
           "200": {
             "description": "Success",
