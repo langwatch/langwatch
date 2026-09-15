@@ -3147,7 +3147,7 @@ model InvoiceItem {
 // - are now PARTIAL unique indexes carrying `WHERE "deletedAt" IS NULL`
 // (`Group_organizationId_slug_live_key`,
 // `Group_organizationId_externalId_live_key`, migration
-// 20260825140000_group_deletion_keeps_its_history), and are deliberately NOT
+// 20260915120002_group_deletion_keeps_its_history), and are deliberately NOT
 // declared here: Prisma has no partial indexes, so an `@@unique` in this file
 // would make the next `prisma migrate dev` drop the WHERE clause and rebuild
 // it across every deleted row - which would refuse the two things the clause
@@ -3209,8 +3209,8 @@ model Group {
   deletedReason    String?
 
   // Uniqueness is enforced by three partial unique indexes over LIVE rows,
-  // defined in migrations 20260825140000_group_deletion_keeps_its_history and
-  // 20260825150000_scim_connection_group_unique_is_live:
+  // defined in migrations 20260915120002_group_deletion_keeps_its_history and
+  // 20260915120003_scim_connection_group_unique_is_live:
   //   • ([organizationId, slug])         - Group_organizationId_slug_live_key
   //   • ([organizationId, externalId])   - Group_organizationId_externalId_live_key
   //   • ([scimConnectionId, externalId]) - Group_scimConnectionId_externalId_live_key
@@ -3241,7 +3241,7 @@ model Group {
 // its own beginning and its own end, not an edit of the old one. The pair's
 // uniqueness survives as a PARTIAL unique index over the live rows only,
 // declared in raw SQL (`GroupMembership_userId_groupId_live_key`, migration
-// 20260825130000_group_membership_is_event_truth) and deliberately NOT as an
+// 20260915120001_group_membership_is_event_truth) and deliberately NOT as an
 // `@@unique` here: Prisma has no partial indexes, so declaring one would make
 // the next `prisma migrate dev` drop the WHERE clause and rebuild it over
 // every removed row - the same reason RoleBinding's six partial uniques and

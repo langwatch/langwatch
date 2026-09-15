@@ -5,7 +5,7 @@
 -- connections in one organization can each provision their own "engineering".
 -- That was correct while a group deletion deleted the row.
 --
--- 20260825140000_group_deletion_keeps_its_history changed that: a deleted
+-- 20260915120002_group_deletion_keeps_its_history changed that: a deleted
 -- group is now MARKED, and its row survives so the memberships it held stay
 -- readable. It converted `([organizationId, slug])` and
 -- `([organizationId, externalId])` to partial uniques over live rows for

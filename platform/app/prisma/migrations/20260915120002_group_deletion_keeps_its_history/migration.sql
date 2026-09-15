@@ -1,6 +1,6 @@
 -- Deleting a group MARKS it, so its history survives the deletion.
 --
--- The previous migration (20260825130000_group_membership_is_event_truth) made
+-- The previous migration (20260915120001_group_membership_is_event_truth) made
 -- a membership removal mark its row instead of deleting it, so that "who could
 -- reach this in June" stays answerable. It then had to state a limit it could
 -- not close: `GroupMembership.group` cascaded, so deleting the GROUP erased
