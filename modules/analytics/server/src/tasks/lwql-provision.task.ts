@@ -238,11 +238,10 @@ export async function runLwqlProvisioningTask({
         }
       }
 
-      // Fatal, exactly like the views above. The inline sync on project creation only ever covers projects created *after* a failure, so a backfill that fails on the
-      // first deploy leaves every pre-existing project without a key-map row until some later deploy happens to re-run this task. That state is not a degraded
-      // LangWatchQL, it is a silently wrong one: the row policies resolve an absent hash to an empty tenant set, so queries return zero rows with HTTP 200 rather than
-      // `lwql_unavailable`, and nothing in the request path detects it. Failing the deploy costs nothing extra in availability terms: this runs on the same admin client
-      // as the ClickHouse objects above, so any outage able to fail the backfill has already failed those and aborted the deploy one step earlier.
+      // Fatal: a failed backfill leaves pre-existing projects without a key-map row (inline sync
+      // only covers projects created after the failure) — silently WRONG, not degraded: row
+      // policies resolve an absent hash to an empty tenant set, so queries return zero rows with
+      // HTTP 200 rather than `lwql_unavailable`, undetected by the request path.
       await backfillKeyMap({ client, database, names, sourceDatabase });
     },
   });
@@ -251,9 +250,9 @@ export async function runLwqlProvisioningTask({
 }
 
 /**
- * The task-launcher entry — `pnpm --filter @langwatch/tasks task lwql-provision`. A thin wrapper over {@link runLwqlProvisioningTask}: the body above
- * is the whole contract, and this class is only the seam the catalogue resolves by name. `database` is composed by the catalogue from the process's
- * real Prisma handle (`TaskHost.requirePrisma()`), which satisfies {@link LwqlProvisioningDatabase} structurally.
+ * The task-launcher entry (`pnpm --filter @langwatch/tasks task lwql-provision`) — a thin
+ * wrapper over {@link runLwqlProvisioningTask}, the whole contract; this class is only the
+ * seam the catalogue resolves by name, with `database` from `TaskHost.requirePrisma()`.
  */
 export class LwqlProvisionTask extends Task {
   readonly name = "lwql-provision";

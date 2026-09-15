@@ -355,6 +355,20 @@ Domain routing still runs first and is unchanged: an address on a connected
 domain redirects to its identity provider whether or not an account exists,
 because just-in-time provisioning is what makes that correct.
 
+**The full sequence**, in order, supersedes §1's table above
+(`routeSignIn` in `modules/identity/contract/src/signin-routing.ts`):
+
+```
+break-glass                → local method set     break_glass
+no address, sole conn      → redirect             sole_active_connection
+domain on a live conn      → redirect             domain_routed
+domain on a paused conn    → picker               connection_suspended
+no account for the address → sign-up              identifier_unknown
+account, methods it holds  → picker               account_methods
+anything else              → picker               no_domain_match
+policy refuses the method  → picker (local)       method_not_*
+```
+
 **What still holds, and is not negotiable.**
 
 - **The credential refusal stays one refusal.** `identity_sign_in_refused`

@@ -83,9 +83,9 @@ const DATE_FILTER_PREVIOUS = `AND OccurredAt >= {previousStart:DateTime64(3)} AN
 const DATE_FILTER_START_END = `AND OccurredAt >= {startDate:DateTime64(3)} AND OccurredAt < {endDate:DateTime64(3)}`;
 
 /**
- * StartTime partition-pruning predicates for the `stored_spans` subqueries that span/event facet filters generate (see translateAllFilters' spanTimePredicate argument). `stored_spans` is partitioned by `toYearWeek(StartTime)` and tiered to S3, so
- * an unbounded facet subquery cold-scans every weekly partition. A span's StartTime falls within its trace's lifetime, so bounding it to the same date envelope the outer OccurredAt filter uses — plus a 2-day cushion for long traces / clock skew,
- * matching the span-fetch partition hints elsewhere — prunes the scan without changing which traces match. One constant per caller date regime: the two-period aggregation vs. the single start/end-range builders.
+ * StartTime partition-pruning bounds for stored_spans facet subqueries (see
+ * translateAllFilters' spanTimePredicate). Mirrors the outer OccurredAt window plus a
+ * 2-day cushion for clock skew, since stored_spans is partitioned by toYearWeek(StartTime).
  */
 const SPAN_TIME_FILTER_BOTH_PERIODS =
   "AND StartTime >= {previousStart:DateTime64(3)} - INTERVAL 2 DAY " +
@@ -94,7 +94,11 @@ const SPAN_TIME_FILTER_START_END =
   "AND StartTime >= {startDate:DateTime64(3)} - INTERVAL 2 DAY " +
   "AND StartTime < {endDate:DateTime64(3)} + INTERVAL 2 DAY";
 
-// Partition-pruning bounds for the evaluation_runs JOIN subquery. The query windows on trace OccurredAt, but evaluation_runs is partitioned by ScheduledAt per the migrations (and by UpdatedAt on long-lived deployments that predate that DDL), so an OccurredAt filter prunes nothing there — without these bounds the JOIN's dedup subquery walks the tenant's entire history across every weekly partition, including the S3-tiered cold ones. Lower bounds only, on BOTH candidate partition columns, so pruning works on either partitioning scheme. Safe as a superset: an evaluation joined to an in-window trace is scheduled at/after that trace occurs, and every row version's UpdatedAt >= its ScheduledAt, so both columns are >= the window start minus scheduling skew — far inside the 7-day margin (partitions are weekly, so the margin costs at most one extra partition). No upper bound: a re-evaluation updates rows long after the window, and the IN-tuple dedup must still see that latest version. UpdatedAt is table-qualified. trace_summaries (the outer scope) also has an UpdatedAt column, and ClickHouse resolves a bare identifier the inner table lacks against the OUTER scope instead of failing — the hazard `join-time-bound-partition-column.unit.test.ts` guards against. Qualifying pins the reference to evaluation_runs' own column so neither ClickHouse nor the guard has to guess. ScheduledAt stays bare: it is evaluation_runs' own partition column per the migrations and does not exist on trace_summaries. The ScheduledAt bound is NULL-safe. On the unified schema (00002) the column is `DateTime64(3) DEFAULT now64(3)` and the IS NULL branch is statically false, so partition pruning is unaffected. But long-lived deployments that predate the unified DDL carry `ScheduledAt Nullable(DateTime64(3))`, where a bare `ScheduledAt >= x` evaluates to NULL for NULL rows and silently DROPS those evaluations from every graph — a correctness regression, not a missed optimisation. NULL rows on such deployments are still bounded by the UpdatedAt predicate, which is their actual partition column anyway.
+// Partition-pruning bounds for the evaluation_runs JOIN subquery (OccurredAt doesn't prune
+// there since it partitions on ScheduledAt/UpdatedAt). Lower bounds only, on both columns —
+// no upper bound, since a re-evaluation updates rows long after the window. UpdatedAt is
+// table-qualified (see join-time-bound-partition-column.unit.test.ts); ScheduledAt is
+// NULL-safe, since it is Nullable on legacy deployments where a bare check would drop rows.
 const EVAL_TIME_FILTER_BOTH_PERIODS =
   "AND (ScheduledAt IS NULL OR ScheduledAt >= {previousStart:DateTime64(3)} - INTERVAL 7 DAY) " +
   "AND evaluation_runs.UpdatedAt >= {previousStart:DateTime64(3)} - INTERVAL 7 DAY";
@@ -227,9 +231,9 @@ interface GroupByExpression {
   usesArrayJoin?: boolean;
   handlesUnknown?: boolean;
   /**
-   * Model grouping attributes additive metrics (cost, tokens) per SPAN via the span-model partition join
-   * (see buildSpanModelPartitionJoin), so per-model buckets sum exactly to the ungrouped totals instead
-   * of counting each multi-model trace once per model it touched.
+   * Model grouping attributes additive metrics (cost, tokens) per SPAN via the span-model
+   * partition join (see buildSpanModelPartitionJoin), so per-model buckets sum exactly to
+   * the ungrouped totals instead of counting each multi-model trace once per model touched.
    */
   spanModelPartitioned?: boolean;
 }
@@ -249,9 +253,9 @@ const SPAN_MODEL_ALIAS = "smd";
 const SPAN_MODEL_KEY_EXPR = `multiIf(SpanAttributes['gen_ai.response.model'] != '', SpanAttributes['gen_ai.response.model'], SpanAttributes['gen_ai.request.model'] != '', SpanAttributes['gen_ai.request.model'], 'unknown')`;
 
 /**
- * Redundant-usage gate: mirrors SpanCostService.isTokenAccumulationSkipped. A span marked as a duplicate usage copy (e.g.
- * codex's lower-level response span echoing the turn rollup) contributed nothing to the trace totals, so it must contribute
- * nothing to the per-model buckets either, otherwise the bucket sum overshoots the ungrouped total.
+ * Redundant-usage gate: mirrors SpanCostService.isTokenAccumulationSkipped. A duplicate usage
+ * copy contributes nothing to the trace totals, so it must be excluded from per-model buckets
+ * too, or the bucket sum overshoots the ungrouped total.
  */
 const SPAN_NOT_SKIPPED = `SpanAttributes['langwatch.reserved.skip_token_accumulation'] != 'true'`;
 
@@ -383,11 +387,11 @@ const groupByExpressions: Partial<Record<string, (groupByKey?: string) => GroupB
     usesArrayJoin: true,
   }),
 
-  // Per-SPAN attribution via the span-model partition join (LEFT JOIN `smd`, one row per (trace, span model)). The former `arrayJoin(Models)` over trace-level
-  // totals attributed each trace's WHOLE cost/token totals to EVERY model the trace touched, so multi-model traces multiplied their cost by the number of models
-  // used (~2.9x observed on a real multi-agent session). Buckets come from each span's own model (response > request, mirroring
-  // SpanCostService.extractModelsFromSpan); traces with no span-model rows (log-only traces, or spans outside the scan window) fall back to their primary model
-  // `Models[1]`, or `'unknown'` when the trace genuinely has no model, so they keep a single, exactly-partitioned bucket instead of vanishing.
+  // Per-SPAN attribution via the span-model partition join (LEFT JOIN `smd`, one row per span
+  // model). The former arrayJoin(Models) attributed each trace's WHOLE cost to EVERY model it
+  // touched, multiplying cost by the model count (~2.9x observed on a real multi-agent session).
+  // Traces with no span-model rows fall back to their primary model (Models[1]) or 'unknown',
+  // keeping one exactly-partitioned bucket instead of vanishing.
   "metadata.model": () => ({
     column: `if(${spanModelPartitionMissExpr()}, if(empty(${tableAliases.trace_summaries}.Models), 'unknown', ${tableAliases.trace_summaries}.Models[1]), ${SPAN_MODEL_ALIAS}.SpanModelKey)`,
     requiredJoins: [],
@@ -741,11 +745,11 @@ export function buildTimeseriesQuery(input: TimeseriesQueryInput): BuiltQuery {
   const simpleMetrics = metricTranslations.filter((m) => !m.requiresSubquery);
   const subqueryMetrics = metricTranslations.filter((m) => m.requiresSubquery);
 
-  // @regression issue #3088: when trace-level metrics (e.g. sum(ts.TotalCost)) are mixed with evaluation metrics in the same query, the evaluation_runs JOIN fans out each trace into N rows (one per evaluation run
-  // on that trace). Aggregating trace-level columns over the fanned-out rows inflates them by N. Fix: wrap the scan in a per-trace CTE that pre-aggregates evaluation metrics at trace granularity. The outer query
-  // then aggregates trace-level columns without duplication and re-aggregates the per-trace eval values across traces. This check MUST run before the `timeScale === "full"` branch below — otherwise summary
-  // widgets (timeScale: "full") mixing eval + trace metrics would route through buildSubqueryTimeseriesQuery which still joins evaluation_runs directly and reproduces the fan-out bug. Guard: only fire when there
-  // are NO pipeline (subquery) metrics. Pipeline metrics live in `subqueryMetrics` which `buildMixedEvalTimeseriesQuery` does not receive — routing here would silently drop them.
+  // @regression issue #3088: mixing trace-level metrics with evaluation metrics makes the
+  // evaluation_runs JOIN fan out each trace into N rows, inflating trace-level aggregates by N.
+  // Fix: pre-aggregate eval metrics per-trace in a CTE before the outer aggregation. MUST run
+  // before the `timeScale === "full"` branch below, or summary widgets reproduce the fan-out bug.
+  // Guard: skip when pipeline (subquery) metrics exist — this path drops them silently.
   if (subqueryMetrics.length === 0 && hasEvalMixedWithTraceMetrics(simpleMetrics)) {
     return buildMixedEvalTimeseriesQuery({
       input,
@@ -936,11 +940,11 @@ function buildMixedEvalTimeseriesQuery({
     innerSelectExprs.push(groupKeyExpr);
   }
 
-  // Per-metric plan for the outer SELECT. Each simple metric gets a column in the inner CTE and a corresponding re-aggregation in the outer
-  // SELECT. Eval metric: inner emits the full conditional aggregation per trace; outer re-aggregates across traces via
-  // mapEvalAggregationToOuter. Trace metric: inner emits `any(<underlying column>)` per trace; outer applies the original aggregation to the
-  // per-trace column, preserving coalesce/quantile wrappers by substituting the column reference in the original expression. Per-trace
-  // aliases start with the metric index digit (e.g. `0__…`), so we wrap them in `quoteIdentifier` to satisfy ClickHouse's identifier rules.
+  // Per-metric plan for the outer SELECT. Eval metric: inner emits the full conditional
+  // aggregation per trace; outer re-aggregates across traces via mapEvalAggregationToOuter.
+  // Trace metric: inner emits `any(<column>)` per trace; outer re-applies the original
+  // aggregation (preserving coalesce/quantile wrappers) to that per-trace column. Per-trace
+  // aliases start with the metric index digit, so `quoteIdentifier` satisfies ClickHouse's rules.
   const outerMetricExprs: string[] = [];
   for (const metric of simpleMetrics) {
     const perTraceAlias = quoteIdentifier(`${metric.alias}__per_trace`);
@@ -1134,9 +1138,9 @@ function extractTraceAggregationColumn(expression: string): string | null {
 }
 
 /**
- * Replace all occurrences of a column reference in an expression with a new alias. Used to rewrite the
- * outer SELECT of a mixed eval/trace query so that the original aggregation (including wrappers like
- * `coalesce(..., 0)`) applies to the per-trace column instead of the raw column.
+ * Replace all occurrences of a column reference in an expression with a new alias. Used to
+ * rewrite the outer SELECT of a mixed eval/trace query so the original aggregation (including
+ * wrappers like `coalesce(..., 0)`) applies to the per-trace column instead of the raw column.
  */
 function replaceColumnWithAlias(expression: string, column: string, alias: string): string {
   // Escape regex metacharacters in the column reference before replacing.
@@ -1203,11 +1207,11 @@ function buildArrayJoinTimeseriesQuery({
   // SELECT where the `es` alias no longer exists. @regression issue #3088
   const simpleMetrics = metricTranslations.filter((m) => !m.requiresSubquery);
 
-  // Pipeline metrics that group by trace_id are redundant in the arrayJoin path because the CTE already deduplicates by (trace_id, group_key): each trace contributes at most one row per
-  // group, so the inner `<agg> BY trace_id` step becomes identity for trace-level columns. Re-translate these as simple metrics so they participate in the outer SELECT instead of being
-  // silently dropped (which is what the `avgCostPerModel` and `avgTokensPerModel` dashboard widgets were hitting — they emit `pipeline: {field: trace_id, aggregation: avg}` and got blanked
-  // out). Safe for sum/avg/min/max: on a per-trace scalar `v`, the inner aggregation collapses to `v` for all four, so the outer aggregation equals the standard aggregation over deduped
-  // traces. Other inner aggregations (quantile, uniq, etc.) are intentionally left to fall through — they'd need separate reasoning.
+  // Pipeline metrics that group by trace_id are redundant in the arrayJoin path: the CTE already
+  // dedupes by (trace_id, group_key), so `<agg> BY trace_id` is identity. Re-translate them as
+  // simple metrics so they reach the outer SELECT instead of being silently dropped — the bug
+  // `avgCostPerModel` / `avgTokensPerModel` widgets hit. Safe only for sum/avg/min/max, which
+  // collapse to the deduped scalar; quantile/uniq stay pipeline since they need separate reasoning.
   const TRACE_ID_PIPELINE_SAFE_AGGS = new Set<string>(["sum", "avg", "min", "max"]);
   for (let i = 0; i < input.series.length; i++) {
     const series = input.series[i]!;
@@ -1260,11 +1264,17 @@ function buildArrayJoinTimeseriesQuery({
   // When using the grouped CTE, wrap trace-level columns in any() since they
   // are constant per (trace_id, group_key) combination.
   const traceColumnWrapper = (col: string) => (hasEvalMixWithTrace ? `any(${col})` : col);
-  // IMPORTANT: When adding a new trace-level column to metric-translator.ts, it MUST also be added to this CTE select list AND to dedupSubstitutions() (consumed by transformMetricForDedup below). The simple-path
-  // buildMixedEvalTimeseriesQuery uses dynamic column extraction via extractTraceAggregationColumn, but this arrayJoin path still uses the hard-coded approach. Missing the update here will make the new column silently return null (or
-  // throw) when combined with an arrayJoin groupBy. TODO(#3115): port this path to extractTraceAggregationColumn for parity. For the span-partitioned model grouping, the additive (span-attributable) columns carry the (trace, model)
-  // bucket's OWN share from the `smd` join instead of the whole-trace value, so the outer sums partition exactly. Traces without a joined smd row (log-only traces, spans outside the scan window) keep the trace-level value: the group-by
-  // expression gives those traces exactly one bucket, so whole-trace attribution stays a partition. Non-additive trace-level columns (duration, TTFT, tokens/second) keep whole-trace attribution in every bucket the trace touched.
+  // IMPORTANT: a new trace-level column in metric-translator.ts must also be added to this CTE
+  // select list AND to dedupSubstitutions() (consumed by transformMetricForDedup below), or it
+  // silently returns null (or throws) when combined with an arrayJoin groupBy. The simple path
+  // (buildMixedEvalTimeseriesQuery) does this dynamically via extractTraceAggregationColumn.
+  // TODO(#3115): port this arrayJoin path to the same helper for parity.
+
+  // For span-partitioned model grouping, additive columns carry the (trace, model) bucket's own
+  // share from the `smd` join instead of the whole-trace value. Traces with no joined smd row
+  // keep the trace-level value (their group-by gives exactly one bucket, so this still partitions).
+  // Non-additive columns (duration, TTFT, tokens/second) keep whole-trace attribution in every
+  // bucket the trace touches.
   const smdMiss = spanModelPartitionMissExpr();
   const partitionedOrTrace = (bucketExpr: string, traceExpr: string) =>
     spanModelPartitioned ? `if(${smdMiss}, ${traceExpr}, ${bucketExpr})` : traceExpr;
@@ -1275,11 +1285,11 @@ function buildArrayJoinTimeseriesQuery({
   const needsNonBilledCost = simpleMetrics.some((m) =>
     m.selectExpression.includes("NonBilledCost"),
   );
-  // Bucket-level non-billed cost mirrors nonBilledCostExpression's precedence exactly: the fold-time
-  // per-span split wins; the legacy all-or-nothing `langwatch.cost.non_billable` trace marker only kicks
-  // in when the trace-level NonBilledCost column is NULL (rows folded before the column existed). The
-  // marker classifies the WHOLE trace as bundled, so under it every bucket's non-billed share equals the
-  // bucket's cost, keeping the buckets an exact partition of the trace expression.
+  // Bucket-level non-billed cost mirrors nonBilledCostExpression's precedence: the fold-time
+  // per-span split wins; the legacy all-or-nothing `langwatch.cost.non_billable` trace marker
+  // only applies when the trace-level NonBilledCost column is NULL (rows folded before the
+  // column existed). The marker treats the WHOLE trace as bundled, so every bucket's non-billed
+  // share equals its cost, keeping the buckets an exact partition of the trace expression.
   const bucketNonBilledExpr = needsNonBilledCost
     ? `if(${ts}.NonBilledCost IS NULL AND ${ts}.Attributes['langwatch.cost.non_billable'] = 'true', ${SPAN_MODEL_ALIAS}.SpanModelCost, ${SPAN_MODEL_ALIAS}.SpanModelNonBilledCost)`
     : `${SPAN_MODEL_ALIAS}.SpanModelNonBilledCost`;
@@ -2316,9 +2326,9 @@ function transformMetricForDedup(selectExpression: string, alias: string): strin
 }
 
 /**
- * The rewrite itself. count() becomes uniqExact(trace_id) to count distinct traces. Trace-level column
- * references are rewritten to their CTE columns, keeping the metric's aggregation AND its arithmetic
- * intact: a composite metric like total_tokens (prompt + completion) keeps both terms.
+ * The rewrite itself. count() becomes uniqExact(trace_id) to count distinct traces. Trace-level
+ * column references are rewritten to their CTE columns, keeping the metric's aggregation AND its
+ * arithmetic intact: a composite metric like total_tokens (prompt + completion) keeps both terms.
  */
 function rewriteMetricForDedup(selectExpression: string, alias: string): string {
   // Handle count() -> uniqExact(trace_id)
@@ -2361,11 +2371,10 @@ function rewriteMetricForDedup(selectExpression: string, alias: string): string 
     return evalRewritten;
   }
 
-  // Handle event-based metrics that reference stored_spans columns (ss."Events.Name", etc.) In the CTE
-  // context with arrayJoin grouping, the group_key already filters to matching events. Only rewrite
-  // count-like metrics — their semantics map to uniqExact(trace_id) in the CTE context where group_key
-  // already filters to matching events. Value-based aggregations (avgArray, sumArray, etc.) pass through
-  // unchanged because rewriting them would silently change "average score" to "count of traces".
+  // Handle event-based metrics referencing stored_spans columns (ss."Events.Name", etc.). In the
+  // arrayJoin CTE, group_key already filters to matching events, so only count-like metrics are
+  // rewritten to uniqExact(trace_id). Value-based aggregations (avgArray, sumArray, etc.) pass
+  // through unchanged — rewriting them would silently turn "average score" into "count of traces".
   const ss = tableAliases.stored_spans;
   const readsEventColumns =
     selectExpression.includes(`${ss}."Events.Name"`) ||
@@ -2645,11 +2654,11 @@ export function buildTopDocumentsQuery(
   const filterWhere =
     filterTranslation.whereClause !== "1=1" ? `AND ${filterTranslation.whereClause}` : "";
 
-  // Build query to get top documents from RAG contexts Documents are stored in SpanAttributes['langwatch.rag.contexts'] as JSON.
-  // The document payload comes entirely from the stored_spans ARRAY JOIN; the fixed part of this query only uses trace_summaries
-  // identity/date columns (the JOIN keys and the OccurredAt filter). So the deduped subquery reads just the identity columns
-  // plus whatever the user filters reference, instead of the full analytics set, which avoids materialising the heavy Attributes
-  // map for every deduped trace.
+  // Build the top-RAG-documents query. Documents live in SpanAttributes['langwatch.rag.contexts']
+  // as JSON, joined in entirely via the stored_spans ARRAY JOIN; the fixed part only needs
+  // trace_summaries identity/date columns (JOIN keys, OccurredAt filter). So the deduped subquery
+  // reads just identity columns plus whatever filters reference, avoiding materializing the heavy
+  // Attributes map for every deduped trace.
   const traceColumns = Array.from(
     new Set([...TRACE_IDENTITY_COLUMNS, ...extractReferencedTraceColumns([filterWhere])]),
   );

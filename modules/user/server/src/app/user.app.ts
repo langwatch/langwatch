@@ -348,10 +348,9 @@ interface UserAppDependencies {
 }
 
 /**
- * Config schema: whether this deployment offers passkeys, and the public
- * base URL a budget-increase deep link is built under. Both default to the
- * "not configured" answer rather than refusing at boot, because a process
- * that composes neither still composes every other user capability.
+ * Config schema: whether this deployment offers passkeys, and the public base URL a
+ * budget-increase deep link is built under. Both default to "not configured" rather
+ * than refusing at boot, since a process composing neither still composes everything else.
  */
 const userAppConfigSchema = z
   .object({
@@ -399,11 +398,9 @@ export class UserApp implements UserApi {
   }
 
   /**
-   * The application over a hand-supplied infrastructure bag, for a suite
-   * that exercises the App directly rather than through a booted process.
-   * Nothing here builds `UserInfrastructure` — the caller supplies the whole
-   * shape, exactly as `create` itself did before this module built its own
-   * collaborators from declared reads.
+   * The application over a hand-supplied infrastructure bag, for a suite exercising
+   * the App directly rather than through a booted process. Nothing here builds
+   * `UserInfrastructure` — the caller supplies the whole shape, unlike `create`.
    */
   static createForTesting(setup: {
     repositories: UserRepositories;
@@ -556,12 +553,9 @@ export class UserApp implements UserApi {
   }
 
   /**
-   * The signup form's whole path.
-   *
-   * Keyed off the RESOLVED provider, not the raw environment: on an SSO-capable
-   * deployment with no genuine license the platform gate coerces to email mode
-   * (ADR-027 Decision 4), and blocking this path would kill the fresh-signup
-   * recovery route (Decision 5c).
+   * The signup form's whole path. Keyed off the RESOLVED provider, not the raw
+   * environment: the platform gate coerces to email mode with no license (ADR-027
+   * Decision 4), and blocking this path would kill fresh-signup recovery (5c).
    */
   async registerCredentialAccount(input: RegisterCredentialAccountInput): Promise<CreatedUser> {
     // The same rules the form ran, from the same module, so the two cannot
@@ -614,20 +608,16 @@ export class UserApp implements UserApi {
   }
 
   /**
-   * Fills an EMPTY credential slot and never replaces a full one.
-   *
-   * A stolen session can already read everything; what is worth denying it is a
-   * credential that outlives the session being revoked. So the refusal below is
-   * the whole endpoint's safety argument, the attempt is throttled, and every
-   * other session ends the moment a password lands.
+   * Fills an EMPTY credential slot and never replaces a full one. A stolen session can
+   * already read everything; what's worth denying it is a credential that outlives the
+   * session being revoked — the refusal below is the whole endpoint's safety argument.
    */
   async setOwnFirstPassword(input: SetOwnFirstPasswordInput): Promise<void> {
-    // Refused before anything else. While impersonating, the account written
-    // IS the subject's, and this method demands no proof of the current
-    // password — so without this an operator could mint a durable credential
-    // on exactly the single-sign-on-only and passkey-only accounts it exists
-    // for. `keepSessionId` being null while impersonating is the defensive
-    // half of the same rule; this is the refusal itself.
+    // Refused before anything else: while impersonating, the account written is the
+    // subject's with no proof of the current password, so without this an operator
+    // could mint a durable credential on exactly the SSO-only/passkey-only accounts
+    // this method exists for. `keepSessionId` being null is the defensive half of
+    // the same rule.
     if (input.caller.impersonated) throw new ImpersonationCannotChangeCredentialsError();
 
     const problem = passwordProblem(input.password);
@@ -659,11 +649,9 @@ export class UserApp implements UserApi {
   }
 
   /**
-   * Verifies the current password and replaces it.
-   *
-   * Throttled for both modes: this path is not behind the recent-reauthentication
-   * gate the hosted change-password endpoint has, so without a budget a stolen
-   * session could brute-force `currentPassword`.
+   * Verifies the current password and replaces it. Throttled for both modes: this path
+   * has no recent-reauthentication gate like the hosted change-password endpoint, so
+   * without a budget a stolen session could brute-force `currentPassword`.
    */
   async changeOwnPassword(input: ChangeOwnPasswordInput): Promise<void> {
     // Same rule as `setOwnFirstPassword`: how an account signs in belongs to
@@ -712,11 +700,9 @@ export class UserApp implements UserApi {
   }
 
   /**
-   * Whether to offer this person a passkey right now (ADR-120).
-   *
-   * Somebody who already HOLDS one is never asked, whatever they signed in with
-   * today: a member on a machine that does not hold theirs has a good reason,
-   * and asking them to make another is a nag with no upside.
+   * Whether to offer this person a passkey right now (ADR-120). Somebody who already
+   * HOLDS one is never asked, whatever they signed in with today — a member on a machine
+   * without theirs has a good reason, and asking for another is a nag with no upside.
    */
   async getPasskeyOffer(input: UserIdInput): Promise<UserPasskeyOffer> {
     const offersPasskeys = this.#members.deployment.offersPasskeys();
@@ -800,10 +786,9 @@ export class UserApp implements UserApi {
   }
 
   /**
-   * Retirement is three writes, not one: the durable flag, then the two
-   * credential families that would otherwise outlive it. A deactivation that
-   * stopped at the flag would leave a live session and a live CLI token
-   * belonging to somebody the product says is gone.
+   * Retirement is three writes, not one: the durable flag, then the two credential
+   * families that would otherwise outlive it. Stopping at the flag would leave a live
+   * session and a live CLI token belonging to somebody the product says is gone.
    */
   async deactivateAccount({
     userId,
@@ -1053,12 +1038,9 @@ export class UserApp implements UserApi {
   // -- the two REST doors ----------------------------------------------------
 
   /**
-   * The personal rollup one API key may read.
-   *
-   * Ingestion-source ledger rows land under the organization's hidden
-   * governance tenant rather than the personal project, so the union is scoped
-   * to THIS organization's tenant — both to prune partitions and to keep a
-   * person who belongs to several organizations from summing across them.
+   * The personal rollup one API key may read, scoped to THIS organization's hidden
+   * governance tenant — not the personal project — both to prune partitions and to
+   * stop a person in several organizations from summing usage across them.
    */
   async getPersonalUsage({
     projectId,
@@ -1237,10 +1219,9 @@ export class UserApp implements UserApi {
 type WeighedBudgetScope = UserBudgetScopeDecision & { pctUsed: number };
 
 /**
- * The budget the banner and the chip speak about: the blocking one where the
- * gateway named one, else the fullest. `blockedBy` carries the same scopes
- * without the derived percentage, so it is weighed the same way rather than
- * tested for the field.
+ * The budget the banner and the chip speak about: the blocking one where the gateway
+ * named one, else the fullest. `blockedBy` carries the same scopes without the derived
+ * percentage, so it's weighed the same way rather than tested for the field.
  */
 function findTopBudgetScope(decision: UserBudgetDecision): WeighedBudgetScope | undefined {
   const blocking = decision.blockedBy[0];

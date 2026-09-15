@@ -2,43 +2,15 @@ import { z } from "zod";
 import { identifierDomain, normalizeIdentifierValue } from "./identifier.ts";
 
 /**
- * The identifier-first sign-in router (D03, ADR-117 §1): a PURE decision
- * engine. Email in, decision out — no Prisma, no env, no framework, no clock.
- *
- * Everything the engine needs is assembled by a composition layer from
- * injected ports: an org-level domain lookup, an instance-level method
- * policy, and — since the 2026-08-25 revision — what the identified account
- * holds.
- *
- * ── Why this engine now sees an account, when it was built not to ────────
- *
- * It was built existence-blind on purpose, so that ADR-117 §2's no-oracle
- * held by construction rather than by care. That constraint is retired, and
- * the ADR revision carries the argument in full; the short version is that
- * the sign-up door already answers "does this address have an account" to
- * anybody who asks (`EMAIL_ALREADY_REGISTERED`, Q12), so spending the
- * router's architecture hiding the same fact bought nothing except a worse
- * sign-in for the people who do have accounts — a password box in front of a
- * passkey-only account, and a password box in front of no account at all.
- *
- * What the engine sees is deliberately the thinnest thing that answers the
- * two questions the screen has: does an account exist, and what KINDS of
- * method does it hold. It reads no credential, no hash, no passkey material
- * and no session, and it is still pure — the lookup happens in the
- * composition layer, and its answer arrives as a value.
- *
- * What did NOT change, and must not: a credential refusal is still one
- * refusal (`identity_sign_in_refused` covers a wrong password and an unknown
- * address alike), and the identifier lookup is still rate-limited at its
- * entry point, so enumeration stays expensive in bulk even though any single
- * answer is now cheap.
+ * The identifier-first sign-in router (D03, ADR-117 §1): a PURE decision engine — email in,
+ * decision out, no Prisma/env/framework/clock. It also sees account existence and method
+ * kinds now; see ADR-117's "Revision (2026-08-25)" for why that no longer breaks the no-oracle.
  */
 
 /**
- * The reason vocabulary. Codes are VOCABULARY, not copy — the customer-facing
- * words live in the app's presentation registry keyed by error code, and the
- * screens (D13) key their guidance states off these. A screen that needs a new
- * behavior needs a new reason code first (ADR-117 §6).
+ * The reason vocabulary. Codes are VOCABULARY, not copy — customer-facing words live in the
+ * app's presentation registry keyed by error code; screens (D13) key guidance states off these.
+ * A screen needing new behavior needs a new reason code first (ADR-117 §6).
  */
 export const SIGNIN_ROUTING_REASON_CODES = [
   /** Self-hosted, no email asked yet, exactly one connection can serve it. */
@@ -218,32 +190,17 @@ export interface RoutingInput {
   /** Connections this instance could auto-redirect to with no address at all. */
   activeConnections: readonly RoutableConnection[];
   /**
-   * What the submitted address's account holds, or null when no account holds
-   * the address at all.
-   *
-   * `undefined` means the question was not asked — no address was submitted,
-   * or the composition layer skipped the lookup because the decision was
-   * already made without it (break-glass, and a domain that routes). The three
-   * states are distinct on purpose: "no account" is a routing answer, and "not
-   * asked" must never be mistaken for it.
+   * What the submitted address's account holds, or null when no account holds it.
+   * `undefined` means the question was not asked (break-glass, or a domain that already
+   * routed) — distinct from null, since "no account" must never be mistaken for "not asked".
    */
   account?: AccountSignInMethods | null;
 }
 
 /**
- * The account's own methods, strongest first, and only the ones this
- * deployment actually offers.
- *
- * Strongest-first is passkey, then a federated connection, then password, and
- * the order is a security claim rather than a preference: a passkey cannot be
- * phished or replayed, a federated sign-in inherits whatever the organization
- * enforces centrally, and a password is the one a person can be talked out of
- * over the telephone.
- *
- * The intersection with policy is what stops the account's history overruling
- * the instance's rules: somebody who once set a password on a deployment that
- * has since turned passwords off is not offered one, because it would not
- * work.
+ * The account's own methods, strongest first (passkey, then federated, then password — a
+ * security claim, not a preference: a passkey resists phishing/replay, a password can be
+ * talked out of someone by phone), intersected with policy so a retired method is dropped.
  */
 export function rankAccountMethods({
   account,
@@ -309,24 +266,9 @@ function redirectOrFall({
 }
 
 /**
- * The whole router. Read top to bottom, it is ADR-117 §1's table, as amended
- * by the 2026-08-25 revision:
- *
- *   break-glass                → local method set     break_glass
- *   no address, sole conn      → redirect             sole_active_connection
- *   domain on a live conn      → redirect             domain_routed
- *   domain on a paused conn    → picker               connection_suspended
- *   no account for the address → sign-up              identifier_unknown
- *   account, methods it holds  → picker               account_methods
- *   anything else              → picker               no_domain_match
- *   policy refuses the method  → picker (local)       method_not_*
- *
- * The account branches sit BELOW domain routing, and that ordering is load
- * bearing: an address on a connected domain redirects to its identity
- * provider whether or not an account exists here yet, because just-in-time
- * provisioning is exactly the case where it does not. Asking "do we know
- * this person" before "does their organization own this domain" would send
- * every genuine new hire to a sign-up form instead of to their employer.
+ * The whole router: read top to bottom, this is ADR-117's decision table (2026-08-25 revision).
+ * The account branches sit BELOW domain routing — load-bearing, since a just-in-time-provisioned
+ * hire's domain must redirect to their identity provider before any account lookup happens.
  */
 export function routeSignIn(input: RoutingInput): RoutingDecision {
   const { identifier, breakGlass, policy, domainConnection, activeConnections, account } = input;

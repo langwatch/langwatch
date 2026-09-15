@@ -1,8 +1,7 @@
 /**
  * @vitest-environment node
  * @integration
- * Tests helm template output for ServiceAccount surface; unit tests grep source.
- * Skips when helm unavailable.
+ * Tests helm-rendered ServiceAccount output; unit tests grep source. Skips without helm.
  */
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
@@ -75,10 +74,9 @@ function chartDepsReady(): boolean {
 const canRenderChart = hasHelm() && chartDepsReady();
 
 /**
- * CI must never report these as skipped: the suite is the only enforcement of
- * the workload-identity label and ServiceAccount guards, so a silent skip
- * turns a green job into no coverage at all. Locally (no helm, no network) the
- * skip stays, which is what keeps it usable on a laptop.
+ * CI must never report these as skipped — this suite is the only enforcement of the
+ * workload-identity label and ServiceAccount guards, so a silent skip turns a green
+ * job into no coverage. The skip stays locally (no helm/network) to keep it usable.
  */
 if (process.env.REQUIRE_HELM_TESTS === "1" && !canRenderChart) {
   throw new Error(
@@ -101,12 +99,9 @@ function render(setArgs: string[]): string {
 }
 
 /**
- * Renders expecting FAILURE, returning helm's own diagnostic text.
- *
- * Deliberately not asserting on the thrown Error's `message`: Node only folds
- * stderr into that message on some versions, so a test written against it
- * passes locally and fails in CI against the useless "Command failed: helm
- * template …". helm's actual complaint is always on stderr.
+ * Renders expecting FAILURE, returning helm's own diagnostic text. Deliberately not
+ * asserting on the thrown Error's `message` — Node only folds stderr into it on some
+ * versions, so such a test passes locally and fails in CI. helm's complaint is on stderr.
  */
 function renderExpectingFailure(setArgs: string[]): string {
   try {
@@ -135,11 +130,9 @@ const ALL_WORKLOADS = [
 ];
 
 /**
- * A ServiceAccount the chart creates AND annotates with the Entra client id.
- * The chart refuses workloadIdentity with `create=true` and no client-id: an
- * account the admission webhook cannot bind an identity to is the same runtime
- * failure as a pod with no label, one layer down. Token-mode tests therefore
- * supply both, exactly as a real install must.
+ * A ServiceAccount the chart creates AND annotates with the Entra client id. The chart
+ * refuses workloadIdentity with `create=true` and no client-id — an unbindable account
+ * is the same runtime failure as a pod with no label. Token-mode tests supply both.
  */
 const IDENTITY_SERVICE_ACCOUNT = [
   "--set",
@@ -280,10 +273,9 @@ describeHelm("Helm ServiceAccount surface for cloud identity", () => {
     });
 
     /**
-     * Least privilege (langwatch-agent review on PR #6181): cron pods only
-     * curl the app over HTTP. Giving them the Blob-capable federated token
-     * would mean a compromise of any cron image inherits Storage Blob Data
-     * Contributor on the account for no functional gain.
+     * Least privilege (PR #6181 review): cron pods only curl the app over HTTP. Giving
+     * them the Blob-capable federated token would mean a compromised cron image inherits
+     * Storage Blob Data Contributor on the account for no functional gain.
      */
     it("never binds the storage identity to cron pods", () => {
       // workloadIdentity, not the sharedKey default: under sharedKey no label
@@ -378,13 +370,11 @@ describeHelm("Helm ServiceAccount surface for cloud identity", () => {
         ...IDENTITY_SERVICE_ACCOUNT,
       ]);
 
-      // One per storage-touching pod template: app and workers. A count short
-      // means a workload boots without a token and fails on its first storage
-      // call, which is exactly the shape of the bug this label exists to
-      // prevent. The cron pods are deliberately not among them — they only
-      // call the app over HTTP and never reach storage themselves, and the
-      // sibling "never binds the storage identity to cron pods" pins that
-      // exclusion rather than leaving it to this count.
+      // One per storage-touching pod template: app and workers. A count short means a
+      // workload boots without a token and fails on its first storage call — exactly the
+      // bug this label exists to prevent. Cron pods are deliberately excluded (they only
+      // curl the app over HTTP); the sibling "never binds the storage identity to cron
+      // pods" test pins that exclusion instead of this count.
       const labelled = out.match(/^\s*azure\.workload\.identity\/use: "true"$/gm) ?? [];
       expect(labelled).toHaveLength(2);
     });
@@ -445,10 +435,9 @@ describeHelm("Helm ServiceAccount surface for cloud identity", () => {
     ];
 
     /**
-     * Regression (langwatch-agent review on PR #6181): the chart emitted the
-     * sovereign endpoint but had no value for the identity authority, so it
-     * rendered green and the app then refused the combination at the first
-     * storage call. Failing at render moves that to deploy time.
+     * Regression (PR #6181): the chart used to render green with the sovereign endpoint
+     * set but no identity-authority value, only failing later at the first storage call.
+     * Failing at render instead moves that failure to deploy time.
      */
     it("refuses to render without a matching identity authority", () => {
       expect(renderExpectingFailure(SOVEREIGN)).toMatch(/not the Azure public cloud/);
@@ -627,12 +616,9 @@ describeHelm("Helm ServiceAccount surface for cloud identity", () => {
   });
 
   /**
-   * Regression: an Azure->S3 migration keeps Azure settings alive for READS
-   * (legacyAzureRead) while writes move to S3. Both the identity label and the
-   * chart's validation used to be gated on `provider == "azureBlob"`, which is
-   * false here — so the pod got the Azure connection settings but no injected
-   * token, `maybeAzureDriver()` returned undefined, and every historical
-   * azure-blob:// object became unreadable with the chart still rendering green.
+   * Regression: a legacyAzureRead migration (reads on Azure, writes on S3) used to fail
+   * silently — label and validation were gated on `provider == "azureBlob"`, false here,
+   * so the pod got Azure settings with no token and every Azure object went unreadable.
    */
   describe("given an Azure->S3 migration under workload identity", () => {
     /** The migration itself, with no identity backing it. */

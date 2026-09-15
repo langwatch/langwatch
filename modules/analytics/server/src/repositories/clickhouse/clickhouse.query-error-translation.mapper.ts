@@ -16,17 +16,9 @@ export const TRANSIENT_NETWORK_CODES = new Set([
 ]);
 
 /**
- * One ClickHouse server error, by both of the forms it can arrive in.
- *
- * `@clickhouse/client` sets `code` and `type` as properties; an error that
- * arrives as raw HTTP text carries neither, and is read from the `Code: <n>.`
- * prefix the engine writes at the head of the body. Both are needed — reading
- * only the message would miss the driver's own errors, whose text it has
- * already stripped.
- *
- * The message is not searched for the symbolic name: it echoes the submitted
- * query, so that would let a caller name a table after a variant and pick the
- * error code it gets back.
+ * One ClickHouse server error, by both forms it can arrive in: `@clickhouse/client`'s
+ * `code`/`type` properties, or raw HTTP text's `Code: <n>.` prefix. The message itself is
+ * never searched — it echoes the query, so a caller could pick its own code by name.
  */
 interface ServerError {
   /** The numeric code, as a string — how the driver exposes it. */
@@ -56,23 +48,15 @@ const TIMEOUT_EXCEEDED: ServerError = {
 const TOO_MANY_ROWS: ServerError = { code: "158", name: "TOO_MANY_ROWS" };
 const TOO_MANY_BYTES: ServerError = { code: "307", name: "TOO_MANY_BYTES" };
 
-// The three shapes of "the object this query names is not there for you":
-// missing table, missing database, and an RBAC refusal. None of the three is
-// ever echoed back to the caller — the LangWatchQL validator only lets
-// catalog-approved names reach the database, so which one fired describes the
-// server's internals (and this deployment's provisioning), never the query —
-// but the two callers below intentionally group them differently: the first
-// pair means the objects the catalog promises are not there at all, the third
-// means they exist but this identity's grants are incomplete. That is a real
-// difference for the customer-facing message (see
-// `LangWatchQLUnavailableError` vs `LangWatchQLProvisioningIncompleteError`),
-// so it must not be a difference the two predicates below erase.
+// The three server-error shapes are grouped deliberately: the two predicates below split
+// "object doesn't exist" (UNKNOWN_TABLE/UNKNOWN_DATABASE) from "grants incomplete"
+// (ACCESS_DENIED), matching the two distinct customer-facing errors
+// (`LangWatchQLUnavailableError` vs `LangWatchQLProvisioningIncompleteError`).
+
 /**
- * A name in the query that resolves to no column.
- *
- * Kept apart from the three below: those describe the deployment (a missing
- * view, an ungranted grant), whereas this one describes the SQL, and only a
- * caller who wrote the SQL can act on it.
+ * A name in the query that resolves to no column. Kept apart from the three below,
+ * which describe the deployment — this one describes the SQL, which only the caller
+ * who wrote it can act on.
  */
 const UNKNOWN_IDENTIFIER: ServerError = {
   code: "47",
@@ -84,13 +68,9 @@ const UNKNOWN_DATABASE: ServerError = { code: "81", name: "UNKNOWN_DATABASE" };
 const ACCESS_DENIED: ServerError = { code: "497", name: "ACCESS_DENIED" };
 
 /**
- * Whether `error` is one of `variants`, by any of the three forms a server
- * error arrives in: the driver's `code` property, its `type` property, or the
- * `Code: <n>.` prefix the engine writes at the head of a raw HTTP body.
- *
- * The prefix is anchored, and the symbolic name is never searched for in the
- * message: the message echoes the submitted query, so a table or alias named
- * after a variant would otherwise let the caller choose its own error.
+ * Whether `error` matches any of `variants`, by driver `code`/`type` properties or
+ * the anchored `Code: <n>.` prefix. The symbolic name is never searched for in the
+ * message — it echoes the query, so a caller could otherwise pick its own error code.
  */
 function raisedServerError({
   error,
@@ -111,15 +91,9 @@ function raisedServerError({
 }
 
 /**
- * True when the server refused because an object the query names does not
- * exist for this identity at all — UNKNOWN_TABLE (60), UNKNOWN_DATABASE (81).
- *
- * Not mapped inside {@link translateClickHouseQueryError}: on the
- * application's own connection these are plain bugs and must degrade to
- * "unknown" (ADR-045). Exported for the one caller with a stronger invariant —
- * the LangWatchQL executor, whose validator only lets catalog-approved names
- * through, so either of these there means the deployment never provisioned
- * the object at all, distinct from {@link isClickHouseObjectAccessDeniedError}.
+ * True when the object doesn't exist — UNKNOWN_TABLE (60) or UNKNOWN_DATABASE (81). Not
+ * mapped in {@link translateClickHouseQueryError}: a bug on our own connection (ADR-045).
+ * Exported for the LangWatchQL executor: means never-provisioned, not access-denied.
  */
 export function isClickHouseObjectMissingError(error: unknown): boolean {
   if (!(error instanceof Error)) return false;
@@ -130,15 +104,9 @@ export function isClickHouseObjectMissingError(error: unknown): boolean {
 }
 
 /**
- * True when the server refused because a name in the query resolves to no
- * column: UNKNOWN_IDENTIFIER (47).
- *
- * Not mapped inside {@link translateClickHouseQueryError}, for the same reason
- * as {@link isClickHouseObjectUnavailableError}: on the application's own
- * connection every column name is one this repository wrote, so a rejected one
- * is a plain bug and must degrade to "unknown" (ADR-045). Exported for the
- * caller where the SQL is the customer's own and the name is theirs to fix,
- * the LangWatchQL executor.
+ * True when a name resolves to no column (UNKNOWN_IDENTIFIER, 47). Not mapped in {@link
+ * translateClickHouseQueryError} — on our own connection this is a bug (ADR-045); exported
+ * for the LangWatchQL executor, where the name is the customer's own.
  */
 export function isClickHouseUnknownIdentifierError(error: unknown): boolean {
   if (!(error instanceof Error)) return false;
@@ -153,23 +121,9 @@ export function isClickHouseUnknownIdentifierError(error: unknown): boolean {
 const IDENTIFIER_SHAPE = /^[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)?$/;
 
 /**
- * The sentences ClickHouse uses to say a name resolved to nothing.
- *
- * Captured from a real server rather than assumed. 25.x writes:
- *
- *     Unknown expression identifier `trace_idd_typo` in scope SELECT ...
- *
- * Note the **backticks**: the analyzer quotes identifiers with them, not with
- * the single quotes the rest of its diagnostics use. An earlier version of this
- * matched `'...'` only, passed its own fixtures, and read nothing at all off
- * the live engine, which is what `unknownIdentifier.integration.test.ts`
- * exists to catch. The older non-analyzer path writes `Missing columns: 'x'
- * while processing query: ...` with single quotes, so both delimiters are
- * accepted and the shape check below decides what is usable.
- *
- * Either delimiter opens and closes, rather than a matched pair: an identifier
- * can contain neither, so a mismatched pair cannot smuggle anything past
- * {@link IDENTIFIER_SHAPE}.
+ * The sentences ClickHouse uses to say a name resolved to nothing. Both delimiter forms
+ * (backtick from the analyzer path, single quote from the older path) are matched without
+ * requiring a matched pair — identifiers can't contain either, so that stays safe.
  */
 const IDENTIFIER_PATTERNS: readonly RegExp[] = [
   /Unknown (?:expression |table |column )?identifier [`'"]([^`'"]{1,128})[`'"]/,
@@ -177,16 +131,9 @@ const IDENTIFIER_PATTERNS: readonly RegExp[] = [
 ];
 
 /**
- * The identifier ClickHouse could not resolve, or `undefined`.
- *
- * **This is the only thing that may be taken from the message.** A ClickHouse
- * error echoes the submitted query and names internal objects, so relaying the
- * text would leak both the query and the deployment's shape to whoever
- * receives the error. So the extraction is deliberately narrow and fails
- * closed twice: the sentence has to match one of the known forms, and the
- * token it captures has to look like an identifier. A miss returns
- * `undefined`, and the caller reports the failure without naming a column,
- * which is worse copy and still correct.
+ * The identifier ClickHouse could not resolve, or `undefined` on a miss. This is the
+ * only thing safely taken from the message — the rest would leak the query and the
+ * deployment's shape. Fails closed twice: sentence form, then identifier shape.
  */
 export function unknownIdentifierFromError(error: unknown): string | undefined {
   if (!(error instanceof Error)) return undefined;
@@ -200,16 +147,9 @@ export function unknownIdentifierFromError(error: unknown): string | undefined {
 }
 
 /**
- * True when the server refused because the connecting identity is not
- * allowed to read an object the query names — ACCESS_DENIED (497).
- *
- * Kept apart from {@link isClickHouseObjectMissingError}: on the LangWatchQL
- * executor's stronger invariant (validator-approved names only), this means
- * the object exists and the catalog is otherwise working, but this
- * identity's grants on it are incomplete — a narrower, purely-our-fault
- * condition than "nothing is provisioned," and one whose customer-facing
- * message must not send a customer to their own workspace administrator for
- * something only we can fix.
+ * True when the connecting identity can't read an object the query names — ACCESS_DENIED
+ * (497). Distinct from {@link isClickHouseObjectMissingError}: the object exists but our
+ * grants are incomplete — our fault, so the customer message must not blame their admin.
  */
 export function isClickHouseObjectAccessDeniedError(error: unknown): boolean {
   if (!(error instanceof Error)) return false;
@@ -217,27 +157,9 @@ export function isClickHouseObjectAccessDeniedError(error: unknown): boolean {
 }
 
 /**
- * Translates a raw ClickHouse driver error into a typed `HandledError` for the
- * read path, after the resilient client's retries are exhausted. The raw error
- * is preserved in `reasons` — retry classifiers
- * (`event-sourcing/services/errorHandling.classifyClickHouseError`) and batch
- * splitters (`traces/clickhouse-trace.service.isClickHouseMemoryLimitError`)
- * unwrap it, so background consumers keep seeing the transient condition they
- * retry on while users get an actionable error with remediation tips.
- *
- * Mapped:
- * - MEMORY_LIMIT_EXCEEDED (241) → `QueryMemoryExceededError` — the caller can
- *   shrink the query (narrow range, more filters, fewer fields).
- * - TIMEOUT_EXCEEDED (159) → `QueryTimeoutError` — same remediation.
- * - TOO_MANY_ROWS (158) / TOO_MANY_BYTES (307) → `QueryScanLimitExceededError` —
- *   a scan ceiling (`max_rows_to_read` / `max_bytes_to_read`) under
- *   `read_overflow_mode = 'throw'`, which the governed analytics profile pins.
- *   Same remediation shape, different cause from memory.
- * - Connection-level failure (network errno, 502/503) →
- *   `ClickHouseUnavailableError` — platform incident, retry shortly.
- *
- * Anything else passes through untouched: an unmapped error is genuinely
- * unhandled and must degrade to "unknown" at the boundary (ADR-045).
+ * Translates a raw ClickHouse driver error into a typed `HandledError`, after retries
+ * are exhausted. The raw error is preserved in `reasons` so retry classifiers can still
+ * unwrap the transient condition; anything unmapped degrades to "unknown" (ADR-045).
  */
 export function translateClickHouseQueryError(error: unknown, durationMs: number): unknown {
   if (!(error instanceof Error)) return error;

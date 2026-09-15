@@ -1,9 +1,6 @@
 /**
- * The thin client: talk to the daemon if it is there, and never, ever break if
- * it is not.
- *
- * Loaded on every CLI invocation, so it imports node builtins and its own
- * sibling modules and nothing else.
+ * The thin client: talk to the daemon if it's there, and never break if it's not. Loaded
+ * on every CLI invocation, so it imports node builtins and its own sibling modules only.
  */
 
 import * as net from "node:net";
@@ -17,34 +14,25 @@ import {
   type ServerFrame,
 } from "./protocol";
 
-/** Connecting to a socket on the local filesystem is sub-millisecond; if it is not, something is wrong and we should just run the command. */
+/**
+ * Connecting to a socket on the local filesystem is sub-millisecond; if it is not,
+ * something is wrong and we should just run the command.
+ */
 const CONNECT_TIMEOUT_MS = 500;
 /** The daemon answers a handshake without touching the network. */
 const HANDSHAKE_TIMEOUT_MS = 1_000;
 
 /**
- * The whole request, from connect to `exit`, has to finish inside this.
- *
- * The connect and handshake bounds only cover getting the command ACCEPTED.
- * After `hello-ok` nothing bounded the rest, and output is held back until the
- * command finishes, so a daemon that took the exec and then wedged left the
- * client waiting with zero bytes written and no message. An agent harness that
- * stops a command at 30 seconds then killed it, and the caller saw an empty
- * result rather than a failure. The daemon's own per-request timeout is ten
- * minutes (server.ts), far past that, so the bound has to be here.
- *
- * 25s leaves 5s under a 30s harness for this client to print and exit, and it
- * clears the CLI's own longest in-command deadline (`ui call`, 20s), so a
- * command that has its own limit always reports the failure itself.
+ * The whole request, from connect to `exit`, must finish inside this: nothing else bounds
+ * it after `hello-ok`, and output is held back until the command finishes. 25s leaves
+ * margin under a 30s harness deadline and clears the CLI's longest in-command limit.
  */
 const REQUEST_TIMEOUT_MS = 25_000;
 
 /**
- * What the caller sees when the deadline trips.
- *
- * It has to name the failure, the deadline, and the way to run without a
- * daemon, because the shape it replaces (no output at all) tells the caller
- * nothing and reads as the CLI producing an empty result.
+ * What the caller sees when the deadline trips: names the failure, the deadline, and how
+ * to run without a daemon — the shape it replaces (no output at all) told the caller
+ * nothing and read as the CLI producing an empty result.
  */
 const REQUEST_TIMEOUT_MESSAGE =
   `langwatch: the daemon accepted this command and did not answer within ${REQUEST_TIMEOUT_MS / 1000}s. ` +
@@ -53,25 +41,16 @@ const REQUEST_TIMEOUT_MESSAGE =
   "The wedged daemon was asked to stop, so the next command starts a fresh one.\n";
 
 /**
- * The exit status of a command the client abandoned at its deadline.
- *
- * The same status the daemon uses when it abandons a request at its own
- * per-request timeout, and the shell convention for a command a timeout ended.
+ * The exit status of a command the client abandoned at its deadline: the same status the
+ * daemon uses when it abandons a request at its own per-request timeout, and the shell
+ * convention for a timeout-ended command.
  */
 const REQUEST_TIMEOUT_EXIT_CODE = 124;
 
 /**
- * Output is buffered until the command finishes, then flushed in one go.
- *
- * This is what makes the fallback airtight: if the daemon dies (or the socket
- * breaks, or the handshake is refused) at ANY point before the `exit` frame,
- * nothing has been written to the caller's stdout yet, so we can re-run the
- * command in-process with zero risk of duplicated or truncated output.
- *
- * The buffer is capped. A command with a genuinely large stdout (`trace export`)
- * flushes early and "commits" — from that point on we are streaming and can no
- * longer fall back, which is the correct trade: we would rather stream 200MB
- * than hold it in memory for a fallback that has never been needed.
+ * Output is buffered until the command finishes, so a daemon failure at any point before
+ * the `exit` frame can be re-run in-process with zero risk of duplicated or truncated
+ * output. The buffer is capped: a large command (`trace export`) streams past it and "commits".
  */
 const DEFAULT_MAX_BUFFER_BYTES = 8 * 1024 * 1024;
 
@@ -109,11 +88,9 @@ interface PendingChunk {
 }
 
 /**
- * Try to have the daemon run this command.
- *
- * Resolves `{ served: false }` for every failure mode there is — no socket, a
- * stale socket, a refused handshake, a daemon that died mid-command before
- * committing output. The caller runs the command in-process in all of them.
+ * Try to have the daemon run this command. Resolves `{ served: false }` for every failure
+ * mode — no socket, a stale socket, a refused handshake, a daemon that died mid-command
+ * before committing output — and the caller runs the command in-process for all of them.
  */
 export async function execViaDaemon(options: DaemonExecOptions): Promise<DaemonExecOutcome> {
   const stdout = options.stdout ?? process.stdout;
@@ -284,12 +261,9 @@ export async function execViaDaemon(options: DaemonExecOptions): Promise<DaemonE
           }
           case "fallback": {
             if (committed) {
-              // The daemon declined AFTER our output crossed the buffer cap and
-              // was flushed. Re-running would print everything the caller has
-              // already seen a second time, so we cannot — the honest report is
-              // that the output is incomplete and this status is ours, not the
-              // command's. (In practice only the shutdown-grace path can reach
-              // here: every other `fallback` is sent before any output at all.)
+              // The daemon declined AFTER our output was already flushed past the buffer cap:
+              // re-running would duplicate what the caller has already seen, so we report the
+              // output as incomplete and this exit status as ours. Only shutdown-grace reaches it.
               stderr.write(
                 `langwatch: daemon stopped mid-command (${frame.reason}); ` +
                   `the output above is incomplete and this exit status is not the command's — please re-run\n`,
@@ -386,10 +360,9 @@ export async function requestStatus(socketPath: string): Promise<DaemonStatus | 
 }
 
 /**
- * Ask a running daemon to shut down. Resolves true if one was there to ask.
- *
- * Deliberately does not require a handshake: this is also how a NEWER client
- * evicts an OLDER daemon, which by definition cannot agree on the version.
+ * Ask a running daemon to shut down. Resolves true if one was there to ask. Deliberately
+ * does not require a handshake: this is also how a NEWER client evicts an OLDER daemon,
+ * which by definition cannot agree on the version.
  */
 export async function requestStop(socketPath: string): Promise<boolean> {
   // Deliberately does not require a handshake — but it still requires a socket

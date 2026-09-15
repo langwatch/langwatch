@@ -1,9 +1,8 @@
 import type { WireOf } from "@langwatch/api/web";
 /**
- * `defaultModelOverride`: authoring or editing one ModelDefaultConfig policy.
- * Inherit on the wire = key absence. Missing on purpose: the Langy pill
- * sync helper, since it lives in `@langwatch/langy-web` and importing it
- * back would cycle — an open panel keeps the outgoing model until remounted.
+ * `defaultModelOverride`: "Inherit" on the wire is key absence. The Langy pill sync helper is
+ * missing on purpose (importing `@langwatch/langy-web` back would cycle), so an open panel
+ * keeps the outgoing model stale until remounted.
  */
 
 import { Box, Button, HStack, Text, VStack } from "@chakra-ui/react";
@@ -58,12 +57,9 @@ const ROLE_BLURB: Record<ModelRoleKey, string> = {
 };
 
 /**
- * Restricted-provider gating for the drawer's pickers (codex is the only
- * restricted provider today). A role-level default applies across every
- * feature in the role, so restricted models are offered only for the
- * roles whose whole feature set is licensed to run them (Langy, Fast);
- * a feature-override row re-admits them only when its own feature key
- * is licensed. Exported for tests.
+ * Restricted-provider gating (codex is the only restricted provider today): a role-level
+ * default is offered only where the whole role's feature set is licensed for it (Langy,
+ * Fast); a feature-override row re-admits it only when its own feature key is licensed.
  */
 export function roleSelectModelOptions({
   options,
@@ -131,11 +127,9 @@ function withOverride(
 }
 
 /**
- * Hydrate once per target, and re-hydrate when the target changes. Keying on
- * the `editing` object identity wiped in-progress edits whenever a background
- * refetch replaced the query data; a plain "hydrated once" latch keeps the
- * previous target's values, and the drawer is non-modal, so the pencil behind
- * it can retarget without ever unmounting.
+ * Hydrate once per target, then re-hydrate when the target changes. Keying on `editing`
+ * object identity wiped in-progress edits on a background refetch; the drawer is
+ * non-modal, so the pencil behind it can retarget without ever unmounting.
  */
 function nextHydration({
   editing,
@@ -161,10 +155,9 @@ function nextHydration({
 }
 
 /**
- * Creating: at least one key must be pinned, since an all-inherit new config
- * is a no-op the server refuses. Editing: an empty config is a valid save (it
- * deletes the config), but the target row must have loaded so the save carries
- * its id — deriving the id from an unsettled query turned edits into creates.
+ * Creating: at least one key must be pinned, since an all-inherit config is a no-op the
+ * server refuses. Editing: an empty config is a valid save (it deletes the config), but the
+ * target row must have loaded first — an unsettled query turned edits into creates.
  */
 function canSaveConfig({
   busy,
@@ -185,10 +178,9 @@ function canSaveConfig({
 }
 
 /**
- * Aliases sit at the top of the chat lists so the reader lands on "Latest" /
- * "Latest smaller" without scrolling — pinning a specific model is the
- * exceptional case. Embeddings get none: the latest embedding model is not a
- * moving target the way a chat flagship is.
+ * Aliases sit at the top of the chat lists so the reader lands on "Latest" without
+ * scrolling; pinning a specific model is the exceptional case. Embeddings get none, since
+ * the latest embedding model isn't a moving target the way a chat flagship is.
  */
 function aliasChatOptionsFor(enabledKeys: Set<string>): string[] {
   const aliases: string[] = [];
@@ -227,10 +219,9 @@ function customModelIdsFor({
 }
 
 /**
- * Still loading: the full registry, so the dropdown is not visually broken on
- * first paint. Once the data lands, a project with no enabled providers (or a
- * failed query) gets an empty list rather than a picker that lies about what
- * is available.
+ * Still loading: returns the full registry, so the dropdown isn't visually broken on first
+ * paint. Once data lands, a project with no enabled providers (or a failed query) gets an
+ * empty list rather than a picker that lies about what is available.
  */
 function modelOptionsForMode({
   enabledEntries,
@@ -292,11 +283,9 @@ function modelOptionsByRoleFor({
 }
 
 /**
- * The write, and the refusal it becomes. The cache refresh is isolated in its
- * own try: the write already committed, so a failed refresh must not turn a
- * successful save into a reported failure. Invalidating `modelProvider`
- * reaches every mounted reader keyed on that prefix, including the Langy
- * pill's `getResolvedDefault` — but not Langy's own store.
+ * The cache refresh runs in its own try: the write already committed, so a failed refresh
+ * must not turn a successful save into a reported failure. Invalidating `modelProvider`
+ * reaches every mounted reader on that prefix (including the Langy pill) but not Langy's own store.
  */
 async function persistConfig({
   config,
@@ -348,12 +337,9 @@ async function persistConfig({
 }
 
 interface Props {
-  /** Config id when editing an existing policy; absent = create. The
-   *  drawer fetches the full ConfigRow + available / features / effective
-   *  payloads from the same getDefaultModelsForProject query
-   *  DefaultModelsSection already consumes (tRPC dedupes the second
-   *  caller). Kept as a single serializable prop so the drawer fits
-   *  the URL-driven `currentDrawer` pattern used everywhere else. */
+  /** Config id when editing; absent = create. Kept as a single serializable
+   *  prop so the drawer fits the URL-driven `currentDrawer` pattern used
+   *  everywhere else. */
   editingId?: string;
 }
 
@@ -708,12 +694,10 @@ function FeatureRow({
   /** Configured custom-model display names, keyed by `<provider>/<modelId>`. */
   displayNames: Record<string, string>;
 }) {
-  // The feature's inherit entry follows the same cascade the resolver
-  // does: a role-level pick in THIS config (in-progress) wins over the
-  // server's per-feature cascade, which in turn beats the role cascade.
-  // Without that local check the entry would lag behind what the user
-  // just typed in the role row above. When nothing carries a value the
-  // entry reads "Not configured", same as the role rows.
+  // The feature's inherit entry follows the resolver's cascade: a role-level
+  // pick in THIS config wins over the server's per-feature cascade, which
+  // beats the role cascade — otherwise it would lag behind what the user
+  // just typed in the role row above.
   let inheritOption: InheritOptionShape;
   if (roleLevelOverride) {
     inheritOption = {
@@ -776,10 +760,9 @@ function saveOutcomeCopy({ editingId, hasAnyKey }: { editingId?: string; hasAnyK
 }
 
 /**
- * The inherit entry for a real cascade hit at the picked scopes, or
- * undefined when the server has none. `inferred` is not a cascade hit — it
- * is the server guessing from enabled providers — and showing it as a ghost
- * value gave the contradictory read that something was set when nothing was.
+ * The inherit entry for a real cascade hit, or undefined when the server has none.
+ * `inferred` is not a cascade hit (the server guessing from enabled providers), and
+ * showing it as a ghost value gave the contradictory read that something was set.
  */
 export function inheritHitOption(entry: InheritedEntry): InheritOptionShape | undefined {
   if (!entry || entry.source === "inferred") return undefined;
@@ -790,10 +773,9 @@ export function inheritHitOption(entry: InheritedEntry): InheritOptionShape | un
 }
 
 /**
- * Builds the `inheritOption` payload `ProviderModelSelector` consumes. With
- * no cascade hit it still reads "Not configured" with no model attached, so
- * an edit can always clear a pinned key back to inherit without claiming a
- * value flows down from somewhere.
+ * Builds the `inheritOption` payload `ProviderModelSelector` consumes. With no cascade
+ * hit it reads "Not configured" with no model attached, so an edit can clear a pinned
+ * key back to inherit without implying a value flows down from somewhere.
  */
 export function buildInheritOption(entry: InheritedEntry): InheritOptionShape {
   return inheritHitOption(entry) ?? { label: "Not configured" };
@@ -801,9 +783,8 @@ export function buildInheritOption(entry: InheritedEntry): InheritOptionShape {
 
 /**
  * Note under the scope picker when a picked scope already belongs to
- * another config. Saving claims those scopes (one config per scope), so
- * the user learns the existing config gets replaced BEFORE hitting
- * save, instead of discovering a silently rewired table after.
+ * another config: saving claims those scopes (one config per scope), so the
+ * user learns about the replacement BEFORE hitting save.
  */
 function replacedScopeNames({
   scopes,
@@ -853,10 +834,9 @@ function ReplacedConfigsNote({
 }
 
 /**
- * Scope picker section, following `ProviderScopeSection`'s pattern. Lives
- * inline here rather than pulling that component in, since it is tightly
- * coupled to `useModelProviderForm`'s reducer — a follow-up if more
- * surfaces need this primitive.
+ * Scope picker section, following `ProviderScopeSection`'s pattern but kept
+ * inline: it is tightly coupled to `useModelProviderForm`'s reducer, a
+ * follow-up if more surfaces need this primitive.
  */
 function ScopeSection({
   scopes,
@@ -867,14 +847,11 @@ function ScopeSection({
   onChange: (next: ScopeTriadEntry[]) => void;
   available: Payload["available"];
 }) {
-  // Drawer renders only the dropdown - the Organization/Team/Project
-  // quick-pick chips are redundant when scope assignment is effectively
-  // always at org scope, and the dropdown already surfaces all reachable
-  // scopes. The quick-pick variant is preserved on `ScopeChipPicker`
-  // (`showQuickPicks` prop) for future surfaces where the chip-row UX
-  // makes sense.
-  // Default label is "Scope" - render it so the picker reads consistent
-  // with the model-provider drawer's scope section.
+  // Renders only the dropdown: the Organization/Team/Project quick-pick
+  // chips are redundant when scope assignment is effectively always at org
+  // scope, and the dropdown already surfaces all reachable scopes (chips
+  // stay available via `ScopeChipPicker`'s `showQuickPicks` prop). Default
+  // label "Scope" matches the model-provider drawer's scope section.
   return (
     <ScopeChipPicker
       value={scopes}

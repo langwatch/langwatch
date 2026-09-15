@@ -16,10 +16,9 @@ import type {
 export type LangWatchQLParameterValue = string | number | boolean | null;
 
 /**
- * The period a submission reports over, as instants. Epoch milliseconds
- * rather than `Date`, so a snapshot stays comparable by value — two `Date`
- * objects for the same instant are never `Object.is`-equal, and a staleness
- * test built on them would call every result stale on the next render.
+ * The period a submission reports over, as instants: epoch milliseconds, not
+ * `Date` — two `Date` objects for the same instant are never `Object.is`-equal,
+ * so a staleness test built on them would call every result stale on render.
  */
 export interface LangWatchQLTimeWindowValues {
   readonly start: number;
@@ -31,25 +30,22 @@ export interface LangWatchQLSnapshot {
   readonly sql: string;
   readonly parameters: Readonly<Record<string, LangWatchQLParameterValue>>;
   /**
-   * The window the surface supplies for the reserved `dashboard_context_period_start` /
-   * `dashboard_context_period_end` parameters. Part of the snapshot because a
-   * result produced for last week's period is not current for this week's, and
-   * only a snapshot that carries it can say so.
+   * The window for the reserved `dashboard_context_period_start`/`_end` params.
+   * Part of the snapshot because a result for last week's period is not
+   * current for this week's, and only a snapshot carrying it can say so.
    */
   readonly timeWindow?: LangWatchQLTimeWindowValues;
   /**
-   * The step the surface supplies for the reserved `dashboard_context_granularity_seconds`
-   * parameter. Part of the snapshot for the same reason the window is: a result
-   * bucketed by the hour is not the answer to the same question asked by the
-   * second, and only a snapshot carrying the step can say the one on screen has gone stale.
+   * The step for the reserved `dashboard_context_granularity_seconds` param —
+   * kept for the same reason as the window: an hourly bucket isn't the answer
+   * to a by-the-second question, and only a snapshot carrying it can tell.
    */
   readonly granularitySeconds?: LangWatchQLGranularityStep;
 }
 
 /**
- * What came back, before it is tied to the request that earned it.
- *
- * The transport knows this much and no more, which is why the reducer rather
+ * What came back, before it is tied to the request that earned it — the
+ * transport knows this much and no more, which is why the reducer rather
  * than the caller decides which snapshot it belongs to.
  */
 export type LangWatchQLAnswer =
@@ -57,10 +53,9 @@ export type LangWatchQLAnswer =
   | { readonly kind: "error"; readonly error: unknown };
 
 /**
- * An answer and the snapshot that produced it. The snapshot rides on the
- * outcome rather than `submitted`, because `submitted` is the LAST request,
- * not the one the visible answer came from — they part ways the moment a
- * second submission is cancelled after the first still shows on screen.
+ * An answer and the snapshot that produced it, riding on the outcome rather
+ * than `submitted` — `submitted` is the LAST request, not the one the visible
+ * answer came from; they part when a second submission is cancelled but the first still shows.
  */
 export type LangWatchQLOutcome =
   | {
@@ -80,12 +75,9 @@ export interface LangWatchQLRequestState {
   /** What was last sent, byte for byte. `null` until the first submission. */
   readonly submitted: LangWatchQLSnapshot | null;
   /**
-   * Identifies the submission whose answer is still wanted.
-   *
-   * Every submission and every abandonment moves it, so an answer that arrives
-   * for a superseded or cancelled request carries a number the state no longer
-   * recognises and is dropped. This is what makes cancellation correct even
-   * when the transport delivers the response anyway.
+   * Identifies the submission whose answer is still wanted: every submission
+   * and abandonment moves it, so a stale answer carries a number the state no
+   * longer recognises and is dropped — correct cancellation even if transport delivers it.
    */
   readonly submissionId: number;
   readonly isInFlight: boolean;
@@ -168,10 +160,9 @@ export function lwqlSnapshotsMatch(
 }
 
 /**
- * The one transition function. Two refusals are load-bearing and live here
- * rather than at the call site, so no caller can forget them: a submission
- * while one is in flight is a no-op, and an answer whose `submissionId` isn't
- * the one awaited is dropped (making an aborted or superseded response harmless).
+ * The one transition function: two refusals live here, not the call site, so
+ * no caller can forget them — a submission while one is in flight is a no-op,
+ * and an answer whose `submissionId` isn't awaited is dropped.
  */
 export function lwqlRequestReducer(
   state: LangWatchQLRequestState,
@@ -259,10 +250,9 @@ function withSubmission(
 }
 
 /**
- * Drops an answer for a submission no longer awaited, and otherwise records it
- * against `state.submitted` — the one moment id-matching proves the two are
- * the same request — so every reader downstream compares against the answer's
- * own snapshot instead of the latest one.
+ * Drops an answer no longer awaited; otherwise records it against
+ * `state.submitted` — the one moment id-matching proves they're the same
+ * request — so readers downstream compare against the answer's own snapshot.
  */
 function withAnswer(
   state: LangWatchQLRequestState,
@@ -293,12 +283,9 @@ function abandoned(state: LangWatchQLRequestState): LangWatchQLRequestState {
 }
 
 /**
- * Whether the visible outcome belongs to a snapshot the draft has since moved
- * away from.
- *
- * The result is not hidden when this is true — a member reading a table wants
- * to keep reading it while they edit the next query — it is *labelled*, which
- * is the difference between a stale answer and a lie.
+ * Whether the visible outcome's snapshot is one the draft has since moved
+ * away from. Not hidden when true — a member reading a table keeps reading
+ * while they edit the next query — it is *labelled*, the line between stale and a lie.
  */
 export function isLangWatchQLResultStale(state: LangWatchQLRequestState): boolean {
   if (state.outcome === null) return false;

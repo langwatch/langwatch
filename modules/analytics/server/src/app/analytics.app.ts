@@ -1,26 +1,7 @@
 /**
- * The analytics feature's application: what both of its doors call.
- *
- * It holds every service and port the feature needs, and it is the one typed
- * thing a transport is given. Before it, each door declared its own private
- * bag — `Readonly<{ analytics: AnalyticsService; filters: … }>` on the reads
- * door and `Readonly<{ langWatchQL: LangWatchQLService }>` on the workbench
- * door — two descriptions of the same process object, agreeing by attention
- * rather than by construction, and neither reachable from the other.
- *
- * Most operations are the services' own, reached through {@link
- * AnalyticsAppDependencies}. What lives here as a rule is what a door would
- * otherwise have to know: today that is which filters narrow a filter's own
- * offered values, which is a fact about the question being asked rather than
- * about the transport it arrived over.
- *
- * The filter catalogue arrives as a port because which fields exist, and what
- * a stored filter means, is the host's catalogue rather than anything
- * Analytics owns.
- *
- * A caller arrives as an argument, never read from a session or a request.
- * That is what lets one operation serve a browser session, an API key and a
- * background job without knowing which it is serving.
+ * The analytics feature's application: what both doors call, holding every service and
+ * port as the one typed thing a transport is given. A caller is always an argument,
+ * never read from a session, so one operation serves a browser, an API key, or a background job.
  */
 import {
   analyticsServerConfigSchema,
@@ -75,10 +56,9 @@ import type { LangWatchQLConnection } from "../repositories/langwatch-ql-executo
 import type { EvaluationAnalyticsClickHouseClient } from "../repositories/clickhouse/clickhouse.analytics-persistence.repository.ts";
 
 /**
- * The filter-value read this feature makes on the host's filter registry.
- *
- * Declared as the one method it calls: which fields exist, and what a stored
- * filter means, is the host's catalogue rather than anything Analytics owns.
+ * The filter-value read this feature makes on the host's filter registry — declared
+ * as the one method it calls, since which fields exist and what a stored filter means
+ * is the host's catalogue, not Analytics' own.
  */
 export type AnalyticsFilterOptionsLookup = Readonly<{
   getFilterOptions(
@@ -137,10 +117,9 @@ type AnalyticsDependencies = Readonly<{
 }>;
 
 /**
- * The contract's env-resolved LWQL identity, plus the one value the api's
- * own composition supplies rather than an env var this module reads
- * itself: the deployment's public origin, for the deep links this module
- * publishes on saved charts and dashboard widgets.
+ * The contract's env-resolved LWQL identity, plus `publicBaseUrl` — supplied by the
+ * api's own composition rather than an env var this module reads itself — for the
+ * deep links this module publishes on saved charts and dashboard widgets.
  */
 const analyticsAppConfigSchema = analyticsServerConfigSchema.and(
   z.object({ publicBaseUrl: z.url() }),
@@ -164,15 +143,9 @@ const langWatchQlConnection = (values: readonly string[]): LangWatchQLConnection
 };
 
 /**
- * Adapts the process's ONE routing `clickhouse` member to the per-tenant
- * session shape Analytics' repositories were written against —
- * `.query({query, query_params, format, clickhouse_settings})` /
- * `.insert({table, values, format, clickhouse_settings})`, the same calling
- * convention `@clickhouse/client` itself exposes. The member already routes
- * and guards every statement by `tenantId` internally (`packages/infrastructure`'s
- * `clickhouse` member docblock), so this session is a thin translation bound to
- * one tenant, not a second connection: `query`/`insert` carry that tenant on to
- * {@link ClickHouseQueryClient.query} / {@link ClickHouseQueryClient.insert}.
+ * Adapts the process's one routing `clickhouse` member to the per-tenant session
+ * shape Analytics' repositories expect. Not a second connection — the member already
+ * routes and guards every statement by `tenantId`; this just carries that tenant on.
  */
 class ClickHouseMemberSession implements EvaluationAnalyticsClickHouseClient {
   constructor(
@@ -212,12 +185,9 @@ class ClickHouseMemberSession implements EvaluationAnalyticsClickHouseClient {
 }
 
 /**
- * Both doors' shapes are declared in the `implements` clause, not left to
- * agree by attention: a transport is handed this object through the
- * operations-only feature-API proxy, so an operation a door names and this
- * class does not serve is a `TypeError` on the first request rather than a
- * type error at the seam. `/api/v1/query` answered 500 to every call for
- * exactly that reason.
+ * Both doors' shapes are declared in the `implements` clause, not left to agree by
+ * attention: a transport reaches this object through the operations-only feature-API
+ * proxy, so an unserved operation is a runtime `TypeError`, not a caught type error.
  */
 export class AnalyticsApp implements AnalyticsApiContract, AnalyticsQueryApi {
   static readonly contract = AnalyticsApiToken;
@@ -296,14 +266,9 @@ export class AnalyticsApp implements AnalyticsApiContract, AnalyticsQueryApi {
   }
 
   /**
-   * The values one filter field can offer, narrowed by the OTHER filters
-   * already applied.
-   *
-   * The exclusion is here rather than in the door because it is a fact about
-   * the question: the values offered for a field must not already be narrowed
-   * by the selection being made on that same field, or the picker can only
-   * ever re-offer what is already chosen. A door that forgot it would not
-   * fail — it would quietly answer a narrower question.
+   * The values one filter field can offer, narrowed by every OTHER filter already applied
+   * — never by the field's own selection, or the picker could only re-offer what's already
+   * chosen. Forgetting this exclusion wouldn't fail; it would quietly narrow the answer.
    */
   filterOptions(request: AnalyticsFilterOptionsRequest): Promise<AnalyticsFilterOption[]> {
     const scopeFilters = Object.fromEntries(
@@ -323,10 +288,9 @@ export class AnalyticsApp implements AnalyticsApiContract, AnalyticsQueryApi {
   }
 
   /**
-   * Whether this deployment has a LangWatchQL identity to run statements as.
-   *
-   * A deployment without one can still describe the catalogue, which is why
-   * the workbench gates its navigation on this rather than on the schema.
+   * Whether this deployment has a LangWatchQL identity to run statements as. A
+   * deployment without one can still describe the catalogue, which is why the
+   * workbench gates its navigation on this rather than on the schema.
    */
   isLangWatchQLAvailable(): boolean {
     return this.#dependencies.langWatchQL.available;
@@ -340,11 +304,9 @@ export class AnalyticsApp implements AnalyticsApiContract, AnalyticsQueryApi {
   }
 
   /**
-   * Runs one submitted statement exactly as it was written.
-   *
-   * Parsing, the default-deny policy, tenant isolation and the resource
-   * ceilings are the service's; nothing here second-guesses them, because a
-   * second opinion could only ever disagree.
+   * Runs one submitted statement exactly as it was written. Parsing, the default-deny
+   * policy, tenant isolation and the resource ceilings are the service's — nothing here
+   * second-guesses them, because a second opinion could only ever disagree.
    */
   executeLangWatchQL(input: LangWatchQLExecuteInput): Promise<LangWatchQLQueryResult> {
     return this.#dependencies.langWatchQL.execute(input);
@@ -440,10 +402,9 @@ export class AnalyticsApp implements AnalyticsApiContract, AnalyticsQueryApi {
   }
 
   /**
-   * The restricted tenant identity a member's own statement runs as, read
-   * through the SAME project peer the rollout gate reads — never a raw
-   * Prisma client in this App. Refuses with `project_not_found` when the
-   * project no longer exists.
+   * The restricted tenant identity a member's own statement runs as, read through the
+   * same project peer the rollout gate reads — never a raw Prisma client in this App.
+   * Refuses with `project_not_found` when the project no longer exists.
    */
   resolveRunCaller(input: { userId: string; projectId: string }): Promise<LangWatchQLRunCaller> {
     return resolveWorkbenchRunCaller({
@@ -456,14 +417,9 @@ export class AnalyticsApp implements AnalyticsApiContract, AnalyticsQueryApi {
   }
 
   /**
-   * The same restricted tenant identity for a CREDENTIAL rather than a member.
-   *
-   * It stops at the project because that is all the question is: an API key's
-   * protections are the key's own cut, already resolved as a transport fact by
-   * `resolveApiKeyProtections`, so resolving them a second time here could only
-   * disagree with the answer the door is already holding. Read through the same
-   * project peer as {@link resolveRunCaller}, and refusing with
-   * `project_not_found` the same way.
+   * The same restricted tenant identity, for a CREDENTIAL rather than a member. Stops at
+   * the project because an API key's protections are already resolved as a transport fact
+   * by `resolveApiKeyProtections` — resolving them again here could only disagree.
    */
   async resolveApiKeyRunCaller(input: Readonly<{ projectId: string }>): Promise<LangWatchQLCaller> {
     const project = await this.#dependencies.projects.findById(input.projectId);

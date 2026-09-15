@@ -242,11 +242,9 @@ function channelOption(channel: { id: string; name: string; isPrivate?: boolean 
 }
 
 /**
- * Terminates a sentence so another can follow it.
- *
- * `describeError` only ends in a full stop when the code has body copy to add
- * — a bare title ("Couldn't load channels") comes back unpunctuated — and the
- * hint below always glues the "you can still type it" affordance on the end.
+ * Terminates a sentence so another can follow it. `describeError` only ends in a full stop
+ * when the code has body copy to add — a bare title ("Couldn't load channels") comes back
+ * unpunctuated — and the hint below always glues the "you can still type it" affordance on.
  */
 function endWithStop(sentence: string): string {
   return /[.!?]$/.test(sentence) ? sentence : `${sentence}.`;
@@ -328,34 +326,28 @@ function SlackChannelField({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [channelData, customChannel]);
 
-  // The channel actually PICKED from the list — deliberately NOT
-  // `slice.channelId`, which also holds free-typed text. The combobox rewrites
-  // its own input to the selected item's label every time its `value` changes,
-  // so feeding half-typed text back as `value` wiped the box on every
-  // keystroke: the search never got past one character, and any channel that
-  // needed a longer search was unreachable.
+  // The channel actually PICKED from the list — deliberately NOT `slice.channelId`, which also
+  // holds free-typed text. The combobox rewrites its input to the selected item's label on every
+  // `value` change, so feeding half-typed text back as `value` wiped the box on every keystroke —
+  // the search never got past one character.
   const [selectedId, setSelectedId] = useState("");
   // Once the author starts typing, the field is theirs — nothing below may
   // reach in and rewrite what they are searching for.
   const hasAuthorTyped = useRef(false);
 
-  // Text typed but not yet committed to the slice. A ref, not state, and
-  // deliberately NOT written through on every keystroke: writing the slice
-  // re-renders this whole form, and the combobox resyncs the input element
-  // from a PASSIVE effect, so the resync lands a render late and overwrites
-  // characters typed in between — "#adhoc" arrives as "#ahc". The search stays
-  // live on every keystroke; only the commit waits for the author to finish.
+  // Text typed but not yet committed to the slice. A ref, not state — writing the slice on
+  // every keystroke re-renders the form, and the combobox's PASSIVE resync effect then lands
+  // a render late and eats characters typed in between ("#adhoc" arrives as "#ahc"). The search
+  // stays live on every keystroke; only the commit waits for the author to finish.
   const pendingText = useRef<string | null>(null);
   const commitTypedChannel = () => {
     const typed = pendingText.current;
     pendingText.current = null;
     if (typed !== null && typed !== slice.channelId) {
-      // Typing over a picked channel replaces it, so the old pick must stop
-      // being the selection — otherwise the list keeps a tick beside a channel
-      // that is no longer this field's value. Clearing the selection outright
-      // would blank the box (the combobox rewrites its input from the selected
-      // item, and "nothing selected" stringifies to ""), so the typed channel
-      // becomes the selection instead, backed by its own collection entry.
+      // Typing over a picked channel replaces it, so the old pick must stop being the selection,
+      // or the list keeps a tick beside a channel no longer this field's value. Clearing the
+      // selection outright would blank the box ("nothing selected" stringifies to ""), so the
+      // typed channel becomes the selection instead, backed by its own collection entry.
       if (!listedIds.has(typed)) setCustomChannel(typed);
       setSelectedId(typed);
       onChange({ ...slice, channelId: typed });
@@ -374,13 +366,10 @@ function SlackChannelField({
 
   const canLoad = typedToken.length > 0 || slice.botTokenAlreadySet || !!automationId;
   const returnedError = list.data?.error && list.data.error !== "no_token" ? list.data.error : null;
-  // A listing can succeed and still be short of the workspace. Saying nothing
-  // is the worst option: the author scrolls a list that looks complete, doesn't
-  // find their channel, and concludes the integration is broken.
-  // Both gaps can apply at once — an app without `groups:read` whose public
-  // channels then outrun the page budget — so they are listed, not ranked.
-  // Showing only the first would have the author fix one cause and still not
-  // find their channel.
+  // A listing can succeed and still be short of the workspace — saying nothing is the worst
+  // option, since the author scrolls a list that looks complete, doesn't find their channel,
+  // and concludes the integration is broken. Both gaps can apply at once, so they are listed,
+  // not ranked; showing only the first would fix one cause and still miss their channel.
   const gaps = list.data?.gaps ?? [];
   const gapHints = [
     gaps.includes("private_channels_hidden")
@@ -516,11 +505,9 @@ function templatesFromSlice(slice: SlackSlice) {
 }
 
 /**
- * The preview must render under the SAME rules delivery will. A webhook strips
- * the modern blocks (chart / table / alert banner) and the message degrades to
- * its fallback; a bot connection renders them. Previewing a chart the webhook
- * is about to strip — or hiding one the bot will happily send — is the fastest
- * way to make the editor feel like it is lying.
+ * The preview must render under the SAME rules delivery will: a webhook strips the modern
+ * blocks to their fallback, a bot connection renders them. Previewing a chart the webhook
+ * would strip — or hiding one the bot would send — makes the editor feel like it is lying.
  */
 function previewOptions(slice: SlackSlice) {
   return { allowGatedBlocks: slice.deliveryMethod === "bot" };
@@ -799,11 +786,9 @@ function SlackConfigForm({ slice, onChange, ctx }: ConfigFormProps<SlackSlice, S
 }
 
 /**
- * Bot-connection destination: the channel to post in plus the app's bot token.
- * The token is write-only from the browser's side — once stored, the server
- * echoes a "set" flag (`botTokenAlreadySet`) instead of the secret, so the
- * field stays blank and the author keeps the stored token unless they type a
- * new one. A short setup callout points at where to create the Slack app.
+ * Bot-connection destination: the channel to post in plus the app's bot token. The token is
+ * write-only from the browser's side — once stored, the server echoes a "set" flag instead of
+ * the secret, so the field stays blank and the author keeps it unless they type a new one.
  */
 function SlackBotFields({
   slice,
@@ -935,12 +920,9 @@ function SlackBotFields({
 }
 
 /**
- * Picks an existing Slack webhook off another automation in the same
- * project. Most teams share a single Slack channel for alerts, and forcing
- * the operator to copy the URL out of one automation row and paste it into
- * the next is friction with no upside — the URL is the same secret across
- * triggers. Hidden when no other Slack automation exists so it doesn't
- * advertise an empty menu.
+ * Picks an existing Slack webhook off another automation — most teams share one Slack channel
+ * for alerts, and copying the URL between rows by hand is friction with no upside, since it's
+ * the same secret across triggers. Hidden when no other Slack automation exists.
  */
 function ReuseSlackWebhook({
   projectId,

@@ -63,8 +63,7 @@ const unsubscribeCallerAddress = defineRestMiddleware(
 /**
  * `modules/experiment` — the two SDK doors (`/api/experiment/init`,
  * `/api/dspy/log_steps`) are PUBLIC routes that answer their own bodies, so
- * the key is resolved here with `experiments:manage` as its ceiling — the
- * deleted mounts' own resolution (b383462d96^ experiment-*-rest.mount.ts).
+ * the key is resolved here with `experiments:manage` as its ceiling.
  */
 const experimentInitCaller = defineRestMiddleware(
   "experimentInitCaller",
@@ -225,7 +224,7 @@ export class ApiRestHost implements FeatureRestHost<MountableRestApp> {
     // The ONE session answer this process gives. The verifying half is the
     // deployment's, the live-session half is the auth module's, and they are
     // joined here so no door can compose a second pair.
-    //
+
     // The verifying half comes from the auth module itself unless this host was
     // handed one: the module builds the deployment's ONE Better Auth instance,
     // so reaching for it through the peer is what keeps a second instance from

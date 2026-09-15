@@ -1,8 +1,7 @@
 /**
- * Executes one CLI command inside the daemon and reports its exit code.
- *
- * This is the piece that has to be indistinguishable from a fresh process:
- * same stdout bytes, same stderr bytes, same exit code.
+ * Executes one CLI command inside the daemon and reports its exit code —
+ * indistinguishable from a fresh process: same stdout bytes, same stderr
+ * bytes, same exit code.
  */
 
 import { buildProgram } from "../program";
@@ -35,12 +34,9 @@ export interface CommandExecution {
   /** Resolves with the command's exit code once it has finished. */
   completed: Promise<number>;
   /**
-   * Abandon the command: stop emitting its output and settle at `code`. The
-   * underlying work can't be killed (a promise chain node can't unwind), so this
-   * only guarantees the caller's observable behavior — no further output, an
-   * immediate exit code — while the call finishes silently in the background.
-   * Its execution window must not be handed to another caller until then; see
-   * `abort` in createCommandExecutor.
+   * Abandon the command: stop emitting output and settle at `code`. The work
+   * can't be killed, so this only guarantees observable behavior while it
+   * finishes silently; its execution window can't be handed off until then (see `abort`).
    */
   cancel(code: number): void;
 }
@@ -48,20 +44,16 @@ export interface CommandExecution {
 export type CommandExecutor = (request: ExecuteRequest) => CommandExecution;
 
 /**
- * 10 minutes: generous for any bounded command (the unbounded ones —
- * `--follow`/`--watch` — never reach the daemon, see eligibility.ts), tight
- * enough that a genuinely hung command cannot pin its execution window (and
- * suppress the daemon's idle exit) for long.
+ * 10 minutes: generous for any bounded command (unbounded ones like
+ * `--follow`/`--watch` never reach the daemon, see eligibility.ts), yet
+ * tight enough a hung command can't pin the window and block idle exit.
  */
 export const DEFAULT_REQUEST_TIMEOUT_MS = 10 * 60 * 1000;
 
 /**
- * How long an ABANDONED command may keep holding its execution window after
- * its caller has already been settled at 124/130.
- *
- * 60s is generous for the thing an abandoned command is actually waiting on —
- * an HTTP request that will fail or time out on its own. Past that we assume it
- * will never settle, and the window can never be handed over safely.
+ * How long an ABANDONED command may hold its execution window after its
+ * caller is settled at 124/130. 60s is generous for what it's waiting on (an
+ * HTTP request that fails or times out); past that the window can't be handed over safely.
  */
 export const DEFAULT_ABANDON_GRACE_MS = 60 * 1000;
 
@@ -95,10 +87,9 @@ function positiveIntFromEnv(value: string | undefined, fallback: number): number
 export type WedgedHandler = (details: { requestId: string; graceMs: number }) => void;
 
 /**
- * The default: stop being a daemon. Releasing the window lets the next
- * caller's `applyWindow` chdir and rewrite `process.env` under work still in
- * flight; holding it forever wedges every other caller until an idle timeout
- * that never fires. Exiting is the only option that can't corrupt anything.
+ * The default: stop being a daemon. Holding the window forever wedges every
+ * other caller until an idle timeout that never fires; exiting is the only
+ * option that can't corrupt the next caller's `applyWindow` chdir/env rewrite.
  */
 const exitWhenWedged: WedgedHandler = ({ requestId, graceMs }) => {
   process.stderr.write(
@@ -110,10 +101,9 @@ const exitWhenWedged: WedgedHandler = ({ requestId, graceMs }) => {
 };
 
 /**
- * Build the executor the daemon serves requests with.
- *
- * Injected into the server so tests can drive the socket, handshake, framing
- * and lifecycle without commander in the picture.
+ * Build the executor the daemon serves requests with — injected into the
+ * server so tests can drive the socket, handshake, framing and lifecycle
+ * without commander in the picture.
  */
 export function createCommandExecutor({
   window,
@@ -165,11 +155,9 @@ export function createCommandExecutor({
     };
 
     /**
-     * The abandoned command still holds the window. Bound how long it may.
-     *
-     * Nothing here waits on the CALLER — they already have their 124/130. This
-     * bounds how long a command that never settles may keep the daemon usable
-     * for nobody, and turns "forever" into "the daemon goes away".
+     * The abandoned command still holds the window; this bounds how long. Nothing
+     * here waits on the CALLER — they already have their 124/130 — it only stops
+     * a command that never settles from keeping the daemon usable for nobody, forever.
      */
     const armAbandonGrace = (): void => {
       // Safe only because the post-acquire `cancelled` check re-reads before
@@ -308,14 +296,9 @@ export function createCommandExecutor({
       settle = finish;
       completed.then(finish, (error: unknown) => {
         clearTimeout(timeout);
-        // A rejection means the window could not be applied (e.g. the caller's
-        // cwd was deleted) BEFORE any output was produced — the server turns
-        // it into a `fallback` frame so the client re-runs in-process. It must
-        // NOT be swallowed into a fake exit code: an empty `exit 0` is the
-        // "silent, looks like it worked" failure the daemon is designed
-        // against. Cancel/timeout never land here: those settle via `finish`,
-        // and an aborted-while-queued acquire RESOLVES `completed` (see the
-        // cancelled check above) rather than rejecting it.
+        // A rejection means the window couldn't be applied before any output was
+        // produced — the server turns it into a `fallback` frame for the client to
+        // re-run, rather than a fake exit code (which would look like success).
         reject(error instanceof Error ? error : new Error(String(error)));
       });
     });

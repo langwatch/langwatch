@@ -19,11 +19,8 @@ export type NavigationTeam = {
   name: string;
   isPersonal?: boolean | null;
   /**
-   * Whose personal workspace this is, on the teams that are one.
-   *
-   * The shell compares it against the reader to tell "my own workspace" from
-   * "somebody else's, opened as an administrator" — two different chromes, and
-   * one banner that must not appear over the first.
+   * Whose personal workspace this is: the shell uses it to tell "my own
+   * workspace" from "somebody else's, opened as an administrator".
    */
   ownerUserId?: string | null;
   /** Who may open the team. Absent when the application did not read it. */
@@ -48,11 +45,8 @@ export type NavigationFlagReading = {
 };
 
 /**
- * The signed-in reader, as the shell's chrome needs them.
- *
- * `impersonator` is present only while an operator is viewing the product as
- * this reader; the header tints itself off it, exactly as the application's
- * own chrome did.
+ * The signed-in reader; `impersonator` is set only while an operator views
+ * the product as them, and the header tints itself off it.
  */
 export type NavigationUser = {
   id: string;
@@ -73,11 +67,9 @@ export type NavigationDeployment = {
 };
 
 /**
- * The plan the menu's gates read.
- *
- * `isLoading` is kept for the reason the settings menu's own docblock gives:
- * the enterprise entries are shown WHILE the plan is still arriving, so a
- * reader on that plan never watches four links appear a beat after the page.
+ * The plan the menu's gates read. `isLoading` matters because enterprise
+ * entries show while the plan is still arriving, so a reader on that plan
+ * never watches links appear a beat after the page.
  */
 export type NavigationPlanReading = {
   isEnterprise: boolean;
@@ -85,11 +77,9 @@ export type NavigationPlanReading = {
   /** A lite member sees a narrower menu; the guard is the host's. */
   isLiteMember: boolean;
   /**
-   * How the organization is priced, in the wire's own spelling.
-   *
-   * The usage meter compares it against one value and nothing else reads it,
-   * which is why the port carries a string rather than restating a Prisma
-   * enum a governed web package may not import.
+   * How the organization is priced, in the wire's own spelling: the usage
+   * meter compares it against one value, so the port avoids restating a
+   * Prisma enum a governed web package may not import.
    */
   pricingModel?: string | null;
 };
@@ -134,10 +124,8 @@ export type NavigationSupportChat = {
 /** Account menu additions from app; experiments, impersonation, graphics quality; null is real */
 export type NavigationAccountMenu = {
   /**
-   * What the application draws in the header beside the avatar.
-   *
-   * The impersonation banner is the one thing here today: it belongs next to
-   * the account controls and it belongs to `@langwatch/ops-web`.
+   * What the application draws in the header beside the avatar — today just
+   * the impersonation banner, which belongs to `@langwatch/ops-web`.
    */
   headerBanner?: ReactNode;
   /** Entries drawn above the account group. */
@@ -145,12 +133,9 @@ export type NavigationAccountMenu = {
   /** Entries drawn below the application's own controls. */
   trailing?: ReactNode;
   /**
-   * The presence-broadcast toggle, on the surfaces where presence is live.
-   *
-   * It reads a presence store and a presence feature gate that belong to
-   * `@langwatch/trace-web`, so it arrives as a node like the rest. Absent is a
-   * real answer and the only one off the Trace Explorer: the menu then carries
-   * no presence row at all rather than one that toggles nothing.
+   * The presence-broadcast toggle; arrives as a node since it reads a store
+   * and gate owned by `@langwatch/trace-web`. Absent (off the Trace Explorer)
+   * means no presence row at all, not a toggle that does nothing.
    */
   presence?: ReactNode;
   /** Overlays those entries open, rendered inside the menu root. */
@@ -180,10 +165,9 @@ export abstract class NavigationHost {
   abstract currentUser(): NavigationUser | undefined;
 
   /**
-   * The signed-in user's id, absent until the session answers.
-   *
-   * Derived rather than asked for a second time: two ports answering for the
-   * same reader is exactly how the two halves of a chrome drift apart.
+   * The signed-in user's id, absent until the session answers. Derived
+   * rather than asked twice: two ports answering for the same reader is
+   * how the two halves of a chrome drift apart.
    */
   currentUserId(): string | undefined {
     return this.currentUser()?.id;
@@ -197,12 +181,9 @@ export abstract class NavigationHost {
   abstract organizationRole(): string | undefined;
 
   /**
-   * Teams the reader may open, in the host's ambient preference order.
-   *
-   * "May open" and "which one is ambient" are the application's own scope
-   * policy — the same test its chrome applies before rendering a page — so the
-   * host answers with the list already filtered and ordered rather than handing
-   * the raw graph over with the rules attached.
+   * Teams the reader may open, in the host's ambient preference order:
+   * already filtered and ordered by the application's own scope policy,
+   * not handed over raw with the rules attached.
    */
   abstract openableTeams(): readonly NavigationTeam[];
 
@@ -227,11 +208,9 @@ export abstract class NavigationHost {
   abstract prefersPreviousSimulationsScreens(): boolean;
 
   /**
-   * What the application shows while a navigation decision is still being made.
-   *
-   * The wait belongs to the host: it is that application's chrome, its logo and
-   * its motion budget, and a package may not reach for any of the three. The
-   * same shape the organization family's `projectSwitcher()` established.
+   * What the application shows while a navigation decision is still being
+   * made — belongs to the host's own chrome (logo, motion budget), the same
+   * shape `projectSwitcher()` established.
    */
   abstract waiting(): ReactNode;
 
@@ -242,28 +221,22 @@ export abstract class NavigationHost {
   abstract navigate(to: string): void;
 
   /**
-   * Goes back one entry in this tab's history.
-   *
-   * One reader: the not-found scene, where "take me back" means the page the
-   * reader came from and nothing this package could compute.
+   * Goes back one entry in this tab's history. One reader: the not-found
+   * scene, where "take me back" means the page the reader came from.
    */
   abstract back(): void;
 
   /**
-   * The team the current address resolved to, when there is one.
-   *
-   * The shell reads exactly one thing off it that the project cannot answer:
-   * whether the reader is standing inside their OWN personal workspace, which
-   * is what turns a `/:project/...` address into the personal chrome.
+   * The team the current address resolved to. The shell reads one thing off
+   * it the project can't answer: whether the reader is in their OWN personal
+   * workspace, which turns a `/:project/...` address into the personal chrome.
    */
   abstract team(): NavigationTeam | undefined;
 
   /**
-   * The address on screen, path only.
-   *
-   * The pathname the reader sees, never a route pattern: every settings page
-   * but two resolves to one registered pattern, so an entry matched against a
-   * pattern lights nothing. `isSettingsMenuItemActive` says the same thing.
+   * The address on screen, path only — never a route pattern: most settings
+   * pages share one registered pattern, so matching against it would light
+   * every entry at once. `isSettingsMenuItemActive` relies on this.
    */
   abstract pathname(): string;
 
@@ -273,19 +246,16 @@ export abstract class NavigationHost {
   }
 
   /**
-   * The segments a catch-all route captured, already joined with "/".
-   *
-   * One reader: the project-prefixed redirect, whose whole job is to put the
-   * reader's own project slug in front of the rest of the address.
+   * The segments a catch-all route captured, already joined with "/". One
+   * reader: the project-prefixed redirect, which puts the reader's own
+   * project slug in front of the rest of the address.
    */
   abstract catchAllPath(): string;
 
   /**
-   * The `:project` segment of the address, when the address has one.
-   *
-   * The shell's not-found branch turns on it: an address that NAMES a project
-   * the workspace does not carry is a wrong address, while an address that
-   * names none simply has no project.
+   * The `:project` segment of the address, if any. The shell's not-found
+   * branch turns on it: naming a project the workspace lacks is a wrong
+   * address, naming none simply means no project.
    */
   abstract projectParam(): string | undefined;
 
@@ -302,11 +272,9 @@ export abstract class NavigationHost {
   abstract rememberScope(write: NavigationScopeWrite): void;
 
   /**
-   * Ends the session.
-   *
-   * The identity client is the application's ONE instance, so the package
-   * asks rather than constructing a second one — a governed web package may
-   * not import an authentication implementation at all.
+   * Ends the session. The identity client is the application's ONE
+   * instance, so the package asks rather than constructing a second one —
+   * a governed web package may not import an auth implementation at all.
    */
   abstract signOut(): void;
 
@@ -326,11 +294,9 @@ export abstract class NavigationHost {
   abstract accountMenu(): NavigationAccountMenu | null;
 
   /**
-   * The query string of the address on screen, leading `?` included.
-   *
-   * Read by one thing: the settings return path, which captures the WHOLE
-   * address a reader left so "back" lands them where they were rather than at
-   * the top of the page they were reading.
+   * The query string of the address, leading `?` included. Read by the
+   * settings return path, which captures the WHOLE address a reader left
+   * so "back" lands them where they were, not at the top of the page.
    */
   abstract search(): string;
 
@@ -339,10 +305,7 @@ export abstract class NavigationHost {
 
   /**
    * Sets the document's title, and hands back the way to put it back.
-   *
-   * The shell titles the page from the project and the open destination, the
-   * way the application chrome always did; where that title is WRITTEN is the
-   * host's, since a package may not reach for `document`.
+   * Lives on the host, since a package may not reach for `document`.
    */
   abstract setDocumentTitle(title: string): () => void;
 }
@@ -353,10 +316,9 @@ const NavigationHostContext = createContext<NavigationHost | undefined>(void 0);
 export const NavigationHostProvider = NavigationHostContext.Provider;
 
 /**
- * The host this feature is mounted in.
- *
- * Throws rather than degrading: a navigation surface with no host cannot pick
- * a destination, and a silent default would send the reader somewhere wrong.
+ * The host this feature is mounted in. Throws rather than degrading: a
+ * navigation surface with no host cannot pick a destination, and a silent
+ * default would send the reader somewhere wrong.
  */
 export function useNavigationHost(): NavigationHost {
   const host = useContext(NavigationHostContext);

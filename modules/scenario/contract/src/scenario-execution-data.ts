@@ -1,11 +1,3 @@
-/**
- * Types for scenario execution.
- *
- * Zod schemas with inferred types for data contracts.
- * Interfaces are segregated by responsibility (ISP) so consumers
- * only depend on what they actually need.
- */
-
 import { z } from "zod";
 import { FieldMappingSchema } from "./field-mapping.ts";
 import { runParameterValuesSchema } from "./scenario.parameters.ts";
@@ -39,10 +31,9 @@ export const PromptConfigDataSchema = z.object({
     }),
   ),
   /**
-   * The prompt's declared input variables. Without these the adapter cannot
-   * know a template's `{{question}}` was meant to be bound to anything, and it
-   * rendered as an empty string instead (#6590). Defaulted so a job queued by
-   * an older worker still parses.
+   * The prompt's declared input variables (#6590): without these the adapter can't bind a
+   * template's `{{question}}`, and it rendered as an empty string instead. Defaulted so a
+   * job queued by an older worker still parses.
    */
   inputs: z
     .array(
@@ -124,21 +115,17 @@ export const HttpAgentDataSchema = z.object({
   /** Maps agent input field identifiers to scenario data sources or static values. */
   scenarioMappings: z.record(z.string(), FieldMappingSchema).optional(),
   /**
-   * The project's decrypted secrets, so `{{ secrets.NAME }}` resolves in the
-   * url, the header values and the auth fields, the places a credential
-   * belongs. Defaulted so a job queued before secrets reached http targets
-   * still parses.
+   * The project's decrypted secrets, so `{{ secrets.NAME }}` resolves in the url, the
+   * header values and the auth fields. Defaulted so a job queued before secrets reached
+   * http targets still parses.
    */
   secrets: z.record(z.string(), z.string()).default({}),
 });
 export type HttpAgentData = z.infer<typeof HttpAgentDataSchema>;
 
 /**
- * Pre-fetched code agent configuration for serialized execution.
- * Contains all data needed to execute code-based scenarios without DB access.
- *
- * The code field contains Python source code, and inputs/outputs define
- * the data shape expected by the code execution engine (langwatch_nlp).
+ * Pre-fetched code agent configuration: `code` is Python source, and inputs/outputs
+ * define the data shape expected by the code execution engine (langwatch_nlp).
  */
 export const CodeAgentDataSchema = z.object({
   type: z.literal("code"),
@@ -182,12 +169,9 @@ export const CodeAgentDataSchema = z.object({
 export type CodeAgentData = z.infer<typeof CodeAgentDataSchema>;
 
 /**
- * Pre-fetched workflow agent configuration for serialized execution.
- *
- * Contains the fully published workflow DSL plus scenario-mapping metadata.
- * Workflow execution is delegated to the langwatch_nlp service's /studio/execute_sync
- * endpoint using an execute_flow event, identical to code agents but with the
- * user's own workflow DSL (rather than a synthesized entry→code→end workflow).
+ * Delegated to the langwatch_nlp service's /studio/execute_sync endpoint using an
+ * execute_flow event — identical to code agents but with the user's own workflow DSL
+ * (rather than a synthesized entry→code→end workflow).
  */
 export const WorkflowAgentDataSchema = z.object({
   type: z.literal("workflow"),
@@ -222,12 +206,9 @@ export const WorkflowAgentDataSchema = z.object({
 export type WorkflowAgentData = z.infer<typeof WorkflowAgentDataSchema>;
 
 /**
- * Pre-fetched connected agent configuration for serialized execution.
- *
- * The child reaches the agent through the relay route with the project key,
- * so all it needs is the agent id, where the platform is, and the per-call
- * budget the agent declared. The parameters the agent declares travel with
- * the job so a typed value is sent as its declared type.
+ * Pre-fetched connected agent configuration. The child reaches the agent through the relay
+ * route with the project key, so it only needs the agent id, platform address, and per-call
+ * budget; declared parameters travel with the job as their declared type.
  */
 export const ConnectedAgentDataSchema = z.object({
   type: z.literal("connected"),
@@ -286,10 +267,9 @@ export const VoiceAgentDataSchema = z.object({
 
   callerEnv: z.record(z.string(), z.string()).default({}),
   /**
-   * The whole-call budget in seconds (VOICE_CALL_MAX_SECONDS). The transport
-   * clamps a single turn's wait to it, and the child arms a timer that ends the
-   * call at it so the judge still runs on what was said. Defaulted so a job
-   * queued before the limit existed still parses.
+   * The whole-call budget in seconds (VOICE_CALL_MAX_SECONDS): the transport clamps a
+   * single turn's wait to it, and the child arms a timer that ends the call at it so the
+   * judge still runs on what was said. Defaulted so a job queued before the limit existed.
    */
   maxCallSeconds: z.number().int().positive().default(300),
 });
@@ -374,11 +354,9 @@ export type TargetConfig = z.infer<typeof TargetConfigSchema>;
 // ============================================================================
 
 /**
- * The connected agent instance that answered a run.
- *
- * The runner writes it on its stdout result line, so the parent parses it
- * against this schema before it narrows the value: a line carrying no label,
- * or a label that is not text, is not an instance.
+ * The connected agent instance that answered a run: the runner writes it on its stdout
+ * result line, so the parent validates it against this schema — a line carrying no label,
+ * or a label that isn't text, is not an instance.
  */
 export const ScenarioAgentInstanceSchema = z.object({
   hostname: z.string(),
@@ -424,10 +402,9 @@ export const ChildProcessJobDataSchema = z
     context: ExecutionContextSchema,
     scenario: ScenarioConfigSchema,
     /**
-     * The values the run resolved for this scenario. The scenario's own text
-     * arrives already rendered against them; the target under test reads them
-     * as `params.NAME`. Defaulted so a job queued before parameters existed
-     * still parses.
+     * The values the run resolved for this scenario: the scenario's own text arrives
+     * already rendered against them, and the target under test reads them as
+     * `params.NAME`. Defaulted so a job queued before parameters existed still parses.
      */
     parameters: runParameterValuesSchema.default({}),
     /** Pre-generated scenario run ID so the SDK uses the same aggregate ID. */
@@ -449,11 +426,9 @@ export const ChildProcessJobDataSchema = z
     nlpServiceUrl: z.string(),
     target: TargetConfigSchema,
     /**
-     * Total time in milliseconds the judge waits at verdict time for an http
-     * target's remote traces to arrive and stabilize. Computed by the
-     * prefetcher from the project's own ingest lag; absent for non-http
-     * targets and on jobs queued before the budget existed, in which case
-     * the scenario SDK's default applies.
+     * Total time (ms) the judge waits at verdict for an http target's remote traces to
+     * arrive and stabilize. Computed from the project's own ingest lag; absent for
+     * non-http targets and pre-budget jobs, in which case the SDK's default applies.
      */
     traceWaitTimeoutMs: z.number().optional(),
     /**
@@ -463,10 +438,9 @@ export const ChildProcessJobDataSchema = z
      */
     script: ScriptedRunSchema.optional(),
     /**
-     * The simulated caller's voice, interrupt probability and effects — carried
-     * from the scenario for a voice target only. The child builds the voice
-     * user simulator from it and records the effective values on the run.
-     * Absent for every non-voice run and for a job queued before it existed.
+     * The simulated caller's voice, interrupt probability and effects — carried from
+     * the scenario for a voice target only. The child builds the voice user simulator
+     * from it. Absent for non-voice runs and for a job queued before it existed.
      */
     callerVoice: callerVoiceConfigSchema.optional(),
   })

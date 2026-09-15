@@ -1,10 +1,7 @@
 /**
- * What a persisted dashboard widget's `CustomGraph.graph` column stores: TSX `code` plus named
- * LWQL `queries`. A query's `parameters` are a declaration, not bound values, checked against a
- * frame's `params` before forwarding to `analytics.lwql.query`; the reserved dashboard-context
- * placeholders are supplied by the executor, not author-declared. Versioned like
- * `workbenchChartDefinition.ts` since a `Json` column promises nothing; safe for the client to
- * import — only `zod` and a constant, never Prisma or server-only code.
+ * What a persisted dashboard widget's `CustomGraph.graph` column stores: TSX `code` plus
+ * named LWQL `queries`. Versioned like `workbenchChartDefinition.ts` since a `Json` column
+ * promises nothing; safe for the client to import — only zod and a constant, never Prisma.
  */
 
 import { z } from "zod";
@@ -27,18 +24,16 @@ const MAX_CODE_LENGTH = 200_000;
 const MAX_WIDGET_NAME_LENGTH = 200;
 
 /**
- * Every author-declared parameter name starting with this prefix is
- * rejected — the prefix, not a fixed name list, is what "reserved" means.
- * Host-supplied dashboard context (the page's window/granularity) lives in
- * this namespace; author-declared params never may.
+ * Every author-declared parameter name starting with this prefix is rejected — the prefix,
+ * not a fixed name list, is what "reserved" means. Host-supplied dashboard context (the
+ * page's window/granularity) lives in this namespace; author-declared params never may.
  */
 export const DASHBOARD_CONTEXT_PARAMETER_PREFIX = "dashboard_context_";
 
 /**
- * Property names that must never become a parameter: assigning to one on a
- * plain object mutates the prototype chain rather than adding an own key, so
- * the bound value would be silently lost (and, for `__proto__`, is a
- * prototype-pollution vector). Rejected at the declaration schema.
+ * Property names that must never become a parameter: assigning to one on a plain object
+ * mutates the prototype chain rather than adding an own key, so the bound value would be
+ * silently lost (and, for `__proto__`, is a prototype-pollution vector).
  */
 const FORBIDDEN_PARAMETER_NAMES = new Set([
   "__proto__",
@@ -48,10 +43,8 @@ const FORBIDDEN_PARAMETER_NAMES = new Set([
 
 /**
  * Bound automatically by the executor from the page's window/granularity — never an
- * author-declared parameter; declaring one under these names would silently never receive the
- * value, since the executor's own binding always wins. Exported so the client-side parameters
- * editor can list these as built-in rows without hand-duplicating names/types or importing
- * server-only code (this module is zod + constants only).
+ * author-declared parameter; declaring one under these names would silently never receive
+ * the value. Exported so the parameters editor can list these as built-in rows.
  */
 export const RESERVED_PARAMETERS = [
   {
@@ -106,11 +99,9 @@ const queryParameterDeclarationSchema = z
       }),
     type: queryParameterTypeSchema,
     /**
-     * Fills the value a `LW.query` call omits for this parameter — the Run
-     * button's own source of a value when testing a query standalone, and a
-     * required parameter with no default is one the caller must always pass.
-     * Stored typed rather than as a string so a stray unit test of a default
-     * against a mistyped declaration is a schema violation, not a runtime one.
+     * Fills the value a `LW.query` call omits for this parameter — the Run button's own
+     * source of a value when testing standalone. Stored typed (not stringified) so a
+     * mistyped default against its declared type is a schema violation, not a runtime one.
      */
     default: queryParameterValueSchema.optional(),
   })
@@ -142,12 +133,9 @@ export const dashboardWidgetQuerySchema = z.object({
 });
 
 /**
- * The bounded request-shape pieces every write surface shares — the tRPC
- * router the UI uses and the REST routes the CLI/Langy use. Both validate a
- * widget's name, code and query list against the SAME bounds, so a payload one
- * API accepts the other cannot reject, and neither persists an unbounded blob
- * that only `present()` would catch after the write (DoS via oversized
- * `code`/`queries` — CWE-770).
+ * The bounded request-shape pieces every write surface shares — the tRPC router the UI uses
+ * and the REST routes the CLI/Langy use. Both validate against the SAME bounds so neither
+ * persists an unbounded blob that only `present()` would catch after the write (CWE-770).
  */
 export const dashboardWidgetNameSchema = z
   .string()
@@ -173,11 +161,9 @@ export type DashboardWidgetDefinition = z.infer<
 >;
 
 /**
- * A widget's editable draft — a persisted definition's `code`/`queries` plus
- * the name that lives on `CustomGraph` itself, not in the `graph` column.
- * Lives here (model, not the editor component) so a hook can depend on it
- * without importing a `ui/sections` file — the create drawer, the in-place
- * editor and the card's own hook all read/write this same shape.
+ * A widget's editable draft — a persisted definition's `code`/`queries` plus the name that
+ * lives on `CustomGraph` itself, not in the `graph` column. Lives here (model, not the
+ * editor) so a hook can depend on it without importing a `ui/sections` file.
  */
 export interface DashboardWidgetDraft {
   name: string;
@@ -189,10 +175,9 @@ export interface DashboardWidgetDraft {
 export type DashboardWidgetQueryParamValue = string | number | boolean;
 
 /**
- * What a rejected `LW.query(name, params)` carries back to the frame. Shaped
- * to assign structurally into the bridge's own `ChartQueryError` (defined in
- * `features/custom-chart-playground/bridge/bridgeProtocol.ts`) without this,
- * a server module, importing that client one.
+ * What a rejected `LW.query(name, params)` carries back to the frame. Shaped to assign
+ * structurally into the bridge's own `ChartQueryError` (in
+ * `features/custom-chart-playground/bridge/bridgeProtocol.ts`) without importing it.
  */
 export interface DashboardWidgetQueryParamError {
   readonly code: string;
@@ -208,12 +193,9 @@ export type DashboardWidgetQueryParamValidation =
   | { readonly ok: false; readonly error: DashboardWidgetQueryParamError };
 
 /**
- * The validation gate `LW.query(name, params)` runs through before reaching
- * `analytics.lwql.query`: every passed key must be a declared parameter of the right type, and
- * every declared parameter with no default must be passed — an empty object is required, not
- * merely allowed, catching a typo'd key immediately rather than failing later in ClickHouse.
- * Framework-free and synchronous: shared by the live `LW.query` dispatch and the Queries tab's
- * "Run" button, so validation never differs between the two.
+ * The validation gate `LW.query(name, params)` runs through before `analytics.lwql.query`:
+ * every key must be a declared parameter of the right type, and every parameter with no
+ * default must be passed. Framework-free, so the live dispatch and "Run" button share it.
  */
 export function validateDashboardWidgetQueryParams({
   query,

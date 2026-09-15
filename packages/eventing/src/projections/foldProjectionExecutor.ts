@@ -66,11 +66,9 @@ function compareFoldEvents<State, E extends Event>(
 }
 
 /**
- * Whether an out-of-order event should replay the aggregate's history rather
- * than being applied on top of the state already loaded.
- *
- * See `FoldProjectionOptions.refoldOnOutOfOrder` for why an order-insensitive
- * business-time fold may opt out. Accepted-order folds never enter this path.
+ * Whether an out-of-order event should replay history rather than apply on top of
+ * loaded state. See `FoldProjectionOptions.refoldOnOutOfOrder` for the opt-out;
+ * accepted-order folds never enter this path.
  */
 function canRefold<State, E extends Event>(
   projection: FoldProjectionDefinition<State, E>,
@@ -93,11 +91,9 @@ function canRefold<State, E extends Event>(
 }
 
 /**
- * Returns a context carrying the event's occurredAt — and, when the fold
- * DECLARED a read window (`options.readWindow`), the computed
- * `occurredAt ± widthMs` bound for the store's backing read. The original
- * context is returned unchanged when the event has no usable occurredAt: an
- * unusable business time cannot anchor a window, so the read stays unbounded.
+ * Carries the event's occurredAt and, when the fold declares `options.readWindow`,
+ * the computed `occurredAt ± widthMs` bound. Returned unchanged when occurredAt is
+ * unusable, since it cannot anchor a window — the read then stays unbounded.
  */
 function withReadHints<State, E extends Event>({
   context,
@@ -135,10 +131,9 @@ function withAppliedEventIds(
 // apply event, store result. See ADR-066 for store-miss and re-fold logic.
 export class FoldProjectionExecutor {
   /**
-   * Events per page for the streaming store-miss re-fold
-   * (`streamRefoldUpToDelivered`). Bounds the working set; 1000 keeps the
-   * per-page memory small while amortising the per-query round-trip. Injected
-   * only so tests can force multi-page runs.
+   * Events per page for the streaming store-miss re-fold. Bounds the working set —
+   * 1000 keeps per-page memory small while amortising the round-trip. Injected so
+   * tests can force multi-page runs.
    */
   private readonly refoldPageSize: number;
 
@@ -342,13 +337,10 @@ export class FoldProjectionExecutor {
     });
     if (loaded === null) this.assertUndecodableIsRecoverable(projection, miss);
 
-    // A trusted absent miss folds from init() WITHOUT replaying event_log:
-    // the store always writes a row (see trustAbsentMiss's docstring), so no row
-    // means nothing was ever committed and there is no history worth reading
-    // — the measured steady state was 93% of these re-folds returning exactly
-    // the delivered batch. `undecodable` deliberately does not take this
-    // shortcut: there a complete row EXISTS and the re-fold is what makes
-    // refusing it safe.
+    // A trusted absent miss folds from init() without replaying event_log: the store
+    // always writes a row, so no row means nothing was ever committed. `undecodable`
+    // does not take this shortcut — there a complete row exists and re-fold is what
+    // makes refusing it safe.
     const absentTrusted = loaded === null && miss === "absent" && this.trustsAbsentMiss(projection);
     if (absentTrusted && this.shouldRefoldOnMiss(projection)) {
       incrementEsFoldAbsentMissTrustedTotal(projection.name, "refold");
@@ -410,10 +402,9 @@ export class FoldProjectionExecutor {
   }
 
   /**
-   * The absent-miss re-fold branch of `execute`: when nothing is loaded, the
-   * miss is not trusted absent, and the projection opts into refolding on
-   * miss, re-folds from scratch and commits it. Extracted so its branching
-   * is counted on its own rather than folded into `execute`'s complexity.
+   * The absent-miss re-fold branch of `execute`: re-folds from scratch and commits
+   * when nothing is loaded, the miss isn't trusted absent, and the projection opts in.
+   * Extracted so its branching is counted apart from `execute`'s complexity.
    */
   private async handleAbsentMiss<State, E extends Event>({
     projection,
@@ -460,11 +451,9 @@ export class FoldProjectionExecutor {
   }
 
   /**
-   * The out-of-order re-fold branch of `execute`: event's occurredAt is
-   * STRICTLY LESS than what we've already seen. Same occurredAt (==) does
-   * NOT trigger re-fold — arrival order is the correct tiebreaker for events
-   * at the same logical instant. Extracted for the same reason as {@link
-   * handleAbsentMiss}.
+   * The out-of-order re-fold branch of `execute`: fires when occurredAt is STRICTLY
+   * LESS than what we've already seen — same occurredAt (==) does NOT re-fold, since
+   * arrival order is the correct tiebreaker for events at the same logical instant.
    */
   private async applyOutOfOrderRefold<State, E extends Event>({
     projection,
@@ -747,10 +736,9 @@ export class FoldProjectionExecutor {
   }
 
   /**
-   * Reads the aggregate's history, and re-reads it on a short backoff while a
-   * fence still reports a gap (see `historyReadGap`). Returns the last read
-   * with the gap that stands after the retries, null once the read accounts
-   * for everything the loaded state already holds.
+   * Reads the aggregate's history, re-reading on a short backoff while a fence still
+   * reports a gap (see `historyReadGap`). Returns the last read with the gap that
+   * stands after retries, null once the read covers everything the loaded state holds.
    */
   private async readHistoryUntilComplete<State, E extends Event>({
     projection,
@@ -906,12 +894,9 @@ export class FoldProjectionExecutor {
       return e.id > latest.id ? e : latest;
     });
 
-    // Stream the re-fold page-by-page when the fold is order-insensitive and a
-    // paginated loader is wired. Bounds memory for a huge aggregate (a hot
-    // trace's 100k+ events never land in memory whole). Gated on
-    // refoldOnOutOfOrder: false because pages arrive in (timestamp, eventId)
-    // order, not occurredAt order — equivalent only for an order-insensitive
-    // fold.
+    // Stream the re-fold page-by-page when order-insensitive and a paginated loader is
+    // wired, bounding memory for a huge aggregate (100k+ events). Gated on
+    // refoldOnOutOfOrder: false since paged results arrive in (timestamp, eventId) order.
     if (projection.eventLoaderUpToPaged && projection.options?.refoldOnOutOfOrder === false) {
       return this.streamRefoldUpToDelivered(projection, delivered, context, upToEvent);
     }

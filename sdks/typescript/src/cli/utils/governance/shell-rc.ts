@@ -66,10 +66,9 @@ export function toolMarkers(tool: string): { begin: string; end: string } {
 export type DetectedShell = "zsh" | "bash" | "fish";
 
 /**
- * Best-effort shell detection from $SHELL. Falls back to zsh on
- * macOS (default since Catalina) and bash on Linux. Returns null
- * when running under an unsupported shell (cmd, powershell, etc.)
- * - the persist flow skips entirely in that case.
+ * Best-effort shell detection from $SHELL, falling back to zsh on macOS and
+ * bash on Linux. Null for an unsupported shell (cmd, powershell), which
+ * skips the persist flow entirely.
  */
 export function detectShell(): DetectedShell | null {
   const raw = (process.env.SHELL ?? "").toLowerCase();
@@ -162,12 +161,9 @@ export function buildScopedToolFunction(
 }
 
 /**
- * Append (or replace, if the marker block already exists) the
- * export block to the shell rc file. Creates the file if missing.
- * Idempotent: a second run replaces the block in place rather
- * than duplicating it.
- *
- * Returns the path that was written for the caller to surface.
+ * Append (or replace, if the marker block already exists) the export block to
+ * the shell rc file, creating it if missing. Idempotent: a second run
+ * replaces in place rather than duplicating. Returns the path written.
  */
 export function persistBlockToRc(
   shell: DetectedShell,

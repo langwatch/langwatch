@@ -362,10 +362,8 @@ function isKeyMaterial(value: string): boolean {
 
 /**
  * Words that turn a bare `key` into a credential. Shared by the name rule and
- * the free-text cue below, so the two cannot drift: they disagreed once, and
- * the cue treating an unqualified `key` as proof of a credential meant a map
- * entry like `{"key":"<content hash>"}` was destroyed at ingestion while the
- * same value on its own was correctly kept.
+ * the free-text cue below so the two cannot drift — an unqualified `key` alone
+ * is not proof of a credential; it as often names an ordinary map entry.
  */
 const CREDENTIAL_QUALIFIERS = new Set([
   "master",
@@ -685,12 +683,9 @@ function guardCustomPattern(pattern: string): string {
 }
 
 /**
- * Strings carrying no credential of any kind: ordinary agent prose, a
- * transcript tag, a source path, a timestamp, a model name. A custom pattern
- * that matches one of these is not describing a credential, and because a match
- * replaces text irreversibly at ingestion, such a pattern destroys trace
- * content instead of protecting it. The transcript tag is the one a customer
- * actually lost to a pattern of `sk-.*`.
+ * Strings carrying no credential: agent prose, a transcript tag, a source
+ * path, a timestamp, a model name. Matching one destroys trace content
+ * irreversibly instead of protecting it — a customer has lost a tag this way.
  */
 const ORDINARY_TEXT_PROBES = [
   "the user asked the agent to summarise the meeting notes",
@@ -785,10 +780,9 @@ export interface SecretsRedactionResult {
 }
 
 /**
- * What one matched rule leaves behind, or `null` to decline the match and put
- * the text back exactly as it was found. A broad rule gets the final say on its
- * own candidate here; rules that keep surrounding context (url password, bearer
- * prefix) are tightly bounded already, so they render without the clamp.
+ * What one matched rule leaves behind, or `null` to decline and restore the
+ * original text. Context-preserving rules (url password, bearer prefix) skip
+ * the clamp below — they're already tightly bounded, so nothing else needed.
  */
 function replacementFor(rule: ValueRule, args: string[]): string | null {
   const full = args[0] ?? "";

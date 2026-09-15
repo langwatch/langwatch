@@ -47,11 +47,9 @@ const dedupDataSchema = z
   .passthrough();
 
 /**
- * Dispatches admitted coding-agent spans as bounded session facts (ADR-056/069).
- * The enqueue filter prevents unrelated spans from creating jobs. New jobs
- * carry lifted facts and need no racing store read. Legacy `span_referenced`
- * and full `span_received` payloads remain readable so queued work from earlier
- * releases can drain safely.
+ * Dispatches admitted coding-agent spans as bounded session facts (ADR-056/069). The
+ * enqueue filter prevents unrelated spans from creating jobs; new jobs carry lifted facts
+ * and need no racing store read. Legacy payloads remain readable so queued work drains.
  */
 export function createCodingAgentSpanFactsDispatchSubscriber(deps: {
   contributeSpanFacts: (data: ContributeSpanFactsCommandData) => Promise<void>;
@@ -60,10 +58,9 @@ export function createCodingAgentSpanFactsDispatchSubscriber(deps: {
   const normalization = deps.traces;
 
   /**
-   * The raw-name gate — the enqueue filter, and the handler's inline guard.
-   * `CodingAgentSessionSpanProjection.admits` is a set lookup for the firehose;
-   * only a bare DECLARED name (codex's `session_task.turn`) additionally
-   * asks the scope, so a foreign span reusing it never mints a session.
+   * The raw-name gate: `CodingAgentSessionSpanProjection.admits` is a set lookup for the
+   * firehose; only a bare DECLARED name (codex's `session_task.turn`) additionally asks the
+   * scope, so a foreign span reusing that name never mints a session.
    */
   const isCodingAgentSpan = (event: TraceProcessingEvent): event is SpanReceivedEvent => {
     if (!isSpanReceivedEvent(event)) return false;
@@ -90,23 +87,16 @@ export function createCodingAgentSpanFactsDispatchSubscriber(deps: {
         stage: (event) =>
           isCodingAgentSpan(event) ? makeSpanFactsLiftedPayload({ event, normalization }) : event,
       },
-      // The lifted derivation resolves without touching the span store, so
-      // there is no sibling write left to debounce past. The delay stays only
-      // for the residual full-event fallback, which normalizes in its own lane
-      // and is cheap to defer — and dropping it outright would dispatch a
-      // burst of coding-agent spans at ingest rate rather than spreading them
-      // across the dedup window below.
+      // The lifted derivation resolves without touching the span store, so there is no
+      // sibling write left to debounce past. The delay stays for the residual full-event
+      // fallback, which normalizes in its own lane and spreads bursts across the dedup window.
       delay: 2_000,
       deduplication: {
         makeId: (event) => {
           const { tenantId, aggregateId, spanId } = dedupIdentity(event);
-          // aggregateId is the trace id — span ids are only unique WITHIN a
-          // trace, so the key needs both or two traces' spans can collide
-          // inside the TTL and silently drop facts. When the span carries a
-          // wire id, all three staged shapes expose that same RAW id, so the
-          // key is identical across both upgrades; when it carries none, the
-          // key falls back to the event id (see `dedupIdentity`), which every
-          // shape also shares.
+          // aggregateId is the trace id — span ids are only unique WITHIN a trace, so the key
+          // needs both, or two traces' spans could collide inside the TTL and drop facts. All
+          // three staged shapes expose the same RAW id, or fall back to the event id alike.
           return `coding-agent-span-facts:${tenantId}:${aggregateId}:${spanId}`;
         },
         ttlMs: 60_000,
@@ -153,12 +143,9 @@ function hasReadableSpanBody(event: SpanReceivedEvent): boolean {
 }
 
 /**
- * The full-event path: a job carrying the whole `span_received`, staged by a
- * pre-derivation release or by a seam that could not lift the span.
- *
- * Split out of `handle` so that function stays what it reads as — a dispatcher
- * over the three staged shapes — rather than a dispatcher with one shape's
- * implementation inlined into it.
+ * The full-event path: a job carrying the whole `span_received`, staged by a pre-derivation
+ * release or a seam that could not lift the span. Split out of `handle` so that function
+ * stays what it reads as — a dispatcher over the three staged shapes.
  */
 async function handleFullEvent({
   event,
@@ -171,12 +158,9 @@ async function handleFullEvent({
   isCodingAgentSpan: (event: TraceProcessingEvent) => event is SpanReceivedEvent;
   contributeSpanFacts: (data: ContributeSpanFactsCommandData) => Promise<void>;
 }): Promise<void> {
-  // Before treating this as a full event, establish that it IS one: a payload
-  // of some other type is a shape this build cannot read — almost certainly
-  // staged by a newer worker mid-rollout — and returning here would COMPLETE
-  // the job with no throw, no retry and no counter, silently dropping that
-  // span's facts. Refusing it is the whole reason the deploy-order rule is
-  // enforceable (ADR-069).
+  // Before treating this as a full event, establish that it IS one: an unreadable payload
+  // type is likely a newer worker mid-rollout, and completing here would silently drop that
+  // span's facts. Refusing it is what makes the deploy-order rule enforceable (ADR-069).
   if (!isSpanReceivedEvent(event)) {
     const parsedType = stagedTypeSchema.safeParse(event);
     const stagedType = parsedType.success ? parsedType.data.type : void 0;
@@ -185,13 +169,10 @@ async function handleFullEvent({
     );
   }
 
-  // The type says `span_received`, so read the body before the name gate
-  // answers for it. The gate's `false` means "an event I decline", and a body
-  // with no span object would reach that answer for the wrong reason —
-  // unreadable, not declined — and complete silently. This cannot fire for a
-  // job this seam minted: `enqueue.filter` already found a listed span name on
-  // `data.span`, so an absent span means the payload came from somewhere this
-  // build does not know.
+  // The type says `span_received`, so read the body before the name gate answers for it: a
+  // body with no span object would reach the gate's "declined" answer for the wrong reason —
+  // unreadable, not declined. Can't fire for a job this seam minted (filter already found a
+  // span name on `data.span`), so an absent span means an unknown payload origin.
   if (!hasReadableSpanBody(event)) {
     throw new Error(
       `codingAgentSpanFactsDispatch cannot read the staged "span_received" body (trace ${String(event.aggregateId)}): no span object on it. Refusing it into the queue's retry rather than completing it.`,
@@ -306,14 +287,9 @@ async function resolveClaimCheck(
     occurredAtMs: ref.data.startTimeUnixMs ?? ref.occurredAt,
   });
   if (span === null) {
-    // The reference raced the sibling span write, or that write never landed.
-    // Throwing is the contract: the queue retries with backoff.
-    //
-    // Say what the queue actually does. The retry budget is finite
-    // (JOB_RETRY_CONFIG: 25 attempts, ~2h27m), and on exhaustion the job parks
-    // its per-trace group in `:blocked` and stops. A message promising retries
-    // "until the write lands" read as a system still working on it, while 22
-    // groups sat blocked for hours on 2026-08-05.
+    // The reference raced the sibling span write, or that write never landed. Throwing is
+    // the contract: the queue retries with backoff (JOB_RETRY_CONFIG: 25 attempts, ~2h27m),
+    // then parks the per-trace group in `:blocked` and stops — not "retries until it lands".
     throw new Error(
       `Referenced span is not readable in the span store (trace ${ref.data.traceId}, span ${ref.data.spanId}). Retrying on the shared job budget; once that is exhausted this group blocks and stops. A group that blocks here means the span's spanStorage write never landed — investigate that write, not this subscriber.`,
     );

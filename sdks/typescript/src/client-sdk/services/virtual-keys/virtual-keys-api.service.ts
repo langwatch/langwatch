@@ -43,11 +43,9 @@ export interface VirtualKey {
   display_prefix: string;
   principal_user_id: string | null;
   /**
-   * Where this key's traces and costs land. Not a scope: it grants no
-   * access to the key. Decided when the key is written and stored on it,
-   * so editing what the key is scoped to never moves it. Null only on a
-   * key created before this was stored, in an organization that had no
-   * governance project to fall back to.
+   * Where this key's traces and costs land. Not a scope: it grants no access to the key.
+   * Decided when the key is written and stored on it, so editing what the key is scoped to
+   * never moves it. Null only on a pre-existing key with no governance project fallback.
    */
   trace_project_id: string | null;
   /**
@@ -66,10 +64,9 @@ export interface VirtualKey {
   last_used_at: string | null;
   revoked_at: string | null;
   /**
-   * When the key stops serving, or null for a key that never expires.
-   * Requests presented after this moment are refused with
-   * `virtual_key_expired`. `status` stays "active" past the date, so read
-   * this field rather than the status to tell an expired key apart.
+   * When the key stops serving, or null for a key that never expires. Requests presented
+   * after this moment are refused with `virtual_key_expired`. `status` stays "active" past
+   * the date, so read this field to tell an expired key apart, not status.
    */
   expires_at: string | null;
 }
@@ -160,10 +157,9 @@ export interface VirtualKeyWithSecret {
 export interface VirtualKeyPage {
   data: VirtualKey[];
   /**
-   * Pass back as `cursor` for the next page. Null means the walk is
-   * exhausted. Neither page length tells you anything here: visibility is
-   * applied to each page AFTER it is read, so a page can hold fewer rows
-   * than `limit` with more still to come.
+   * Pass back as `cursor` for the next page. Null means the walk is exhausted. Neither page
+   * length tells you anything here: visibility is applied to each page AFTER it is read, so
+   * a page can hold fewer rows than `limit` with more still to come.
    */
   next_cursor: string | null;
 }
@@ -189,12 +185,9 @@ export class VirtualKeysApiError extends Error {
 }
 
 /**
- * Client for the gateway virtual-key surface (/api/gateway/v1).
- *
- * Entity types and the create/update bodies mirror the wire verbatim, so
- * their fields are lowercase snake_case. Call options this SDK invents (query
- * filters, per-call behaviour, action arguments) are camelCase like the rest
- * of the SDK.
+ * Client for the gateway virtual-key surface (/api/gateway/v1). Entity types and the
+ * create/update bodies mirror the wire verbatim (lowercase snake_case); call options this
+ * SDK invents (filters, per-call behaviour, action arguments) are camelCase like the rest.
  */
 export class VirtualKeysApiService {
   private readonly endpoint: string;
@@ -253,11 +246,9 @@ export class VirtualKeysApiService {
   }
 
   /**
-   * ONE page of the virtual keys visible to the caller, newest first. Pass
-   * `next_cursor` back as `cursor` verbatim — an unrecognized cursor answers
-   * 400 rather than restarting the walk. `limit` caps the rows READ, not
-   * returned, since the visibility filter runs on the page afterwards.
-   * Prefer `list()` unless you mean to page deliberately.
+   * ONE page of the virtual keys visible to the caller, newest first. Pass `next_cursor`
+   * back as `cursor` verbatim — an unrecognized cursor answers 400 rather than restarting.
+   * `limit` caps rows READ, not returned. Prefer `list()` unless paging deliberately.
    */
   async listPage(options?: {
     cursor?: string;
@@ -278,11 +269,9 @@ export class VirtualKeysApiService {
   }
 
   /**
-   * Every virtual key visible to the caller (project, team, or org scoped).
-   * Follows `next_cursor` until it comes back null — a short page does NOT
-   * mean done, since the server's visibility filter runs after reading each
-   * page. `limit` sizes each request in the walk, it does not cap the total.
-   * Take one page with `listPage()`, or stream it with `iterate()`.
+   * Every virtual key visible to the caller (project, team, or org scoped). Follows
+   * `next_cursor` until null — a short page does NOT mean done, since the visibility filter
+   * runs after each page. `limit` sizes each request, it does not cap the total.
    */
   async list(options?: {
     cursor?: string;
@@ -306,11 +295,9 @@ export class VirtualKeysApiService {
   }
 
   /**
-   * Every visible virtual key, one row at a time, fetching each page only
-   * when the consumer reaches it. Stop early and the rest is never read,
-   * which `list()` cannot offer because it materialises the whole listing
-   * first. Raises rather than looping forever on a cursor chain that never
-   * ends, exactly like `list()`.
+   * Every visible virtual key, one row at a time, fetching each page only when the
+   * consumer reaches it — stop early and the rest is never read, unlike `list()` which
+   * materialises the whole listing first. Raises rather than looping forever, like `list()`.
    */
   async *iterate(options?: {
     cursor?: string;
@@ -421,10 +408,9 @@ export class VirtualKeysApiService {
   }
 
   /**
-   * Aggregate spend for one key over a window in epoch milliseconds.
-   * Defaults to the current UTC calendar month server-side. Reads the same
-   * cost path the dashboard reads, so this number and the UI agree by
-   * construction.
+   * Aggregate spend for one key over a window in epoch milliseconds. Defaults to the
+   * current UTC calendar month server-side. Reads the same cost path the dashboard reads,
+   * so this number and the UI agree by construction.
    */
   async spend(
     id: string,

@@ -49,18 +49,16 @@ const PROBE_TIMEOUT_MS = 10_000;
 const INSTALL_TIMEOUT_MS = 120_000;
 
 /**
- * How long a failed install suppresses the next attempt. A `claude` that could
- * not install the plugin today is overwhelmingly likely to fail the same way in
- * the next hour, and retrying on every single wrapped session would spend a
- * subprocess and a clone each time to learn it again.
+ * How long a failed install suppresses the next attempt. A `claude` that failed today
+ * is overwhelmingly likely to fail the same way within the hour, and retrying every
+ * wrapped session would spend a subprocess and a clone each time to learn it again.
  */
 const RETRY_AFTER_MS = 24 * 60 * 60 * 1000;
 
 /**
- * How long a completed update check suppresses the next one. The plugin moves
- * when we cut a release, which is nowhere near often enough to be worth a
- * repository fetch per wrapped launch, and a day is short enough that a fix
- * reaches a machine the day after it ships.
+ * How long a completed update check suppresses the next one. The plugin only moves on
+ * a release — far too rarely to justify a repository fetch per wrapped launch — and a
+ * day is short enough that a fix still reaches a machine the day after it ships.
  */
 const UPDATE_CHECK_INTERVAL_MS = 24 * 60 * 60 * 1000;
 
@@ -89,11 +87,9 @@ function debugLog(message: string): void {
 }
 
 /**
- * What Claude Code currently records about the plugin, read off disk.
- *
- * Every field answers "no" for state we cannot read: a missing file, JSON that
- * will not parse, or a shape we do not recognise all mean the same thing to
- * every caller, which is that there is nothing here to reuse or remove.
+ * What Claude Code currently records about the plugin, read off disk. Every field
+ * answers "no" for unreadable state — a missing file, unparsable JSON, or an
+ * unrecognised shape all mean the same thing: nothing here to reuse or remove.
  */
 export interface ClaudePluginState {
   /** An install record exists for the plugin, at any scope. */
@@ -128,10 +124,9 @@ function probePluginCli(): boolean {
 }
 
 /**
- * The Claude Code settings file. app-settings owns the location, keyed by the
- * wrapped tool's slug, and always has one for claude. Note the slug is `claude`
- * while the plugin's own name is `langwatch`: they are different names for
- * different things and must not be crossed.
+ * The Claude Code settings file. app-settings owns the location, keyed by the wrapped
+ * tool's slug (`claude`) — always present, and distinct from the plugin's own name
+ * (`langwatch`): different names for different things, not to be crossed.
  */
 function claudeSettingsPath(): string {
   return appSettingsTargetFor("claude")!.path;
@@ -143,10 +138,9 @@ function claudePluginsDir(): string {
 }
 
 /**
- * Read the three files Claude Code keeps the plugin's state in. Tolerant by
- * design: these are somebody else's files in somebody else's format, and a shape
- * we do not recognise must degrade to "not installed" rather than throw into a
- * coding session.
+ * Read the three files Claude Code keeps the plugin's state in. Tolerant by design:
+ * these are somebody else's files in somebody else's format, so an unrecognised shape
+ * degrades to "not installed" rather than throwing into a coding session.
  */
 export function readClaudePluginState(): ClaudePluginState {
   const pluginsDir = claudePluginsDir();
@@ -169,9 +163,8 @@ export function readClaudePluginState(): ClaudePluginState {
 
 /**
  * `installed_plugins.json` holds `{ version, plugins: { "<name>@<marketplace>":
- * [ { scope, ... } ] } }`. An entry present with anything in it counts: which
- * scope it was installed at is the user's business, and a record we half
- * recognise still means removing rather than installing is the right move.
+ * [ { scope, ... } ] } }`. Any entry present counts, whatever scope — a half-recognised
+ * record still means removing rather than installing is the right move.
  */
 function hasInstallRecord(document: Record<string, unknown>): boolean {
   const plugins = isPlainObject(document.plugins) ? document.plugins : document;
@@ -195,19 +188,16 @@ const OWNED_HOSTS = new Set(["github.com", "www.github.com"]);
 const OWNED_PROTOCOLS = new Set(["https:", "http:", "ssh:", "git:"]);
 
 /**
- * The fields that say WHERE a marketplace comes from, across the shapes Claude
- * Code writes. Only these decide ownership: a description, a commit message or
- * any other metadata that happens to mention the repository says nothing about
- * who published the marketplace, and reading the whole entry would hand
- * somebody else's registration to our logout.
+ * The fields that say WHERE a marketplace comes from, across the shapes Claude Code
+ * writes. Only these decide ownership — other metadata that merely mentions the
+ * repository could otherwise hand somebody else's registration to our logout.
  */
 const SOURCE_IDENTITY_KEYS = ["source", "repo", "url", "path"] as const;
 
 /**
- * Parsed rather than pattern-matched: the interesting inputs are near misses
- * built to look right, like `github.com/langwatch/agent-plugin.evil`. This gate
- * decides both what logout may deregister and what a wrapped run may pull new
- * code from without asking.
+ * Parsed rather than pattern-matched: the interesting inputs are near misses built
+ * to look right, like `github.com/langwatch/agent-plugin.evil`. This gate decides both
+ * what logout may deregister and what a wrapped run may pull new code from unasked.
  */
 function pointsAtOwnedRepo(value: unknown): boolean {
   if (typeof value !== "string") return false;
@@ -352,19 +342,17 @@ export interface ClaudePluginUpdateResult {
 }
 
 /**
- * Updates the plugin at most once a day; never throws, since this runs on the
- * way into a session that has nothing to do with plugin housekeeping. The
- * check is stamped BEFORE the fetch, so a hang or a kill mid-run costs nothing
- * next launch — the trade is a transient failure waiting a day to retry.
+ * Updates the plugin at most once a day; never throws, since this runs on the way
+ * into a session unrelated to plugin housekeeping. Stamped BEFORE the fetch, so a
+ * hang or kill mid-run costs nothing next launch — the trade is a day's retry wait.
  */
 export function updateLangwatchClaudePlugin({
   onCheckStart,
 }: {
   /**
-   * Called once, immediately before the first subprocess, and not at all on
-   * the runs that answer from disk. The work behind it is a network fetch on
-   * somebody's way into a coding session, so the caller gets the chance to say
-   * what the pause is for rather than leaving a silent terminal.
+   * Called once, immediately before the first subprocess, never on runs that answer
+   * from disk. The work behind it is a network fetch on the way into a coding
+   * session, so the caller can say what the pause is for instead of a silent terminal.
    */
   onCheckStart?: () => void;
 } = {}): ClaudePluginUpdateResult {
@@ -424,10 +412,9 @@ export function updateLangwatchClaudePlugin({
 }
 
 /**
- * Why this run should not go looking, or null when it should — answered from
- * disk alone, so the common no-op case costs no subprocess. A conclusion this
- * reaches gets stamped, so a `claude` that cannot manage plugins is not asked
- * again until tomorrow.
+ * Why this run should not go looking, or null when it should — answered from disk
+ * alone, so the common no-op case costs no subprocess. A conclusion reached here
+ * gets stamped, so an unmanageable `claude` isn't asked again until tomorrow.
  */
 function updateEligibility(): ClaudePluginUpdateResult | null {
   // The user scope is the one this CLI installs into and the only one it may
@@ -489,10 +476,9 @@ function applyUpdate({
 }
 
 /**
- * The install record this CLI put there, or null when the machine has none.
- * Only the user scope qualifies: a project or local record belongs to a
- * checkout somebody else pinned, and moving it would be taking that decision
- * off them.
+ * The install record this CLI put there, or null when the machine has none. Only the
+ * user scope qualifies — a project or local record belongs to a checkout somebody
+ * else pinned, and moving it would be taking that decision away from them.
  */
 function readUserScopeInstall(): Record<string, unknown> | null {
   const document = readJsonObject(path.join(claudePluginsDir(), "installed_plugins.json"));
@@ -560,10 +546,9 @@ function lastCheckedAt(): number | undefined {
 }
 
 /**
- * Whether a check inside the last day already answered this. Bounded at both
- * ends for the same reason the install suppression is: a stamp in the future is
- * a clock that went backwards or a config copied from another machine, and
- * reading it as recent would suppress every check until time caught up.
+ * Whether a check inside the last day already answered this. Bounded at both ends,
+ * same as the install suppression: a future stamp is a backwards clock or a copied
+ * config, and reading it as recent would suppress every check until time caught up.
  */
 function checkedRecently(checkedAt: number | undefined): boolean {
   if (checkedAt === undefined) return false;
@@ -597,10 +582,9 @@ export interface ClaudePluginRemovalResult {
 }
 
 /**
- * Reads state first so a machine that never had the plugin spends no
- * subprocess finding that out. When the subcommand cannot remove it, disabling
- * it in `enabledPlugins` still matters: left enabled, it keeps firing hooks at
- * a collector that will reject every one after logout revokes the token.
+ * Reads state first so a machine that never had the plugin spends no subprocess
+ * finding that out. If the subcommand can't remove it, disabling `enabledPlugins`
+ * still matters — left enabled, hooks keep firing at a collector that rejects them.
  */
 export function uninstallLangwatchClaudePlugin(): ClaudePluginRemovalResult {
   try {
@@ -627,11 +611,9 @@ export function uninstallLangwatchClaudePlugin(): ClaudePluginRemovalResult {
 }
 
 /**
- * Deregister the marketplace, but only the one we registered. A marketplace of
- * the same name pointing somewhere else belongs to whoever added it, and logout
- * removing it would cost them every plugin they installed from it.
- *
- * Returns true when the registration is gone.
+ * Deregister the marketplace, but only the one we registered — a same-named
+ * marketplace pointing elsewhere belongs to whoever added it, and removing it would
+ * cost them every plugin they installed from it. Returns true once it's gone.
  */
 export function removeLangwatchClaudeMarketplace(): boolean {
   try {
@@ -665,11 +647,9 @@ function migrateAwayFromRawHooks(): void {
 }
 
 /**
- * Switch the plugin off in the settings file, preserving everything else.
- *
- * Reports the END STATE, not whether a write happened: a plugin that is already
- * switched off is the outcome the caller wanted, and a second logout finding it
- * that way is a success. Only a state we could not reach is false.
+ * Switch the plugin off in the settings file, preserving everything else. Reports the
+ * END STATE, not whether a write happened: an already-off plugin is the outcome the
+ * caller wanted, so a second logout finding it that way is still a success.
  */
 function disableInSettings(): boolean {
   const filePath = claudeSettingsPath();

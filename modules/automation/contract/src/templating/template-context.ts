@@ -2,24 +2,17 @@ import type { AlertType } from "../trigger.ts";
 import { type Instant, nowInstant, toDate } from "@langwatch/time";
 
 /**
- * The single variable contract every trigger-notification template renders
- * against, for both immediate and digest dispatch (see ADR-036).
- *
- * Templates always iterate `matches`: an immediate dispatch sets
- * `matches.length === 1`, a digest sets it to N. The same template handles
- * both — there is no `{% if digest %}` branch to write.
+ * The variable contract every trigger-notification template renders against, for
+ * both immediate (`matches.length === 1`) and digest (`length === N`) dispatch —
+ * same template, no `{% if digest %}` branch. See ADR-036.
  */
 export interface TemplateContext {
   trigger: TemplateTriggerVars;
   project: TemplateProjectVars;
   digest: TemplateDigestVars;
   /**
-   * Convenience handle for the first matched trace, equivalent to
-   * `matches[0] ?? null`. Useful in `{{ match.* }}` style references when the
-   * author knows they're handling a single immediate dispatch and doesn't want
-   * the iteration syntax. The canonical variable surface is `matches[]` —
-   * templates iterating `{% for m in matches %}` work identically for an
-   * immediate dispatch (length 1) and a digest (length N). See ADR-036.
+   * Convenience handle equal to `matches[0] ?? null`, for templates that only
+   * expect a single immediate dispatch. `matches[]` is the canonical surface — see ADR-036.
    */
   match: TemplateMatchVars | null;
   /** Iterable matches for both immediate and digest dispatch. ADR-036 + ADR-026. */
@@ -30,13 +23,9 @@ export interface TemplateTriggerVars {
   id: string;
   name: string;
   alertType: AlertType | null;
-  /** Deep link to the automation's edit page — `{{ project.url }}/automations`
-   *  with `drawer.open=automation&drawer.automationId=<id>&drawer.source=email-link`,
-   *  matching the query-param contract `useDrawer` consumes so navigation
-   *  lands on the Automations page with the edit drawer already open. The
-   *  `drawer.source=email-link` marker lets the drawer surface a small
-   *  "Opened from an email notification" banner so the operator has context
-   *  for why they're here. */
+  /** Deep link to the automation's edit page: `{{ project.url }}/automations` with
+   *  `drawer.open=automation&drawer.automationId=<id>&drawer.source=email-link`, which
+   *  also triggers an "Opened from an email notification" banner in the drawer. */
   editUrl: string;
 }
 
@@ -223,11 +212,8 @@ function timePeriodLabel(minutes: number): string {
 }
 
 /**
- * Neutralise CR/LF and NUL that could enable header injection when a value
- * flows into an email subject or a Slack payload string. Applied to
- * user-controlled fields (metric.label, trigger.name display strings, etc.)
- * that lack per-callsite escaping. Not a substitute for context-specific
- * escaping (mrkdwn, HTML) — this only closes the header-injection vector.
+ * Neutralise CR/LF/NUL to close the header-injection vector when a value flows into
+ * an email subject or Slack payload — not a substitute for context-specific escaping.
  */
 function stripHeaderInjection(input: string): string {
   return input.replace(/[\r\n\0]+/g, " ");
@@ -365,10 +351,8 @@ export function buildGraphAlertTemplateContext({
 }
 
 /**
- * Example alert context for surfaces that render a graph-alert template
- * without a real fire: the drawer's preview pane and test-fire. Keeps the
- * preview honest — same shape `dispatchGraphAlertAction` renders — with
- * placeholder values a reader immediately recognises as an example.
+ * Example alert context for the preview pane and test-fire (no real alert fired).
+ * Mirrors the shape `dispatchGraphAlertAction` renders, with recognisable placeholders.
  */
 export function buildExampleGraphAlertTemplateContext({
   baseHost,
@@ -500,10 +484,8 @@ export function buildTemplateContext({
 export type ReportSourceKind = "traceQuery" | "customGraph" | "dashboard";
 
 /**
- * One trace in a trace-query report. Typed rather than pre-formatted: a table
- * template puts `costUsd` / `durationMs` into NUMERIC Block Kit cells
- * (`raw_number`), which Slack right-aligns and formats, and which a string row
- * can never become.
+ * One trace in a trace-query report. Typed rather than pre-formatted: `costUsd` /
+ * `durationMs` go into NUMERIC Block Kit cells (`raw_number`), which Slack right-aligns.
  */
 export interface ReportTraceRow {
   traceId: string;
@@ -599,21 +581,17 @@ export function reportSnippet(
 }
 
 /**
- * The legacy `rows` line for one trace (`"<traceId> — <input snippet>"`).
- * Templates pipe rows through `mrkdwn_escape`, so this deliberately does no
- * escaping of its own. Falls back to the bare trace id when the trace carries
- * no input preview (e.g. teaser-redacted by the visibility window).
+ * The legacy `rows` line for one trace. No escaping here — templates pipe rows
+ * through `mrkdwn_escape`. Falls back to the bare trace id with no input preview.
  */
 export function formatReportRowLine(row: ReportTraceRow): string {
   return row.input ? `${row.traceId} — ${row.input}` : row.traceId;
 }
 
 /**
- * Example report context for the drawer's live preview and its
- * unknown-variable check. Without this, a report preview renders against the
- * TRACE context — every report variable resolves empty and the author sees a
- * blank message. The example data mirrors the shape the source really produces:
- * a trace-query report gets traces, a graph or dashboard report gets charts.
+ * Example report context for the drawer's preview and unknown-variable check —
+ * without it, a preview renders against the TRACE context and every variable
+ * resolves empty. Mirrors the real shape: trace-query gets traces, graph/dashboard charts.
  */
 export function buildExampleReportTemplateContext({
   baseHost,

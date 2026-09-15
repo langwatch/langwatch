@@ -1,9 +1,3 @@
-/**
- * What a REST family answers with: the request-context keys every layer reads
- * off, the handler-context types, the status-carrying error vocabulary, the two
- * wire envelopes and their documented responses, the stored-object hardening,
- * the correlation handles a refusal quotes, and the two family error handlers.
- */
 import { HandledError, type SerializedReason } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant, toEpochMs } from "@langwatch/time";
@@ -29,10 +23,9 @@ export const ENDPOINT_INPUT = "endpointInput" as const;
 export const REQUEST_FAMILY = "requestFamily" as const;
 
 /**
- * Context key marking that a request log record is already owed for this
- * request. See {@link REQUEST_FAMILY}: a request through twenty-one mounted
- * families would otherwise write twenty-one identical lines. The outermost
- * one owns the record; the rest stand down.
+ * Context key marking that a request log record is already owed for this request. See
+ * {@link REQUEST_FAMILY}: without it, a request through every mounted family would write
+ * one identical log line per family. The outermost family owns the record; the rest stand down.
  */
 export const REQUEST_LOG_CLAIM = "requestLogClaim" as const;
 
@@ -119,11 +112,9 @@ export interface RouteResponse {
 // ─────────────────────────────────────────────────────────────────────────────
 
 /**
- * The answer a handler gives when the request is not its own after all: the
- * caller runs the next mount instead of writing a response, so the namespaces
- * mounted after this family keep their own routing and their own 404. Only an
- * any-method route can use it — every other route was matched by method and
- * path and owns what it matched.
+ * The answer a handler gives when the request is not its own after all: the caller runs
+ * the next mount instead of writing a response. Only an any-method route can use it —
+ * every other route was matched by method and path and owns what it matched.
  */
 const DECLINED = Symbol.for("@langwatch/api/rest/declined");
 
@@ -179,11 +170,9 @@ export class UnauthorizedError extends HttpError {
 }
 
 /**
- * Error for 403 Forbidden responses.
- *
- * The caller is authenticated and holds the permission; the request is
- * refused on its own merits. Use `UnauthorizedError` when the credentials or
- * the permission are what is missing.
+ * Error for 403 Forbidden responses: the caller is authenticated and holds the
+ * permission, but the request is refused on its own merits. Use `UnauthorizedError`
+ * when credentials or permission are what's missing.
  */
 export class ForbiddenError extends HttpError {
   readonly status = 403;
@@ -217,10 +206,9 @@ export class InternalServerError extends HttpError {
 }
 
 /**
- * Hono's own `HTTPException`, recognised by shape rather than
- * `instanceof`, which answers false whenever the two ends resolved
- * `hono/http-exception` to different module instances — losing the
- * refusal's status and reaching the caller as a generic 500.
+ * Hono's own `HTTPException`, recognised by shape rather than `instanceof`: instanceof
+ * answers false whenever the two ends resolved `hono/http-exception` to different module
+ * instances, losing the refusal's status and reaching the caller as a generic 500.
  */
 export function isFrameworkRefusal(
   error: unknown,
@@ -245,10 +233,9 @@ export function coerceToEpoch(value: string | number): number {
 export const successSchema = z.object({ success: z.boolean() });
 
 /**
- * The canonical REST error envelope: one shape for every refusal so a caller writes one reader.
- * `type` is the HTTP status class, `code` is the stable machine name (branch on this), `message`
- * is for humans, `meta` carries structured detail, `retryable` is explicit. `tips`, `docs_url`
- * and `fault` carry remediation when present.
+ * The canonical REST error envelope: one shape for every refusal so a caller writes one
+ * reader. `type` is the HTTP status class; `code` is the stable machine name to branch on;
+ * `message` is for humans. `meta`, `retryable`, `tips`, `docs_url`, `fault` are optional detail.
  */
 export const apiErrorSchema = z.object({
   error: z.object({
@@ -350,11 +337,9 @@ export function apiErrorBody({
 }
 
 /**
- * The pre-canonical flat error shape, `{ error: "<sentence>", message? }`.
- *
- * Still the wire shape of the route families that predate the canonical
- * envelope, and of the client readers written against them. New routes must use
- * {@link apiErrorSchema}.
+ * The pre-canonical flat error shape, `{ error: "<sentence>", message? }`. Still the wire
+ * shape of families that predate the canonical envelope, and of client readers written
+ * against them. New routes must use {@link apiErrorSchema}.
  */
 export const errorSchema = z.object({
   error: z.string(),
@@ -482,12 +467,9 @@ export const STORED_OBJECT_RESPONSE_BASE_HEADERS: Readonly<Record<string, string
 };
 
 /**
- * Resolves the Content-Type for a stored-object response: the requested type
- * when `readbackSafe` accepts it, otherwise `application/octet-stream` to
- * neutralize MIME sniffing and stored-XSS primitives.
- *
- * The allowlist is the stored-object contract's `isReadbackSafe`, passed in
- * rather than imported: the ingest path applies the same predicate.
+ * Resolves the Content-Type for a stored-object response: the requested type when
+ * `readbackSafe` accepts it, else `application/octet-stream` to prevent MIME-sniffing XSS.
+ * The allowlist is passed in (not imported) so the ingest path applies the same predicate.
  */
 export function safeMediaType({
   mediaType,
@@ -547,11 +529,9 @@ function liveId(id: unknown, zero: string): string | undefined {
 }
 
 /**
- * The request's trace correlation handles, as set by the tracer middleware.
- *
- * Every canonical refusal carries them, because the body of a 5xx deliberately
- * says nothing about the failure: quoting a trace id is what connects a
- * customer's report to the log line that holds the detail.
+ * The request's trace correlation handles, as set by the tracer middleware. Every
+ * canonical refusal carries them, because a 5xx body deliberately says nothing about the
+ * failure: quoting a trace id connects a customer's report to the log line with the detail.
  */
 export function requestTraceIds(c: Context): {
   traceId?: string;
@@ -649,10 +629,9 @@ export function createFamilyErrorHandler(options: {
 }
 
 /**
- * A canonical-envelope family's own `onError`: its log line over the one
- * shared mapping. Installing an `onError` REPLACES the spine's, so `mapError`
- * is not optional — without it a family that logged would stop answering
- * canonically.
+ * A canonical-envelope family's own `onError`, layered over the shared mapping. Installing
+ * an `onError` REPLACES the spine's, so `mapError` is not optional — without it a family
+ * that logs would stop answering canonically.
  */
 export function createCanonicalFamilyErrorHandler(options: {
   /** e.g. `langwatch:api:webhooks:errors`. */

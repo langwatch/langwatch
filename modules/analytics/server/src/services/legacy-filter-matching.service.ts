@@ -8,23 +8,11 @@ import {
 import type { EvaluationRunData } from "@langwatch/evaluation-contract";
 
 /**
- * The legacy `filters` grammar, decided in memory instead of in ClickHouse.
- *
- * Automations written before the LangWatchQL migration carry a `filters` map
- * rather than a query, and a settled match has to be re-checked against the
- * trace it settled on — with no query engine to hand it to. This is that
- * check, and it is the in-memory twin of `filters/clickhouse`: the same
- * within-field OR, the same across-field AND, the same numeric-range guards on
- * `events.metrics.value`. The two have to agree, because one of them decides
- * which traces a customer SEES and the other decides which ones page them.
- *
- * Fail-closed is the whole design (issue #4805). A filter set passes only when
- * every actionable condition positively matched. A non-empty condition on a
- * field this matcher cannot positively evaluate — an evaluation field at trace
- * time, a key selector, a phantom field, a shape nested deeper than the
- * grammar — forces NO-MATCH for the whole set rather than skipping to pass.
- * Skipping to pass is what made every such automation fire on every trace.
+ * The legacy `filters` grammar, matched in memory (twin of `filters/clickhouse`).
+ * Fail-closed (#4805): an unevaluable field forces NO-MATCH for the whole set —
+ * skip-to-pass used to fire every such automation on every trace.
  */
+
 /**
  * Fields that are only answerable once evaluations have run. Actionable here
  * means no-match; the caller routes them to `matchesEvaluationFilters`.
@@ -42,14 +30,9 @@ const EVALUATION_FIELDS: ReadonlySet<string> = new Set([
 ]);
 
 /**
- * Fields this matcher cannot positively evaluate at trace time.
- *
- * - `metadata.key`: a key-presence selector, not a standalone precondition.
- * - `events.event_details.value`: a phantom field — in neither the filter
- *   registry nor the ClickHouse builder — so it can never match.
- *
- * `events.metrics.value` is deliberately NOT here: it is matched as an
- * inclusive numeric range, mirroring the ClickHouse builder.
+ * Cannot positively evaluate: `metadata.key` (key-presence, not a precondition)
+ * and `events.event_details.value` (a phantom field, matched nowhere).
+ * `events.metrics.value` is absent on purpose — it matches as a numeric range.
  */
 const UNSUPPORTED_FIELDS: ReadonlySet<string> = new Set([
   "metadata.key",
@@ -93,14 +76,9 @@ export class LegacyFilterMatchingService {
   }
 
   /**
-   * The evaluation half, run once the trace's evaluations have been read.
-   *
-   * - evaluator_id filters (`string[]`): some evaluation names a listed id.
-   * - keyed filters (`Record<evaluatorId, string[]>`): for each evaluator id,
-   *   some evaluation of that evaluator carries a listed value.
-   * - double-keyed filters (`evaluations.score`): the same, subkey ignored,
-   *   because a run carries a single score.
-   * - across fields: AND.
+   * The evaluation half, run once evaluations are read: `string[]` matches by
+   * evaluator_id, keyed filters match a value per evaluator, and double-keyed
+   * (`evaluations.score`) ignores the subkey since a run carries one score; fields AND.
    */
   matchesEvaluationFilters(input: {
     evaluations: EvaluationRunData[];
@@ -128,12 +106,9 @@ export class LegacyFilterMatchingService {
 }
 
 /**
- * Whether a filter value carries at least one non-empty (actionable) condition.
- * Empty arrays — at any nesting depth — are vacuous and do not constrain the
- * match, mirroring the ClickHouse builder which emits no SQL for them.
- *
- * Recursive rather than depth-limited so it cannot be fooled by a shape one
- * level deeper than whatever the key selectors happen to nest today.
+ * Whether a filter value has at least one non-empty (actionable) condition.
+ * Empty arrays at any depth are vacuous, mirroring the ClickHouse builder.
+ * Recursive, not depth-limited, so a deeper key-selector shape can't fool it.
  */
 function hasActionableCondition(filterValue: unknown): boolean {
   if (Array.isArray(filterValue)) {
@@ -148,11 +123,9 @@ function hasActionableCondition(filterValue: unknown): boolean {
 }
 
 /**
- * Matches a single filter field against trace data.
- * Handles three filter value shapes:
- *   - string[] — simple array (e.g., "spans.model": ["gpt-4", "gpt-5-mini"])
- *   - Record<string, string[]> — keyed (e.g., "metadata.value": { "env": ["prod"] })
- *   - Record<string, Record<string, string[]>> — double-keyed
+ * Matches a single filter field against trace data across three value shapes:
+ * `string[]` (simple array), `Record<string, string[]>` (keyed), and
+ * `Record<string, Record<string, string[]>>` (double-keyed).
  */
 function matchField(
   traceData: PreconditionTraceData,
@@ -261,18 +234,9 @@ function matchSimpleArray(
 }
 
 /**
- * Matches the `events.metrics.value` numeric-range filter in-memory.
- *
- * The filter value is double-keyed: `{ [eventType]: { [metricKey]: [min, max] } }`.
- * OR across every event-type / metric-key pair. A pair matches iff some event of
- * that type carries a metric with that key whose value is within the inclusive
- * `[min, max]` range.
- *
- * Mirrors the ClickHouse builder (`filters/clickhouse/filter-conditions.ts` →
- * "events.metrics.value") exactly: a range needs >= 2 values, both parse as
- * finite numbers, and min <= max; any range failing those guards contributes no
- * match (matching the ClickHouse `1=0`). With no actionable (non-empty) range,
- * the condition is vacuous and passes.
+ * Matches `events.metrics.value`: double-keyed `{eventType: {metricKey: [min,
+ * max]}}`, ORed across pairs, inclusive range. Mirrors the ClickHouse builder:
+ * a malformed range contributes no match (never a vacuous pass); empty passes.
  */
 function matchEventMetricRange(
   traceData: PreconditionTraceData,
@@ -385,7 +349,8 @@ function matchEvaluationField(
       continue;
     }
 
-    // Record<string, Record<string, string[]>> — evaluations.score: { "eval-1": { "score": ["0.5"] } }
+    // Record<string, Record<string, string[]>> — evaluations.score:
+    // { "eval-1": { "score": ["0.5"] } }
     for (const [, values] of Object.entries(subValue)) {
       if (!Array.isArray(values) || values.length === 0) {
         continue;
@@ -401,13 +366,9 @@ function matchEvaluationField(
 }
 
 /**
- * A verdict (passed/score) is only real when the evaluation ran to
- * completion. Producers can attach `passed: false` alongside `status:
- * "error"` (the SDKs expose them as independent params), and the run feed is
- * unfiltered — without this guard a trigger configured as "evaluations.passed
- * = false" pages someone for a quality regression that is actually a
- * provider timeout (#6833). Status-based filters (`evaluations.state`) are
- * the intended way to alert on errored evaluators.
+ * A verdict is only real once the evaluation completed — `passed: false` can
+ * accompany `status: "error"`, so without this guard "passed = false" pages
+ * for what is actually a provider timeout (#6833); use `evaluations.state` instead.
  */
 function hasVerdict(e: EvaluationRunData): boolean {
   return e.status === "processed";

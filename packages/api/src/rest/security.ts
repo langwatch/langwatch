@@ -1,10 +1,7 @@
 /**
- * The process security kernel a REST door composes: the ports one process fills
- * for its own doors, the process-wide route-policy registry and the cross-check
- * that every mounted route declared a policy, the fingerprint a credential
- * refusal is logged with, the one shared-secret comparison, the management
- * surface's audit emission, and the permission vocabulary custom roles are
- * built from.
+ * The process security kernel a REST door composes: per-process ports, the route-policy
+ * registry and its every-route-declared-a-policy check, the credential-refusal fingerprint,
+ * the shared-secret comparison, the audit emission, and the custom-role permission vocabulary.
  */
 import { timingSafeEqual } from "node:crypto";
 
@@ -15,14 +12,10 @@ import type { AccessPolicy, CredentialClass } from "../access-policy.ts";
 import type { Credential } from "../access/access.ts";
 import type { IdempotentRunner } from "./idempotency.ts";
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Everything a REST door needs from the process it runs in.
-//
-// Authentication reads API keys, sessions and role bindings out of a database,
-// and the two error envelopes are rendered by the application's own error
-// taxonomy. Neither belongs in a transport package, and neither can be resolved
-// here: the process that owns those substrates supplies them once.
-// ─────────────────────────────────────────────────────────────────────────────
+// Everything a REST door needs from the process it runs in. Authentication (API keys,
+// sessions, role bindings) and the two rendered error envelopes come from a database and
+// the application's error taxonomy — neither belongs in a transport package, so the
+// owning process supplies both once rather than this file resolving them itself.
 
 /** Which error shape a route family publishes. */
 export type ApiErrorEnvelope = "legacy" | "canonical";
@@ -121,13 +114,9 @@ export function familyFromBasePath(basePath: string): string {
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// The process-wide route-policy registry.
-//
-// Populated as each family mounts. The router-introspection guard cross-checks
-// the composed router against it, so any mounted route lacking a declared
-// policy — even one that bypassed the runtime — fails CI.
-// ─────────────────────────────────────────────────────────────────────────────
+// The process-wide route-policy registry, populated as each family mounts. The
+// router-introspection guard cross-checks the composed router against it, so any mounted
+// route lacking a declared policy — even one that bypassed the runtime — fails CI.
 
 export interface RegisteredRoute {
   readonly method: string;
@@ -135,10 +124,9 @@ export interface RegisteredRoute {
   readonly policy: AccessPolicy;
   readonly family: string;
   /**
-   * Which credential an API consumer sends here. Derived by the runtime from
-   * the mount and the route, so a route cannot claim a credential class
-   * nothing enforces. Read by the OpenAPI generator to stamp each operation's
-   * `security`.
+   * Which credential an API consumer sends here. Derived by the runtime from the mount and
+   * the route, so a route cannot claim a credential class nothing enforces. Read by the
+   * OpenAPI generator to stamp each operation's `security`.
    */
   readonly credentialClass: CredentialClass;
   /**
@@ -299,21 +287,15 @@ export function assertEveryRouteDeclared(options: {
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// The fingerprint every credential refusal on this boundary is logged with.
-//
-// A 401 on an ingestion hot path is reported by the customer as "my SDK stopped
-// working", and the one thing on-call needs is which caller and which SDK. None
-// of these fields is a credential: the token never appears, only the shape of
-// the request that carried it.
-// ─────────────────────────────────────────────────────────────────────────────
+// The fingerprint every credential refusal on this boundary is logged with. A 401 on an
+// ingestion hot path reads to the customer as "my SDK stopped working", and on-call needs
+// to know which caller and which SDK. None of these fields is a credential — the token
+// never appears, only the shape of the request that carried it.
 
 /**
- * `hasEmptyAuthToken` distinguishes "X-Auth-Token sent as an empty string" — a
- * customer-side environment misconfiguration, where an SDK with an empty
- * `api_key` still serialises the header — from "no auth header at all", which
- * is a misconfigured SDK or an unauthenticated probe. Both answer the same 401;
- * the log line is the only place they are told apart.
+ * `hasEmptyAuthToken` distinguishes an empty X-Auth-Token (an SDK with an empty `api_key`
+ * still serialises the header) from no header at all (misconfigured SDK, or an
+ * unauthenticated probe) — both answer the same 401; only the log line tells them apart.
  */
 export type AuthDiagnostics = {
   path: string;
@@ -372,13 +354,9 @@ export function isInternalSecretValid({
   return timingSafeEqual(presentedBytes, expectedBytes);
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Audit emission for management API writes, as a port.
-//
-// The write has already committed by the time this is called, so a logging
-// failure must not fail the response — the port returns `void` rather than a
-// promise on purpose, and the process that supplies it owns the swallow.
-// ─────────────────────────────────────────────────────────────────────────────
+// Audit emission for management API writes, as a port. The write has already committed by
+// the time this runs, so a logging failure must not fail the response — the port returns
+// `void` rather than a promise on purpose, and the process that supplies it owns the swallow.
 
 /** Action names follow `management.<resource>.<verb>`. */
 export type AppRestManagementAudit = (entry: {
@@ -390,11 +368,9 @@ export type AppRestManagementAudit = (entry: {
 }) => void;
 
 /**
- * The audit actor behind an org-authenticated management request.
- *
- * The user the credential acts as; a service key acts as nobody, so it is
- * recorded as `apikey:<id>`, still one stable string per credential, so an
- * audit reader can group a provisioning run's writes.
+ * The audit actor behind an org-authenticated management request: the user the credential
+ * acts as, or — for a service key acting as nobody — `apikey:<id>`, still one stable string
+ * per credential so an audit reader can group a provisioning run's writes.
  */
 export function managementActor(c: Context): string {
   const userId = c.get("apiKeyUserId") as string | null | undefined;
@@ -425,14 +401,10 @@ export function emitManagementAudit({
   });
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// The permission vocabulary custom roles are built from, as a port.
-//
-// The catalogue itself is application data — the resource and action lists the
-// settings UI, the RBAC resolver and the custom-role validator all read. A
-// transport package that imported it would drag the whole RBAC tree behind
-// `@langwatch/api`, so the process hands the three facts over instead.
-// ─────────────────────────────────────────────────────────────────────────────
+// The permission vocabulary custom roles are built from, as a port. The catalogue is
+// application data — the resource and action lists the settings UI, the RBAC resolver and
+// the custom-role validator all read — and importing it here would drag the whole RBAC
+// tree behind `@langwatch/api`, so the process hands the three facts over instead.
 
 /**
  * Both lists arrive in the order the process states them, and the published

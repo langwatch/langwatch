@@ -22,10 +22,9 @@ import {
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 
 /**
- * The one allowed terminal: `@langwatch/mail` renders templates with
- * react-email, server-side. It's a TERMINAL (the walk stops on entry), not
- * an excused importer, so a file that reaches React some other way is
- * still reported.
+ * The one allowed terminal: `@langwatch/mail` renders templates with react-email,
+ * server-side. It's a TERMINAL (the walk stops on entry), not an excused importer, so
+ * a file reaching React some other way is still reported.
  */
 const MAIL_PACKAGE = join(REPO_ROOT, "packages", "mail") + sep;
 
@@ -53,10 +52,9 @@ const API_SRC = join(REPO_ROOT, "apps", "api", "src");
 const WORKER_SRC = join(REPO_ROOT, "apps", "worker", "src");
 
 /**
- * The process entrypoints, and every composition module: a composition is
- * wired into a process by name, so a browser package on one is a browser
- * package in the process that composes it, whether or not today's
- * entrypoint happens to reach it.
+ * The process entrypoints, and every composition module: a composition is wired into a
+ * process by name, so a browser package on one is a browser package in the process that
+ * composes it, whether or not today's entrypoint happens to reach it.
  */
 const applicationRoots = (): string[] => {
   const roots: string[] = [];
@@ -75,11 +73,9 @@ const applicationRoots = (): string[] => {
 };
 
 /**
- * Every server-side source tree a feature or platform package owns.
- *
- * Derived, not listed. A hand-written list only ever guards the package
- * somebody remembered to add to it, and a new feature package is exactly the
- * case a list cannot see.
+ * Every server-side source tree a feature or platform package owns — derived, not listed.
+ * A hand-written list only ever guards the package somebody remembered to add to it, and a
+ * new feature package is exactly the case a list cannot see.
  */
 const serverPackageRoots = (): string[] => {
   const roots: string[] = [];
@@ -104,10 +100,9 @@ const BACKEND_ROOTS = [
 ].sort();
 
 /**
- * The browser package trees: a backend graph may not reach a module inside
- * one at all — not just the toolkits it imports today. A module that looks
- * framework-free can acquire a React edge later, and browser-code review
- * would not know a backend process is downstream.
+ * The browser package trees: a backend graph may not reach a module inside one at all —
+ * not just the toolkits it imports today. A module that looks framework-free can acquire
+ * a React edge later, and browser-code review would not know a backend process is downstream.
  */
 const browserModuleRoots = (): string[] => {
   const roots = [join(REPO_ROOT, "apps", "ui")];
@@ -128,11 +123,9 @@ const bannedModule = (target: string | undefined): string | undefined =>
 const resolver = createWorkspaceModuleResolver({ root: REPO_ROOT });
 
 /**
- * Two walks rather than one, so each answer is exact. A single walk settles
- * every tainted file on ONE cause, so a root reaching both a browser package
- * and a browser module would be reported under whichever the flood reached
- * first — a real chain, but not an answer to the question either assertion
- * asks.
+ * Two walks rather than one, so each answer is exact. A single walk settles every tainted
+ * file on ONE cause, so a root reaching both a browser package and a browser module would
+ * report under whichever the flood reached first — real, but not what either assertion asks.
  */
 const graphReaching = ({
   roots,
@@ -285,12 +278,10 @@ describe("browser-only UI never reaches backend code", () => {
     });
   });
 
-  // Workspace packages were invisible to the platform walk until
-  // `@langwatch/react-rum` was found reaching three backend files. These two
-  // pin both halves of the resolution: the barrel must still look dangerous,
-  // and the leaf must still look safe. If the first stopped failing the guard
-  // would be blind again; if the second started failing, every safe import
-  // would be a false positive and the guard would be ignored.
+  // Workspace packages were invisible to the platform walk until `@langwatch/react-rum` was
+  // found reaching three backend files. These two pin both halves: the barrel must still look
+  // dangerous, and the leaf must still look safe — losing either reopens the blind spot or
+  // turns every safe import into a false positive.
   describe("given a workspace package whose barrel re-exports browser tracing", () => {
     it("reports a chain through the barrel", () => {
       const barrel = resolver.resolve({
@@ -382,12 +373,10 @@ describe("browser-only UI never reaches backend code", () => {
     });
 
     it("stops at that package and nowhere else", () => {
-      // The sharpest subject used to be the worker's own react-email template,
-      // a twin of one this package already held. It is gone — moved here,
-      // which is what made the exception mean something — so the case asks the
-      // question of a file that renders React outside the package instead. A
-      // terminal that widened to "anything that renders mail" would take the
-      // guard's teeth with it, silently.
+      // The sharpest subject used to be the worker's own react-email template, a twin of one
+      // this package already held; it moved here, which is what made the exception mean
+      // something. This case asks the same question of a file outside the package instead —
+      // a terminal widened to "anything that renders mail" would take the guard's teeth with it.
       const outside = join(
         REPO_ROOT,
         "modules/agent/web/src/features/management/ui/blocks/agent-card.tsx",
@@ -410,13 +399,11 @@ describe("browser-only UI never reaches backend code", () => {
         "@langwatch/mail",
       );
 
-      // The package COMPILES now — Node cannot load a `.tsx` file, and its
-      // templates are the only JSX a server process boots through — so the
-      // entry a backend root reaches is `dist/`, which this walk never reads
-      // (`dist` is not source, and it may not even be built when this runs).
-      // The terminal has to cover both halves: the compiled entry the
-      // processes import, and the `src` a test or the studio still imports
-      // directly. A terminal that covered only one would report the other.
+      // The package COMPILES now — Node cannot load `.tsx`, and its templates are the only
+      // JSX a server process boots through — so a backend root reaches `dist/`, which this
+      // walk never reads (not source, and maybe not even built here). The terminal must cover
+      // both halves — the compiled entry processes import, and the `src` a test/studio still
+      // imports directly — or it would report the one it misses.
       const manifest: { exports: { ".": { import: string } } } = JSON.parse(
         readFileSync(join(REPO_ROOT, "packages/mail/package.json"), "utf8"),
       );

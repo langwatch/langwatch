@@ -67,10 +67,9 @@ export function otlpEndpointFor(controlPlaneUrl: string): string {
 }
 
 /**
- * Whether an unmarked env map (claude settings `env` block) carries
- * langwatch-shaped OTLP wiring this CLI could have written. An env whose
- * endpoint/headers point at some other system is not ours and must never
- * be modified.
+ * Whether an unmarked env map (claude settings `env` block) carries langwatch-shaped OTLP
+ * wiring this CLI could have written. An env pointing at another system is not ours and
+ * must never be modified.
  */
 export function otelWiringLooksLangwatchAuthored(env: Record<string, string>): boolean {
   const endpoint = env.OTEL_EXPORTER_OTLP_ENDPOINT;
@@ -89,19 +88,17 @@ export interface IngestionKeyResolution {
   /** True when a fresh key was minted (vs a cached one reused). */
   minted: boolean;
   /**
-   * True when the platform rejected this device's session, so the cached
-   * key was reused without anything confirming it is still live — wiring
-   * the tool with a key that may work beats wiring it with nothing, but the
-   * caller must say so instead of reporting a working setup.
+   * True when the platform rejected this device's session, so the cached key was reused
+   * without confirming it is still live — wiring with a maybe-working key beats wiring
+   * with nothing, but the caller must say so instead of reporting a working setup.
    */
   sessionExpired?: boolean;
 }
 
 /**
- * Resolve a live personal ingest key for `sourceType`: reuse the cached key
- * only when the platform confirms it is still live, otherwise mint a fresh
- * one (#4755); a rejected confirmation falls back to the cache unless the
- * caller opts out via `allowOfflineFallback: false`.
+ * Resolve a live personal ingest key for `sourceType`: reuse the cached key only when the
+ * platform confirms it is live, otherwise mint a fresh one (#4755); a rejected confirmation
+ * falls back to the cache unless the caller opts out via `allowOfflineFallback: false`.
  */
 export async function resolveLiveIngestionKey({
   cfg,
@@ -182,9 +179,8 @@ export interface IngestionCredentialResolution extends IngestionKeyResolution {
 
 /**
  * Resolve the ingest credential for a tool: the project pin when one exists
- * (`tool_project_keys[tool]`), else the personal path via
- * `resolveLiveIngestionKey`. A pin is used verbatim with no server round
- * trip — it may belong to a project the device session cannot list at all.
+ * (`tool_project_keys[tool]`), else the personal path via `resolveLiveIngestionKey`. A pin
+ * is used verbatim with no server round trip — it may belong to a project the device can't list.
  */
 export async function resolveIngestionCredential({
   cfg,
@@ -216,10 +212,9 @@ export async function resolveIngestionCredential({
 }
 
 /**
- * Re-sync the langwatch-authored env block in `~/.claude/settings.json`,
- * firing only when a langwatch-shaped block is already present. Also
- * removes (never asserts) the session-context seam when the LangWatch
- * plugin is present, since the plugin's own hooks would otherwise run twice.
+ * Re-sync the langwatch-authored env block in `~/.claude/settings.json`, firing only when
+ * a langwatch-shaped block is already present. Also removes (never asserts) the
+ * session-context seam when the LangWatch plugin is present, since its hooks run twice otherwise.
  */
 export function refreshClaudeUserTelemetryEnv({
   vars,
@@ -246,11 +241,9 @@ export function refreshClaudeUserTelemetryEnv({
 }
 
 /**
- * Re-sync the scoped `<tool>()` shell functions (gemini / opencode)
- * across every supported rc file with the current run's values. A
- * marker pair is explicit langwatch authorship, so any present block
- * whose body doesn't carry the current endpoint + Authorization header
- * is rewritten in place. Returns one label per rc file refreshed.
+ * Re-sync the scoped `<tool>()` shell functions (gemini / opencode) across every supported
+ * rc file. A marker pair is explicit langwatch authorship, so a present block whose body
+ * doesn't carry the current endpoint + Authorization header is rewritten in place.
  */
 export function refreshScopedShellFunctions({
   tool,
@@ -274,10 +267,9 @@ export function refreshScopedShellFunctions({
 }
 
 /**
- * Re-sync the langwatch `[otel]` marker block in the codex config.toml
- * with the given endpoint + token, preserving whether the Authorization
- * header was persisted. Only fires when the block is already present.
- * Returns the refreshed target's label, or null when nothing changed.
+ * Re-sync the langwatch `[otel]` marker block in codex's config.toml with the given
+ * endpoint + token, preserving whether the Authorization header was persisted. Only
+ * fires when the block is already present.
  */
 export function refreshCodexOtelBlockTo({
   endpoint,
@@ -312,10 +304,9 @@ export interface ClaudeProjectPinResult {
 }
 
 /**
- * Write (or re-sync) telemetry env into `.claude/settings.local.json`, which
- * Claude Code applies above user-level settings so a wrapped run always
- * emits to the login that spawned it. `skipped` means the file already
- * carries non-langwatch OTLP wiring the user owns.
+ * Write (or re-sync) telemetry env into `.claude/settings.local.json`, which Claude Code
+ * applies above user-level settings so a wrapped run always emits to the login that spawned
+ * it. `skipped` means the file already carries non-langwatch OTLP wiring the user owns.
  */
 export function ensureClaudeProjectTelemetryPin({
   vars,
@@ -339,10 +330,9 @@ export function ensureClaudeProjectTelemetryPin({
 }
 
 /**
- * Strip the langwatch telemetry env from `.claude/settings.local.json`, when
- * present and langwatch-shaped. Used by gateway-mode wrapper runs (gateway
- * capture plus a live OTel exporter would double-trace) and by `langwatch
- * logout`. Deletes the file (and an empty `.claude` dir) when left empty.
+ * Strip the langwatch telemetry env from `.claude/settings.local.json` when present and
+ * langwatch-shaped. Used by gateway-mode wrapper runs (capture + a live exporter would
+ * double-trace) and by `langwatch logout`. Deletes the file (and empty `.claude` dir) when empty.
  */
 export function removeClaudeProjectTelemetryPin({ cwd }: { cwd: string }): boolean {
   const target = claudeProjectSettingsTarget(cwd);
@@ -371,11 +361,9 @@ function removeSettingsFileIfEmpty(filePath: string): void {
 }
 
 /**
- * Best-effort: keep the pin (which carries an ingest key) out of the
- * repo's history via `.git/info/exclude` - local-only, never committed,
- * and the same mechanism Claude Code uses for this file. Resolves the
- * common git dir so worktrees share the exclusion. Silently does
- * nothing outside a git repo or without git on PATH.
+ * Best-effort: keep the pin (it carries an ingest key) out of history via
+ * `.git/info/exclude` — local-only, the same mechanism Claude Code uses for this file.
+ * Resolves the common git dir so worktrees share it; no-ops outside a repo or without git.
  */
 function excludeClaudeLocalSettingsFromGit(cwd: string): void {
   try {
@@ -450,10 +438,9 @@ export interface LoginTelemetryRefreshResult {
 }
 
 /**
- * Login-time half of latest-login-wins: refresh any langwatch-authored
- * block whose endpoint differs from the new control plane; a block already
- * pointing here is left for the next wrapper run to re-sync. Best-effort —
- * per-tool failures skip that tool and never fail the login itself.
+ * Login-time half of latest-login-wins: refresh any langwatch-authored block whose endpoint
+ * differs from the new control plane; a block already pointing here is left for the next
+ * wrapper run to re-sync. Best-effort — per-tool failures skip that tool, never the login.
  */
 export async function refreshTelemetryWiringForLogin(
   cfg: GovernanceConfig,
@@ -470,14 +457,11 @@ export async function refreshTelemetryWiringForLogin(
         // surfaces that on the next run rather than login guessing.
         continue;
       }
-      // codex's notify hook is what recovers the conversation, and the
-      // guidance beside it is what tells a session to declare the checkout
-      // it moved to. Neither names an endpoint or a key, so both stand
-      // ahead of the pin check: a pinned codex needs them exactly as a
-      // personal one does, and only the mint and the rewiring below are a
-      // pin's to refuse. A config already pointing at this login skips the
-      // refresh below, so a device whose [otel] block predates either would
-      // never be given one. Idempotent and quiet when they are in place.
+      // codex's notify hook recovers the conversation, and its guidance tells a session to
+      // declare the checkout it moved to. Neither names an endpoint or a key, so both stand
+      // ahead of the pin check — a pinned codex needs them exactly as a personal one does.
+      // A config already pointing at this login skips the refresh below, so a device whose
+      // [otel] block predates either would never be given one; both calls are idempotent.
       if (tool === "codex" && codexHasOtelBlock(defaultCodexConfigPath())) {
         assertCodexTurnHarvest();
         assertCodexAgentGuidance();

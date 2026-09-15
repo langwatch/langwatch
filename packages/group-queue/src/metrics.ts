@@ -178,6 +178,7 @@ export const gqRetryBackoffMilliseconds = new Histogram({
 });
 
 // --- Per-job duration metric ---
+
 /**
  * Failed reads of the group retry-chain counter. A failed read returns 0, so a
  * sibling-led retry is indistinguishable from a genuine fresh delivery — it

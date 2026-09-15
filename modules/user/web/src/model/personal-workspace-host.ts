@@ -18,12 +18,9 @@ export type PersonalOrganization = {
   name: string;
   slug: string;
   /**
-   * The single sign-on provider the organization is pinned to, if any.
-   *
-   * Read by ONE surface, Settings > Authentication, for one decision: an
-   * organization on enterprise single sign-on may not link additional sign-in
-   * methods, because a second way in would route around the provider the
-   * organization chose.
+   * The single sign-on provider the organization is pinned to, if any. Read by ONE
+   * surface (Settings > Authentication): an org on enterprise SSO may not link
+   * additional sign-in methods, since a second way in would route around it.
    */
   ssoProvider?: string | null;
   teams: readonly PersonalTeam[];
@@ -51,12 +48,9 @@ export type PersonalActor = {
 };
 
 /**
- * The reader's standing in the organization, as the view-only notice reads it.
- *
- * A string rather than the Prisma enum: the enum is generated server code a web
- * package may not name, and the one value this family compares against is
- * `"EXTERNAL"`. Absent means the answer has not arrived, which is not the same
- * as a member who holds no elevated role.
+ * The reader's standing in the organization, as the view-only notice reads it. A
+ * string, not the Prisma enum a web package may not name — the one value compared
+ * against is `"EXTERNAL"`. Absent means unanswered, not "no elevated role."
  */
 export type PersonalOrganizationRole = string | undefined;
 
@@ -74,12 +68,9 @@ export type PersonalSuccessNotice = {
 };
 
 /**
- * A failure, as the screen knows it.
- *
- * The raw `error` travels and never a sentence the screen composed: since the
- * wire message of a handled error is its code slug, a screen that wrote its own
- * copy would print the slug at the customer. `fallbackTitle` names the action
- * that failed, so an unrecognised code still says what the reader was doing.
+ * A failure, as the screen knows it. The raw `error` travels, never a sentence the
+ * screen composed — a handled error's wire message is its code slug, so screen-written
+ * copy would print that slug. `fallbackTitle` names the action for an unrecognised code.
  */
 export type PersonalFailureNotice = {
   error: unknown;
@@ -91,37 +82,30 @@ export type PersonalFailureNotice = {
 
 /**
  * The shape of the deployment, as the install copy and the OTLP panel read it.
- *
- * `appBaseUrl` is this application's own address, which the CLI is pointed at
- * on a self-hosted install and which the personal OTLP endpoint is built from.
+ * `appBaseUrl` is this application's own address — what the CLI is pointed at on a
+ * self-hosted install, and what the personal OTLP endpoint is built from.
  */
 export type PersonalDeployment = {
   isSaas: boolean;
   appBaseUrl: string;
   /**
-   * Whether this deployment mounted the passkey plugin at boot.
-   *
-   * A deployment that did not has no endpoint behind any of the passkey
-   * controls, so the section renders nothing rather than making an offer it
-   * cannot honour. Read from the browser bootstrap contract, which is the
-   * static half of the public environment and is available before any request.
+   * Whether this deployment mounted the passkey plugin at boot. A deployment that
+   * did not has no endpoint behind the passkey controls, so the section renders
+   * nothing rather than offering what it can't honour. Read from the bootstrap contract.
    */
   passkeysEnabled: boolean;
   /**
-   * `"email"`, or the federated provider id this deployment mounted. Absent
-   * means email mode. Same shell field the front door's own sign-in screens
-   * read; the sign-in-methods section is the one signed-in surface that also
-   * needs it, to offer linking an additional method.
+   * `"email"`, or the federated provider id this deployment mounted. Absent means
+   * email mode — the same shell field the front door's sign-in screens read; the
+   * sign-in-methods section is the one signed-in surface that also needs it.
    */
   authProvider: string | undefined;
 };
 
 /**
- * One passkey, of the parts this family reads.
- *
- * `transports` is what the authenticator said about how it is reached, and it
- * is a HINT rather than a fact — which is why it only decides which heading a
- * card sits under and never anything that would matter if it were wrong.
+ * One passkey, of the parts this family reads. `transports` is a HINT from the
+ * authenticator, not a fact — it only decides which heading a card sits under,
+ * never anything that would matter if it were wrong.
  */
 export type HeldPasskey = {
   id: string;
@@ -140,11 +124,9 @@ export type PasskeyOutcome =
 export type LinkSignInMethodOutcome = { ok: true } | { ok: false; reason?: string };
 
 /**
- * The one thing a screen is handed.
- *
- * Methods rather than an object of loose functions, so the adapter is a class
- * the frontend feature constructs once and a test double is an obvious object
- * literal.
+ * The one thing a screen is handed. Methods rather than an object of loose
+ * functions, so the adapter is a class the frontend feature constructs once,
+ * and a test double is an obvious object literal.
  */
 export abstract class PersonalWorkspaceHostPort {
   /** The organization and project this page is about. */
@@ -157,11 +139,9 @@ export abstract class PersonalWorkspaceHostPort {
   abstract project(): PersonalProject | undefined;
 
   /**
-   * Whether the organization graph has answered.
-   *
-   * The project-scoped screens gate their empty state on it: "no sessions" and
-   * "we have not looked yet" are the same absent project, and only one of them
-   * is a fact.
+   * Whether the organization graph has answered. Project-scoped screens gate their
+   * empty state on it: "no sessions" and "we have not looked yet" are the same
+   * absent project, and only one of them is a fact.
    */
   abstract isScopeResolved(): boolean;
 
@@ -207,21 +187,16 @@ export abstract class PersonalWorkspaceHostPort {
   abstract removePasskey(input: { id: string }): Promise<PasskeyOutcome>;
 
   /**
-   * Sends the reader to the provider to link an additional sign-in method.
-   *
-   * Answers a REASON rather than throwing, because the failure that matters
-   * here is the provider refusing rather than the request failing: better-auth
-   * hands back an error string and the section shows it.
+   * Sends the reader to the provider to link an additional sign-in method. Answers a
+   * REASON rather than throwing: the failure that matters is the provider refusing,
+   * not the request failing — better-auth hands back an error string to show.
    */
   abstract linkSignInMethod(provider: string): Promise<LinkSignInMethodOutcome>;
 
   /**
-   * Whether this reader can hand a question to the assistant.
-   *
-   * The gate is the application's, not this package's: it turns on a grant, a
-   * release flag and which project is open, and none of those are facts a
-   * feature screen holds. A composition that mounts no assistant answers
-   * false, and the screens that offer the hand-off simply do not.
+   * Whether this reader can hand a question to the assistant. The gate is the
+   * application's, not this package's — it turns on a grant, a release flag, and
+   * which project is open. No assistant mounted means false, hand-off not offered.
    */
   abstract canAskAssistant(): boolean;
 
@@ -239,10 +214,9 @@ const PersonalWorkspaceHostContext = createContext<PersonalWorkspaceHostPort | u
 export const PersonalWorkspaceHostProvider = PersonalWorkspaceHostContext.Provider;
 
 /**
- * The application this screen is running in.
- *
- * Missing means the screen was mounted outside its frontend feature, which is a
- * composition fault rather than something the screen can degrade around.
+ * The application this screen is running in. Missing means the screen was mounted
+ * outside its frontend feature — a composition fault, not something the screen
+ * can degrade around.
  */
 export function usePersonalWorkspaceHost(): PersonalWorkspaceHostPort {
   const host = useContext(PersonalWorkspaceHostContext);

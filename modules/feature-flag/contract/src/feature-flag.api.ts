@@ -23,36 +23,29 @@ import type { FrontendFeatureFlag } from "./frontend-feature-flags.ts";
 import type { PublicAnonymousFlagMap } from "./public-anonymous-feature-flags.ts";
 
 /**
- * The one canonical feature flag capability.
- *
- * Evaluation, operator administration and the browser's own authorized reads
- * sit on the same API because they share the registry, the targeting rules and
- * the cache invalidation that makes an operator write visible to evaluation.
+ * The one canonical feature flag capability: evaluation, operator
+ * administration and the browser's authorized reads share this API because
+ * they share the registry, targeting rules and cache invalidation.
  */
 export interface FeatureFlagApi {
   /**
-   * Full resolution: environment override, then the force-enable list, then
-   * the operator store with its targeting rules, then the registry default.
-   *
-   * Throws `UnknownFeatureFlagError` for a key the registry does not define.
+   * Full resolution: environment override, then force-enable list, then the
+   * operator store's targeting rules, then the registry default. Throws
+   * `UnknownFeatureFlagError` for a key the registry does not define.
    */
   isEnabled(flagKey: FeatureFlagKey, target: FeatureFlagTarget): Promise<boolean>;
 
   /**
-   * Every browser-visible flag for one signed-in target, in one pass.
-   *
-   * Bounded by `FRONTEND_FEATURE_FLAGS`, and reachable only with a person
-   * behind it: an anonymous browser has its own, narrower surface below.
+   * Every browser-visible flag for one signed-in target, in one pass,
+   * bounded by `FRONTEND_FEATURE_FLAGS`. An anonymous browser has its own,
+   * narrower surface below.
    */
   resolveFrontendFlags(target: AuthenticatedExperimentTarget): Promise<FrontendFeatureFlagMap>;
 
   /**
-   * The flags a signed-out browser may resolve.
-   *
-   * Bounded by `PUBLIC_ANONYMOUS_FEATURE_FLAGS`, which is a much shorter
-   * list than the authenticated one: this answer is reachable by anybody,
-   * so it must never disclose the name or value of an ordinary frontend
-   * flag.
+   * The flags a signed-out browser may resolve, bounded by
+   * `PUBLIC_ANONYMOUS_FEATURE_FLAGS` — reachable by anybody, so it must
+   * never disclose the name or value of an ordinary frontend flag.
    */
   resolvePublicAnonymousFlags(target: {
     kind: "anonymous";
@@ -60,23 +53,18 @@ export interface FeatureFlagApi {
   }): Promise<PublicAnonymousFlagMap>;
 
   /**
-   * Every experiment this target may see, with its effective value and the
-   * reason for it.
-   *
-   * An experiment the target cannot see is absent, not present-and-false, so
-   * a signed-out visitor learns nothing about experiments that are not
-   * public.
+   * Every experiment this target may see, with its effective value and
+   * reason. An experiment it cannot see is absent, not present-and-false —
+   * a signed-out visitor learns nothing about non-public experiments.
    */
   resolveExperimentCatalogue(
     target: ExperimentEvaluationTarget,
   ): Promise<ExperimentCatalogueEntry[]>;
 
   /**
-   * A person's own enrolment. Joining requires the experiment to be available
-   * to that same target; leaving removes the row rather than storing a
-   * negative, so a later tenant `enabled` still reaches them. Throws
-   * `UnknownFeatureFlagExperimentError` for a key that is not an experiment,
-   * and `FeatureFlagExperimentUnavailableError` for one not open to them.
+   * A person's own enrolment: joining requires the experiment available to
+   * the target; leaving removes the row (not a stored negative) so a later
+   * tenant `enabled` still reaches them. Throws for an unknown/unavailable key.
    */
   setUserExperimentEnrolment(input: {
     flagKey: FrontendFeatureFlag;
@@ -85,12 +73,9 @@ export interface FeatureFlagApi {
   }): Promise<void>;
 
   /**
-   * An owner's policy for one exact tenant scope. The caller supplies the
-   * scope it authorized. Validates that the key is a registered experiment;
-   * base availability still governs evaluation, so a policy on an
-   * unreleased experiment changes nothing until it is released.
-   *
-   * Throws `UnknownFeatureFlagExperimentError` for a non-experiment key.
+   * An owner's policy for one exact tenant scope the caller authorized.
+   * Validates the key is a registered experiment; an unreleased experiment's
+   * policy changes nothing until release. Throws for a non-experiment key.
    */
   setExperimentTenantPolicy(input: {
     flagKey: FrontendFeatureFlag;
@@ -109,9 +94,8 @@ export interface FeatureFlagApi {
 
   /**
    * One flag for the tenant a signed-in caller named, authorized at that
-   * tenant's own tier before the flag is read. A project is checked against
-   * the organization that actually owns it, so a caller cannot pair a project
-   * with an organization it is not in.
+   * tenant's tier first. A project is checked against the organization that
+   * owns it, so a caller cannot pair a project with an org it is not in.
    */
   isEnabledForCaller(input: FeatureFlagReadForCaller): Promise<boolean>;
 
