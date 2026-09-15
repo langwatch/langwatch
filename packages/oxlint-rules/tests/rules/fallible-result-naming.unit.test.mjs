@@ -43,7 +43,7 @@ describe("given a strict feature port module", () => {
 
       expect(found[0].message).toContain("Name it `getById`");
       expect(found[0].message).toContain("make the body throw");
-      expect(found[0].message).toContain("is not the fix");
+      expect(found[0].message).toContain("drop null and undefined from the return type");
     });
   });
 
@@ -54,8 +54,8 @@ describe("given a strict feature port module", () => {
 
       expect(found.map((entry) => entry.messageId)).toContain("requirePrefix");
       expect(found.find((e) => e.messageId === "requirePrefix").message).toBe(
-        "Rename `requireById`: drop the `require` prefix; a method already returns or throws." +
-          " Rename the method without the `require` prefix.",
+        "`requireById` carries a redundant `require` prefix: a method already answers or throws." +
+          " Name it `byId` and leave the body as it is.",
       );
     });
   });

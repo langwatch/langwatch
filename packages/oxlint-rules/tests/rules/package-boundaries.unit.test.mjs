@@ -95,8 +95,9 @@ describe("given package-boundaries", () => {
       expect(found.map((e) => e.messageId)).toContain("webImportsServer");
       const entry = found.find((e) => e.messageId === "webImportsServer");
       expect(entry.message).toBe(
-        "A web package cannot import a server package." +
-          " Call the API the server exposes, or import the type from the contract.",
+        "`@langwatch/project-server` is server-only, and this is a web package." +
+          " Call the REST or tRPC endpoint the server exposes through this feature's" +
+          " web client, and import any shared type from `@langwatch/<feature>-contract`.",
       );
     });
   });
@@ -127,8 +128,10 @@ describe("given package-boundaries", () => {
       expect(entry).toBeTruthy();
       expect(entry.data.specifier).toBe("node:fs");
       expect(entry.message).toBe(
-        "A contract package is transport-neutral: `node:fs` is a node/browser/server runtime." +
-          " Move this code to the server or web package and keep only types and schemas here.",
+        "A contract package is transport-neutral: `node:fs` is a node, browser or server runtime." +
+          " Keep only types and schemas here, and move the code that calls `node:fs` to the" +
+          " feature's server package when it is a `node:` or server import, or to its web" +
+          " package when it is a browser import.",
       );
     });
   });

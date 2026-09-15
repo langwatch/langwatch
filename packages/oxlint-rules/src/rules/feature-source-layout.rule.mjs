@@ -67,24 +67,42 @@ export const featureSourceLayoutRule = defineRule({
       fix: "Add the subject to the filename.",
     },
     contractServerArtifact: {
-      what: "Server artifact {{name}} cannot live in contract source.",
-      fix: "Move it to `server/src/<dir>/`.",
+      what: "`{{name}}` is a server artifact: contract source may not hold `.adapter`, `.api`, `.mapper`, `.migration`, `.port`, `.projection`, `.repository` or `.store` files.",
+      fix:
+        "Move it into `modules/<feature>/server/src/`: `.repository`, `.store` and"
+        + " `.mapper` under `repositories/`, `.adapter` under `repositories/<backend>/`"
+        + " or `channels/<tier>/`, `.projection` under `eventing/`, `.migration` under"
+        + " `migrations/`, a `.port` rewritten as the `repositories/<subject>.repository.ts`"
+        + " interface it describes, and any `.api` other than `<feature>.api.ts` as"
+        + " `transport/<feature>.<rest|trpc|ws>.ts`.",
     },
     contractFilename: {
       what: "Rename `{{name}}` to `<subject>.<artifact>.ts` in lower kebab case, e.g. `trace-search.service.ts`.",
-      fix: "Use one of the canonical contract artifacts.",
+      fix:
+        "Take the artifact from `app`, `commands`, `errors`, `events`, `queries` or"
+        + " `service`, and write the subject and the artifact in lower kebab case with a"
+        + " single dot between them.",
     },
     processManagerService: {
       what: "Rename `{{path}}` to `processes/<subject>.process.ts`; a process manager is not a service.",
       fix: "Move the file to `processes/` and rename its `.service.ts` suffix to `.process.ts`.",
     },
     rulesImpurity: {
-      what: "Rules module {{path}} may only export functions and constants (found {{found}}).",
-      fix: "Move the class or `new` into a service or adapter and pass its result in.",
+      what: "Rules module `{{path}}` may only export functions and constants (found {{found}}).",
+      fix: "Move the class or the `new` into `services/<name>.service.ts` and pass the constructed value into `{{path}}` as a function parameter.",
     },
     serverPath: {
       what: `\`{{path}}\` has no home in layout v0. Only this shape is allowed: ${SERVER_HOMES}.`,
-      fix: "Move it to the directory matching its artifact suffix.",
+      fix:
+        "Move `{{path}}` onto one of those paths: a service flattens to"
+        + " `services/<name>.service.ts`, with no subdirectory under `services/` and no"
+        + " qualifier before `.service`; an adapter or store becomes"
+        + " `repositories/<backend>/<backend>.<subject>.repository.ts` or"
+        + " `channels/<tier>/<tier>.<subject>.channel.ts`; a projection, subscriber,"
+        + " process manager or intent becomes"
+        + " `eventing/<feature>.<projection|subscriber|process|intent>.ts`; a transport"
+        + " becomes `transport/<feature>.<rest|trpc|ws>.ts`; a file with no artifact"
+        + " suffix moves into the module that already uses it.",
     },
   },
   create(context, file) {

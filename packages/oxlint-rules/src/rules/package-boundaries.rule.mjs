@@ -138,48 +138,48 @@ export const boundaryRule = defineRule({
   kind: "problem",
   messages: {
     compositionRoot: {
-      what: "Only a composition root (`apps/api`, `apps/worker`, `apps/tasks`, `enterprise/packages/composition/*`) may import a feature server package.",
-      fix: "Import the feature's contract package here, or move this wiring into the composition root.",
+      what: "`{{specifier}}` is a feature server package, and only a composition root (`apps/api`, `apps/worker`, `apps/tasks`, `enterprise/packages/composition/*`) may import one.",
+      fix: "Import the capability from that feature's contract package here, and do the wiring that needs `{{specifier}}` in the composition root that already builds the app.",
     },
     crossFeature: {
       what: "`{{specifier}}` is another feature's server or web package.",
       fix: "Import the same capability from `@langwatch/{{feature}}-contract`; if it is not exported there, add it to the contract first.",
     },
     packageEscape: {
-      what: "This relative import leaves `{{packageRoot}}`.",
-      fix: "Import the target by its package name, or move the module into this package.",
+      what: "`{{specifier}}` resolves outside `{{packageRoot}}`, so this package depends on a file it does not own.",
+      fix: "Replace `{{specifier}}` with the target's package name — `@langwatch/<feature>-<contract|server|web>` for a feature package, `@langwatch/<name>` for any other workspace package. Move the file into `{{packageRoot}}` instead only when nothing outside `{{packageRoot}}` imports it.",
     },
     contractRuntime: {
-      what: "A contract package is transport-neutral: `{{specifier}}` is a node/browser/server runtime.",
-      fix: "Move this code to the server or web package and keep only types and schemas here.",
+      what: "A contract package is transport-neutral: `{{specifier}}` is a node, browser or server runtime.",
+      fix: "Keep only types and schemas here, and move the code that calls `{{specifier}}` to the feature's server package when it is a `node:` or server import, or to its web package when it is a browser import.",
     },
     webImportsServer: {
-      what: "A web package cannot import a server package.",
-      fix: "Call the API the server exposes, or import the type from the contract.",
+      what: "`{{specifier}}` is server-only, and this is a web package.",
+      fix: "Call the REST or tRPC endpoint the server exposes through this feature's web client, and import any shared type from `@langwatch/<feature>-contract`.",
     },
     serverImportsBrowser: {
       what: "A server package cannot import `{{specifier}}` (browser).",
       fix: "Move the browser-only value to the web package.",
     },
     coreImportsEnterprise: {
-      what: "Core code cannot import enterprise packages.",
-      fix: "Register the enterprise implementation through the composition root instead.",
+      what: "`{{specifier}}` is an enterprise package, and this is core code.",
+      fix: "Declare the capability as an interface in this feature's contract package, depend on that interface here, and register the implementation from `{{specifier}}` in `enterprise/packages/composition/<api|worker>`.",
     },
     deadAlias: {
-      what: "`{{specifier}}` is a deleted alias (`~/`, `@app/`, `@ee/`).",
-      fix: "Import the module by its package name.",
+      what: "`{{specifier}}` is a deleted alias (`~/`, `@app/`, `@ee/`); nothing resolves it any more.",
+      fix: "Import the module by its package name — `@langwatch/<feature>-<contract|server|web>` for a feature package, `@langwatch/<name>` for any other workspace package — or by a relative path when it already lives inside this package.",
     },
     prismaContainment: {
-      what: "Prisma may be imported only by a server repository adapter under src/repositories/prisma.",
-      fix: "Move the query into a `*.repository.ts` there and call it through the service.",
+      what: "`{{specifier}}` is Prisma, which only a server repository under `src/repositories/prisma/` may import.",
+      fix: "Move the query into `repositories/prisma/prisma.<subject>.repository.ts`, behind the `repositories/<subject>.repository.ts` interface, and call that interface from the service.",
     },
     featureLayer: {
-      what: "`{{layer}}` cannot import `{{targetLayer}}`.",
-      fix: "Depend on the port or service instead and let the composition root supply the concrete adapter.",
+      what: "`{{layer}}` cannot import `{{targetLayer}}` (`{{specifier}}`).",
+      fix: "Take the collaborator as a constructor parameter typed by its interface and let `app/<feature>.app.ts` pass the concrete one in. Where the target is the api or migrations layer, invert the call instead so that outer layer calls this one.",
     },
     retiredPackageRuntime: {
-      what: "This package entry point belongs to a retired runtime or package surface.",
-      fix: "Use {{replacement}} instead.",
+      what: "`{{specifier}}` is a retired runtime or package entry point.",
+      fix: "Import {{replacement}} instead.",
     },
     schemaBoundary: {
       what: "`{{specifier}}` binds the contract to Hono.",
@@ -187,7 +187,7 @@ export const boundaryRule = defineRule({
     },
     sealedExports: {
       what: "`{{subpath}}` is not in `{{package}}`'s `exports`.",
-      fix: "Import from a declared entry, or add the subpath to that package's `exports` if it is meant to be public.",
+      fix: "Import from `{{package}}` itself when its entry already re-exports the symbol; otherwise add `\"{{subpath}}\"` to the `exports` map in `{{package}}`'s package.json and re-export the symbol from the file that entry points at.",
     },
   },
   create(context) {
@@ -206,7 +206,7 @@ export const boundaryRule = defineRule({
         context.report({
           node,
           messageId: "retiredPackageRuntime",
-          data: { replacement },
+          data: { specifier, replacement },
         });
         return;
       }
@@ -220,7 +220,10 @@ export const boundaryRule = defineRule({
             context.report({
               node,
               messageId: "packageEscape",
-              data: { packageRoot: relative(context.cwd, packageRoot).split(sep).join("/") },
+              data: {
+                specifier,
+                packageRoot: relative(context.cwd, packageRoot).split(sep).join("/"),
+              },
             });
           }
 
@@ -253,19 +256,23 @@ export const boundaryRule = defineRule({
               context.report({
                 node,
                 messageId: "featureLayer",
-                data: { layer: "api", targetLayer: "the persistence or infrastructure layer" },
+                data: {
+                  specifier,
+                  layer: "api",
+                  targetLayer: "the persistence or infrastructure layer",
+                },
               });
             } else if (serviceImportsOuterLayer) {
               context.report({
                 node,
                 messageId: "featureLayer",
-                data: { layer: "service", targetLayer: "the api or migrations layer" },
+                data: { specifier, layer: "service", targetLayer: "the api or migrations layer" },
               });
             } else if (serviceImportsConcreteAdapter) {
               context.report({
                 node,
                 messageId: "featureLayer",
-                data: { layer: "service", targetLayer: "a concrete adapter" },
+                data: { specifier, layer: "service", targetLayer: "a concrete adapter" },
               });
             }
           }
@@ -328,13 +335,13 @@ export const boundaryRule = defineRule({
           classification.role !== "other" &&
           target.pkg.enterprise
         ) {
-          context.report({ node, messageId: "coreImportsEnterprise" });
+          context.report({ node, messageId: "coreImportsEnterprise", data: { specifier } });
         }
         if (classification.role === "contract" && target.pkg.role !== "contract") {
           context.report({ node, messageId: "contractRuntime", data: { specifier } });
         }
         if (classification.role === "web" && target.pkg.role === "server") {
-          context.report({ node, messageId: "webImportsServer" });
+          context.report({ node, messageId: "webImportsServer", data: { specifier } });
         }
         if (classification.role === "server" && target.pkg.role === "web") {
           context.report({ node, messageId: "serverImportsBrowser", data: { specifier } });
@@ -346,7 +353,7 @@ export const boundaryRule = defineRule({
           !testSupportImport;
 
         if (importsServerOutsideCompositionRoot) {
-          context.report({ node, messageId: "compositionRoot" });
+          context.report({ node, messageId: "compositionRoot", data: { specifier } });
         }
       }
 
@@ -357,7 +364,9 @@ export const boundaryRule = defineRule({
         const allowed =
           classification.role === "server" &&
           /\/src\/repositories\/prisma\//.test(`/${classification.workspacePath}`);
-        if (!allowed) context.report({ node, messageId: "prismaContainment" });
+        if (!allowed) {
+          context.report({ node, messageId: "prismaContainment", data: { specifier } });
+        }
       }
 
       if (
@@ -385,7 +394,7 @@ export const boundaryRule = defineRule({
         productionSource && classification.role === "web" && (nodeRuntime || serverRuntime);
 
       if (webImportsServerRuntime) {
-        context.report({ node, messageId: "webImportsServer" });
+        context.report({ node, messageId: "webImportsServer", data: { specifier } });
       }
       if (productionSource && classification.role === "server" && browserRuntime) {
         context.report({ node, messageId: "serverImportsBrowser", data: { specifier } });

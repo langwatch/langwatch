@@ -40,24 +40,34 @@ export const fallibleResultNamingRule = defineRule({
   applies: isFallibleResultModule,
   messages: {
     tryPrefix: {
-      what: "`{{name}}` hedges: a `try` method hands the caller a maybe instead of an answer.",
+      what: "`{{name}}` hedges: `try` names how the method behaves on failure, not what it answers.",
+      why: "A caller that cannot tell absence from breakage writes the same branch for both.",
       fix:
-        "Name it `{{plain}}` and make the body throw: delete the catch that turns a"
-        + " failure into a maybe, so the caller gets the answer or the reason there is"
-        + " none. Renaming it `find...` is not the fix — that moves the hedge into the"
-        + " name and leaves the swallowed error where it was.",
+        "Name it `{{plain}}` and make the body throw on failure — where the body catches"
+        + " an error and returns null or undefined, delete that catch so the caller gets"
+        + " the answer or the reason there is none. Keep a nullable return type only when"
+        + " `{{plain}}` begins with `find` and its callers branch on absence; otherwise"
+        + " drop null and undefined from the return type as well.",
     },
     requirePrefix: {
-      what: "Rename `{{name}}`: drop the `require` prefix; a method already returns or throws.",
-      fix: "Rename the method without the `require` prefix.",
+      what: "`{{name}}` carries a redundant `require` prefix: a method already answers or throws.",
+      fix: "Name it `{{plain}}` and leave the body as it is.",
     },
     noResultType: {
       what: "`{{name}}` has no explicit result type, so its absence contract cannot be enforced.",
-      fix: "Add an explicit return type.",
+      fix:
+        "Write the return type after the parameter list: `T` (or `Promise<T>`) when the"
+        + " method always answers, and `T | null` only when `{{name}}` begins with `find`.",
     },
     nullableWithoutFind: {
-      what: "`{{name}}` can return null/undefined, but only a `find*` method may answer with absence.",
-      fix: "Throw the domain error and drop the nullable from the type; only a genuine lookup whose callers branch on absence becomes `find<Noun>`, named for what it looks up — never `find` bolted onto this name. A write whose target may normally be absent returns an explicit result union instead of null.",
+      what: "`{{name}}` can answer null or undefined, but only a `find*` method may answer with absence.",
+      fix:
+        "Choose by what absence means here. If the caller branches on it, rename"
+        + " `{{name}}` to `find<Noun>` for the thing it looks up — never `find` bolted"
+        + " onto this name — and keep the nullable. If absence means the domain refused,"
+        + " throw the domain error and drop null and undefined from the return type. If"
+        + " this is a write whose target may normally be absent, return an explicit"
+        + " result union instead of null.",
     },
   },
   create(context) {
@@ -76,7 +86,11 @@ export const fallibleResultNamingRule = defineRule({
       }
 
       if (/^require[A-Z]/.test(name)) {
-        context.report({ node: key, messageId: "requirePrefix", data: { name } });
+        context.report({
+          node: key,
+          messageId: "requirePrefix",
+          data: { name, plain: withoutPrefix(name, "require") },
+        });
       }
 
       if (!returnType) {

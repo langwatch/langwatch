@@ -16,14 +16,21 @@ export const zodObjectCompositionRule = defineRule({
   applies: isSchemaSource,
   messages: {
     spreadShape: {
-      what: "Zod .{{method}}() composes object types through mapped generics.",
-      why: "Shape spreads avoid repeated generic instantiation when constructing derived schemas.",
-      fix: "Compose with z.object({ ...base.shape, ...fields }); preserve strictness and catchalls with the matching object constructor and .catchall(). Use .safeExtend() when refinement or assignability checks must be retained.",
+      what: "`.{{method}}()` builds this schema's type through Zod's mapped `Extend` generic.",
+      why: "Only the shape spread produces a fresh object type; `.safeExtend()` preserves behaviour but instantiates the same generic.",
+      fix:
+        "Choose by what the base schema carries. When it is a plain `z.object()` with no"
+        + " `.strict()` or `z.strictObject()`, no `.catchall()` and no `.refine()` or"
+        + " `.superRefine()`, write `z.object({ ...base.shape, ...fields })` — spreading"
+        + " `...other.shape` for `.merge(other)` — since that is the only form that"
+        + " avoids the generic. Otherwise write `.safeExtend({ ...fields })`, which keeps"
+        + " the strictness, catchall and refinements that the shape spread drops"
+        + " silently.",
     },
     keepRefinements: {
-      what: "This Zod object carries refinements before .{{method}}().",
+      what: "`.{{method}}()` is called on a Zod object that carries refinements.",
       why: "Spreading its shape alone would discard those checks.",
-      fix: "Use .safeExtend() to retain refinements, or apply the refinements to the final composed object.",
+      fix: "Write `.safeExtend({ ...fields })` here — a `z.object({ ...base.shape })` spread would drop those refinements without a type error.",
     },
   },
   create(context, file) {

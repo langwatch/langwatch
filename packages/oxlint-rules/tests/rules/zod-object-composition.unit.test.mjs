@@ -71,7 +71,8 @@ describe("efficient Zod object composition", () => {
     const findings = report(code);
     expect(findings).toHaveLength(1);
     expect(findings[0].messageId).toBe("spreadShape");
-    expect(findings[0].message).toContain("preserve strictness and catchalls");
+    expect(findings[0].message).toContain("z.object({ ...base.shape, ...fields })");
+    expect(findings[0].message).toContain(".safeExtend({ ...fields })");
     expect(zodObjectCompositionRule.meta.fixable).toBeUndefined();
   });
 
@@ -82,7 +83,7 @@ describe("efficient Zod object composition", () => {
     const findings = report(code);
     expect(findings).toHaveLength(1);
     expect(findings[0].messageId).toBe("keepRefinements");
-    expect(findings[0].message).toContain("Use .safeExtend()");
+    expect(findings[0].message).toContain("Write `.safeExtend({ ...fields })` here");
   });
 
   it.each([
