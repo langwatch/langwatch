@@ -52,6 +52,12 @@ export const GOVERNANCE_OVERRIDES: Record<string, Partial<DatasetOverride>> = {
       "internal_governance project; visible only to a caller whose project " +
       "set includes it.",
     grain: "one row per (TenantId, RestatementKey)",
+    // `Day` is a `Date` column, not `DateTime` — defaultTimeColumn() only
+    // recognizes the `DateTime` prefix, so without this override it falls
+    // back to the sort key's first column (TenantId, a String), and the
+    // generated example query compares TenantId to a DateTime, which
+    // ClickHouse rejects (no supertype for String and DateTime).
+    timeColumn: "Day",
     dedup: { versionColumn: "EventTimestamp" },
   },
   governance_kpis: {

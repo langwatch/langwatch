@@ -44,7 +44,6 @@ function docsViewNames(): string[] {
 }
 
 describe("LWQL docs-catalog parity", () => {
-  /** @scenario "Every catalog view is documented, and every documented view exists" */
   it("lists exactly the catalog's view names, both directions", () => {
     const catalogNames = new Set(LWQL_VIEW_CATALOG.map((view) => view.name));
     const docNames = docsViewNames();
@@ -61,7 +60,6 @@ describe("LWQL docs-catalog parity", () => {
     );
   });
 
-  /** @scenario "The docs table has no duplicate view rows" */
   it("names each view exactly once", () => {
     const docNames = docsViewNames();
     const seen = new Set<string>();

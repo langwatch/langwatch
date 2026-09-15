@@ -2032,10 +2032,25 @@ describe("given the /api/v1/query REST family's service, isolation and policy pr
         openProject.id,
         openProject.apiKey,
         openProject.lwqlKey,
-        ...LWQL_VIEW_CATALOG.map((view) => view.sourceTable),
         facts,
         ...relayed,
       ];
+
+      // Physical source table names get their own, stricter check: a
+      // response is allowed — expected, even — to name a dataset's PUBLIC
+      // view (e.g. the schema door's `availableViews` hint), and one view's
+      // physical table can sit inside another view's public name as plain
+      // text (the "legacy_event_log" view's own name contains the physical
+      // table "event_log" belonging to it). A bare substring match would
+      // flag that legitimate name as a leak of the table backing it, so this
+      // only counts an occurrence that isn't glued to a larger identifier.
+      const sourceTables = LWQL_VIEW_CATALOG.map((view) => view.sourceTable);
+      const leaksPhysicalTable = (text: string, table: string): boolean => {
+        const escaped = table.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+        return new RegExp(`(?<![A-Za-z0-9_])${escaped}(?![A-Za-z0-9_])`).test(
+          text,
+        );
+      };
 
       const probes: readonly {
         sql: string;
@@ -2106,6 +2121,12 @@ describe("given the /api/v1/query REST family's service, isolation and policy pr
           expect(
             text.includes(secret),
             `"${secret}" reached the caller through: ${sql}\n${text}`,
+          ).toBe(false);
+        }
+        for (const table of sourceTables) {
+          expect(
+            leaksPhysicalTable(text, table),
+            `"${table}" (physical table) reached the caller through: ${sql}\n${text}`,
           ).toBe(false);
         }
       }
