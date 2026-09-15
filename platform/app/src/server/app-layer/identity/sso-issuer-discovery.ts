@@ -45,6 +45,10 @@ export class HttpSsoIssuerDiscovery implements SsoIssuerDiscoveryPort {
   constructor(
     private readonly fetchImpl: typeof fetch = fetch,
     private readonly resolveHost: HostResolver = systemHostResolver,
+    /** Origins somebody vouched for, which may answer inside a private
+     *  network. Resolved by the composition root — see
+     *  `dialable-internal-origins.ts`. Empty means the guard's plain rule. */
+    private readonly dialableInternalOrigins: string[] = [],
   ) {}
 
   async discover({
@@ -73,6 +77,7 @@ export class HttpSsoIssuerDiscovery implements SsoIssuerDiscoveryPort {
         signal: AbortSignal.timeout(DISCOVERY_TIMEOUT_MS),
         headers: { accept: "application/json" },
         maxRedirects: DISCOVERY_MAX_REDIRECTS,
+        dialableInternalOrigins: this.dialableInternalOrigins,
       });
 
       if (!outcome.ok) {

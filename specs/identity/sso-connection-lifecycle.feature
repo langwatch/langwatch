@@ -335,3 +335,47 @@ Feature: SsoConnection - enterprise SSO becomes an aggregate with a guarded life
     And they are told to give the issuer URL their provider publishes
     And nothing in the answer describes our network back to them
 
+  # --- Except where somebody has vouched for the address --------------------
+  #
+  # Refusing every private address also refuses the two cases where dialling
+  # one is the whole point: an identity provider that lives inside the
+  # customer's own network, and the simulator a developer walks this journey
+  # against. The engine already dials both at sign-in, on the strength of
+  # SSO_TRUSTED_IDP_ORIGINS and LANGWATCH_IDPSIM_URL. Registration refused
+  # them, so an installation could sign in through a provider it was not
+  # allowed to register — the ceremony and the sign-in disagreeing about the
+  # same address.
+  #
+  # One list now answers for both, with the same rule the engine already
+  # applies: an operator's allowlist is honoured everywhere, and the
+  # simulator's address is honoured outside production only, because it signs
+  # whatever it is asked to sign.
+  #
+  # Vouching is per ORIGIN and does not travel. A redirect away from a
+  # vouched origin is judged like any other hop, so an address somebody
+  # allowed cannot become a way to reach the rest of the network.
+
+  @unit
+  Scenario: An issuer inside the network an operator vouched for is dialled
+    Given an operator registering a connection
+    And they have vouched for the origin their provider answers on
+    When the issuer they give resolves to an address inside that origin
+    Then the provider is asked whether it is one
+    And the connection registers on the answer
+
+  @unit
+  Scenario: The simulator is dialled outside production and nowhere else
+    Given a developer registering a connection against the identity provider
+    simulator
+    When the issuer they give is the simulator's own address
+    Then the provider is asked whether it is one
+    But the same address is refused on a production installation
+
+  @unit
+  Scenario: Vouching for an origin does not vouch for where it redirects
+    Given an operator registering a connection
+    And they have vouched for the origin their provider answers on
+    When that origin redirects the discovery request into our own network
+    Then the connection is not registered
+    And nothing in the answer describes our network back to them
+

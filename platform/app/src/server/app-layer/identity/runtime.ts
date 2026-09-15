@@ -106,6 +106,7 @@ import { InProcessBreakGlassLimiter } from "./break-glass-limiter";
 import { IdentitySsoConnectionGrandfatherMigration } from "./connection-grandfather.migration";
 import { CredentialAccountService } from "./credential-account.service";
 import { CredentialAccountStorageAdapter } from "./credential-account.storage-adapter";
+import { resolveDialableInternalOrigins } from "./dialable-internal-origins";
 import { IdentityIdentifierBackfillMigration } from "./identifier-backfill.migration";
 import { IdentityLookupService } from "./identity-lookup.service";
 import {
@@ -135,6 +136,7 @@ import {
 } from "./organization-mfa-adapters";
 import { AdminEmailPlatformOperators } from "./platform-operators";
 import { PriorSessionService } from "./prior-session.service";
+import { systemHostResolver } from "./public-egress";
 import { PrismaCredentialAccountRepository } from "./repositories/credential-account.prisma.repository";
 import { PrismaIdentityAccountsRepository } from "./repositories/identity-accounts.prisma.repository";
 import { PrismaIdentityBackfillRepository } from "./repositories/identity-backfill.prisma.repository";
@@ -785,7 +787,19 @@ export function ssoSelfServe(): SsoSelfServeService {
     files: new HttpsDomainProofFileLookup(),
     license: licenseProof,
     credentials: ssoCredentials,
-    discovery: new HttpSsoIssuerDiscovery(),
+    // The guard refuses a private address because the issuer came off a
+    // form. The two addresses somebody named in advance — an operator's own
+    // provider, and the simulator — are the two it must not refuse, and they
+    // are the same two the engine already dials at sign-in.
+    discovery: new HttpSsoIssuerDiscovery(
+      fetch,
+      systemHostResolver,
+      resolveDialableInternalOrigins({
+        trustedIdpOrigins: env.SSO_TRUSTED_IDP_ORIGINS,
+        idpSimulatorUrl: env.LANGWATCH_IDPSIM_URL,
+        isProduction: env.NODE_ENV === "production",
+      }),
+    ),
     baseUrl: env.NEXTAUTH_URL ?? "",
     // The evidence a test sign-in happened is the account the engine wrote,
     // read here rather than recorded anywhere: activation carries the id of
