@@ -58,11 +58,14 @@ export const conditionShapeRule = defineRule({
   kind: "problem",
   messages: {
     nameCondition: {
-      what: "This condition takes {{hops}} property hops, {{calls}} calls and {{operators}} logical operators to read.",
+      what: "This test combines {{calls}} calls and {{operators}} logical operators across a chain {{hops}} properties deep.",
       why: "A test nobody can read at a glance is where the wrong branch hides.",
       fix:
-        "Assign it to a const named for what the branch means, not a restatement of the"
-        + " expression, and test that name.",
+        "Split it into guard clauses: return, `continue`, or `break` as soon as one part fails, so"
+        + " each remaining test keeps at most one call and no combined operator — a chain alone,"
+        + " however deep, is fine once it stops combining with anything else. For a `switch`, read"
+        + " the value once above it and switch on that read. Move a ternary out of the test"
+        + " entirely: decide it in the branch it already belongs to, not nested inside this one.",
     },
   },
   options: {

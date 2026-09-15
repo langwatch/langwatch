@@ -32,8 +32,10 @@ export const noPortVocabularyRule = defineRule({
     portFile: {
       what: "`{{name}}` is a port file.",
       fix:
-        "Move it to repositories/, channels/, services/ or the module's Infrastructure and " +
-        "give it the name of its role.",
+        "Move it to `repositories/` if it owns state, `channels/` if it exchanges messages with " +
+        "something the module does not own, `services/` if it's behaviour, or the module's " +
+        "Infrastructure if it's a client the process supplies — then rename the file for that " +
+        "role, dropping `port`.",
     },
   },
   create(context) {
@@ -53,13 +55,17 @@ export const noPortVocabularyRule = defineRule({
       },
       ExportNamedDeclaration(node) {
         const source = node.source && typeof node.source.value === "string" ? node.source.value : "";
-        if (source && (PORT_PATH.test(source) || PORT_FILE.test(source))) {
+        const reExportsFromPortPath = source && (PORT_PATH.test(source) || PORT_FILE.test(source));
+
+        if (reExportsFromPortPath) {
           report(context, node, source);
         }
       },
       ExportAllDeclaration(node) {
         const source = typeof node.source?.value === "string" ? node.source.value : "";
-        if (source && (PORT_PATH.test(source) || PORT_FILE.test(source))) {
+        const reExportsAllFromPortPath = source && (PORT_PATH.test(source) || PORT_FILE.test(source));
+
+        if (reExportsAllFromPortPath) {
           report(context, node, source);
         }
       },

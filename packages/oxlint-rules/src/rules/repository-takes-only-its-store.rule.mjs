@@ -19,7 +19,10 @@ export const repositoryTakesOnlyItsStoreRule = defineRule({
     repositoryTakesMoreThanItsStore: {
       what: "A repository names {{crossed}} (`{{specifier}}`).",
       why: "A repository takes the store it reads and nothing else. Behaviour lives in the service and the app above it, and outside its own package a module is its App.",
-      fix: "Move the decision into the service that calls this repository, and keep the repository over its store alone.",
+      fix:
+        "Move the decision into the service that calls this repository, and keep the repository" +
+        " over its store alone. When the crossing is into another module, reach it through that" +
+        " module's contract Api token instead — a module is its App outside its own package.",
     },
   },
   applies: isRepository,

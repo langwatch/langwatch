@@ -30,9 +30,13 @@ describe("given a strict feature service module", () => {
       expect(found[0].messageId).toBe("nameCondition");
       expect(found[0].data).toEqual({ calls: 0, hops: 3, operators: 1 });
       expect(found[0].message).toBe(
-        "This condition takes 3 property hops, 0 calls and 1 logical operators to read." +
-          " Assign it to a const named for what the branch means, not a restatement of the" +
-          " expression, and test that name.",
+        "This test combines 0 calls and 1 logical operators across a chain 3 properties deep." +
+          " Split it into guard clauses: return, `continue`, or `break` as soon as one part fails," +
+          " so each remaining test keeps at most one call and no combined operator — a chain" +
+          " alone, however deep, is fine once it stops combining with anything else. For a" +
+          " `switch`, read the value once above it and switch on that read. Move a ternary out of" +
+          " the test entirely: decide it in the branch it already belongs to, not nested inside" +
+          " this one.",
       );
     });
   });

@@ -10,16 +10,19 @@ export const serviceClassesRule = defineRule({
   applies: (file) => file.isServiceModule,
   messages: {
     create: {
-      what: "A service class must expose construction through a static create method.",
-      fix: "Add a static `create` method and make the constructor private.",
+      what: "Service class `{{name}}` must expose construction through a static create method.",
+      fix: "Add a static `create` method to `{{name}}` and make its constructor private.",
     },
     missing: {
       what: "A service module must define a class whose name ends in Service.",
       fix: "Export a `*Service` class from this module.",
     },
     standalone: {
-      what: "Exported function `{{name}}` in a service module: make it a method on the `*Service` class, or a private module-level helper (not exported).",
-      fix: "Move the behaviour onto the class, or stop exporting the helper.",
+      what: "Exported function `{{name}}` in a service module.",
+      fix:
+        "If it only transforms its arguments, drop `export` and keep it a private module-level" +
+        " helper. Otherwise move it onto the `*Service` class as a method — a service module" +
+        " exports exactly one class.",
     },
   },
   create(context) {
@@ -79,7 +82,11 @@ export const serviceClassesRule = defineRule({
               member.key.name === "create",
           );
           if (!hasStaticCreate) {
-            context.report({ node: serviceClass, messageId: "create" });
+            context.report({
+              node: serviceClass,
+              messageId: "create",
+              data: { name: serviceClass.id?.name ?? "" },
+            });
           }
         }
       },

@@ -65,7 +65,8 @@ describe("given a source file outside the burn-down allowlist", () => {
       expect(found[0].data.width).toBe(wide.length);
       expect(found[0].message).toBe(
         `Comment line is ${wide.length} columns; wrap at 100.` +
-          " Rewrap the block at 100 columns, or cut it to the sentence that earns its place.",
+          " Wrap it at 100 columns, keeping the sentence whole across the break. If it only" +
+          " restates the code beside it, delete it instead of wrapping it.",
       );
     });
   });
