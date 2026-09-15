@@ -147,13 +147,20 @@ describe("the credential boundary on a deployment that issues its own passwords"
 
   describe("given a request that names no address", () => {
     it("asks nothing and refuses nothing on that ground", async () => {
+      // Both halves, because the refusal is the half that matters: a lookup
+      // that answers "governed" for every address must not turn an
+      // address-less request into a refusal, or `/reset-password` — which
+      // carries a token and no email — would stop working the moment any
+      // connection existed.
       const routesToConnection = vi.fn().mockResolvedValue(true);
 
-      await submit({
-        policy: issuesOwnPasswords,
-        routesToConnection,
-        body: {},
-      });
+      await expect(
+        submit({
+          policy: issuesOwnPasswords,
+          routesToConnection,
+          body: {},
+        }),
+      ).resolves.toEqual({ refused: false });
 
       expect(routesToConnection).not.toHaveBeenCalled();
     });
