@@ -4,7 +4,8 @@ export function quietly(report: () => void): void {
   try {
     report();
   } catch {
-    // Deliberately swallowed. The only channel for reporting a broken
-    // reporting hook is the hook that just threw.
+    // The only channel for reporting a broken reporting hook is the hook that
+    // just threw, so the answer to a failed report is no report.
+    return;
   }
 }

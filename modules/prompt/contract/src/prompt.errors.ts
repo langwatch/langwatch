@@ -94,6 +94,40 @@ export class PromptSystemPromptRequiredError extends HandledError {
     this.name = "PromptSystemPromptRequiredError";
   }
 }
+/**
+ * The playground door was reached without a signed-in browser session. The
+ * door reads the session itself, so the refusal is its own rather than the
+ * framework's.
+ */
+export class PromptPlaygroundSignInRequiredError extends HandledError {
+  declare readonly code: "unauthorized";
+
+  constructor() {
+    super("unauthorized", "Sign in to run a prompt in the playground", {
+      httpStatus: 401,
+      fault: "customer",
+    });
+    this.name = "PromptPlaygroundSignInRequiredError";
+  }
+}
+
+/**
+ * The session is real and does not hold `prompts:view` on the project it
+ * named — or the project is the shared demo, which never spends provider
+ * credit on a visitor's run.
+ */
+export class PromptPlaygroundNotPermittedError extends HandledError {
+  declare readonly code: "insufficient_permissions";
+
+  constructor() {
+    super("insufficient_permissions", "You cannot run prompts on this project", {
+      httpStatus: 403,
+      fault: "customer",
+    });
+    this.name = "PromptPlaygroundNotPermittedError";
+  }
+}
+
 export class HandleGenerationError extends Error {
   readonly code = "prompt_handle_generation_failed";
   constructor(message: string) {

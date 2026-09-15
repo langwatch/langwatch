@@ -1,8 +1,8 @@
-import { HandledError } from "@langwatch/handled-error";
 import {
   CODEX_OAUTH_CLIENT_ID,
   CODEX_OAUTH_ISSUER,
   CODEX_VERIFICATION_URL,
+  CodexAuthError,
   type CodexTokenKeys,
 } from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
@@ -26,27 +26,6 @@ export interface CodexDeviceCode {
 
 /** One poll's outcome: still waiting, or a full token set. */
 export type CodexPollResult = { status: "pending" } | { status: "complete"; keys: CodexTokenKeys };
-
-/** HandledError so the sign-in UI shows `message` verbatim without logging an unhandled 500. */
-export class CodexAuthError extends HandledError {
-  /** The issuer's HTTP status for kind "http" — what separates an OAuth
-   *  rejection (4xx + error body) from a retryable outage (5xx, network). */
-  public readonly status?: number;
-
-  constructor(
-    public readonly kind: "http" | "malformed" | "timed_out" | "refresh_rejected",
-    message: string,
-    options?: { status?: number },
-  ) {
-    super("codex_auth_failed", message, {
-      meta: { kind },
-      fault: "provider",
-      httpStatus: kind === "refresh_rejected" ? 401 : 502,
-    });
-    this.name = "CodexAuthError";
-    this.status = options?.status;
-  }
-}
 
 interface CodexOAuthTokens {
   idToken: string;

@@ -36,8 +36,12 @@ afterEach(async () => {
   for (const pid of sessions.splice(0)) {
     try {
       process.kill(pid, "SIGKILL");
-    } catch {
-      // Already gone.
+    } catch (error) {
+      // Already gone. ESRCH is the normal outcome; anything
+      // else (a permission refusal) is a real teardown failure.
+      if (!(error instanceof Error && "code" in error && error.code === "ESRCH")) {
+        throw error;
+      }
     }
   }
   for (let attempt = 0; attempt < 40; attempt += 1) {

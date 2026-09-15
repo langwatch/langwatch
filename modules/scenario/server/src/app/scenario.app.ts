@@ -1,7 +1,6 @@
 /**
  * The scenario feature's application: what all of its doors call.
  */
-import { HandledError } from "@langwatch/handled-error";
 import {
   startScenarioTabPresence,
   ScenarioApi,
@@ -61,6 +60,7 @@ import {
   type SimulationScenarioSetRunsInput,
   type SimulationService,
   type SimulationSetData,
+  ScenarioSimulationsUnavailableError,
   withActor,
   withNote,
   withResolvedModels,
@@ -156,23 +156,6 @@ export interface ScenarioAppInfrastructure {
  */
 const scenarioAppConfigSchema = z.object({ publicBaseUrl: z.string().optional() }).default({});
 export type ScenarioAppConfig = z.infer<typeof scenarioAppConfigSchema>;
-
-/**
- * Error when ClickHouse-backed simulation reads are not composed yet,
- * refusing raw crash with undefined.
- */
-export class ScenarioSimulationsUnavailableError extends HandledError {
-  declare readonly code: "service_unavailable";
-
-  constructor() {
-    super(
-      "service_unavailable",
-      "This deployment cannot read simulation runs yet, because its simulation reads are not composed.",
-      { httpStatus: 503, fault: "platform" },
-    );
-    this.name = "ScenarioSimulationsUnavailableError";
-  }
-}
 
 /** The one peer API this feature reads directly. */
 export const scenarioAppDependencyTokens = { users: UserApi };

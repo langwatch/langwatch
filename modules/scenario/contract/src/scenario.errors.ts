@@ -142,3 +142,49 @@ export class ScenarioFieldTypeInvalidError extends HandledError {
     this.name = "ScenarioFieldTypeInvalidError";
   }
 }
+
+/**
+ * Error when ClickHouse-backed simulation reads are not composed yet,
+ * refusing raw crash with undefined.
+ */
+export class ScenarioSimulationsUnavailableError extends HandledError {
+  declare readonly code: "service_unavailable";
+
+  constructor() {
+    super(
+      "service_unavailable",
+      "This deployment cannot read simulation runs yet, because its simulation reads are not composed.",
+      { httpStatus: 503, fault: "platform" },
+    );
+    this.name = "ScenarioSimulationsUnavailableError";
+  }
+}
+
+/** Refuses decryption without the deployment key before a provider receives invalid credentials. */
+export class ScenarioSecretsUnavailableError extends HandledError {
+  declare readonly code: "service_unavailable";
+
+  constructor() {
+    super(
+      "service_unavailable",
+      "This deployment cannot store or read scenario secrets, because it has no encryption key configured.",
+      { httpStatus: 503, fault: "platform" },
+    );
+    this.name = "ScenarioSecretsUnavailableError";
+  }
+}
+
+/**
+ * The agent row a finish names does not exist in the project. The row id comes
+ * from the signed token, but it is still checked against the project before a
+ * run is written under it, so a stale or forged row id cannot create a run.
+ */
+export class VoiceAgentNotFoundError extends HandledError {
+  declare readonly code: "agent_not_found";
+  constructor() {
+    super("agent_not_found", "The voice agent was not found in this project", {
+      httpStatus: 404,
+    });
+    this.name = "VoiceAgentNotFoundError";
+  }
+}

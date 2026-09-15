@@ -178,7 +178,9 @@ describe("AgentVoiceEditorDrawer", () => {
     try {
       sessionStorage.clear();
     } catch {
-      // ignore
+      // A jsdom without sessionStorage leaves nothing to clear, which is the
+      // state this setup was after.
+      return;
     }
   });
   afterEach(cleanup);

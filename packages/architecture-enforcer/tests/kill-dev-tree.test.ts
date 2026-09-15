@@ -49,11 +49,12 @@ afterEach(async () => {
       // Its own group, so this reaches the lanes as well as the stack itself.
       process.kill(-(child.pid as number), "SIGKILL");
     } catch (error) {
-      // Already gone is what most of these tests assert, so ESRCH is the
-      // normal outcome; a permission refusal is a real teardown failure.
-      if (!(error instanceof Error && "code" in error && error.code === "ESRCH")) {
-        throw error;
-      }
+      // Already gone is what most of these tests assert. A group whose members
+      // have all been reaped answers ESRCH, or EPERM on Darwin, where the pgid
+      // no longer names a group this process may signal. Anything else is a
+      // real teardown failure and is raised.
+      const code = error instanceof Error && "code" in error ? error.code : void 0;
+      if (code !== "ESRCH" && code !== "EPERM") throw error;
     }
   }
   await sleep(100);

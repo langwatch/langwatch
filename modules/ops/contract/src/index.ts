@@ -1,6 +1,7 @@
 export * from "./admin.ts";
 export * from "./admin-backoffice.ts";
 export * from "./admin.errors.ts";
+export * from "./ops.errors.ts";
 export * from "./admin.queries.ts";
 export * from "./blob-store.ts";
 export * from "./ops.responses.ts";

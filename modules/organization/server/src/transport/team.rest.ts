@@ -4,12 +4,19 @@
  * collection routes stay at organization scope as they operate on that whole set.
  */
 import {
+  organizationTeamRestAddMemberSchema,
   organizationTeamRestArchivedSchema,
+  organizationTeamRestCreateSchema,
   organizationTeamRestMemberListSchema,
   organizationTeamRestMemberSchema,
+  organizationTeamRestMemberParamsSchema,
   organizationTeamRestPageSchema,
+  organizationTeamRestPaginationQuerySchema,
+  organizationTeamRestParamsSchema,
+  organizationTeamRestProjectListSchema,
   organizationTeamRestSchema,
-  organizationTeamRoleSchema,
+  organizationTeamRestSuccessSchema,
+  organizationTeamRestUpdateSchema,
   type OrganizationApi,
   type OrganizationCaller,
   type OrganizationTeam,
@@ -75,34 +82,6 @@ const callerOf = (actor: { type: string; id?: string } | null): OrganizationCall
     : { id: SYSTEM_ACTORS.managementApi };
 
 /**
- * Wire schemas the REST family uses but which live in the contract, imported
- * above alongside the response shapes the application already computed.
- */
-const paginationQuerySchema = z.object({
-  page: z.coerce.number().int().positive().optional().default(1),
-  limit: z.coerce.number().int().positive().max(1000).optional().default(50),
-});
-
-const createTeamSchema = z.object({
-  name: z.string().min(1, "name is required").max(255),
-});
-
-const updateTeamSchema = z.object({
-  name: z.string().min(1).max(255).optional(),
-});
-
-const addMemberSchema = z.object({
-  userId: z.string().min(1, "userId is required"),
-  role: organizationTeamRoleSchema.optional().default("MEMBER"),
-});
-
-const teamParamsSchema = z.object({ id: z.string().min(1) });
-const teamMemberParamsSchema = teamParamsSchema.extend({ userId: z.string().min(1) });
-
-const successSchema = z.object({ success: z.boolean() });
-const teamProjectListSchema = z.object({ data: z.array(z.unknown()) });
-
-/**
  * The team's response shape: the stored shape omits the personal flag and owner,
  * so the wire is narrower.
  */
@@ -147,7 +126,7 @@ export const teamsRest: Readonly<{
 
   .get("/", "listTeams")
   .withPermission("team:view")
-  .withQuery(paginationQuerySchema)
+  .withQuery(organizationTeamRestPaginationQuerySchema)
   .withOutput(organizationTeamRestPageSchema)
   .withDocs({
     tags: ["Teams"],
@@ -168,7 +147,7 @@ export const teamsRest: Readonly<{
 
   .post("/", "createTeam")
   .withPermission("team:manage")
-  .withInput(createTeamSchema)
+  .withInput(organizationTeamRestCreateSchema)
   .withOutput(organizationTeamRestSchema)
   .withStatus(201)
   .withDocs({
@@ -186,7 +165,7 @@ export const teamsRest: Readonly<{
 
   .get("/:id", "getTeam")
   .withPermission("team:view")
-  .withParams(teamParamsSchema)
+  .withParams(organizationTeamRestParamsSchema)
   .withOutput(organizationTeamRestSchema)
   .withDocs({
     tags: ["Teams"],
@@ -203,8 +182,8 @@ export const teamsRest: Readonly<{
 
   .patch("/:id", "updateTeam")
   .withPermission("team:manage")
-  .withParams(teamParamsSchema)
-  .withInput(updateTeamSchema)
+  .withParams(organizationTeamRestParamsSchema)
+  .withInput(organizationTeamRestUpdateSchema)
   .withOutput(organizationTeamRestSchema)
   .withDocs({
     tags: ["Teams"],
@@ -222,7 +201,7 @@ export const teamsRest: Readonly<{
 
   .delete("/:id", "archiveTeam")
   .withPermission("team:manage")
-  .withParams(teamParamsSchema)
+  .withParams(organizationTeamRestParamsSchema)
   .withOutput(organizationTeamRestArchivedSchema)
   .withDocs({
     tags: ["Teams"],
@@ -243,7 +222,7 @@ export const teamsRest: Readonly<{
 
   .get("/:id/members", "listTeamMembers")
   .withPermission("team:view")
-  .withParams(teamParamsSchema)
+  .withParams(organizationTeamRestParamsSchema)
   .withOutput(organizationTeamRestMemberListSchema)
   .withDocs({
     tags: ["Teams"],
@@ -269,9 +248,9 @@ export const teamsRest: Readonly<{
 
   .post("/:id/members", "addTeamMember")
   .withPermission("team:manage")
-  .withParams(teamParamsSchema)
-  .withInput(addMemberSchema)
-  .withOutput(successSchema)
+  .withParams(organizationTeamRestParamsSchema)
+  .withInput(organizationTeamRestAddMemberSchema)
+  .withOutput(organizationTeamRestSuccessSchema)
   .withStatus(201)
   .withDocs({
     tags: ["Teams"],
@@ -296,8 +275,8 @@ export const teamsRest: Readonly<{
 
   .delete("/:id/members/:userId", "removeTeamMember")
   .withPermission("team:manage")
-  .withParams(teamMemberParamsSchema)
-  .withOutput(successSchema)
+  .withParams(organizationTeamRestMemberParamsSchema)
+  .withOutput(organizationTeamRestSuccessSchema)
   .withDocs({
     tags: ["Teams"],
     description: "Remove a member from a team",
@@ -317,8 +296,8 @@ export const teamsRest: Readonly<{
 
   .get("/:id/projects", "listTeamProjects")
   .withPermission("team:view")
-  .withParams(teamParamsSchema)
-  .withOutput(teamProjectListSchema)
+  .withParams(organizationTeamRestParamsSchema)
+  .withOutput(organizationTeamRestProjectListSchema)
   .withDocs({
     tags: ["Teams"],
     description: "List projects in a team",

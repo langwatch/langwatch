@@ -86,13 +86,19 @@ export const isProxyBypassed = (config: OutboundProxyConfig, targetHost: string)
  * hostname is empty, so the parsed result is only trusted when it is non-empty.
  */
 export const hostnameOf = (urlOrHost: string): string => {
-  try {
-    const hostname = new URL(urlOrHost).hostname;
-    if (hostname) return hostname;
-  } catch {
-    // Not a URL; fall through to the bare-host handling below.
-  }
+  const parsed = findUrlHostname(urlOrHost);
+  if (parsed) return parsed;
   const withoutScheme = urlOrHost.replace(/^[a-z][a-z0-9+.-]*:\/\//i, "");
   const hostPort = withoutScheme.split("/")[0] ?? "";
   return hostPort.replace(/:\d+$/, "") || urlOrHost;
 };
+
+/** The hostname of a full URL, or undefined when the string is not one. */
+function findUrlHostname(value: string): string | undefined {
+  try {
+    return new URL(value).hostname || void 0;
+  } catch {
+    // Not a URL: the caller reads the bare host out of the string itself.
+    return void 0;
+  }
+}

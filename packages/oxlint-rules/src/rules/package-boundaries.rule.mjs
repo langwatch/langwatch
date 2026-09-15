@@ -65,7 +65,10 @@ function declaredWebDependencies(cwd) {
       }
     }
   } catch {
-    // The architecture validator reports malformed catalogues separately.
+    // The architecture validator reports malformed catalogues separately, so
+    // this rule reads a catalogue it cannot parse as declaring nothing rather
+    // than as declaring the half of it that parsed.
+    dependencies.clear();
   }
 
   webDependencyCache.set(cwd, dependencies);
@@ -224,12 +227,13 @@ export const boundaryRule = defineRule({
           // Production sources only: a service's own unit test composes it with
           // the real adapter or repository it runs against, which is the point of
           // the test rather than a layering breach.
-          if (
+          const appliesLayeringRules =
             !escaped &&
             productionSource &&
             classification.layoutVersion === 0 &&
-            classification.role === "server"
-          ) {
+            classification.role === "server";
+
+          if (appliesLayeringRules) {
             const targetWorkspacePath = relative(context.cwd, targetPath).split(sep).join("/");
             const importer = classification.workspacePath;
             const apiImportsImplementation =
@@ -303,14 +307,16 @@ export const boundaryRule = defineRule({
             data: { subpath, package: target.name },
           });
         }
-        if (
+
+        const crossesFeatureBoundary =
           classification.feature &&
           target.pkg.feature !== classification.feature &&
           target.pkg.role !== "contract" &&
           !testSupportImport &&
           !webSurfaceImport &&
-          !declaredWebDependency
-        ) {
+          !declaredWebDependency;
+
+        if (crossesFeatureBoundary) {
           context.report({
             node,
             messageId: "crossFeature",
@@ -333,12 +339,13 @@ export const boundaryRule = defineRule({
         if (classification.role === "server" && target.pkg.role === "web") {
           context.report({ node, messageId: "serverImportsBrowser", data: { specifier } });
         }
-        if (
+        const importsServerOutsideCompositionRoot =
           classification.role === "other" &&
           target.pkg.role === "server" &&
           !isFeatureServerCompositionRoot(classification.workspacePath) &&
-          !testSupportImport
-        ) {
+          !testSupportImport;
+
+        if (importsServerOutsideCompositionRoot) {
           context.report({ node, messageId: "compositionRoot" });
         }
       }
@@ -365,14 +372,19 @@ export const boundaryRule = defineRule({
       const serverRuntime = /^(hono|@trpc\/server|@langwatch\/(eventing|group-queue))/.test(
         specifier,
       );
-      if (
+      const contractImportsRuntime =
         productionSource &&
         classification.role === "contract" &&
-        (nodeRuntime || browserRuntime || serverRuntime)
-      ) {
+        (nodeRuntime || browserRuntime || serverRuntime);
+
+      if (contractImportsRuntime) {
         context.report({ node, messageId: "contractRuntime", data: { specifier } });
       }
-      if (productionSource && classification.role === "web" && (nodeRuntime || serverRuntime)) {
+
+      const webImportsServerRuntime =
+        productionSource && classification.role === "web" && (nodeRuntime || serverRuntime);
+
+      if (webImportsServerRuntime) {
         context.report({ node, messageId: "webImportsServer" });
       }
       if (productionSource && classification.role === "server" && browserRuntime) {
@@ -406,11 +418,12 @@ export const boundaryRule = defineRule({
         }
       },
       CallExpression(node) {
-        if (
+        const isRequireStringLiteralCall =
           node.callee.type === "Identifier" &&
           node.callee.name === "require" &&
-          node.arguments[0]?.type === "Literal"
-        ) {
+          node.arguments[0]?.type === "Literal";
+
+        if (isRequireStringLiteralCall) {
           reportImport(node.arguments[0], node.arguments[0].value);
         }
       },

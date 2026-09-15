@@ -300,3 +300,21 @@ export class UserAvatarNotFoundError extends NotFoundError {
     this.name = "UserAvatarNotFoundError";
   }
 }
+
+/**
+ * A capability this deployment does not hold. `fault: "platform"` because
+ * nothing the customer sent caused it, and the message names which
+ * capability is missing.
+ */
+export class UserCapabilityUnavailableError extends HandledError {
+  declare readonly code: "service_unavailable";
+
+  constructor(capability: string) {
+    super("service_unavailable", `This deployment has no ${capability}.`, {
+      httpStatus: 503,
+      fault: "platform",
+      meta: { capability },
+    });
+    this.name = "UserCapabilityUnavailableError";
+  }
+}

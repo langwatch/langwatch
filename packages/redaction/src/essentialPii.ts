@@ -7,10 +7,9 @@ import {
 } from "./identifierHoldout.ts";
 
 /**
- * Native, lightweight redaction for the "essential" PII level (emails, phones,
- * cards, IPs, IBANs, national IDs), run in-process per span so projects on the
- * default level stop calling the external analysis service. Person names and
- * locations need ML NER and remain the "strict" level, which keeps the service.
+ * Native, lightweight redaction for the "essential" PII level (emails, phones, cards, IPs,
+ * IBANs, national IDs), run in-process per span so projects on the default level stop calling
+ * the external analysis service. Names and locations need ML NER and stay at "strict".
  */
 
 const MAX_SCAN_LENGTH = 250_000;
@@ -22,10 +21,9 @@ interface Recognizer {
   entity: string;
   regex: RegExp;
   /**
-   * A literal the regex cannot match without, checked via `String.includes`
-   * before the regex runs, to skip its backtracking cost on non-matching text.
-   * Getting it wrong silently stops redacting real data, so
-   * `essentialPii.prefilter.unit.test.ts` proves each one against its pattern.
+   * A literal the regex cannot match without, checked via `String.includes` before the regex
+   * runs to skip its backtracking cost on non-matching text. Getting it wrong silently stops
+   * redacting real data, so `essentialPii.prefilter.unit.test.ts` proves each one.
    */
   requiresSubstring?: string;
   /** Checksum/structure check on the raw match; a falsey result drops the candidate. */
@@ -114,10 +112,9 @@ function ipv6Plausible(raw: string): boolean {
 }
 
 /**
- * Validate a Brazilian CPF by its two check digits (mod 11). Rejects the
- * repeated-digit sequences (000.000.000-00, 111..., etc.) that pass the
- * arithmetic but are never issued, so a random eleven-digit run is not
- * mistaken for a taxpayer id.
+ * Validates a Brazilian CPF by its two check digits (mod 11). Rejects repeated-digit
+ * sequences (000.000.000-00, 111..., etc.) that pass the arithmetic but are never issued,
+ * so a random eleven-digit run isn't mistaken for a taxpayer id.
  */
 function cpfValid(raw: string): boolean {
   const digits = raw.replace(/\D/g, "");
@@ -279,18 +276,16 @@ const HAS_WHITESPACE = /\s/;
 const HAS_LETTER = /[A-Za-z]/;
 
 /**
- * The characters that carry on an identifier around a detected span. Narrower
- * than the whole-value rule in {@link isIdentifierShapedValue}: a dot or a colon
- * ends the token here, so sentence punctuation and `"phone":"+1..."` in minified
- * JSON cannot pull a detected number into an identifier that surrounds it.
+ * The characters that carry on an identifier around a detected span. Narrower than the
+ * whole-value rule in {@link isIdentifierShapedValue}: a dot or colon ends the token here, so
+ * sentence punctuation and `"phone":"+1..."` in minified JSON can't pull in a number.
  */
 const IDENTIFIER_TOKEN_CHAR = /[A-Za-z0-9_-]/;
 
 /**
- * Whether a match sits inside a longer identifier: the identifier characters
- * around it reach past the match and carry a letter, as the `20260812-09` in
- * `hosted-eu-20260812-09` does. A match that itself holds whitespace
- * (`+31 6 12345678`) covers more than one token, so it is never inside one.
+ * Whether a match sits inside a longer identifier: the identifier characters around it reach
+ * past the match and carry a letter, as `20260812-09` does in `hosted-eu-20260812-09`. A
+ * match holding whitespace (`+31 6 12345678`) covers more than one token, so never inside one.
  */
 function insideIdentifierToken(text: string, span: Span): boolean {
   if (HAS_WHITESPACE.test(text.slice(span.start, span.end))) return false;
@@ -317,11 +312,9 @@ export interface PiiRedactionResult {
 }
 
 /**
- * Whether a detected span is vetoed by a do-not-redact exception: one of the
- * compiled exception regexes matches its ENTIRE matched text. Full-match only,
- * so an exception for a known-safe prefix can never carve a hole out of a
- * longer identifier it happens to start. Callers pre-anchor the patterns via
- * `compilePiiExceptPatterns`.
+ * Whether a detected span is vetoed by a do-not-redact exception: a compiled regex matches
+ * its ENTIRE matched text. Full-match only, so an exception for a known-safe prefix can't
+ * carve a hole out of a longer identifier it happens to start. Callers pre-anchor patterns.
  */
 export function matchesPiiException(
   matchedText: string,
@@ -331,22 +324,30 @@ export function matchesPiiException(
 }
 
 /**
- * Compile policy exception patterns for the redaction passes, anchoring each
- * one so it must cover a detected span's whole matched text. Invalid patterns
- * are skipped defensively: the service layer rejects them at save time, so a
- * compile failure here means legacy or hand-edited config, and redaction must
- * keep running rather than crash ingestion.
+ * Compiles policy exception patterns for the redaction passes, anchoring each one to cover a
+ * detected span's whole matched text. Invalid patterns are skipped defensively — the service
+ * layer rejects them at save time, so a failure here means stale config, not a crash to risk.
  */
 export function compilePiiExceptPatterns(patterns: readonly string[]): RegExp[] {
   const compiled: RegExp[] = [];
   for (const pattern of patterns) {
-    try {
-      compiled.push(new RegExp(`^(?:${pattern})$`));
-    } catch {
-      // Skip: validated at write time; never let a bad pattern break ingestion.
-    }
+    const anchored = findAnchoredPattern(pattern);
+    if (anchored) compiled.push(anchored);
   }
   return compiled;
+}
+
+/**
+ * One exception pattern, anchored, or undefined when it does not compile — the
+ * service layer rejects those at save time, so an uncompilable one here is
+ * stale config and is skipped rather than allowed to break ingestion.
+ */
+function findAnchoredPattern(pattern: string): RegExp | undefined {
+  try {
+    return new RegExp(`^(?:${pattern})$`);
+  } catch {
+    return void 0;
+  }
 }
 
 /** A [start, end) character range an exception has vetoed from masking. */
@@ -356,11 +357,9 @@ export interface ProtectedRange {
 }
 
 /**
- * Subtract `protectedRanges` from one [start, end) interval, returning the
- * sub-intervals that remain maskable. Detected spans can overlap an
- * exception-vetoed span (DLP and the native recognizers both produce
- * overlapping findings on digit runs); masking must never eat into the vetoed
- * text, and must still cover whatever falls outside it.
+ * Subtracts `protectedRanges` from one [start, end) interval, returning the sub-intervals
+ * that remain maskable. Detected spans can overlap an exception-vetoed span (DLP and native
+ * recognizers both find overlapping digit runs); masking must never eat into vetoed text.
  */
 export function subtractProtectedRanges(
   span: { start: number; end: number },
@@ -385,10 +384,9 @@ export function subtractProtectedRanges(
 }
 
 /**
- * Whether a raw recognizer match survives its own recognizer's rules: the
- * checksum/format validator (if any) and the nearby-context-word requirement
- * (if any). Does not apply the exception veto — that is shared across
- * recognizer types, see `excepted` in `collectCandidateSpans`.
+ * Whether a raw recognizer match survives its own recognizer's rules: the checksum/format
+ * validator (if any) and the nearby-context-word requirement (if any). Does not apply the
+ * exception veto, shared across recognizer types — see `excepted` in `collectCandidateSpans`.
  */
 function isValidRecognizerMatch({
   recognizer,
@@ -409,10 +407,9 @@ function isValidRecognizerMatch({
 }
 
 /**
- * One regex match reduced to a kept span, or null when the validator, the
- * context gate, or the exception veto rules it out. Split out of
- * `collectRecognizerSpans` so its loop body is a single call, not three
- * nested conditionals per match.
+ * One regex match reduced to a kept span, or null when the validator, context gate, or
+ * exception veto rules it out. Split out of `collectRecognizerSpans` so its loop body is a
+ * single call, not three nested conditionals per match.
  */
 function recognizedSpanFor({
   recognizer,
@@ -438,11 +435,9 @@ function recognizedSpanFor({
 }
 
 /**
- * Whether one recognizer runs in this pass: the custom level can narrow the
- * set through `allowed`, and on an identifier-shaped value only the recognizers
- * that prove their own finding run. That value is one token a customer sends as
- * a reference, so a shape, or a word inside that same token, is not evidence of
- * personal data.
+ * Whether one recognizer runs in this pass: the custom level can narrow the set through
+ * `allowed`, and on an identifier-shaped value only self-proving recognizers run — the value
+ * is a token a customer sends as a reference, so a shape alone isn't evidence of personal data.
  */
 function recognizerRuns({
   recognizer,
@@ -468,10 +463,9 @@ function recognizerRuns({
 }
 
 /**
- * Regex/checksum recognizer pass: every `RECOGNIZERS` entry `recognizerRuns`
- * keeps, reduced match-by-match via `recognizedSpanFor`. Split out of
- * `collectCandidateSpans` so each pass stays independently under the
- * cognitive-complexity budget.
+ * Regex/checksum recognizer pass: every `RECOGNIZERS` entry `recognizerRuns` keeps, reduced
+ * match-by-match via `recognizedSpanFor`. Split out of `collectCandidateSpans` so each pass
+ * stays independently under the cognitive-complexity budget.
  */
 function collectRecognizerSpans({
   text,
@@ -539,17 +533,17 @@ function collectPhoneSpans({
       spans.push(span);
     }
   } catch {
-    // Defensive: never let phone parsing break ingestion.
+    // Defensive: never let phone parsing break ingestion. Whatever the
+    // detector produced before it gave up is still a real answer.
+    return spans;
   }
   return spans;
 }
 
 /**
- * Collect every candidate PII span in `text`: the regex/checksum recognizers
- * (respecting `allowed`) plus the phone detector, running each candidate
- * through its validator/context gate and the exception veto. Vetoed spans are
- * appended to `protectedRanges` as a side effect so the caller can shield them
- * from later overlapping, non-excepted spans.
+ * Collects every candidate PII span in `text`: the regex/checksum recognizers (respecting
+ * `allowed`) plus the phone detector, each run through its validator/context gate and the
+ * exception veto. Vetoed spans are appended to `protectedRanges` as a side effect.
  */
 function collectCandidateSpans({
   text,
@@ -580,12 +574,9 @@ function collectCandidateSpans({
 }
 
 /**
- * Rebuild `text` with every maskable span replaced by its typed marker.
- * `spans` must already be exception-shielded (see `collectCandidateSpans`) and
- * merged for overlaps; a kept span can still overlap a protected one (a phone
- * match inside an excepted number), so each is further split against
- * `protectedRanges` before masking, so an exception always preserves its
- * entire matched text.
+ * Rebuilds `text` with every maskable span replaced by its typed marker. `spans` must
+ * already be exception-shielded and merged for overlaps; a kept span can still overlap a
+ * protected one, so each is split against `protectedRanges` first to preserve excepted text.
  */
 function maskSpans({
   text,
@@ -616,10 +607,9 @@ function maskSpans({
 }
 
 /**
- * Redacts essential PII in `text`, returning the replaced-span count.
- * `isAttributeValue` and `shouldTreatAsIdentifier` exempt a value that is (or
- * is claimed to be) a single identifier-shaped token from all but the
- * self-proving recognizers; free text never qualifies for the exemption.
+ * Redacts essential PII in `text`, returning the replaced-span count. `isAttributeValue` and
+ * `shouldTreatAsIdentifier` exempt a value that is (or is claimed to be) a single
+ * identifier-shaped token from all but the self-proving recognizers; free text never qualifies.
  */
 export function redactEssentialPiiInText({
   text,

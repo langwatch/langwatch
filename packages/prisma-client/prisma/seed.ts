@@ -476,10 +476,10 @@ function encryptCredentials(value: string, key: string): string {
 function loadSeedEnv(): Record<string, string> {
   const merged: Record<string, string> = {};
   const rootEnv = fileURLToPath(new URL("../../../.env", import.meta.url));
-  try {
+  // An absent file is fine: the process environment may already carry
+  // everything. A file that is present and unreadable is not, and throws.
+  if (fs.existsSync(rootEnv)) {
     Object.assign(merged, parseDotenv(fs.readFileSync(rootEnv)));
-  } catch {
-    // missing file — fine, process configuration may be complete already
   }
   for (const [k, v] of Object.entries(process.env)) {
     if (v !== undefined) merged[k] = v;

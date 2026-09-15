@@ -5,7 +5,7 @@
  */
 import type { Plan, SendUsageLimitWarningInput, UsageLimitWarning } from "@langwatch/entitlement-contract";
 import type { EntitlementSource } from "@langwatch/entitlement-contract";
-import { HandledError } from "@langwatch/handled-error";
+import { EntitlementNotifierUnavailableError } from "@langwatch/entitlement-contract";
 import type { Logger } from "@langwatch/observability";
 import { BASELINES, quotedLimitsOfPlan, type Plan as CataloguePlan } from "@langwatch/plans";
 import { USAGE_UNKNOWN, type UsageCounter, type UsageWarning } from "./entitlement.members.ts";
@@ -64,21 +64,6 @@ class AbsentUsageCounter implements UsageCounter {
 
   async getResolvedUsageUnit(): Promise<"traces"> {
     return "traces";
-  }
-}
-
-/** The approaching-limit mail on a deployment with no Enterprise billing
- * gateway composed. */
-class EntitlementNotifierUnavailableError extends HandledError {
-  declare readonly code: "service_unavailable";
-
-  constructor(processName: string) {
-    super("service_unavailable", "This part of the product is not available on this deployment", {
-      httpStatus: 503,
-      fault: "platform",
-      meta: { process: processName, capability: "the approaching-limit notification" },
-    });
-    this.name = "EntitlementNotifierUnavailableError";
   }
 }
 

@@ -4,12 +4,12 @@
  * only per-exchange traces.
  */
 
-import { HandledError } from "@langwatch/handled-error";
-import type {
-  CallRecord,
-  SimulationMessage,
-  SimulationService,
-  VoiceSessionInfrastructure,
+import {
+  VoiceAgentNotFoundError,
+  type CallRecord,
+  type SimulationMessage,
+  type SimulationService,
+  type VoiceSessionInfrastructure,
 } from "@langwatch/scenario-contract";
 
 /**
@@ -34,21 +34,6 @@ export interface VoiceCallRunWriterCollaborators {
 
 /** How the run records who spoke as the caller: a person, not a simulator. */
 export const HUMAN_CALLER_KIND = "human";
-
-/**
- * The agent row a finish names does not exist in the project. The row id comes
- * from the signed token, but it is still checked against the project before a
- * run is written under it, so a stale or forged row id cannot create a run.
- */
-export class VoiceAgentNotFoundError extends HandledError {
-  declare readonly code: "agent_not_found";
-  constructor() {
-    super("agent_not_found", "The voice agent was not found in this project", {
-      httpStatus: 404,
-    });
-    this.name = "VoiceAgentNotFoundError";
-  }
-}
 
 /**
  * Message ids derive from the run id and the turn index, not from anything

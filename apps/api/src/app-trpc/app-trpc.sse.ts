@@ -159,9 +159,11 @@ export function createSseSubscriptionApp(options: {
       throw new LiveStreamCrossSiteBlockedError();
     }
 
+    // An address that names no channel at all is a channel we do not serve,
+    // which is the same answer as a path naming a procedure that is not there.
     const path = subscriptionPathOf(url);
     if (!path) {
-      return c.json({ message: "Missing trpc path" }, 400);
+      throw new LiveStreamNotFoundError();
     }
 
     // Both refusals come BEFORE the caller exists: building one resolves the

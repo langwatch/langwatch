@@ -24,3 +24,18 @@ export class PlanLimitExceededError extends HandledError {
     this.name = "PlanLimitExceededError";
   }
 }
+
+/** The approaching-limit mail on a deployment with no Enterprise billing
+ * gateway composed. */
+export class EntitlementNotifierUnavailableError extends HandledError {
+  declare readonly code: "service_unavailable";
+
+  constructor(processName: string) {
+    super("service_unavailable", "This part of the product is not available on this deployment", {
+      httpStatus: 503,
+      fault: "platform",
+      meta: { process: processName, capability: "the approaching-limit notification" },
+    });
+    this.name = "EntitlementNotifierUnavailableError";
+  }
+}

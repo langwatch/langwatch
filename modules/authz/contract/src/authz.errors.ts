@@ -351,3 +351,15 @@ export class MembershipDisabledError extends HandledError {
     this.name = "MembershipDisabledError";
   }
 }
+
+export class AuthzRoleDuplicateNameError extends HandledError {
+  declare readonly code: "custom_role_name_taken";
+
+  constructor(message = "A role with this name already exists") {
+    super("custom_role_name_taken", message, {
+      httpStatus: 409,
+      ...remediation("custom_role_name_taken"),
+    });
+    this.name = "AuthzRoleDuplicateNameError";
+  }
+}

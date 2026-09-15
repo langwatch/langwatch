@@ -12,6 +12,7 @@ import {
   LangyApi,
   LangyApiIdentityDeniedError,
   LangyApiRequestInvalidError,
+  langyRestConversationParamsSchema,
   langyRestTurnBodySchema,
 } from "@langwatch/langy-contract";
 import { z } from "zod";
@@ -58,8 +59,6 @@ export const langyTurnsMembers = defineRestMiddleware(
   "langyTurnsMembers",
   z.custom<LangyTurnsRestMembers>(),
 );
-
-const turnParamsSchema = z.object({ conversationId: z.string().min(1) });
 
 /** Hono's own 404, byte-for-byte what an unmounted path returns. */
 const darkAnswer = (): Response => new Response("404 Not Found", { status: 404 });
@@ -210,7 +209,7 @@ export const langyTurnsRest = defineRestRouter(LangyApi)
 
   .post("/api/langy/conversations/:conversationId/messages", "continueLangyConversationTurn")
   .withPermission("langy:create")
-  .withParams(turnParamsSchema)
+  .withParams(langyRestConversationParamsSchema)
   .withRawBody("text")
   .withRawResponse({ produces: "application/json" })
   .withBodyLimit({ maxBytes: MAX_TURN_BODY_BYTES, onExceeded: () => new PayloadTooLargeError() })

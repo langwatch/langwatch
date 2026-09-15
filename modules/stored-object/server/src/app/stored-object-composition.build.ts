@@ -4,17 +4,18 @@
  */
 import { AwsClientProcessRuntime, OutboundProxyResolver } from "@langwatch/aws-client";
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
-import { HandledError } from "@langwatch/handled-error";
+import type { ProcessMembers } from "@langwatch/infrastructure/members";
 import type { Logger } from "@langwatch/observability";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ResourceOwnership } from "@langwatch/runtime-composition";
 import {
   mintStoredObjectUri,
   StoredObjectOwnerResolver,
+  StoredObjectCapabilityUnavailableError,
   type StoredObjectDeliveryCapability,
 } from "@langwatch/stored-object-contract";
 import { AzureBlobCredentialsAdapter } from "../services/azure-blob-credentials.service.ts";
 import { AzureBlobStoredObjectDriverAdapter } from "../repositories/azure/azure.stored-object-blob.repository.ts";
+import { PrismaStoredObjectProjectOrganizationRepository } from "../repositories/prisma/prisma.stored-object-project-organization.repository.ts";
 import { PrometheusStoredObjectsTelemetryAdapter } from "../services/prometheus.stored-objects-telemetry.service.ts";
 import { StoredObjectBlobFilesystemRepository } from "../repositories/filesystem/filesystem.stored-object-blob.repository.ts";
 import { StoredObjectBlobS3Repository } from "../repositories/s3/s3.stored-object-blob.repository.ts";
@@ -41,7 +42,7 @@ import type { StoredObjectInfrastructure } from "./stored-object.app.ts";
 
 /** What `buildStoredObjectInfrastructure` reads off the process's own members. */
 export type StoredObjectProcessMembers = Readonly<{
-  prisma: PrismaClient;
+  prisma: ProcessMembers["prisma"];
   clickhouse: ClickHouseQueryClient;
   logger: Logger;
 }>;
@@ -59,41 +60,24 @@ const UPLOAD_EXPIRY_MS = 300_000;
 const DEFAULT_LOCAL_FILESYSTEM_ROOT = "/var/lib/langwatch/objects";
 
 /**
- * A capability this deployment did not compose, refused by name. One class
- * rather than one per entry: the customer-facing distinction is WHICH
- * capability is missing, and that is the `capability` the message carries.
- */
-class StoredObjectUnavailableError extends HandledError {
-  declare readonly code: "service_unavailable";
-
-  constructor(capability: string) {
-    super("service_unavailable", `${capability} is not available on this deployment.`, {
-      httpStatus: 503,
-      fault: "platform",
-    });
-    this.name = "StoredObjectUnavailableError";
-  }
-}
-
-/**
  * The delivery capability, absent. Minting one signs a URL against a policy
  * this process composes no signer for, so the operation refuses by name
  * rather than answering a link nothing honours.
  */
 class UnavailableStoredObjectDelivery extends StoredObjectDelivery {
   async mint(): Promise<StoredObjectDeliveryCapability> {
-    throw new StoredObjectUnavailableError("Stored-object delivery");
+    throw new StoredObjectCapabilityUnavailableError("Stored-object delivery");
   }
 }
 
 /** The upload-token codec, absent for the same reason the delivery policy is. */
 class UnavailableStoredObjectUploadTokens extends StoredObjectUploadTokenCodec {
   async encode(): Promise<string> {
-    throw new StoredObjectUnavailableError("The stored-object upload ceremony");
+    throw new StoredObjectCapabilityUnavailableError("The stored-object upload ceremony");
   }
 
   async decode(): Promise<never> {
-    throw new StoredObjectUnavailableError("The stored-object upload ceremony");
+    throw new StoredObjectCapabilityUnavailableError("The stored-object upload ceremony");
   }
 }
 
@@ -115,7 +99,7 @@ class NoOutboundProxyResolver extends OutboundProxyResolver {
  */
 class StoredObjectS3Targets implements StoredObjectS3TargetResolver {
   constructor(
-    private readonly prisma: PrismaClient,
+    private readonly projectOrganizations: PrismaStoredObjectProjectOrganizationRepository,
     private readonly storage: StoredObjectAppConfig,
   ) {}
 
@@ -166,11 +150,7 @@ class StoredObjectS3Targets implements StoredObjectS3TargetResolver {
 
   private async tryRoute(projectId: string) {
     if (Object.keys(this.storage.routes).length === 0) return null;
-    const project = await this.prisma.project.findUnique({
-      where: { id: projectId },
-      select: { team: { select: { organizationId: true } } },
-    });
-    const organizationId = project?.team?.organizationId;
+    const organizationId = await this.projectOrganizations.findOrganizationId(projectId);
     if (!organizationId) return null;
     return this.storage.routes[organizationId] ?? null;
   }
@@ -281,7 +261,10 @@ export function buildStoredObjectInfrastructure(input: {
   const aws = AwsClientProcessRuntime.create({ outboundProxy: new NoOutboundProxyResolver() });
   input.resources.own("api stored-object aws client runtime", () => aws.close());
 
-  const targets = new StoredObjectS3Targets(members.prisma, storage);
+  const targets = new StoredObjectS3Targets(
+    PrismaStoredObjectProjectOrganizationRepository.create(members.prisma),
+    storage,
+  );
   const destinations = StoredObjectDestinationPolicyAdapter.create({
     selection: {
       // The `azure` selection has a driver behind it, so a write to an Azure

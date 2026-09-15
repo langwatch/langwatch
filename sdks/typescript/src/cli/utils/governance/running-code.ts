@@ -121,14 +121,21 @@ function readCommandPath({
 	let candidate = "";
 	for (let end = index; end < Math.min(args.length, index + 16); end++) {
 		candidate += `${end === index ? "" : " "}${args[end]!}`;
-		try {
-			if (statSync(candidate).isFile())
-				return { value: candidate, next: end + 1 };
-		} catch {
-			// A prefix of a space-containing path normally does not exist.
-		}
+		if (isExistingFile(candidate)) return { value: candidate, next: end + 1 };
 	}
 	return { value: first, next: index + 1 };
+}
+
+/**
+ * Whether the path names a file that is there. A prefix of a space-containing
+ * path normally is not, which is the answer rather than a failure.
+ */
+function isExistingFile(path: string): boolean {
+	try {
+		return statSync(path).isFile();
+	} catch {
+		return false;
+	}
 }
 
 // Consume option arguments before looking for the script: a preload module is

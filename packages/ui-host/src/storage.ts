@@ -51,6 +51,7 @@ export class BrowserUiStorage extends UiStorage {
       globalThis.localStorage?.setItem(key, value);
     } catch {
       // A device that will not remember is not a failure the reader can act on.
+      return;
     }
   }
 
@@ -59,6 +60,7 @@ export class BrowserUiStorage extends UiStorage {
       globalThis.localStorage?.removeItem(key);
     } catch {
       // As above.
+      return;
     }
   }
 }

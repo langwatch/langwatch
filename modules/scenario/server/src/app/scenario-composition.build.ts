@@ -1,9 +1,8 @@
 // Builds id generators, clock, and secret cipher from encryption member
 // (previously separate members of ScenarioApp)
 import { generate } from "@langwatch/ksuid";
-import { nanoid } from "nanoid";
 import { nowInstant, toDate } from "@langwatch/time";
-import { HandledError } from "@langwatch/handled-error";
+import { ScenarioSecretsUnavailableError } from "@langwatch/scenario-contract";
 import type { Encryption } from "@langwatch/infrastructure/members";
 import type {
   ScenarioClock,
@@ -14,6 +13,13 @@ import type {
 
 const SCENARIO_KSUID_RESOURCE = "scenario";
 
+/**
+ * The app's KSUID resource for a test suite's folder id
+ * (`KSUID_RESOURCES.SCENARIO_TEST_SUITE`): `suite_` is the format the
+ * other tier already reads, so it belongs with the writer.
+ */
+const SCENARIO_TEST_SUITE_KSUID_RESOURCE = "suite";
+
 /** The scenario id, in the persisted ksuid format the other tier reads. */
 class KsuidScenarioId implements ScenarioId {
   next(): string {
@@ -22,9 +28,9 @@ class KsuidScenarioId implements ScenarioId {
 }
 
 /** The folder id, in the `suite_` format the other tier reads. */
-class NanoidScenarioTestSuiteId implements ScenarioTestSuiteId {
+class KsuidScenarioTestSuiteId implements ScenarioTestSuiteId {
   next(): string {
-    return `suite_${nanoid()}`;
+    return generate(SCENARIO_TEST_SUITE_KSUID_RESOURCE).toString();
   }
 }
 
@@ -44,20 +50,6 @@ class ApiScenarioSecretCipher implements ScenarioSecretCipher {
 
   decrypt(ciphertext: string): string {
     return this.encryption.decrypt(ciphertext);
-  }
-}
-
-/** Refuses decryption without the deployment key before a provider receives invalid credentials. */
-export class ScenarioSecretsUnavailableError extends HandledError {
-  declare readonly code: "service_unavailable";
-
-  constructor() {
-    super(
-      "service_unavailable",
-      "This deployment cannot store or read scenario secrets, because it has no encryption key configured.",
-      { httpStatus: 503, fault: "platform" },
-    );
-    this.name = "ScenarioSecretsUnavailableError";
   }
 }
 
@@ -89,7 +81,7 @@ export function buildScenarioComposition(input: { encryption: Encryption | undef
 } {
   return {
     ids: new KsuidScenarioId(),
-    testSuiteIds: new NanoidScenarioTestSuiteId(),
+    testSuiteIds: new KsuidScenarioTestSuiteId(),
     clock: new SystemScenarioClock(),
     secretCipher: input.encryption
       ? new ApiScenarioSecretCipher(input.encryption)

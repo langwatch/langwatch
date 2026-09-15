@@ -7,7 +7,11 @@
  */
 import { z } from "zod";
 
-import { organizationTeamMemberRoleSchema, organizationTeamSchema } from "./team.ts";
+import {
+  organizationTeamMemberRoleSchema,
+  organizationTeamRoleSchema,
+  organizationTeamSchema,
+} from "./team.ts";
 
 export const organizationTeamRestSchema = organizationTeamSchema.omit({
   isPersonal: true,
@@ -43,3 +47,40 @@ export const organizationTeamRestMemberSchema = z.object({
 export const organizationTeamRestMemberListSchema = z.object({
   data: z.array(organizationTeamRestMemberSchema),
 });
+
+/** Page and page size a collection route reads off the query string. */
+export const organizationTeamRestPaginationQuerySchema = z.object({
+  page: z.coerce.number().int().positive().optional().default(1),
+  limit: z.coerce.number().int().positive().max(1000).optional().default(50),
+});
+
+/** The body a create takes: a name, and nothing else. */
+export const organizationTeamRestCreateSchema = z.object({
+  name: z.string().min(1, "name is required").max(255),
+});
+
+/** The body a rename takes. A PATCH here never touches membership. */
+export const organizationTeamRestUpdateSchema = z.object({
+  name: z.string().min(1).max(255).optional(),
+});
+
+/** The body that adds one member to a team, at a role. */
+export const organizationTeamRestAddMemberSchema = z.object({
+  userId: z.string().min(1, "userId is required"),
+  role: organizationTeamRoleSchema.optional().default("MEMBER"),
+});
+
+/** The path a route addressing one team carries. */
+export const organizationTeamRestParamsSchema = z.object({ id: z.string().min(1) });
+
+/** The path a route addressing one member of one team carries. */
+export const organizationTeamRestMemberParamsSchema = z.object({
+  ...organizationTeamRestParamsSchema.shape,
+  userId: z.string().min(1),
+});
+
+/** What a route answers when the whole of its answer is that it worked. */
+export const organizationTeamRestSuccessSchema = z.object({ success: z.boolean() });
+
+/** The projects of one team, as the door lists them. */
+export const organizationTeamRestProjectListSchema = z.object({ data: z.array(z.unknown()) });

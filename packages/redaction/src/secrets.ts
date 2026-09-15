@@ -736,13 +736,23 @@ export function overBroadSecretPatternProbe(pattern: string): string | null {
 export function compileSecretPatterns(patterns: readonly string[]): RegExp[] {
   const compiled: RegExp[] = [];
   for (const pattern of patterns) {
-    try {
-      compiled.push(new RegExp(guardCustomPattern(pattern), "gi"));
-    } catch {
-      // Skip an uncompilable pattern rather than throwing in the hot path.
-    }
+    const guarded = findGuardedPattern(pattern);
+    if (guarded) compiled.push(guarded);
   }
   return compiled;
+}
+
+/**
+ * One custom pattern, guarded, or undefined when it does not compile — the
+ * service checks them with `isSafeRegex` before they are stored, so an
+ * uncompilable one is skipped rather than thrown in the hot path.
+ */
+function findGuardedPattern(pattern: string): RegExp | undefined {
+  try {
+    return new RegExp(guardCustomPattern(pattern), "gi");
+  } catch {
+    return void 0;
+  }
 }
 
 /**

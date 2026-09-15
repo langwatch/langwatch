@@ -54,3 +54,20 @@ export class WebhookEventNotFoundError extends HandledError {
     this.name = "WebhookEventNotFoundError";
   }
 }
+
+/**
+ * A named refusal for the one collaborator a process may compose no builder
+ * for: a stable code, a customer-safe message, `fault: "platform"`.
+ */
+export class WebhookDispatchUnavailableError extends HandledError {
+  declare readonly code: "service_unavailable";
+
+  constructor() {
+    super(
+      "service_unavailable",
+      "This process cannot send a webhook test delivery; delivery runs on a different process here.",
+      { httpStatus: 503, fault: "platform" },
+    );
+    this.name = "WebhookDispatchUnavailableError";
+  }
+}

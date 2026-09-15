@@ -104,7 +104,8 @@ function writeDraft(projectId: string, draft: PersistedVoiceAgentDraft): void {
     sessionStorage.setItem(draftKey(projectId), JSON.stringify(persisted));
   } catch {
     // sessionStorage may be unavailable (private mode, quota); the draft is a
-    // convenience, so a failure to persist is silent.
+    // convenience, so a device that will not remember simply does not.
+    return;
   }
 }
 
@@ -113,6 +114,7 @@ function clearDraft(projectId: string): void {
     sessionStorage.removeItem(draftKey(projectId));
   } catch {
     // See writeDraft.
+    return;
   }
 }
 

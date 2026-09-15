@@ -2787,30 +2787,6 @@
       "measured": "2026-09-10"
     },
     {
-      "key": "modules/model-provider/server/src/services/http.model-provider-credential-probe.service.ts|ProviderEndpointRedirectedError",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "modules/model-provider/server/src/services/http.model-provider-credential-probe.service.ts|ProviderKeyInvalidError",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "modules/model-provider/server/src/services/http.model-provider-credential-probe.service.ts|ProviderKeyMissingError",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "modules/model-provider/server/src/services/http.model-provider-credential-probe.service.ts|ProviderKeyRestrictedError",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "modules/model-provider/server/src/services/http.model-provider-credential-probe.service.ts|ProviderRefusedError",
-      "measured": "2026-09-10"
-    },
-    {
-      "key": "modules/model-provider/server/src/services/http.model-provider-credential-probe.service.ts|ProviderServiceDisabledError",
-      "measured": "2026-09-10"
-    },
-    {
       "key": "modules/model-provider/server/src/services/model-provider-scope.service.ts|ModelProviderAvailableScopes",
       "measured": "2026-09-10"
     },

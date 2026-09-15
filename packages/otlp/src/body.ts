@@ -89,7 +89,8 @@ function releaseQuietly(reader: { releaseLock: () => void }): void {
   try {
     reader.releaseLock();
   } catch {
-    // Deliberately swallowed; see above.
+    // See above: the failure already on its way out is the diagnosis.
+    return;
   }
 }
 
@@ -99,6 +100,7 @@ async function cancelQuietly(reader: { cancel: () => Promise<void> }): Promise<v
     await reader.cancel();
   } catch {
     // The refusal we are about to throw is the diagnosis, not this.
+    return;
   }
 }
 

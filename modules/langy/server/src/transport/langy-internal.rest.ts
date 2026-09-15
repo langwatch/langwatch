@@ -8,6 +8,8 @@ import {
 } from "@langwatch/api/rest";
 import {
   LangyApi,
+  LangyApiRequestInvalidError,
+  LangyRelayUnavailableError,
   langyInternalAcceptedSchema,
   langyInternalRefusalSchema,
   langyInternalRevokedSchema,
@@ -188,12 +190,16 @@ export const langyInternalRest = defineRestRouter(LangyApi)
     if (!hasLiveBuffer) {
       logger.error("relay called with no Redis connection");
 
-      return Response.json({ error: "streaming unavailable" }, { status: 503 });
+      throw new LangyRelayUnavailableError();
     }
 
     const body = request.body;
 
-    if (!body) return Response.json({ error: "missing body" }, { status: 400 });
+    if (!body) {
+      throw new LangyApiRequestInvalidError([
+        { path: [], message: "A frame stream must carry a request body" },
+      ]);
+    }
 
     const relay = app.openRelayConnection();
     const tally = await readFrames({ relay, body });

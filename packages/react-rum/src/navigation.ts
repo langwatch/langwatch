@@ -115,7 +115,8 @@ function handleFor(span: Span, spanContext: Context): NavigationSpanHandle {
           span.setAttribute(ATTR_HTTP_ROUTE, route);
         }
       } catch {
-        // Best effort; the span keeps the name and duration it would have had.
+        // Best effort: the span keeps the name and duration it would have had.
+        return;
       }
     },
     fail(error: unknown) {
@@ -125,7 +126,8 @@ function handleFor(span: Span, spanContext: Context): NavigationSpanHandle {
           message: error instanceof Error ? error.message : String(error),
         });
       } catch {
-        // Best effort.
+        // Best effort: the span keeps whatever status it already carried.
+        return;
       }
     },
     end() {
@@ -137,7 +139,9 @@ function handleFor(span: Span, spanContext: Context): NavigationSpanHandle {
         clearAmbientContext(spanContext);
         span.end(committedAt);
       } catch {
-        // Best effort.
+        // Best effort: an unclosed span expires on the exporter's own terms
+        // rather than taking the navigation down with it.
+        return;
       }
     },
   };

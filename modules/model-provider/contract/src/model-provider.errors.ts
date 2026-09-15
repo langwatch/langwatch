@@ -421,3 +421,150 @@ export class ModelCostPreviewUnavailableError extends HandledError {
     this.name = "ModelCostPreviewUnavailableError";
   }
 }
+
+/** The provider positively identified the credential itself as wrong. */
+export class ProviderKeyInvalidError extends HandledError {
+  constructor({ provider }: { provider: string }) {
+    super("provider_key_invalid", `${provider} rejected the API key`, {
+      fault: "customer",
+      httpStatus: 400,
+      meta: { provider },
+    });
+  }
+}
+
+/** The credential is fine; the API it needs is switched off for its project. */
+export class ProviderServiceDisabledError extends HandledError {
+  constructor({ provider }: { provider: string }) {
+    super("provider_service_disabled", `${provider} reports the required API is not enabled`, {
+      fault: "customer",
+      httpStatus: 403,
+      meta: { provider },
+      tips: [
+        "Enable the Generative Language API in the Google Cloud console.",
+        "Or configure a Vertex AI provider, which uses service-account credentials.",
+      ],
+    });
+  }
+}
+
+/**
+ * The credential exists but its own restrictions refuse this call.
+ */
+export class ProviderKeyRestrictedError extends HandledError {
+  constructor({
+    provider,
+    reason,
+    googleDoor,
+  }: {
+    provider: string;
+    reason: string;
+    /**
+     * Which Google door refused — the same `API_KEY_SERVICE_BLOCKED` reason means
+     * opposite remediations on the two doors (fill in the project/location pair vs
+     * clear it), so the presentation registry branches on this.
+     */
+    googleDoor?: "gemini-api" | "agent-platform";
+  }) {
+    super("provider_key_restricted", `${provider} refused the API key (${reason})`, {
+      fault: "customer",
+      httpStatus: 403,
+      meta: { provider, reason, ...(googleDoor ? { googleDoor } : {}) },
+      tips: ["Adjust the key's restrictions in the Google Cloud console."],
+    });
+  }
+}
+
+/**
+ * The provider answered, refused, and did not say anything we can map.
+ */
+export class ProviderRefusedError extends HandledError {
+  constructor({ provider, status }: { provider: string; status: number }) {
+    super("provider_refused", `${provider} refused the credential check with ${status}`, {
+      fault: "provider",
+      httpStatus: 502,
+      meta: { provider, status },
+    });
+  }
+}
+
+/** There was no credential to check — nothing stored, nothing in the env. */
+export class ProviderKeyMissingError extends HandledError {
+  constructor({ provider }: { provider: string }) {
+    super("provider_key_missing", `No API key stored for ${provider}`, {
+      fault: "customer",
+      httpStatus: 400,
+      meta: { provider },
+    });
+  }
+}
+
+/**
+ * The endpoint answered with a redirect, and we will not follow it.
+ */
+export class ProviderEndpointRedirectedError extends HandledError {
+  constructor({ provider }: { provider: string }) {
+    super(
+      "provider_endpoint_redirected",
+      `The endpoint configured for ${provider} redirects elsewhere`,
+      {
+        fault: "customer",
+        httpStatus: 400,
+        meta: { provider },
+        tips: [
+          "Point the base URL at the address the provider actually serves.",
+          "An http:// URL that redirects to https:// is the usual cause.",
+        ],
+      },
+    );
+    this.name = "ProviderEndpointRedirectedError";
+  }
+}
+
+/**
+ * The probe never reached the provider, so nothing was learned about the key.
+ */
+export class ProviderUnreachableError extends HandledError {
+  constructor({
+    provider,
+    hasConfigurableEndpoint,
+  }: {
+    provider: string;
+    hasConfigurableEndpoint: boolean;
+  }) {
+    const tips = hasConfigurableEndpoint
+      ? ["Check your network connection.", "Check the base URL is correct and reachable."]
+      : ["Check your network connection."];
+
+    super("provider_unreachable", `Could not reach ${provider} to check the API key`, {
+      fault: "provider",
+      httpStatus: 502,
+      // `hasConfigurableEndpoint` is in `meta` because the registry entry
+      // branches on it: only some providers have a base URL there is any
+      // point telling someone to check.
+      meta: { provider, hasConfigurableEndpoint },
+      tips,
+    });
+  }
+}
+
+/** HandledError so the sign-in UI shows `message` verbatim without logging an unhandled 500. */
+export class CodexAuthError extends HandledError {
+  /** The issuer's HTTP status for kind "http" — what separates an OAuth
+   *  rejection (4xx + error body) from a retryable outage (5xx, network). */
+  public readonly status?: number;
+
+  constructor(
+    public readonly kind: "http" | "malformed" | "timed_out" | "refresh_rejected",
+    message: string,
+    options?: { status?: number },
+  ) {
+    super("codex_auth_failed", message, {
+      meta: { kind },
+      fault: "provider",
+      httpStatus: kind === "refresh_rejected" ? 401 : 502,
+    });
+    this.name = "CodexAuthError";
+    this.status = options?.status;
+  }
+}

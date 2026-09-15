@@ -101,6 +101,7 @@ export function startBrowserTracing({
     });
   } catch {
     // Leave the page untraced rather than broken.
+    return;
   }
 }
 

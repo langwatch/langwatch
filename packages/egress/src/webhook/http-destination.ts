@@ -162,7 +162,7 @@ export async function sendHttpDestination({
     });
   }
 
-  let responseBody = "";
+  let responseBody: string;
   try {
     responseBody = await readCappedBody({
       body: response.body,
@@ -170,7 +170,8 @@ export async function sendHttpDestination({
     });
   } catch {
     // Body unreadable (stream error, timeout mid-body) — the status still
-    // carries the outcome; leave the snippet empty.
+    // carries the outcome, so the snippet is simply empty.
+    responseBody = "";
   }
 
   return {

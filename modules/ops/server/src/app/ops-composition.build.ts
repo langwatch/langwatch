@@ -6,9 +6,9 @@
 import { PrismaProcessStore, PrismaScheduledJobStore } from "@langwatch/eventing/server";
 import type { EventSourcing } from "@langwatch/eventing";
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
-import { HandledError } from "@langwatch/handled-error";
+import type { ProcessMembers } from "@langwatch/infrastructure/members";
 import type { Logger } from "@langwatch/observability";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { OpsCapabilityUnavailableError } from "@langwatch/ops-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
 import type { ResourceOwnership } from "@langwatch/runtime-composition";
 
@@ -43,25 +43,12 @@ import type {
 
 /** What `buildOpsInfrastructure` reads off the process's own members. */
 export type OpsProcessMembers = Readonly<{
-  prisma: PrismaClient;
+  prisma: ProcessMembers["prisma"];
   redis: RedisConnection;
   clickhouse: ClickHouseQueryClient;
   eventing: EventSourcing;
   logger: Logger;
 }>;
-
-/** An operator capability this process does not run, refused by name. */
-class OpsCapabilityUnavailableError extends HandledError {
-  declare readonly code: "service_unavailable";
-
-  constructor(capability: string) {
-    super("service_unavailable", `${capability} is not available on this deployment`, {
-      httpStatus: 503,
-      fault: "platform",
-    });
-    this.name = "OpsCapabilityUnavailableError";
-  }
-}
 
 /** One operator explorer, refused by name on every method. */
 function unavailableOperatorRuntime<T>(capability: string): T {

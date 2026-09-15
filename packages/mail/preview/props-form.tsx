@@ -325,8 +325,9 @@ const JsonBox = ({
         try {
           onChange(JSON.parse(event.target.value));
         } catch {
-          // An unfinished edit is not an error worth showing; the render below
-          // keeps the last good value until the JSON parses again.
+          // An unfinished edit is not an error worth showing; the field keeps
+          // the last value that parsed until this one does.
+          return;
         }
       }}
     />

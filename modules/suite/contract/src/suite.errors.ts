@@ -111,3 +111,20 @@ export class SuiteTestSuiteMembershipManagedError extends ValidationError {
     this.name = "SuiteTestSuiteMembershipManagedError";
   }
 }
+
+/**
+ * A suite run cannot be scheduled on this process. See the file header for
+ * why: the seam from a queued suite run to the scenario module's own event
+ * stream is not yet decided.
+ */
+export class SuiteExecutionUnavailableError extends HandledError {
+  declare readonly code: "service_unavailable";
+
+  constructor() {
+    super("service_unavailable", "Starting a suite run is not available on this deployment", {
+      httpStatus: 503,
+      fault: "platform",
+    });
+    this.name = "SuiteExecutionUnavailableError";
+  }
+}

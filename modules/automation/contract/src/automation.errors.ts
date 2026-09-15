@@ -376,3 +376,16 @@ export class UnsubscribeLinkInvalidError extends HandledError {
     this.name = "UnsubscribeLinkInvalidError";
   }
 }
+
+/** A capability the API process deliberately does not run, refused by name. */
+export class ApiAutomationUnavailableError extends HandledError {
+  declare readonly code: "service_unavailable";
+
+  constructor(capability: string) {
+    super("service_unavailable", `The API process does not ${capability}.`, {
+      httpStatus: 503,
+      fault: "platform",
+    });
+    this.name = "ApiAutomationUnavailableError";
+  }
+}

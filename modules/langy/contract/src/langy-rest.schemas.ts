@@ -79,6 +79,16 @@ export const langyLocalConversationBodySchema = z.object({
 /** The call or wait a poll and a cancel name in the path. */
 export const langyLocalCallIdParamsSchema = z.object({ id: z.string().min(1) });
 
+/** The conversation a code-access status read optionally narrows to. */
+export const langyLocalWorkspaceQuerySchema = z.object({
+  conversationId: z.string().optional(),
+});
+
+/** The conversation a code-access request is raised against. */
+export const langyLocalCreateRequestBodySchema = z.object({
+  conversationId: z.string().min(1),
+});
+
 export const langyLocalStartCallRequestSchema =
   langyLocalConversationBodySchema.and(startCallBodySchema);
 export const langyLocalStartWaitRequestSchema =
@@ -147,6 +157,11 @@ export const langyRestTurnMessageSchema = z
     role,
     parts: parts ?? (content === undefined ? [] : [{ type: "text", text: content }]),
   }));
+
+/** The conversation a turn route addresses, off the path. */
+export const langyRestConversationParamsSchema = z.object({
+  conversationId: z.string().min(1),
+});
 
 export const langyRestTurnBodySchema = z.object({
   messages: z.array(langyRestTurnMessageSchema).min(1),

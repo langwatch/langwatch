@@ -23,8 +23,10 @@ import {
   SHARE_CONTROL_COMMAND,
   workspaceStatusSchema,
   langyLocalCallIdParamsSchema,
+  langyLocalCreateRequestBodySchema,
   langyLocalStartCallRequestSchema,
   langyLocalStartWaitRequestSchema,
+  langyLocalWorkspaceQuerySchema,
 } from "@langwatch/langy-contract";
 import { z } from "zod";
 
@@ -176,9 +178,6 @@ function parseJsonBody<T extends z.ZodType>(raw: string, schema: T): z.infer<T> 
   return parsed.data;
 }
 
-const workspaceQuerySchema = z.object({ conversationId: z.string().optional() });
-const createRequestBodySchema = z.object({ conversationId: z.string().min(1) });
-
 export const langyLocalRest = defineRestRouter(LangyApi)
   .withNamespace("langy")
   .withVersion(MANAGEMENT_API_VERSION)
@@ -189,7 +188,7 @@ export const langyLocalRest = defineRestRouter(LangyApi)
 
   .get("/api/langy/local/workspace", "langyLocalWorkspace")
   .withPermission(LOCAL_PERMISSION)
-  .withQuery(workspaceQuerySchema)
+  .withQuery(langyLocalWorkspaceQuerySchema)
   .withRawResponse({ produces: "application/json" })
   .withDocs({ description: "The code access card's own status document, as the command line reads it." })
   .withMiddleware(langyLocalRestMembers)
@@ -224,7 +223,7 @@ export const langyLocalRest = defineRestRouter(LangyApi)
 
   .post("/api/langy/local/requests", "langyLocalCreateRequest")
   .withPermission(LOCAL_PERMISSION)
-  .withInput(createRequestBodySchema)
+  .withInput(langyLocalCreateRequestBodySchema)
   .withBodyLimit({ maxBytes: MAX_BODY_BYTES, onExceeded: () => new PayloadTooLargeError() })
   .withRawResponse({ produces: "application/json" })
   .withDocs({ description: "The recorded request and the command that approves it." })

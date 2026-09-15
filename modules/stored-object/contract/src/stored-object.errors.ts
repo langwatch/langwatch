@@ -254,3 +254,33 @@ export class IdempotencyConflictError extends StoredObjectHandledError {
     });
   }
 }
+
+/**
+ * A capability this deployment did not compose, refused by name. One class
+ * rather than one per entry: the customer-facing distinction is WHICH
+ * capability is missing, and that is the `capability` the message carries.
+ */
+export class StoredObjectCapabilityUnavailableError extends HandledError {
+  declare readonly code: "service_unavailable";
+
+  constructor(capability: string) {
+    super("service_unavailable", `${capability} is not available on this deployment.`, {
+      httpStatus: 503,
+      fault: "platform",
+    });
+    this.name = "StoredObjectCapabilityUnavailableError";
+  }
+}
+
+export class PayloadStagingUnavailableError extends HandledError {
+  declare readonly code: "service_unavailable";
+
+  constructor() {
+    super(
+      "service_unavailable",
+      "This request carries more data than can be sent inline, and this deployment has no object storage configured to stage it through.",
+      { httpStatus: 503, fault: "platform" },
+    );
+    this.name = "PayloadStagingUnavailableError";
+  }
+}

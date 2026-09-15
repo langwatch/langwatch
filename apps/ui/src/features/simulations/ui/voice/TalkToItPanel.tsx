@@ -272,7 +272,9 @@ async function runEndCall({
   try {
     await refs.session.current?.hangUp();
   } catch {
-    // The socket may already be closed; the finish still runs.
+    // The socket may already be closed, which is the same outcome the hang-up
+    // was asking for. Let go of it either way, and let the finish run.
+    refs.session.current = null;
   }
   await finish({ isCutAtLimit });
 }

@@ -271,11 +271,12 @@ async function failureOf(response: {
     code?: unknown;
     message?: unknown;
     meta?: unknown;
-  } = {};
+  };
   try {
     parsed = JSON.parse(raw);
   } catch {
     // Not JSON: the status alone names the failure.
+    parsed = {};
   }
   const code = codeOf({ parsed, status: response.status });
   const meta =

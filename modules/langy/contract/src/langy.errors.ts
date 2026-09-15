@@ -304,6 +304,23 @@ export class LangyAgentUnavailableError extends HandledError {
   }
 }
 
+/**
+ * The relay's live buffer is not part of the process that answered. A frame
+ * stream needs one, and a process built without it answers the same way every
+ * time rather than accepting frames nothing can read back.
+ */
+export class LangyRelayUnavailableError extends HandledError {
+  declare readonly code: "service_unavailable";
+
+  constructor() {
+    super("service_unavailable", "Streaming Langy worker frames is not available here.", {
+      httpStatus: 503,
+      fault: "platform",
+    });
+    this.name = "LangyRelayUnavailableError";
+  }
+}
+
 // ── the key-authed public turn surface (`/api/langy`) ───────────────────── Transport
 // refusals, not domain rules: they say why a REQUEST could not be admitted, before any
 // conversation exists to have a rule about. They live here rather than in the route so the

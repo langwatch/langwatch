@@ -3,12 +3,14 @@
  * rows, not evaluation/delivery/scheduling (those are the worker's responsibilities).
  */
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
-import type { SlackActionParams, SlackChannelListing } from "@langwatch/automation-contract";
+import {
+  ApiAutomationUnavailableError,
+  type SlackActionParams,
+  type SlackChannelListing,
+} from "@langwatch/automation-contract";
 import { PrismaScheduledJobStore, SchedulerService } from "@langwatch/eventing/server";
-import { HandledError } from "@langwatch/handled-error";
-import type { Encryption } from "@langwatch/infrastructure/members";
+import type { Encryption, ProcessMembers } from "@langwatch/infrastructure/members";
 import type { Logger } from "@langwatch/observability";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { RedisConnection } from "@langwatch/redis-client";
 import { fromDate, nowInstant, toDate, type Instant } from "@langwatch/time";
 
@@ -42,24 +44,11 @@ import type {
 
 /** What `buildAutomationInfrastructure` reads off the process's own members. */
 export type AutomationProcessMembers = Readonly<{
-  prisma: PrismaClient;
+  prisma: ProcessMembers["prisma"];
   redis: RedisConnection;
   logger: Logger;
   encryption: Encryption;
 }>;
-
-/** A capability the API process deliberately does not run, refused by name. */
-class ApiAutomationUnavailableError extends HandledError {
-  declare readonly code: "service_unavailable";
-
-  constructor(capability: string) {
-    super("service_unavailable", `The API process does not ${capability}.`, {
-      httpStatus: 503,
-      fault: "platform",
-    });
-    this.name = "ApiAutomationUnavailableError";
-  }
-}
 
 /** Builds the {@link AutomationInfrastructure} `AutomationApp.create` composes over. */
 export function buildAutomationInfrastructure(input: {

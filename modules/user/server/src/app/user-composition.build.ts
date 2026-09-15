@@ -3,18 +3,19 @@
  * here from hand-composition in deleted apps/api/features/user/user.composition.ts.
  */
 import type { AuthApi } from "@langwatch/auth-contract";
-import { HandledError } from "@langwatch/handled-error";
+import type { ProcessMembers } from "@langwatch/infrastructure/members";
 import type { OrganizationApi } from "@langwatch/organization-contract";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { RedisConnection } from "@langwatch/redis-client";
+import { UserCapabilityUnavailableError } from "@langwatch/user-contract";
 import { hash, compare } from "bcrypt";
 
+import { PrismaUserOrganizationDirectoryRepository } from "../repositories/prisma/prisma.user-organization-directory.repository.ts";
 import type { UserAppConfig, UserInfrastructure } from "./user.app.ts";
 
 /** What this process hands `UserApp` at boot. */
 export function buildUserInfrastructure(input: {
-  prisma: PrismaClient;
+  prisma: ProcessMembers["prisma"];
   redis: RedisConnection;
   config: UserAppConfig;
   dependencies: {
@@ -86,7 +87,10 @@ export function buildUserInfrastructure(input: {
           ),
         ),
     },
-    organizations: organizationDirectory({ prisma, organizations: dependencies.organizations }),
+    organizations: organizationDirectory({
+      directory: PrismaUserOrganizationDirectoryRepository.create(prisma),
+      organizations: dependencies.organizations,
+    }),
     projects: {
       findById: ({ projectId }) => dependencies.projects.findIdentity(projectId),
       // The organization's hidden governance project is minted by Enterprise
@@ -148,10 +152,10 @@ export function buildUserInfrastructure(input: {
  * every other member call is answered from.
  */
 function organizationDirectory(options: {
-  prisma: PrismaClient;
+  directory: PrismaUserOrganizationDirectoryRepository;
   organizations: OrganizationApi;
 }): UserInfrastructure["organizations"] {
-  const { prisma, organizations } = options;
+  const { directory, organizations } = options;
 
   return {
     isMember: ({ userId, organizationId }) => organizations.isMember({ userId, organizationId }),
@@ -159,10 +163,10 @@ function organizationDirectory(options: {
       const settings = await organizations.getSettings({ organizationId });
       if (settings.supportContact) return settings.supportContact;
 
-      return await firstAdminEmail(prisma, organizationId);
+      return await directory.findFirstAdminEmail(organizationId);
     },
     getBudgetIncreaseRecipient: async ({ organizationId }) => {
-      const adminEmail = await firstAdminEmail(prisma, organizationId);
+      const adminEmail = await directory.findFirstAdminEmail(organizationId);
       if (!adminEmail) {
         throw unavailable(
           "administrator for this organization to send the budget increase request to",
@@ -171,38 +175,10 @@ function organizationDirectory(options: {
 
       return adminEmail;
     },
-    findName: async ({ organizationId }) =>
-      (
-        await prisma.organization.findUnique({
-          where: { id: organizationId },
-          select: { name: true },
-        })
-      )?.name ?? null,
-    findFirstProjectSlug: async ({ organizationId, userId }) =>
-      (
-        await prisma.project.findFirst({
-          where: { team: { organizationId, members: { some: { userId } } }, archivedAt: null },
-          orderBy: { createdAt: "asc" },
-          select: { slug: true },
-        })
-      )?.slug ?? null,
+    findName: ({ organizationId }) => directory.findName(organizationId),
+    findFirstProjectSlug: ({ organizationId, userId }) =>
+      directory.findFirstProjectSlug({ organizationId, userId }),
   };
-}
-
-/**
- * The organization's first administrator, by seat age. A row read with the
- * organization id already in hand, which is why it lives here beside the
- * other reads this module answers from its own `prisma` member rather than
- * behind a port.
- */
-async function firstAdminEmail(prisma: PrismaClient, organizationId: string): Promise<string | null> {
-  const admin = await prisma.organizationUser.findFirst({
-    where: { organizationId, role: "ADMIN", disabledAt: null },
-    orderBy: { createdAt: "asc" },
-    select: { user: { select: { email: true } } },
-  });
-
-  return admin?.user.email ?? null;
 }
 
 const REDIS_RATE_LIMIT_PREFIX = "user:rate-limit:";
@@ -248,24 +224,6 @@ class BcryptPasswordHasher {
 
   matches({ password, hash: stored }: { password: string; hash: string }): Promise<boolean> {
     return compare(password, stored);
-  }
-}
-
-/**
- * A capability this deployment does not hold. `fault: "platform"` because
- * nothing the customer sent caused it, and the message names which
- * capability is missing.
- */
-class UserCapabilityUnavailableError extends HandledError {
-  declare readonly code: "service_unavailable";
-
-  constructor(capability: string) {
-    super("service_unavailable", `This deployment has no ${capability}.`, {
-      httpStatus: 503,
-      fault: "platform",
-      meta: { capability },
-    });
-    this.name = "UserCapabilityUnavailableError";
   }
 }
 

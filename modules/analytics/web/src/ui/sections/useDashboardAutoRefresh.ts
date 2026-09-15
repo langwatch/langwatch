@@ -105,6 +105,7 @@ export function useDashboardAutoRefresh({
     } catch {
       // Storage may be unavailable (private mode, quota); the choice then
       // simply lasts for this page.
+      return;
     }
   }, []);
 

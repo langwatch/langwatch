@@ -11,6 +11,8 @@ import {
   executeRequestSchema,
   parseLLMError,
   PromptApi,
+  PromptPlaygroundNotPermittedError,
+  PromptPlaygroundSignInRequiredError,
   type PlaygroundStreamEvent,
   PROMPT_EXECUTE_ENDPOINT,
 } from "@langwatch/prompt-contract";
@@ -120,7 +122,9 @@ function createSseResponse(
         try {
           controller.enqueue(sseFrame(event));
         } catch {
-          // The reader is already gone; further writes are unobservable.
+          // The reader is already gone; further writes are unobservable, and
+          // the run is told to stop rather than keep producing for nobody.
+          aborted = true;
         }
       };
       try {
@@ -129,7 +133,8 @@ function createSseResponse(
         try {
           controller.close();
         } catch {
-          // Already closed by a cancel().
+          // Already closed by a cancel(); the stream is gone either way.
+          aborted = true;
         }
       }
     },
@@ -250,7 +255,7 @@ export const promptExecuteRest = defineRestRouter(PromptApi)
 
     const session = await members.resolveSession(request);
     if (!session) {
-      return Response.json({ error: "You must be logged in to access this endpoint." }, { status: 401 });
+      throw new PromptPlaygroundSignInRequiredError();
     }
 
     const { projectId, formValues, variables, messages, threadId } = input;
@@ -259,10 +264,7 @@ export const promptExecuteRest = defineRestRouter(PromptApi)
       !members.isDemoProject(projectId) &&
       (await members.probeProjectPermission(session, projectId, "prompts:view"));
     if (!permitted) {
-      return Response.json(
-        { error: "You do not have permission to access this endpoint." },
-        { status: 403 },
-      );
+      throw new PromptPlaygroundNotPermittedError();
     }
 
     // Allocated before anything that can throw: the error path streams under
@@ -287,10 +289,7 @@ export const promptExecuteRest = defineRestRouter(PromptApi)
       // Matched on the handled CODE: the dataset feature's own class is in
       // another feature's server package, which this one may not name.
       if (handledCodeOf(error) === "dataset_not_ready") {
-        return Response.json(
-          { error: error instanceof Error ? error.message : String(error) },
-          { status: 425 },
-        );
+        throw error;
       }
       // A node with no model is fixable in the editor, not a server fault.
       if (error instanceof LlmModelNotSetError) {
@@ -298,7 +297,7 @@ export const promptExecuteRest = defineRestRouter(PromptApi)
       }
       logger.error({ error, projectId }, "could not prepare a playground run");
       members.reportError?.(error, { projectId });
-      return Response.json({ error: "Could not prepare this prompt run." }, { status: 500 });
+      throw error;
     }
 
     return createSseResponse((send, isAborted) =>

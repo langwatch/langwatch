@@ -38,8 +38,12 @@ afterEach(async () => {
   for (const pid of launchers.splice(0)) {
     try {
       process.kill(pid, "SIGKILL");
-    } catch {
-      // Already gone, which is what most of these tests assert.
+    } catch (error) {
+      // Already gone is what most of these tests assert, so ESRCH is the
+      // normal outcome; a permission refusal is a real teardown failure.
+      if (!(error instanceof Error && "code" in error && error.code === "ESRCH")) {
+        throw error;
+      }
     }
   }
   // These tests count processes by name, so nothing from this one may still be

@@ -14,10 +14,13 @@ import type {
 import { createAdapterFactory } from "better-auth/adapters";
 import type { IdentityUserGate } from "../rules/identity-user-gate.rules.ts";
 import {
+  IDENTITY_UNSUPPORTED_STORAGE_QUERY_CODE,
+  IdentityUnsupportedStorageQueryError,
+} from "@langwatch/identity-contract";
+import {
   type AccountQuery,
   type AccountWhere,
   BetterAuthAccountQueriesAdapter,
-  IdentityUnsupportedStorageQueryError,
 } from "./better-auth-account-queries.service.ts";
 import type { IdentityAccountCeremonies } from "../rules/ceremony-types.rules.ts";
 import { BetterAuthIdentityBirthAdapter } from "./better-auth-identity-birth.service.ts";
@@ -38,7 +41,9 @@ const logger = createLogger("langwatch:identity:storage-adapter");
  * customer as a sign-in error page and leaves NOTHING behind to diagnose it with.
  */
 const refused = <T>(error: T): T => {
-  if (error instanceof IdentityUnsupportedStorageQueryError) {
+  // Recognised by CODE, not by class: the class is published from the contract
+  // package, and a bundler that loads two copies of it makes `instanceof` lie.
+  if (HandledError.isHandled(error) && error.code === IDENTITY_UNSUPPORTED_STORAGE_QUERY_CODE) {
     logger.error(
       { err: error, detail: error.reasons[0]?.message },
       "the identity storage adapter refused a better-auth account operation; the sign-in or account write it belongs to fails",

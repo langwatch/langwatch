@@ -65,6 +65,24 @@ function flatten(value: OtlpAnyValue, prefix: string, output: Record<string, unk
 }
 
 /**
+ * A JSON-shaped string re-serialised so the sender's whitespace does not reach
+ * storage, or undefined when it is not JSON after all.
+ */
+function findNormalizedJson(value: string): string | undefined {
+  const trimmed = value.trim();
+  const shaped =
+    (trimmed.startsWith("{") && trimmed.endsWith("}")) ||
+    (trimmed.startsWith("[") && trimmed.endsWith("]"));
+  if (!shaped) return void 0;
+
+  try {
+    return JSON.stringify(JSON.parse(trimmed));
+  } catch {
+    return void 0;
+  }
+}
+
+/**
  * An OTLP attribute array as a flat map of strings, one leaf per dotted path — flattened so a
  * column store can index an attribute by name without knowing its shape. JSON-looking strings
  * are re-serialised to normalise sender whitespace; malformed entries are skipped, not raised.
@@ -81,21 +99,8 @@ export function normalizeOtlpAttributeMap(attributes: unknown): Record<string, s
   for (const [key, value] of Object.entries(flattened)) {
     if (value instanceof Uint8Array) result[key] = Buffer.from(value).toString("hex");
     else if (Array.isArray(value)) result[key] = JSON.stringify(value);
-    else if (typeof value === "string") {
-      const trimmed = value.trim();
-      if (
-        (trimmed.startsWith("{") && trimmed.endsWith("}")) ||
-        (trimmed.startsWith("[") && trimmed.endsWith("]"))
-      ) {
-        try {
-          result[key] = JSON.stringify(JSON.parse(trimmed));
-          continue;
-        } catch {
-          // Keep malformed JSON as the sender supplied it.
-        }
-      }
-      result[key] = value;
-    } else if (value !== undefined && value !== null) result[key] = String(value);
+    else if (typeof value === "string") result[key] = findNormalizedJson(value) ?? value;
+    else if (value !== undefined && value !== null) result[key] = String(value);
   }
   return result;
 }

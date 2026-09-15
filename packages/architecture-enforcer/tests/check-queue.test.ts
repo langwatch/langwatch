@@ -801,7 +801,8 @@ describe("check queue", () => {
         try {
           pid = readFileSync(pidFile, "utf8").trim();
         } catch {
-          // Not created yet.
+          // Not created yet, which reads the same as created-but-empty below.
+          pid = "";
         }
         // The redirection creates the file before the shell writes the pid into
         // it, so an empty read is as much "not ready" as a missing file. Waiting

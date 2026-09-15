@@ -520,3 +520,25 @@ export class IdentityEngineUnavailableError extends HandledError {
     this.name = "IdentityEngineUnavailableError";
   }
 }
+
+/**
+ * An `account` storage operation the identity branch does not serve. `fault: "platform"`
+ * because nothing the customer did caused it and nothing they can do fixes it: the library
+ * asked for a shape we never taught the branch.
+ */
+/** The refusal's machine name, held as a constant so a reader recognises it by
+ *  code rather than by class identity across a package boundary. */
+export const IDENTITY_UNSUPPORTED_STORAGE_QUERY_CODE = "identity_unsupported_storage_query";
+
+export class IdentityUnsupportedStorageQueryError extends HandledError {
+  declare readonly code: "identity_unsupported_storage_query";
+
+  constructor(detail: string) {
+    super(IDENTITY_UNSUPPORTED_STORAGE_QUERY_CODE, "identity_unsupported_storage_query", {
+      httpStatus: 500,
+      fault: "platform",
+      reasons: [new Error(detail)],
+    });
+    this.name = "IdentityUnsupportedStorageQueryError";
+  }
+}

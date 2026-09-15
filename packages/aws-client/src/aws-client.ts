@@ -92,15 +92,21 @@ function present(value: string | null | undefined): value is string {
 }
 
 function hostnameOf(value: string): string {
-  try {
-    const hostname = new URL(value).hostname;
-    if (hostname) return hostname;
-  } catch {
-    // A bare hostname is a valid target for an AWS client.
-  }
+  const parsed = findUrlHostname(value);
+  if (parsed) return parsed;
   const withoutScheme = value.replace(/^[a-z][a-z0-9+.-]*:\/\//i, "");
   const hostPort = withoutScheme.split("/")[0] ?? "";
   return hostPort.replace(/:\d+$/, "") || value;
+}
+
+/** The hostname of a full URL, or undefined when the string is not one. */
+function findUrlHostname(value: string): string | undefined {
+  try {
+    return new URL(value).hostname || void 0;
+  } catch {
+    // A bare hostname is a valid target for an AWS client.
+    return void 0;
+  }
 }
 
 /**

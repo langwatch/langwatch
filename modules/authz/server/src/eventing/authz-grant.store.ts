@@ -6,13 +6,13 @@
 import type { LedgerActor } from "@langwatch/actor";
 import {
   AuthzGrantNotConfirmedError,
+  AuthzRoleDuplicateNameError,
   type DefineRoleCommandData,
   type GrantEventSource,
   type RevokeGrantCommandData,
   type TeamUserRole as AuthzTeamUserRole,
   roleKeyForTeamRole,
 } from "@langwatch/authz-contract";
-import { HandledError, remediation } from "@langwatch/handled-error";
 import { AuthzGrantsCommandDispatcher } from "../services/authz-grants-command-dispatcher.service.ts";
 import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
@@ -138,18 +138,6 @@ type AuthzGrantFilter = Record<string, unknown> & {
   id?: unknown;
   organizationId?: unknown;
 };
-
-export class AuthzRoleDuplicateNameError extends HandledError {
-  declare readonly code: "custom_role_name_taken";
-
-  constructor(message = "A role with this name already exists") {
-    super("custom_role_name_taken", message, {
-      httpStatus: 409,
-      ...remediation("custom_role_name_taken"),
-    });
-    this.name = "AuthzRoleDuplicateNameError";
-  }
-}
 
 /**
  * The injected ledger adapter. Every verb bumps the organization's authz
@@ -579,9 +567,13 @@ export class EventingAuthzLedgerAdapter implements AuthzCompatibilityLedger {
       if (!(await this.options.cutover.readUncached({ organizationId }))) {
         return;
       }
-    } catch {
+    } catch (error) {
       // Revocation fails toward append: an unnecessary revoke fact on the
       // legacy side is harmless, while missing one can resurrect access.
+      logger.warn(
+        { error, organizationId },
+        "could not read the authz cutover; appending the revocation anyway",
+      );
     }
     const revocation: {
       organizationId: string;

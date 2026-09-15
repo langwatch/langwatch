@@ -4,6 +4,7 @@
  * and runs inside the query client's limiter so a retry keeps its slot.
  */
 
+import { quietly } from "./observability.ts";
 import type { AbortSignalLike, QueryRequest } from "./query.ts";
 import { isTransientClickHouseError, jitteredBackoffMs, retryNoticeLevel } from "./resilience.ts";
 
@@ -131,18 +132,15 @@ export async function runWithRetry<T>(
       // learn which ClickHouse error actually happened, and the remaining
       // attempts would be cancelled by the reporting of the failure rather than
       // the failure. Observability must not change what it observes.
-      try {
+      quietly(() =>
         onRetry?.({
           attempt,
           maxAttempts,
           delayMs,
           error,
           level: retryNoticeLevel(attempt),
-        });
-      } catch {
-        // Deliberately swallowed. There is nowhere better to put it: the only
-        // channel for reporting it is the thing that just threw.
-      }
+        }),
+      );
 
       await sleep(delayMs);
 

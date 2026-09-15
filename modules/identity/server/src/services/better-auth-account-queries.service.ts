@@ -1,4 +1,4 @@
-import { HandledError } from "@langwatch/handled-error";
+import { IdentityUnsupportedStorageQueryError } from "@langwatch/identity-contract";
 
 /**
  * The `account` queries better-auth issues, enumerated (ADR-116 §7).
@@ -40,22 +40,6 @@ export type AccountQuery =
    * (issuer, providerAccountId) is a key this branch can answer on, with an index already there.
    */
   | { kind: "byIssuerSubject"; issuer: string; accountId: string };
-
-/**
- * An `account` storage operation the identity branch does not serve. `fault: "platform"`
- * because nothing the customer did caused it and nothing they can do fixes it: the library
- * asked for a shape we never taught the branch.
- */
-export class IdentityUnsupportedStorageQueryError extends HandledError {
-  constructor(detail: string) {
-    super("identity_unsupported_storage_query", "identity_unsupported_storage_query", {
-      httpStatus: 500,
-      fault: "platform",
-      reasons: [new Error(detail)],
-    });
-    this.name = "IdentityUnsupportedStorageQueryError";
-  }
-}
 
 const shapeOf = (where: readonly AccountWhere[]): string =>
   where

@@ -1,26 +1,9 @@
 // Build SuiteApp collaborators; `execution` field is deliberately refused.
 import type { AgentApi } from "@langwatch/agent-contract";
 import { resolvePlatformDefaultRetentionDays } from "@langwatch/data-retention-contract";
-import { HandledError } from "@langwatch/handled-error";
+import { SuiteExecutionUnavailableError } from "@langwatch/suite-contract";
 import type { ConnectedPresenceReader } from "../services/connected-target.service.ts";
 import type { SuiteAppConfig, SuiteExecution } from "./suite.app.ts";
-
-/**
- * A suite run cannot be scheduled on this process. See the file header for
- * why: the seam from a queued suite run to the scenario module's own event
- * stream is not yet decided.
- */
-export class SuiteExecutionUnavailableError extends HandledError {
-  declare readonly code: "service_unavailable";
-
-  constructor() {
-    super("service_unavailable", "Starting a suite run is not available on this deployment", {
-      httpStatus: 503,
-      fault: "platform",
-    });
-    this.name = "SuiteExecutionUnavailableError";
-  }
-}
 
 /** Refuses every run by name, rather than crashing on an absent collaborator. */
 class UnavailableSuiteExecution implements SuiteExecution {
