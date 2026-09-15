@@ -264,7 +264,13 @@ describe("catchUpConversationFold", () => {
   });
 
   describe("when a durable cursor names a freshly minted conversation", () => {
-    it("confirms it exists, so a later not-found read stops reading as pending", async () => {
+    it("does NOT confirm it — the log is ahead of the projection by definition", async () => {
+      // A signal's cursor proves the EVENT LOG knows the conversation, not
+      // that the history read will succeed: the read is served from the
+      // Postgres projection, and the first turn's signal always outruns the
+      // fold. Confirming here defeated the pending grace on every new chat —
+      // the refetch hit the same not-found and the panel rendered the card
+      // at once. Only a successful history read confirms (useLangyMessages).
       useLangyStore.setState({ unconfirmedConversations: { "conv-1": true } });
       const { utils } = utilsWith({});
 
@@ -275,9 +281,9 @@ describe("catchUpConversationFold", () => {
         targetCursor: { acceptedAt: 200, eventId: "e2" },
       });
 
-      expect(
-        useLangyStore.getState().unconfirmedConversations["conv-1"],
-      ).toBeUndefined();
+      expect(useLangyStore.getState().unconfirmedConversations["conv-1"]).toBe(
+        true,
+      );
     });
   });
 

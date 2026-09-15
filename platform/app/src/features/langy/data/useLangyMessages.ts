@@ -76,16 +76,35 @@ export interface LangyMessagesResult {
 const TURN_IN_FLIGHT_POLL_MS = 3_000;
 
 /**
+ * How often a read that has not produced data yet is retried while the
+ * conversation is still unconfirmed. Shorter than the in-flight cadence: the
+ * projection usually lands within a few seconds, and every beat of this
+ * interval is a beat the panel spends saying "not found" about a conversation
+ * the user is looking at.
+ */
+const UNCONFIRMED_POLL_MS = 1_000;
+
+/**
  * Self-stopping poll (see dev/docs/best_practices/async-processing-ui.md):
  * while the fold says a turn is in flight, re-check on a short interval so the
  * settled state lands even when the freshness signal is delayed or lost —
  * without it a stale `isTurnInFlight: true` sits in the cache and the working
  * indicator outlives the answer. Stops itself the moment the turn settles.
+ *
+ * A read with NO data for a conversation this tab just minted also polls
+ * (`isUnconfirmed` — see `unconfirmedConversations`): the projection row is
+ * written by an asynchronous fold, so the first read routinely 404s, the
+ * query's retry policy rightly never retries a 404, and nothing else would
+ * ever re-ask. Stops itself on the first successful read — data lands, the
+ * success effect confirms the conversation, and the flag drops.
  */
 export function langyMessagesPollInterval(
   data: { isTurnInFlight: boolean } | undefined,
+  isUnconfirmed = false,
 ): number | false {
-  return data?.isTurnInFlight ? TURN_IN_FLIGHT_POLL_MS : false;
+  if (data?.isTurnInFlight) return TURN_IN_FLIGHT_POLL_MS;
+  if (!data && isUnconfirmed) return UNCONFIRMED_POLL_MS;
+  return false;
 }
 
 /**
@@ -99,6 +118,12 @@ export function useLangyMessages(
 ): LangyMessagesResult {
   const { project } = useOrganizationTeamProject();
 
+  // Subscribed on THIS hook's conversation (not the store's active one): the
+  // poll must follow the query it drives, and the two ids diverge mid-switch.
+  const isUnconfirmed = useLangyStore(
+    (s) => !!conversationId && !!s.unconfirmedConversations[conversationId],
+  );
+
   const query = api.langy.messages.useQuery(
     {
       projectId: project?.id ?? "",
@@ -109,13 +134,19 @@ export function useLangyMessages(
       staleTime: 30_000,
       refetchOnWindowFocus: false,
       placeholderData: keepPreviousData,
-      refetchInterval: (query) => langyMessagesPollInterval(query.state.data),
+      refetchInterval: (query) =>
+        langyMessagesPollInterval(query.state.data, isUnconfirmed),
     },
   );
 
   // A successful read is durable proof the conversation's projection exists —
   // confirms a freshly-minted conversation (see `unconfirmedConversations`).
-  const conversationRead = !!conversationId && query.isSuccess;
+  // Placeholder data is NOT that proof: `keepPreviousData` reports success
+  // for the conversation just left while the new one is still fetching, and
+  // confirming off it would stop the unconfirmed poll on the very 404 it
+  // exists to retry.
+  const conversationRead =
+    !!conversationId && query.isSuccess && !query.isPlaceholderData;
   useEffect(() => {
     if (conversationRead && conversationId) {
       useLangyStore.getState().confirmConversation(conversationId);
