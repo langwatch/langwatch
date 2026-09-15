@@ -5,18 +5,32 @@ import { defineRule } from "../define-rule.mjs";
 // or Slack has no seam a test can stand in for, and no name for the message
 // it is really sending.
 
+// `tier` names the `channels/<tier>/` folder the concrete implementation
+// belongs in (see CHANNEL_TIERS in feature-layout-policy.mjs). Fixed per
+// conduit except AWS, where the same package covers several services; there
+// it is read off the specifier itself, and left as the literal placeholder
+// `<tier>` only when even that cannot tell SES from SQS from an untiered
+// service (e.g. S3), which the reader — who wrote the import — can name.
 const CONDUIT_SPECIFIER = [
-  { match: /^@langwatch\/eventing(?:\/|$)/, conduit: "the event bus" },
-  { match: /^ioredis(?:\/|$)/, conduit: "Redis pub/sub" },
-  { match: /^(?:undici|axios|got|node-fetch)(?:\/|$)/, conduit: "an HTTP client" },
-  { match: /^node:https?$/, conduit: "an HTTP client" },
-  { match: /^@aws-sdk\//, conduit: "an AWS client" },
-  { match: /^(?:resend|nodemailer)(?:\/|$)/, conduit: "a mail sender" },
-  { match: /^@slack\//, conduit: "Slack" },
+  { match: /^@langwatch\/eventing(?:\/|$)/, conduit: "the event bus", tier: "eventing" },
+  { match: /^ioredis(?:\/|$)/, conduit: "Redis pub/sub", tier: "redis" },
+  { match: /^(?:undici|axios|got|node-fetch)(?:\/|$)/, conduit: "an HTTP client", tier: "http" },
+  { match: /^node:https?$/, conduit: "an HTTP client", tier: "http" },
+  {
+    match: /^@aws-sdk\//,
+    conduit: "an AWS client",
+    tier: (specifier) =>
+      specifier.includes("sqs") ? "sqs" : specifier.includes("ses") ? "ses" : undefined,
+  },
+  { match: /^(?:resend|nodemailer)(?:\/|$)/, conduit: "a mail sender", tier: "ses" },
+  { match: /^@slack\//, conduit: "Slack", tier: "slack" },
 ];
 
 function conduitFor(specifier) {
-  return CONDUIT_SPECIFIER.find((entry) => entry.match.test(specifier))?.conduit;
+  const entry = CONDUIT_SPECIFIER.find((candidate) => candidate.match.test(specifier));
+  if (!entry) return undefined;
+  const tier = typeof entry.tier === "function" ? entry.tier(specifier) : entry.tier;
+  return { conduit: entry.conduit, tier: tier ?? "<tier>" };
 }
 
 function isService(file) {
@@ -34,13 +48,13 @@ export const serviceDoesNotOpenAChannelRule = defineRule({
     serviceOpensAChannel: {
       what: "A service opens {{conduit}} directly (`{{specifier}}`).",
       why: "Messages to or from something the module does not own are a channel: an interface the module names, a live implementation per tier and a memory twin a test asserts against.",
-      fix: "Move the conduit to `channels/<tier>/<tier>.<subject>.channel.ts` and inject the channel interface.",
+      fix: "Move the conduit to `channels/{{tier}}/{{tier}}.<subject>.channel.ts` and inject the channel interface.",
     },
   },
   applies: isService,
   create(context) {
-    const report = (node, conduit, specifier) =>
-      context.report({ node, messageId: "serviceOpensAChannel", data: { conduit, specifier } });
+    const report = (node, { conduit, specifier, tier }) =>
+      context.report({ node, messageId: "serviceOpensAChannel", data: { conduit, specifier, tier } });
 
     return {
       ImportDeclaration(node) {
@@ -48,12 +62,12 @@ export const serviceDoesNotOpenAChannelRule = defineRule({
         if (typeof specifier !== "string") return;
         if (node.importKind === "type") return;
 
-        const conduit = conduitFor(specifier);
-        if (conduit) report(node, conduit, specifier);
+        const found = conduitFor(specifier);
+        if (found) report(node, { ...found, specifier });
       },
       CallExpression(node) {
         if (node.callee?.type === "Identifier" && node.callee.name === "fetch") {
-          report(node, "an HTTP client", "fetch");
+          report(node, { conduit: "an HTTP client", specifier: "fetch", tier: "http" });
         }
       },
     };

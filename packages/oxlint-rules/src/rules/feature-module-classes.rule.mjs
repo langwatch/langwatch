@@ -155,12 +155,12 @@ export const featureModuleClassesRule = defineRule({
       fix: "Export a concrete `*{{suffix}}` class.",
     },
     create: {
-      what: "A concrete strict feature class must expose construction through static create.",
-      fix: "Add a static `create` method.",
+      what: "`{{name}}` is a concrete strict feature class with no static create factory.",
+      fix: "Add `static create(): {{name}}` that returns `new {{name}}(...)`.",
     },
     standalone: {
-      what: "Exported function in `{{path}}`: a `{{suffix}}` module keeps behaviour on its class.",
-      fix: "Move it onto the class or into `rules/`.",
+      what: "`{{name}}` is an exported function in the `{{suffix}}` module `{{path}}`, which must keep all behaviour on its class.",
+      fix: "Move it {{destination}}.",
     },
   },
   create(context, file) {
@@ -183,11 +183,21 @@ export const featureModuleClassesRule = defineRule({
           return;
         }
         const declarations = declaredClasses(node);
+        const classForSuffix = declarations.classes.find((candidate) =>
+          candidate.id?.name?.endsWith(kind.suffix),
+        );
         for (const fn of declarations.functions) {
           context.report({
             node: fn,
             messageId: "standalone",
-            data: { path: normalized, suffix: kind.suffix },
+            data: {
+              destination: classForSuffix
+                ? `onto the \`${classForSuffix.id.name}\` class`
+                : "into a `rules/` module beside this file",
+              name: fn.id?.name ?? "This function",
+              path: normalized,
+              suffix: kind.suffix,
+            },
           });
         }
         const matchingClasses = declarations.classes.filter((candidate) =>
@@ -218,7 +228,11 @@ export const featureModuleClassesRule = defineRule({
               isStaticCreateFactory(member),
           );
           if (!hasStaticCreate) {
-            context.report({ node: candidate, messageId: "create" });
+            context.report({
+              node: candidate,
+              messageId: "create",
+              data: { name: candidate.id?.name ?? "This class" },
+            });
           }
         }
       },

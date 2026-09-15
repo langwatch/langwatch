@@ -27,6 +27,30 @@ describe("given a strict feature source file", () => {
       expect(found[0].data.name).toBe("AgentService.service.ts");
       expect(found[0].data.artifacts).toContain("service");
     });
+
+    /** @scenario "A misnamed strict source file names the exact renamed target" */
+    it("computes the exact kebab-case target, stripping a redundant artifact word", () => {
+      const found = report("modules/agent/server/src/services/AgentService.service.ts");
+
+      expect(found[0].message).toContain("Rename the file to `agent.service.ts`");
+    });
+
+    /** @scenario "A filename with no recognizable artifact falls back to the closed list" */
+    it("falls back to the artifact list when no artifact can be inferred", () => {
+      const found = report("modules/agent/server/src/services/AgentHelper.ts");
+
+      expect(found[0].message).toContain("picking one artifact from");
+    });
+  });
+
+  describe("when a server filename hyphenates its architectural qualifier", () => {
+    /** @scenario "A qualifier-prefixed server filename names the dot-separated rename" */
+    it("names the exact dot-separated rename instead of a folder move", () => {
+      const found = report("modules/agent/server/src/repositories/prisma-agent.repository.ts");
+
+      expect(found).toHaveLength(1);
+      expect(found[0].message).toContain("Rename the file to `prisma.agent.repository.ts`");
+    });
   });
 
   describe("when the filename is already lower kebab case", () => {

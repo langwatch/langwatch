@@ -50,13 +50,23 @@ function importedNameOf(specifierNode) {
   return specifierNode.local?.name;
 }
 
+// `moduleApi<X>("<kebab-module>")` is always exported as `<PascalModule>Api`
+// from `@langwatch/<package>-contract` (e.g. `data-retention` ->
+// `DataRetentionApi`); this holds with no exception across every module.
+function pascalCase(kebab) {
+  return kebab
+    .split("-")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join("");
+}
+
 export const moduleAppOnlyAcrossPackagesRule = defineRule({
   name: "module-app-only-across-packages",
   kind: "problem",
   messages: {
     reachThroughApi: {
       what: "`{{name}}` reaches `{{module}}`'s server package directly.",
-      fix: "Reach {{module}} through its contract Api token; a module is its App outside its package.",
+      fix: "Import `{{apiName}}` from `{{contractPackage}}` and call the operation on it instead.",
     },
   },
   create(context, file) {
@@ -80,9 +90,17 @@ export const moduleAppOnlyAcrossPackagesRule = defineRule({
         const ownRoot = `${target.enterprise ? "enterprise/" : ""}modules/${target.module}/server/`;
         if (file.workspacePath.startsWith(ownRoot)) return;
 
+        const apiName = `${pascalCase(target.module)}Api`;
+        const contractPackage = `@langwatch/${target.enterprise ? "enterprise-" : ""}${target.module}-contract`;
+        const data = { apiName, contractPackage, module: target.module };
+
         const specifiers = node.specifiers ?? [];
         if (specifiers.length === 0) {
-          context.report({ node, messageId: "reachThroughApi", data: { name: specifier, module: target.module } });
+          context.report({
+            node,
+            messageId: "reachThroughApi",
+            data: { ...data, name: specifier },
+          });
           return;
         }
 
@@ -94,7 +112,7 @@ export const moduleAppOnlyAcrossPackagesRule = defineRule({
           context.report({
             node: specifierNode,
             messageId: "reachThroughApi",
-            data: { name: name ?? specifier, module: target.module },
+            data: { ...data, name: name ?? specifier },
           });
         }
       },

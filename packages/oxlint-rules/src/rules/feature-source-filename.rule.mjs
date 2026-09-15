@@ -2,10 +2,84 @@ import {
   CANONICAL_ARTIFACTS,
   isLowerKebabFilename,
   isStrictServerFilename,
+  SERVER_ARCHITECTURAL_QUALIFIERS,
+  SERVER_QUALIFIED_ARTIFACTS,
 } from "../../grammar/feature-layout-policy.mjs";
 import { defineRule } from "../define-rule.mjs";
 
 const ALLOWED_ARTIFACTS = [...CANONICAL_ARTIFACTS].sort().join(", ");
+
+function extensionOf(name) {
+  return name.match(/\.[cm]?[jt]sx?$/)?.[0];
+}
+
+function toKebabWords(text) {
+  return text
+    .replace(/([a-z0-9])([A-Z])/g, "$1-$2")
+    .replace(/([A-Z]+)([A-Z][a-z])/g, "$1-$2")
+    .replace(/[_\s]+/g, "-")
+    .replace(/-+/g, "-")
+    .toLowerCase();
+}
+
+// A server filename with a flat qualifier prefix (`prisma-agent.repository.ts`)
+// is refused only because the qualifier is hyphen-joined to the subject
+// instead of living in its own dot segment; splitting it (`prisma.agent.repository.ts`)
+// is always the exact, always-valid fix, independent of which of the
+// `SERVER_QUALIFIED_ARTIFACTS` it is or which folder it sits in.
+function qualifierPrefixRename(name) {
+  const extension = extensionOf(name);
+  if (!extension) return undefined;
+  const parts = name.slice(0, -extension.length).split(".");
+  if (parts.length !== 2 || !SERVER_QUALIFIED_ARTIFACTS.has(parts[1])) return undefined;
+  const qualifier = SERVER_ARCHITECTURAL_QUALIFIERS.find((candidate) =>
+    parts[0].startsWith(`${candidate}-`),
+  );
+  if (!qualifier) return undefined;
+  return `${qualifier}.${parts[0].slice(qualifier.length + 1)}.${parts[1]}${extension}`;
+}
+
+// A casing/shape violation (`AgentService.service.ts`, `AgentService.ts`,
+// `agent_service.ts`): kebab-case every word and drop a subject word that
+// only repeats the artifact, e.g. `AgentService.service.ts` -> `agent.service.ts`.
+function kebabCaseRename(name) {
+  const extension = extensionOf(name);
+  if (!extension) return undefined;
+  const rawParts = name.slice(0, -extension.length).split(".");
+  const lastRaw = rawParts.at(-1)?.toLowerCase();
+
+  let artifact;
+  let subjectWords;
+  if (rawParts.length > 1 && CANONICAL_ARTIFACTS.has(lastRaw)) {
+    artifact = lastRaw;
+    subjectWords = toKebabWords(rawParts.slice(0, -1).join("-"))
+      .split("-")
+      .filter(Boolean);
+  } else {
+    const words = toKebabWords(rawParts.join("-"))
+      .split("-")
+      .filter(Boolean);
+    const tail = words.at(-1);
+    if (words.length < 2 || !CANONICAL_ARTIFACTS.has(tail)) return undefined;
+    artifact = tail;
+    subjectWords = words.slice(0, -1);
+  }
+
+  if (subjectWords.length > 1 && subjectWords.at(-1) === artifact) {
+    subjectWords = subjectWords.slice(0, -1);
+  }
+  if (subjectWords.length === 0) return undefined;
+
+  return `${subjectWords.join("-")}.${artifact}${extension}`;
+}
+
+function suggestFilename(source) {
+  if (source.role === "server") {
+    const qualifierFix = qualifierPrefixRename(source.name);
+    if (qualifierFix) return qualifierFix;
+  }
+  return kebabCaseRename(source.name);
+}
 
 export const featureSourceFilenameRule = defineRule({
   name: "feature-source-filename",
@@ -13,7 +87,7 @@ export const featureSourceFilenameRule = defineRule({
   messages: {
     filename: {
       what: "`{{name}}` is not `<subject>.<artifact>.ts` in lower kebab case.",
-      fix: "Rename it after the subject and the artifact, e.g. `trace-search.service.ts`; the artifacts are {{artifacts}}.",
+      fix: "{{instruction}}",
     },
   },
   create(context, file) {
@@ -26,12 +100,17 @@ export const featureSourceFilenameRule = defineRule({
         : isLowerKebabFilename(source.name);
     if (valid) return {};
 
+    const suggested = suggestFilename(source);
+    const instruction = suggested
+      ? `Rename the file to \`${suggested}\` (a file rename, not an edit inside it).`
+      : `Rename the file to \`<subject>.<artifact>.ts\` in lower kebab case, picking one artifact from ${ALLOWED_ARTIFACTS}.`;
+
     return {
       Program(node) {
         context.report({
           node,
           messageId: "filename",
-          data: { name: source.name, artifacts: ALLOWED_ARTIFACTS },
+          data: { artifacts: ALLOWED_ARTIFACTS, instruction, name: source.name },
         });
       },
     };

@@ -55,11 +55,40 @@ function isRecursiveCall(node, name) {
   );
 }
 
+// Human label for the single construct the message points at, so the fix
+// names a concrete extraction target instead of just the function.
+const CONSTRUCT_LABELS = {
+  IfStatement: "if statement",
+  ConditionalExpression: "ternary expression",
+  SwitchStatement: "switch statement",
+  ForStatement: "for loop",
+  ForInStatement: "for-in loop",
+  ForOfStatement: "for-of loop",
+  WhileStatement: "while loop",
+  DoWhileStatement: "do-while loop",
+  CatchClause: "catch block",
+  LogicalExpression: "chained boolean condition",
+  BreakStatement: "labeled break",
+  ContinueStatement: "labeled continue",
+  CallExpression: "recursive call",
+};
+
+function describeConstruct(node) {
+  return CONSTRUCT_LABELS[node.type] ?? "construct";
+}
+
 export function cognitiveComplexity(functionNode) {
   let score = 0;
+  // The single construct that added the most to the score, so the report can
+  // point at one concrete extraction target instead of just the function.
+  let heaviest;
+  const note = (node, delta) => {
+    score += delta;
+    if (!heaviest || delta > heaviest.delta) heaviest = { delta, node };
+  };
 
   const walkIf = (node, nesting, isElseIf, owner) => {
-    score += isElseIf ? 1 : 1 + nesting;
+    note(node, isElseIf ? 1 : 1 + nesting);
     walk(node.test, nesting, owner);
     walk(node.consequent, nesting + 1, owner);
     const alternate = node.alternate;
@@ -68,7 +97,7 @@ export function cognitiveComplexity(functionNode) {
       walkIf(alternate, nesting, true, owner);
       return;
     }
-    score += 1;
+    note(node, 1);
     walk(alternate, nesting + 1, owner);
   };
 
@@ -89,13 +118,13 @@ export function cognitiveComplexity(functionNode) {
         walkIf(node, nesting, false, owner);
         return;
       case "ConditionalExpression":
-        score += 1 + nesting;
+        note(node, 1 + nesting);
         walk(node.test, nesting, owner);
         walk(node.consequent, nesting + 1, owner);
         walk(node.alternate, nesting + 1, owner);
         return;
       case "SwitchStatement":
-        score += 1 + nesting;
+        note(node, 1 + nesting);
         walk(node.discriminant, nesting, owner);
         for (const switchCase of node.cases) walk(switchCase, nesting + 1, owner);
         return;
@@ -104,11 +133,11 @@ export function cognitiveComplexity(functionNode) {
       case "ForOfStatement":
       case "WhileStatement":
       case "DoWhileStatement":
-        score += 1 + nesting;
+        note(node, 1 + nesting);
         walkNested(node, nesting, owner, nesting + 1);
         return;
       case "CatchClause":
-        score += 1 + nesting;
+        note(node, 1 + nesting);
         walkNested(node, nesting, owner, nesting + 1);
         return;
       case "LogicalExpression": {
@@ -129,16 +158,16 @@ export function cognitiveComplexity(functionNode) {
         for (let index = 1; index < operators.length; index += 1) {
           if (operators[index] !== operators[index - 1]) sequences += 1;
         }
-        score += sequences;
+        note(node, sequences);
         for (const leaf of leaves) walk(leaf, nesting, owner);
         return;
       }
       case "BreakStatement":
       case "ContinueStatement":
-        if (node.label) score += 1;
+        if (node.label) note(node, 1);
         return;
       case "CallExpression":
-        if (isRecursiveCall(node, owner)) score += 1;
+        if (isRecursiveCall(node, owner)) note(node, 1);
         break;
       case "FunctionDeclaration":
       case "FunctionExpression":
@@ -152,7 +181,7 @@ export function cognitiveComplexity(functionNode) {
   }
 
   walkNested(functionNode, 0, functionName(functionNode), 0);
-  return score;
+  return { heaviest, score };
 }
 
 export const cognitiveComplexityRule = defineRule({
@@ -163,8 +192,8 @@ export const cognitiveComplexityRule = defineRule({
   },
   messages: {
     tooComplex: {
-      what: "`{{name}}` has cognitive complexity {{complexity}}; the maximum is {{max}}.",
-      fix: "Extract the deepest branch into a named function, or replace the if/else chain with an early return or lookup table.",
+      what: "`{{name}}` has cognitive complexity {{complexity}} (max {{max}}); the heaviest contributor is the {{construct}} at line {{atLine}}.",
+      fix: "Extract that {{construct}} into its own named function so the rest of `{{name}}` stays flat.",
     },
   },
   create(context, file, { max }) {
@@ -175,12 +204,18 @@ export const cognitiveComplexityRule = defineRule({
       ) {
         return;
       }
-      const complexity = cognitiveComplexity(node);
+      const { heaviest, score: complexity } = cognitiveComplexity(node);
       if (complexity <= max) return;
       context.report({
         node,
         messageId: "tooComplex",
-        data: { complexity, max, name: functionName(node) ?? "This function" },
+        data: {
+          atLine: heaviest?.node?.loc?.start?.line ?? "?",
+          complexity,
+          construct: heaviest ? describeConstruct(heaviest.node) : "construct",
+          max,
+          name: functionName(node) ?? "This function",
+        },
       });
     };
 
