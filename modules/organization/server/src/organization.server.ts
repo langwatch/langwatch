@@ -14,6 +14,7 @@ import {
 import { organizationTrpcTransport } from "./transport/organization.trpc.ts";
 import { organizationsProvisioningRest } from "./transport/organizations.rest.ts";
 import { personalWorkspaceFeaturesTrpcTransport } from "./transport/personal-workspace-features.trpc.ts";
+import { teamsRest } from "./transport/team.rest.ts";
 import { teamTrpcTransport } from "./transport/team.trpc.ts";
 
 export const organizationServer = defineServerModule("organization")
@@ -29,6 +30,7 @@ export const organizationServer = defineServerModule("organization")
     organizationManagementRest,
     organizationsProvisioningRest,
     groupsRest,
+    teamsRest,
   )
   // Both families sit behind the organization credential and both require the
   // Enterprise plan: groups arrive with SCIM, and the whole management surface

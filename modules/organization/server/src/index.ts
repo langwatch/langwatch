@@ -113,7 +113,7 @@ export type {
   OrganizationSignals,
 } from "./app/organization.members.ts";
 export { groupsRest, groupsRestEnterpriseGate } from "./transport/group.rest.ts";
-export { createTeamRest } from "./transport/team.rest.ts";
+export { teamsRest, TeamManagementApi } from "./transport/team.rest.ts";
 export { organizationsProvisioningRest } from "./transport/organizations.rest.ts";
 export { ORGANIZATIONS_SPEC_OPTIONS } from "./rules/organization-provisioning-openapi.rules.ts";
 export { buildInviteAcceptUrl, buildMembersSettingsUrl } from "./rules/invite-link.rules.ts";

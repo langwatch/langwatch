@@ -4,22 +4,66 @@
  * collection routes stay at organization scope as they operate on that whole set.
  */
 import {
-  OrganizationApi,
   organizationTeamRestArchivedSchema,
   organizationTeamRestMemberListSchema,
   organizationTeamRestMemberSchema,
   organizationTeamRestPageSchema,
   organizationTeamRestSchema,
   organizationTeamRoleSchema,
-  organizationTeamSchema,
+  type OrganizationApi,
   type OrganizationCaller,
   type OrganizationTeam,
+  type UpdateOrganizationTeamInput,
 } from "@langwatch/organization-contract";
-import { defineRestRouter, MANAGEMENT_API_VERSION, type RestTransportDeclaration } from "@langwatch/api/rest";
-import type { AuthzService } from "@langwatch/authz-contract";
-import type { ProjectApi } from "@langwatch/project-contract";
+import {
+  defineRestRouter,
+  MANAGEMENT_API_VERSION,
+  type RestTransportDeclaration,
+} from "@langwatch/api/rest";
+import type { AuthzApi, AuthzTeamMemberBinding } from "@langwatch/authz-contract";
+import { moduleApi } from "@langwatch/runtime-composition";
 import { SYSTEM_ACTORS } from "@langwatch/actor";
 import { z } from "zod";
+
+/**
+ * What the `/api/teams` family reaches, as flat operations the organization's
+ * own application serves.
+ *
+ * Every member is implemented by `ServerOrganizationApp`, which declares
+ * `implements TeamManagementApi` — so a route naming something the application
+ * does not serve fails the build rather than the first request. This family
+ * used to ask for two injected accessors (`authz()`, `projects()`) that only an
+ * apps/api mount file supplied; when that file was deleted the family lost its
+ * only caller and stopped being registered at all.
+ *
+ * The seven organization operations and the one authorization read are taken
+ * straight off {@link OrganizationApi} and {@link AuthzApi} so they cannot
+ * drift from the contracts that already declare them. `updateTeam` is spelled
+ * out because it is implemented by `OrganizationService` and reached by this
+ * door alone, so it has never been on the peer-facing contract.
+ */
+export interface TeamManagementApi
+  extends
+    Pick<
+      OrganizationApi,
+      | "listTeams"
+      | "createTeam"
+      | "getTeam"
+      | "archiveTeam"
+      | "addTeamMember"
+      | "removeTeamMember"
+      | "listProjectsByTeam"
+    >,
+    Pick<AuthzApi, "listTeamMemberBindings"> {
+  /**
+   * Renames one of this organization's teams. The body carries a name or
+   * nothing at all, and nothing else: a PATCH here never touches membership,
+   * which is what `updateTeamWithMembers` is for and why it is not this.
+   */
+  updateTeam(input: UpdateOrganizationTeamInput): Promise<OrganizationTeam>;
+}
+
+export const TeamManagementApi = moduleApi<TeamManagementApi>("organization");
 
 /**
  * Who a write is attributed to: the member the credential acts as, or the
@@ -77,221 +121,220 @@ function teamResponse(team: OrganizationTeam) {
  * A team member with the role their binding grants at the team's scope,
  * converted from the authz service's binding shape to the wire shape.
  */
-function memberResponse(binding: {
-  userId: string;
-  user?: { name?: string | null; email?: string | null } | null;
-  role: string;
-}): z.infer<typeof organizationTeamRestMemberSchema> {
+function memberResponse(
+  binding: AuthzTeamMemberBinding,
+): z.infer<typeof organizationTeamRestMemberSchema> {
   return {
     userId: binding.userId,
     name: binding.user?.name ?? null,
     email: binding.user?.email ?? null,
-    role: binding.role as z.infer<typeof organizationTeamRestMemberSchema>["role"],
+    role: binding.role,
   };
 }
 
 /**
- * Builds the `/api/teams` family. `authz` and `projects` are resolved by the
- * caller at mount time; they must never be read at module load, or every
- * deployment gets the default values regardless of its own configuration.
+ * The `/api/teams` family, and its `/api/v1/teams` canonical twin. The type is
+ * written out rather than inferred so the declaration emit stays portable.
  */
-export function createTeamRest(options: Readonly<{
-  authz: () => AuthzService;
-  projects: () => ProjectApi;
-}>): Readonly<{ protocol: "rest"; namespace: string; router: () => RestTransportDeclaration<OrganizationApi> }> {
-  return defineRestRouter(OrganizationApi)
-    .withNamespace("teams")
-    .withVersion(MANAGEMENT_API_VERSION)
-    .withCredential("organization")
+export const teamsRest: Readonly<{
+  protocol: "rest";
+  namespace: string;
+  router: () => RestTransportDeclaration<TeamManagementApi>;
+}> = defineRestRouter(TeamManagementApi)
+  .withNamespace("teams")
+  .withVersion(MANAGEMENT_API_VERSION)
+  .withCredential("organization")
 
-    .get("/", "listTeams")
-    .withPermission("team:view")
-    .withQuery(paginationQuerySchema)
-    .withOutput(organizationTeamRestPageSchema)
-    .withDocs({
-      tags: ["Teams"],
-      description: "List all non-archived teams for the organization (paginated)",
-    })
-    .handle(async ({ app, input, scope }) => {
-      const result = await app.listTeams({
+  .get("/", "listTeams")
+  .withPermission("team:view")
+  .withQuery(paginationQuerySchema)
+  .withOutput(organizationTeamRestPageSchema)
+  .withDocs({
+    tags: ["Teams"],
+    description: "List all non-archived teams for the organization (paginated)",
+  })
+  .handle(async ({ app, input, scope }) => {
+    const result = await app.listTeams({
+      organizationId: scope.id,
+      page: input.page,
+      limit: input.limit,
+    });
+
+    return {
+      data: result.data.map(teamResponse),
+      pagination: result.pagination,
+    };
+  })
+
+  .post("/", "createTeam")
+  .withPermission("team:manage")
+  .withInput(createTeamSchema)
+  .withOutput(organizationTeamRestSchema)
+  .withStatus(201)
+  .withDocs({
+    tags: ["Teams"],
+    description: "Create a new team that can group projects and members",
+  })
+  .handle(async ({ app, input, scope }) =>
+    teamResponse(
+      await app.createTeam({
         organizationId: scope.id,
-        page: input.page,
-        limit: input.limit,
-      });
+        name: input.name,
+      }),
+    ),
+  )
 
-      return {
-        data: result.data.map(teamResponse),
-        pagination: result.pagination,
-      };
-    })
-
-    .post("/", "createTeam")
-    .withPermission("team:manage")
-    .withInput(createTeamSchema)
-    .withOutput(organizationTeamRestSchema)
-    .withStatus(201)
-    .withDocs({
-      tags: ["Teams"],
-      description: "Create a new team that can group projects and members",
-    })
-    .handle(async ({ app, input, scope }) =>
-      teamResponse(
-        await app.createTeam({
-          organizationId: scope.id,
-          name: input.name,
-        }),
-      ),
-    )
-
-    .get("/:id", "getTeam")
-    .withPermission("team:view")
-    .withParams(teamParamsSchema)
-    .withOutput(organizationTeamRestSchema)
-    .withDocs({
-      tags: ["Teams"],
-      description: "Get a team by its id",
-    })
-    .handle(async ({ app, input, scope }) =>
-      teamResponse(
-        await app.getTeam({
-          teamId: input.id,
-          organizationId: scope.id,
-        }),
-      ),
-    )
-
-    .patch("/:id", "updateTeam")
-    .withPermission("team:manage")
-    .withParams(teamParamsSchema)
-    .withInput(updateTeamSchema)
-    .withOutput(organizationTeamRestSchema)
-    .withDocs({
-      tags: ["Teams"],
-      description: "Update a team by its id",
-    })
-    .handle(async ({ app, input, scope }) =>
-      teamResponse(
-        await app.updateTeam({
-          teamId: input.id,
-          organizationId: scope.id,
-          ...(input.name === undefined ? {} : { name: input.name }),
-        }),
-      ),
-    )
-
-    .delete("/:id", "archiveTeam")
-    .withPermission("team:manage")
-    .withParams(teamParamsSchema)
-    .withOutput(organizationTeamRestArchivedSchema)
-    .withDocs({
-      tags: ["Teams"],
-      description: "Archive a team (soft-delete)",
-    })
-    .handle(async ({ app, input, scope }) => {
-      const team = await app.archiveTeam({
-        teamId: input.id,
-        organizationId: scope.id,
-      });
-
-      return {
-        id: team.id,
-        name: team.name,
-        archivedAt: team.archivedAt ?? null,
-      };
-    })
-
-    .get("/:id/members", "listTeamMembers")
-    .withPermission("team:view")
-    .withParams(teamParamsSchema)
-    .withOutput(organizationTeamRestMemberListSchema)
-    .withDocs({
-      tags: ["Teams"],
-      description: "List members of a team",
-    })
-    .handle(async ({ app, input, scope }) => {
-      // Reads the team first so a team outside the organization is a 404 rather
-      // than an empty membership list.
+  .get("/:id", "getTeam")
+  .withPermission("team:view")
+  .withParams(teamParamsSchema)
+  .withOutput(organizationTeamRestSchema)
+  .withDocs({
+    tags: ["Teams"],
+    description: "Get a team by its id",
+  })
+  .handle(async ({ app, input, scope }) =>
+    teamResponse(
       await app.getTeam({
         teamId: input.id,
         organizationId: scope.id,
-      });
+      }),
+    ),
+  )
 
-      const bindings = await options.authz().listTeamMemberBindings({
+  .patch("/:id", "updateTeam")
+  .withPermission("team:manage")
+  .withParams(teamParamsSchema)
+  .withInput(updateTeamSchema)
+  .withOutput(organizationTeamRestSchema)
+  .withDocs({
+    tags: ["Teams"],
+    description: "Update a team by its id",
+  })
+  .handle(async ({ app, input, scope }) =>
+    teamResponse(
+      await app.updateTeam({
+        teamId: input.id,
         organizationId: scope.id,
-        teamIds: [input.id],
-      });
+        ...(input.name === undefined ? {} : { name: input.name }),
+      }),
+    ),
+  )
 
-      return {
-        data: (bindings.get(input.id) ?? []).map(memberResponse),
-      };
-    })
+  .delete("/:id", "archiveTeam")
+  .withPermission("team:manage")
+  .withParams(teamParamsSchema)
+  .withOutput(organizationTeamRestArchivedSchema)
+  .withDocs({
+    tags: ["Teams"],
+    description: "Archive a team (soft-delete)",
+  })
+  .handle(async ({ app, input, scope }) => {
+    const team = await app.archiveTeam({
+      teamId: input.id,
+      organizationId: scope.id,
+    });
 
-    .post("/:id/members", "addTeamMember")
-    .withPermission("team:manage")
-    .withParams(teamParamsSchema)
-    .withInput(addMemberSchema)
-    .withOutput(successSchema)
-    .withStatus(201)
-    .withDocs({
-      tags: ["Teams"],
-      description: "Add a member to a team",
-    })
-    .handle(async ({ app, input, scope, actor }) => {
-      const ledgerActor = actor && actor.type === "user" ? { type: "user" as const, id: actor.id ?? null } : { type: "system" as const, id: null };
+    return {
+      id: team.id,
+      name: team.name,
+      archivedAt: team.archivedAt ?? null,
+    };
+  })
 
-      await app.addTeamMember({
+  .get("/:id/members", "listTeamMembers")
+  .withPermission("team:view")
+  .withParams(teamParamsSchema)
+  .withOutput(organizationTeamRestMemberListSchema)
+  .withDocs({
+    tags: ["Teams"],
+    description: "List members of a team",
+  })
+  .handle(async ({ app, input, scope }) => {
+    // Reads the team first so a team outside the organization is a 404 rather
+    // than an empty membership list.
+    await app.getTeam({
+      teamId: input.id,
+      organizationId: scope.id,
+    });
+
+    const bindings = await app.listTeamMemberBindings({
+      organizationId: scope.id,
+      teamIds: [input.id],
+    });
+
+    return {
+      data: (bindings.get(input.id) ?? []).map(memberResponse),
+    };
+  })
+
+  .post("/:id/members", "addTeamMember")
+  .withPermission("team:manage")
+  .withParams(teamParamsSchema)
+  .withInput(addMemberSchema)
+  .withOutput(successSchema)
+  .withStatus(201)
+  .withDocs({
+    tags: ["Teams"],
+    description: "Add a member to a team",
+  })
+  .handle(async ({ app, input, scope, actor }) => {
+    const ledgerActor =
+      actor && actor.type === "user"
+        ? { type: "user" as const, id: actor.id ?? null }
+        : { type: "system" as const, id: null };
+
+    await app.addTeamMember({
+      teamId: input.id,
+      organizationId: scope.id,
+      userId: input.userId,
+      role: input.role,
+      actor: ledgerActor,
+    });
+
+    return { success: true };
+  })
+
+  .delete("/:id/members/:userId", "removeTeamMember")
+  .withPermission("team:manage")
+  .withParams(teamMemberParamsSchema)
+  .withOutput(successSchema)
+  .withDocs({
+    tags: ["Teams"],
+    description: "Remove a member from a team",
+  })
+  .handle(async ({ app, input, scope, actor }) => {
+    await app.removeTeamMember(
+      {
         teamId: input.id,
         organizationId: scope.id,
         userId: input.userId,
-        role: input.role,
-        actor: ledgerActor,
-      });
+      },
+      callerOf(actor),
+    );
 
-      return { success: true };
-    })
+    return { success: true };
+  })
 
-    .delete("/:id/members/:userId", "removeTeamMember")
-    .withPermission("team:manage")
-    .withParams(teamMemberParamsSchema)
-    .withOutput(successSchema)
-    .withDocs({
-      tags: ["Teams"],
-      description: "Remove a member from a team",
-    })
-    .handle(async ({ app, input, scope, actor }) => {
-      await app.removeTeamMember(
-        {
-          teamId: input.id,
-          organizationId: scope.id,
-          userId: input.userId,
-        },
-        callerOf(actor),
-      );
+  .get("/:id/projects", "listTeamProjects")
+  .withPermission("team:view")
+  .withParams(teamParamsSchema)
+  .withOutput(teamProjectListSchema)
+  .withDocs({
+    tags: ["Teams"],
+    description: "List projects in a team",
+  })
+  .handle(async ({ app, input, scope }) => {
+    await app.getTeam({
+      teamId: input.id,
+      organizationId: scope.id,
+    });
 
-      return { success: true };
-    })
-
-    .get("/:id/projects", "listTeamProjects")
-    .withPermission("team:view")
-    .withParams(teamParamsSchema)
-    .withOutput(teamProjectListSchema)
-    .withDocs({
-      tags: ["Teams"],
-      description: "List projects in a team",
-    })
-    .handle(async ({ app, input, scope }) => {
-      await app.getTeam({
-        teamId: input.id,
+    return {
+      data: await app.listProjectsByTeam({
         organizationId: scope.id,
-      });
+        teamId: input.id,
+      }),
+    };
+  })
 
-      return {
-        data: await options.projects().listByTeam({
-          organizationId: scope.id,
-          teamId: input.id,
-        }),
-      };
-    })
-
-    .build();
-}
+  .build();

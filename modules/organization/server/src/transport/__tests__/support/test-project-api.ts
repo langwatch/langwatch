@@ -1,0 +1,73 @@
+/**
+ * A complete `ProjectApi` boundary for the teams family's suite. Only the one
+ * read `GET /api/teams/:id/projects` makes is answered; everything else refuses
+ * by name, so a route that starts reaching the project module some other way
+ * fails here rather than passing on a stub's default.
+ */
+import type { Project, ProjectApi } from "@langwatch/project-contract";
+
+const unsupported = <Method>(name: string): Method =>
+  (() =>
+    Promise.reject(new Error(`ProjectApi.${name} is not reached by the teams family`))) as Method;
+
+export class TestProjectApi implements ProjectApi {
+  readonly #byTeam: ReadonlyMap<string, readonly Project[]>;
+
+  private constructor(byTeam: ReadonlyMap<string, readonly Project[]>) {
+    this.#byTeam = byTeam;
+  }
+
+  static create(
+    options: { byTeam?: Readonly<Record<string, readonly Project[]>> } = {},
+  ): TestProjectApi {
+    return new TestProjectApi(new Map(Object.entries(options.byTeam ?? {})));
+  }
+
+  async listByTeam(input: { organizationId: string; teamId: string }): Promise<Project[]> {
+    return [...(this.#byTeam.get(input.teamId) ?? [])];
+  }
+
+  listPaths = unsupported<ProjectApi["listPaths"]>("listPaths");
+  findOrganizationId = unsupported<ProjectApi["findOrganizationId"]>("findOrganizationId");
+  isPresenceEnabled = unsupported<ProjectApi["isPresenceEnabled"]>("isPresenceEnabled");
+  findSummaryById = unsupported<ProjectApi["findSummaryById"]>("findSummaryById");
+  searchByQuery = unsupported<ProjectApi["searchByQuery"]>("searchByQuery");
+  findById = unsupported<ProjectApi["findById"]>("findById");
+  getOrganizationId = unsupported<ProjectApi["getOrganizationId"]>("getOrganizationId");
+  getWithTeam = unsupported<ProjectApi["getWithTeam"]>("getWithTeam");
+  findWithTeam = unsupported<ProjectApi["findWithTeam"]>("findWithTeam");
+  listByOrganization = unsupported<ProjectApi["listByOrganization"]>("listByOrganization");
+  listNamesByIds = unsupported<ProjectApi["listNamesByIds"]>("listNamesByIds");
+  listIdsByOrganization = unsupported<ProjectApi["listIdsByOrganization"]>("listIdsByOrganization");
+  create = unsupported<ProjectApi["create"]>("create");
+  updateSettings = unsupported<ProjectApi["updateSettings"]>("updateSettings");
+  archive = unsupported<ProjectApi["archive"]>("archive");
+  regenerateLegacyProjectKey = unsupported<ProjectApi["regenerateLegacyProjectKey"]>(
+    "regenerateLegacyProjectKey",
+  );
+  findIdByLegacyApiKey = unsupported<ProjectApi["findIdByLegacyApiKey"]>("findIdByLegacyApiKey");
+  rotateLegacyApiKey = unsupported<ProjectApi["rotateLegacyApiKey"]>("rotateLegacyApiKey");
+  findTraceSharingConfig =
+    unsupported<ProjectApi["findTraceSharingConfig"]>("findTraceSharingConfig");
+  findPersonalWorkspaceOwner = unsupported<ProjectApi["findPersonalWorkspaceOwner"]>(
+    "findPersonalWorkspaceOwner",
+  );
+  requestTopicClustering =
+    unsupported<ProjectApi["requestTopicClustering"]>("requestTopicClustering");
+  touchCodingAgentPullRequestSeen = unsupported<ProjectApi["touchCodingAgentPullRequestSeen"]>(
+    "touchCodingAgentPullRequestSeen",
+  );
+  touchCodingAgentSessionSeen = unsupported<ProjectApi["touchCodingAgentSessionSeen"]>(
+    "touchCodingAgentSessionSeen",
+  );
+  findInternal = unsupported<ProjectApi["findInternal"]>("findInternal");
+  ensureInternal = unsupported<ProjectApi["ensureInternal"]>("ensureInternal");
+  findIdentity = unsupported<ProjectApi["findIdentity"]>("findIdentity");
+  listActiveByScopes = unsupported<ProjectApi["listActiveByScopes"]>("listActiveByScopes");
+  updateMetadata = unsupported<ProjectApi["updateMetadata"]>("updateMetadata");
+  resolveOrgAdmin = unsupported<ProjectApi["resolveOrgAdmin"]>("resolveOrgAdmin");
+  resolveTraceDestination =
+    unsupported<ProjectApi["resolveTraceDestination"]>("resolveTraceDestination");
+  findTraceDestination = unsupported<ProjectApi["findTraceDestination"]>("findTraceDestination");
+  listTraceDestinations = unsupported<ProjectApi["listTraceDestinations"]>("listTraceDestinations");
+}

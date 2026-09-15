@@ -12,7 +12,11 @@ import {
   OrganizationNotFoundForTeamError,
 } from "@langwatch/organization-contract";
 import { ProjectApi } from "@langwatch/project-contract";
-import { AuthzApi } from "@langwatch/authz-contract";
+import {
+  AuthzApi,
+  type AuthzListTeamMemberBindingsInput,
+  type AuthzTeamMemberBinding,
+} from "@langwatch/authz-contract";
 import { ApiKeyApi } from "@langwatch/api-key-contract";
 import { ShareApi } from "@langwatch/share-contract";
 import { UserApi } from "@langwatch/user-contract";
@@ -68,8 +72,10 @@ import type {
   RenameOrganizationGroupInput,
   UpdateOrganizationSettingsInput,
   UpdateOrganizationSettingsResult,
+  UpdateOrganizationTeamInput,
   UpdateOrganizationTeamWithMembersInput,
 } from "@langwatch/organization-contract";
+import type { TeamManagementApi } from "../transport/team.rest.ts";
 import { OrganizationMembershipService } from "../services/organization-membership.service.ts";
 import { OrganizationService as OrganizationEntityService } from "../services/organization.service.ts";
 import type { OrganizationRepositories } from "../repositories/organization.repositories.ts";
@@ -260,16 +266,26 @@ function refusing<T>(capability: string): T {
   return new Proxy(
     {},
     {
-      get:
-        () =>
-        (): Promise<never> =>
-          Promise.reject(new OrganizationCapabilityUnavailableError(capability)),
+      get: () => (): Promise<never> =>
+        Promise.reject(new OrganizationCapabilityUnavailableError(capability)),
       has: () => true,
     },
   ) as T;
 }
 
-export class ServerOrganizationApp implements OrganizationApi {
+/**
+ * The organization feature's application.
+ *
+ * It implements two things by name: the module's own {@link OrganizationApi},
+ * which peer modules and the tRPC namespaces call, and
+ * {@link TeamManagementApi}, which is what the `/api/teams` door calls. The
+ * second is declared here rather than left to agree by attention — the door is
+ * handed this object through the operations-only feature-API proxy, so a member
+ * it names and this class does not serve is not a type error at the seam, it is
+ * a `TypeError` on the first request. Naming the door's shape in this
+ * `implements` clause is what turns that back into a build failure.
+ */
+export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi {
   static readonly contract = OrganizationApi;
   static readonly dependencies = {
     projects: ProjectApi,
@@ -647,9 +663,7 @@ export class ServerOrganizationApp implements OrganizationApi {
         createdByUserId: null,
         organizationId: created.organization.id,
         permissionMode: "all",
-        bindings: [
-          { role: "ADMIN", scopeType: "ORGANIZATION", scopeId: created.organization.id },
-        ],
+        bindings: [{ role: "ADMIN", scopeType: "ORGANIZATION", scopeId: created.organization.id }],
       });
 
       const summary = await this.findProvisioningSummary(created.organization.id);
@@ -663,7 +677,11 @@ export class ServerOrganizationApp implements OrganizationApi {
       }
 
       return {
-        organization: { id: created.organization.id, name: created.organization.name, slug: summary.slug },
+        organization: {
+          id: created.organization.id,
+          name: created.organization.name,
+          slug: summary.slug,
+        },
         team: created.team,
         adminApiKey: { id: adminKey.apiKey.id, token: adminKey.token },
       };
@@ -792,7 +810,10 @@ export class ServerOrganizationApp implements OrganizationApi {
 
   /** Changes one member's role inside one team. */
   updateTeamMemberRole(
-    input: Omit<Parameters<OrganizationMembershipService["updateTeamMemberRole"]>[0], "currentUserId">,
+    input: Omit<
+      Parameters<OrganizationMembershipService["updateTeamMemberRole"]>[0],
+      "currentUserId"
+    >,
     by: OrganizationCaller,
   ): Promise<void> {
     return this.#dependencies.membership.updateTeamMemberRole({
@@ -921,9 +942,34 @@ export class ServerOrganizationApp implements OrganizationApi {
     });
   }
 
+  /**
+   * Renames one team, scoped to the organization the caller's credential
+   * resolved — never to the team's own organization, which would let a
+   * management token issued for one organization rename another's team.
+   *
+   * Distinct from `updateTeamWithMembers`: that one saves the settings form's
+   * whole diff and demands the membership array with it, and a PATCH carrying
+   * only a name has none to give.
+   */
+  updateTeam(input: UpdateOrganizationTeamInput): Promise<OrganizationTeam> {
+    return this.#dependencies.organizations.updateTeam(input);
+  }
+
   /** Archives one team. */
   archiveTeam(input: GetOrganizationTeamInput): Promise<OrganizationTeam> {
     return this.#dependencies.organizations.archiveTeam(input);
+  }
+
+  /**
+   * The bindings that make somebody a member of a team, read through the one
+   * permission service this application already holds. The `/api/teams` door
+   * reads it here rather than through an injected authorization accessor,
+   * because an accessor is a member no composition supplies.
+   */
+  listTeamMemberBindings(
+    input: AuthzListTeamMemberBindingsInput,
+  ): Promise<Map<string, AuthzTeamMemberBinding[]>> {
+    return this.#dependencies.permissions.listTeamMemberBindings(input);
   }
 
   /** Removes one member from a team, attributed to its caller. */
@@ -1528,14 +1574,11 @@ export class ServerOrganizationApp implements OrganizationApi {
 }
 
 class UserApiOrganizationSessionRevocation implements OrganizationSessionRevocation {
-  static create(
-    users: UserApi,
-  ): UserApiOrganizationSessionRevocation {
+  static create(users: UserApi): UserApiOrganizationSessionRevocation {
     return new UserApiOrganizationSessionRevocation(users);
   }
 
-  private constructor(private readonly users: UserApi) {
-  }
+  private constructor(private readonly users: UserApi) {}
 
   revokeAllBrowserSessions(input: { userId: string }): Promise<void> {
     return this.users.revokeAllBrowserSessions(input);
@@ -1547,8 +1590,7 @@ class AuthzApiOrganizationGrantCache implements OrganizationGrantCache {
     return new AuthzApiOrganizationGrantCache(authz);
   }
 
-  private constructor(private readonly authz: AuthzApi) {
-  }
+  private constructor(private readonly authz: AuthzApi) {}
 
   invalidateOrganization(input: { organizationId: string }): Promise<void> {
     return this.authz.invalidateOrganization(input);
