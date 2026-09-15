@@ -9,11 +9,9 @@ import { setOutputFormat } from "./outputScope";
 import { parsePositiveIntOrNull } from "./positiveInt";
 
 /**
- * js-yaml is only needed for `-o yaml`, so it is loaded lazily and memoized:
- * a static import here would put its ~8ms load cost on the cold-start path of
- * EVERY invocation (this module is imported by `program.ts`). A dynamic
- * import (not a bare `require`) keeps it bundle-visible to Bun's
- * `build --compile`, which cannot see through `createRequire`.
+ * js-yaml is only needed for `-o yaml`, loaded lazily and memoized: a static
+ * import would put its ~8ms load cost on every invocation's cold-start path.
+ * Dynamic `import()`, not `require`, keeps it visible to Bun's `build --compile`.
  */
 let yamlModulePromise: Promise<typeof yaml> | undefined;
 const loadYaml = (): Promise<typeof yaml> => (yamlModulePromise ??= import("js-yaml"));
@@ -71,11 +69,9 @@ export interface ResolvedOutput {
 }
 
 /**
- * Whether the caller asked for a format EXPLICITLY (any spelling) — as
- * opposed to agent mode merely being active in the environment. Commands
- * whose default output is already agent-friendly raw text (help-tree,
- * skills get) use this to keep that default unless a machine format was
- * actually requested.
+ * Whether the caller asked for a format EXPLICITLY, as opposed to agent mode
+ * merely being active. Commands whose default is already agent-friendly raw
+ * text use this to keep that default unless a machine format was requested.
  */
 export const hasExplicitFormatRequest = (options?: RawOutputFlags): boolean =>
   options?.output !== undefined ||
@@ -192,11 +188,9 @@ const descend = (value: unknown, key: string): unknown => {
 const SUPPORTED_SEGMENT_RE = /^([A-Za-z_][A-Za-z0-9_-]*)?((?:\[(?:-?\d+)?\])*)$/;
 
 /**
- * What to do instead, on every refusal.
- *
- * This subset reads the answer before it reaches disk, so it stays small on
- * purpose. The shell carries the full tools, and saying so is what stops the
- * caller trying three spellings of the same idea and losing all three.
+ * What to do instead, on every refusal. This subset stays small on purpose;
+ * the shell carries the full tools, and saying so stops the caller trying
+ * three spellings of the same idea and losing all three.
  */
 const USE_THE_SHELL =
   " Redirect the answer to a file (`--format json > results.json`) and narrow it" +
@@ -209,11 +203,9 @@ type PathStep =
   | { kind: "index"; index: number };
 
 /**
- * The path expression as a flat list of steps.
- *
- * Splitting on "." alone is not enough once a segment carries accessors, so each
- * segment is parsed into its key and its accessors, and the whole path becomes
- * one list the walk can read without looking back at the text.
+ * The path expression as a flat list of steps. Splitting on "." alone is not
+ * enough once a segment carries accessors, so each is parsed into its key and
+ * accessors, becoming one list the walk can read without looking back.
  */
 const parsePathSteps = (expression: string): PathStep[] => {
   const steps: PathStep[] = [];
@@ -421,11 +413,9 @@ const withNormalizedTotal = (data: unknown): unknown => {
 };
 
 /**
- * The payload as the caller asked to see it: cut to `--limit`, narrowed to
- * `--json <fields>`, then filtered through `--jq`.
- *
- * That order is the readable one: the cap says how many rows, the projections
- * say what to read off them, so `--limit 5 --jq length` answers 5.
+ * The payload as asked: cut to `--limit`, narrowed to `--json <fields>`, then
+ * filtered through `--jq`. The cap runs first, so `--limit 5 --jq length`
+ * answers 5 rather than the size of an already-projected page.
  */
 const projectResult = (data: unknown, resolved: ResolvedOutput): unknown => {
   // The total is normalized BEFORE the cap, so `--limit 5` still prints the
@@ -480,12 +470,9 @@ export interface CommandResult {
 }
 
 /**
- * Commands whose action speaks the output contract.
- *
- * Marked at registration by `emitsResult` rather than sniffed off the handler:
- * commander's `.action(fn)` stores its OWN listener wrapping `fn`, so anything
- * we tag `fn` with is sealed inside that closure and unreachable. A WeakSet
- * keyed on the command is both simpler and free of commander private API.
+ * Commands whose action speaks the output contract, marked at registration
+ * by `emitsResult` rather than sniffed off the handler: commander wraps `fn`
+ * in its own closure, so tagging `fn` itself would be unreachable.
  */
 const OUTPUT_AWARE_COMMANDS = new WeakSet<Command>();
 

@@ -1,8 +1,7 @@
 /**
- * Hardens VS Code's integrated terminal against the `copilot_vscode`
- * bearer-token leak (ADR-039 §Extension #2): terminals inherit the extension
- * host's OTEL_* env unless `terminal.integrated.env.<os>` nulls those keys,
- * unsetting them for terminals while the extension host keeps them.
+ * Hardens VS Code's terminal against the `copilot_vscode` bearer-token leak
+ * (ADR-039 Extension #2): terminals inherit the extension host's OTEL_* env
+ * unless `terminal.integrated.env.<os>` nulls those keys.
  */
 
 import * as fs from "node:fs";
@@ -88,10 +87,9 @@ function readSettingsText(filePath: string): string {
 }
 
 /**
- * Parse settings text as JSONC. Returns the settings object, or null when the
- * text does not parse even as JSONC (in which case NOTHING may be written) or
- * parses to a non-object. Empty/whitespace-only text parses as `{}` — a fresh
- * file has no user content to protect.
+ * Parses settings text as JSONC, returning null when it doesn't parse (then
+ * NOTHING may be written) or parses to a non-object. Empty/whitespace text
+ * parses as `{}` -- a fresh file has no user content to protect.
  */
 function parseSettings(text: string): Record<string, unknown> | null {
   if (text.trim() === "") return {};
@@ -115,9 +113,8 @@ function atomicWrite(filePath: string, content: string): void {
 
 /**
  * Sets each of `keys` to null under `terminal.integrated.env.<os>` via
- * minimal, comment-preserving JSONC edits. Returns null when unsupported,
- * empty, or unparseable — refused rather than clobbered, so the caller can
- * surface that the hardening is NOT in place.
+ * minimal, comment-preserving JSONC edits. Returns null when unsupported or
+ * unparseable -- refused rather than clobbered.
  */
 export function clearVscodeTerminalOtelEnv(args: VscodeSettingsArgs): string | null {
   const filePath = vscodeUserSettingsPath(args.platform, args.home, args.appData);
@@ -136,11 +133,9 @@ export function clearVscodeTerminalOtelEnv(args: VscodeSettingsArgs): string | n
 }
 
 /**
- * Remove `keys` from `terminal.integrated.env.<os>` (logout teardown). Drops
- * the env object and the settings key when they become empty, preserving all
- * other settings, comments, and formatting. Returns true when the file
- * changed; false when absent, unparseable, or none of the keys were present
- * (idempotent). An unparseable file is left untouched rather than clobbered.
+ * Removes `keys` from `terminal.integrated.env.<os>` (logout teardown),
+ * dropping empty containers while preserving other settings, comments and
+ * formatting. Returns whether it changed; an unparseable file is left untouched.
  */
 export function removeVscodeTerminalOtelEnv(args: VscodeSettingsArgs): boolean {
   const filePath = vscodeUserSettingsPath(args.platform, args.home, args.appData);

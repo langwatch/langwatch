@@ -1,10 +1,7 @@
 /**
- * The LangWatch guidance block in codex's global `AGENTS.md`. Codex has no
- * always-loaded context channel — notify/hooks are fire-and-forget, and Agent
- * Plugins 1.0 carries only skills and MCP servers — so this sits in the
- * AGENTS.md hierarchy's global layer instead. Bracketed in HTML comment
- * markers so nothing renders as markdown structure and install/removal
- * touches exactly our region, byte-preserving everything else the user wrote.
+ * The LangWatch guidance block in codex's global `AGENTS.md`, since codex
+ * has no always-loaded context channel. Bracketed in HTML comment markers
+ * so install/removal touches exactly our region, byte-preserving the rest.
  */
 
 import * as fs from "node:fs";
@@ -107,10 +104,9 @@ export function installCodexAgentGuidance(filePath = defaultCodexAgentsMdPath())
 }
 
 /**
- * Remove exactly the guidance block. A file that then holds nothing but
- * whitespace is deleted outright, so a file that existed only to carry our
- * block does not linger empty; a file with the user's own content keeps it
- * byte for byte. Reports whether anything was removed.
+ * Removes exactly the guidance block. A file left holding only whitespace is
+ * deleted outright, so it doesn't linger empty; a file with the user's own
+ * content keeps it byte for byte. Reports whether anything was removed.
  */
 export function removeCodexAgentGuidance(filePath = defaultCodexAgentsMdPath()): boolean {
   let content: string;

@@ -13,12 +13,9 @@ import {
   vi,
 } from "vitest";
 
-// The tunnel path verifies the binary it is about to run on every start, and
-// the mock below points at the node executable. Verification fails closed on
-// an unlisted platform, so the tests pin platform and arch to darwin-x64, a
-// named UNVERIFIED_PLATFORMS exception, and verification skips
-// deterministically on any host. These tests exercise the session flow
-// rather than the checksum.
+// The tunnel path verifies the binary on every start; the mock points at the
+// node executable. Tests pin platform/arch to darwin-x64, a named
+// UNVERIFIED_PLATFORMS exception, so verification skips deterministically.
 const realPlatform = process.platform;
 const realArch = process.arch;
 beforeAll(() => {
@@ -402,10 +399,9 @@ describe("agent tunnel session", () => {
   };
 
   /**
-   * Start the command, wait for the write-back, and arm the restore GET.
-   * The outcome promise is wrapped in an object: returning it bare would make
-   * `await startCommandUntilWriteBack()` flatten into awaiting the command
-   * itself, which only ends after the signal this helper's caller sends.
+   * Starts the command, waits for write-back, arms the restore GET. The
+   * outcome promise is wrapped in an object -- bare, it would flatten
+   * `await startCommandUntilWriteBack()` into awaiting the command itself.
    */
   const startCommandUntilWriteBack = async (): Promise<{
     outcome: Promise<unknown>;
@@ -439,14 +435,10 @@ describe("agent tunnel session", () => {
     /** @scenario "A bring-your-own tunnel session stays up instead of exiting at once" */
     it("keeps the event loop alive until a signal ends the session", async () => {
       await withDetachedProcessListeners(async () => {
-        // A caller-supplied tunnel starts neither a tunnel child process nor
-        // the local auth proxy, and the health monitor's timer is unref'd, so
-        // the command's own keep-alive is all that stands between the banner
-        // and an immediate exit that would strand the agent on the tunnel URL.
-        // `getActiveResourcesInfo` lists only what keeps the event loop alive,
-        // which is exactly that question. Comparing the count across the
-        // shutdown, rather than against a count taken before the command
-        // started, keeps the test's own timers out of the difference.
+        // A caller-supplied tunnel starts no child process and the health
+        // monitor's timer is unref'd, so the command's own keep-alive is all
+        // that stops an immediate exit. `getActiveResourcesInfo` measures
+        // that; comparing across shutdown keeps the test's own timers out.
         const countRefdTimers = (): number =>
           process.getActiveResourcesInfo().filter((resource) => resource === "Timeout").length;
 

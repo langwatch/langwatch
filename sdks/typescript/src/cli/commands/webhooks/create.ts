@@ -18,12 +18,9 @@ export interface CreateWebhookOptions {
 }
 
 /**
- * The queue's secret access key, which is never a flag.
- *
- * An argument lands in shell history, in `ps` output for every user on the
- * box, and in CI command logs. A long-lived AWS secret does not go there, so
- * it is read from the environment instead and the flag that would have
- * carried it does not exist.
+ * The queue's secret access key, which is never a flag: an argument lands
+ * in shell history, `ps` output and CI logs. A long-lived AWS secret does
+ * not go there, so it is read from the environment instead.
  */
 export const SQS_SECRET_ENV = "LANGWATCH_SQS_SECRET_ACCESS_KEY";
 
@@ -35,11 +32,9 @@ export function sqsSecretFromEnv(): string | undefined {
 }
 
 /**
- * Which destination the flags describe, and its fields.
- *
- * Naming a queue is what selects the queue destination: there is no separate
- * kind flag to keep in agreement with the address, so the two can never
- * disagree.
+ * Which destination the flags describe, and its fields. Naming a queue is
+ * what selects the queue destination -- there is no separate kind flag to
+ * keep in agreement with the address, so the two can never disagree.
  */
 export function destinationFromOptions(options: CreateWebhookOptions): WebhookDestinationInput {
   if (options.queueUrl) {

@@ -1,31 +1,17 @@
 #!/usr/bin/env node
 /**
- * profile-startup — what does one CLI invocation actually load and run?
- *
- * For a given CLI argv (default `--help`, always with LANGWATCH_NO_DAEMON=1
- * so the in-process path is what is measured) this produces, in
- * `sdks/typescript/.startup-profile/`:
- *
- *   <label>-require-tree.json   timed require tree (every external module,
- *                               with parent links, self + total time)
- *   <label>-require-tree.txt    top-30 tables (by total, by self)
- *   <label>-speedscope.json     CPU profile in speedscope format — drop it
- *                               onto https://speedscope.app
- *   <label>-wall.txt            median wall time over --runs runs
- *
- * Usage:
- *   node scripts/profile-startup.mjs                       # --help
- *   node scripts/profile-startup.mjs whoami
- *   node scripts/profile-startup.mjs skills list
- *   node scripts/profile-startup.mjs --runs 10 --binary --help
- *
- * Flags:
- *   --runs N    wall-time repetitions for the median (default 10)
- *   --binary    also time .bin/langwatch/langwatch (skipped gracefully if absent;
- *               the bun binary is never rebuilt from here — it takes minutes)
- *   --label L   output file prefix (default: the argv joined with '-')
- *
- * Requires the built dist: run `pnpm build` first.
+ * profile-startup -- what does one CLI invocation actually load and run?
+ * Runs a given CLI argv (default `--help`) with LANGWATCH_NO_DAEMON=1.
+ */
+
+/**
+ * Writes to `sdks/typescript/.startup-profile/`: a timed require tree, its
+ * top-30 tables, a speedscope CPU profile, and the median wall time.
+ */
+
+/**
+ * Usage: node scripts/profile-startup.mjs [args] [--runs N] [--binary]
+ * [--label L]. Requires the built dist: run `pnpm build` first.
  */
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
@@ -104,11 +90,10 @@ const timeRuns = (command, commandArgs) => {
   };
 };
 
-// ----------------------------------------------- cpuprofile → speedscope ----
+// --- cpuprofile -> speedscope ---
 /**
  * The V8 .cpuprofile is already samples + deltas; speedscope's "sampled"
- * format is the same idea with frames hoisted into a shared table. This is a
- * mechanical re-index, nothing clever.
+ * format hoists frames into a shared table. Mechanical re-index, nothing clever.
  */
 const convertCpuProfile = (cpuprofile, name) => {
   const nodeById = new Map(cpuprofile.nodes.map((node) => [node.id, node]));

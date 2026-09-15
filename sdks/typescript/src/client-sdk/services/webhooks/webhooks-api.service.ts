@@ -86,10 +86,9 @@ interface CreateWebhookEndpointBase {
 }
 
 /**
- * The POST body, exactly as the wire takes it. A destination is one kind and one address, so
- * the two are a union rather than independent optional fields — matching what the server
- * refuses too. `destination_kind` is optional only on the http branch, where absent has
- * always meant http.
+ * The POST body, exactly as the wire takes it. A destination is one kind and
+ * one address, so the two are a union, matching what the server refuses too.
+ * `destination_kind` is optional only on the http branch (absent means http).
  */
 export type WebhookDestinationInput =
   | { destination_kind?: "http"; url: string; sqs?: never }
@@ -328,12 +327,9 @@ export class WebhooksApiService {
   }
 
   /**
-   * ONE page of the endpoint's delivery attempts, newest first.
-   *
-   * The cursor is why this is a page: the route has always served one, and
-   * dropping it truncated the delivery log at whatever the first page held,
-   * with nothing in the result to say the rest existed. Pass `next_cursor`
-   * back as `cursor`, or walk the whole log with `iterDeliveries()`.
+   * ONE page of the endpoint's delivery attempts, newest first. Pass
+   * `next_cursor` back as `cursor` for the next page, or walk the whole log
+   * with `iterDeliveries()`.
    */
   async deliveriesPage(
     id: string,
@@ -398,10 +394,8 @@ export class WebhooksApiService {
 
   /**
    * ONE page of the organization's emitted-events log, newest first.
-   *
-   * Webhooks are a push over this log, never the only copy of it: a consumer
-   * that missed a delivery reads the window back from here. Walk the whole
-   * window with `iterEvents()`.
+   * Webhooks are a push over this log, never the only copy: a consumer that
+   * missed a delivery reads the window back from here.
    */
   async eventsPage(options: {
     type?: string;
@@ -455,10 +449,9 @@ export class WebhooksApiService {
   }
 
   /**
-   * One emitted event by id, the envelope exactly as it was delivered.
-   *
-   * A 404 covers every reason the log cannot answer: never emitted, past the
-   * retention horizon, or belonging to another organization.
+   * One emitted event by id, the envelope exactly as it was delivered. A 404
+   * covers every reason the log cannot answer: never emitted, past
+   * retention, or belonging to another organization.
    */
   async getEvent(id: string): Promise<EmittedEvent> {
     const res = await this.request<{ data: EmittedEvent }>(

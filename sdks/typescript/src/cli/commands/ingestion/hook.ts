@@ -87,9 +87,8 @@ export interface HookCommandOptions {
 
 /**
  * The part of the device config the hook needs to reach a collector. Every
- * field is optional here even though the config type requires the control
- * plane: a CLI that was never signed in has none of them, and that is the
- * "no telemetry configured" case rather than an error.
+ * field is optional here (even though the config type requires it): a CLI
+ * never signed in has none, which is "no telemetry configured", not an error.
  */
 export type CliTelemetryConfig = Partial<
   Pick<
@@ -214,13 +213,10 @@ async function runHook({
     target,
   });
 
-  // A 401 means the key this device exports with is dead: revoked on the
-  // platform, or retired with the session that minted it. The agent's own
-  // exporter fails the same way and says nothing, so this is the one place
-  // the device finds out. A personal key is re-minted under the current
-  // session, the wiring rewritten, the record retried, and the user told to
-  // restart the agent, which still holds the old key. A pinned key stops at
-  // the report.
+  // A 401 means the key is dead (revoked, or retired with its session); the
+  // agent's exporter fails silently, so this is the one place it's caught. A
+  // personal key is re-minted, rewired and retried, with the user told to
+  // restart the agent (which still holds the old key); a pinned key just reports.
   let liveTarget = target;
   if (own.httpStatus === 401 && claimHealWindow({ stateDir, agent, now })) {
     // A pinned key is not this device's to replace: minting a personal one in
@@ -572,10 +568,9 @@ interface OwnContextOutcome {
 }
 
 /**
- * Where to post the record: env first (OTel exporter spec), but not the only
- * source — Claude Code strips every `OTEL_*` var from hooks it spawns. Falls
- * back to the CLI's own device config: the tool's pin first, then the
- * personal ingest key. Null means no source can name a collector.
+ * Where to post the record: env first, but not the only source -- Claude
+ * Code strips every `OTEL_*` var from hooks it spawns. Falls back to the
+ * device config's pin, then the personal key. Null means no source can name a collector.
  */
 export function resolveTarget({
   env,
@@ -598,14 +593,10 @@ export function resolveTarget({
   const config = readCliConfig();
   const controlPlane = config.control_plane_url;
 
-  // `langwatch instrument <tool> --key/--project` pins the tool to one ingest
-  // key, and while that pin stands the personal path is neither consulted nor
-  // rewritten, so a pinned tool has no personal key to read here. The pin is
-  // kept per tool rather than per agent, hence the slug translation. It wins
-  // over the personal key, and the endpoint it carries wins with it, because a
-  // pin is an explicit choice of where this tool's data goes;
-  // `installTelemetryWiring` picks the same credential for the env block, so
-  // the record posted here and the traces the agent exports land together.
+  // A pin from `langwatch instrument` wins over the personal key (and its
+  // endpoint with it) while it stands -- an explicit choice of where this
+  // tool's data goes. `installTelemetryWiring` picks the same credential for
+  // the env block, so the record posted here and exported traces land together.
   const pinned = config.tool_project_keys?.[TOOL_BY_SOURCE_TYPE[agent] ?? agent];
   const pinnedSecret = pinned?.secret?.trim();
   if (pinnedSecret) {

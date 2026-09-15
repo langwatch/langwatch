@@ -1,9 +1,7 @@
 /**
- * The opencode plugin that makes a session report the repository it ran in. opencode has no
- * command hooks — a plugin module is its only seam; the session id comes from the event bus
- * (`session.created`'s `properties.info.id`, or `session.idle`'s `properties.sessionID`). It
- * shells out to `langwatch ingest hook opencode`, spawned unreferenced so a slow collector
- * can't block the session opencode awaits it for.
+ * The opencode plugin reporting a session's repository. opencode has no
+ * command hooks, so a plugin module is its only seam. Shells out to
+ * `langwatch ingest hook opencode`, spawned unreferenced.
  */
 
 import * as fs from "node:fs";
@@ -58,10 +56,9 @@ export function opencodePluginTarget(dirPath?: string): OpencodePluginTarget {
 }
 
 /**
- * Write the plugin, creating the plugins directory when missing. Idempotent:
- * a second run with the same CLI reports `unchanged`. A file already there that
- * is not ours is left exactly as it is, and reported `unchanged` rather than
- * silently replaced.
+ * Writes the plugin, creating the plugins directory when missing.
+ * Idempotent: a second run reports `unchanged`. A file already there that
+ * isn't ours is left exactly as-is, reported `unchanged` rather than replaced.
  */
 export function installOpencodeSessionContextPlugin({
   dirPath,
@@ -119,12 +116,9 @@ function readFileOrNull(filePath: string): string | null {
 }
 
 /**
- * The plugin module, exactly as it lands on disk.
- *
- * `session.created` is the session's first moment and the only event carrying
- * the directory it runs in; `session.idle` closes every turn, which is when a
- * branch switch during the session becomes visible. Both spellings of the id
- * are read because `session.idle` carries only the flat `sessionID`.
+ * The plugin module, exactly as it lands on disk. `session.created` carries
+ * the directory it runs in; `session.idle` closes every turn. Both id
+ * spellings are read since `session.idle` carries only the flat `sessionID`.
  */
 function opencodePluginSource(): string {
   return `${OPENCODE_PLUGIN_MARKER}

@@ -9,12 +9,9 @@ export const stripAnsi = (str: string): string => {
 };
 
 /**
- * Neutralises terminal control sequences in server-supplied text before it
- * is printed. A widget/dashboard name is user data echoed to the terminal, so
- * an embedded escape, carriage return or other C0/C1 control character could
- * rewrite the line, hide output, or worse (CWE-150). Tabs and newlines collapse
- * to a single space so the value stays on one line; every remaining control
- * byte becomes the Unicode replacement character.
+ * Neutralises terminal control sequences in server-supplied text before
+ * printing: an embedded escape or C0/C1 byte could rewrite the line or hide
+ * output (CWE-150). Remaining control bytes become the replacement character.
  */
 export const sanitizeTerminalText = (value: string): string =>
   value
@@ -25,10 +22,9 @@ export const sanitizeTerminalText = (value: string): string =>
 export type ColumnColorMap = Record<string, (value: string) => string>;
 
 /**
- * Prints a formatted table to stdout with column-aligned headers, separator,
- * and optional per-column color functions.
- *
- * Columns not in the colorMap default to chalk.gray.
+ * Prints a formatted table to stdout with column-aligned headers, separator
+ * and optional per-column color functions. Columns not in the colorMap
+ * default to chalk.gray.
  */
 export const formatTable = ({
   data,

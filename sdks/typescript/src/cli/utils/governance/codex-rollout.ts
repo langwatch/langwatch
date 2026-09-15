@@ -11,10 +11,9 @@ const MAX_INPUT_CHARS = 120_000;
 const MAX_OUTPUT_CHARS = 30_000;
 
 /**
- * A LangWatch chat message. Roles map to the canonical chat roles
- * (`system|user|assistant|tool`); codex's `developer` role is folded into
- * `system`. Shapes a subset of the platform `chatMessageSchema` so the
- * receiver's LangWatch extractor canonicalises it to `gen_ai.input.messages`.
+ * A LangWatch chat message. Roles map to the canonical chat roles; codex's
+ * `developer` role folds into `system`. Shapes a subset of the platform
+ * `chatMessageSchema` so the receiver canonicalises it to `gen_ai.input.messages`.
  */
 export interface CodexChatMessage {
   role: "system" | "user" | "assistant" | "tool";
@@ -45,11 +44,9 @@ export interface CodexTurnIO {
 }
 
 /**
- * Session-level identity from the rollout's `session_meta` line: which session
- * this transcript belongs to and which repository, branch and directory it ran
- * in. Codex records these once at session start (`id`, `cwd`, `git.branch`,
- * `git.repository_url`) and exports none of them over telemetry, so this line
- * is the only repository identity a plain codex run reports anywhere.
+ * Session-level identity from the rollout's `session_meta` line. Codex
+ * records these once at session start and exports none over telemetry, so
+ * this line is the only repository identity a plain codex run reports.
  */
 export interface CodexRolloutMeta {
   sessionId: string | null;
@@ -57,11 +54,9 @@ export interface CodexRolloutMeta {
   gitBranch: string | null;
   gitRepositoryUrl: string | null;
   /**
-   * The first thing the user typed, apart from the context codex injects as
-   * user-role messages. What names the session, since codex generates no title
-   * of its own. Read from the `user_message` event, and from the conversation
-   * itself when there is none. Codex 0.149 emits no such event in any mode,
-   * interactive or exec, so the conversation is the only source there.
+   * The first thing the user typed, apart from injected context. Names the
+   * session, since codex generates no title. Read from `user_message`, or
+   * the conversation when absent -- codex 0.149 emits no such event at all.
    */
   firstUserMessage: string | null;
 }
@@ -203,11 +198,9 @@ function explicitToolCallId(payload: Record<string, unknown>): string | null {
 }
 
 /**
- * Replays a codex rollout's events into a running chat history and snapshots one
- * {@link CodexTurnIO} per turn boundary. All the cross-event state (the running
- * history, the open turn, the held assistant text, the authoritative final
- * answer, the session model) lives here so {@link parseCodexRollout} stays a
- * thin parse-and-dispatch coordinator.
+ * Replays a codex rollout's events into a chat history and snapshots one
+ * {@link CodexTurnIO} per turn. All cross-event state lives here so
+ * {@link parseCodexRollout} stays a thin parse-and-dispatch coordinator.
  */
 class CodexTurnAccumulator {
   /** Emitted turns, in rollout order. */

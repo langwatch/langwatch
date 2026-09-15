@@ -1,9 +1,7 @@
 /**
- * Mode-resolution tests for the wrapper. Exercises the in-memory
- * decision tree (gateway vs ingestion) without touching the real
- * cli-api: the ingestion-key mint call is mocked at module
- * boundary, the codex-config-toml writer is overridden via test
- * harness redirect to a tmpdir.
+ * Mode-resolution tests for the wrapper's gateway-vs-ingestion decision
+ * tree. The ingestion-key mint call is mocked at module boundary; the
+ * codex-config-toml writer redirects to a tmpdir via test harness.
  */
 import * as fs from "node:fs";
 import * as os from "node:os";
@@ -158,10 +156,8 @@ describe("resolveWrapperMode", () => {
 
   describe("when no VK is present (the no-surprise auto-Path-B path)", () => {
     /**
-     * The "$5 VPS running claude code" scenario rchaves called
-     * out: a user with no VK should be able to run `langwatch
-     * codex` and have it Just Work via Path B without first
-     * remembering to invoke a separate install command.
+     * The "$5 VPS running claude code" case: no VK should still Just Work
+     * via Path B, without a separate install command first.
      */
     it("falls through to ingestion mode and mints a new key", async () => {
       const { resolveWrapperMode } = await import("../wrapper-mode.js");
@@ -262,10 +258,9 @@ describe("resolveWrapperMode", () => {
 
   describe("when cfg.tool_mode pins ingestion despite VK presence", () => {
     /**
-     * User explicitly opted into Path B for a tool (e.g. their VK
-     * routes to a budget they don't want this tool to charge to).
-     * Wrapper honours the persisted preference even when a VK
-     * would normally win the auto-pick.
+     * User explicitly opted into Path B for a tool (e.g. a VK routes to a
+     * budget they don't want charged). The wrapper honours that even when
+     * a VK would normally win the auto-pick.
      */
     it("uses ingestion mode and skips the gateway envs", async () => {
       const { resolveWrapperMode } = await import("../wrapper-mode.js");
@@ -292,10 +287,9 @@ describe("resolveWrapperMode", () => {
 
   describe("when codex resolves to gateway mode", () => {
     /**
-     * codex 0.134+ rejects --profile <X> when [profiles.X] lives
-     * inside config.toml; the profile body must be in a sibling
-     * <X>.config.toml file. Andre's dogfood at 4f37ed27a HEAD
-     * surfaced this rejection — guard against regression.
+     * codex 0.134+ rejects --profile <X> when [profiles.X] lives inside
+     * config.toml; the profile body must be in a sibling <X>.config.toml
+     * file. Regression guard (surfaced at 4f37ed27a).
      */
     it("returns codexProfilePath + writes profile body to the sibling file", async () => {
       const { resolveWrapperMode } = await import("../wrapper-mode.js");
@@ -349,10 +343,9 @@ describe("resolveWrapperMode", () => {
 
   describe("when claude resolves to ingestion mode", () => {
     /**
-     * claude-code 2.x needs 4 OTEL_LOG_* knobs or the wire is metadata-only
-     * (no prompt/tool/response text) — RAW_API_BODIES alone carries response
-     * text. Pinned so a refactor can't silently drop one and lose content
-     * visibility.
+     * claude-code 2.x needs all 4 OTEL_LOG_* knobs or the wire is
+     * metadata-only; RAW_API_BODIES alone carries response text. Pinned
+     * against silent drift.
      */
     it("sets all 4 claude OTEL_LOG_* unlock knobs (collect-everything)", async () => {
       const { resolveWrapperMode } = await import("../wrapper-mode.js");
@@ -391,10 +384,9 @@ describe("resolveWrapperMode", () => {
 
   describe("when gemini resolves to ingestion mode", () => {
     /**
-     * gemini-cli 0.46-preview needs 6 telemetry env knobs together, all
-     * load-bearing — notably TARGET=local (its own schema docstring claiming
-     * "otlp" works is a lie; only local|gcp are accepted at runtime).
-     * Dropping any one silently kills the OTLP path.
+     * gemini-cli 0.46-preview needs all 6 telemetry env knobs, notably
+     * TARGET=local -- its own schema docstring claims "otlp" works; only
+     * local|gcp are accepted at runtime. Dropping any one kills OTLP.
      */
     it("sets all 6 gemini telemetry knobs required for OTLP traces + log records", async () => {
       const { resolveWrapperMode } = await import("../wrapper-mode.js");
@@ -864,12 +856,9 @@ describe("resolveWrapperMode", () => {
 
   describe("given a stale claude env block persisted by a previous login (#6202)", () => {
     /**
-     * Claude Code applies ~/.claude/settings.json's `env` block ON TOP
-     * of the child process env, so a block persisted by a previous
-     * install (previous instance's endpoint + key) silently overrides
-     * the correct env this run computes - telemetry lands on the wrong
-     * instance. Latest login wins: the resolver re-syncs the persisted
-     * block before the spawn.
+     * Claude Code applies settings.json's `env` block ON TOP of the child
+     * process env, so a stale persisted block could override this run's.
+     * Latest login wins: resync before spawn.
      */
     it("refreshes the settings.json block to this run's endpoint and key", async () => {
       const { resolveWrapperMode } = await import("../wrapper-mode.js");

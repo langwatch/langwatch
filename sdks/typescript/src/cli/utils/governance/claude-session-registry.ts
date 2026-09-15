@@ -1,14 +1,12 @@
 /**
- * The name Claude Code holds for a session, read from `<config dir>/sessions/
- * <pid>.json` rather than the hook payload alone: SessionStart's `session_title`
- * is set only at start and no hook fires on `/rename`, so reading the registry
- * from the Stop hook is what lets a rename reach the platform within one turn.
+ * The name Claude Code holds for a session, from
+ * `<config dir>/sessions/<pid>.json`: no hook fires on `/rename`, so
+ * reading it from the Stop hook lets a rename reach the platform in one turn.
  */
 
 /**
- * Best-effort: an unreadable, malformed, oversized or unmatched file reads as
- * "no name", never an error. When several files claim one session id (a resumed
- * session's old file lingers until pruned), the newest `updatedAt` wins.
+ * Best-effort: an unreadable, malformed or unmatched file reads as "no
+ * name", never an error. Several files claiming one session id: newest wins.
  * Spec: specs/ai-governance/cli-wrappers/session-context-hook.feature
  */
 import { readdirSync, readFileSync, statSync } from "node:fs";

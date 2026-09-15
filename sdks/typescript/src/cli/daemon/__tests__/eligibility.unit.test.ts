@@ -91,10 +91,9 @@ describe("evaluateEligibility", () => {
   });
 
   /**
-   * The daemon is spawned with `stdio: "ignore"` (spawn.ts), so its fd 0 is
-   * /dev/null. A caller who is PIPING data in is therefore the one shape it can
-   * least serve — while being, on a TTY check alone, indistinguishable from the
-   * agent this whole feature exists for.
+   * The daemon is spawned with `stdio: "ignore"`, so its fd 0 is /dev/null.
+   * A caller PIPING data in is the one shape it can least serve, yet a TTY
+   * check alone can't tell it from the agent this feature exists for.
    */
   describe("given a caller whose stdin carries data", () => {
     /** @scenario "A command reads the caller's standard input" */
@@ -458,12 +457,10 @@ describe("stdinCarriesData", () => {
     });
 
     it("reports a descriptor nothing is open on as carrying nothing rather than throwing", () => {
-      // NOT open-then-close: fd numbers are recycled lowest-first, so anything
-      // the runner opens between the close and the fstat lands on that same
-      // number and the assertion starts measuring an unrelated file — a failure
-      // with no relation to the code under test. A number far above what a
-      // process this size ever allocates is never handed out, so the fstat can
-      // only answer EBADF: exactly what a closed descriptor answers.
+      // NOT open-then-close: fd numbers recycle lowest-first, so anything
+      // opened between close and fstat could land on that number, measuring
+      // an unrelated file. A number never allocated this size can only
+      // answer EBADF, exactly what a closed descriptor answers.
       const neverAllocated = 4096;
 
       // Pin the premise, so a machine that somehow DID have this descriptor

@@ -26,10 +26,9 @@ export interface SessionRefreshDeps {
 }
 
 /**
- * Whether `cfg.access_token` is at or past its recorded expiry. Returns
- * false when there is no recorded expiry: pre-`expires_at` configs and
- * `langwatch login --api-key` sessions have nothing to reason about, so
- * they keep the old behaviour of trying the call and handling the 401.
+ * Whether `cfg.access_token` is at or past its recorded expiry. False when
+ * there's no recorded expiry: pre-`expires_at` and `--api-key` sessions keep
+ * the old behaviour of trying the call and handling the 401.
  */
 export function isAccessTokenExpired(
   cfg: GovernanceConfig,
@@ -56,11 +55,9 @@ export type SessionRefreshOutcome =
   | { status: "failed"; message: string };
 
 /**
- * The reason a refresh failed, as a string worth showing someone. Rejections
- * do not always arrive as `Error`: a polyfilled fetch can reject with a bare
- * string or an `AbortError`-shaped object, and `(err as Error).message` on
- * those is `undefined`, which is what the wrapper would otherwise print as
- * the reason the session died.
+ * The reason a refresh failed, as a string worth showing someone. A
+ * polyfilled fetch can reject with a bare string or an `AbortError`-shaped
+ * object, where `(err as Error).message` is `undefined`.
  */
 function messageOf(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
@@ -83,12 +80,9 @@ function applyRefreshResult(
 }
 
 /**
- * Trade `cfg.refresh_token` for a fresh access + refresh pair, mutating
- * `cfg` and persisting it on success.
- *
- * On a server rejection the config on disk is re-read once: a sibling
- * CLI process may have rotated the pair in the meantime, in which case
- * its newer refresh token is tried before giving up.
+ * Trades `cfg.refresh_token` for a fresh pair, mutating and persisting
+ * `cfg`. On a server rejection, the config is re-read once in case a
+ * sibling CLI process rotated it first, trying its newer token before giving up.
  */
 export async function refreshSession(
   cfg: GovernanceConfig,

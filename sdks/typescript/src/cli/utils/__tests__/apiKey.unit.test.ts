@@ -1,9 +1,6 @@
 /**
- * Credential resolution is the first thing every API-calling command does, so
- * its priority order, its session-liveness gate, its daemon discipline (never
- * write the resolved key to the shared env), and both renderings of its
- * failure are pinned here.
- *
+ * Credential resolution is the first thing every API-calling command does:
+ * priority order, session-liveness gate, daemon discipline, both failures.
  * Feature: specs/ai-governance/cli-onboarding/me-credentials.feature
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";

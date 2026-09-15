@@ -1,8 +1,7 @@
 /**
  * Per-tool gateway env mapping (Path A). Leaf module with no
- * governance-internal imports so both the spawn orchestrator
- * (wrapper.ts) and the persist/refresh surfaces (shell-rc.ts,
- * telemetry-refresh.ts) can share it without import cycles.
+ * governance-internal imports so the spawn orchestrator and the
+ * persist/refresh surfaces can share it without import cycles.
  */
 
 import { normalizeEndpoint } from "../../../internal/endpoint";
@@ -29,13 +28,9 @@ export function envForTool(cfg: GovernanceConfig, tool: string): ToolEnv {
   if (!auth) return { vars: {} };
   switch (tool) {
     case "claude":
-      // claude-code (2.1.x) appends `/v1/messages` to ANTHROPIC_BASE_URL itself.
-      // Clear the legacy ANTHROPIC_API_KEY twin: claude-code warns
-      // "Both ANTHROPIC_AUTH_TOKEN and ANTHROPIC_API_KEY set, auth may
-      // not work as expected" when both are present (the gateway route
-      // uses AUTH_TOKEN; API_KEY is left over from pre-langwatch direct
-      // SDK usage). Stripping it leaves only the gateway-routed creds
-      // on the child env.
+      // claude-code appends `/v1/messages` to ANTHROPIC_BASE_URL itself.
+      // Clears the legacy ANTHROPIC_API_KEY twin: claude-code warns when
+      // both auth vars are present, so strip it, leaving only gateway-routed creds.
       return {
         vars: {
           ANTHROPIC_BASE_URL: gw,

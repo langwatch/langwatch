@@ -1,10 +1,7 @@
 /**
  * Per-tool Path B (ingestion) OTel env block builder. Leaf module so the
- * three consumers - the mode resolver (wrapper-mode.ts), the persisted-
- * wiring refresh (telemetry-refresh.ts), and the logout scan
- * (telemetry-targets.ts) - can all derive the SAME key set and values
- * without import cycles. Install, refresh, and removal all read from
- * this one builder, so the surfaces can never drift apart.
+ * mode resolver, persisted-wiring refresh and logout scan can all derive
+ * the same key set and values without import cycles or drift.
  */
 
 /** Ingestion source_type slug per wrapped tool (mint + cache key). */
@@ -34,10 +31,9 @@ export const TOOL_BY_SOURCE_TYPE: Record<string, string> = Object.fromEntries(
 );
 
 /**
- * The env var names langwatch persists for `tool`'s Path B telemetry.
- * Derived from the same builder that installs them, so the logout /
- * removal path can strip exactly the keys the install path wrote (no
- * drift). Values are irrelevant here, so placeholders are passed in.
+ * The env var names langwatch persists for `tool`'s Path B telemetry,
+ * derived from the same builder that installs them so removal strips
+ * exactly what install wrote. Values are irrelevant; placeholders suffice.
  */
 export function telemetryEnvVarNames(tool: string): string[] {
   return Object.keys(buildOtelEnvBlock(tool, "", ""));
@@ -55,14 +51,10 @@ export function buildOtelEnvBlock(
 
   switch (tool) {
     case "claude":
-      // Four OTel knobs (code.claude.com/docs/en/monitoring-usage), all ON:
-      // TOOL_DETAILS/TOOL_CONTENT lift tool input/output onto tool events;
-      // RAW_API_BODIES is the ONLY surface carrying assistant response
-      // text, capped at 60KB inline by claude 2.x itself — extended-thinking
-      // content is ALWAYS redacted from it regardless of flag state.
-      // ENHANCED_TELEMETRY_BETA unlocks span-tracing (agent_id/
-      // parent_agent_id); without it every sub-agent collapses into one
-      // synthesized per-turn trace instead of a reconstructable tree.
+      // Four OTel knobs, all ON: TOOL_DETAILS/TOOL_CONTENT lift tool I/O
+      // onto tool events; RAW_API_BODIES is the only surface carrying
+      // response text (capped 60KB, extended-thinking always redacted);
+      // ENHANCED_TELEMETRY_BETA unlocks span-tracing into a reconstructable tree.
       return {
         CLAUDE_CODE_ENABLE_TELEMETRY: "1",
         CLAUDE_CODE_ENHANCED_TELEMETRY_BETA: "1",
@@ -85,12 +77,10 @@ export function buildOtelEnvBlock(
         OTEL_RESOURCE_ATTRIBUTES: "service.name=codex",
       };
     case "gemini":
-      // gemini-cli's target only accepts local|gcp, NOT otlp (the doc string's
-      // "example" is misleading — passing otlp throws FatalConfigError). We
-      // reach our OTLP endpoint via `local` + `useCollector=true` instead.
-      // `logPrompts=true` is what embeds actual prompt text in the
-      // user_prompt event, without which there is nothing to lift onto
-      // langwatch.input.value.
+      // gemini-cli's target only accepts local|gcp, not otlp (its own doc
+      // string's "example" is misleading -- otlp throws FatalConfigError).
+      // We reach OTLP via `local` + `useCollector=true`; `logPrompts=true`
+      // embeds prompt text.
       return {
         GEMINI_TELEMETRY_ENABLED: "true",
         GEMINI_TELEMETRY_TARGET: "local",
@@ -114,12 +104,10 @@ export function buildOtelEnvBlock(
         OTEL_RESOURCE_ATTRIBUTES: "service.name=opencode",
       };
     case "copilot":
-      // COPILOT_OTEL_EXPORTER_TYPE is pinned to "otlp-http" because an
-      // inherited =file (from a prior ccusage setup) would silently redirect
-      // all telemetry to a local JSONL file and Path B would capture nothing
-      // (ADR-039 D5). CAPTURE_MESSAGE_CONTENT is the only surface carrying
-      // prompt/response content. No OTEL_LOGS_EXPORTER: Copilot emits spans
-      // + metrics only. grpc silently falls back, so http/json is pinned.
+      // COPILOT_OTEL_EXPORTER_TYPE is pinned "otlp-http": an inherited
+      // =file (prior ccusage setup) would silently redirect telemetry to
+      // JSONL (ADR-039 D5). No OTEL_LOGS_EXPORTER -- Copilot emits spans +
+      // metrics only; grpc falls back silently, so http/json is pinned.
       return {
         COPILOT_OTEL_ENABLED: "true",
         COPILOT_OTEL_EXPORTER_TYPE: "otlp-http",
@@ -131,14 +119,10 @@ export function buildOtelEnvBlock(
         OTEL_RESOURCE_ATTRIBUTES: "service.name=copilot-cli",
       };
     case "code":
-      // VS Code Copilot Chat extension (ADR-039 §Extension #2). Same OTel
-      // GenAI export as the copilot CLI, enabled purely by env — the
-      // COPILOT_OTEL_ENABLED env overrides the extension's default-false
-      // `github.copilot.chat.otel.enabled` setting (spike-verified: an
-      // env-only launch with an empty settings.json still captured a real
-      // turn). service.name=copilot-chat is the extension's own resource
-      // label and the sourceType discriminator on the wire. Ingestion-only:
-      // the chat extension has no BYOK gateway env, so no Path A here.
+      // VS Code Copilot Chat extension (ADR-039 Extension #2).
+      // COPILOT_OTEL_ENABLED overrides the extension's default-false
+      // setting purely by env (verified: an empty settings.json still
+      // captured a turn). Ingestion-only -- no BYOK gateway env, so no Path A.
       return {
         COPILOT_OTEL_ENABLED: "true",
         OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT: "true",

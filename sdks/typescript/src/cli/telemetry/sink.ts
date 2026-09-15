@@ -1,9 +1,7 @@
 /**
- * Where a live CLI event actually goes, kept behind an interface since the
- * wire is the part most likely to change. Two sinks: IPC (cheap, no SDK,
- * enabled just by the host handing us a socket) and OTLP logs (crosses a
- * process boundary, pays a ~60ms SDK load). IPC wins when both are
- * configured — strictly cheaper and faster, and the listening host wants it.
+ * Where a live CLI event goes, behind an interface since the wire is most
+ * likely to change. Two sinks: IPC (cheap, no SDK) and OTLP logs (~60ms SDK
+ * load). IPC wins when both are configured -- cheaper and faster.
  */
 
 import net from "node:net";
@@ -28,12 +26,9 @@ export interface EventSink {
 }
 
 /**
- * NDJSON down a unix socket.
- *
- * Connection is lazy and optimistic: records queue in memory until the socket is
- * up, then drain in order. If the host never answers, or hangs up, the records
- * are simply dropped — a telemetry channel losing frames is not an error the
- * user's command should ever hear about.
+ * NDJSON down a unix socket. Connection is lazy and optimistic: records
+ * queue until the socket is up, then drain in order. An unanswering or
+ * hung-up host just drops them -- not an error the user's command hears about.
  */
 export const createIpcSink = ({ path }: { path: string }): EventSink => {
   const pending: string[] = [];
@@ -80,13 +75,11 @@ export const createIpcSink = ({ path }: { path: string }): EventSink => {
     flush: async () => {
       if (broken || !socket) return;
 
-      // The command is over, so the connection is too: `end()` flushes whatever is
-      // buffered and then sends FIN, which is what tells the host this run is
-      // finished rather than merely quiet.
-      //
-      // A socket still mid-connect gets a moment to come up first, but never more:
-      // the timer is unref'd and bounded, so a host that went away cannot delay the
-      // user's command by a single tick beyond it.
+      // The command is over, so the connection is too: `end()` flushes what's
+      // buffered then sends FIN, telling the host this run finished.
+
+      // A socket still mid-connect gets a moment first, but never more: the
+      // timer is unref'd and bounded, so a gone host cannot delay the command.
       await new Promise<void>((resolve) => {
         const timer = setTimeout(resolve, IPC_DRAIN_MS);
         timer.unref?.();

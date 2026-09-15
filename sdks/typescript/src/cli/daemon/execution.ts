@@ -1,9 +1,7 @@
 /**
- * Running a CLI command inside a long-lived process, faithfully.
- *
- * Three process-global things stand between "call the command function" and
- * "behave exactly like a fresh CLI process": stdout/stderr, process.exit, and
- * the working directory + environment. This module owns all three.
+ * Running a CLI command inside a long-lived process, faithfully. Owns the
+ * three process-globals between calling the command and behaving like a
+ * fresh CLI process: stdout/stderr, process.exit, cwd + environment.
  */
 
 import { AsyncLocalStorage } from "node:async_hooks";
@@ -52,11 +50,8 @@ export function isDaemonExitSignal(error: unknown): error is DaemonExitSignal {
 }
 
 /**
- * One in-flight command. Owns that command's output and its exit code.
- *
- * `finalize` is first-write-wins and irreversible, which is what makes exit
- * semantics faithful: the first `process.exit(code)` decides the status and
- * silences everything that comes after, just as process termination would.
+ * One in-flight command, owning its output and exit code. `finalize` is
+ * first-write-wins and irreversible, as real process termination would be.
  */
 export class ExecutionContext {
   private finished = false;
@@ -95,11 +90,9 @@ export class ExecutionContext {
   }
 
   /**
-   * Strip SGR sequences, holding back a trailing PARTIAL one (ESC, or
-   * ESC[ + parameters with no terminating `m` yet) and prepending it to the
-   * next chunk on the same stream — an escape split across two writes would
-   * otherwise leak half of it to the caller. A partial left dangling at
-   * finalize is never a complete sequence, so nothing visible is lost.
+   * Strips SGR sequences, holding back a trailing PARTIAL one and
+   * prepending it to the next chunk -- a split escape would otherwise leak
+   * half of it. A partial left at finalize is never complete.
    */
   private stripSgr({ stream, chunk }: { stream: OutputStream; chunk: Buffer }): Buffer {
     // SGR sequences are pure ASCII, so the held-back partial decodes safely on
@@ -144,11 +137,8 @@ export class ExecutionContext {
 const storage = new AsyncLocalStorage<ExecutionContext>();
 
 /**
- * Run `fn` with `context` as the ambient execution context.
- *
- * Also enters a fresh output scope (utils/errorOutput.ts withOutputScope), so
- * the request's `--format`/`--agent` context lives in the same async scope as
- * its stdout/stderr routing and two concurrent requests cannot clobber each
+ * Runs `fn` with `context` as the ambient execution context, entering a
+ * fresh output scope so two concurrent requests can never clobber each
  * other's error format or colour.
  */
 export function withExecutionContext<T>(context: ExecutionContext, fn: () => T): T {
@@ -310,11 +300,8 @@ export class ExecutionWindow {
       this.activeKey = key;
     }
     // chalk.level is re-applied on every admission, not only on a window
-    // switch: it is process-global mutable state, so this is cheap insurance
-    // against ANY mid-request mutation leaking into the next caller on a
-    // reused window. (Agent mode no longer mutates it — daemon-served
-    // requests strip colour at the sink instead, see ExecutionContext.write —
-    // but the in-process path and third-party code still can.)
+    // switch: it's process-global mutable state, cheap insurance against a
+    // mid-request mutation leaking into the next caller on a reused window.
     chalk.level = request.colorLevel as typeof chalk.level;
     this.inflight++;
     let released = false;
@@ -378,12 +365,10 @@ export class ExecutionWindow {
       if (value === undefined) delete process.env[key];
       else process.env[key] = value;
     }
-    // The caller's LANGWATCH_* variables are authoritative: a variable the
-    // daemon inherited but the caller does not have must not be visible. The
-    // same goes for the agent-mode markers (utils/output.ts
-    // AGENT_MODE_ENV_VARS): a daemon auto-spawned BY an agent inherits e.g.
-    // CLAUDECODE=1 into its baseline, and a later HUMAN caller must not be
-    // misread as an agent (compact JSON, no spinners) because of it.
+    // The caller's LANGWATCH_* variables are authoritative: one the daemon
+    // inherited but the caller lacks must not be visible. Same for
+    // agent-mode markers -- a daemon spawned by an agent inherits
+    // CLAUDECODE=1, and a later human caller must not be misread as one.
     for (const key of Object.keys(process.env)) {
       if (
         (key.startsWith("LANGWATCH_") || AGENT_MODE_ENV_VAR_SET.has(key)) &&

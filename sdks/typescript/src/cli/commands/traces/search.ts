@@ -12,11 +12,9 @@ import { parseOriginOption } from "./origin-filter";
 const PROGRESS_CHUNK = 5;
 
 /**
- * The text query is matched as a phrase, so a Lucene-style query returns zero
- * rows rather than an error, and zero rows reads like "you have none of those".
- * Measured against a project with 638 traces: "validation failed" matched 40,
- * "validation AND failed" matched 0. Named here so an empty result says which
- * of the two it is.
+ * The text query is matched as a phrase, so a Lucene-style query returns
+ * zero rows rather than an error -- reading like "you have none of those".
+ * Named here so an empty result says which of the two it is.
  */
 const BOOLEAN_OPERATORS = /(^|\s)(AND|OR|NOT)(\s|$)/;
 
@@ -101,12 +99,11 @@ export const searchTracesCommand = async (
   const traces = result.traces as Record<string, unknown>[];
   const matched = result.pagination.totalHits;
 
-  // Rendering stays OUTSIDE the search try: a printResult rejection (invalid
-  // --jq) is a rendering failure, not a search failure.
-  //
-  // The machine branch comes FIRST: a machine caller must get the document
-  // even when it holds zero traces — an empty `{ traces: [], pagination }`
-  // is a parseable answer, prose on stdout is a corrupted one.
+  // Rendering stays OUTSIDE the search try: a printResult rejection is a
+  // rendering failure, not a search failure.
+
+  // The machine branch comes FIRST: an empty `{ traces: [], pagination }` is
+  // a parseable answer; prose on stdout is a corrupted one.
   if (resolveOutputOptions(options).format !== "table") {
     reportProgress({ events, total: traces.length, matched });
   }
@@ -139,11 +136,9 @@ export const searchTracesCommand = async (
 };
 
 /**
- * Walks the returned traces in chunks, reporting progress. This is progress
- * over the traces already in hand from one request — search renders a single
- * page (`trace export` is what walks the scrollId cursor) — not a multi-page
- * fetch. Making the fetch page would change what a disabled CLI does, which
- * this feature may not trade away.
+ * Walks the returned traces in chunks, reporting progress -- over traces
+ * already in hand from one request (search renders a single page; `trace
+ * export` walks the scrollId cursor), not a multi-page fetch.
  */
 const reportProgress = ({
   events,

@@ -58,11 +58,9 @@ export interface ConnectCopilotAppResult {
 }
 
 /**
- * Orchestrates the connect flow with injected collaborators so the
- * behaviour (guards, ordering, notices) is unit-testable without touching
- * the machine, the network, or the OS service manager. Ordering matters:
- * the app-installed guard fires BEFORE the mint, so a missing app never
- * mints a stray key.
+ * Orchestrates the connect flow with injected collaborators, unit-testable
+ * without touching the machine, network or OS service manager. Ordering
+ * matters: the app-installed guard fires BEFORE the mint.
  */
 export async function connectCopilotApp(
   deps: ConnectCopilotAppDeps,
@@ -118,12 +116,9 @@ export async function connectCopilotApp(
     );
   }
   const project = cfg.organization?.slug ?? cfg.organization?.name ?? "your personal project";
-  // Honest lifecycle: the agent starts Copilot with tracking now (darwin
-  // bootstrap runs RunAtLoad, linux is an explicit restart, win32 an
-  // explicit /Run) and on every login. Two sessions the agent cannot
-  // capture: an app window already open before connecting (it keeps the
-  // pre-rotation env), and a manual Dock/Start-menu relaunch before the
-  // next login (inherits no environment). ADR-039 §Extension.
+  // Honest lifecycle: the agent starts Copilot with tracking now and on
+  // every login. Two sessions it cannot capture: a window already open
+  // before connecting, and a manual relaunch before next login. ADR-039 Extension.
   deps.info(
     `GitHub Copilot app connected. Usage will be tracked into ${project}. Capture starts now and on every login. If a Copilot app window was already open, quit and reopen it — that session is not tracked; the same goes for a manual Dock/Start-menu relaunch before your next login.`,
   );
@@ -146,11 +141,9 @@ function currentPlatform(): AppPlatform {
 }
 
 /**
- * Resolve the copilot_app ingest key with the same reuse-first rules the
- * wrappers follow: a cached key that the platform confirms live is used
- * as-is, so re-running `connect` does not rotate a working key out from
- * under an agent on another machine. A fresh mint is cached for the next
- * run.
+ * Resolves the copilot_app ingest key with the same reuse-first rules the
+ * wrappers follow: a cached, live-confirmed key is reused, so re-running
+ * `connect` never rotates a working key out from under another machine.
  */
 async function resolveCopilotAppKey(
   cfg: GovernanceConfig,

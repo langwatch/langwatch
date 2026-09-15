@@ -1,8 +1,7 @@
 /**
  * Bidirectional mapping between the platform's `outputs` array and the local
  * YAML `response_format` block; push and pull must be exact inverses. Flat
- * platform fields ⇆ a flat JSON-schema object round-trip losslessly, and a
- * rich JSON schema ⇆ a single `json_schema` output preserves it verbatim.
+ * fields round-trip losslessly; a rich schema becomes one `json_schema` output.
  */
 
 export type CliOutputType = "str" | "float" | "bool" | "json_schema";
@@ -46,9 +45,8 @@ const isPlainObject = (value: unknown): value is Record<string, unknown> =>
 
 /**
  * Accepts either the canonical local form `{ name?, schema }` or the
- * OpenAI-standard wrapper `{ type: "json_schema", json_schema: { name, schema } }`
- * and normalizes to `{ name?, schema }`. Returns undefined when there is no
- * usable schema.
+ * OpenAI-standard wrapper, normalizing to `{ name?, schema }`. Returns
+ * undefined when there is no usable schema.
  */
 export const normalizeResponseFormat = (raw: unknown): LocalResponseFormat | undefined => {
   if (!isPlainObject(raw)) return undefined;
@@ -77,12 +75,9 @@ export const normalizeResponseFormat = (raw: unknown): LocalResponseFormat | und
 };
 
 /**
- * A "simple flat object schema" has only scalar properties (string / number /
- * integer / boolean), no extra JSON-schema keywords on the schema or on any
- * property, and (when present) `required` listing exactly the properties.
- * These map losslessly to flat platform fields. Anything richer (enums,
- * arrays, nested objects, descriptions, …) is opaque and must be preserved
- * verbatim as a json_schema output.
+ * A "simple flat object schema" has only scalar properties, no extra
+ * JSON-schema keywords, and (if present) `required` listing exactly the
+ * properties -- these map losslessly to flat platform fields.
  */
 export const asFlatFields = (
   schema: Record<string, unknown>,
@@ -179,10 +174,9 @@ export const outputsToResponseFormat = (
 };
 
 /**
- * Push direction: turn the local `response_format` block back into the
- * platform `outputs` array. The exact inverse of {@link outputsToResponseFormat}:
- * a flat object schema expands to flat fields (so the platform keeps showing
- * them individually), anything richer becomes one json_schema output.
+ * Push direction: turns the local `response_format` block back into the
+ * platform `outputs` array, the exact inverse of {@link outputsToResponseFormat}.
+ * A flat schema expands to flat fields; anything richer becomes one json_schema output.
  */
 export const responseFormatToOutputs = (raw: unknown): CliOutput[] | undefined => {
   const rf = normalizeResponseFormat(raw);

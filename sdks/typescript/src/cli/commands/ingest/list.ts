@@ -6,12 +6,9 @@ import { reportCommandError } from "@/cli/utils/errorOutput";
 import { normalizeEndpoint } from "@/internal/endpoint";
 
 /**
- * `langwatch ingest list [--all] [--json]`
- *
- * Read-only enumeration of the org's IngestionSources, mirroring the
- * `/governance/ingestion-sources` list page for ops folks
- * who live in terminal. Same multi-tenant guard as the web UI
- * (org-scoped via the device-flow Bearer token).
+ * `langwatch ingest list [--all] [--json]`: read-only enumeration of the
+ * org's IngestionSources, mirroring the `/governance/ingestion-sources`
+ * page. Same multi-tenant guard as the web UI (device-flow Bearer token).
  */
 export async function ingestListCommand(options: { all?: boolean; json?: boolean }): Promise<void> {
   const cfg = loadConfig();
@@ -79,10 +76,9 @@ function colorStatus(status: string): string {
 }
 
 /**
- * Render a relative timestamp like "5m ago" / "2h ago" / "3d ago"
- * for the table's LAST EVENT column. Falls back to the ISO string
- * for future timestamps (clock drift) since "in 5 minutes" would be
- * confusing in a "last event" context. Exported for unit testing.
+ * Renders a relative timestamp like "5m ago" for the LAST EVENT column,
+ * falling back to the ISO string for future timestamps (clock drift), since
+ * "in 5 minutes" would confuse a "last event" context.
  */
 export function humanRelative(d: Date, now: number = Date.now()): string {
   const ms = now - d.getTime();

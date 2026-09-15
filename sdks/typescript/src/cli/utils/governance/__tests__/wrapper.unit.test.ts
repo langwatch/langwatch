@@ -61,13 +61,9 @@ describe("envForTool", () => {
     expect(env.ANTHROPIC_AUTH_TOKEN).toBe("lw_vk_test_x");
   });
 
-  // Regression: claude-code 2.x warns "Both ANTHROPIC_AUTH_TOKEN and
-  // ANTHROPIC_API_KEY set, auth may not work as expected" when a
-  // legacy ANTHROPIC_API_KEY is already exported in the user's
-  // shell. The wrapper has to clear that twin from the inherited env
-  // before spawn so the child only sees the gateway-routed
-  // ANTHROPIC_AUTH_TOKEN. Asserted by listing the key in the per-tool
-  // clears array.
+  // Regression: claude-code 2.x warns when a legacy ANTHROPIC_API_KEY is
+  // already exported, so the wrapper clears that twin from the inherited env
+  // before spawn, asserted by listing it in the per-tool clears array.
   it("claude → clears ANTHROPIC_API_KEY (gateway auth uses AUTH_TOKEN, twin would conflict)", () => {
     const result = envForTool(cfg, "claude");
     expect(result.clears).toEqual(["ANTHROPIC_API_KEY"]);
@@ -103,13 +99,9 @@ describe("envForTool", () => {
     expect(result.clears).toEqual(["ANTHROPIC_API_KEY"]);
   });
 
-  // Verified empirically against gemini-cli 0.46-preview: the binary
-  // reads GOOGLE_GEMINI_BASE_URL, NOT the previous GOOGLE_GENAI_API_BASE
-  // guess. POSTs `{BASE}/v1beta/models/{m}:generateContent`, prepending
-  // the API version itself. The base must therefore be the bare gateway
-  // URL with no `/v1beta` suffix; appending one doubles the prefix to
-  // `/v1beta/v1beta/` and the gateway 404s the routing call (which
-  // surfaces on the cli side as "Unexpected end of JSON input").
+  // Verified against gemini-cli 0.46-preview: it reads GOOGLE_GEMINI_BASE_URL
+  // and prepends the API version itself, so the base must have no `/v1beta`
+  // suffix -- appending one doubles the prefix and the gateway 404s.
   it("gemini → GOOGLE_GEMINI_BASE_URL=$gw (no /v1beta suffix) + GEMINI_API_KEY + GOOGLE_API_KEY", () => {
     const env = envForTool(cfg, "gemini").vars;
     expect(env.GOOGLE_GEMINI_BASE_URL).toBe("http://gw.example.com");
@@ -127,13 +119,10 @@ describe("envForTool", () => {
     expect(result.clears ?? []).toEqual([]);
   });
 
-  // opencode 1.x uses the Vercel AI SDK, which posts to
-  // `{BASE}/messages` and `{BASE}/chat/completions` WITHOUT prepending
-  // /v1. So opencode needs the base to ALREADY include /v1, unlike
-  // claude-code + codex which append it themselves. Also opencode's
-  // anthropic-provider auto-detect gates on ANTHROPIC_API_KEY, not
-  // ANTHROPIC_AUTH_TOKEN — both must be set or `--model anthropic/...`
-  // fails ProviderModelNotFoundError at init time.
+  // opencode's Vercel AI SDK posts without prepending /v1, so its base must
+  // already include /v1, unlike claude-code/codex. Its anthropic-provider
+  // auto-detect also gates on ANTHROPIC_API_KEY, not _AUTH_TOKEN -- both
+  // must be set or init fails with ProviderModelNotFoundError.
   it("opencode → both Anthropic + OpenAI pairs with /v1 suffix + ANTHROPIC_API_KEY for provider auto-detect", () => {
     const env = envForTool(cfg, "opencode").vars;
     expect(env.OPENAI_BASE_URL).toBe("http://gw.example.com/v1");
@@ -144,11 +133,9 @@ describe("envForTool", () => {
   });
 
   // opencode INTENTIONALLY sets both ANTHROPIC_AUTH_TOKEN and
-  // ANTHROPIC_API_KEY (the Vercel AI SDK's anthropic-provider
-  // auto-detect gates on _API_KEY; the gateway routes on _AUTH_TOKEN).
-  // Scrubbing either one would break opencode at provider-init time.
-  // Pinned with an empty-clears assertion so anyone copy-pasting the
-  // claude scrub here would fail this test.
+  // ANTHROPIC_API_KEY (auto-detect gates on one, the gateway routes on the
+  // other); scrubbing either breaks it. Pinned so a copy-pasted claude
+  // scrub here would fail this test.
   it("opencode → no clears (both Anthropic keys are intentionally set)", () => {
     const result = envForTool(cfg, "opencode");
     expect(result.clears ?? []).toEqual([]);

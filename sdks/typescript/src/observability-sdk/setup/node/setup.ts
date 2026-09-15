@@ -118,10 +118,8 @@ type TerminationSignal = "SIGINT" | "SIGTERM";
 
 /**
  * Registers flush-on-exit handlers backing `advanced.disableAutoShutdown`.
- * Never calls `process.exit()` directly — Node runs every listener for a
- * signal, so exiting early would cut off other listeners' shutdown work.
- * Instead: flush, remove our own listeners, and if none remain, re-raise the
- * signal so Node's default action still applies (correct 128+n exit code).
+ * Never calls `process.exit()` directly -- Node runs every listener for a
+ * signal, so flush, remove our listeners, and re-raise if none remain.
  */
 const registerAutoShutdownHandlers = ({
   sdk,
@@ -613,11 +611,9 @@ export function createAndStartNodeSdk(
 }
 
 /**
- * Ensures observability is set up, but only if not already configured:
- * idempotent — does nothing if OpenTelemetry (or LangWatch) is already
- * configured, sets it up if no tracer provider exists, and does nothing if
- * LANGWATCH_API_KEY is unset. For libraries that want tracing available
- * without conflicting with the host app's own observability setup.
+ * Ensures observability is set up, only if not already configured:
+ * idempotent, sets up a tracer provider if none exists, does nothing if
+ * LANGWATCH_API_KEY is unset.
  */
 export const ensureSetup = (): ObservabilityHandle => {
   const globalProvider = trace.getTracerProvider();

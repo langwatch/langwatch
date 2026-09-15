@@ -9,9 +9,8 @@ import { emitEvaluationEvent } from "../index";
 
 /**
  * The complete set of keys the emitted payload must contain, matching the
- * Python `Evaluation` TypedDict (`python-sdk/.../domain/__init__.py`) exactly.
- * Notably there is NO `cost` key: Python routes cost into span metrics, not the
- * evaluation event payload.
+ * Python `Evaluation` TypedDict exactly. Notably there is NO `cost` key --
+ * Python routes cost into span metrics, not the evaluation event payload.
  */
 const EXPECTED_PAYLOAD_KEYS = [
   "evaluation_id",
@@ -104,13 +103,13 @@ describe("addEvaluation", () => {
     });
 
     it("emits span_id as null for an invalid / non-recording span context", () => {
-      // An invalid span context carries the all-zero span id that OTel JS hands
-      // back outside an active trace. Python guards this via `is_valid` and
-      // emits null; we must match by guarding on `isSpanContextValid`.
-      //
-      // Use a MockSpan (which records events so we can read the payload back)
-      // but override its context to the OTel-canonical INVALID_SPAN_CONTEXT so
-      // the real `isSpanContextValid` path is exercised.
+      // An invalid span context carries the all-zero span id OTel JS hands
+      // back outside an active trace. Python guards via `is_valid`; we match
+      // by guarding on `isSpanContextValid`.
+
+      // Uses a MockSpan (records events so we can read the payload back) but
+      // overrides its context to INVALID_SPAN_CONTEXT so the real
+      // `isSpanContextValid` path is exercised.
       const mockSpan = new MockSpan("invalid-ctx-target");
       mockSpan.spanContext = () => INVALID_SPAN_CONTEXT;
 

@@ -26,10 +26,9 @@ const MAX_SOCKET_PATH_BYTES = 100;
 const SOCKET_FILE_BYTES = 1 + 16 + ".sock".length;
 
 /**
- * A daemon binds a pid-scoped staging name, not the shared path — up to 3
- * bytes longer than the shared name (a 7-digit pid replacing the ".sock"
- * suffix). Budgeting only the shared path underestimates, letting a directory
- * that "fits" still fail at `bind()`.
+ * A daemon binds a pid-scoped staging name, up to 3 bytes longer than the
+ * shared path (a 7-digit pid replacing ".sock"). Budgeting only the shared
+ * path underestimates and lets a "fitting" directory still fail at `bind()`.
  */
 export const MAX_STAGING_OVERHEAD_BYTES = 3;
 
@@ -45,11 +44,9 @@ export interface DaemonIdentity {
 }
 
 /**
- * Windows would need a named pipe (`\\.\pipe\...`) and has no 0600/0700
- * equivalent — its default pipe ACL is owner+admins, which is a different
- * (weaker for the admin case) security posture than the one documented above.
- * Rather than ship an unverified credential-holding IPC surface, the daemon is
- * disabled on win32 and every command runs in-process, exactly as today.
+ * Windows needs a named pipe with no 0600/0700 equivalent -- its default
+ * ACL is a weaker posture, so rather than ship an unverified IPC surface,
+ * the daemon is disabled on win32; every command runs in-process.
  */
 export function isDaemonSupported(): boolean {
   return process.platform !== "win32";
@@ -75,13 +72,11 @@ export function daemonSocketDir(): string {
   const home = os.homedir();
   if (home !== "") {
     const underHome = path.join(home, ".langwatch", "run", leaf);
-    // A very long $HOME would push the socket past sockaddr_un and disable the
-    // daemon outright. The temp dir is shorter; a daemon whose directory we
-    // validate on every connect beats no daemon at all.
-    //
-    // Budgeted against the STAGING name, which is the one bind() sees and the
-    // longer of the two — a directory that fits the shared path but not the
-    // staging path is a directory no daemon can start in.
+    // A long $HOME pushes the socket past sockaddr_un and disables the
+    // daemon. The temp dir is shorter, validated on every connect -- some
+    // daemon beats none. Budgeted against the STAGING name, the longer of
+    // the two: a directory fitting the shared path but not staging can't
+    // start a daemon.
     if (
       Buffer.byteLength(underHome, "utf8") + SOCKET_FILE_BYTES + MAX_STAGING_OVERHEAD_BYTES <=
       MAX_SOCKET_PATH_BYTES
@@ -93,11 +88,9 @@ export function daemonSocketDir(): string {
 }
 
 /**
- * Resolve the identity of the CURRENT invocation.
- *
- * Endpoint resolution goes through the CLI's single resolver so the client and
- * the daemon can never disagree about what "the endpoint" is — a drift there
- * would silently key two identical invocations to two different daemons.
+ * Resolves the identity of the CURRENT invocation, via the CLI's single
+ * endpoint resolver so client and daemon never disagree about "the
+ * endpoint" -- a drift would key two invocations to different daemons.
  */
 export function resolveIdentity(env: NodeJS.ProcessEnv = process.env): DaemonIdentity {
   const endpoint = resolveControlPlaneUrl();
@@ -240,10 +233,9 @@ export class UntrustedSocketDirError extends Error {
 }
 
 /**
- * Creates the directory 0700, repairing looser permissions if it already
- * exists. Fails CLOSED when the directory is owned by someone else:
- * `chmodSync` cannot repair another owner's directory, so a pre-created,
- * attacker-owned directory must be treated as "no daemon", never a warning.
+ * Creates the directory 0700, repairing looser permissions if it exists.
+ * Fails CLOSED when owned by someone else: `chmodSync` can't repair
+ * another owner's directory, so an attacker-owned one means "no daemon".
  */
 export function ensureSocketDir(socketDir: string): void {
   fs.mkdirSync(socketDir, { recursive: true, mode: 0o700 });
@@ -262,12 +254,9 @@ export function ensureSocketDir(socketDir: string): void {
 }
 
 /**
- * Tighten a freshly-bound socket to 0600.
- *
- * node's net.Server.listen() creates the socket with 0755 & ~umask, which on a
- * default umask leaves it group/other readable+writable — i.e. any local user
- * could connect and drive a credential-holding daemon. Must be called
- * immediately after listen().
+ * Tightens a freshly-bound socket to 0600. `net.Server.listen()` creates
+ * it as 0755 & ~umask, world read/writable by default -- call immediately
+ * after listen().
  */
 export function secureSocketFile(socketPath: string): void {
   fs.chmodSync(socketPath, 0o600);

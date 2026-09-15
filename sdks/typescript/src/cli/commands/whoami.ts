@@ -2,11 +2,9 @@ import chalk from "chalk";
 import { loadConfig, isLoggedIn, type GovernanceConfig } from "@/cli/utils/governance/config";
 
 /**
- * One line for what the login key reaches. The key is minted from the scope
- * the user picked while approving, and that choice is invisible afterwards —
- * a `--project` that fails is otherwise the first sign of it. Nothing is
- * printed when the field is absent: the login predates the feature, or the
- * server does not mint login keys, and either way there is no reach to state.
+ * One line for what the login key reaches: the scope picked at approval,
+ * otherwise invisible until a `--project` fails. Nothing is printed when
+ * the field is absent -- no reach to state either way.
  */
 export const loginKeyScopeLine = (
   scope: GovernanceConfig["cli_api_key_scope"],
@@ -18,11 +16,9 @@ export const loginKeyScopeLine = (
 };
 
 /**
- * One line for what the login key can DO. "Whole organization" states reach,
- * not power: the key carries the permission list picked at approval, and a
- * command the list does not cover is refused with a 403 that reads as a
- * surprise when `whoami` never said so. Nothing is printed when the login
- * predates the field.
+ * One line for what the login key can DO. "Whole organization" states
+ * reach, not power: the key's permission list picked at approval, so a
+ * covered command's 403 doesn't surprise. Absent when the login predates it.
  */
 export const loginKeyPermissionsLine = (
   scope: GovernanceConfig["cli_api_key_scope"],

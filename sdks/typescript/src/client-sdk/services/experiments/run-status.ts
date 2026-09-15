@@ -53,10 +53,9 @@ export interface PollExperimentRunResult {
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
- * Polls a run to completion via `getStatus`, mirroring the python SDK poll
- * loop. Resolves on `completed`/`stopped`, throws on `failed` or on timeout.
- * The status fetcher is injected so the experiment and workflow paths share
- * this one loop.
+ * Polls a run to completion via `getStatus`, mirroring the python SDK.
+ * Resolves on `completed`/`stopped`, throws on `failed` or timeout. The
+ * fetcher is injected so experiment and workflow paths share this one loop.
  */
 export const pollExperimentRun = async ({
   runId,
@@ -110,12 +109,9 @@ export const pollExperimentRun = async ({
 };
 
 /**
- * Replace the domain of a URL with a new base, preserving path/query/fragment.
- *
- * The platform returns its own (cloud) URL for a run; rebasing it onto the
- * configured endpoint keeps a self-hosted run pointing at the local instance
- * instead of app.langwatch.ai. Returns the original string if either URL is
- * unparseable.
+ * Replaces a URL's domain with a new base, preserving path/query/fragment.
+ * The platform returns its own cloud URL for a run; rebasing it keeps a
+ * self-hosted run pointing local instead of app.langwatch.ai.
  */
 export const rebaseUrlToEndpoint = (url: string, newBase: string): string => {
   if (!url) return url;
@@ -129,11 +125,9 @@ export const rebaseUrlToEndpoint = (url: string, newBase: string): string => {
 };
 
 /**
- * Fetches a run's per-row results, retrying through the brief post-completion
- * window where results 404 or come back empty because the ClickHouse
- * projection has not caught up. Retries up to `maxAttempts` only when the run
- * reported rows (`expectsRows`); otherwise the first read is returned. Shared
- * by the experiment and workflow SDK paths, mirroring the python SDK.
+ * Fetches a run's per-row results, retrying through the brief window where
+ * ClickHouse projection lags (404 or empty). Retries up to `maxAttempts`
+ * only when the run reported rows; otherwise the first read is returned.
  */
 export const fetchResultsWithRetry = async <T>({
   getResults,

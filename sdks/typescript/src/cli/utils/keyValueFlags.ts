@@ -1,8 +1,7 @@
 /**
- * Repeatable `key=value` command-line flags. Two families share this shape
- * and differ in what a key holds: a spend filter may repeat one key with
- * several values, while a run parameter holds exactly one value per name.
- * Equals rather than a colon, because a value may itself contain a colon.
+ * Repeatable `key=value` command-line flags. A spend filter may repeat one
+ * key with several values; a run parameter holds one value per name. Equals
+ * rather than colon, because a value may itself contain a colon.
  */
 
 import { commandValidationError, reportCommandError } from "./errorOutput";
@@ -41,12 +40,9 @@ const splitPair = ({
 };
 
 /**
- * `--metadata tier=gold`, repeated, collected into a record where one key may
- * carry several values.
- *
- * A key may not contain a colon: the server splits a pair on its FIRST colon,
- * so a key carrying one would silently address a different key. Refusing beats
- * reporting spend for a filter the caller did not write.
+ * `--metadata tier=gold`, repeated, collected where one key may carry
+ * several values. A key may not contain a colon: the server splits on the
+ * FIRST one, so a key carrying one would silently address a different key.
  */
 export const parseKeyValueFlags = ({
   pairs,
@@ -79,11 +75,9 @@ export const parseKeyValueFlags = ({
 };
 
 /**
- * Read one flag value as the type it looks like: exactly `true`/`false`
- * becomes boolean, a number that round-trips back to what was typed becomes a
- * number (keeping `007`, `1.50` and long account numbers as text), and
- * everything else stays text. A declared type overrides the guess; text that
- * cannot be read as it stays text, and the platform refuses it by name.
+ * Reads one flag value as the type it looks like: `true`/`false` becomes
+ * boolean, a round-tripping number becomes a number (keeping `007`/`1.50` as
+ * text), else text. A declared type overrides the guess.
  */
 export const coerceParameterValue = ({
   value,
@@ -112,10 +106,8 @@ export const coerceParameterValue = ({
 
 /**
  * `--param account_tier=gold`, repeated, collected into the values a run
- * supplies for the names its scenarios declare.
- *
- * A name repeated across flags keeps the last value, so a wrapper script can
- * append an override to a command line it did not write.
+ * supplies for names its scenarios declare. A name repeated keeps the last
+ * value, so a wrapper script can append an override it did not write.
  */
 export const parseRunParameterFlags = ({
   pairs,

@@ -69,9 +69,8 @@ export const renderTargetOutput = (result: unknown): string => {
 
 /**
  * The judge settings for a comparison, carrying only what the caller set.
- *
- * `golden` is the single knob for reference-answer judging: passing one turns
- * `has_golden_answer` on, so the two can never disagree.
+ * `golden` is the single knob for reference-answer judging: passing one
+ * turns `has_golden_answer` on, so the two can never disagree.
  */
 export const buildComparisonSettings = (
   options: Pick<
@@ -109,11 +108,9 @@ export const buildComparisonSettings = (
 };
 
 /**
- * The candidates the judge will see, in the order given.
- *
- * A name with nothing recorded against it never reaches here, and if one ever
- * does it is a bug in candidate selection rather than a thin row, so it says
- * which target it was instead of judging a silent candidate.
+ * The candidates the judge will see, in the order given. A name with
+ * nothing recorded never reaches here; if one ever does, it's a bug in
+ * candidate selection, so it names the target instead of judging silently.
  */
 export const buildComparisonCandidates = (
   names: string[],
@@ -135,11 +132,9 @@ export const buildComparisonCandidates = (
   });
 
 /**
- * The judge entry for a row.
- *
- * `row_index` seeds the judge's deterministic candidate shuffle, so it comes
- * from the row the caller is already naming rather than from a second argument
- * they would have to remember to keep in step.
+ * The judge entry for a row. `row_index` seeds the judge's deterministic
+ * candidate shuffle, coming from the row the caller already names rather
+ * than a second argument they'd have to keep in step.
  */
 export const buildComparisonData = ({
   input,
@@ -188,12 +183,9 @@ export const toComparisonVerdict = ({
 };
 
 /**
- * The batch status a verdict is recorded under.
- *
- * The batch protocol carries three statuses to the verdict's five, so the
- * mapping lives here and nowhere else: what the row records and what the
- * caller is handed are then two readings of one decision rather than two
- * decisions that can drift apart.
+ * The batch status a verdict is recorded under. The batch protocol carries
+ * three statuses to the verdict's five, so this mapping lives here alone --
+ * what the row records and what the caller reads are one decision, not two.
  */
 export const comparisonEntryStatus = (status: ComparisonStatus): EvaluationStatus => {
   switch (status) {

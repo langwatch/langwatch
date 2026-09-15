@@ -1,10 +1,7 @@
 /**
  * What the session-context seams remember between invocations: one small
- * file per session, shared by the command hooks and the codex rollout
- * harvest so a device posts a session's context once. Lives beside the CLI's
- * own config, not the repository, since it describes this machine. Reads
- * report "nothing recorded" on any failure; writes throw, and the caller
- * decides what a lost fingerprint is worth.
+ * file per session, shared by command hooks and the rollout harvest. Reads
+ * report "nothing recorded" on failure; writes throw.
  */
 
 import * as fs from "node:fs";
@@ -20,10 +17,9 @@ export function defaultStateDir(): string {
 }
 
 /**
- * Where one session's fingerprint lives. The agent is part of the key because
- * session ids are only unique within one agent, and two agents sharing a
- * fingerprint would leave the second silent. Whatever the agent and session id
- * turn out to contain, the result is one path segment.
+ * Where one session's fingerprint lives. The agent is part of the key
+ * because session ids are only unique within one agent -- two agents
+ * sharing a fingerprint would leave the second silent.
  */
 export function stateFilePath({
   stateDir,

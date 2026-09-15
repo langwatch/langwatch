@@ -60,12 +60,9 @@ describe("the CLI boot (index.ts)", () => {
     it("evaluates the dispatch module before config() despite the source order", async () => {
       await boot(["node", "cli.js", "trace", "search"]);
 
-      // index.ts reads as though config() precedes `import { runCli } from
-      // "./daemon/dispatch"`, but ES module semantics (and esbuild's bundling)
-      // hoist every static import above the module body. dispatch's
-      // MODULE-LEVEL side effects therefore run FIRST; only its function
-      // bodies see the loaded .env. Pinned here so the entrypoint's comment
-      // and reality cannot drift apart again.
+      // ES module semantics hoist every static import above the module body,
+      // so dispatch's MODULE-LEVEL side effects run FIRST; only its function
+      // bodies see the loaded .env. Pinned so comment and reality can't drift.
       expect(bootEvents[0]).toBe("dispatch module evaluated");
       expect(bootEvents.indexOf("dispatch module evaluated")).toBeLessThan(
         bootEvents.indexOf("dotenv config() called"),
@@ -103,11 +100,9 @@ const resolveImport = (spec: string, importer: string): string | null => {
 };
 
 /**
- * Top-level static imports only. `import type` is skipped (erased at compile
- * time); dynamic `import()` is skipped by construction because the pattern is
- * anchored to the start of a line. `[^;]*?` keeps the optional `… from` clause
- * from running past a side-effect import (`import "./compileCache";`) and
- * stealing the next statement's specifier.
+ * Top-level static imports only: `import type` is skipped, dynamic
+ * `import()` skipped by anchoring to line-start. `[^;]*?` stops the
+ * optional `... from` clause from stealing the next statement's specifier.
  */
 const STATIC_IMPORT = /^import\s+(?!type\s)(?:[^;]*?\sfrom\s+)?["']([^"']+)["']/gm;
 

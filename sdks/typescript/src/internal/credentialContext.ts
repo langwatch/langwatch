@@ -1,10 +1,7 @@
 /**
- * Request-scoped resolved credentials. The CLI daemon serves concurrent
- * requests from one process; device-mode requests share no API key in the
- * environment, so writing a resolved key into `process.env.LANGWATCH_API_KEY`
- * would let one in-flight request build a service with another's key — the
- * cross-identity leak this holder (an `AsyncLocalStorage` scope established at
- * each request boundary) exists to make structurally impossible.
+ * Request-scoped resolved credentials: the CLI daemon serves concurrent
+ * requests from one process, so a resolved key in `process.env` would leak
+ * across requests -- this holder makes that structurally impossible.
  */
 
 import { AsyncLocalStorage } from "node:async_hooks";
@@ -19,8 +16,7 @@ const storage = new AsyncLocalStorage<CredentialHolder>();
 /**
  * Process-local fallback for callers not wrapped in a holder scope: a plain
  * SDK embed, or a cold-CLI path that skipped the wrapper. Never used inside
- * the daemon, where every request runs inside its own `run`-established
- * holder, so it can never carry one request's key into another.
+ * the daemon, where every request runs in its own holder.
  */
 const fallbackHolder: CredentialHolder = {};
 
@@ -55,10 +51,9 @@ export function scopedApiKey(): string | undefined {
 }
 
 /**
- * Publish the project the current request targets. A user-scoped API key
- * carries no project identity of its own, so the resolver decides which
- * project the request names (the personal one by default, `--project
- * <id|slug>` otherwise) and every client built afterwards reads it from here.
+ * Publishes the project the current request targets. A user-scoped API key
+ * carries no project identity, so the resolver decides which project the
+ * request names, and every client built afterwards reads it from here.
  */
 export function setResolvedProjectId(projectId: string | undefined): void {
   currentHolder().projectId = projectId;

@@ -63,20 +63,16 @@ interface InstallReport {
    */
   codex_turn_harvest_action?: CodexTurnHarvestOutcome["status"];
   /**
-   * How the tool's session context seam was left: the hook entries for
-   * claude_code and codex, the plugin file for opencode. Absent for a
-   * claude_code install the Claude Code plugin took, which carries the same
-   * hooks and so leaves nothing in the settings file to report.
+   * How the tool's session context seam was left: hook entries for
+   * claude_code/codex, the plugin file for opencode. Absent when the Claude
+   * Code plugin took the install, leaving nothing in settings to report.
    */
   session_hooks_action?: "created" | "updated" | "unchanged";
   session_hooks_path?: string;
   /**
-   * What became of the LangWatch Claude Code plugin, for claude_code only, and
-   * only when the run wired something: `--env-only` prints the exports and
-   * installs no seam at all, so the field is absent rather than any action.
-   * When it is present, anything other than `installed` / `already_installed`
-   * means the raw hook entries ran as the fallback, and `session_hooks_action`
-   * says what they did.
+   * What became of the Claude Code plugin, claude_code only, when the run
+   * wired something. Anything other than `installed`/`already_installed`
+   * means raw hooks ran as fallback -- see `session_hooks_action`.
    */
   claude_plugin_action?: ClaudePluginEnsureAction;
   env_block: string[];
@@ -120,14 +116,9 @@ async function runInstall(
   tool: SupportedTool,
   options: InstallOptions,
 ): Promise<InstallReport> {
-  // Resolve the ingest key (`ik-lw-` shape) for this tool the same way the
-  // wrappers do, so a tool pinned to a team project keeps that scope instead
-  // of having a personal key written over it. Without the pin it falls back
-  // to the personal key with the reuse-first rules: the cached key is used
-  // while the platform confirms it live; a revoked or missing one mints
-  // fresh. The SupportedTool slug doubles as the source_type the mint route
-  // expects (claude_code / codex / gemini / opencode); the config keys the
-  // pin by CLI tool slug, so read that back off the source type.
+  // Resolves the ingest key the same way the wrappers do, so a team-pinned
+  // tool keeps that scope. Without a pin, falls back to the personal key
+  // with reuse-first rules: cached-and-live wins, a revoked/missing one mints fresh.
   const { token, prefix, endpoint, minted, scope, projectLabel } = await resolveIngestionCredential(
     {
       cfg,
@@ -242,13 +233,10 @@ function buildEnvBlock(tool: SupportedTool, endpoint: string, token: string): st
     case "claude_code":
       return [
         `export CLAUDE_CODE_ENABLE_TELEMETRY=1`,
-        // Enhanced-telemetry beta: unlocks the real span-tracing signal
-        // (scope com.anthropic.claude_code.tracing — llm_request / tool /
-        // subagent.spawn spans) carrying agent_id + parent_agent_id, the
-        // only telemetry that ties a model call / tool run to the sub-agent
-        // that issued it. Without it OTEL_TRACES_EXPORTER is a no-op and the
-        // receiver collapses every sub-agent into one synthesized per-turn
-        // trace. Content still rides the log events, joined by request_id.
+        // Enhanced-telemetry beta unlocks span-tracing carrying agent_id +
+        // parent_agent_id, the only signal tying a model/tool call to its
+        // sub-agent. Without it, every sub-agent collapses into one
+        // synthesized per-turn trace; content still rides the log events.
         `export CLAUDE_CODE_ENHANCED_TELEMETRY_BETA=1`,
         // OTel content unlock knobs: log prompts, tool details, tool content, api bodies
         `export OTEL_LOG_USER_PROMPTS=1`,

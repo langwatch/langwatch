@@ -1,8 +1,7 @@
 /**
- * Shared plumbing for the `langwatch skills` mutating commands: turning name
- * arguments into bundle skills (with a loud error on typos), the human
- * rendering of the per-file result list, and the one confirmation gate every
- * destructive path goes through.
+ * Shared plumbing for `langwatch skills` mutating commands: name-to-skill
+ * resolution (loud on typos), the per-file result list rendering, and the
+ * one confirmation gate every destructive path goes through.
  */
 import * as readline from "node:readline";
 import chalk from "chalk";
@@ -18,9 +17,8 @@ import { throwValidationError } from "./validation";
 
 /**
  * The skills a mutating command acts on: the whole bundle with --all, else
- * the named ones. Unknown names fail loudly with the valid set in `meta` —
- * a silent no-op install is how an agent ends up believing a skill exists
- * on disk when nothing was ever written.
+ * the named ones. Unknown names fail loudly with the valid set in `meta` --
+ * a silent no-op would let an agent believe a skill exists on disk.
  */
 export const resolveTargets = ({
   names,

@@ -8,11 +8,9 @@ import * as os from "node:os";
 import { identityEnv, type DaemonIdentity } from "./identity";
 
 /**
- * The environment a spawned daemon may inherit from its spawner. The
- * daemon's boot env becomes the baseline every request resets to, so handing
- * it the spawner's full shell env would leak one project's variables into
- * every other caller's requests. It inherits only the identity triple, the
- * caller's already-filtered allowlisted overlay, and the vars listed below.
+ * The environment a spawned daemon may inherit. Its boot env becomes the
+ * baseline every request resets to, so it inherits only the identity
+ * triple, the caller's filtered allowlist, and the vars below.
  */
 const BASELINE_ENV_VARS = [
   "PATH",
@@ -44,11 +42,9 @@ function baselineEnv(env: NodeJS.ProcessEnv): Record<string, string> {
 }
 
 /**
- * Starts a daemon in the background and returns immediately. The triggering
- * command runs in-process regardless; racing the spawn against it would only
- * shave a cold start we're about to amortise away, at the cost of two code
- * paths that can each be half-done on exit. Detached with stdio to
- * /dev/null, so it survives the caller exiting and never writes to its terminal.
+ * Starts a daemon in the background and returns immediately; the triggering
+ * command still runs in-process. Detached with stdio to /dev/null, so it
+ * survives the caller exiting and never writes to its terminal.
  */
 export function spawnDaemon({
   cliPath,

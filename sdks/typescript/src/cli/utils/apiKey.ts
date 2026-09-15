@@ -9,10 +9,9 @@ import { fetchPersonalProject, SessionApiError } from "./governance/session-api"
 import { projectScopeErrorLines, ProjectScopeError, resolveProjectSelector } from "./projectScope";
 
 /**
- * Re-reads the caller's .env for LANGWATCH_* keys only. In the daemon this
- * runs per request in one shared process, so loading the whole file would
- * leak one caller's secrets into another's request. Existing env vars are
- * never overwritten (dotenv semantics).
+ * Re-reads the caller's .env for LANGWATCH_* keys only: the daemon runs
+ * this per request in one shared process, so loading the whole file would
+ * leak secrets across callers. Existing env vars are never overwritten.
  */
 const loadEnvFileScoped = (): void => {
   // `processEnv: {}` parses the file into a throwaway object instead of
@@ -42,18 +41,15 @@ export interface ResolvedCredentials {
 
 /**
  * How long a cached personal-project key is trusted before re-confirming
- * liveness. Bounds how long a stolen `~/.langwatch/config.json` keeps
- * working after device revocation to minutes, not days.
+ * liveness -- bounds a stolen config's post-revocation window to minutes.
  * Spec: specs/ai-governance/cli-onboarding/me-credentials.feature
  */
 export const SESSION_REVALIDATE_WINDOW_MS = 5 * 60 * 1000;
 
 /**
- * Resolves credentials in priority order: --api-key flag, then env
- * `LANGWATCH_API_KEY`, then the device session. Publishes into the
- * request-scoped credential store (not `process.env`), so the daemon's
- * concurrent requests — each its own async context — never cross identities;
- * writing to the process-global env instead was the leak this design forbids.
+ * Resolves credentials in priority order: --api-key flag, env, then the
+ * device session. Publishes into the request-scoped store, not
+ * `process.env`, so concurrent daemon requests never cross identities.
  */
 export const resolveCredentials = async (
   opts: { apiKey?: string; project?: string } = {},
@@ -131,12 +127,9 @@ export const resolveCredentials = async (
 };
 
 /**
- * Resolve `--project` into the request's target project and publish it.
- *
- * Returns undefined when no flag was given, which leaves whatever the session
- * path already published in place. A value that does not resolve ends the
- * command: there is no safe fallback, since silently running against the
- * personal project would answer a question the user did not ask.
+ * Resolves `--project` into the request's target project and publishes it.
+ * Undefined leaves the session path's value in place; an unresolvable
+ * value ends the command rather than falling back to the personal project.
  */
 async function applyProjectScope({
   project,
@@ -204,11 +197,9 @@ interface SessionCredential {
 }
 
 /**
- * The key for a device session. Two keys can be cached, and the login key
- * (`cli_api_key`) wins over the personal-project key when present — using
- * either past `SESSION_REVALIDATE_WINDOW_MS` unconditionally would be the
- * revocation bypass, so each branch below re-confirms or falls back on its
- * own terms (revoked, legacy server predating the endpoint, or offline).
+ * The key for a device session. The login key (`cli_api_key`) wins over
+ * the personal-project key when present; using either past
+ * `SESSION_REVALIDATE_WINDOW_MS` unconditionally would be a revocation bypass.
  */
 async function resolveSessionCredential(
   cfg: GovernanceConfig,
@@ -259,12 +250,9 @@ async function resolveSessionCredential(
     };
   } catch (err) {
     if (err instanceof SessionApiError && (err.status === 401 || err.status === 403)) {
-      // Session revoked, expired or refused: sever access. Drop both cached
-      // keys so the retained config can no longer authenticate. 403 counts
-      // the same as 401 — a session the server refuses is one the CLI must
-      // stop presenting, whichever status says so. (fetchPersonalProject's
-      // refresh path may already have cleared the personal project; this is
-      // idempotent.)
+      // Session revoked, expired or refused: 403 counts the same as 401.
+      // Drop both cached keys so the retained config can no longer
+      // authenticate (idempotent -- the refresh path may have cleared one).
       delete cfg.personal_project;
       delete cfg.cli_api_key;
       delete cfg.cli_api_key_scope;
@@ -346,12 +334,9 @@ function reportMissingCredentials(endpoint: string): never {
 }
 
 /**
- * Org-anchored surfaces (webhooks, spend-events) authenticate with the ONE
- * supported credential, LANGWATCH_API_KEY, exactly like every other
- * command: org and project permission checks are enforced server-side, and
- * a project-scoped key gets a 401 from these routes. No separate org-key
- * variable and no client-side fallback chain, per the recorded auth
- * decision.
+ * Org-anchored surfaces (webhooks, spend-events) authenticate with the one
+ * supported credential, LANGWATCH_API_KEY; a project-scoped key gets a 401
+ * from these routes. No separate org-key variable, no client fallback chain.
  */
 export const checkOrgApiKey = (): string => {
   loadEnvFileScoped();

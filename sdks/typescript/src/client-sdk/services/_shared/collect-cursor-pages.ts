@@ -1,8 +1,7 @@
 /**
  * The walk that turns a cursor-paginated endpoint back into a whole listing.
- * A full page doesn't mean there's more, nor a short page that there isn't:
- * only a null `next_cursor` ends it, and served cursors must be replayed
- * verbatim — a cursor the endpoint did not issue answers 400 `invalid_cursor`.
+ * Only a null `next_cursor` ends it (page size says nothing); served cursors
+ * must be replayed verbatim, or the endpoint answers 400 `invalid_cursor`.
  */
 
 /**
@@ -30,12 +29,9 @@ export interface CursorWalkOptions<TPage> {
 }
 
 /**
- * The one walk: yields each page as it arrives, so a caller can stop early
- * without paying for the rest, and raises rather than looping forever on a
- * cursor chain that never ends.
- *
- * Every eager `list()` and every lazy `iterate()` in the SDK is built on this,
- * so the end-of-walk contract and the endless-walk guards are written once.
+ * The one walk: yields each page as it arrives so a caller can stop early,
+ * and raises rather than looping forever on a cursor chain that never ends.
+ * Every `list()`/`iterate()` in the SDK is built on this, written once.
  */
 export async function* walkCursorPages<TPage>(
   options: CursorWalkOptions<TPage>,
@@ -72,10 +68,9 @@ export async function* walkCursorPages<TPage>(
 }
 
 /**
- * Read every page of a cursor-paginated list, in order.
- *
- * Returns the pages rather than the rows so the caller can fold whatever else
- * rides on each page (a `spend_available` flag, say) instead of losing it.
+ * Reads every page of a cursor-paginated list, in order. Returns the pages
+ * rather than the rows so the caller can fold whatever else rides on each
+ * page (a `spend_available` flag, say) instead of losing it.
  */
 export async function collectCursorPages<TPage>(
   options: CursorWalkOptions<TPage>,

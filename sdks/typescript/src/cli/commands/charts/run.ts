@@ -10,19 +10,16 @@ import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
 
 /**
- * The datapoint steps the platform offers, in seconds. The API is the source
- * of truth (`LWQL_GRANULARITY_STEPS`, restricted in the route schema); this
- * local copy only exists to refuse an off-list value before a request is made,
- * with a message that names the steps instead of a schema rejection.
+ * The datapoint steps the platform offers, in seconds. The API
+ * (`LWQL_GRANULARITY_STEPS`) is the source of truth; this local copy exists
+ * only to refuse an off-list value early, naming the steps in the message.
  */
 const OFFERED_GRANULARITY_STEPS = [1, 60, 3600] as const;
 
 /**
- * One of the offered datapoint steps, in seconds — validated locally against
- * `OFFERED_GRANULARITY_STEPS` before a request is made. `runQuery` itself
- * accepts the plain `number` the shared query door's request body types it
- * as (issue #7565): the door is not chart-specific, so it does not know
- * about this CLI's offered-steps list.
+ * One of the offered datapoint steps, validated locally against
+ * `OFFERED_GRANULARITY_STEPS`. `runQuery` accepts the plain `number` the
+ * shared query door types it as (#7565): the door doesn't know this CLI's list.
  */
 type ChartRunGranularitySeconds = (typeof OFFERED_GRANULARITY_STEPS)[number];
 

@@ -1,8 +1,7 @@
 /**
- * Single source of truth for the control-plane URL, replacing three previously drifted readers.
- * Priority (highest wins): 1. `opts.flag` (per-command override) 2. `LANGWATCH_ENDPOINT` (env)
- * 3. persisted config (`~/.langwatch/config.json:control_plane_url`) 4. `DEFAULT_ENDPOINT`
- * (`https://app.langwatch.ai`). Spec: specs/ai-governance/cli-onboarding/login-unified.feature
+ * Single source of truth for the control-plane URL. Priority: 1. `opts.flag`
+ * 2. `LANGWATCH_ENDPOINT` 3. persisted config 4. `DEFAULT_ENDPOINT`.
+ * Spec: specs/ai-governance/cli-onboarding/login-unified.feature
  */
 
 import { DEFAULT_ENDPOINT } from "@/internal/constants";
@@ -24,10 +23,9 @@ export interface ResolvedEndpoint {
 }
 
 /**
- * Resolve the control-plane endpoint per the documented priority order.
- *
- * Returns both the resolved URL and the source that won, so
- * `langwatch config list` can show the user where each value came from.
+ * Resolves the control-plane endpoint per the documented priority order,
+ * returning both the URL and the source that won, so `langwatch config
+ * list` can show the user where each value came from.
  */
 export function resolveControlPlaneEndpoint(opts: ResolveEndpointOptions = {}): ResolvedEndpoint {
   // Each source is judged on what it normalizes to, not on truthiness: both a

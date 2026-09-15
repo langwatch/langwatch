@@ -26,10 +26,9 @@ export class ManagementFlagError extends Error {
 export const oneOf = (values: readonly string[]): string => values.join(", ");
 
 /**
- * A non-negative integer flag, refused by name rather than sent as NaN. Matched as plain
- * decimal digits rather than run through `Number`, which reads "" as 0, "0x10" as 16 and
- * "1e3" as 1000. Digits alone aren't enough either: past 2^53 a decimal string can round to
- * a different integer, so `Number.isSafeInteger` guards that too.
+ * A non-negative integer flag, refused by name rather than sent as NaN.
+ * Matched as plain decimal digits, not `Number` (reads "" as 0, "0x10" as
+ * 16). Past 2^53 a decimal string can round wrong, so `isSafeInteger` guards too.
  */
 export const parseCount = ({ value, flag }: { value: string; flag: string }): number => {
   const trimmed = value.trim();
@@ -169,11 +168,9 @@ export const parsePrincipalType = (value: string): RoleBindingPrincipalFlag => {
 };
 
 /**
- * The filters a role-bindings listing sends.
- *
- * A filter the caller did not give is ABSENT from the result, never present
- * and empty: an empty string is a filter that matches nothing, which would
- * turn "no filter" into "no results".
+ * The filters a role-bindings listing sends. A filter the caller did not
+ * give is ABSENT, never present and empty: an empty string filter matches
+ * nothing, turning "no filter" into "no results".
  */
 export const composeRoleBindingFilters = (
   flags: RoleBindingFilterFlags,

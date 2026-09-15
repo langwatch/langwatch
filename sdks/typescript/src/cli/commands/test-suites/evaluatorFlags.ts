@@ -115,10 +115,9 @@ export function warnMissingMappings(
 }
 
 /**
- * The attachment list the flags describe, or none when no evaluator flag was
- * written. `--evaluators-json` is the full list; `--evaluator` references are
- * resolved and their mappings inferred against the fields. Both may be
- * given, and the list is their concatenation.
+ * The attachment list the flags describe, or none if no evaluator flag was
+ * written. `--evaluators-json` is the full list; `--evaluator` references
+ * resolve against the fields. Both may be given; the list is their concatenation.
  */
 export async function readEvaluators({
   options,
@@ -153,11 +152,9 @@ export async function readEvaluators({
 }
 
 /**
- * Reads `--evaluators-json`: a path to a JSON file, or the JSON itself. The
- * document is the full attachment list. An attachment may leave `id` and
- * `required` out; the id is generated and the gate defaults to required.
- * Every mapping path is checked against the suite's fields, so a field the
- * suite does not declare is refused here with the reason.
+ * Reads `--evaluators-json`: a path to a JSON file or the JSON itself, the
+ * full attachment list. `id`/`required` may be omitted (generated / defaults
+ * required). Every mapping path is checked against the suite's fields.
  */
 export function readEvaluatorsJson({
   value,

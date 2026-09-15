@@ -1,8 +1,7 @@
 /**
  * Shared fixtures for the three suites reading Claude Code's plugin state,
- * seeding the same two files under `~/.claude/plugins` so a shape drift
- * cannot let one suite pass against a file the others prove nothing about.
- * Not named `*.test.ts`: vitest's `include` would collect it as a suite.
+ * avoiding a shape drift between them. Not `*.test.ts` -- vitest's
+ * `include` would collect it as its own suite.
  */
 import * as fs from "node:fs";
 import * as os from "node:os";
@@ -16,10 +15,9 @@ import type * as ClaudePluginModuleType from "../claude-plugin";
 export const OWNED_MARKETPLACE_REPO = "langwatch/agent-plugin";
 
 /**
- * Where every fixture writes. Claude Code keeps all of this under one directory
- * in the user's home, so the suites point HOME at a temp tree and let the module
- * under test resolve the rest for itself, rather than injecting paths it would
- * never be given in production.
+ * Where every fixture writes. Claude Code keeps all of this under one home
+ * directory, so suites point HOME at a temp tree and let the module under
+ * test resolve the rest itself, rather than inject paths production never gives.
  */
 export const writeClaudeJson = ({
   home,
@@ -61,10 +59,9 @@ export const seedInstalledPlugin = ({
   });
 
 /**
- * `known_marketplaces.json` with a marketplace named `langwatch` sourced from
- * `repo` (default: the repo we publish) and its clone.
- * `publishedVersion` writes the plugin manifest the update path compares
- * against; omitting it yields a listing whose manifest cannot be read.
+ * `known_marketplaces.json` with a marketplace named `langwatch`, sourced
+ * from `repo` (default: the repo we publish). `publishedVersion` writes the
+ * manifest the update path compares against; omitting it yields an unreadable one.
  */
 export const seedMarketplace = ({
   home,
@@ -208,10 +205,9 @@ function spawnInspectors(spawnSyncMock: Mock) {
 }
 
 /**
- * A temp HOME with a CLI config beside it, per test, and everything the suite
- * touched put back afterwards. Absent variables are restored by DELETING them:
- * assigning `undefined` through `process.env` stores the string "undefined",
- * which the next file's HOME resolution would read as a real path.
+ * A temp HOME with a CLI config beside it, per test, restored afterwards.
+ * Absent variables are restored by DELETING them: assigning `undefined`
+ * through `process.env` stores the string "undefined", read as a real path.
  */
 function registerTempHomeLifecycle({
   state,
@@ -246,12 +242,9 @@ function registerTempHomeLifecycle({
 }
 
 /**
- * Everything the plugin suites need around the module under test: a temp HOME
- * that is torn down per test, a CLI config beside it, and a programmable
- * `claude`. Registers its own `beforeEach` / `afterEach`.
- *
- * The `spawnSync` mock itself stays in the calling file, because `vi.mock` is
- * hoisted per module and cannot be registered from here.
+ * Everything the plugin suites need: a temp HOME torn down per test, a CLI
+ * config beside it, a programmable `claude`, its own `beforeEach`/`afterEach`.
+ * The `spawnSync` mock stays in the calling file (`vi.mock` hoists per module).
  */
 export function installClaudePluginHarness({
   spawnSyncMock,

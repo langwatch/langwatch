@@ -1,10 +1,7 @@
 /**
- * The one HTTP client every request to the LangWatch API goes through. It sends
- * with `redirect: "manual"` because the global `fetch` turns a POST into a GET and
- * drops its body on a 301/302, silently losing the event. GET/HEAD follow up to
- * `MAX_FOLLOW_HOPS` same-method redirects, dropping credential headers unless a hop
- * only upgrades http to https on the same host/port; every other method follows one
- * such redirect, replaying the method/headers/body. Refusal throws `LangWatchRedirectError`.
+ * The one HTTP client every LangWatch API request goes through, with
+ * `redirect: "manual"` since the global `fetch` turns a POST into a GET on
+ * a redirect. GET/HEAD follow up to `MAX_FOLLOW_HOPS`; refusal throws.
  */
 import { ConsoleLogger, type Logger } from "../../logger";
 
@@ -86,23 +83,18 @@ const abortError = (signal: AbortSignal): Error => {
 };
 
 /**
- * Releases the unread copy of a request body. `Request.clone` tees the body
- * stream, and a branch nobody reads holds every chunk the other branch consumes
- * in memory, so the replay's unused copy is cancelled to avoid buffering a
- * streamed upload whole. Never awaited: a tee's `cancel` promise only settles
- * once both branches are cancelled, and the sent branch is still live.
+ * Releases the unread copy of a request body. `Request.clone` tees the
+ * stream, so the unused copy is cancelled without buffering a streamed
+ * upload whole. Never awaited -- `cancel` settles once both branches are done.
  */
 const discard = (spare: Request | null): void => {
   void spare?.body?.cancel().catch(() => undefined);
 };
 
 /**
- * The body bytes to replay, read under the caller's signal.
- *
- * A `Request` built from a stream hands its copy over as a stream too, and
- * reading one that never ends would leave the call pending for good, past an
- * abort the caller already made. The read races the signal and cancels the
- * copy it loses to, so an aborted call settles.
+ * The body bytes to replay, read under the caller's signal. A stream-backed
+ * `Request`'s copy is a stream too, so the read races the signal and
+ * cancels the copy it loses to, letting an aborted call settle.
  */
 const replayBody = async ({
   spare,
@@ -230,11 +222,9 @@ const refusalOf = ({
   });
 
 /**
- * What `fetch(input, init)` would send, as one request both sends read from.
- * `init` wins over a `Request` input field by field, so reading the raw input
- * for the replay would resend a method, headers or body the caller overrode.
- * A plain URL input stays null: the non-Request path keeps `init` as it is, so
- * a stream body reaches the transport untouched.
+ * What `fetch(input, init)` would send, as one request both sends read
+ * from. `init` wins field-by-field over a `Request` input, so reading raw
+ * input would resend an overridden field. A plain URL input stays null.
  */
 const effectiveRequest = ({
   input,

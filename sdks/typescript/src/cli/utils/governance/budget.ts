@@ -22,12 +22,9 @@ export interface CheckBudgetOptions {
 }
 
 /**
- * Returns the 402 payload if the user is currently blocked, null
- * otherwise. 404 is treated as "older self-hosted server doesn't
- * expose this endpoint yet — pass through" so the CLI degrades
- * gracefully against legacy deploys. Network/5xx/etc. also
- * pass-through (the gateway's own 402 will surface via the wrapped
- * tool's error rendering as a fallback).
+ * Returns the 402 payload if blocked, null otherwise. 404 passes through
+ * (older self-hosted server), as do network/5xx -- the gateway's own 402
+ * surfaces via the tool's error rendering as fallback.
  */
 export async function checkBudget(
   cfg: GovernanceConfig,

@@ -16,10 +16,9 @@ export interface DefinitionFlags {
 export class ChartInputError extends Error {}
 
 /**
- * Parses one repeatable `--param key=value` flag. Values that read as JSON
- * scalars are sent as those scalars (`--param since=7` binds a number,
- * `--param active=true` a boolean) so a saved parameter keeps the type the
- * statement's placeholder declares; anything else is sent as the string.
+ * Parses one repeatable `--param key=value` flag. JSON-scalar-shaped values
+ * (`since=7`, `active=true`) send as that scalar so a saved parameter keeps
+ * its placeholder's type; anything else sends as the string.
  */
 export const parseParameterFlags = (flags: string[]): Record<string, ChartParameterValue> => {
   const parameters: Record<string, ChartParameterValue> = {};
@@ -54,10 +53,8 @@ const coerceScalar = (raw: string): ChartParameterValue => {
 
 /**
  * Resolves the definition flags into the request's definition, or undefined
- * when no definition flag was supplied at all (an update touching only the
- * name). `--sql` and `--sql-file` are mutually exclusive; a definition needs
- * one of them, because parameters and a specification mean nothing without
- * the statement they belong to.
+ * when none was supplied (an update touching only the name). `--sql` and
+ * `--sql-file` are mutually exclusive; a definition needs one of them.
  */
 export const resolveDefinitionInput = (
   flags: DefinitionFlags,

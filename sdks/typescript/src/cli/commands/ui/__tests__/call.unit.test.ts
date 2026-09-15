@@ -183,11 +183,9 @@ describe("the ui call command", () => {
   });
 
   /**
-   * The failure used to be written to stderr as the platform's REST envelope,
-   * which is not the document this CLI's readers parse. The panel's tool card
-   * therefore fell back to printing the whole thing, so a customer watching
-   * Langy work saw a wall of escaped JSON with the one useful sentence buried
-   * in the middle of it.
+   * The failure used to be written to stderr as the platform's REST
+   * envelope, not the document this CLI's readers parse, so the panel's
+   * tool card fell back to printing a wall of escaped JSON.
    */
   describe("given the platform refuses the action", () => {
     /** @scenario "A refused action reaches the reader as a sentence, not the wire envelope" */
@@ -232,9 +230,8 @@ describe("the ui call command", () => {
 
   /**
    * The page claims an action and carries it out before it answers, so a
-   * failed dispatch is the ANSWER going missing rather than the work. A caller
-   * told only that the request failed retries, and a retried duplicate leaves
-   * a second column beside the one that was made.
+   * failed dispatch is the ANSWER going missing, not the work. A caller told
+   * only "failed" retries, leaving a duplicate column beside the real one.
    */
   describe("given the dispatch fails after the page may have acted", () => {
     /** @scenario "A failed dispatch says the action may still have applied" */

@@ -191,10 +191,9 @@ export {
 } from "./client-sdk/services/gateway-budgets/gateway-budgets-api.service";
 
 /**
- * Provisioning teams and projects, the two things an integration has to
- * create before anything else exists to write to. Both families want an
- * organization API key; creating a project also mints that project's own
- * service API key, served once in the create response.
+ * Provisioning teams and projects, the two things an integration creates
+ * before anything else exists to write to. Both want an organization API
+ * key; creating a project also mints its own service API key, once.
  */
 export {
   TeamsApiService,
@@ -222,10 +221,9 @@ export const logger = {
 };
 
 /**
- * The HTTP client every SDK request to the LangWatch API goes through. It
- * follows a redirect only when it upgrades http to https on the same URL and
- * refuses every other one with `LangWatchRedirectError`. `createLangWatchFetch`
- * builds one over another transport or logger.
+ * The HTTP client every SDK request goes through, following a redirect
+ * only when it upgrades http to https on the same URL, refusing every
+ * other one with `LangWatchRedirectError`.
  */
 export {
   langwatchFetch,

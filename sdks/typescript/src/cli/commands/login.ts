@@ -80,11 +80,8 @@ const updateEnvFile = (apiKey: string): { created: boolean; updated: boolean; pa
 };
 
 /**
- * Headless guidance for project login. A browser device-code poll can wait
- * up to ten minutes for an approval that can never happen in a VM or CI,
- * which reads as a hang to an agent, so a non-TTY `--project` (and the
- * non-TTY no-flags default that routes here) fails fast and names every
- * non-interactive path instead.
+ * Headless guidance for project login: a device-code poll can hang ten
+ * minutes in a VM/CI, so a non-TTY caller fails fast and names every path.
  * Spec: specs/ai-governance/cli-onboarding/login-unified.feature
  */
 const failFastHeadlessProjectLogin = (): never => {
@@ -110,10 +107,9 @@ const failFastHeadlessProjectLogin = (): never => {
 };
 
 /**
- * Non-interactive project login: `langwatch login --project <slug>` trades
- * the device session for the named project's EXISTING API key over
- * POST /api/auth/cli/project-key (write access enforced server-side) and
- * writes it to $CWD/.env. No browser, no prompts, works headless.
+ * Non-interactive project login: trades the device session for the named
+ * project's existing API key over POST /api/auth/cli/project-key and writes
+ * it to $CWD/.env. No browser, no prompts, works headless.
  */
 const loginToProjectBySlug = async (slug: string): Promise<void> => {
   const cfg = loadConfig();
@@ -216,12 +212,9 @@ export const loginCommand = async (options?: {
       return;
     }
 
-    // --project: force PROJECT login (a project SDK key into $CWD/.env).
-    // Symmetric to --device. With a slug, the key is resolved through the
-    // device session with no browser at all, which is the headless/agent
-    // path. Without a slug, the project is picked in the browser, so a
-    // terminal with no TTY fails fast instead of blocking on an approval
-    // that cannot happen.
+    // --project: force PROJECT login, symmetric to --device. With a slug,
+    // the key resolves through the device session with no browser (headless
+    // path); without one, a non-TTY terminal fails fast instead of blocking.
     if (typeof options?.project === "string") {
       await loginToProjectBySlug(options.project);
       return;
@@ -257,13 +250,10 @@ export const loginCommand = async (options?: {
       return;
     }
 
-    // Interactive mode (no flags). On a non-TTY context (CI, an agent's
-    // piped stdin) we cannot prompt. Erroring here used to nudge agents
-    // toward `--device`, which signs them into a personal device-session and
-    // silently routed their evaluations to a personal project. Default to
-    // PROJECT login instead: it writes a real project's key to `.env`, which
-    // is what the SDK, `langwatch eval`, and the skills expect. AI-tools
-    // login stays explicit behind `--device`.
+    // Interactive mode, non-TTY (CI, agent piped stdin): default to PROJECT
+    // login, writing a real project's key to `.env` as the SDK and skills
+    // expect. AI-tools login stays explicit behind `--device` now, which
+    // used to be the nudge here and silently routed evals to a personal project.
     if (!process.stdin.isTTY) {
       console.log(
         chalk.gray(
@@ -287,12 +277,9 @@ export const loginCommand = async (options?: {
     console.log(chalk.blue("🔐 LangWatch Login"));
     console.log();
 
-    // Q1 — endpoint (cloud vs self-hosted). Skipped if --endpoint was
-    // passed (already persisted above). The chosen endpoint is persisted to
-    // ~/.langwatch/config.json on EVERY branch so the subsequent
-    // `runUnifiedLoginFlow`/`runDeviceFlowLogin` call (which reads
-    // control_plane_url directly) and every later CLI command's resolver read
-    // target the right host with no env-vs-config ambiguity.
+    // Q1 -- endpoint (cloud vs self-hosted), skipped if --endpoint was
+    // passed. Persisted to ~/.langwatch/config.json on every branch so the
+    // login call and every later resolver target the right host.
     if (!options?.endpoint) {
       // When the user already resolved a non-cloud endpoint (local dev or a
       // self-hosted deployment via LANGWATCH_ENDPOINT or persisted config),

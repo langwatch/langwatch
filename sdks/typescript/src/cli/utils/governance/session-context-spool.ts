@@ -1,10 +1,7 @@
 /**
- * Declarations that could not be delivered, held for a seam that can. Codex's
- * sandboxed shell has no network, but its notify program (and claude's hooks)
- * run outside it, so a declaration is queued here and drained by the next
- * seam that reports for the session. Newest replaces pending per
- * agent+session; entries older than an hour are dropped unsent. Falls back
- * to the temp directory, trusted only when it belongs to this user alone.
+ * Declarations that could not be delivered, held for a seam that can.
+ * Codex's sandboxed shell has no network, but its notify program runs
+ * outside it, so a declaration queues here and drains on the next seam.
  */
 
 import * as fs from "node:fs";
@@ -212,11 +209,9 @@ export function pruneSpool({ stateDir, now }: { stateDir: string; now: () => num
 }
 
 /**
- * Send every queued declaration, newest per session, and record what landed.
- *
- * Returns how many were delivered. Never throws and never reports failure to
- * the caller in a way that could change its exit status: a seam's own work
- * has already succeeded by the time this runs.
+ * Sends every queued declaration, newest per session, recording what
+ * landed. Never throws or reports failure in a way that changes exit
+ * status -- a seam's own work has already succeeded by the time this runs.
  */
 export async function drainSessionContextSpool({
   stateDir,

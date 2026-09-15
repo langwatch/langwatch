@@ -58,10 +58,9 @@ export class ProjectsApiError extends Error {
     public readonly operation: string,
     public readonly originalError?: unknown,
     /**
-     * The status the platform answered with. Callers that resolve a
-     * `--project` selector through the listing branch on it: a 401/403 means
-     * the credential cannot see the listing at all, which is a different
-     * answer to the user than "no project of yours matches this name".
+     * The status the platform answered with. A 401/403 means the credential
+     * cannot see the listing at all -- a different answer than "no project
+     * of yours matches this name".
      */
     public readonly status?: number,
   ) {
@@ -80,11 +79,9 @@ export class ProjectsApiService {
   }
 
   /**
-   * Bearer, never the project-pinned Basic shape the data routes use. The
-   * listing is the question "which projects can this credential see?", so
-   * naming one project in the header would scope the answer to that project
-   * and defeat the call — including the `--project <slug>` lookup, which reads
-   * the listing precisely because it does not know the id yet.
+   * Bearer, never the project-pinned Basic shape: the listing asks "which
+   * projects can this credential see?", so naming one project in the header
+   * would scope the answer and defeat the call, including `--project <slug>`.
    */
   private headers(): Record<string, string> {
     return {

@@ -11,11 +11,9 @@ import type { CommandResult } from "../../utils/output.ts";
 import { langwatchFetch } from "@/internal/http/langwatchFetch";
 
 /**
- * Returns the updated secret's metadata rather than printing it: the output
- * port renders it in whatever format the caller asked for (utils/output.ts).
- * The new VALUE the caller passed in `--value` is not echoed into the payload
- * — the server does not return it, and a machine payload must not reintroduce
- * key material the human output never showed.
+ * Returns the updated secret's metadata rather than printing it (output
+ * port renders per-format). The new `--value` is not echoed back -- the
+ * server doesn't return it, so a machine payload can't leak key material.
  */
 export const updateSecretCommand = async (
   id: string,

@@ -18,10 +18,9 @@ type TeamAssignment = InviteInput["teams"][number];
 const EMAIL_SHAPE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /**
- * One invited address, refused before the batch is sent.
- *
- * An invite batch is all-or-nothing at the platform, so one mistyped address
- * costs the caller the whole run. `source` names which one was wrong.
+ * One invited address, refused before the batch is sent. An invite batch is
+ * all-or-nothing at the platform, so one mistyped address costs the caller
+ * the whole run; `source` names which one was wrong.
  */
 const parseEmail = ({ value, source }: { value: string; source: string }): string => {
   const email = value.trim();
@@ -184,9 +183,8 @@ const parseInviteEntry = ({ entry, index }: { entry: unknown; index: number }): 
 
 /**
  * The invite batch a JSON document describes. Both the bare array and the
- * `{ invites: [...] }` envelope are accepted, because the first is what a
- * person writes and the second is what the API answers with, and pasting back
- * a previous response is the obvious thing to try.
+ * `{ invites: [...] }` envelope are accepted -- the first is what a person
+ * writes, the second what the API answers with (pasting one back is obvious).
  */
 export const parseInvitesJson = (raw: string): InviteInput[] => {
   let parsed: unknown;

@@ -4,11 +4,9 @@ import type { CommandResult } from "../../utils/output";
 import { evaluatorTypeCatalog } from "./catalog";
 
 /**
- * Lists every evaluator type `evaluator create --type` (and the platform's
- * create route) accepts. Reads the catalog embedded at build — no API call
- * and no API key, so the answer is there even before login. Returns the
- * listing rather than printing it: the output port renders it in whatever
- * format the caller asked for (utils/output.ts).
+ * Lists every evaluator type `evaluator create --type` accepts, from the
+ * catalog embedded at build -- no API call, so the answer exists even
+ * before login. Returns the listing; the output port renders it per-format.
  */
 export const listEvaluatorTypesCommand = (): CommandResult => {
   const entries = evaluatorTypeCatalog();

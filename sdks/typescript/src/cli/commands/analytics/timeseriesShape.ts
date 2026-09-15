@@ -31,12 +31,9 @@ export interface TimeseriesShape {
 }
 
 /**
- * What a metric is measured IN, read off the metric path the caller asked for.
- *
- * Off the METRIC, deliberately — never off the values. A day whose costs happen
- * to land between 0 and 1 is not a percentage, and a renderer sniffing the
- * numbers would decide it was. The metric path is a declaration; the values are
- * a coincidence.
+ * What a metric is measured IN, read off the metric path, never off the
+ * values -- a day whose costs land between 0 and 1 is not a percentage. The
+ * metric path is a declaration; the values are a coincidence.
  */
 export function unitFor(metric: string): TimeseriesShape["unit"] {
   if (/cost/i.test(metric)) return "usd";
@@ -54,9 +51,8 @@ export function humanMetric(metric: string): string {
 }
 
 /**
- * The measure in a bucket. Everything except `date` is a measure; with a
- * `groupBy` there are several, and they are summed — the chart is one line per
- * period, and a total is the only reading of several groups that is true
+ * The measure in a bucket: everything except `date`. With a `groupBy` there
+ * are several, summed -- a total is the only reading that stays true
  * regardless of which groups happened to be present on a given day.
  */
 function valueOf(bucket: AnalyticsBucket): number {

@@ -1,9 +1,6 @@
 /*
-  This file contains the semantic conventions for attributes either owned by LangWatch, or
-  which are no yet part of the OpenTelemetry semantic conventions for Gen AI.
-
-  Any that are not yet part of the OpenTelemetry semantic conventions for Gen AI are
-  marked with an UNSTABLE_ prefix.
+  Semantic conventions for attributes owned by LangWatch, or not yet part of
+  OpenTelemetry's Gen AI conventions. The latter get an UNSTABLE_ prefix.
 */
 
 /**
@@ -97,9 +94,7 @@ export const ATTR_LANGWATCH_USER_ID = "langwatch.user.id";
 export const ATTR_LANGWATCH_LABELS = "langwatch.labels";
 
 /**
- * LangWatch tags attribute key
- * Used to store tags for a span or event
- *
+ * LangWatch tags attribute key, used to store tags for a span or event.
  * @deprecated: Please use `ATTR_LANGWATCH_LABELS`.
  */
 export const ATTR_LANGWATCH_TAGS = "langwatch.labels";

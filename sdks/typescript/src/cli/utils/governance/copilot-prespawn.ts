@@ -1,10 +1,7 @@
 /**
- * Copilot pre-spawn checks: mode-independent, warn-and-continue warnings for the two conditions
- * that make copilot telemetry silently incomplete (ADR-039 Decisions 8 + 9) — an org-wide managed
- * OTel collector overriding the wrapper's env vars (device layer only; the server layer needs
- * live auth and can't be preflighted from disk), and an old Copilot CLI exporting an incomplete
- * OTel set. Live outside preflightWrapper because preflight only runs on the gateway branch,
- * while copilot's default path is ingestion — gateway-only placement would skip most runs.
+ * Copilot pre-spawn checks: warn-and-continue for two conditions that make
+ * telemetry silently incomplete (ADR-039 Decisions 8+9). Lives outside
+ * preflightWrapper since copilot's default path is ingestion, not gateway.
  */
 
 import { spawnSync } from "node:child_process";
@@ -37,11 +34,8 @@ export function copilotManagedSettingsPaths(
 }
 
 /**
- * Whether a managed-settings file (or policy.d document) pins OTel
- * config. Key names observed in the 1.0.69 bundle's managed shape:
- * `enabled`, `endpoint`, `protocol`, `headers`, `captureContent`,
- * `lockCaptureContent`, `serviceName` under an otel section — a plain
- * substring probe for "otel" keeps this robust to schema evolution
+ * Whether a managed-settings file (or policy.d document) pins OTel config.
+ * A plain substring probe for "otel" keeps this robust to schema evolution
  * while never flagging a file that only manages permissions.
  */
 function fileMentionsOtel(filePath: string): boolean {
@@ -145,11 +139,9 @@ export function copilotPrespawnWarnings(opts: CopilotPrespawnOptions = {}): stri
 }
 
 /**
- * Gateway mode routes copilot through its BYOK provider env (COPILOT_PROVIDER_*), and GitHub
- * documents COPILOT_MODEL as REQUIRED for BYOK — without a model, copilot fails with an opaque
- * error before any traffic reaches the gateway. Returns an actionable message when no model is
- * resolvable from the args or environment, else null. Gateway-only: the ingestion (direct-OTLP)
- * path runs copilot on its seat with its own model selection and needs no model here.
+ * Gateway mode routes copilot through BYOK provider env, and GitHub
+ * requires COPILOT_MODEL for BYOK -- without it copilot fails opaquely.
+ * Returns an actionable message when no model resolves, else null.
  */
 export function copilotGatewayModelPreflight(opts: {
   args: string[];

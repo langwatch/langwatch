@@ -23,10 +23,9 @@ import {
 const DEFAULT_BACKFILL_HOURS = 24;
 
 /**
- * How far back to sweep when codex ran us but the payload was unreadable. Short
- * on purpose: the fallback exists so an unparseable payload still captures the
- * turn that just ended, not so it re-reads the user's whole history on a hook
- * that fires after every single turn.
+ * How far back to sweep when the payload was unreadable. Short on purpose:
+ * the fallback captures the turn that just ended, not the user's whole
+ * history, on a hook that fires after every turn.
  */
 const NOTIFY_FALLBACK_MS = 30 * 60 * 1000;
 
@@ -48,10 +47,9 @@ interface TurnCompletePayload {
 }
 
 /**
- * Where the recovered content is posted, read back from the codex config the
- * user already enabled capture in. Null when capture is not on, which is the
- * honest answer: with no endpoint and key persisted, codex is not exporting
- * spans either, so there is no trace for this content to join.
+ * Where recovered content is posted, read from the codex config capture was
+ * enabled in. Null when capture isn't on: with no endpoint/key persisted,
+ * codex isn't exporting spans either, so there's no trace to join.
  */
 function resolveTarget(configPath: string): {
   endpoint: string;

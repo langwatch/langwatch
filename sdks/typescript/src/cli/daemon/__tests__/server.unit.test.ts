@@ -77,13 +77,10 @@ describe("unlinkIfSameFile", () => {
       it("leaves the replacement alone", () => {
         const mine = identify(filePath);
 
-        // Hold the original inode open for the duration, which is what the real
-        // daemon does — its socket is still bound while it decides whether to
-        // unlink the shared name. That is load-bearing, not test scaffolding:
-        // an inode with no remaining reference is free for immediate reuse, and
-        // Linux DOES reuse the number, so without a live handle the successor's
-        // file can land on the same (dev, ino) and the guard cannot tell the two
-        // apart. Keeping ours open is what makes the identity meaningful.
+        // Holds the original inode open, as the real daemon does while
+        // deciding to unlink. Load-bearing, not scaffolding: an inode with no
+        // reference is free for reuse, and Linux DOES reuse it, so a live
+        // handle is what lets the guard tell two files on the same (dev, ino) apart.
         const held = fs.openSync(filePath, "r");
         try {
           // What a successor daemon does: unlink the corpse, bind its own.
@@ -120,12 +117,9 @@ describe("unlinkIfSameFile", () => {
   });
 
   /**
-   * A LIVE symlink is the case `stat` gets quietly wrong. `stat` succeeds on
-   * it, so the identity recorded is the TARGET's inode — while `unlink(2)`
-   * removes the LINK. The guard would then be authorising a removal against an
-   * inode the removal does not touch, which is wrong in both directions: two
-   * different links to one target compare equal, and one link repointed between
-   * the identify and the unlink compares unequal.
+   * A LIVE symlink is the case `stat` gets quietly wrong: it records the
+   * TARGET's inode while `unlink(2)` removes the LINK, so the guard would
+   * authorise a removal against an inode it never touches.
    */
   describe("given a live symlink standing where the socket should be", () => {
     let target: string;

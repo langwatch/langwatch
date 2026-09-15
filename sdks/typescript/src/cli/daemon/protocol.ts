@@ -1,8 +1,7 @@
 /**
  * Wire protocol between the CLI client and the daemon: newline-delimited
  * JSON, output chunks base64'd (stdout isn't guaranteed valid UTF-8). One
- * connection carries exactly one request. Dependency-free (node builtins
- * only) — it loads on the client's hot path, on every CLI invocation.
+ * connection, one request. Dependency-free -- it loads on every invocation.
  */
 import { StringDecoder } from "node:string_decoder";
 
@@ -20,11 +19,9 @@ export interface HelloFrame {
   /** Human-readable CLI version of the *client*, for error messages. */
   cliVersion: string;
   /**
-   * Identity of the CODE the client is running: version + entrypoint size/mtime.
-   * Must equal the daemon's, or the daemon is stale and gets evicted. See
-   * `resolveBuildId` — the semver alone does not move when a bundle is rebuilt
-   * or reinstalled, and a daemon serving yesterday's code is the worst bug this
-   * feature can have.
+   * Identity of the CODE the client is running: version + entrypoint
+   * size/mtime. Must equal the daemon's, or it is stale and gets evicted --
+   * the semver alone does not move when a bundle is rebuilt. See `resolveBuildId`.
    */
   build: string;
   /** sha256 of (endpoint, apiKey, uid). See identity.ts. */
@@ -106,11 +103,9 @@ export interface ExitFrame {
 }
 
 /**
- * Daemon -> client: "I cannot serve this faithfully, run it yourself."
- *
- * Only ever sent BEFORE any `out`/`err` frame, so the client can fall back
- * with zero risk of duplicated output. Used when the caller's cwd vanished,
- * or when a future daemon wants to decline a command it does not support.
+ * Daemon -> client: "I cannot serve this faithfully, run it yourself." Only
+ * ever sent BEFORE any `out`/`err` frame, so the client falls back with zero
+ * risk of duplicated output.
  */
 export interface FallbackFrame {
   t: "fallback";
@@ -148,10 +143,9 @@ export function encodeFrame(frame: AnyFrame): string {
 }
 
 /**
- * Incremental newline-delimited-JSON reader.
- *
- * Socket reads split anywhere, so a frame can arrive across several chunks
- * and several frames can arrive in one. Feed raw buffers, get whole frames.
+ * Incremental newline-delimited-JSON reader: socket reads split anywhere, so
+ * a frame can span several chunks and several frames can arrive in one.
+ * Feed raw buffers, get whole frames.
  */
 export class FrameDecoder<T extends AnyFrame = AnyFrame> {
   private buffer = "";

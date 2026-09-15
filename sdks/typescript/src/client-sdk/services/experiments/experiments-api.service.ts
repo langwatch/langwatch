@@ -49,12 +49,9 @@ export const toRunStartRequest = ({
 };
 
 /**
- * `GET /api/v1/experiments/runs/{runId}` is declared `withRawResponse`
- * (`modules/experiment/server/src/transport/experiment-v3.rest.ts:430`), so
- * `assertSchemaAnswerFree` forbids it from publishing a response schema and no
+ * `GET /api/v1/experiments/runs/{runId}` is `withRawResponse`, so no
  * document will ever type this body. Restored from the last document that
- * had it (`openapi-document.json` at `0a0f549cfd^`), not invented from a call
- * site.
+ * had it (`openapi-document.json` at `0a0f549cfd^`), not invented.
  */
 export interface ExperimentRunStatusResponse {
   runId: string;
@@ -252,10 +249,9 @@ export type ExperimentCreateResponse =
   paths["/api/v1/experiments"]["post"]["responses"]["200"]["content"]["application/json"];
 
 /**
- * These endpoints are all declared `withRawResponse`, so none of their
- * responses come from the document — restored from the last document that
- * had them. The read answers one of two shapes, chosen by the `fields` query:
- * `state` is what splits the union the overloads promise.
+ * These endpoints are all `withRawResponse`, restored from the last
+ * document that had them. The read answers one of two shapes, chosen by
+ * `fields`: `state` splits the union the overloads promise.
  */
 export interface ExperimentWorkbenchStateResponse {
   id: string;

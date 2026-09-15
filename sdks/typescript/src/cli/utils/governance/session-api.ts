@@ -1,8 +1,7 @@
 /**
  * Session-authenticated calls that trade the device session for project
- * credentials, refreshing an expired token first via the shared
- * `session-refresh.ts` so concurrent CLI processes resolve consistently.
- * Only a server rejection drops the stored tokens; a network failure leaves them alone.
+ * credentials, refreshing an expired token via `session-refresh.ts`. Only
+ * a server rejection drops stored tokens; a network failure leaves them.
  */
 
 import { normalizeEndpoint } from "../../../internal/endpoint";
@@ -16,11 +15,9 @@ export interface SessionApiOptions {
 }
 
 /**
- * Deadline on every session-authenticated request (including the token
- * refresh it may perform). The credential resolver awaits these calls on
- * every command once the revalidation window lapses; without a bound, a
- * black-holed control plane would hang every CLI command instead of letting
- * the resolver fall back to the cached key.
+ * Deadline on every session-authenticated request, including any token
+ * refresh. Without a bound, a black-holed control plane would hang every
+ * CLI command instead of letting the resolver fall back to the cached key.
  */
 export const SESSION_REQUEST_TIMEOUT_MS = 10_000;
 
@@ -53,10 +50,9 @@ function isExpired(cfg: GovernanceConfig): boolean {
 }
 
 /**
- * Rotate the stored token pair via POST /api/auth/cli/refresh and persist it.
- * Returns false when the session is revoked or unrefreshable, in which case
- * the dead tokens (and the personal project cache tied to them) are cleared
- * so `isLoggedIn` honestly reports logged-out from here on.
+ * Rotates the stored token pair via POST /api/auth/cli/refresh. Returns
+ * false when revoked or unrefreshable, clearing the dead tokens (and tied
+ * personal project cache) so `isLoggedIn` honestly reports logged-out.
  */
 async function refreshSession(cfg: GovernanceConfig, opts: SessionApiOptions): Promise<boolean> {
   const outcome = await sharedRefreshSession(cfg, {
@@ -65,11 +61,9 @@ async function refreshSession(cfg: GovernanceConfig, opts: SessionApiOptions): P
   if (outcome.status === "refreshed") return true;
 
   // Only a server rejection means the session is genuinely gone. Rotation is
-  // single-use, so a sibling CLI process that refreshed first would otherwise
-  // look like a revocation from here; the shared refresh already re-read the
-  // config and retried with whatever the sibling persisted before reporting
-  // this, so clearing now cannot wipe a live token. A network failure clears
-  // nothing: the tokens may be perfectly good.
+  // single-use, so the shared refresh already re-read and retried with a
+  // sibling's persisted tokens before reporting this -- clearing now can't
+  // wipe a live token. A network failure clears nothing.
   if (outcome.status === "rejected") {
     delete cfg.access_token;
     delete cfg.refresh_token;
@@ -166,9 +160,8 @@ export interface SessionProjectKey {
 }
 
 /**
- * Non-interactive project login: resolve a shared project's existing API key
- * by slug through the device session. Server enforces write access and
- * refuses other users' personal projects; the error_description is carried
+ * Non-interactive project login: resolves a shared project's existing API
+ * key by slug through the device session. error_description is carried
  * through so the CLI can show the server's own sentence.
  */
 export async function fetchProjectKeyBySlug(

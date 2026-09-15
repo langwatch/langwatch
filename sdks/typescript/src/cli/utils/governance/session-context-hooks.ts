@@ -1,10 +1,7 @@
 /**
  * The command-hook entries that make a session report the repository it ran
- * in, merged into whichever agent's hook file declares them (shape and
- * per-agent facts live in `TARGETS`). Ownership doctrine, as elsewhere: an
- * entry is ours only when the command it runs is one of ours — every other
- * entry is read past and written back untouched, so installing or logout
- * never touches the user's own hooks.
+ * in. Ownership doctrine: an entry is ours only when the command it runs is
+ * one of ours -- every other entry is read past and written back untouched.
  */
 
 import * as fs from "node:fs";
@@ -30,9 +27,8 @@ const OWNED_COMMAND_PREFIX = "langwatch ingest hook";
 
 /**
  * The guidance hook that injects the declare-your-context text as
- * SessionStart additionalContext, for a claude without plugin support (the
- * plugin's launcher runs the same command). Installed and removed with the
- * session hooks.
+ * SessionStart additionalContext, for a claude without plugin support.
+ * Installed and removed with the session hooks.
  */
 const GUIDANCE_COMMAND_PREFIX = "langwatch ingest guidance";
 
@@ -101,12 +97,9 @@ export interface SessionContextHooksInstallResult extends HooksTarget {
 }
 
 /**
- * Merge the session-context hooks into the tool's hook file, creating it and
- * its directory when missing. Idempotent: running twice leaves exactly one
- * entry per event, and reports `unchanged` the second time.
- *
- * Throws when an existing file cannot be read as a JSON object: the write
- * replaces it wholesale, and the user's own hooks live in there too.
+ * Merges the session-context hooks into the tool's hook file, creating it
+ * when missing. Idempotent -- reports `unchanged` the second run. Throws
+ * when the existing file isn't a JSON object.
  */
 export function installSessionContextHooks({
   tool,
@@ -154,10 +147,9 @@ export function hasSessionContextHooks({
 }
 
 /**
- * Strip every langwatch hook entry from the tool's hook file, leaving the
- * user's own entries exactly as they were; an event left with no entries
- * loses its key so removal leaves no residue. A file we cannot parse is left
- * alone rather than rewritten. Returns true when the file changed.
+ * Strips every langwatch hook entry, leaving the user's own entries exactly
+ * as they were; an event left with none loses its key so removal leaves no
+ * residue. An unparseable file is left alone. Returns whether it changed.
  */
 export function removeSessionContextHooks({
   tool,
@@ -229,12 +221,9 @@ function mergeHookEntries({
 }
 
 /**
- * No matcher: every session start counts, whatever started it. Still ONE
- * entry per event: claude's SessionStart carries the guidance hook as a
- * second command in the same entry, so the one-entry invariant (and the
- * removal that rides on it) holds for both commands. Only claude takes the
- * guidance: codex hook output never reaches the model, so its guidance
- * rides the AGENTS.md block instead.
+ * No matcher: every session start counts. Still ONE entry per event --
+ * claude's SessionStart carries the guidance hook as a second command, so
+ * removal holds for both. Codex's guidance rides the AGENTS.md block instead.
  */
 function sessionContextHookEntry(
   tool: HookedTool,

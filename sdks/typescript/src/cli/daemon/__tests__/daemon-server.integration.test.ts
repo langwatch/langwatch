@@ -1,10 +1,7 @@
 /**
- * Integration tests over a real Unix domain socket.
- *
- * The command executor is injected, so these drive the parts that must not
- * break — handshake, framing, identity, lifecycle, cancellation, fallback —
- * without commander or the network in the picture. The real CLI running through
- * a real daemon is covered by daemon-cli.integration.test.ts.
+ * Integration tests over a real Unix domain socket, driving handshake,
+ * framing, identity, lifecycle, cancellation and fallback without commander.
+ * The full CLI-through-daemon path is covered elsewhere.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import * as fs from "node:fs";
@@ -213,10 +210,9 @@ describe("daemon over a unix socket", () => {
   });
 
   /**
-   * A symlink is not a squat here — inside our own 0700 directory nobody else could have put it
-   * there — but a DANGLING one is invisible to `stat`, so `link(2)` still sees the name as taken.
-   * That makes the daemon die at publish time with EEXIST, which `daemon.ts` reads as a lost
-   * start race and swallows: a permanent wedge with no output anywhere.
+   * A dangling symlink is invisible to `stat`, so `link(2)` still sees the
+   * name as taken and publish fails EEXIST, which `daemon.ts` reads as a
+   * lost start race and swallows -- a permanent wedge with no output.
    */
   describe("given a dangling symlink where the socket should be", () => {
     beforeEach(() => {
@@ -343,14 +339,10 @@ describe("daemon over a unix socket", () => {
 
     describe("when it shuts down", () => {
       it("unlinks its name while its socket is still bound, so the identity it matched cannot have been reused", async () => {
-        // The ORDER is the whole point, and it is invisible to an
-        // inode-comparison test: an orphan whose name is unlinked while it is
-        // still bound keeps its inode allocated, so a successor is handed a
-        // different number and the guard is right by luck rather than by rule.
-        // What the rule is actually for is the moment AFTER `close()`: the last
-        // reference is gone, the ino is free for immediate reuse (Linux reuses
-        // it readily), and a successor landing on it would be deleted by this
-        // daemon's own cleanup.
+        // The ORDER matters: unlinking while still bound keeps the inode
+        // allocated, so an inode-comparison test passes by luck. The real
+        // risk is AFTER close(): the inode frees for reuse, and a successor
+        // landing on it would be deleted by this daemon's own cleanup.
         const running = await startDaemon();
         expect(fs.statSync(socketPath).isSocket()).toBe(true);
 
@@ -799,11 +791,9 @@ describe("daemon over a unix socket", () => {
   });
 
   /**
-   * The daemon's whole trust model is filesystem permissions. The server half
-   * (0600 socket in a 0700 directory) is worthless if the CLIENT will talk to
-   * any socket at that path — it pipelines `exec` before the handshake is
-   * answered, so a squatter is handed the caller's args, cwd and forwarded
-   * LANGWATCH_* env, API key included.
+   * The daemon's trust model is filesystem permissions; the 0600/0700
+   * server half is worthless if the client talks to any socket at the
+   * path, pipelining `exec` before the handshake answers.
    */
   describe("given a socket the caller cannot trust", () => {
     describe("when its directory is writable by other users", () => {
@@ -869,13 +859,10 @@ describe("daemon over a unix socket", () => {
   describe("given somebody else already holds the socket path", () => {
     describe("when the real daemon tries to start", () => {
       it("names the squat instead of reporting a daemon that is already running", async () => {
-        // The DoS the trust check has to prevent. `isSocketAlive` used to
-        // connect blind, so a squatter binding the path first — reachable via
-        // LANGWATCH_DAEMON_DIR, XDG_RUNTIME_DIR or the tmp fallback — made
-        // `listen()` throw DaemonAlreadyRunningError, forever. Nothing is
-        // disclosed (no bytes are sent), but the daemon could never start again
-        // and nothing would ever say why: a permanent, silent denial of service.
-        // A stranger's listener, bound to our socket path first.
+        // The DoS this guards against: `isSocketAlive` used to connect
+        // blind, so a squatter binding the path first made `listen()` throw
+        // forever with no disclosure and no explanation -- a permanent,
+        // silent denial of service.
         const squatter = net.createServer();
         await new Promise<void>((resolve) => squatter.listen(socketPath, resolve));
         secureSocketFile(socketPath);
@@ -915,12 +902,9 @@ describe("daemon over a unix socket", () => {
   });
 
   /**
-   * The shape from a customer report: one `ui call` printed the runtime's
-   * crash banner, and the very next identical invocation printed NOTHING and
-   * was killed by the agent harness at 30 seconds. The daemon had accepted the
-   * exec and then wedged, output is held back until the command finishes, and
-   * the daemon's own per-request timeout is ten minutes, so the client waited
-   * with zero bytes written until something outside killed it.
+   * Customer shape: a `ui call` crashed, then the next invocation printed
+   * NOTHING and was killed at 30s -- the daemon had wedged mid-exec, output
+   * held back until the command finishes.
    */
   describe("given a daemon that accepts a command and then stops answering", () => {
     /** A daemon that takes the exec, writes nothing, and never finishes. */
@@ -1077,12 +1061,10 @@ describe("daemon over a unix socket", () => {
 
     describe("when the in-flight request has already flushed output to the caller", () => {
       it("reports the truncation honestly instead of pretending it can re-run", async () => {
-        // The case the drain-timeout guarantee does NOT cover. Once output
-        // crosses the client's buffer cap it is on the caller's real stdout,
-        // so the clean in-process re-run is off the table — re-running would
-        // print it twice. `trace search`, `analytics query` and any large
-        // `--format json` land here, and routine version-skew eviction
-        // (dispatch.ts requestStop) is what triggers it.
+        // What the drain-timeout guarantee does NOT cover: once output
+        // crosses the buffer cap it's already on the caller's real stdout,
+        // so a clean re-run would print it twice. Large `--format json`
+        // output lands here.
         const running = await startDaemon({
           shutdownGraceMs: 30,
           executor: (request): CommandExecution => {

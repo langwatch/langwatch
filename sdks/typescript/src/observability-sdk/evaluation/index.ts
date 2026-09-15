@@ -9,10 +9,8 @@ import { generate as generateKsuid } from "xksuid";
 import { ATTR_LANGWATCH_EVALUATION_CUSTOM } from "../semconv/attributes";
 
 /**
- * The status of a recorded evaluation.
- *
- * Mirrors the Python `Literal["processed", "skipped", "error"]` accepted by
- * `add_evaluation`.
+ * The status of a recorded evaluation, mirroring the Python
+ * `Literal["processed", "skipped", "error"]` accepted by `add_evaluation`.
  */
 export type EvaluationStatus = "processed" | "skipped" | "error";
 
@@ -62,10 +60,9 @@ export interface AddEvaluationParams {
 }
 
 /**
- * Error shape emitted in the evaluation payload.
- *
- * Matches the Python `capture_exception` output (`{ message, stacktrace }`),
- * which is the runtime-proven collector path.
+ * Error shape emitted in the evaluation payload, matching the Python
+ * `capture_exception` output (`{ message, stacktrace }`), the
+ * runtime-proven collector path.
  */
 interface EvaluationErrorCapture {
   message: string;
@@ -73,11 +70,9 @@ interface EvaluationErrorCapture {
 }
 
 /**
- * The JSON payload serialized into the `json_encoded_event` attribute.
- *
- * Keys are snake_case to match the Python `_EvaluationTypedDict` emitted by
- * `_add_evaluation`. All keys are always present (with `null` for absent
- * values), matching the Python behavior where every field is passed explicitly.
+ * The JSON payload serialized into the `json_encoded_event` attribute. Keys
+ * are snake_case to match the Python `_EvaluationTypedDict`; all keys are
+ * always present (`null` for absent values), matching Python's explicit-field behavior.
  */
 interface EvaluationEventPayload {
   evaluation_id: string;

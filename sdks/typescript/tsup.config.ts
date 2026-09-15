@@ -1,23 +1,18 @@
 import { defineConfig } from "tsup";
 import packageJson from "./package.json";
 
-// The card/domain-error contract is a source-only workspace package and a
-// devDependency, so it must be inlined rather than left as an import the
-// published `langwatch` tarball could never resolve. The pattern covers every
-// subpath the CLI takes (`/cards`, `/cards/handled-error`), not just the one
-// spelled here — a plain string would match a single specifier and silently
-// leave the others external.
-// zod is bundled, not external, and that is load-bearing rather than a size
-// tradeoff. The SDK validates its own API responses with zod 4 APIs
-// (`.loose()`, `z.core`). Left external, the specifier `zod` is resolved by
-// whoever consumes the SDK. A consumer-selected, incompatible runtime can then
-// replace the version the SDK was built and tested against, and the SDK dies with
-// `z.object(...).loose is not a function` at first import.
-//
-// Bundling is safe precisely because zod never crosses the public API as a
-// VALUE: every schema is internal to response validation, so no caller-owned
-// schema has to satisfy an instanceof against the SDK's copy. Making the
-// library carry its own runtime is what makes response validation deterministic.
+// The card/domain-error contract is a source-only workspace devDependency,
+// inlined because the published tarball could never resolve it. Covers every
+// subpath the CLI takes (`/cards`, `/cards/handled-error`), not just one.
+
+// zod is bundled, not external -- load-bearing, not a size tradeoff. The SDK
+// validates responses with zod 4 APIs (`.loose()`, `z.core`); left external, a
+// consumer's incompatible zod version dies with `z.object(...).loose is not a
+// function` at first import.
+
+// Safe because zod never crosses the public API as a VALUE: every schema is
+// internal to validation, so no caller-owned schema needs an instanceof
+// against the SDK's copy.
 const noExternal = [/^@langwatch\/langy(\/|$)/, /^zod(\/|$)/];
 
 // `__CLI_VERSION__` is a bare identifier in src/cli/program.ts.
@@ -27,12 +22,11 @@ const define = {
 
 export default defineConfig([
   {
-    // Library entries — the published SDK surface (`langwatch`,
-    // `langwatch/observability`, …). Dual format + dts, exactly as before.
-    //
-    // NOTE: no `clean` here — tsup builds the configs of this array
-    // CONCURRENTLY, so a clean in either would race the other build's output.
-    // The `build` script rm -rf's dist before invoking tsup instead.
+    // Library entries -- the published SDK surface (`langwatch`,
+    // `langwatch/observability`, ...). Dual format + dts, as before.
+
+    // NOTE: no `clean` here -- these configs build CONCURRENTLY and would
+    // race; the `build` script rm -rf's dist before invoking tsup instead.
     entry: [
       "src/index.ts",
       "src/observability-sdk/index.ts",
@@ -48,19 +42,14 @@ export default defineConfig([
     define,
   },
   {
-    // `langwatch/agent` — Node only, and built as a SEPARATE config object for
-    // that reason. `src/agent/transport.ts` loads the optional `ws` package
-    // with `createRequire(__filename)` so a runtime without it degrades to one
-    // message instead of failing while the module loads. In the ESM output
-    // `__filename` comes from `shims`, which spells it
-    // `fileURLToPath(import.meta.url)` and so needs both a target that keeps
-    // `import.meta` (the tsconfig target, es2017, replaces it with an empty
-    // object) and `node:url`. Both belong to this entry alone: shared with the
-    // library entries above, the shim would land in a chunk the
-    // browser-capable observability entries import.
-    //
-    // Object-form entry pins the output path, the way the CLI entry below
-    // does: a plain string entry would take src/agent as the outbase and emit
+    // `langwatch/agent` -- Node only, built as a SEPARATE config: it loads
+    // the optional `ws` package via `createRequire(__filename)` so a runtime
+    // without it degrades to one message instead of failing at import. Its
+    // ESM shim needs `import.meta`/`node:url`, kept out of shared chunks so
+    // browser-capable observability entries never import it.
+
+    // Object-form entry pins the output path, like the CLI entry below: a
+    // plain string entry would take src/agent as the outbase and emit
     // dist/index.js over the library's main entry.
     entry: { "agent/index": "src/agent/index.ts" },
     splitting: false,
@@ -75,47 +64,38 @@ export default defineConfig([
     define,
   },
   {
-    // CLI entry — only ever RUN as CJS (package.json `bin` →
-    // ./dist/cli/index.js), never imported as a library, so the ESM copy, the
-    // dts and the sourcemaps were pure tarball weight. Built as a SEPARATE
-    // config object, not another entry above: entries in one build share
-    // chunks, and a CJS-only entry must not share chunks with dual-format
-    // library entries (an ESM-only shared chunk would break `require`).
-    //
+    // CLI entry -- only ever RUN as CJS, never imported as a library, so the
+    // ESM copy, dts and sourcemaps were pure tarball weight. Built as a
+    // SEPARATE config: a CJS-only entry must not share chunks with
+    // dual-format library entries (an ESM-only chunk would break `require`).
+
     // `splitting: false` inlines the lazy command chunks into the single
-    // file — dynamic `import()` calls keep their lazy semantics (esbuild
-    // wraps them in promises), which is what keeps command modules and the
-    // lazy js-yaml load off the cold-start path.
-    // Object-form entry pins the output path: with a single string entry
-    // tsup would take src/cli as the outbase and emit dist/index.js,
-    // clobbering the library's main entry.
-    //
-    // The bundle emits as cli/bundle.js; `onSuccess` then writes the real
-    // cli/index.js as a tiny stub that enables Node's compile cache BEFORE
-    // the 600KB bundle is even parsed, and only then requires it. Enabling
-    // the cache from inside the bundle (src/cli/compileCache.ts) comes too
-    // late for the bundle's own ~10ms compile — V8 compiles the entry file
-    // before its first statement runs — so the entry must be a file that is
-    // not the bundle. The in-bundle enable stays as belt and braces for the
-    // Bun binary (which compiles src/cli/index.ts directly) and for anyone
-    // executing bundle.js straight.
+    // file -- dynamic `import()` keeps its lazy semantics (esbuild wraps it
+    // in promises), keeping command modules and the js-yaml load off cold-start.
+
+    // Object-form entry pins the output path: a single string entry would
+    // take src/cli as the outbase and emit dist/index.js, clobbering the
+    // library's main entry.
+
+    // The bundle emits as cli/bundle.js; `onSuccess` writes the real
+    // cli/index.js as a tiny stub enabling Node's compile cache BEFORE the
+    // 600KB bundle is parsed. Enabling it from inside the bundle comes too
+    // late -- V8 compiles the entry file before its first statement runs --
+    // so the stub stays belt and braces for the Bun binary too.
     entry: { "cli/bundle": "src/cli/index.ts" },
     splitting: false,
     clean: false,
     format: ["cjs"],
     minify: true,
     dts: false,
-    // Minified WITHOUT a sourcemap, every user-reported stack trace reads
-    // `at t (bundle.js:1:284119)` and is unresolvable even for us. So the map
-    // is generated — but it is excluded from the published tarball via
-    // package.json `files` (`!dist/cli/*.map`), which keeps the npm weight win
-    // the minify+no-dts decision above was after. Node only reads maps under
-    // `--enable-source-maps`, so shipping the reference without the map costs
-    // nothing at runtime.
-    //
+    // Minified WITHOUT a sourcemap: a bare stack trace is unresolvable even
+    // for us, so the map is generated but excluded from the tarball
+    // (`!dist/cli/*.map`), keeping the npm weight win; Node only reads maps
+    // under `--enable-source-maps`, so this costs nothing at runtime.
+
     // To decode a trace from a released version: check out that tag, run
-    // `pnpm build`, and use the local dist/cli/bundle.js.map — esbuild output
-    // is deterministic for a given input, so it matches what shipped.
+    // `pnpm build`, and use the local dist/cli/bundle.js.map -- esbuild
+    // output is deterministic, so it matches what shipped.
     sourcemap: true,
     noExternal,
     define,

@@ -1,8 +1,7 @@
 /**
- * The port wired into the REAL command tree: proves it is actually connected,
- * since a migration that converts an implementation but forgets its `emitsResult`
- * registration would leave the command silently unmigrated. Split out of
- * `output-port.unit.test.ts`, which pins the mechanism itself.
+ * The port wired into the REAL command tree: proves it is connected, since a
+ * migration that forgets `emitsResult` registration would leave a command
+ * silently unmigrated. Split from `output-port.unit.test.ts`.
  */
 import { describe, it, expect } from "vitest";
 import { Command } from "commander";
@@ -28,11 +27,9 @@ describe("the real command tree", () => {
   });
 
   /**
-   * The registration is the ONLY thing that marks a command output-aware —
-   * migrating an implementation to return a CommandResult does nothing on its
-   * own, and a registration left on `.action(` fails silently for `table`
-   * callers while refusing `-o json`. So the wiring is asserted here, per
-   * group, rather than trusted.
+   * Registration is the ONLY thing that marks a command output-aware; a
+   * registration left on `.action(` fails silently for `table` callers while
+   * refusing `-o json`. So the wiring is asserted here, per group.
    */
   describe("when a command group has been wired to the port", () => {
     const wired = [
@@ -82,12 +79,9 @@ describe("the real command tree", () => {
 
   describe("when a command deliberately emits nothing at all", () => {
     /**
-     * The session context hook runs as a coding agent's own hook, where stdout
-     * is injected into the user's session context, so it prints nothing in any
-     * format. That honours every format, and the registration is what keeps the
-     * auto-detected agent mode (Claude Code sets CLAUDECODE in its children)
-     * from annotating every session start and stop with a note about a table
-     * that does not exist.
+     * The session context hook runs as a coding agent's own hook, printing
+     * nothing in any format. Registration keeps agent mode from annotating
+     * every session start/stop with a note about a table that doesn't exist.
      */
     it("marks `ingest hook` as speaking the output contract", async () => {
       const { buildProgram } = await import("../../program.js");
@@ -99,17 +93,15 @@ describe("the real command tree", () => {
   });
 
   /**
-   * The exhaustive counterpart to the per-command lists above: every leaf in
-   * the real tree must be either wired to the port or named here as a
-   * deliberate holdout, so a new command forces that decision rather than
-   * silently missing both.
+   * The exhaustive counterpart to the lists above: every leaf in the real
+   * tree must be wired to the port or named here as a deliberate holdout, so
+   * a new command forces that decision rather than silently missing both.
    */
 
   /**
-   * `-o json` is the current spelling, but `-f/--format json` is what the
-   * skills put in front of the agent; Commander rejects an undeclared option
-   * before the output preprocessor ever runs, so the flag must be declared per
-   * command or the agent gets `error: unknown option '--format'`.
+   * `-o json` is current, but `-f/--format json` is what skills put in front
+   * of agents; Commander rejects an undeclared option before the output
+   * preprocessor runs, so the flag must be declared per command.
    */
   describe("when inspecting the commands an agent drives the open page with", () => {
     const agentDriven = [

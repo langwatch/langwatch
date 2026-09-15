@@ -12,10 +12,9 @@ const REPO_ROOT = path.join(__dirname, "../../../../../../../");
 const SKILLS_ROOT = path.join(REPO_ROOT, "skills");
 
 /**
- * Whether a skill's opening YAML frontmatter declares a `feature-flag:` key.
- * Scoped to the frontmatter block ONLY: matching anywhere in the file would let
- * a `feature-flag:` line inside a fenced body example wrongly exclude a
- * publishable skill from the bundle.
+ * Whether a skill's frontmatter declares a `feature-flag:` key. Scoped to
+ * the frontmatter block ONLY -- matching anywhere would let a fenced body
+ * example wrongly exclude a publishable skill.
  */
 const frontmatterIsFlagGated = (source: string): boolean => {
   const frontmatter = /^---\n([\s\S]*?)\n---/.exec(source)?.[1] ?? "";
@@ -28,9 +27,8 @@ const isFlagGated = (src: string): boolean =>
 
 /**
  * The published set, read from the same sources the codegen reads. Skills
- * gated by a `feature-flag:` frontmatter key are excluded, mirroring
- * generate-skills-bundle.mjs — the CLI bundle ships inside the binary with
- * no per-caller flag to resolve, so a gated skill isn't in it yet.
+ * gated by `feature-flag:` are excluded, mirroring generate-skills-bundle.mjs
+ * -- the CLI bundle ships inside the binary with no per-caller flag to resolve.
  */
 const expectedPublishedSlugs = (): { slug: string; isRecipe: boolean }[] => {
   const featureSkillsSrc = fs.readFileSync(

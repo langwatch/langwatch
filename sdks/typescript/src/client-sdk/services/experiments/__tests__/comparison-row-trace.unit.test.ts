@@ -1,10 +1,7 @@
 /**
- * Which trace a comparison is attributed to when rows are judged concurrently.
+ * Which trace a comparison is attributed to when rows judge concurrently:
+ * a real tracer avoids a shared all-zero trace hiding a wrong attribution.
  * Spec: specs/experiments/comparison-sdk.feature
- *
- * A real tracer is installed here, unlike the sibling comparison suites: under the no-op tracer
- * every row reports the same all-zero trace, so a verdict pinned to another row's trace would be
- * indistinguishable from a correct one.
  */
 
 import { trace } from "@opentelemetry/api";
@@ -82,11 +79,9 @@ describe("Experiment.compare", () => {
   };
 
   /**
-   * How many of these entries name a trace, and which of those name a row
-   * other than their own. An entry with no trace id is evidence of nothing,
-   * so it is counted out rather than passed silently: the count is what makes
-   * "no mismatches" mean something, since a run that attributed nothing would
-   * otherwise read the same as a run that attributed everything correctly.
+   * How many entries name a trace, and which name a row other than their
+   * own. A traceless entry is counted out rather than silently passed, so
+   * "no mismatches" can't mean a run that attributed nothing.
    */
   const attribution = (
     owners: Map<string, number>,
@@ -162,14 +157,10 @@ describe("Experiment.compare", () => {
           })),
         );
 
-        // One traced comparison per side, not four. Only the row that runs
-        // before any withTarget() call gets an iteration span, because the
-        // switch to target-rooted traces is a run-wide latch, so the other
-        // rows compare with no row-level trace to be attributed to. Asserting
-        // the count is what keeps "no mismatches" meaningful: blanking every
-        // trace id would leave nothing to mismatch. Give every row its own
-        // trace and this number becomes CAPITALS.length, which is a change to
-        // make here deliberately rather than discover as a passing test.
+        // One traced comparison per side, not four: only the row before any
+        // withTarget() call gets a span, since the switch to target-rooted
+        // traces is a run-wide latch. Asserting the count keeps "no
+        // mismatches" meaningful -- blanking every id would leave nothing to mismatch.
         expect({
           mismatched: [...judged.mismatched, ...filed.mismatched],
           tracedJudged: judged.traced,

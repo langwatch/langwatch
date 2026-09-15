@@ -1,9 +1,7 @@
 /**
- * Regression for #4755: revoking an ingestion key silently bricks CLI Path B
- * telemetry because the wrapper reused a cached key forever. Contract: (1)
- * before reuse, call listIngestionKeys and mint fresh if the cached
- * lookupId is gone; (2) on a rejected call, reuse the cache (offline
- * fallback); (3) after login, reconcile cached keys against the live list.
+ * Regression for #4755: revoking an ingestion key silently bricked Path B
+ * telemetry via a forever-cached key. Contract: reuse only after confirming
+ * the cached lookupId lives; on rejection, fall back to cache; reconcile after login.
  */
 import * as fs from "node:fs";
 

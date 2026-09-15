@@ -1,8 +1,7 @@
 /**
- * The CLI's front door: every `langwatch …` invocation lands here, deciding
- * from argv/env/stdio whether a warm daemon can serve the call. The fallback
- * to running in-process is the DEFAULT path, not an error path — with no
- * daemon running it hands over to exactly the pre-daemon code.
+ * The CLI's front door: every invocation lands here, deciding whether a warm
+ * daemon can serve the call. Falling back to in-process is the DEFAULT
+ * path, not an error path -- with no daemon it's exactly the pre-daemon code.
  */
 
 import { runWithCredentialHolder } from "@/internal/credentialContext";
@@ -58,12 +57,9 @@ export async function runCli(argv: string[]): Promise<void> {
   }
 
   const identity = resolveIdentity(process.env);
-  // The budget a DAEMON needs, not just the one this client needs to dial: a
-  // daemon binds a pid-scoped staging name in the same directory and publishes
-  // it under the shared one, so a shared path that fits while the staging path
-  // does not is a path no daemon can ever be started on. Asking the narrower
-  // question here left the client spawning a daemon every two misses, each
-  // dying at `listen()`, forever.
+  // The budget a DAEMON needs, not just this client's dial: a daemon binds a
+  // longer pid-scoped staging name first, so a shared path that fits while
+  // staging doesn't is one no daemon can ever start on.
   if (!isDaemonSocketPathUsable(identity.socketPath)) {
     debugLog("in-process (socket path too long for this platform)");
     await runInProcess(argv);
@@ -116,8 +112,7 @@ export async function runCli(argv: string[]): Promise<void> {
 }
 
 /**
- * The pre-daemon code path, verbatim: build the commander tree and parse.
- *
+ * The pre-daemon code path, verbatim: builds the commander tree and parses.
  * Dynamically imported so a daemon-served invocation never pays commander's
  * ~80ms of this feature's ~165ms cold start.
  */

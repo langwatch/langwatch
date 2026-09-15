@@ -8,10 +8,9 @@
 const LOOPBACK_V6 = new Set(["::1", "0:0:0:0:0:0:0:1"]);
 
 /**
- * Whether posting the ingest key to `endpoint` sends it unencrypted to another
- * host. False for https, for loopback, and for anything that does not parse as
- * a URL: an endpoint we could not read is refused on its own merits elsewhere,
- * and a warning naming nothing helps no one.
+ * Whether posting the ingest key to `endpoint` sends it unencrypted. False
+ * for https, loopback, or anything unparseable as a URL -- an unreadable
+ * endpoint is refused elsewhere, and a warning naming nothing helps no one.
  */
 export function sendsIngestKeyInClear(endpoint: string | undefined): boolean {
 	if (!endpoint?.trim()) return false;
@@ -26,11 +25,9 @@ export function sendsIngestKeyInClear(endpoint: string | undefined): boolean {
 }
 
 /**
- * Whether a URL hostname resolves to this machine. Covers the three forms a
- * person actually types (`localhost`, a `127.0.0.0/8` address, `[::1]`), the
- * `.localhost` names the local dev proxy hands out, which RFC 6761 reserves for
- * loopback, and the IPv4-mapped IPv6 spelling of a loopback address, which is
- * what `new URL()` normalises `[::ffff:127.0.0.1]` into.
+ * Whether a URL hostname resolves to this machine: `localhost`, a
+ * `127.0.0.0/8` address, `[::1]`, `.localhost` (RFC 6761 loopback), and the
+ * IPv4-mapped IPv6 spelling `new URL()` normalises `[::ffff:127.0.0.1]` into.
  */
 function isLoopbackHost(hostname: string): boolean {
 	const host = hostname.trim().toLowerCase().replace(/^\[|\]$/g, "");

@@ -17,9 +17,8 @@ const isSet = (value: string | undefined): value is string =>
 
 /**
  * The transport to start with: the explicit option, then
- * `LANGWATCH_AGENT_TRANSPORT`, else the WebSocket. Anything that is not
- * `http` is the WebSocket, which falls back to HTTP on its own when the
- * upgrade is refused.
+ * `LANGWATCH_AGENT_TRANSPORT`, else the WebSocket, which falls back to HTTP
+ * on its own when the upgrade is refused.
  */
 export function resolveTransport({
   explicit,
@@ -101,10 +100,9 @@ const wrapWs = (socket: WsWebSocket): SocketLike => {
 type WsConstructor = new (url: string, options: { headers: Record<string, string> }) => WsWebSocket;
 
 /**
- * The `ws` constructor, or null when the package cannot be loaded. It is
- * required rather than imported: a runtime or a bundle without `ws` must
- * reach the factory below and get one clear message, never fail while this
- * module loads.
+ * The `ws` constructor, or null when the package cannot be loaded. Required
+ * rather than imported so a runtime without `ws` reaches the factory below
+ * for one clear message, never fails while this module loads.
  */
 const wsConstructor = (): WsConstructor | null => {
   try {
@@ -144,11 +142,9 @@ const POST_RETRY_DELAYS_MS = [250, 500, 1000];
 const EMPTY_POLL_FLOOR_MS = 250;
 
 /**
- * How long a close waits for the queued frames to go out before it drops them.
- * A frames request has no deadline of its own, so a proxy that accepts the
- * request and never answers would otherwise keep the socket from ever
- * reporting its close, and the client that is waiting to open a replacement
- * would wait with it.
+ * How long a close waits for queued frames before dropping them: a frames
+ * request has no deadline of its own, so an unanswering proxy would
+ * otherwise keep the socket from ever reporting close.
  */
 const CLOSE_DEADLINE_MS = 500;
 
@@ -165,12 +161,9 @@ export interface HttpLongPollOptions {
 }
 
 /**
- * The same frames over three requests. `send` of a register frame posts it
- * and starts the poll loop on the registered answer; `send` of any other
- * frame posts it in order; every frame a poll answers with is a message.
- * A poll that is refused, that fails or that names an unknown session ends
- * the connection the way a dropped socket would, and the client reconnects
- * with its own backoff, registering again.
+ * The same frames over three requests: `send` of a register frame starts
+ * the poll loop; a refused/failed/unknown-session poll ends the connection
+ * like a dropped socket, and the client reconnects with its own backoff.
  */
 export class HttpLongPollSocket implements SocketLike {
   private readonly url: string;
@@ -225,10 +218,9 @@ export class HttpLongPollSocket implements SocketLike {
   }
 
   /**
-   * Stops polling, lets the frames already queued go out, then reports the
-   * close. The wait is bounded: on the deadline the frame requests are aborted
-   * and the close is reported anyway, so a request that never answers cannot
-   * hold the connection open.
+   * Stops polling, lets queued frames go out, then reports close. Bounded: on
+   * the deadline the frame requests are aborted and close is reported anyway,
+   * so an unanswering request cannot hold the connection open.
    */
   close(code = 1000): void {
     this.closed = true;

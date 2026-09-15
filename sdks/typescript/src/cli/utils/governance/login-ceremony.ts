@@ -1,9 +1,7 @@
 /**
- * Renders the "You're in!" ceremony lines emitted by `langwatch login` after
- * a successful device-flow exchange: identity, available tools, model
- * providers eligible for a virtual key, and applicable budgets. Tools and
- * providers answer different questions and must not be conflated. Pure
- * function — returns lines; the caller applies color and writes to stdout.
+ * Renders the "You're in!" ceremony lines after a device-flow exchange:
+ * identity, tools, providers eligible for a VK, and budgets. Tools and
+ * providers must not be conflated. Pure: returns lines, caller colors + writes.
  */
 
 export interface LoginCeremonyTool {
@@ -67,17 +65,15 @@ export interface LoginCeremonyInput {
   /** Model providers the user can mint their own virtual key for. */
   providers?: LoginCeremonyProvider[];
   /**
-   * Legacy single-number budget from /bootstrap. Only rendered when
-   * `budgets` is undefined (older server without the overview endpoint):
-   * the collapsed number cannot say which budget it is, which is the
-   * mislabel the overview replaced.
+   * Legacy single-number budget from /bootstrap, rendered only when
+   * `budgets` is undefined (older server): a collapsed number can't say
+   * which budget it is, the mislabel the overview replaced.
    */
   budget?: LoginCeremonyBudget;
   /**
-   * Budgets that bind the user's key, most binding first. When present
-   * it supersedes `budget`; an empty array renders nothing at all (the
-   * user has gateway access but no budget applies). Undefined means the
-   * server predates the overview endpoint.
+   * Budgets that bind the user's key, most binding first. Supersedes
+   * `budget` when present; empty renders nothing (gateway access, no
+   * budget applies). Undefined means the server predates this endpoint.
    */
   budgets?: LoginCeremonyBudgetLine[];
   /** Where "…and N more" points when more than three budgets apply. */

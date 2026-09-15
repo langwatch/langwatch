@@ -11,10 +11,9 @@ export interface VirtualKeySpendOptions {
 }
 
 /**
- * A `--from` / `--to` flag as the epoch milliseconds the API takes.
- *
- * The flag stays human: a date or timestamp anyone would type, or the epoch
- * value itself. Only the wire is strict about the unit.
+ * A `--from` / `--to` flag as the epoch milliseconds the API takes. The
+ * flag stays human -- a date, timestamp or the epoch value itself. Only the
+ * wire is strict about the unit.
  */
 function parseWindowBound(flag: string, value: string | undefined): number | undefined {
   if (value === undefined) return undefined;
@@ -27,11 +26,9 @@ function parseWindowBound(flag: string, value: string | undefined): number | und
 }
 
 /**
- * Aggregate spend for one key over a window (default: the current UTC
- * calendar month). The server reads the same cost path the dashboard
- * reads, so this number and the UI column agree by construction — the
- * read-back half of the reseller loop (mint a key, cap it, show the
- * customer their spend).
+ * Aggregates spend for one key over a window (default: current UTC month).
+ * The server reads the same cost path the dashboard reads, so this number
+ * and the UI column agree by construction.
  */
 export const virtualKeySpendCommand = async (
   id: string,

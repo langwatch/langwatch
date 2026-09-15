@@ -1,9 +1,6 @@
 /**
- * The CLI's live event channel: a running commentary on a command, so the
- * Langy panel can show a status line, a stat card and a progress bar instead
- * of a spinner. Off by default at zero cost (no-op with no transport; OTLP
- * loads via deferred `import()`, saving ~60ms per invocation). Every emit is
- * fire-and-forget, and failure messages are always scrubbed of secrets.
+ * The CLI's live event channel: a running commentary for the Langy panel's
+ * status line, stat card and progress bar. Off by default at zero cost.
  * Spec: telemetry/langy-live-events.feature
  */
 
@@ -73,11 +70,9 @@ const isTruthy = (value: string | undefined): boolean =>
 export type Transport = { kind: "ipc"; path: string } | { kind: "otlp"; endpoint: string } | null;
 
 /**
- * Resolve the transport. A pure env read — this is the gate that keeps a disabled
- * CLI at zero cost, so it must stay free of imports and side effects.
- *
- * IPC wins when both are configured: a host that handed us a socket is a host that
- * is listening, and the socket is both cheaper to load and faster to deliver.
+ * Resolves the transport. A pure env read, free of imports and side effects
+ * -- the gate that keeps a disabled CLI at zero cost. IPC wins when both are
+ * configured: it's cheaper to load and faster to deliver.
  */
 export const resolveTransport = (env: NodeJS.ProcessEnv = process.env): Transport => {
   const socket = env[LANGWATCH_EVENTS_SOCKET_ENV]?.trim();
@@ -112,10 +107,9 @@ const SECRET_PATTERNS: RegExp[] = [
 ];
 
 /**
- * Scrub a message before it leaves the process. Belt and braces: the literal
- * values of this environment's secrets go first — the strongest guarantee, since
- * an API key echoed back by a server is caught by value whatever shape it has —
- * then anything that merely LOOKS like a credential.
+ * Scrubs a message before it leaves the process: the literal values of this
+ * environment's secrets go first (catches any shape), then anything that
+ * merely looks like a credential.
  */
 export const redactSecrets = (message: string, env: NodeJS.ProcessEnv = process.env): string => {
   let scrubbed = message;
@@ -144,12 +138,9 @@ const softDelay = (ms: number): Promise<void> =>
   });
 
 /**
- * The OTLP logs sink. Everything heavy is imported here, on the enabled path only
- * — see rule 1 in the module docstring.
- *
- * `SimpleLogRecordProcessor`, not the batch one, because this is a LIVE channel:
- * the panel wants "Searching traces…" now, not up to five seconds from now, and a
- * read command emits a handful of records, not a firehose.
+ * The OTLP logs sink; everything heavy is imported here, on the enabled path
+ * only. `SimpleLogRecordProcessor`, not the batch one, because this is a LIVE
+ * channel: the panel wants "Searching traces..." now, not five seconds from now.
  */
 const createOtlpSink = async (endpoint: string): Promise<EventSink> => {
   const [{ LoggerProvider, SimpleLogRecordProcessor }, { OTLPLogExporter }, resources] =
@@ -215,10 +206,9 @@ const openSink = async (transport: NonNullable<Transport>): Promise<EventSink> =
     : createOtlpSink(transport.endpoint);
 
 /**
- * Open the live event channel for one command.
- *
- * Returns a no-op when no transport is configured, so a call site can emit
- * unconditionally and an unconfigured CLI pays nothing for the privilege.
+ * Opens the live event channel for one command. Returns a no-op when no
+ * transport is configured, so a call site can emit unconditionally and an
+ * unconfigured CLI pays nothing for the privilege.
  */
 export const createCommandEvents = ({
   resource,

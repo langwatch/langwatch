@@ -1,8 +1,6 @@
 /**
- * The attribute vocabulary the CLI puts on its live OTEL log records — the
- * only channel Langy has into a command's mid-flight state, since it runs
- * this CLI in a shell and sees nothing until exit. Published contract: add
- * freely, but renaming or repurposing a key breaks the reader on the other side.
+ * The attribute vocabulary on the CLI's live OTEL log records -- Langy's
+ * only channel into mid-flight state. Add freely; renaming a key breaks the reader.
  * Spec: sdks/typescript/specs/telemetry/langy-live-events.feature
  */
 
@@ -28,10 +26,9 @@ export const LANGWATCH_EVENT_ATTRIBUTES = {
   /** The failure message on an `error` record. Never carries a credential. */
   error: "langwatch.error",
   /**
-   * The platform's own name for a failure — the `HandledError.kind` it raised,
-   * e.g. `dataset_not_found`. This is the attribute that lets the panel react to
-   * a failure instead of merely printing it: a `not_found` can offer to list what
-   * does exist, where a sentence can only be read.
+   * The platform's own name for a failure -- the `HandledError.kind` raised,
+   * e.g. `dataset_not_found`. Lets the panel react instead of merely
+   * printing it: a `not_found` can offer to list what does exist.
    */
   errorKind: "langwatch.error.kind",
   /** The HTTP status the platform answered with. */

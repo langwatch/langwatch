@@ -40,12 +40,9 @@ export const MANAGED_MARKER = `<!-- managed-by: langwatch-skills v${SKILLS_BUNDL
 const MANAGED_MARKER_RE = /(?:^|\n)<!-- managed-by: langwatch-skills v(\S+) -->\s*$/;
 
 /**
- * Defence in depth: a slug becomes a path segment, so it must not be able to
- * escape the install root. Runtime traversal is not currently reachable —
- * every slug is exact-matched against the compiled bundle by `findSkill` — but
- * nothing in the type system says so, and `BundledSkill` is a plain interface
- * any future caller can construct. A violated invariant throws; it is a bug in
- * the bundle, not a per-file condition to report.
+ * Defence in depth: a slug becomes a path segment and must not escape the
+ * install root. Not currently reachable, but `BundledSkill` is a plain
+ * interface a future caller could construct wrong. A violation throws.
  */
 const assertPathSafeSlug = (slug: string): void => {
   if (slug === "" || slug.includes("/") || slug.includes("\\") || slug.includes("..")) {
@@ -128,12 +125,9 @@ const fsErrorReason = (error: unknown): string => {
 };
 
 /**
- * Turn a filesystem refusal into a reported skip.
- *
- * Without this a single EACCES/EPERM/EISDIR anywhere in a batch throws out of
- * the `.map()`, `printResult` is never reached, and the caller is told the
- * command failed but not WHICH files were already written — the worst possible
- * report for a half-applied change.
+ * Turns a filesystem refusal into a reported skip. Without this, a single
+ * EACCES/EPERM/EISDIR anywhere throws out of the `.map()`, and the caller is
+ * told the command failed but not WHICH files were already written.
  */
 const asFileResult = (
   skill: BundledSkill,
@@ -204,11 +198,9 @@ const writeSkill = (filePath: string, content: string): void => {
 };
 
 /**
- * Install one skill: create when missing, leave identical files alone, and
- * refuse to overwrite a differing file unless --force was passed (gcx
- * semantics — a differing file may be the user's own edit or another
- * installer's work). A file we manage from an OLDER bundle is pointed at
- * `langwatch skills update`, the intended path for it.
+ * Installs one skill: creates when missing, leaves identical files alone,
+ * refuses to overwrite a differing file unless --force. A file from an
+ * OLDER bundle is pointed at `langwatch skills update`.
  */
 export const installSkill = ({
   skill,
@@ -321,10 +313,9 @@ export const planUninstall = ({
 };
 
 /**
- * Execute a confirmed uninstall plan, returning the plan as it actually
- * turned out: a removal the filesystem refused comes back as a failed skip
- * rather than throwing out of the loop and stranding the caller with no
- * record of which files were already gone.
+ * Executes a confirmed uninstall plan, returning what actually happened: a
+ * refused removal comes back as a failed skip rather than throwing and
+ * stranding the caller with no record of which files were already gone.
  */
 export const applyUninstall = ({
   results,

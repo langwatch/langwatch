@@ -169,9 +169,8 @@ describe("writeCodexOtelBlock", () => {
 
     /**
      * `$&`, ``$` `` and `$'` are replacement directives to
-     * `String.prototype.replace`, and the replacement here is built from the
-     * caller's own values. Expanded rather than written out, they splice the
-     * surrounding config back into the block and codex stops parsing the file.
+     * `String.prototype.replace`; expanded rather than written literally,
+     * they'd splice surrounding config into the block and break codex's parse.
      */
     it("writes a dollar sign in the environment label out literally", () => {
       const filePath = path.join(tmp, "config.toml");
@@ -304,10 +303,9 @@ describe("writeCodexOtelBlock", () => {
 
   describe("when the file has unrelated content with TOML sections", () => {
     /**
-     * Guards against a regex that would over-match into adjacent
-     * sections. The marker pair must be the only thing the merger
-     * touches; codex's own [projects.*] / [tui.*] sections stay
-     * verbatim.
+     * Guards against a regex over-matching into adjacent sections: the
+     * marker pair must be the only thing the merger touches; codex's own
+     * sections stay verbatim.
      */
     it("preserves adjacent codex sections byte-for-byte", () => {
       const filePath = path.join(tmp, "config.toml");
@@ -341,12 +339,9 @@ describe("writeCodexOtelBlock", () => {
 
 describe("buildCodexGatewayBlock", () => {
   /**
-   * Codex 0.130+ defers to ChatGPT OAuth unless an explicit
-   * model_provider with name="OpenAI" + env_key + wire_api is
-   * picked. Confirmed by Andre's dogfood at 24d07fc6a where
-   * `langwatch codex` spawned codex but the child ignored
-   * OPENAI_API_KEY and routed to auth.openai.com instead of the
-   * local gateway.
+   * Codex 0.130+ defers to ChatGPT OAuth unless an explicit model_provider
+   * with name="OpenAI" + env_key + wire_api is picked. Regression guard
+   * (surfaced at 24d07fc6a).
    */
   it("emits the langwatch model_provider entry only", () => {
     const out = buildCodexGatewayBlock({
@@ -361,10 +356,8 @@ describe("buildCodexGatewayBlock", () => {
 
   /**
    * codex 0.134+ rejects [profiles.<name>] inside config.toml when
-   * --profile <name> is passed; the profile body lives in a sibling
-   * file. Andre's dogfood at the 4f37ed27a HEAD surfaced this with
-   * "cannot be used while config.toml contains legacy `profile = ...`
-   * or `[profiles.langwatch-gateway]` config".
+   * --profile is passed; the profile body lives in a sibling file.
+   * Regression guard (surfaced at 4f37ed27a).
    */
   it("does NOT embed [profiles.X] inside config.toml", () => {
     const out = buildCodexGatewayBlock({

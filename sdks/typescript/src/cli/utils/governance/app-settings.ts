@@ -42,12 +42,9 @@ export function appSettingsTargetFor(tool: string): AppSettingsTarget | null {
 }
 
 /**
- * Project-level Claude Code settings target for a working directory:
- * `<cwd>/.claude/settings.local.json`. Claude applies local project
- * settings ABOVE user-level `~/.claude/settings.json`, so an env block
- * written here is the documented way for a wrapped run to win over
- * whatever a previous install left at user level. Shares the same
- * read/merge/remove helpers as the user-level target.
+ * Project-level Claude Code settings target: `<cwd>/.claude/settings.local.json`.
+ * Claude applies local settings ABOVE user-level ones, so writing here lets a
+ * wrapped run win over whatever a previous install left at user level.
  */
 export function claudeProjectSettingsTarget(cwd: string): AppSettingsTarget {
   return {
@@ -58,20 +55,18 @@ export function claudeProjectSettingsTarget(cwd: string): AppSettingsTarget {
 }
 
 /**
- * The target's current `env` map (string values only). Empty when the
- * file is missing, malformed, or has no `env` object. Lets callers
- * inspect the persisted values, e.g. to decide whether an existing
- * block is langwatch-authored before refreshing it in place.
+ * The target's current `env` map (string values only), empty when missing,
+ * malformed, or absent. Lets callers inspect persisted values, e.g. to
+ * decide whether a block is langwatch-authored before refreshing it.
  */
 export function appEnvValues(target: AppSettingsTarget): Record<string, string> {
   return readEnvMap(target.path);
 }
 
 /**
- * Whether the target's `env` map already contains every required
- * key with the required value. Used to stay quiet when a previous
- * run already installed the current export set (so re-running
- * `langwatch <tool>` doesn't nag).
+ * Whether the target's `env` map already contains every required key with
+ * the required value, so re-running `langwatch <tool>` stays quiet when a
+ * previous run already installed the current export set.
  */
 export function appEnvHasAllVars(target: AppSettingsTarget, vars: Record<string, string>): boolean {
   const current = readEnvMap(target.path);
@@ -176,12 +171,9 @@ export function readAppSettingsFileForUpdate(filePath: string): Record<string, u
 }
 
 /**
- * Write a settings document back, creating parent directories when missing.
- *
- * One writer for every caller that edits one of these files, whichever region
- * of it they own. Indentation, the trailing newline and directory creation are
- * what the user's own diff shows after we touch their config, so they cannot
- * depend on which of us wrote it last.
+ * Writes a settings document back, creating parent directories when
+ * missing. One writer for every caller editing these files keeps
+ * indentation and newlines consistent regardless of who wrote last.
  */
 export function writeAppSettingsFile({
   filePath,

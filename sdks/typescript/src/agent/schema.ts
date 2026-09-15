@@ -24,9 +24,8 @@ export type ParameterDefinitions = Record<string, ParameterDefinition>;
 
 /**
  * The Standard JSON Schema converter an object exposes under `"~standard"`.
- * Method syntax on purpose: a library narrows `target` to its own union, and
- * a method parameter is checked bivariantly, so zod 4, valibot and arktype
- * all fit without the SDK naming any of them.
+ * Method syntax on purpose: a method parameter is checked bivariantly, so
+ * zod 4, valibot and arktype all fit without the SDK naming any of them.
  */
 export interface StandardJsonSchemaConverter {
   input?(options: { readonly target: string }): Record<string, unknown>;
@@ -44,10 +43,9 @@ export type StandardSchemaResult<O> =
   | { readonly issues: readonly StandardSchemaIssue[] };
 
 /**
- * Any object that implements the Standard JSON Schema interface. When it also
- * implements Standard Schema (`validate`), the values of every call go
- * through it before the handler runs, so a zod 4 schema validates, fills its
- * defaults and types `params` in one place.
+ * Any object implementing the Standard JSON Schema interface. When it also
+ * implements Standard Schema (`validate`), every call's values pass through
+ * it first, so a zod 4 schema validates, fills defaults and types `params`.
  */
 export interface StandardJsonSchema<O = unknown> {
   readonly "~standard": {
@@ -241,10 +239,9 @@ const coerce = ({
 };
 
 /**
- * The values the handler receives: every declared parameter, from the call or
- * from its default. A required parameter with no value, or a value of the
- * wrong type or outside the options, is refused with `agent_parameter_invalid`
- * before the handler runs. Names the schema does not declare pass through.
+ * The values the handler receives: every declared parameter, from the call
+ * or its default. A required parameter with no value, wrong type, or
+ * outside the options is refused with `agent_parameter_invalid`.
  */
 export function resolveParameterValues({
   specs,
@@ -280,9 +277,8 @@ const issuePath = (issue: StandardSchemaIssue): string =>
 
 /**
  * The values after the schema's own `validate`: a zod 4 schema refines,
- * fills its defaults and strips what it does not declare. A refusal names
- * every issue with its path. Names the schema does not declare pass through
- * untouched, so a scenario-declared parameter still reaches the handler.
+ * fills defaults and strips what it doesn't declare. A refusal names every
+ * issue's path; undeclared names pass through untouched.
  */
 export async function validateParameterValues({
   schema,

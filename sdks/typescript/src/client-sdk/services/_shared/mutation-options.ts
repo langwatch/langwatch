@@ -1,9 +1,7 @@
 /**
- * The per-call options every mutating call on the billing surfaces takes.
- * A call with an options bag (`disable(id, { reason })`) gains these fields
- * there; a call with a request BODY (`create(input)`) gets them as a
- * separate trailing param, since body types mirror the wire verbatim. An
- * interface, not a bare `signal`, so a new field never needs a new param.
+ * The per-call options every mutating billing call takes. An options-bag
+ * call gains these fields there; a body call (`create(input)`) gets them as
+ * a trailing param, since body types mirror the wire verbatim.
  */
 
 /** The request header the control plane deduplicates creates on. */
@@ -26,19 +24,15 @@ export interface MutationOptions {
 
 export interface IdempotentCreateOptions extends MutationOptions {
   /**
-   * Makes the create safe to retry: resending without a key after a dropped
-   * response would mint a second resource, but the same key replays the
-   * first response verbatim (including its one-time secret). Any 8-255 char
-   * string; a UUID per logical create is typical. Reusing a key with a
-   * DIFFERENT body is refused with `idempotency_error` rather than answering
-   * for the wrong request.
+   * Makes the create safe to retry: the same key replays the first
+   * response verbatim, while a dropped response with no key would mint a
+   * second resource. A DIFFERENT body under the same key is refused.
    */
   idempotencyKey?: string;
   /**
    * Called when the response came from a receipt, not a fresh write. A hook
-   * rather than a field on the resource: the resource is identical either
-   * way (callers log this, not branch on it), and it keeps wire-shaped
-   * entities free of fields the wire does not have.
+   * rather than a resource field, since callers log this rather than branch
+   * on it, keeping wire-shaped entities free of fields the wire lacks.
    */
   onIdempotentReplay?: () => void;
 }

@@ -138,10 +138,9 @@ const trackTestSuiteFlags = (
 };
 
 /**
- * Records `--evaluator`, `--required` and `--not-required` in the order they
- * were written. A boolean flag keeps only its last value in commander, so the
- * pairing of a gate flag with the evaluator before it is read from the
- * option events instead. The reader clears what it read.
+ * Records `--evaluator`, `--required` and `--not-required` in the order
+ * written. A boolean flag keeps only its last value in commander, so
+ * pairing a gate flag with its evaluator is read from option events instead.
  */
 const trackEvaluatorFlags = (
   command: Command,
@@ -874,12 +873,10 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     }
   });
 
-  // `langwatch ingest guidance <tool>`: prints the declare-your-context
-  // guidance as SessionStart additionalContext JSON. Hidden: nobody types
-  // this, the session-hooks install writes it into claude's settings for
-  // installs without plugin support, and the Claude Code plugin's launcher
-  // runs it on every session start. Same cross-version contract as `ingest
-  // hook` above: unknown arguments are ignored, the exit is always zero.
+  // `langwatch ingest guidance <tool>` prints declare-your-context guidance
+  // as SessionStart JSON. Hidden: only session-hooks install and the Claude
+  // Code plugin's launcher run it, on every session start. Same contract as
+  // `ingest hook`: unknown args ignored, exit always zero.
   rendersOwnResult(
     ingestCmd
       .command("guidance <tool>", { hidden: true })

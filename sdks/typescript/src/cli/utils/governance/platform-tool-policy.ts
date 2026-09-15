@@ -1,9 +1,7 @@
 /**
- * Platform-tool policy table: per-tool toggles gating the two `langwatch
- * <tool>` routing paths — `allowVk` (gateway via the user's personal VK)
- * and `allowOtelDirect` (OTLP direct with the user's ingestion key). Falls
- * back to these hardcoded defaults when no login-cached policy map exists;
- * keep in sync with the server-side PLATFORM_TOOL_POLICY_DEFAULTS.
+ * Platform-tool policy: per-tool toggles gating `allowVk` and
+ * `allowOtelDirect`. Falls back to these defaults with no login-cached map;
+ * keep in sync with the server's PLATFORM_TOOL_POLICY_DEFAULTS.
  */
 
 export type PlatformToolSlug =
@@ -58,10 +56,9 @@ function hardcodedPolicy(toolSlug: string): PlatformToolPolicy {
 }
 
 /**
- * Resolve the policy for a given tool slug. Prefers the login-cached
- * server map when it carries an entry for the tool; otherwise falls
- * back to the hardcoded defaults. A non-platform slug (typo) also
- * resolves to DEFAULTS so the wrapper never crashes.
+ * Resolves the policy for a tool slug: prefers the login-cached server map
+ * when it has an entry, else the hardcoded defaults. A non-platform slug
+ * (typo) also resolves to DEFAULTS so the wrapper never crashes.
  */
 export function resolvePlatformToolPolicy(
   toolSlug: string,

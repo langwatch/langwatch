@@ -156,12 +156,9 @@ describe("`langwatch help` command", () => {
 });
 
 /**
- * The package ships TWO bin names for one bundle — `lw` and `langwatch` — and
- * one daemon serves both (`resolveBuildId` stats the same symlink target either
- * way). So inside the daemon, `process.argv[1]` is whichever bin happened to
- * spawn it and is a coin flip for everybody else: an `lw` caller whose daemon
- * was started by `langwatch` was shown `Usage: langwatch …`, for `--help` and
- * for every commander error, since the root sets `.showHelpAfterError()`.
+ * The package ships TWO bin names for one bundle -- `lw` and `langwatch` --
+ * sharing one daemon, so `process.argv[1]` inside it is whichever bin
+ * happened to spawn it: an `lw` caller could see `Usage: langwatch ...`.
  */
 describe("the name usage and errors are titled with", () => {
   const savedArgv1 = process.argv[1] ?? "";
@@ -172,11 +169,9 @@ describe("the name usage and errors are titled with", () => {
   });
 
   /**
-   * What a caller who mistypes actually sees. `helpInformation()` renders the
-   * intentional `--help` page and nothing else, so it cannot speak for the
-   * error path at all — and the error path is the half `.showHelpAfterError()`
-   * added, reached through `_displayError` rather than through `outputHelp`.
-   * Commander writes the whole block to stderr there, so that is where we look.
+   * What a caller who mistypes actually sees. `helpInformation()` only
+   * renders the intentional `--help` page; the error path is the half
+   * `.showHelpAfterError()` adds, via `_displayError`, writing to stderr.
    */
   const commanderErrorText = (args: string[], options: { bin?: string } = {}): string => {
     let text = "";
