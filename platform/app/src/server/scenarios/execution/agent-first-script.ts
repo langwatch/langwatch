@@ -1,13 +1,13 @@
 /**
- * The "Agent speaks first" script for a non-scripted phone voice run.
+ * The greeting-first script for a non-scripted inbound phone voice run.
  *
- * Some phone agents greet the moment the call connects (scenario#995,
- * scenario#992). A normal run opens with the user simulator, so the caller
- * talks over — or before — that greeting and the callee asks "is anyone
- * there?". When the target has `isAgentSpeaksFirst` on, the run instead opens
- * with the agent's own turn (so the greeting is captured as the first turn),
- * then hands over to the normal simulator/judge loop via `proceed()`, which
- * runs the scenario to its conclusion.
+ * An inbound phone agent answers the call and greets the moment it connects
+ * (scenario#995, scenario#992). A normal run opens with the user simulator, so
+ * the caller talks over — or before — that greeting and the callee asks "is
+ * anyone there?". When the target's `callDirection` is "inbound", the run
+ * instead opens with the agent's own turn (so the greeting is captured as the
+ * first turn), then hands over to the normal simulator/judge loop via
+ * `proceed()`, which runs the scenario to its conclusion.
  *
  * Lives in its own module because the child entry point runs `main()` at import
  * time; this keeps the decision unit-testable without that side effect.
@@ -19,14 +19,14 @@ import * as ScenarioRunner from "@langwatch/scenario";
 import type { TargetAdapterData } from "./types";
 
 /**
- * Phone agents may greet the instant the call connects, so the run must
- * capture that greeting before the user simulator speaks.
+ * An inbound phone agent answers and greets the instant the call connects, so
+ * the run must capture that greeting before the user simulator speaks.
  */
-export function isAgentSpeaksFirst(adapterData: TargetAdapterData): boolean {
+export function agentGreetsFirst(adapterData: TargetAdapterData): boolean {
   return (
     adapterData.type === "voice" &&
     adapterData.voiceTarget.transport === "phone" &&
-    adapterData.voiceTarget.isAgentSpeaksFirst
+    adapterData.voiceTarget.callDirection === "inbound"
   );
 }
 
@@ -51,10 +51,10 @@ export function isAgentSpeaksFirst(adapterData: TargetAdapterData): boolean {
  * (scenario-child-process.ts) compensates by giving an agent-first run one
  * extra turn of budget.
  */
-export function buildIsAgentSpeaksFirstScript(
+export function buildAgentGreetsFirstScript(
   adapterData: TargetAdapterData,
 ): ScenarioRunner.ScriptStep[] | undefined {
-  return isAgentSpeaksFirst(adapterData)
+  return agentGreetsFirst(adapterData)
     ? [
         ScenarioRunner.agent(),
         ScenarioRunner.user(),
