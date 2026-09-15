@@ -707,20 +707,25 @@ const VALUE_RULES: ValueRule[] = [
       // token: `/api/files/local-dev-project/so_<id>` matches with prefix
       // `local` and a body that runs across the slash, and eating it turns a
       // media reference into a 404 (#8077). A span whose LAST path segment
-      // names itself a record id is a reference to that record, not a
-      // credential, whatever the earlier segments look like. The guard stays
-      // narrow on purpose — RECORD ids only, not the wider non-credential
-      // family: a digest or uuid prefix on the terminal segment says nothing
-      // about the rest of the span, and a slash-containing credential that
-      // happens to end in `sha_…` must keep its protection. A real key has
-      // no reason to end in an allowlisted record prefix.
+      // names itself a record id is treated as a reference to that record —
+      // but only when the path in FRONT of it is benign. The record id says
+      // what the span POINTS AT, not what the earlier segments carry: a
+      // key-shaped segment ahead of it is still key material
+      // (`acme_<secret>/so_<id>`), and that span is redacted whole, record
+      // reference included — the safe direction, and what this rule always
+      // did to that shape. The guard stays narrow on the tail too — RECORD
+      // ids only, not the wider non-credential family: a digest or uuid
+      // prefix on the terminal segment says nothing about the rest of the
+      // span, and a slash-containing credential that happens to end in
+      // `sha_…` must keep its protection.
       const lastSlash = body.lastIndexOf("/");
       if (lastSlash !== -1) {
         const tailPrefix = /^([A-Za-z][A-Za-z0-9]{1,11})[_-]/.exec(
           body.slice(lastSlash + 1),
         )?.[1];
         if (tailPrefix && RECORD_ID_PREFIXES.has(tailPrefix.toLowerCase())) {
-          return false;
+          const headSegments = body.slice(0, lastSlash).split("/");
+          return headSegments.some(isKeyShapedBody);
         }
       }
       return isKeyShapedBody(body);

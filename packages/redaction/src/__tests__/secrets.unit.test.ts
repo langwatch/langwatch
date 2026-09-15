@@ -1252,6 +1252,20 @@ describe("redactSecretsInText, stored-object media URLs (#8077)", () => {
     });
   });
 
+  describe("given a credential followed by a record reference in one span", () => {
+    // The record id says what the span points at, not what the earlier
+    // segments carry. Exempting the whole span on the tail alone would hand
+    // any secret a costume: append `/so_<id>` and walk past the detector.
+    it("redacts the span whole — the reference does not launder the key ahead of it", () => {
+      const input = `creds acme_Zx9Qm2Lp7Rt4Vw8sBn6Dc3Fy5Hj1Kq0M/${STORED_OBJECT_ID} here`;
+
+      const { text, redactedCount } = redactSecretsInText({ text: input });
+
+      expect(text).not.toContain("Zx9Qm2Lp7Rt4Vw8sBn6Dc3Fy5Hj1Kq0M");
+      expect(redactedCount).toBeGreaterThanOrEqual(1);
+    });
+  });
+
   describe("given a slash-carrying key whose tail apes a digest or uuid prefix", () => {
     // The tail bypass is RECORD ids only, not the wider non-credential
     // family: `sha`/`uuid`/`phc` on the terminal segment say nothing about
