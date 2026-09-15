@@ -90,6 +90,18 @@ import {
   traceLegacySearchBodySchema,
 } from "../rules/trace-legacy-search-body.rules.ts";
 import type { TraceLegacyCredentialService } from "../services/support/trace-legacy-credential.service.ts";
+import type { TraceIngestCredentialService } from "../services/support/trace-ingest-credential.service.ts";
+import type { TraceIngestionService } from "../services/ingestion/trace-ingestion.service.ts";
+import type {
+  CollectorApp,
+  CollectorCredential,
+  CollectorProject,
+} from "../transport/collector.rest.ts";
+import type {
+  CollectorEvaluationReport,
+  CollectorSpanIngest,
+} from "../services/trace-collector-dispatch.service.ts";
+import { reportEvaluationCommandDataSchema } from "@langwatch/evaluation-contract";
 import type { RestCredentialPrincipal } from "@langwatch/api/rest";
 import type {
   TraceLegacyCredential,
@@ -380,6 +392,19 @@ export interface TraceAppDependencies {
    * when it is absent.
    */
   legacyCredential?: TraceLegacyCredentialService;
+  /**
+   * The door `POST /api/collector` and the OTLP receiver resolve their own
+   * project credential through. Optional for the same reason the legacy one is:
+   * a process that mounts no REST never reaches it, and the members that read
+   * it raise by name rather than admitting an unauthenticated caller.
+   */
+  ingestCredential?: TraceIngestCredentialService;
+  /**
+   * Where an ingested span goes. Absent on a process that composed no receiver,
+   * and then the ingestion doors refuse by name rather than answering 200 to
+   * data they drop.
+   */
+  ingestion?: TraceIngestionService;
   /** The deployment's public origin, for `platformUrl`. Optional: not every install serves REST. */
   publicBaseUrl?: string;
 }
@@ -430,7 +455,18 @@ type TraceSetup = FeatureSetup<
   TraceRepositories
 >;
 
-export class TraceApp implements TraceApi {
+/**
+ * The trace feature's application.
+ *
+ * It implements the module's own {@link TraceApi}, which peer modules call, and
+ * {@link CollectorApp}, which the `POST /api/collector` door calls. The second
+ * is declared here rather than left to agree by attention: the door is handed
+ * this object through the operations-only feature-API proxy, so a member it
+ * names and this class does not serve is not a type error at the seam - it is a
+ * `TypeError` on the first span a customer sends. Naming the door's shape in
+ * this `implements` clause is what turns that back into a build failure.
+ */
+export class TraceApp implements TraceApi, CollectorApp {
   static readonly contract = TraceApiToken;
   static readonly dependencies = traceDependencies;
   static readonly configSchema = traceAppConfigSchema;
@@ -440,7 +476,7 @@ export class TraceApp implements TraceApi {
    * blob read's refusal. Everything else Trace composes over is a peer Api or
    * a row from its own repository registry.
    */
-  static readonly reads = reads("clickhouse", "eventing", "logger");
+  static readonly reads = reads("clickhouse", "eventing", "logger", "redis");
 
   static create(input: TraceAppDependencies | TraceSetup): TraceApp {
     if (!("members" in input)) return new TraceApp(input);
@@ -1337,5 +1373,73 @@ export class TraceApp implements TraceApi {
   /** Renders a schema failure as the one sentence that family answers with. */
   describeValidationError(error: unknown): string {
     return describeTraceLegacyValidationError(error);
+  }
+
+  // -- the SDK collector's own members --------------------------------------
+  //
+  // `transport/collector.rest.ts` declares this set. Every one is a METHOD: the
+  // mounted door reads this application through a proxy that answers callable
+  // operations only, so a property member throws where it is read.
+
+  /**
+   * The project credential that door resolves for itself. Raises rather than
+   * refusing when the door was never composed: a process serving ingestion with
+   * no API-key directory is mis-wired, and answering a customer's SDK 401 would
+   * hide it behind a credential they would then go and rotate.
+   */
+  collectorCredential(input: { request: Request }): Promise<CollectorCredential> {
+    if (!this.#dependencies.ingestCredential) {
+      throw new Error(
+        "The collector asked for a credential, and this process composed Trace without the API-key directory it resolves through",
+      );
+    }
+
+    return this.#dependencies.ingestCredential.resolveForCollector(input);
+  }
+
+  /**
+   * The plan's monthly allowance. Accepts every batch: the allowance is read
+   * through a usage meter no module contract publishes yet, so this deployment
+   * enforces none at this door. It is a member rather than an absence because
+   * the door reads it by name.
+   */
+  collectorUsageLimit(_input: { project: CollectorProject }): Promise<void> {
+    return Promise.resolve();
+  }
+
+  /** Where one already-normalized span goes: the receiver both doors share. */
+  ingestSpan(
+    input: Parameters<CollectorSpanIngest>[0],
+  ): ReturnType<CollectorSpanIngest> {
+    const ingestion = this.#dependencies.ingestion;
+    if (!ingestion) {
+      throw new TraceIngestionUnavailableError();
+    }
+
+    return ingestion.ingestNormalizedSpan(input);
+  }
+
+  /**
+   * One custom SDK evaluation, on the same command the workbench's own re-scores
+   * travel. Parsed against the command's schema rather than cast onto it, so a
+   * field this door spells differently is a rejection here and not a malformed
+   * row downstream.
+   */
+  reportEvaluation(
+    input: Parameters<CollectorEvaluationReport>[0],
+  ): ReturnType<CollectorEvaluationReport> {
+    return this.#dependencies.evaluations.reportEvaluation(
+      reportEvaluationCommandDataSchema.parse(input),
+    );
+  }
+
+  /** The evaluator-id slug rule, as EVALUATION's own module spells it. */
+  deriveEvaluatorId(name: string): string {
+    return this.#dependencies.evaluations.deriveEvaluatorId(name);
+  }
+
+  /** A failure the door answered but did not raise, kept off the customer's body. */
+  collectorReportError(error: Error, context: Readonly<{ projectId: string }>): void {
+    logger.error({ error, projectId: context.projectId }, "the collector answered a failure");
   }
 }

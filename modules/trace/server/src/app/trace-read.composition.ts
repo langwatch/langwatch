@@ -1,7 +1,15 @@
 import { TraceProcessingSpanIngestAdapter } from "../services/trace-processing-span-ingest.service.ts";
+import {
+  TraceIngestionService,
+  TraceIngressCommand,
+  type TraceSpanDedup,
+} from "../services/ingestion/trace-ingestion.service.ts";
+import { TraceIngestCredentialService } from "../services/support/trace-ingest-credential.service.ts";
+import type { RecordSpanCommandData } from "@langwatch/trace-contract";
 import type { ClickHouseClient } from "@clickhouse/client";
 import type { AnnotationApi } from "@langwatch/annotation-contract";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
+import type { AuthzApi } from "@langwatch/authz-contract";
 import { TraceLegacyCredentialService } from "../services/support/trace-legacy-credential.service.ts";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import { createTenantId, type FoldProjectionStore } from "@langwatch/eventing";
@@ -68,7 +76,19 @@ export type TraceReaderCompositionOptions = {
    * resolves a project credential through. Absent, that family's five
    * addresses raise by name rather than admitting an unauthenticated caller.
    */
-  apiKeys?: ApiKeyApi | undefined;
+  apiKeys?: Pick<ApiKeyApi, "findResolvedToken" | "markUsed"> | undefined;
+  /**
+   * The ingestion doors' duplicate claim. Required: the doors are mounted on
+   * every process that composes Trace's REST surface, and a claim that is
+   * absent rather than null would be an ingest path deciding silently.
+   */
+  dedup: TraceSpanDedup;
+  /**
+   * The ceiling the INGESTION doors ask about, where it is not the viewer
+   * protections' own. Narrow because one question is all they ask: whether this
+   * key may create traces in its project.
+   */
+  ingestAuthz?: Pick<AuthzApi, "hasApiKeyPermission"> | undefined;
   /** Analytics's filter translator; absent, a FILTERED legacy list refuses. */
   filterConditions?:
     | import("../repositories/clickhouse/trace-legacy-read.repository.ts").TraceLegacyFilterConditions
@@ -184,6 +204,15 @@ export function composeTraceAppDependencies(
       changeTraceName: options.commands.changeTraceName,
     },
     spanIngest: TraceProcessingSpanIngestAdapter.create(options.commands),
+    // The receiver the two ingestion doors share. ONE dedup claim and ONE
+    // command sender across both, so a span posted to `/api/collector` and the
+    // same span exported over OTLP are one record, not two.
+    ingestion: TraceIngestionService.create({
+      codingAgents: options.codingAgents,
+      codingAgentSpanFilterEnabled: CODING_AGENT_SPAN_FILTER_ENABLED,
+      dedup: options.dedup,
+      commands: TraceComposedIngressCommand.create(options.commands),
+    }),
     viewer: TraceViewerReadService.create({
       read,
       protections,
@@ -209,10 +238,39 @@ export function composeTraceAppDependencies(
             apiKeys: options.apiKeys,
             authz: options.protections.authz,
           }),
+          ingestCredential: TraceIngestCredentialService.create({
+            apiKeys: options.apiKeys,
+            authz: options.ingestAuthz ?? options.protections.authz,
+          }),
         }
       : {}),
     publicBaseUrl: options.publicBaseUrl,
   };
+}
+
+/**
+ * The coding-agent span filter is on by default, exactly as the retired
+ * platform application had it: its kill switch was an environment variable read
+ * at that process's boot, and no process carries one now.
+ */
+const CODING_AGENT_SPAN_FILTER_ENABLED = true;
+
+/** The pipeline handoff, as the receiver's own abstract command. */
+class TraceComposedIngressCommand extends TraceIngressCommand {
+  static create(commands: TraceProcessingCommands): TraceComposedIngressCommand {
+    return new TraceComposedIngressCommand(commands);
+  }
+
+  #commands: TraceProcessingCommands;
+
+  private constructor(commands: TraceProcessingCommands) {
+    super();
+    this.#commands = commands;
+  }
+
+  async recordSpan(data: RecordSpanCommandData): Promise<void> {
+    await this.#commands.recordSpan(data);
+  }
 }
 
 class TraceReadQueryFieldValues extends TraceQueryFieldValuesRepository {

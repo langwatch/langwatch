@@ -2,6 +2,7 @@ import { bindRestMiddleware, projectCredentialOfRequest } from "@langwatch/api/r
 import { defineServerModule } from "@langwatch/runtime-composition";
 import { TraceApp } from "./app/trace.app.ts";
 import { traceRepositories } from "./repositories/trace-repositories.registry.ts";
+import { collectorRest } from "./transport/collector.rest.ts";
 import { spansTrpcTransport } from "./transport/spans.trpc.ts";
 import { traceLegacyRest } from "./transport/trace-legacy.rest.ts";
 import { traceEditOverlayTrpcTransport } from "./transport/trace-edit-overlay.trpc.ts";
@@ -27,6 +28,16 @@ export const traceServer = defineServerModule("trace")
     traceEditOverlayTrpcTransport,
     traceLegacyRest,
     tracesRest,
+    // `POST /api/collector`, the one address a released SDK posts a trace to.
+    // It binds NO transport fact, unlike the reads above: the door is declared
+    // public and resolves the project credential inside the handler, because
+    // its refusal bodies predate the framework envelope and a deployed SDK
+    // parses them. The binding it does have is `TraceApp.collectorCredential`,
+    // which every mounted process supplies through the API-key directory.
+    //
+    // Mounted last of the REST families, and anything matching `/api/collector/*`
+    // must be mounted after it: a wildcard in front would swallow this literal.
+    collectorRest,
   )
   .withTransportFacts(() => [
     // The v1 trace reads answer through the key's own grants, so the routes

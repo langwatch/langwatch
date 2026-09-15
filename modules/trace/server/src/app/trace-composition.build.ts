@@ -17,6 +17,11 @@ import { TraceCanonicalisationService } from "../services/canonicalisers/trace-c
 import { TRACE_PROCESSING_PIPELINE_NAME } from "../services/eventing.trace-pipeline.service.ts";
 import { TraceBlobStoreService } from "../services/offload/trace-blob-store.service.ts";
 import { TraceProcessingProducerAdapter } from "../services/trace-processing-producer.service.ts";
+import type { TraceSpanDedup } from "../services/ingestion/trace-ingestion.service.ts";
+import {
+  RedisTraceSpanDedupAdapter,
+  type TraceSpanDedupConnection,
+} from "../services/ingestion/trace-span-dedup.service.ts";
 import type { TracesTrpcEmitters } from "./trace.app.ts";
 import type { TraceProcessingCommands } from "./trace.members.ts";
 
@@ -36,6 +41,12 @@ export type TraceCollaborators = Readonly<{
   fallbackVisibilityDays: number;
   processName: string;
   publicBaseUrl?: string;
+  /**
+   * The ingestion doors' duplicate claim. Always present: where the process
+   * opened no Redis it is the null claim, which records a retried span twice
+   * rather than dropping it.
+   */
+  dedup: TraceSpanDedup;
 }>;
 
 /** Exactly the process members {@link buildTraceCollaborators} reads. */
@@ -43,6 +54,8 @@ export type TraceBuildMembers = Readonly<{
   clickhouse: ClickHouseQueryClient;
   eventing: EventSourcing;
   logger: Logger;
+  /** What the ingestion doors claim a span id in, so a retry is not a second span. */
+  redis: TraceSpanDedupConnection;
 }>;
 
 /** The config slice the deployment states for this module. */
@@ -90,6 +103,10 @@ export function buildTraceCollaborators(input: {
           processName: config.processName,
         }),
     broadcast: refusingBroadcast(refuse),
+    dedup: RedisTraceSpanDedupAdapter.create({
+      connection: members.redis,
+      logger: members.logger,
+    }),
     fallbackVisibilityDays: config.fallbackVisibilityDays,
     processName: config.processName,
     ...(config.publicBaseUrl === undefined ? {} : { publicBaseUrl: config.publicBaseUrl }),

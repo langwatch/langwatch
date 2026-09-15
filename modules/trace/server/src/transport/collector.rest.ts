@@ -72,21 +72,31 @@ export type CollectorCredentialResolver = (input: {
  */
 export type CollectorUsageLimit = (input: { project: CollectorProject }) => Promise<void>;
 
-/** The whole of what `POST /api/collector` asks the process for. */
+/**
+ * The whole of what `POST /api/collector` asks the process for.
+ *
+ * Every member carries the `collector` prefix where the trace application
+ * already answers a question of the same name for another door: the legacy
+ * `/api/trace/*` family resolves a `credential` too, and the OTLP receiver an
+ * allowance and an error report, and one class serves all three. A shared name
+ * would be one of the three doors silently reading another's answer.
+ */
 export type CollectorApp = Readonly<{
-  credential: CollectorCredentialResolver;
+  collectorCredential: CollectorCredentialResolver;
   /**
-   * The plan allowance, or none. None where the process composed no usage meter, and then no
-   * monthly allowance is enforced.
+   * The plan allowance. Resolves without refusing where the process composed no
+   * usage meter, and then no monthly allowance is enforced - it is a member
+   * rather than an optional one because the application is reached through the
+   * operations-only proxy, which throws on a name it does not serve.
    */
-  usageLimit?: CollectorUsageLimit | undefined;
+  collectorUsageLimit: CollectorUsageLimit;
   /** Where a normalized span goes. Required: it is the whole of this door. */
   ingestSpan: CollectorSpanIngest;
   /**
-   * Where a custom SDK evaluation goes, or none. None where the process registered no
-   * evaluation pipeline.
+   * Where a custom SDK evaluation goes. Answers that the evaluation was refused
+   * where the process registered no evaluation pipeline.
    */
-  reportEvaluation?: CollectorEvaluationReport | undefined;
+  reportEvaluation: CollectorEvaluationReport;
   /**
    * The evaluator-id slug rule, for an evaluation that names no evaluator. Supplied by the
    * process because the rule is EVALUATION's — the same one its own `custom-evaluation-sync`
@@ -94,7 +104,7 @@ export type CollectorApp = Readonly<{
    * server package.
    */
   deriveEvaluatorId: (name: string) => string;
-  reportError?: CollectorErrorReport | undefined;
+  collectorReportError: CollectorErrorReport;
 }>;
 
 export const CollectorApi = moduleApi<CollectorApp>("trace");
@@ -233,7 +243,7 @@ async function ingestCollectorBody(input: {
   const dispatch = TraceCollectorDispatchService.create({
     ingestSpan: app.ingestSpan,
     deriveEvaluatorId: app.deriveEvaluatorId,
-    ...(app.reportEvaluation ? { reportEvaluation: app.reportEvaluation } : {}),
+    reportEvaluation: app.reportEvaluation,
   });
 
   const { freshSpans, droppedOldSpans } = dispatch.partitionFreshSpans(spans, {
@@ -293,7 +303,7 @@ async function collect({
   request: Request;
   raw: string;
 }): Promise<RestRawResult> {
-  const auth = await app.credential({ request });
+  const auth = await app.collectorCredential({ request });
   if (!auth.ok) {
     if (auth.kind === "ceiling") {
       logger.warn("collector request denied by API key ceiling");
@@ -314,11 +324,11 @@ async function collect({
 
   // The allowance refuses by throwing; every other outcome — including a
   // lookup that failed inside the port — lets the batch through.
-  await app.usageLimit?.({ project });
+  await app.collectorUsageLimit({ project });
 
   const params = parseCollectorParams(body, {
     projectId: project.id,
-    ...(app.reportError ? { reportError: app.reportError } : {}),
+    reportError: app.collectorReportError,
   });
   if (isCollectorRejection(params)) return answer(params.body, params.status);
 
@@ -328,7 +338,7 @@ async function collect({
 
   const prepared = prepareCollectorBody(body, params, {
     projectId: project.id,
-    ...(app.reportError ? { reportError: app.reportError } : {}),
+    reportError: app.collectorReportError,
   });
   if (isCollectorRejection(prepared)) return answer(prepared.body, prepared.status);
 

@@ -2,6 +2,11 @@
  * @vitest-environment node
  * Verifies rejection payloads are specific enough to distinguish schema bugs
  * from sender errors.
+ *
+ * This test builds the router directly, so it proves what the ROUTER answers
+ * and nothing about whether the module mounts it. The family was unmounted for
+ * the whole life of this file and it stayed green throughout. What the door is
+ * served at all is `collector-rest.composition.integration.test.ts`.
  */
 import { createRestRuntime } from "@langwatch/api/rest";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -50,10 +55,12 @@ const runtime = createRestRuntime({
 
 const collector = runtime.mount(collectorRest.router(), {
   app: () => ({
-    credential: async () => ({ ok: true as const, project, markUsed: () => undefined }),
+    collectorCredential: async () => ({ ok: true as const, project, markUsed: () => undefined }),
+    collectorUsageLimit: async () => undefined,
     ingestSpan: async () => ({ status: "collected" }),
+    reportEvaluation: async () => undefined,
     deriveEvaluatorId: (name: string) => name,
-    reportError: (error: Error, context: unknown) => {
+    collectorReportError: (error: Error, context: unknown) => {
       reportedErrors.push({ message: error.message, context });
     },
   }),

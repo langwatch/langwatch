@@ -64,7 +64,8 @@ function parseBasicCredentials(value: string): TraceLegacyRequestCredentials | n
 
 /** The two peers this door reads, and nothing else. */
 export type TraceLegacyCredentialOptions = Readonly<{
-  apiKeys: ApiKeyApi;
+  /** Narrowed to what this door calls: it resolves a token and stamps its clock. */
+  apiKeys: Pick<ApiKeyApi, "findResolvedToken" | "markUsed">;
   authz: Pick<AuthzApi, "hasApiKeyPermission">;
   logger?: Pick<Logger, "error"> | undefined;
 }>;
@@ -78,12 +79,12 @@ export class TraceLegacyCredentialService {
     );
   }
 
-  #apiKeys: ApiKeyApi;
+  #apiKeys: Pick<ApiKeyApi, "findResolvedToken" | "markUsed">;
   #authz: Pick<AuthzApi, "hasApiKeyPermission">;
   #logger: Pick<Logger, "error">;
 
   private constructor(
-    apiKeys: ApiKeyApi,
+    apiKeys: Pick<ApiKeyApi, "findResolvedToken" | "markUsed">,
     authz: Pick<AuthzApi, "hasApiKeyPermission">,
     logger: Pick<Logger, "error">,
   ) {
