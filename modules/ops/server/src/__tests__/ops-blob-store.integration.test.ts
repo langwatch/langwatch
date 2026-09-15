@@ -9,12 +9,10 @@ import {
 } from "@langwatch/group-queue/operational";
 import Redis, { type Redis as RedisClient } from "ioredis";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
-import {
-  NoopSchedulerWakeService,
-  OpsOperations,
-  QueuePayloadDecoder,
-  type SchedulerOpsRepository,
-} from "@langwatch/ops-server";
+import type { SchedulerOpsRepository } from "@langwatch/ops-server";
+import { OpsOperations } from "../app/ops-operations.ts";
+import { NoopSchedulerWakeService } from "../services/scheduler-wake.service.ts";
+import type { QueuePayloadDecoder } from "../app/ops.app.ts";
 import type { OpsService } from "../services/ops.service.ts";
 import type { BrowserSessionApi } from "@langwatch/auth-contract";
 import type { UserApi } from "@langwatch/user-contract";

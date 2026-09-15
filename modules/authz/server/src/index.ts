@@ -1,12 +1,9 @@
-export { AuthzService, type AuthzServiceOptions } from "./services/authz.service.ts";
+export type { AuthzServiceOptions } from "./services/authz.service.ts";
 export {
   AuthzCollectorService,
   type AuthzCollectorOptions,
 } from "./services/authz-collector.service.ts";
-export {
-  AuthzGrantsService,
-  type AuthzGrantsServiceOptions,
-} from "./services/authz-grants.service.ts";
+export type { AuthzGrantsServiceOptions } from "./services/authz-grants.service.ts";
 export {
   PostgresAuthzAdapter,
   type AuthzPipeline,
@@ -45,9 +42,7 @@ export {
   type AuthzCutoverCounter,
 } from "./services/authz-cutover-telemetry.service.ts";
 export { AuthzGrantIdentity } from "./services/authz-grant-identity.service.ts";
-export { authzRepositories } from "./repositories/authz-repositories.registry.ts";
 export type { AuthzRepositories } from "./repositories/authz.repositories.ts";
-export { AuthzApp } from "./app/authz.app.ts";
 export { authzServer, type AuthzInfrastructure } from "./authz.server.ts";
 export {
   authzRoleBindingRest,

@@ -868,11 +868,6 @@
       "expires": "2026-10-01"
     },
     {
-      "key": "private-runtime-export|modules/authz/server/src/index.ts|./app/authz.app.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
       "key": "private-runtime-export|modules/authz/server/src/index.ts|./app/postgres-authz-pipeline.build.ts",
       "measured": "2026-09-10",
       "expires": "2026-10-01"
@@ -883,22 +878,7 @@
       "expires": "2026-10-01"
     },
     {
-      "key": "private-runtime-export|modules/authz/server/src/index.ts|./repositories/authz-repositories.registry.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
       "key": "private-runtime-export|modules/authz/server/src/index.ts|./services/authz-collector.service.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/authz/server/src/index.ts|./services/authz-grants.service.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/authz/server/src/index.ts|./services/authz.service.ts",
       "measured": "2026-09-10",
       "expires": "2026-10-01"
     },
@@ -1698,27 +1678,12 @@
       "expires": "2026-10-01"
     },
     {
-      "key": "private-runtime-export|modules/log/server/src/index.ts|./app/log.app.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
       "key": "private-runtime-export|modules/log/server/src/index.ts|./repositories/clickhouse/clickhouse.log-processing.repository.ts",
       "measured": "2026-09-10",
       "expires": "2026-10-01"
     },
     {
-      "key": "private-runtime-export|modules/log/server/src/index.ts|./repositories/clickhouse/clickhouse.log.repository.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
       "key": "private-runtime-export|modules/log/server/src/index.ts|./services/canonical-log.service.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/log/server/src/index.ts|./services/log-request-collection.service.ts",
       "measured": "2026-09-10",
       "expires": "2026-10-01"
     },
@@ -1729,11 +1694,6 @@
     },
     {
       "key": "private-runtime-export|modules/metric/server/src/index.ts|./services/metric-processing.service.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/metric/server/src/index.ts|./services/metric-request-collection.service.ts",
       "measured": "2026-09-10",
       "expires": "2026-10-01"
     },
@@ -1918,67 +1878,7 @@
       "expires": "2026-10-01"
     },
     {
-      "key": "private-runtime-export|modules/ops/server/src/index.ts|./app/ops-operations.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
       "key": "private-runtime-export|modules/ops/server/src/index.ts|./app/ops-system-migrations.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/ops/server/src/index.ts|./app/ops.app.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/ops/server/src/index.ts|./repositories/clickhouse/clickhouse.event-explorer.repository.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/ops/server/src/index.ts|./repositories/clickhouse/clickhouse.ops-explain.repository.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/ops/server/src/index.ts|./repositories/memory/memory.event-explorer.repository.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/ops/server/src/index.ts|./repositories/memory/memory.ops.store.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/ops/server/src/index.ts|./repositories/memory/memory.process-audit.repository.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/ops/server/src/index.ts|./repositories/memory/memory.process-ops.repository.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/ops/server/src/index.ts|./repositories/memory/memory.replay.repository.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/ops/server/src/index.ts|./repositories/memory/memory.scheduler-audit.repository.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/ops/server/src/index.ts|./repositories/ops-queue-metrics-source.repository.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/ops/server/src/index.ts|./repositories/prisma/prisma.bug-report.repository.ts",
       "measured": "2026-09-10",
       "expires": "2026-10-01"
     },
@@ -1988,82 +1888,7 @@
       "expires": "2026-10-01"
     },
     {
-      "key": "private-runtime-export|modules/ops/server/src/index.ts|./repositories/prisma/prisma.process-audit.repository.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
       "key": "private-runtime-export|modules/ops/server/src/index.ts|./repositories/prisma/prisma.process-manager-purge.repository.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/ops/server/src/index.ts|./repositories/prisma/prisma.process-ops.repository.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/ops/server/src/index.ts|./repositories/prisma/prisma.system-migration-state.repository.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/ops/server/src/index.ts|./repositories/process/ops-audit.repository.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/ops/server/src/index.ts|./repositories/redis/queue.repository.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/ops/server/src/index.ts|./repositories/redis/redis.ops-metrics.repository.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/ops/server/src/index.ts|./repositories/redis/redis.ops-snapshot-redis.repository.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/ops/server/src/index.ts|./repositories/redis/redis.ops-snapshot.repository.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/ops/server/src/index.ts|./repositories/redis/redis.scheduler-wake.repository.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/ops/server/src/index.ts|./rules/ops-clickhouse-explain.rules.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/ops/server/src/index.ts|./rules/ops-clickhouse-guardrails.rules.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/ops/server/src/index.ts|./rules/ops-error-normalizer.rules.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/ops/server/src/index.ts|./rules/ops-in-flight.rules.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/ops/server/src/index.ts|./rules/ops-redis-engine-cpu.rules.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/ops/server/src/index.ts|./rules/ops-system-migration-cohort.rules.ts",
       "measured": "2026-09-10",
       "expires": "2026-10-01"
     },
@@ -2073,77 +1898,7 @@
       "expires": "2026-10-01"
     },
     {
-      "key": "private-runtime-export|modules/ops/server/src/index.ts|./services/bug-report-inbox.service.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/ops/server/src/index.ts|./services/bug-report-intake.service.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/ops/server/src/index.ts|./services/event-explorer.service.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/ops/server/src/index.ts|./services/eventing.ops-introspection.service.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/ops/server/src/index.ts|./services/impersonation.service.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/ops/server/src/index.ts|./services/manager-explorer.service.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/ops/server/src/index.ts|./services/null.organization-dataplane.service.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/ops/server/src/index.ts|./services/ops-clickhouse-explain.service.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/ops/server/src/index.ts|./services/ops-metrics-collector.service.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/ops/server/src/index.ts|./services/ops-snapshot-reader.service.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
       "key": "private-runtime-export|modules/ops/server/src/index.ts|./services/otel.storage-stats-metrics.service.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/ops/server/src/index.ts|./services/queue.ops-queue-metrics-source.service.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/ops/server/src/index.ts|./services/queue.service.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/ops/server/src/index.ts|./services/replay-lock-heartbeat.service.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/ops/server/src/index.ts|./services/replay.service.ts",
       "measured": "2026-09-10",
       "expires": "2026-10-01"
     },
@@ -2153,27 +1908,7 @@
       "expires": "2026-10-01"
     },
     {
-      "key": "private-runtime-export|modules/ops/server/src/index.ts|./services/scheduler-wake.service.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/ops/server/src/index.ts|./services/slack.bug-report-notifier.service.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
       "key": "private-runtime-export|modules/ops/server/src/index.ts|./services/storage-stats-collection.service.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/ops/server/src/index.ts|./services/system-migration-cohort.service.ts",
-      "measured": "2026-09-10",
-      "expires": "2026-10-01"
-    },
-    {
-      "key": "private-runtime-export|modules/ops/server/src/index.ts|./services/system-migrations.service.ts",
       "measured": "2026-09-10",
       "expires": "2026-10-01"
     },

@@ -2,12 +2,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { SLOT_STALE_AFTER_MS } from "@langwatch/ops-contract";
-import {
-  NoopSchedulerWakeService,
-  SchedulerAuditRepository,
-  type ScheduledJobRecord,
-} from "../../index.ts";
+import type { ScheduledJobRecord } from "../../index.ts";
 import type { SchedulerOpsRepository } from "../../index.ts";
+import { NoopSchedulerWakeService } from "../scheduler-wake.service.ts";
+import { SchedulerAuditRepository } from "../../repositories/process/ops-audit.repository.ts";
 import { SchedulerOpsService } from "../scheduler-ops.service.ts";
 
 const NOW = new Date("2026-08-11T12:00:00.000Z");

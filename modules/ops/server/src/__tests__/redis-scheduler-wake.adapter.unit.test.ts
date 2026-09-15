@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { RedisSchedulerWakeAdapter } from "../index.ts";
+import { RedisSchedulerWakeRepository as RedisSchedulerWakeAdapter } from "../repositories/redis/redis.scheduler-wake.repository.ts";
 
 describe("RedisSchedulerWakeAdapter", () => {
   it("publishes a best-effort scheduler wake", async () => {
