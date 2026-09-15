@@ -314,7 +314,10 @@ async function lockOrganization(
   tx: Prisma.TransactionClient,
   organizationId: string,
 ): Promise<void> {
-  await tx.$queryRaw`
+  // `$executeRaw` (not `$queryRaw`): pg_advisory_xact_lock returns `void`,
+  // which $queryRaw can't deserialize. $executeRaw runs the statement and
+  // ignores the result, acquiring the lock as a side effect.
+  await tx.$executeRaw`
     -- @tenancy: organization-scoped advisory lock keyed by the bound organization id
     SELECT pg_advisory_xact_lock(hashtextextended(${organizationId}, 0))
   `;
