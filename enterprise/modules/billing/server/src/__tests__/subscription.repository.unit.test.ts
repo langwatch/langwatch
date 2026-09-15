@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { NUMERIC_OVERRIDE_FIELDS } from "../index.ts";
+import { NUMERIC_OVERRIDE_FIELDS } from "../services/plan-provider.service.ts";
 import { SubscriptionStatus } from "@langwatch/enterprise-billing-contract";
 import { PrismaSubscriptionRepository } from "../repositories/prisma/prisma.subscription.repository.ts";
 

@@ -1,7 +1,7 @@
 import type Stripe from "stripe";
 import { describe, expect, it } from "vitest";
 import { BillingPriceCatalogue, PlanTypes } from "@langwatch/enterprise-billing-contract";
-import { SubscriptionItemCalculatorService } from "../index.ts";
+import { SubscriptionItemCalculatorService } from "../services/subscription-item-calculator.service.ts";
 
 const prices = BillingPriceCatalogue.create("test").prices;
 const calculator = SubscriptionItemCalculatorService.create(prices);

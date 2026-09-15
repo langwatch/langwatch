@@ -1,16 +1,8 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { UNLIMITED_PLAN } from "@langwatch/enterprise-licensing-contract";
-import {
-  LicenseGenerationService,
-  LicenseLogger,
-  LicenseStorage,
-  LicenseRetention,
-  LicenseService,
-  LicenseServiceConfiguration,
-  LicenseUsage,
-  NodeLicenseCryptographyAdapter,
-  type StoredLicense,
-} from "../index.ts";
+import { LicenseLogger, LicenseStorage, LicenseRetention, LicenseUsage, NodeLicenseCryptographyAdapter, type StoredLicense } from "../index.ts";
+import { LicenseGenerationService } from "../services/license-generation.service.ts";
+import { LicenseService, LicenseServiceConfiguration } from "../services/license.service.ts";
 import {
   EXPIRED_LICENSE_KEY,
   TAMPERED_LICENSE_KEY,

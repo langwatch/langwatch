@@ -36,7 +36,10 @@
  * Spec: specs/governance/governance-people-discovery.feature
  */
 
-import { DepartmentService } from "@langwatch/enterprise-governance-server";
+import {
+  createDepartmentDirectory,
+  type DepartmentService,
+} from "@langwatch/enterprise-governance-server";
 import type { NormalizedPullEvent } from "@langwatch/enterprise-governance-contract";
 import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "~/generated/prisma/client";
@@ -78,7 +81,7 @@ export class DirectoryDepartmentSyncService {
   constructor(deps: DirectoryDepartmentSyncDeps) {
     this.prisma = deps.prisma;
     this.departments =
-      deps.departments ?? DepartmentService.create(deps.prisma);
+      deps.departments ?? createDepartmentDirectory(deps.prisma);
     this.matcher = deps.matcher ?? IdentityMatchService.create(deps.prisma);
     this.discoveredPeople =
       deps.discoveredPeople ?? new DiscoveredPersonRepository();

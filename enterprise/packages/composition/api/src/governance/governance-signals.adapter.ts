@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import {
+  createGovernanceSignals,
   type GovernanceDiagnosticsSink,
   type GovernanceSignalChannel,
-  GovernanceSignalService,
+  type GovernanceSignalService,
   type GatewayBudgetCrossingCandidate,
   type GovernanceBudgetCrossingData,
   type GovernanceResolvedBudgetCrossing,
@@ -117,7 +118,7 @@ export class AppGovernanceSignalsService {
     const port = AppGovernanceSignal.create(storage, delivery);
     return new AppGovernanceSignalsService(
       port,
-      GovernanceSignalService.create(port, new AppGovernanceSignalDiagnostics()),
+      createGovernanceSignals(port, new AppGovernanceSignalDiagnostics()),
     );
   }
 

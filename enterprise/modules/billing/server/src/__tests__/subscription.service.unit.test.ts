@@ -2,15 +2,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import Stripe from "stripe";
 import { PlanTypes, SubscriptionStatus } from "@langwatch/enterprise-billing-contract";
 import { StripeErrorTranslatorService } from "../services/stripe-error-translator.service.ts";
-import {
-  BillingSubscriptionService,
-  SeatEventSubscriptionService,
-  RECENT_INVOICES_LIMIT,
-  type BillingSubscription,
-  type BillingOrganization,
-  type BillingSubscriptionNotifier,
-  type SubscriptionItemCalculatorService,
-} from "../index.ts";
+import { type BillingSubscription, type BillingSubscriptionNotifier } from "../index.ts";
+import { BillingSubscriptionService, RECENT_INVOICES_LIMIT } from "../services/subscription.service.ts";
+import { SeatEventSubscriptionService } from "../services/seat-event-subscription.service.ts";
+import { type BillingOrganization } from "../repositories/organization/billing-account-facts.repository.ts";
+import { type SubscriptionItemCalculatorService } from "../services/subscription-item-calculator.service.ts";
 
 const mockSendSlackSubscriptionEvent = vi.fn().mockResolvedValue(undefined);
 

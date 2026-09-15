@@ -30,13 +30,12 @@ export {
  * directly: the API application may depend on the Enterprise API composition
  * and not on an Enterprise feature server.
  */
-export { createGovernanceRestApp, GovernanceApp } from "@langwatch/enterprise-governance-server";
+export { createGovernanceRestApp } from "@langwatch/enterprise-governance-server";
 
 /**
  * The governance capability itself, and the three shapes an API-role process reads off it.
  */
 export {
-  OrganizationSessionPolicyService,
   PersonaHomeResolverService,
   type PersonaResolution,
 } from "@langwatch/enterprise-governance-server";
@@ -80,14 +79,14 @@ export {
  * the process mounts them on its own runtime.
  */
 export {
-  PostgresScimAdapter,
+  createScimService,
+  createScimSyncLifecycle,
   scimProtocolErrorHandler,
   scimProtocolRest,
   scimTokenRest,
   scimTokenRestActor,
   scimTokenTrpcTransport,
   scimWebhookRest,
-  ScimSyncLifecycleAdapter,
   type ScimSyncLifecycle,
   type PostgresScimAdapterOptions,
   type ScimSyncLifecycleAdapterDeps,

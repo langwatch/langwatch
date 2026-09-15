@@ -4,7 +4,10 @@ import type {
   ManagedProviderConfiguration,
   ManagedProviderCredentialVendor,
 } from "@langwatch/enterprise-managed-provider-server";
-import { ManagedProviderService } from "@langwatch/enterprise-managed-provider-server";
+import {
+  createManagedProviderService,
+  type ManagedProviderService,
+} from "@langwatch/enterprise-managed-provider-server";
 import type { ProjectApi } from "@langwatch/project-contract";
 
 export type EnterpriseWorkerCompositionOptions = {
@@ -28,7 +31,7 @@ export class EnterpriseWorkerComposition {
   ): EnterpriseWorkerComposition & { readonly managedProviders: ManagedProviderService };
   static create(options?: EnterpriseWorkerCompositionOptions): EnterpriseWorkerComposition {
     const managedProviders = options
-      ? ManagedProviderService.create({
+      ? createManagedProviderService({
           configuration: options.managedProvider.configuration,
           projects: options.managedProvider.projects,
           credentials: options.managedProvider.credentials,

@@ -1,10 +1,10 @@
 export { NodeLicenseCryptographyAdapter } from "./services/node-license-cryptography.service.ts";
+export type { LicensingInfrastructure, LicensingRuntime } from "./app/licensing.app.ts";
 export {
-  LicensingApp,
-  type LicensingInfrastructure,
-  type LicensingRuntime,
-} from "./app/licensing.app.ts";
-export { licensingServer } from "./licensing.server.ts";
+  createDeploymentEntitlementSource,
+  createOrganizationLicenses,
+  licensingServer,
+} from "./licensing.server.ts";
 /**
  * The two declared tRPC surfaces, and the one fact the enforcement half asks
  * the process to resolve. A mount binds the fact; nothing else may.
@@ -22,29 +22,23 @@ export {
   type LicensingEntitlementSourceAdapterMode,
 } from "./services/licensing-entitlement-source.service.ts";
 export { PrismaOrganizationLicenseRepository } from "./repositories/prisma/prisma.organization-license.repository.ts";
-export {
-  type LicenseCryptography,
-  type LicenseLogger,
-  type LicenseRetention,
-  type LicenseRetentionRule,
-  type LicenseStorage,
-  type LicenseUsage,
-  type LicenseUsageCount,
-  type OrganizationLicense,
-  type OrganizationLicenseCandidate,
-  type StoredLicense,
+export type {
+  LicenseCryptography,
+  LicenseLogger,
+  LicenseRetention,
+  LicenseRetentionRule,
+  LicenseStorage,
+  LicenseUsage,
+  LicenseUsageCount,
+  OrganizationLicense,
+  OrganizationLicenseCandidate,
+  StoredLicense,
 } from "./app/licensing.members.ts";
-export { LicenseGenerationService } from "./services/license-generation.service.ts";
-export {
-  LicensePlanSourceService,
-  type LicensePlanSourceOptions,
-} from "./services/license-plan-source.service.ts";
-export {
-  LicenseService,
-  LicenseServiceConfiguration,
-  type LicenseRetentionConfiguration,
-  type LicenseServiceConfigurationInput,
-  type LicenseServiceOptions,
+export type { LicensePlanSourceOptions } from "./services/license-plan-source.service.ts";
+export type {
+  LicenseRetentionConfiguration,
+  LicenseServiceConfigurationInput,
+  LicenseServiceOptions,
 } from "./services/license.service.ts";
 
 /**
@@ -52,9 +46,8 @@ export {
  * are applied once and hold everywhere. Was
  * `platform/app/src/server/app-layer/subscription/plan-provider.ts`.
  */
-export {
-  PlanProviderService,
-  type PlanProvider,
-  type PlanProviderUser,
-  type PlanResolver,
+export type {
+  PlanProvider,
+  PlanProviderUser,
+  PlanResolver,
 } from "./services/plan-provider.service.ts";

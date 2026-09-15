@@ -13,7 +13,8 @@ import crypto from "crypto";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
-import { LicenseGenerationService, NodeLicenseCryptographyAdapter } from "../index.ts";
+import { NodeLicenseCryptographyAdapter } from "../index.ts";
+import { LicenseGenerationService } from "../services/license-generation.service.ts";
 import { buildMintedPlan } from "@langwatch/enterprise-licensing-contract";
 
 /**

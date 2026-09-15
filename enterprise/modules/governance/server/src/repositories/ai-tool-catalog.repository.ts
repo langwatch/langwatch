@@ -40,12 +40,14 @@ export abstract class AiToolCatalogRepository {
   abstract reorder(input: ReorderAiToolEntriesInput): Promise<void>;
 }
 
-export abstract class AiToolSlug {
-  abstract generate(displayName: string): string;
+/** How a catalogue entry's stable slug is minted from its display name. */
+export interface AiToolSlug {
+  generate(displayName: string): string;
 }
 
-export abstract class AiToolProviderCatalog {
-  abstract list(): Array<{
+/** The model providers this deployment can offer a catalogue entry. */
+export interface AiToolProviderCatalog {
+  list(): Array<{
     providerKey: string;
     displayName: string;
     type: string;

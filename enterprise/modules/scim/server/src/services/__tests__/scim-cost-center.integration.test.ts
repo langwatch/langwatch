@@ -8,8 +8,7 @@
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
-import { DepartmentService } from "@langwatch/enterprise-governance-server";
-import { PrismaDepartmentRepository } from "@langwatch/enterprise-governance-server/testing";
+import { createDepartmentTestService } from "@langwatch/enterprise-governance-server/testing";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import {
   PrismaConfigService,
@@ -69,7 +68,7 @@ describe.skipIf(!databaseUrl)("ScimService department auto-assignment", () => {
   const ORG_ID = `org-${ns}`;
 
   const departments = () =>
-    DepartmentService.create({ repository: PrismaDepartmentRepository.create(prisma) });
+    createDepartmentTestService(prisma);
 
   /**
    * Everything SCIM asks of the user directory, over the same rows: creating

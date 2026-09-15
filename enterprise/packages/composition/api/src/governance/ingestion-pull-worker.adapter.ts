@@ -8,34 +8,19 @@ import {
 } from "@aws-sdk/client-s3";
 import type { GovernanceInternalProject } from "@langwatch/project-server";
 import {
-  BuiltInPullerRegistryService,
+  createIngestionPullWorker,
   type GovernanceHttpClient,
   type GovernanceObjectStore,
   type GovernanceOcsfEventSink,
-  IngestionCredentialsService,
   type IngestionPullDiagnosticsSink,
   type IngestionPullSource,
-  IngestionPullWorkerService,
+  type IngestionPullWorkerService,
   type PulledUsageEntitlements,
-  PulledUsagePricingService,
   type PulledUsageRateReader,
-  PulledUsageRecordService,
   type GovernanceOcsfEventInput,
   type GovernanceHttpResponse,
   type GovernanceObjectStorageCredentials,
   type PulledUsageRateInput,
-} from "@langwatch/enterprise-governance-server";
-import {
-  AnthropicAdminPullerAdapter,
-  ClaudeComplianceReferencePullerAdapter,
-  CopilotStudioReferencePullerAdapter,
-  CopilotStudioDataversePullerAdapter,
-  DatabricksGeniePullerAdapter,
-  HttpPollingPullerAdapter,
-  OpenAiComplianceReferencePullerAdapter,
-  OpenAiAdminPullerAdapter,
-  PullerRegistryService,
-  S3PollingPullerAdapter,
 } from "@langwatch/enterprise-governance-server";
 import { createLogger } from "@langwatch/observability";
 import type { AppGovernanceOcsfEventsAdapter } from "./governance-ocsf-events.clickhouse.repository.ts";
@@ -306,33 +291,16 @@ export class AppIngestionPullWorkerAdapter {
   }
 
   build(): IngestionPullWorkerService {
-    const diagnostics = AppIngestionPullDiagnostics.create(this.host);
-    const http = AppGovernanceHttp.create(this.host);
-    const objects = AppGovernanceObjectStorage.create(this.host);
-    const pullers = PullerRegistryService.create();
-    pullers.register(HttpPollingPullerAdapter.create({ http, diagnostics }));
-    pullers.register(S3PollingPullerAdapter.create({ objects, diagnostics }));
-    pullers.register(CopilotStudioReferencePullerAdapter.create({ http, diagnostics }));
-    pullers.register(CopilotStudioDataversePullerAdapter.create(http));
-    pullers.register(OpenAiComplianceReferencePullerAdapter.create({ objects, diagnostics }));
-    pullers.register(OpenAiAdminPullerAdapter.create(http));
-    pullers.register(ClaudeComplianceReferencePullerAdapter.create({ http, diagnostics }));
-    pullers.register(AnthropicAdminPullerAdapter.create(http));
-    pullers.register(DatabricksGeniePullerAdapter.create(http));
-    const registry = BuiltInPullerRegistryService.create(pullers).build();
-    const credentials = IngestionCredentialsService.create(
-      AppGovernanceEncryption.create(this.host.encryption),
-    );
-    const pricing = PulledUsagePricingService.create(AppPulledUsageRate.create(this.host));
-    return IngestionPullWorkerService.create({
+    return createIngestionPullWorker({
       sources: this.sources,
-      registry,
-      credentials,
       projects: this.projects,
+      http: AppGovernanceHttp.create(this.host),
+      objects: AppGovernanceObjectStorage.create(this.host),
       sink: AppGovernanceOcsfEventSink.create(this.events),
+      encryptor: AppGovernanceEncryption.create(this.host.encryption),
       usageEntitlement: AppPulledUsageEntitlement.create(this.host),
-      usageRecords: PulledUsageRecordService.create(pricing),
-      diagnostics,
+      usageRate: AppPulledUsageRate.create(this.host),
+      diagnostics: AppIngestionPullDiagnostics.create(this.host),
     });
   }
 }

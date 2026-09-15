@@ -5,7 +5,7 @@ import {
   type GovernanceSetupActivityReader,
   type IngestionSourceEntitlements,
   type IngestionSourceLifecycleChannel,
-  PostgresGovernanceInstallationAdapter,
+  createGovernanceInstallation,
   type GovernanceInstallationOptions,
 } from "@langwatch/enterprise-governance-server";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
@@ -92,7 +92,7 @@ export class AppGovernanceRuntime {
     });
     const ingestionKeys = AppIngestionKeyAdapter.create(options.apiKeys);
 
-    return PostgresGovernanceInstallationAdapter.create({
+    return createGovernanceInstallation({
       database,
       organizations: options.organizations,
       projects: options.projects,
@@ -126,6 +126,6 @@ export class AppGovernanceRuntime {
       ingestionKeyRepository: ingestionKeys.repository(),
       ingestionKeyIssuer: ingestionKeys.issuer(),
       ottl: AppGovernanceOttlGateway.create(options.ottl ?? {}),
-    }).build();
+    });
   }
 }

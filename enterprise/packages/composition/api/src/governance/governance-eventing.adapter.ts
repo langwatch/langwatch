@@ -4,22 +4,21 @@ import {
   type CostRollupDayComparer,
   type CostRollupDayLook,
   CostRollupWatchProcess,
+  createIngestionPullEventing,
+  createIngestionPullExecution,
+  createIngestionPullLifecycle,
+  createPulledUsageEventing,
   type GovernanceEventingChannel,
   type GovernanceDiagnosticsSink,
-  IngestionPullEventingAdapter,
   type IngestionPullLifecycleChannel,
-  IngestionPullLifecycleService,
+  type IngestionPullLifecycleService,
   type IngestionPullMetricsSink,
   type IngestionPullOutcomeChannel,
   IngestionPullProcess,
   type IngestionPullRunner,
   type IngestionPullScheduler,
-  IngestionPullService,
   type IngestionPullTenantResolver,
-  PrismaIngestionPullLifecycleRepository,
-  PrismaIngestionPullRunProjectionRepository,
   type PulledUsageDispatcher,
-  PulledUsageEventingAdapter,
   type PulledUsageLedgerRepository,
   PulledUsageLedgerProcess,
   type IngestionPullLifecycleDatabase,
@@ -528,7 +527,7 @@ export class AppGovernanceEventingAdapter {
 
   register(): AppGovernanceEventingInstallation {
     const pulledUsagePipeline = this.eventSourcing.register(
-      PulledUsageEventingAdapter.create({
+      createPulledUsageEventing({
         ledger: this.runtime.execution.ledger
           ? PulledUsageLedgerProcess.create(
               AppPulledUsageLedger.create(this.runtime.execution.ledger),
@@ -539,29 +538,27 @@ export class AppGovernanceEventingAdapter {
               AppCostRollupDayComparer.create(this.runtime.execution.costRollup),
             )
           : undefined,
-      }).build(),
+      }),
     );
     const pulledUsageCommands = mapCommands(pulledUsagePipeline.commands);
     const pulledUsage = AppPulledUsagePipeline.create(pulledUsageCommands.recordPulledUsage);
     const ingestionPull = AppIngestionPullPipeline.deferred();
-    const execution = IngestionPullService.create(
-      AppIngestionPullRun.create({
+    const execution = createIngestionPullExecution({
+      run: AppIngestionPullRun.create({
         worker: this.runtime.execution.worker,
         pulledUsage: AppPulledUsageEventDispatcher.create(pulledUsage),
       }),
-      AppIngestionPullOutcome.create(ingestionPull),
-      AppIngestionPullMetrics.create(this.runtime.execution.metrics),
-    );
+      outcome: AppIngestionPullOutcome.create(ingestionPull),
+      metrics: AppIngestionPullMetrics.create(this.runtime.execution.metrics),
+    });
     const ingestionPullPipeline = this.eventSourcing.register(
-      IngestionPullEventingAdapter.create({
-        runStatusStore: PrismaIngestionPullRunProjectionRepository.create(
-          this.runtime.lifecycle.database,
-        ),
+      createIngestionPullEventing({
+        runStatusDatabase: this.runtime.lifecycle.database,
         process: IngestionPullProcess.create({
           schedule: UtcIngestionPullSchedule.create(this.runtime.lifecycle.schedule),
           execution,
         }),
-      }).build(),
+      }),
     );
     const ingestionPullCommands = mapCommands(ingestionPullPipeline.commands);
     ingestionPull.bind(
@@ -576,8 +573,8 @@ export class AppGovernanceEventingAdapter {
   }
 
   private lifecycle(pipeline: AppIngestionPullPipeline): IngestionPullLifecycleService {
-    return IngestionPullLifecycleService.create({
-      repository: PrismaIngestionPullLifecycleRepository.create(this.runtime.lifecycle.database),
+    return createIngestionPullLifecycle({
+      database: this.runtime.lifecycle.database,
       tenant: AppIngestionPullTenant.create(this.runtime.lifecycle.projects),
       commands: AppIngestionPullLifecycleCommand.create(pipeline),
       diagnostics: new AppIngestionPullDiagnostics(),

@@ -2,11 +2,9 @@
 
 import { createLogger } from "@langwatch/observability";
 import {
-  AnomalyAlertDispatcherService,
-  type AnomalyAlertHttp,
+  type AnomalyAlertHttpClient,
   type AnomalySpendReader,
-  PrismaSpendSpikeAnomalyRepository,
-  SpendSpikeAnomalyEvaluatorService,
+  createSpendSpikeAnomalyEvaluator,
   type SpendSpikeAnomalyDatabase,
 } from "@langwatch/enterprise-governance-server";
 import { nowInstant } from "@langwatch/time";
@@ -56,7 +54,7 @@ export type SpendSpikeAnomalyWorkerDependencies = {
    * spikes.
    */
   spend: AnomalySpendReader;
-  http: AnomalyAlertHttp;
+  http: AnomalyAlertHttpClient;
 };
 
 /**
@@ -75,10 +73,10 @@ export function startSpendSpikeAnomalyWorker(
 ): SpendSpikeAnomalyWorkerHandle {
   let stopped = false;
   let timer: NodeJS.Timeout | undefined;
-  const evaluator = SpendSpikeAnomalyEvaluatorService.create({
-    repository: PrismaSpendSpikeAnomalyRepository.create(dependencies.database),
+  const evaluator = createSpendSpikeAnomalyEvaluator({
+    database: dependencies.database,
     spend: dependencies.spend,
-    dispatcher: AnomalyAlertDispatcherService.create({ http: dependencies.http }),
+    http: dependencies.http,
   });
 
   const tick = async () => {

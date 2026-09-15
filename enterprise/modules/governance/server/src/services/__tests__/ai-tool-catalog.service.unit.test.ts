@@ -51,11 +51,11 @@ class MemoryCatalog extends AiToolCatalogRepository {
   reorder = vi.fn(async () => undefined);
 }
 
-class FixedSlug extends AiToolSlug {
+class FixedSlug implements AiToolSlug {
   generate = vi.fn(() => "generated-slug");
 }
 
-class FixedProviders extends AiToolProviderCatalog {
+class FixedProviders implements AiToolProviderCatalog {
   list() {
     return [
       { providerKey: "openai", displayName: "OpenAI", type: "llm" },

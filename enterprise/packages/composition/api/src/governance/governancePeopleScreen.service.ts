@@ -26,7 +26,10 @@ import {
   IdentityMatchSuggestionRepository,
   OrganizationAccountDirectoryRepository,
 } from "../repositories/governanceIdentity.repository";
-import { DepartmentService } from "@langwatch/enterprise-governance-server";
+import {
+  createDepartmentDirectory,
+  type DepartmentService,
+} from "@langwatch/enterprise-governance-server";
 
 export interface PeopleScreenPerson {
   id: string;
@@ -81,7 +84,7 @@ export class GovernancePeopleScreenService {
 
   constructor({ prisma }: { prisma: PrismaClient }) {
     this.prisma = prisma;
-    this.departments = DepartmentService.create(prisma);
+    this.departments = createDepartmentDirectory(prisma);
   }
 
   static create(prisma: PrismaClient): GovernancePeopleScreenService {

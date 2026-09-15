@@ -8,7 +8,18 @@
 import { bindRestMiddleware, organizationCredentialOfRequest } from "@langwatch/api/rest";
 import { defineServerModule } from "@langwatch/runtime-composition";
 
+import type { ScimService as ScimServiceContract } from "@langwatch/enterprise-scim-contract";
+
 import { ScimApp } from "./app/scim.app.ts";
+import type { ScimSyncLifecycle } from "./app/scim.members.ts";
+import {
+  PostgresScimAdapter,
+  type PostgresScimAdapterOptions,
+} from "./services/postgres-scim.service.ts";
+import {
+  ScimSyncLifecycleAdapter,
+  type ScimSyncLifecycleAdapterDeps,
+} from "./services/scim-sync-lifecycle.service.ts";
 import { scimProtocolRest } from "./transport/scim-protocol.rest.ts";
 import { scimTokenRest, scimTokenRestActor } from "./transport/scim-token.rest.ts";
 import { scimTokenTrpcTransport } from "./transport/scim-token.trpc.ts";
@@ -32,3 +43,20 @@ export const scimServer = defineServerModule("scim")
       return { actorId: credential.userId ?? `apikey:${credential.apiKeyId}` };
     }),
   ]);
+
+export type { PostgresScimAdapterOptions, ScimSyncLifecycleAdapterDeps };
+
+/**
+ * What a process composes SCIM from: the provisioning service over its own
+ * connection and peers, and the durable directory-sync history that states what
+ * happened as facts on the connection's identity aggregate. The adapters behind
+ * them stay private to this feature server.
+ */
+export function createScimService(options: PostgresScimAdapterOptions): ScimServiceContract {
+  return PostgresScimAdapter.create(options).build();
+}
+
+/** The durable directory-sync history for one deployment. */
+export function createScimSyncLifecycle(deps: ScimSyncLifecycleAdapterDeps): ScimSyncLifecycle {
+  return ScimSyncLifecycleAdapter.create(deps);
+}

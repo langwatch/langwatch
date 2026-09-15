@@ -3,22 +3,24 @@ import type {
   PullResult,
   PullRunOptions,
 } from "@langwatch/enterprise-governance-contract";
-import {
+import type {
+  GovernanceEncryptor,
   GovernanceHttpClient,
+  GovernanceHttpResponse,
+  GovernanceObjectStorageCredentials,
   GovernanceObjectStore,
+  GovernanceOcsfEventInput,
+} from "../../app/governance.members.ts";
+import type {
   GovernanceOcsfEventSink,
-  type GovernanceEncryptor,
-  IngestionCredentialsService,
   IngestionPullSourceReader,
-  IngestionPullWorkerService,
-  NullIngestionPullDiagnosticsAdapter,
   PulledUsageEntitlements,
-  PulledUsagePricingService,
-  PulledUsageRecordService,
-  type GovernanceHttpResponse,
-  type GovernanceObjectStorageCredentials,
-  type GovernanceOcsfEventInput,
-} from "@langwatch/enterprise-governance-server";
+} from "../../app/governance.members.ts";
+import { NullIngestionPullDiagnosticsAdapter } from "../../services/ingestion-pull-diagnostics.service.ts";
+import { IngestionCredentialsService } from "../../services/ingestion-credentials.service.ts";
+import { IngestionPullWorkerService } from "../../services/ingestion-pull-worker.service.ts";
+import { PulledUsagePricingService } from "../../services/pulled-usage-pricing.service.ts";
+import { PulledUsageRecordService } from "../../services/pulled-usage-record.service.ts";
 import type { PulledUsageRateInput } from "../../app/governance.members.ts";
 import { PullerRegistryService } from "../../services/puller-registry.service.ts";
 import { TestProjectApi as CompleteTestProjectService } from "./test-project-api.ts";
@@ -107,30 +109,24 @@ export class TestObjectStorage implements GovernanceObjectStore {
   }
 }
 
-class TestSource extends IngestionPullSourceReader {
-  constructor(private readonly find: () => Promise<GovernanceIngestionSource | null>) {
-    super();
-  }
+class TestSource implements IngestionPullSourceReader {
+  constructor(private readonly find: () => Promise<GovernanceIngestionSource | null>) {}
 
   findById(): Promise<GovernanceIngestionSource | null> {
     return this.find();
   }
 }
 
-class TestSink extends GovernanceOcsfEventSink {
-  constructor(private readonly insert: (input: GovernanceOcsfEventInput) => Promise<void>) {
-    super();
-  }
+class TestSink implements GovernanceOcsfEventSink {
+  constructor(private readonly insert: (input: GovernanceOcsfEventInput) => Promise<void>) {}
 
   insertEvent(input: GovernanceOcsfEventInput): Promise<void> {
     return this.insert(input);
   }
 }
 
-class TestEntitlement extends PulledUsageEntitlements {
-  constructor(private readonly enabled: (organizationId: string) => Promise<boolean>) {
-    super();
-  }
+class TestEntitlement implements PulledUsageEntitlements {
+  constructor(private readonly enabled: (organizationId: string) => Promise<boolean>) {}
 
   isEnabled(organizationId: string): Promise<boolean> {
     return this.enabled(organizationId);

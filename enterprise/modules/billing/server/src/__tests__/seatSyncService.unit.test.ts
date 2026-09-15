@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { SubscriptionNotLinkedError } from "@langwatch/enterprise-billing-contract";
-import { SeatSyncService } from "../index.ts";
+import { SeatSyncService } from "../services/seat-sync.service.ts";
 import { PrismaOrganizationPricingRepository } from "../repositories/prisma/prisma.organization-pricing.repository.ts";
 
 const createMockDb = ({ pricingModel }: { pricingModel: string | null }) => ({

@@ -41,7 +41,7 @@ import {
   type AgentsListingSummary,
   agentsListingOutcome,
 } from "../../../../../modules/governance/server/src/services/agents-listing-outcome.service.ts";
-import { PrismaIngestionPullRunProjectionRepository } from "@langwatch/enterprise-governance-server";
+import { findAgentsListings } from "@langwatch/enterprise-governance-server";
 
 const logger = createLogger("langwatch:governance:agent-sync");
 
@@ -221,9 +221,8 @@ export class GovernanceAgentSyncService {
       organizationId,
     });
     const listings: Map<string, AgentsListingSummary> = projectId
-      ? await new PrismaIngestionPullRunProjectionRepository(
-          this.prisma,
-        ).findAgentsListings({
+      ? await findAgentsListings({
+          database: this.prisma,
           sourceIds: sources.map((source) => source.id),
           projectId,
         })

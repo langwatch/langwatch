@@ -20,7 +20,7 @@ import {
   LEGACY_CALLBACK_PROVIDER_IDS,
   legacyCallbackUrl,
   PLAIN_OIDC_PROVIDERS,
-} from "@langwatch/enterprise-sso-server";
+} from "../services/better-auth-sso.service.ts";
 
 const BASE_URL = "https://langwatch.acme.test";
 

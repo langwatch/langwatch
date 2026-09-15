@@ -7,7 +7,7 @@
  * database would.
  */
 import { instantiateRepositories } from "@langwatch/runtime-composition";
-import { auditLogRepositories } from "@langwatch/enterprise-audit-log-server";
+import { auditLogRepositories } from "../../audit-log-repositories.registry.ts";
 import { describe, expect, it } from "vitest";
 
 const PROJECT_ID = "project-1";

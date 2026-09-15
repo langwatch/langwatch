@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import type { PersonalVirtualKey } from "@langwatch/enterprise-governance-contract";
-import {
+import type {
   AiToolProviderCatalog,
   AiToolSlug,
-  type CliAdminContactReader,
-  type PersonalVirtualKeyIssuer,
+  CliAdminContactReader,
+  PersonalVirtualKeyIssuer,
 } from "@langwatch/enterprise-governance-server";
 import { nanoid } from "nanoid";
 import type { Instant } from "@langwatch/time";
@@ -91,7 +91,7 @@ export class AppPersonalVirtualKeyIssuer implements PersonalVirtualKeyIssuer {
   }
 }
 
-export class AppAiToolSlug extends AiToolSlug {
+export class AppAiToolSlug implements AiToolSlug {
   generate(displayName: string): string {
     const base = displayName
       .toLowerCase()
@@ -105,10 +105,8 @@ export class AppAiToolSlug extends AiToolSlug {
   }
 }
 
-export class AppAiToolProviderCatalog extends AiToolProviderCatalog {
-  private constructor(private readonly providers: GovernanceModelProviderCatalog) {
-    super();
-  }
+export class AppAiToolProviderCatalog implements AiToolProviderCatalog {
+  private constructor(private readonly providers: GovernanceModelProviderCatalog) {}
 
   static create(providers: GovernanceModelProviderCatalog): AppAiToolProviderCatalog {
     return new AppAiToolProviderCatalog(providers);

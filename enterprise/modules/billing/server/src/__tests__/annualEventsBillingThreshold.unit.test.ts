@@ -17,7 +17,7 @@ const prices = {
 } as StripePriceMap;
 
 import type Stripe from "stripe";
-import { ANNUAL_EVENTS_BILLING_THRESHOLD, AnnualEventsBillingThresholdService } from "../index.ts";
+import { ANNUAL_EVENTS_BILLING_THRESHOLD, AnnualEventsBillingThresholdService } from "../services/annual-events-billing-threshold.service.ts";
 
 const applyThreshold = ({
   stripe,

@@ -15,7 +15,7 @@
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
-import { DepartmentService } from "@langwatch/enterprise-governance-server";
+import { createDepartmentDirectory } from "@langwatch/enterprise-governance-server";
 import type { NormalizedPullEvent } from "@langwatch/enterprise-governance-contract";
 import { prisma } from "~/server/db";
 import { cleanupTestRows } from "~/test-utils/cleanupTestRows";
@@ -215,7 +215,7 @@ describe("Feature: directory departments land on the entities we already have", 
   describe("given directory and confirmed email evidence name different members", () => {
     /** @scenario "Conflicting directory and confirmed email proof changes no department" */
     it("leaves both assignments and their histories untouched", async () => {
-      const departmentService = DepartmentService.create(prisma);
+      const departmentService = createDepartmentDirectory(prisma);
       for (const [userId, name] of [
         [mariaUserId, "Engineering"],
         [jonasUserId, "Operations"],

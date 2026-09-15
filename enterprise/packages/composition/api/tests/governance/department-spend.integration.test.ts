@@ -18,10 +18,7 @@ import type {
   GovernanceClickHouseClient,
   GovernanceClickHouseResolver,
 } from "@langwatch/enterprise-governance-server";
-import {
-  ActivityMonitorService,
-  PrismaActivityMonitorRepository,
-} from "@langwatch/enterprise-governance-server/testing";
+import { createActivityMonitorTestService } from "@langwatch/enterprise-governance-server/testing";
 
 class AllowTestQueries extends PrismaQueryGuard {
   execute(context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {
@@ -125,12 +122,10 @@ describe.skipIf(!databaseUrl || !chUrl)("ActivityMonitorService.spendByDepartmen
         return Promise.resolve(client);
       }
     }
-    return ActivityMonitorService.create(
-      PrismaActivityMonitorRepository.create({
-        prisma,
-        clickhouse: new SuiteResolver(),
-      }),
-    );
+    return createActivityMonitorTestService({
+      prisma,
+      clickhouse: new SuiteResolver(),
+    });
   };
 
   beforeAll(async () => {
