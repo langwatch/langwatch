@@ -152,12 +152,32 @@ oxlint plugin rule sees one file at a time and cannot answer any of those. The
 policies that *could* move are the per-file ones, which are already the cheap
 ones — moving them would save little.
 
+### Two fixes tried and rejected on measurement
+
+**Uncached whole-repo walks** (`sourceFile({ cache: false })` in
+`unused-module-export`): in isolation, parsing 6,000 files uncached peaks at
+0.20 GiB against 0.95 GiB cached, because a tree that never enters the cache is
+never added to the job's kept-alive list. In the real run it made things WORSE
+— 3.39 GiB and 27.0s against 2.76 GiB and 19.9s. The other 54 policies still
+fill the cache with the same files, so one policy opting out does not shrink the
+cache; it only adds uncollected garbage beside it. Any fix here has to apply to
+every whole-repo walk at once, or not at all.
+
+**A bounded LRU**: straight time-for-memory, measured above.
+
+Findings stayed at 2761 across 55 policies under both, so the measurements are
+comparable and neither was unsafe — just not improvements.
+
 ### Where the wins actually are, cheapest first
 
-1. **`service-projection-boundaries`: 1.01 GiB to report nothing.** It holds
-   `Map<string, ts.SourceFile>` and `Map<ts.SourceFile, …>` strongly in
-   `packageTypes()`, pinning every tree it parses. Its tests are real and it is
-   a satisfied guard, not a dead one — but it should stream rather than retain.
+1. **Walk the tree once** — this is the only one that actually pays. The peak
+   is cumulative: every tree any policy parses stays reachable for the run, so
+   the high-water mark is the union of all of them, and no single-policy fix
+   moves it. `unused-module-export` alone already parses nearly everything.
+   Fixing one policy's retention (`service-projection-boundaries` holds
+   `Map<string, ts.SourceFile>` strongly in `packageTypes()` and costs 1.01 GiB
+   to report nothing) saves almost nothing off the peak, because those files are
+   parsed by something else anyway.
 2. **Make the cache honest.** Either document it as the unbounded strong cache
    it is, or give the whole-repo walks a turn boundary so the `WeakRef` works as
    designed and memory is reclaimed under pressure rather than never.
