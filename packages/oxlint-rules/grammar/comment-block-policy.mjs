@@ -1,10 +1,17 @@
-// The comment-block grammar, shared by the oxlint rule that reports
-// `comment-block-size` and by the CLI's 4-5 line review queue. Each caller
-// supplies the comment ranges from the parser it already has; everything
-// below is pure.
+// The comment-block grammar, shared by the two oxlint rules that report block
+// size and by the CLI's 4-5 line review queue. Each caller supplies the comment
+// ranges from the parser it already has; everything below is pure.
 
 export const REVIEW_LINE_COUNT = 4;
 export const MAX_COMMENT_BLOCK_LINES = 5;
+export const COMMENT_BLOCK_WARN_LINES = 6;
+export const COMMENT_BLOCK_ERROR_LINES = 9;
+
+/** The last resort, and almost never correct. It must name the ADR that holds the narrative. */
+export const LINT_KEEP_ANNOTATION = "@lint-keep";
+
+/** A reason is a clause, not a shrug: fewer words than this does not excuse the block. */
+export const LINT_KEEP_REASON_WORDS = 3;
 
 /**
  * The per-file command a reader can paste to get every comment finding in one
@@ -12,22 +19,53 @@ export const MAX_COMMENT_BLOCK_LINES = 5;
  */
 export const COMMENT_SWEEP_COMMAND = "pnpm exec oxlint --config .oxlintrc.architecture.json <file>";
 
+/** The two answers that are almost always right, in the order to try them. */
+const WHERE_IT_BELONGS =
+  "Delete it when the code already says it. Otherwise move the narrative - a decision and its" +
+  " alternatives, a protocol, a migration's reasoning - into an ADR under `dev/docs/adr/` or a" +
+  " page under `dev/docs/best_practices/`, and leave one line here linking it.";
+
+/** Stated wherever the annotation is, so nobody reads it as a general escape hatch. */
+const KEEP_IS_A_LAST_RESORT =
+  `\`${LINT_KEEP_ANNOTATION}\` is a last resort and is almost never the answer: it is for a block a` +
+  " reader needs at the code itself - a state table, an ordering constraint, a wire format - whose" +
+  " full narrative is already recorded in an ADR. Write" +
+  ` \`${LINT_KEEP_ANNOTATION} <reason> dev/docs/adr/<file>.md\` on its own line inside the block,` +
+  " naming that ADR; the annotation's own line does not count toward the length.";
+
+const SWEEP_HINT =
+  "More than one block in a file is a sweep, not an edit: list them all with" +
+  ` \`${COMMENT_SWEEP_COMMAND}\` and rewrite them in one pass.`;
+
 /** Declared as `what` + `fix` so a rule can interpolate either half. */
 export const COMMENT_BLOCK_SIZE_WHAT = "Comment block has {{lines}} lines; the maximum is {{max}}.";
 
 export const COMMENT_BLOCK_SIZE_FIX =
-  "Keep one or two lines of why beside the code and move the narrative into an ADR or a" +
-  " dev/docs page this comment links; delete it outright when the code already says it." +
-  ` More than one block in a file is a sweep, not an edit: list them with \`${COMMENT_SWEEP_COMMAND}\`` +
-  " and hand that list to a haiku subagent to rewrite in one pass.";
+  `${WHERE_IT_BELONGS} ${KEEP_IS_A_LAST_RESORT} ${SWEEP_HINT}`;
 
-export const COMMENT_BLOCK_SIZE_MESSAGE = `${COMMENT_BLOCK_SIZE_WHAT} ${COMMENT_BLOCK_SIZE_FIX}`;
+export const COMMENT_BLOCK_ERROR_WHAT =
+  `${COMMENT_BLOCK_SIZE_WHAT} At {{error}} lines or more this is an error and cannot be` +
+  ` suppressed: \`${LINT_KEEP_ANNOTATION}\` does not apply at this size.`;
 
+export const COMMENT_BLOCK_ERROR_FIX = `${WHERE_IT_BELONGS} ${SWEEP_HINT}`;
+
+export const COMMENT_KEEP_REASON_WHAT =
+  `\`${LINT_KEEP_ANNOTATION}\` on this {{lines}}-line block does not both give a reason of` +
+  " {{words}} words or more and name the ADR recording it, so the block is still over {{max}} lines.";
+
+export const COMMENT_KEEP_REASON_FIX = `${KEEP_IS_A_LAST_RESORT} ${WHERE_IT_BELONGS}`;
+
+const WARN_MESSAGE = `${COMMENT_BLOCK_SIZE_WHAT} ${COMMENT_BLOCK_SIZE_FIX}`;
+const ERROR_MESSAGE = `${COMMENT_BLOCK_ERROR_WHAT} ${COMMENT_BLOCK_ERROR_FIX}`;
+
+/** The message for a block of `lines`, at whichever tier that count falls in. */
 export function commentBlockSizeMessage(lines) {
-  return COMMENT_BLOCK_SIZE_MESSAGE.replace("{{lines}}", String(lines)).replace(
-    "{{max}}",
-    String(MAX_COMMENT_BLOCK_LINES),
-  );
+  const template = lines >= COMMENT_BLOCK_ERROR_LINES ? ERROR_MESSAGE : WARN_MESSAGE;
+
+  return template
+    .replaceAll("{{lines}}", String(lines))
+    .replaceAll("{{max}}", String(MAX_COMMENT_BLOCK_LINES))
+    .replaceAll("{{error}}", String(COMMENT_BLOCK_ERROR_LINES));
 }
 
 const SOURCE_WHITESPACE = new Set([" ", "\t", "\r", "\n"]);
@@ -58,6 +96,35 @@ export function isExemptBlock(text) {
     .map((line) => line.trim())
     .filter((line) => line.length > 0 && line !== "/*" && line !== "*/" && line !== "/**");
   return lines.length > 0 && lines.every((line) => DIRECTIVE_LINE.test(line));
+}
+
+/** The ADR or best-practices page holding the narrative this block is a fragment of. */
+const LINT_KEEP_RECORD = /dev\/docs\/(?:adr|best_practices)\/[\w.-]+\.md\b/;
+
+const LINT_KEEP_LINE = new RegExp(
+  String.raw`^\s*(?:\/\/|\/\*\*?|\*\/?|\*)?\s*@lint-keep\b[ \t]*(.*?)\s*(?:\*\/)?\s*$`,
+);
+
+/**
+ * The `@lint-keep` annotation a block carries, if any: whether it is present,
+ * the reason written beside it, and how many lines it occupies - those lines
+ * are the annotation, not the commentary, so they do not count toward length.
+ */
+export function inspectLintKeep(text) {
+  let annotationLines = 0;
+  let reason = "";
+
+  for (const line of text.split(/\r?\n/)) {
+    const match = LINT_KEEP_LINE.exec(line);
+    if (!match) continue;
+    annotationLines += 1;
+    if (!reason) reason = (match[1] ?? "").trim();
+  }
+
+  const words = reason.split(/\s+/).filter((word) => word.length > 0);
+  const records = LINT_KEEP_RECORD.test(reason);
+
+  return { annotationLines, present: annotationLines > 0, reason, records, words: words.length };
 }
 
 export function mayContainReviewBlock(source) {

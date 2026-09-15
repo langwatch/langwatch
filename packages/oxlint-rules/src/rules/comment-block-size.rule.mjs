@@ -2,9 +2,12 @@ import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
+  COMMENT_BLOCK_ERROR_FIX,
+  COMMENT_BLOCK_ERROR_LINES,
+  COMMENT_BLOCK_ERROR_WHAT,
   MAX_COMMENT_BLOCK_LINES,
   collectCommentBlocks,
-  commentBlockSizeMessage,
+  inspectLintKeep,
   isExemptBlock,
   lineAtOffset,
   lineIndex,
@@ -17,13 +20,9 @@ import { defineRule } from "../define-rule.mjs";
 
 // A block of 6 to 8 lines warns (`comment-block-size-warning.rule.mjs`), 9 or
 // more errors, and a comment line wider than 100 columns errors. Both rules
-// share the one analysis below: it walks the file's comments exactly once per
-// file, memoised so the second rule's visitor is a cache hit, and finds a
-// line's number with the shared binary-search index instead of re-slicing
-// and re-splitting the source per comment range.
+// share the one analysis below, which walks a file's comments exactly once and
+// is memoised so the second rule's visitor is a cache hit.
 
-export const COMMENT_BLOCK_WARN_LINES = 6;
-export const COMMENT_BLOCK_ERROR_LINES = 9;
 export const MAX_COMMENT_COLUMNS = 100;
 
 const COMMENT_EXCLUDED_DIRECTORIES = new Set([
@@ -114,17 +113,15 @@ function commentBlockRoots(cwd) {
 
 export function isCommentScannedPath(workspacePath) {
   if (workspacePath.startsWith("../")) return false;
-  if (workspacePath.split("/").some((segment) => COMMENT_EXCLUDED_DIRECTORIES.has(segment))) {
-    return false;
-  }
+  const segments = workspacePath.split("/");
+  const excluded = segments.some((segment) => COMMENT_EXCLUDED_DIRECTORIES.has(segment));
+  if (excluded) return false;
   return !/\.(?:generated|gen)\.[cm]?[jt]sx?$/.test(workspacePath);
 }
 
 /**
- * Whether the burn-down allowlist still covers this file. A changed file is
- * never covered: new commentary is held to the limit wherever it lands. Only
- * called once a candidate finding exists — the git-backed lookup and the date
- * computation are wasted on the common case of a file with nothing to report.
+ * Whether the burn-down allowlist still covers this file; a changed file never
+ * is. Called only once a candidate exists: the lookup is wasted otherwise.
  */
 export function isCoveredByAllowedRoot(cwd, workspacePath) {
   const changed = changedFiles(cwd);
@@ -138,6 +135,34 @@ function commentRangesOf(program) {
     .filter((comment) => comment.type !== "Shebang")
     .map((comment) => ({ pos: comment.start, end: comment.end }))
     .sort((left, right) => left.pos - right.pos || left.end - right.end);
+}
+
+/** One block, with its `@lint-keep` resolved and the annotation's own lines discounted. */
+function describeBlock(block, lines) {
+  const text = lines.slice(block.line - 1, block.line - 1 + block.lines).join("\n");
+  const keep = inspectLintKeep(text);
+
+  return { ...block, exempt: isExemptBlock(text), keep, lines: block.lines - keep.annotationLines };
+}
+
+/** Every comment line past the column limit, each reported once however many ranges cover it. */
+function overlongCommentLines({ lines, ranges, source }) {
+  const starts = lineIndex(source);
+  const seen = new Set();
+  const overflows = [];
+
+  for (const range of ranges) {
+    const startLine = lineAtOffset(starts, range.pos);
+    const endLine = lineAtOffset(starts, Math.max(range.pos, range.end - 1));
+    for (let line = startLine; line <= endLine; line += 1) {
+      const width = lines[line - 1]?.length ?? 0;
+      if (seen.has(line) || width <= MAX_COMMENT_COLUMNS) continue;
+      seen.add(line);
+      overflows.push({ line, width });
+    }
+  }
+
+  return overflows;
 }
 
 /**
@@ -157,24 +182,11 @@ export function commentBlockAnalysis(context, file, program) {
     const lines = source.split(/\r?\n/);
     const ranges = commentRangesOf(program);
     if (mayContainReviewBlock(source)) {
-      result.blocks = collectCommentBlocks({ source, ranges }).filter((block) => {
-        const text = lines.slice(block.line - 1, block.line - 1 + block.lines).join("\n");
-        return !isExemptBlock(text);
-      });
+      result.blocks = collectCommentBlocks({ source, ranges })
+        .map((block) => describeBlock(block, lines))
+        .filter((block) => !block.exempt);
     }
-    const starts = lineIndex(source);
-    const reported = new Set();
-    for (const range of ranges) {
-      const startLine = lineAtOffset(starts, range.pos);
-      const endLine = lineAtOffset(starts, Math.max(range.pos, range.end - 1));
-      for (let line = startLine; line <= endLine; line += 1) {
-        if (reported.has(line)) continue;
-        const width = lines[line - 1]?.length ?? 0;
-        if (width <= MAX_COMMENT_COLUMNS) continue;
-        reported.add(line);
-        result.columnOverflows.push({ line, width });
-      }
-    }
+    result.columnOverflows = overlongCommentLines({ lines, ranges, source });
   }
 
   analysisCache.set(key, result);
@@ -185,6 +197,10 @@ export const commentBlockSizeRule = defineRule({
   name: "comment-block-size",
   kind: "problem",
   messages: {
+    commentBlockSize: {
+      what: COMMENT_BLOCK_ERROR_WHAT,
+      fix: COMMENT_BLOCK_ERROR_FIX,
+    },
     commentColumns: {
       what: "Comment line is {{width}} columns; wrap at {{max}}.",
       fix: "Rewrap the block at {{max}} columns, or cut it to the sentence that earns its place.",
@@ -205,7 +221,12 @@ export const commentBlockSizeRule = defineRule({
         for (const block of oversized) {
           context.report({
             loc: { line: block.line, column: 0 },
-            message: commentBlockSizeMessage(block.lines),
+            messageId: "commentBlockSize",
+            data: {
+              error: COMMENT_BLOCK_ERROR_LINES,
+              lines: block.lines,
+              max: MAX_COMMENT_BLOCK_LINES,
+            },
           });
         }
         for (const overflow of analysis.columnOverflows) {

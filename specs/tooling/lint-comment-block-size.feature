@@ -1,8 +1,10 @@
 Feature: The comment-block-size lint rule
   A contiguous comment block of 9 or more lines, or a comment line past 100
   columns, is reported — comments exist to make code readable and good code
-  needs almost none. A block carrying a `@scenario` annotation, or a file the
-  burn-down allowlist still covers, is exempt.
+  needs almost none. This tier is an error and cannot be argued with: a
+  `@lint-keep` annotation is refused at this size, and the message says so.
+  A block carrying a `@scenario` annotation, or a file the burn-down allowlist
+  still covers, is exempt.
 
   @unit
   Scenario: An oversized comment block is reported with its measured line count
@@ -33,3 +35,15 @@ Feature: The comment-block-size lint rule
     Given a committed file with a 9-line comment block whose root is listed in the burn-down allowlist
     When the comment-block-size rule runs over it
     Then it reports nothing
+
+  @unit
+  Scenario: The keep annotation does not suppress the error tier
+    Given a 9-line comment block whose @lint-keep gives a reason and names an ADR
+    When the comment-block-size rule runs over it
+    Then it reports the block and says the annotation does not apply
+
+  @unit
+  Scenario: A keep annotation does not promote a warned block into the error tier
+    Given an 8-line comment block whose @lint-keep gives a reason and names an ADR
+    When the comment-block-size rule runs over it
+    Then it reports nothing, because the annotation's own line is not commentary

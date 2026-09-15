@@ -29,7 +29,47 @@ describe("given a comment block between 6 and 8 lines", () => {
 
       expect(found).toHaveLength(1);
       expect(found[0].messageId).toBe("commentBlockSize");
-      expect(found[0].data).toEqual({ lines: 7, max: 5 });
+      expect(found[0].data).toEqual({ lines: 7, max: 5, words: 3 });
+    });
+  });
+
+  describe("when it carries a @lint-keep naming the ADR that records it", () => {
+    /** @scenario "A keep annotation naming its ADR silences the warning" */
+    it("reports nothing", () => {
+      const keep = "// @lint-keep the ordering table is the contract dev/docs/adr/140-x.md";
+      const code = `${commentLines(7)}\n${keep}\nexport const x = 1;`;
+
+      expect(report(code)).toEqual([]);
+    });
+  });
+
+  describe("when a @lint-keep gives a reason but names no ADR", () => {
+    /** @scenario "A keep annotation that records nothing is refused" */
+    it("reports commentKeepReason", () => {
+      const code = `${commentLines(7)}\n// @lint-keep the ordering table is the contract\nexport const x = 1;`;
+
+      expect(report(code).map((entry) => entry.messageId)).toEqual(["commentKeepReason"]);
+    });
+  });
+
+  describe("when it carries a @lint-keep annotation with no reason", () => {
+    /** @scenario "A keep annotation with no reason is refused" */
+    it("reports commentKeepReason instead of the size message", () => {
+      const found = report(`${commentLines(7)}\n// @lint-keep\nexport const x = 1;`);
+
+      expect(found).toHaveLength(1);
+      expect(found[0].messageId).toBe("commentKeepReason");
+      expect(found[0].data).toEqual({ lines: 7, max: 5, words: 3 });
+    });
+  });
+
+  describe("when the @lint-keep reason is too short to be a reason", () => {
+    /** @scenario "A keep annotation whose reason is a single word is refused" */
+    it("reports commentKeepReason", () => {
+      const keep = "// @lint-keep legacy dev/docs/adr/140-x.md";
+      const found = report(`${commentLines(7)}\n${keep}\nexport const x = 1;`);
+
+      expect(found.map((entry) => entry.messageId)).toEqual(["commentKeepReason"]);
     });
   });
 

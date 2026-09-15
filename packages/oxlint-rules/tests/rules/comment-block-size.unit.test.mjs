@@ -28,7 +28,30 @@ describe("given a source file outside the burn-down allowlist", () => {
       expect(found).toHaveLength(1);
       expect(found[0].message).toBe(commentBlockSizeMessage(9));
       expect(found[0].message).toContain("Comment block has 9 lines; the maximum is 5.");
-      expect(found[0].message).toContain("haiku subagent");
+      expect(found[0].message).toContain("dev/docs/adr/");
+    });
+  });
+
+  describe("when an oversized block carries a @lint-keep annotation", () => {
+    /** @scenario "The keep annotation does not suppress the error tier" */
+    it("still reports, and says the annotation does not apply", () => {
+      const keep = "// @lint-keep the ordering table is the contract dev/docs/adr/140-x.md";
+      const code = `${commentLines(9)}\n${keep}\nexport const x = 1;`;
+      const found = report(code);
+
+      expect(found).toHaveLength(1);
+      expect(found[0].messageId).toBe("commentBlockSize");
+      expect(found[0].message).toContain("cannot be suppressed");
+    });
+  });
+
+  describe("when a warned block is annotated up to the error line count", () => {
+    /** @scenario "A keep annotation does not promote a warned block into the error tier" */
+    it("discounts the annotation line so the block stays in the warn tier", () => {
+      const keep = "// @lint-keep the ordering table is the contract dev/docs/adr/140-x.md";
+      const code = `${commentLines(8)}\n${keep}\nexport const x = 1;`;
+
+      expect(report(code)).toEqual([]);
     });
   });
 

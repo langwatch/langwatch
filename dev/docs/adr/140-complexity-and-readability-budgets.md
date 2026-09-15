@@ -46,7 +46,7 @@ rewritten. Both go stale, and neither is read at the moment it matters.
 | `complexity` | oxlint built-in | Cyclomatic complexity of a function, maximum 25 workspace-wide. Raised to 40 in named directories, off in a few. |
 | `langwatch/cognitive-complexity` | plugin | SonarSource cognitive complexity, maximum 15; 40 where the config says so. Reads the baseline. |
 | `langwatch/comment-block-size` | plugin | The stated maximum is 5 lines. A block of 9 or more, or a comment line past 100 columns, errors. |
-| `langwatch/comment-block-size-warning` | plugin | The 6 to 8 line tier of the same analysis. Warns, and says to put the narrative in an ADR the comment points to. A 4 to 5 line block is queued for review and fails nothing. |
+| `langwatch/comment-block-size-warning` | plugin | The 6 to 8 line tier of the same analysis. Warns, and says to put the narrative in an ADR the comment points to. A 4 to 5 line block is queued for review and fails nothing. Only this tier can be silenced, by `@lint-keep` (amendment below). |
 | `no-nested-ternary` | oxlint built-in | A ternary inside another ternary's consequent or alternate. Enabled workspace-wide; does not read the baseline. |
 | `langwatch/unbounded-loop` | plugin | `for (;;)` and `while (true)` in strict server source: the exit belongs in the header. |
 | `langwatch/logical-statement-spacing` | plugin | One blank line around control flow, around a multi-line statement, and between chain groups. |
@@ -95,3 +95,37 @@ decision; this ADR records what they would mean if wired.
 `comment-block-size` is enforced against a ratcheted allowlist of roots
 (`comment-block-root`, ADR-135), so the existing long blocks are held rather
 than deleted, with an expiry per entry.
+
+## Amendment, 2026-09-15: `@lint-keep`, and why it is deliberately expensive
+
+The two tiers were being read as one rule with one number, so a sweep that cut
+every block to 7 lines cleared 743 errors and created 743 warnings in their
+place. The tiers now say what they are, and they answer different questions.
+
+**The error tier cannot be argued with.** At 9 lines or more, or past 100
+columns, there is no annotation, no allowlist entry and no escape: the block is
+cut. The message says so, rather than leaving a reader to discover it.
+
+**The warning tier can be kept, and almost never should be.** A 6 to 8 line
+block has three possible answers, in this order: delete it when the code
+already says it; move the narrative into an ADR or a `dev/docs/best_practices/`
+page and leave one line linking it; or — rarely — keep it where it is.
+
+The third answer is spelled `@lint-keep <reason> dev/docs/adr/<file>.md` on its
+own line inside the block. It requires **both** a reason of at least three
+words **and** a path to the ADR or best-practices page that records the
+narrative. That is the point of the design: a kept block is not an exception to
+"the narrative lives in an ADR", it is the fragment of an already-written ADR
+that a reader needs at the code itself — a state table, an ordering constraint,
+a wire format. Keeping a block therefore costs writing the document first,
+which is what stops the annotation becoming a silencer.
+
+Two consequences worth stating, because both were bugs in the first draft:
+
+- The annotation's own lines do not count toward the block's length. Without
+  that, annotating an 8-line block would push it to 9 and into the error tier,
+  where the annotation is refused — the fix would cause the failure.
+- A `// oxlint-disable-next-line` comment is **not** a way to silence either
+  tier. It is contiguous with the block, so it merges into it and makes it one
+  line longer, it does not suppress a report anchored at the block's first
+  line, and its own length trips the 100-column error.

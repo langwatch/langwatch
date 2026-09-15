@@ -197,6 +197,9 @@ Options: none.
 
 Messages:
 
+- `commentBlockSize`
+  - what: Comment block has {{lines}} lines; the maximum is {{max}}. At {{error}} lines or more this is an error and cannot be suppressed: `@lint-keep` does not apply at this size.
+  - fix: Delete it when the code already says it. Otherwise move the narrative - a decision and its alternatives, a protocol, a migration's reasoning - into an ADR under `dev/docs/adr/` or a page under `dev/docs/best_practices/`, and leave one line here linking it. More than one block in a file is a sweep, not an edit: list them all with `pnpm exec oxlint --config .oxlintrc.architecture.json <file>` and rewrite them in one pass.
 - `commentColumns`
   - what: Comment line is {{width}} columns; wrap at {{max}}.
   - fix: Rewrap the block at {{max}} columns, or cut it to the sentence that earns its place.
@@ -214,7 +217,10 @@ Messages:
 
 - `commentBlockSize`
   - what: Comment block has {{lines}} lines; the maximum is {{max}}.
-  - fix: Keep one or two lines of why beside the code and move the narrative into an ADR or a dev/docs page this comment links; delete it outright when the code already says it. More than one block in a file is a sweep, not an edit: list them with `pnpm exec oxlint --config .oxlintrc.architecture.json <file>` and hand that list to a haiku subagent to rewrite in one pass.
+  - fix: Delete it when the code already says it. Otherwise move the narrative - a decision and its alternatives, a protocol, a migration's reasoning - into an ADR under `dev/docs/adr/` or a page under `dev/docs/best_practices/`, and leave one line here linking it. `@lint-keep` is a last resort and is almost never the answer: it is for a block a reader needs at the code itself - a state table, an ordering constraint, a wire format - whose full narrative is already recorded in an ADR. Write `@lint-keep <reason> dev/docs/adr/<file>.md` on its own line inside the block, naming that ADR; the annotation's own line does not count toward the length. More than one block in a file is a sweep, not an edit: list them all with `pnpm exec oxlint --config .oxlintrc.architecture.json <file>` and rewrite them in one pass.
+- `commentKeepReason`
+  - what: `@lint-keep` on this {{lines}}-line block does not both give a reason of {{words}} words or more and name the ADR recording it, so the block is still over {{max}} lines.
+  - fix: `@lint-keep` is a last resort and is almost never the answer: it is for a block a reader needs at the code itself - a state table, an ordering constraint, a wire format - whose full narrative is already recorded in an ADR. Write `@lint-keep <reason> dev/docs/adr/<file>.md` on its own line inside the block, naming that ADR; the annotation's own line does not count toward the length. Delete it when the code already says it. Otherwise move the narrative - a decision and its alternatives, a protocol, a migration's reasoning - into an ADR under `dev/docs/adr/` or a page under `dev/docs/best_practices/`, and leave one line here linking it.
 
 ## `langwatch/condition-shape`
 
