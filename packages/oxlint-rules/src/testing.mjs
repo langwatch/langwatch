@@ -78,6 +78,24 @@ export function runRule(rule, { code, cwd = process.cwd(), filename, options = [
   return reports;
 }
 
+/**
+ * Asserts what `pnpm lint:fix` would leave behind. The fix is applied by the
+ * linter's own fixer machinery rather than a shim, so a green test is evidence
+ * about the real command and not about our reimplementation of it.
+ * @param {{ meta: object, create: Function }} rule
+ * @param {{ code: string, filename: string, output: string, cwd?: string, errors?: number, options?: unknown[] }} run
+ */
+export function expectFix(rule, { code, cwd = process.cwd(), errors = 1, filename, options = [], output }) {
+  resetClassificationCache();
+  withSilentTestHooks(() => {
+    const tester = new RuleTester({ cwd, languageOptions: { sourceType: "module" } });
+    const testCase = { code, errors, filename, output };
+    if (options.length > 0) testCase.options = options;
+    tester.run(rule.meta?.docs?.name ?? "rule-under-test", rule, { valid: [], invalid: [testCase] });
+  });
+  resetClassificationCache();
+}
+
 function writeFile(root, relativePath, contents) {
   const path = join(root, relativePath);
   mkdirSync(dirname(path), { recursive: true });

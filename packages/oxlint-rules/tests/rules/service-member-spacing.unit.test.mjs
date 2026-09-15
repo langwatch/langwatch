@@ -1,6 +1,6 @@
 import { afterAll, describe, expect, it } from "vitest";
 import { serviceMemberSpacingRule } from "../../src/index.mjs";
-import { createFixtureWorkspace, runRule } from "../../src/testing.mjs";
+import { createFixtureWorkspace, expectFix, runRule } from "../../src/testing.mjs";
 
 const workspace = createFixtureWorkspace({
   features: { agent: { layoutVersion: 0, roles: { server: {} } } },
@@ -22,6 +22,16 @@ describe("given a strict feature service module", () => {
 
       expect(found).toHaveLength(1);
       expect(found[0].messageId).toBe("memberSpacing");
+    });
+
+    /** @scenario "Adjacent methods without a blank line are reported and fixed" */
+    it("writes the blank line that `pnpm lint:fix` would write", () => {
+      expectFix(serviceMemberSpacingRule, {
+        code: "export class AgentService {\n  a() { return 1; }\n  b() { return 2; }\n}",
+        cwd: workspace.cwd,
+        filename: SERVICE,
+        output: "export class AgentService {\n  a() { return 1; }\n\n  b() { return 2; }\n}",
+      });
     });
   });
 
