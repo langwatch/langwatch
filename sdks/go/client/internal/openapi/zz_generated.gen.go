@@ -14419,48 +14419,48 @@ func (e PostApiV1Query200JSONResponseBodyDiagnosticsCode) Valid() bool {
 	}
 }
 
-// Defines values for GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsGates.
+// Defines values for GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates.
 const (
-	GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsGatesCosts  GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsGates = "costs"
-	GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsGatesInput  GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsGates = "input"
-	GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsGatesOutput GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsGates = "output"
+	GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGatesCosts  GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates = "costs"
+	GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGatesInput  GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates = "input"
+	GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGatesOutput GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates = "output"
 )
 
-// Valid indicates whether the value is a known member of the GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsGates enum.
-func (e GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsGates) Valid() bool {
+// Valid indicates whether the value is a known member of the GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates enum.
+func (e GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates) Valid() bool {
 	switch e {
-	case GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsGatesCosts:
+	case GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGatesCosts:
 		return true
-	case GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsGatesInput:
+	case GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGatesInput:
 		return true
-	case GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsGatesOutput:
+	case GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGatesOutput:
 		return true
 	default:
 		return false
 	}
 }
 
-// Defines values for GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsUnit.
+// Defines values for GetApiV1QuerySchema200JSONResponseBodyViewsColumnsUnit.
 const (
-	GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsUnitLessThannil GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsUnit = "<nil>"
-	GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsUnitMs          GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsUnit = "ms"
-	GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsUnitTokens      GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsUnit = "tokens"
-	GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsUnitTokenss     GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsUnit = "tokens/s"
-	GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsUnitUSD         GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsUnit = "USD"
+	GetApiV1QuerySchema200JSONResponseBodyViewsColumnsUnitLessThannil GetApiV1QuerySchema200JSONResponseBodyViewsColumnsUnit = "<nil>"
+	GetApiV1QuerySchema200JSONResponseBodyViewsColumnsUnitMs          GetApiV1QuerySchema200JSONResponseBodyViewsColumnsUnit = "ms"
+	GetApiV1QuerySchema200JSONResponseBodyViewsColumnsUnitTokens      GetApiV1QuerySchema200JSONResponseBodyViewsColumnsUnit = "tokens"
+	GetApiV1QuerySchema200JSONResponseBodyViewsColumnsUnitTokenss     GetApiV1QuerySchema200JSONResponseBodyViewsColumnsUnit = "tokens/s"
+	GetApiV1QuerySchema200JSONResponseBodyViewsColumnsUnitUSD         GetApiV1QuerySchema200JSONResponseBodyViewsColumnsUnit = "USD"
 )
 
-// Valid indicates whether the value is a known member of the GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsUnit enum.
-func (e GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsUnit) Valid() bool {
+// Valid indicates whether the value is a known member of the GetApiV1QuerySchema200JSONResponseBodyViewsColumnsUnit enum.
+func (e GetApiV1QuerySchema200JSONResponseBodyViewsColumnsUnit) Valid() bool {
 	switch e {
-	case GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsUnitLessThannil:
+	case GetApiV1QuerySchema200JSONResponseBodyViewsColumnsUnitLessThannil:
 		return true
-	case GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsUnitMs:
+	case GetApiV1QuerySchema200JSONResponseBodyViewsColumnsUnitMs:
 		return true
-	case GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsUnitTokens:
+	case GetApiV1QuerySchema200JSONResponseBodyViewsColumnsUnitTokens:
 		return true
-	case GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsUnitTokenss:
+	case GetApiV1QuerySchema200JSONResponseBodyViewsColumnsUnitTokenss:
 		return true
-	case GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsUnitUSD:
+	case GetApiV1QuerySchema200JSONResponseBodyViewsColumnsUnitUSD:
 		return true
 	default:
 		return false
@@ -26065,11 +26065,11 @@ type PostApiV1QueryJSONBody_TimeWindow_Start struct {
 // PostApiV1Query200JSONResponseBodyDiagnosticsCode defines parameters for PostApiV1Query.
 type PostApiV1Query200JSONResponseBodyDiagnosticsCode string
 
-// GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsGates defines parameters for GetApiV1QuerySchema.
-type GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsGates string
+// GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates defines parameters for GetApiV1QuerySchema.
+type GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates string
 
-// GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsUnit defines parameters for GetApiV1QuerySchema.
-type GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsUnit string
+// GetApiV1QuerySchema200JSONResponseBodyViewsColumnsUnit defines parameters for GetApiV1QuerySchema.
+type GetApiV1QuerySchema200JSONResponseBodyViewsColumnsUnit string
 
 // ListRunPlansParams defines parameters for ListRunPlans.
 type ListRunPlansParams struct {
@@ -106163,15 +106163,16 @@ type GetApiV1QuerySchemaResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *struct {
-		Database string `json:"database"`
-		Datasets []struct {
+		Database  string   `json:"database"`
+		Functions []string `json:"functions"`
+		Views     []struct {
 			Columns []struct {
-				Available   bool                                                         `json:"available"`
-				Description string                                                       `json:"description"`
-				Gates       []GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsGates `json:"gates"`
-				Name        string                                                       `json:"name"`
-				Type        string                                                       `json:"type"`
-				Unit        *GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsUnit   `json:"unit"`
+				Available   bool                                                      `json:"available"`
+				Description string                                                    `json:"description"`
+				Gates       []GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates `json:"gates"`
+				Name        string                                                    `json:"name"`
+				Type        string                                                    `json:"type"`
+				Unit        *GetApiV1QuerySchema200JSONResponseBodyViewsColumnsUnit   `json:"unit"`
 			} `json:"columns"`
 			Description string   `json:"description"`
 			ExampleSql  string   `json:"exampleSql"`
@@ -106180,8 +106181,7 @@ type GetApiV1QuerySchemaResponse struct {
 			JoinKeys    []string `json:"joinKeys"`
 			Name        string   `json:"name"`
 			TimeColumn  string   `json:"timeColumn"`
-		} `json:"datasets"`
-		Functions []string `json:"functions"`
+		} `json:"views"`
 	}
 	JSON400 *struct {
 		Error struct {
@@ -132175,15 +132175,16 @@ func ParseGetApiV1QuerySchemaResponse(rsp *http.Response) (*GetApiV1QuerySchemaR
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest struct {
-			Database string `json:"database"`
-			Datasets []struct {
+			Database  string   `json:"database"`
+			Functions []string `json:"functions"`
+			Views     []struct {
 				Columns []struct {
-					Available   bool                                                         `json:"available"`
-					Description string                                                       `json:"description"`
-					Gates       []GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsGates `json:"gates"`
-					Name        string                                                       `json:"name"`
-					Type        string                                                       `json:"type"`
-					Unit        *GetApiV1QuerySchema200JSONResponseBodyDatasetsColumnsUnit   `json:"unit"`
+					Available   bool                                                      `json:"available"`
+					Description string                                                    `json:"description"`
+					Gates       []GetApiV1QuerySchema200JSONResponseBodyViewsColumnsGates `json:"gates"`
+					Name        string                                                    `json:"name"`
+					Type        string                                                    `json:"type"`
+					Unit        *GetApiV1QuerySchema200JSONResponseBodyViewsColumnsUnit   `json:"unit"`
 				} `json:"columns"`
 				Description string   `json:"description"`
 				ExampleSql  string   `json:"exampleSql"`
@@ -132192,8 +132193,7 @@ func ParseGetApiV1QuerySchemaResponse(rsp *http.Response) (*GetApiV1QuerySchemaR
 				JoinKeys    []string `json:"joinKeys"`
 				Name        string   `json:"name"`
 				TimeColumn  string   `json:"timeColumn"`
-			} `json:"datasets"`
-			Functions []string `json:"functions"`
+			} `json:"views"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
