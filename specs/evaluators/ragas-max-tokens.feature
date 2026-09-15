@@ -40,3 +40,14 @@ Feature: Ragas evaluators honor the configured max tokens
     When the entry size is checked
     Then the entry is skipped
     And the reason names the shared hard limit as the maximum
+
+  # The check is only as good as what it is handed. Three evaluators counted
+  # the answer and the reference but not the question or the contexts their
+  # scorer also reads, and for a RAG entry the contexts are most of the
+  # payload. An under-counted entry passes the guard and then fails at the
+  # judge, which is the opposite of the skip the guard exists to produce.
+  @unit
+  Scenario: Every Ragas evaluator counts the payload its scorer reads
+    Given a Ragas evaluator whose scorer reads the question and the contexts
+    When the entry size is checked
+    Then the question and the contexts are counted towards the total
