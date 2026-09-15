@@ -1200,3 +1200,93 @@ describe("detectSecretsInText", () => {
     });
   });
 });
+
+describe("redactSecretsInText, stored-object media URLs (#8077)", () => {
+  const STORED_OBJECT_ID = "so_000000000002Ckax9GYtOrWQlpTOa";
+
+  describe("given an /api/files reference whose project id has no allowlisted prefix", () => {
+    it("keeps the URL intact instead of eating the path as one token", () => {
+      const url = `/api/files/local-dev-project/${STORED_OBJECT_ID}`;
+
+      const { text, redactedCount } = redactSecretsInText({ text: url });
+
+      expect(text).toBe(url);
+      expect(redactedCount).toBe(0);
+    });
+
+    it("keeps it intact inside span content too", () => {
+      const content = `{"type":"audio","url":"/api/files/local-dev-project/${STORED_OBJECT_ID}"}`;
+
+      const { text } = redactSecretsInText({ text: content });
+
+      expect(text).toBe(content);
+    });
+  });
+
+  describe("given the production and legacy URL shapes", () => {
+    it("keeps a project_-prefixed reference intact", () => {
+      const url = `/api/files/project_awkQTIH4hwMYdL8KsHbo1/${STORED_OBJECT_ID}`;
+
+      const { text } = redactSecretsInText({ text: url });
+
+      expect(text).toBe(url);
+    });
+
+    it("keeps a legacy id-only reference intact", () => {
+      const url = `/api/files/${STORED_OBJECT_ID}`;
+
+      const { text } = redactSecretsInText({ text: url });
+
+      expect(text).toBe(url);
+    });
+  });
+
+  describe("given a shaped key that carries a slash but no record-id tail", () => {
+    it("still redacts it, so the guard costs no recall", () => {
+      const input = "creds acme_Zx9Qm2Lp7Rt4Vw8s/Yb3Ke6Ng1Jd5Hf0Cu here";
+
+      const { text, redactedCount } = redactSecretsInText({ text: input });
+
+      expect(text).toContain("[SECRET]");
+      expect(redactedCount).toBeGreaterThanOrEqual(1);
+    });
+  });
+
+  describe("given a credential followed by a record reference in one span", () => {
+    // The record id says what the span points at, not what the earlier
+    // segments carry. Exempting the whole span on the tail alone would hand
+    // any secret a costume: append `/so_<id>` and walk past the detector.
+    it("redacts the span whole — the reference does not launder the key ahead of it", () => {
+      const input = `creds acme_Zx9Qm2Lp7Rt4Vw8sBn6Dc3Fy5Hj1Kq0M/${STORED_OBJECT_ID} here`;
+
+      const { text, redactedCount } = redactSecretsInText({ text: input });
+
+      expect(text).not.toContain("Zx9Qm2Lp7Rt4Vw8sBn6Dc3Fy5Hj1Kq0M");
+      expect(redactedCount).toBeGreaterThanOrEqual(1);
+    });
+  });
+
+  describe("given a slash-carrying key whose tail apes a digest or uuid prefix", () => {
+    // The tail bypass is RECORD ids only, not the wider non-credential
+    // family: `sha`/`uuid`/`phc` on the terminal segment say nothing about
+    // the rest of the span, and treating them as a pass would hand any
+    // credential a costume — end it in `sha_…` and walk past the filter.
+    it("still redacts a key whose last segment starts with sha_", () => {
+      const input = "creds acme_Zx9Qm2Lp7Rt4Vw8s/sha_Ke6Ng1Jd5Hf0Cu3Tb9 here";
+
+      const { text, redactedCount } = redactSecretsInText({ text: input });
+
+      expect(text).toContain("[SECRET]");
+      expect(redactedCount).toBeGreaterThanOrEqual(1);
+    });
+
+    it("still redacts a key whose last segment starts with uuid-", () => {
+      const input = "creds acme_Zx9Qm2Lp7Rt4Vw8s/uuid-Ke6Ng1Jd5Hf0Cu3Tb9 here";
+
+      const { text, redactedCount } = redactSecretsInText({ text: input });
+
+      expect(text).toContain("[SECRET]");
+      expect(redactedCount).toBeGreaterThanOrEqual(1);
+    });
+  });
+});

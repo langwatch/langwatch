@@ -366,6 +366,10 @@ const RECORD_ID_PREFIXES = new Set([
   "acct",
   "cus",
   "sub",
+  // Stored objects: edge media extraction rewrites span media to
+  // `/api/files/{projectId}/so_<id>` references, and that id is a record id
+  // like any other minted here (#8077).
+  "so",
 ]);
 
 /**
@@ -696,9 +700,36 @@ const VALUE_RULES: ValueRule[] = [
       `${TOKEN_START}([A-Za-z][A-Za-z0-9]{1,11})[_-]([A-Za-z0-9_+/-]{${SHAPED_TOKEN_MIN_BODY},})${TOKEN_END}`,
       "g",
     ),
-    accept: (groups) =>
-      !isNonCredentialPrefix(groups[1] ?? "") &&
-      isKeyShapedBody(groups[2] ?? ""),
+    accept: (groups) => {
+      if (isNonCredentialPrefix(groups[1] ?? "")) return false;
+      const body = groups[2] ?? "";
+      // The body class crosses `/`, so a URL path can be swallowed as one
+      // token: `/api/files/local-dev-project/so_<id>` matches with prefix
+      // `local` and a body that runs across the slash, and eating it turns a
+      // media reference into a 404 (#8077). A span whose LAST path segment
+      // names itself a record id is treated as a reference to that record —
+      // but only when the path in FRONT of it is benign. The record id says
+      // what the span POINTS AT, not what the earlier segments carry: a
+      // key-shaped segment ahead of it is still key material
+      // (`acme_<secret>/so_<id>`), and that span is redacted whole, record
+      // reference included — the safe direction, and what this rule always
+      // did to that shape. The guard stays narrow on the tail too — RECORD
+      // ids only, not the wider non-credential family: a digest or uuid
+      // prefix on the terminal segment says nothing about the rest of the
+      // span, and a slash-containing credential that happens to end in
+      // `sha_…` must keep its protection.
+      const lastSlash = body.lastIndexOf("/");
+      if (lastSlash !== -1) {
+        const tailPrefix = /^([A-Za-z][A-Za-z0-9]{1,11})[_-]/.exec(
+          body.slice(lastSlash + 1),
+        )?.[1];
+        if (tailPrefix && RECORD_ID_PREFIXES.has(tailPrefix.toLowerCase())) {
+          const headSegments = body.slice(0, lastSlash).split("/");
+          return headSegments.some(isKeyShapedBody);
+        }
+      }
+      return isKeyShapedBody(body);
+    },
     precondition: (text) => text.includes("_") || text.includes("-"),
   },
   {
