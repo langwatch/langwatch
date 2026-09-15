@@ -16,6 +16,7 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { getApp } from "~/server/app-layer/app";
 import type { FederatedPasswordResult } from "~/server/app-layer/identity/credential-account.service";
+import { changeTargetsBrokeredPassword } from "~/server/app-layer/identity/password-change-target";
 import {
   credentialAccounts,
   localSignUpDecision,
@@ -675,7 +676,11 @@ export const userRouter = createTRPCRouter({
       // requires the current password, so this is not the takeover vector
       // Decision 4's all-states block guards against.
       const provider = await resolveAuthProvider();
-      if (provider !== "email" && provider !== "auth0") {
+      if (
+        provider !== "email" &&
+        provider !== "auth0" &&
+        !deploymentIssuesOwnPasswords(env)
+      ) {
         throw new TRPCError({
           code: "BAD_REQUEST",
           message: "Password changes are not available for this auth provider",
@@ -703,7 +708,16 @@ export const userRouter = createTRPCRouter({
         });
       }
 
-      if (provider === "auth0") {
+      // Which password this rewrites is a question about the PERSON, not the
+      // deployment — see `changeTargetsBrokeredPassword` for why reading the
+      // provider alone refuses one password and silently rewrites the wrong
+      // one. Somebody with no local password reaches the same answer the
+      // provider alone gave, so a deployment that never turned the switch on
+      // cannot land anywhere new.
+      const holdsOwnPassword = await credentialAccounts().hasPassword({
+        userId: ctx.session.user.id,
+      });
+      if (changeTargetsBrokeredPassword({ provider, holdsOwnPassword })) {
         await changeAuth0HeldPassword({
           session: ctx.session,
           currentPassword: input.currentPassword,
