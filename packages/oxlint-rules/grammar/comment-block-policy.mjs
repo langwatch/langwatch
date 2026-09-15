@@ -85,12 +85,23 @@ export function marksLicenseHeader(source) {
 
 const DIRECTIVE_LINE = /^(?:\/\/|\/\*\*?|\*\/?|\*)?\s*(?:eslint-|oxlint-|@ts-)/;
 
+const SCENARIO_ANNOTATION = /@scenario\b/;
+
+/**
+ * Whether a line binds a test to a spec scenario. The title is quoted verbatim
+ * on one line, so rewrapping it unbinds the test: such a line is measured by
+ * neither the block limit nor the column limit.
+ */
+export function marksScenarioBinding(line) {
+  return SCENARIO_ANNOTATION.test(line);
+}
+
 /**
  * A block is exempt when it is only lint/type-checker directives, or when it
  * carries a `@scenario` annotation binding a spec scenario to its test.
  */
 export function isExemptBlock(text) {
-  if (/@scenario\b/.test(text)) return true;
+  if (marksScenarioBinding(text)) return true;
   const lines = text
     .split(/\r?\n/)
     .map((line) => line.trim())

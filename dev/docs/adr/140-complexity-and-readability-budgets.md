@@ -125,6 +125,11 @@ Two consequences worth stating, because both were bugs in the first draft:
 - The annotation's own lines do not count toward the block's length. Without
   that, annotating an 8-line block would push it to 9 and into the error tier,
   where the annotation is refused — the fix would cause the failure.
+- A `@scenario` line is measured by neither limit. The block limit already
+  exempted it; the column limit did not, which made 483 findings across 266
+  files into errors with no legal fix — the title is quoted verbatim from its
+  spec, so rewrapping it unbinds the test from the scenario it proves. An
+  error the reader cannot fix teaches them to ignore the rule.
 - A `// oxlint-disable-next-line` comment is **not** a way to silence either
   tier. It is contiguous with the block, so it merges into it and makes it one
   line longer, it does not suppress a report anchored at the block's first

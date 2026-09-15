@@ -70,6 +70,15 @@ describe("given a source file outside the burn-down allowlist", () => {
     });
   });
 
+  describe("when an overlong comment line is a scenario binding", () => {
+    /** @scenario "An overlong scenario binding is not reported" */
+    it("reports nothing, because the title cannot be rewrapped", () => {
+      const wide = `/** @scenario "${"x".repeat(120)}" */`;
+
+      expect(report(`${wide}\nexport const x = 1;`)).toEqual([]);
+    });
+  });
+
   describe("when the block sits under the warn threshold", () => {
     /** @scenario "A comment block under the size thresholds is left alone" */
     it("reports nothing", () => {

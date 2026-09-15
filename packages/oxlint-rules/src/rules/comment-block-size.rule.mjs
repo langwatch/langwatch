@@ -12,6 +12,7 @@ import {
   lineAtOffset,
   lineIndex,
   marksGeneratedHeader,
+  marksScenarioBinding,
   marksLicenseHeader,
   mayContainReviewBlock,
   rootCovers,
@@ -155,10 +156,12 @@ function overlongCommentLines({ lines, ranges, source }) {
     const startLine = lineAtOffset(starts, range.pos);
     const endLine = lineAtOffset(starts, Math.max(range.pos, range.end - 1));
     for (let line = startLine; line <= endLine; line += 1) {
-      const width = lines[line - 1]?.length ?? 0;
-      if (seen.has(line) || width <= MAX_COMMENT_COLUMNS) continue;
+      const text = lines[line - 1] ?? "";
+      if (seen.has(line) || text.length <= MAX_COMMENT_COLUMNS) continue;
       seen.add(line);
-      overflows.push({ line, width });
+      // A scenario binding quotes its spec title verbatim, so it cannot be
+      // rewrapped: reporting it would be an error with no legal fix.
+      if (!marksScenarioBinding(text)) overflows.push({ line, width: text.length });
     }
   }
 

@@ -47,3 +47,9 @@ Feature: The comment-block-size lint rule
     Given an 8-line comment block whose @lint-keep gives a reason and names an ADR
     When the comment-block-size rule runs over it
     Then it reports nothing, because the annotation's own line is not commentary
+
+  @unit
+  Scenario: An overlong scenario binding is not reported
+    Given a comment line past 100 columns carrying a @scenario annotation
+    When the comment-block-size rule runs over it
+    Then it reports nothing, because rewrapping the title would unbind the test
