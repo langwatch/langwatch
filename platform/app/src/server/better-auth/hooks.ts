@@ -1,4 +1,5 @@
 import { extractEmailDomain, isSsoProviderMatch } from "@ee/sso/matching";
+import { isNativeSocialProvider } from "@ee/sso/providers";
 import { platformSSOAllowed } from "@ee/sso/sso-gate";
 import { SYSTEM_ACTORS } from "@langwatch/actor";
 import { generate } from "@langwatch/ksuid";
@@ -387,6 +388,33 @@ const refuseLinkOnInsufficientEvidence = async ({
 };
 
 /**
+ * Whether a provider that does not match the organization's is refused
+ * outright, or only soft-flagged — and which rule decided, for the log line
+ * an operator reads when somebody reports being turned away.
+ *
+ * The account count is asked only where it can change the answer: a native
+ * provider is refused whoever is pressing it, so the query is one this path
+ * stops making rather than makes and ignores.
+ */
+const wrongProviderVerdict = async ({
+  prisma,
+  userId,
+  providerId,
+}: {
+  prisma: PrismaClient;
+  userId: string;
+  providerId: string;
+}): Promise<{ shouldRefuse: boolean; rule: string }> => {
+  if (isNativeSocialProvider(providerId)) {
+    return { shouldRefuse: true, rule: "native_social_provider" };
+  }
+  const existingAccountCount = await prisma.account.count({
+    where: { userId },
+  });
+  return { shouldRefuse: existingAccountCount === 0, rule: "first_account" };
+};
+
+/**
  * Called before a new Account row is created. Ports the provider-linking and
  * pendingSsoSetup logic from the NextAuth signIn callback.
  *
@@ -400,7 +428,12 @@ const refuseLinkOnInsufficientEvidence = async ({
  *   SSO isn't configured.
  * - existing user + SSO org + correct provider → set pendingSsoSetup=false and
  *   remove stale accounts for this provider that have a different providerAccountId
- * - existing user + SSO org + wrong provider → set pendingSsoSetup=true,
+ * - any user + SSO org + a NATIVE social provider → HARD BLOCK. These buttons
+ *   (Google, GitHub, Microsoft) mount beside the broker rather than through
+ *   it, so no existing member's way in runs through one and refusing locks
+ *   nobody out. Admitting one would give an organization that enforces single
+ *   sign-on a second door, outside the identity provider it deprovisions in.
+ * - existing user + SSO org + wrong BROKERED provider → set pendingSsoSetup=true,
  *   DO NOT hard-block (we let them in so existing users aren't locked out
  *   during a migration), banner is shown in DashboardLayout
  * - no SSO org → let BetterAuth handle account creation normally
@@ -482,21 +515,23 @@ export const beforeAccountCreate = async ({
     return;
   }
 
-  // Wrong provider for this SSO org. Determine whether this is a first-time
-  // signup (hard block) or an existing user trying a different provider
-  // (soft block via pendingSsoSetup banner).
+  // Wrong provider for this SSO org.
   if (account.providerId !== "credential" && org.ssoProvider) {
-    const existingAccountCount = await prisma.account.count({
-      where: { userId: user.id },
+    const { shouldRefuse, rule } = await wrongProviderVerdict({
+      prisma,
+      userId: user.id,
+      providerId: account.providerId,
     });
-    if (existingAccountCount === 0) {
+
+    if (shouldRefuse) {
       logger.warn(
         {
           userId: user.id,
           attemptedProvider: account.providerId,
           orgSsoProvider: org.ssoProvider,
+          rule,
         },
-        "Blocked new signup: provider does not match SSO-enforced org",
+        "Refused sign-in: provider does not match SSO-enforced org",
       );
       // Throw APIError so BetterAuth surfaces the specific code in the
       // callback redirect (?error=SSO_PROVIDER_NOT_ALLOWED), which the
@@ -581,6 +616,60 @@ export const afterAccountCreate = async ({
 };
 
 /**
+ * The refusal `beforeAccountCreate` makes, on the path it cannot see.
+ *
+ * better-auth writes an `Account` row the first time a provider is linked and
+ * only UPDATES it on every sign-in after (`handleOAuthUserInfo` takes the
+ * `updateAccount` branch once a row matches the issuer and subject). A guard
+ * that lives on the create path alone therefore closes the door to NEW links
+ * while every link already made keeps letting its holder in — including the
+ * ones the old soft block wrote before this rule existed.
+ *
+ * Native providers only, exactly as on the create path: a brokered sign-in on
+ * the wrong connection is the mid-migration member the soft flag is for.
+ */
+const refuseNativeProviderOnSignIn = async ({
+  prisma,
+  account,
+}: {
+  prisma: PrismaClient;
+  account: { userId: string; providerId: string; accountId: string };
+}): Promise<void> => {
+  if (!isNativeSocialProvider(account.providerId)) return;
+  if (!(await platformSSOAllowed())) return;
+
+  const user = await prisma.user.findUnique({
+    where: { id: account.userId },
+    select: { email: true },
+  });
+  const domain = extractEmailDomain(user?.email);
+  if (!domain) return;
+
+  const org = await prisma.organization.findUnique({
+    where: { ssoDomain: domain },
+  });
+  // A `ssoProvider` the account already matches is this organization's own
+  // door — an organization pinned to `google` signs in with Google, and
+  // `isSsoProviderMatch` is what says so.
+  if (!org?.ssoProvider || isSsoProviderMatch(org, account)) return;
+
+  logger.warn(
+    {
+      userId: account.userId,
+      attemptedProvider: account.providerId,
+      orgSsoProvider: org.ssoProvider,
+      rule: "native_social_provider",
+      path: "account_update",
+    },
+    "Refused sign-in: provider does not match SSO-enforced org",
+  );
+  throw APIError.from("FORBIDDEN", {
+    code: "SSO_PROVIDER_NOT_ALLOWED",
+    message: "SSO_PROVIDER_NOT_ALLOWED",
+  });
+};
+
+/**
  * Called after an existing Account row is updated. On an OAuth sign-in via
  * `handleOAuthUserInfo`, BetterAuth refreshes tokens on the linked Account row
  * (`internalAdapter.updateAccount`), which fires this hook.
@@ -606,6 +695,11 @@ export const afterAccountUpdate = async ({
   prisma: PrismaClient;
   account: { userId: string; providerId: string; accountId: string };
 }): Promise<void> => {
+  // Outside the try below, deliberately: this one REFUSES, and a refusal the
+  // reconciliation's catch swallowed would admit the very sign-in it exists
+  // to stop.
+  await refuseNativeProviderOnSignIn({ prisma, account });
+
   try {
     const user = await prisma.user.findUnique({
       where: { id: account.userId },

@@ -215,6 +215,17 @@ const SOCIAL_PROVIDER_METHOD_IDS: readonly (readonly [string, string])[] = [
 ];
 
 /**
+ * Whether better-auth mounts this provider id as a NATIVE social button - one
+ * this deployment dials itself, rather than the broker or a generic-OAuth id.
+ * Reads the same table the rail draws from, so a provider added there is
+ * covered here without a second edit.
+ */
+export const isNativeSocialProvider = (providerId: string): boolean =>
+  SOCIAL_PROVIDER_METHOD_IDS.some(
+    ([betterAuthKey]) => betterAuthKey === providerId,
+  );
+
+/**
  * The social providers this deployment actually MOUNTED, by the id the
  * product dials them under, in rail order.
  *

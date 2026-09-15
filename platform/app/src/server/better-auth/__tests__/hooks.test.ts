@@ -562,8 +562,8 @@ describe("beforeAccountCreate", () => {
     });
   });
 
-  describe("when an EXISTING user's email domain matches an org with WRONG SSO provider", () => {
-    /** @scenario Existing user with wrong SSO provider gets pending flag */
+  describe("when an EXISTING user's email domain matches an org with a WRONG BROKERED provider", () => {
+    /** @scenario Existing user with wrong brokered SSO provider gets pending flag */
     it("soft-blocks by setting pendingSsoSetup=true without throwing", async () => {
       const update = vi.fn().mockResolvedValue(undefined);
       const prisma = makePrismaMock({
@@ -579,7 +579,7 @@ describe("beforeAccountCreate", () => {
           findUnique: vi.fn().mockResolvedValue({
             id: "org_1",
             ssoDomain: "acme.com",
-            ssoProvider: "okta",
+            ssoProvider: "waad|acme-conn",
           }),
         },
         account: {
@@ -589,15 +589,124 @@ describe("beforeAccountCreate", () => {
         },
       });
 
+      // Through the broker, on one of its other connections: the
+      // mid-migration member this soft flag exists for.
       await beforeAccountCreate({
         prisma,
-        account: { userId: "user_1", providerId: "google", accountId: "sub-1" },
+        account: {
+          userId: "user_1",
+          providerId: "auth0",
+          accountId: "google-oauth2|123",
+        },
       });
 
       expect(update).toHaveBeenCalledWith({
         where: { id: "user_1" },
         data: { pendingSsoSetup: true },
       });
+    });
+  });
+
+  describe("when a NATIVE social provider is used at an SSO-enforced domain", () => {
+    const makeNativePrisma = (accountCount: number) => {
+      const update = vi.fn().mockResolvedValue(undefined);
+      const count = vi.fn().mockResolvedValue(accountCount);
+      return {
+        update,
+        count,
+        prisma: makePrismaMock({
+          user: {
+            findUnique: vi.fn().mockResolvedValue({
+              id: "user_1",
+              email: "existing@acme.com",
+              deactivatedAt: null,
+            }),
+            update,
+          },
+          organization: {
+            findUnique: vi.fn().mockResolvedValue({
+              id: "org_1",
+              ssoDomain: "acme.com",
+              ssoProvider: "waad|acme-conn",
+            }),
+          },
+          account: { deleteMany: vi.fn(), count },
+        }),
+      };
+    };
+
+    /** @scenario A native social sign-in at an SSO-enforced domain is refused */
+    it("refuses an existing member with SSO_PROVIDER_NOT_ALLOWED", async () => {
+      const { prisma, update } = makeNativePrisma(1);
+
+      await expect(
+        beforeAccountCreate({
+          prisma,
+          account: {
+            userId: "user_1",
+            providerId: "google",
+            accountId: "sub-1",
+          },
+        }),
+      ).rejects.toThrow("SSO_PROVIDER_NOT_ALLOWED");
+
+      // The soft flag is for the broker's migration population, not this one:
+      // a refused sign-in must not also strand them behind a banner.
+      expect(update).not.toHaveBeenCalled();
+    });
+
+    /** @scenario An organization pinned to Google still signs in with Google */
+    it("still admits a provider the organization itself pinned", async () => {
+      const update = vi.fn().mockResolvedValue(undefined);
+      const prisma = makePrismaMock({
+        user: {
+          findUnique: vi.fn().mockResolvedValue({
+            id: "user_1",
+            email: "existing@acme.com",
+            deactivatedAt: null,
+          }),
+          update,
+        },
+        organization: {
+          findUnique: vi.fn().mockResolvedValue({
+            id: "org_1",
+            ssoDomain: "acme.com",
+            // This organization's configured provider IS Google.
+            ssoProvider: "google",
+          }),
+        },
+        account: { deleteMany: vi.fn(), count: vi.fn().mockResolvedValue(1) },
+      });
+
+      await expect(
+        beforeAccountCreate({
+          prisma,
+          account: {
+            userId: "user_1",
+            providerId: "google",
+            accountId: "sub-1",
+          },
+        }),
+      ).resolves.toBeUndefined();
+
+      expect(update).not.toHaveBeenCalled();
+    });
+
+    it("reaches that answer without counting the user's accounts", async () => {
+      const { prisma, count } = makeNativePrisma(1);
+
+      await expect(
+        beforeAccountCreate({
+          prisma,
+          account: {
+            userId: "user_1",
+            providerId: "microsoft",
+            accountId: "sub-2",
+          },
+        }),
+      ).rejects.toThrow("SSO_PROVIDER_NOT_ALLOWED");
+
+      expect(count).not.toHaveBeenCalled();
     });
   });
 
@@ -1072,6 +1181,73 @@ describe("afterSessionCreate", () => {
 });
 
 describe("afterAccountUpdate", () => {
+  describe("when an ALREADY-LINKED native social account signs in at an SSO-enforced org", () => {
+    const linkedNativePrisma = (ssoProvider: string) =>
+      makePrismaMock({
+        user: {
+          findUnique: vi.fn().mockResolvedValue({
+            id: "user_1",
+            email: "existing@acme.com",
+            // The soft block wrote this row before the refusal existed; the
+            // flag is irrelevant to the guard, and set here to prove it.
+            pendingSsoSetup: true,
+          }),
+          update: vi.fn(),
+        },
+        organization: {
+          findUnique: vi.fn().mockResolvedValue({
+            id: "org_1",
+            ssoDomain: "acme.com",
+            ssoProvider,
+          }),
+        },
+        account: { deleteMany: vi.fn() },
+        $transaction: vi.fn().mockImplementation(async (ops: unknown[]) => ops),
+      });
+
+    /** @scenario A native social sign-in on an already-linked account is refused too */
+    it("refuses, because no Account row is created on this path", async () => {
+      await expect(
+        afterAccountUpdate({
+          prisma: linkedNativePrisma("waad|acme-conn"),
+          account: {
+            userId: "user_1",
+            providerId: "google",
+            accountId: "sub-1",
+          },
+        }),
+      ).rejects.toThrow("SSO_PROVIDER_NOT_ALLOWED");
+    });
+
+    it("lets a brokered sign-in on the wrong connection through", async () => {
+      // The mid-migration member the soft flag is for: refused here, they
+      // would be sent to a connection they may hold no account in.
+      await expect(
+        afterAccountUpdate({
+          prisma: linkedNativePrisma("waad|acme-conn"),
+          account: {
+            userId: "user_1",
+            providerId: "auth0",
+            accountId: "google-oauth2|123",
+          },
+        }),
+      ).resolves.toBeUndefined();
+    });
+
+    it("lets the organization's own pinned provider through", async () => {
+      await expect(
+        afterAccountUpdate({
+          prisma: linkedNativePrisma("google"),
+          account: {
+            userId: "user_1",
+            providerId: "google",
+            accountId: "sub-1",
+          },
+        }),
+      ).resolves.toBeUndefined();
+    });
+  });
+
   describe("when the user has pendingSsoSetup=true and the updated account matches the org's SSO provider", () => {
     it("clears pendingSsoSetup and deletes stale non-credential accounts", async () => {
       const deleteMany = vi.fn().mockResolvedValue(undefined);
@@ -1153,6 +1329,10 @@ describe("afterAccountUpdate", () => {
   });
 
   describe("when the updated account does NOT match the org's SSO provider", () => {
+    // A BROKERED mismatch: the native case is refused outright now, and is
+    // covered above. This is the mid-migration member who is still let in,
+    // and whose flag stays set because their provider is still not the
+    // organization's.
     it("is a no-op (we do not clear the flag on wrong-provider sign-in)", async () => {
       const deleteMany = vi.fn();
       const update = vi.fn();
@@ -1169,7 +1349,7 @@ describe("afterAccountUpdate", () => {
           findUnique: vi.fn().mockResolvedValue({
             id: "org_1",
             ssoDomain: "acme.com",
-            ssoProvider: "auth0",
+            ssoProvider: "waad|acme-conn",
           }),
         },
         account: { deleteMany },
@@ -1179,8 +1359,8 @@ describe("afterAccountUpdate", () => {
         prisma,
         account: {
           userId: "user_1",
-          providerId: "google",
-          accountId: "google-sub-1",
+          providerId: "auth0",
+          accountId: "google-oauth2|123",
         },
       });
 
