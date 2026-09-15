@@ -3,7 +3,7 @@ import { platformSSOAllowed, resolveAuthProvider } from "@ee/sso/sso-gate";
 import type { SignInMethod, SignInMethodPolicy } from "@langwatch/identity";
 import type { SignInMethodPolicyPort } from "@langwatch/identity-server";
 import { env } from "~/env.mjs";
-import { AUTH0_BRIDGE_METHODS, auth0BridgeActive } from "~/utils/auth0-bridge";
+import { auth0BridgeActive, auth0BridgeRailIds } from "~/utils/auth0-bridge";
 
 /**
  * The instance's method-set policy (ADR-117 §4) — the module ADR-027's
@@ -217,13 +217,22 @@ export async function resolveSignInMethodPolicy(): Promise<SignInMethodPolicy> {
   // requires the RESOLVED method to be auth0, so an unmounted or unlicensed
   // broker offers no branded buttons — and then ranks nothing bridged either,
   // since ranking intersects with exactly this default set.
+  //
+  // A provider mounted NATIVELY takes its own bridge slot rather than landing
+  // beside it (`auth0BridgeRailIds`): both ids mean "Continue with Google",
+  // and a rail carrying them both would draw the same button twice, with
+  // nothing on either to tell a person which one their account is behind.
+  // Mounting the native client IS the cutover for that provider, one provider
+  // at a time, and the slot keeps its leading position through it.
   const bridge =
     federated?.id === "auth0" &&
     auth0BridgeActive({
       isSaas: env.IS_SAAS,
       authProvider: env.NEXTAUTH_PROVIDER,
     })
-      ? AUTH0_BRIDGE_METHODS.map((method) => federatedMethod(method.methodId))
+      ? auth0BridgeRailIds({
+          mountedSocialMethodIds: social.map((method) => method.id),
+        }).map(federatedMethod)
       : [];
   const federatedMethods = dedupeById([
     ...bridge,

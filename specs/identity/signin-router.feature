@@ -291,6 +291,21 @@ Feature: The identifier-first sign-in router - one auth screen, routed by data
     Then the decision redirects to the branded Google method
     And an account the broker holds as a database user keeps the generic method
 
+  # How the bridge ends: one provider at a time, on its credentials. Mounting
+  # a native client for a bridged provider IS that provider's cutover — the
+  # rail can never draw two buttons that both say "Continue with Google", and
+  # the accounts already brokered through that connection must follow the
+  # button the rail actually draws, or ranking drops them onto the generic
+  # picker the bridge exists to avoid.
+  @unit
+  Scenario: A natively mounted provider takes over its own bridge button
+    Given a SaaS deployment whose provider is the Auth0 broker
+    And credentials are present for the native Google provider
+    When the sign-in page is requested
+    Then the native Google method stands in the bridge's Google slot
+    And the providers with no native credentials keep their branded bridge methods
+    And an account brokered through the Google connection routes to the native method
+
   # What of the ask survives on every deployment: the address was already
   # typed once, on our screen, and typing it again on the provider's is the
   # provider's screen failing to be told.

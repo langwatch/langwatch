@@ -11,6 +11,7 @@
  */
 
 import { PlanTypes } from "@ee/billing/planTypes";
+import { configuredSocialProviderIds } from "@ee/sso/providers";
 import { platformSSOAllowed, resolveAuthProvider } from "@ee/sso/sso-gate";
 import {
   normalizeIdentifierValue,
@@ -453,6 +454,11 @@ const signInRouterService = new SignInRouterService({
       isSaas: env.IS_SAAS,
       authProvider: env.NEXTAUTH_PROVIDER,
     }),
+    // The same set the policy builds its rail from, so a provider cut over to
+    // its native client routes its brokered accounts to the button the rail
+    // actually draws. Both readings are of the mounted providers, which do
+    // not change after boot.
+    mountedSocialMethodIds: configuredSocialProviderIds(env),
   }),
 });
 

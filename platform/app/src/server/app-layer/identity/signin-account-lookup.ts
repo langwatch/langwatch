@@ -42,6 +42,11 @@ export interface ProjectionSignInAccountLookupDeps {
    *  own branded methods (`utils/auth0-bridge.ts`) — a composition decision,
    *  handed in so this class never reads the environment. */
   auth0BridgeIsActive?: boolean;
+  /** The social providers this deployment mounted natively, by the method id
+   *  the rail draws them under. A brokered subject whose provider is among
+   *  them routes to the NATIVE method, because the rail replaced the bridge
+   *  button with it and ranking offers only what the rail offers. */
+  mountedSocialMethodIds?: readonly string[];
 }
 
 export class ProjectionSignInAccountLookup implements SignInAccountLookupPort {
@@ -49,12 +54,14 @@ export class ProjectionSignInAccountLookup implements SignInAccountLookupPort {
   private readonly legacy: LegacySignInAccountDirectory;
   private readonly isLatched: IdentityUserGate;
   private readonly auth0BridgeIsActive: boolean;
+  private readonly mountedSocialMethodIds: readonly string[];
 
   constructor(deps: ProjectionSignInAccountLookupDeps) {
     this.heads = deps.heads;
     this.legacy = deps.legacy;
     this.isLatched = deps.isLatched;
     this.auth0BridgeIsActive = deps.auth0BridgeIsActive ?? false;
+    this.mountedSocialMethodIds = deps.mountedSocialMethodIds ?? [];
   }
 
   async findAccountMethods({
@@ -146,7 +153,17 @@ export class ProjectionSignInAccountLookup implements SignInAccountLookupPort {
       return identifier.providerId;
     }
     if (identifier.providerAccountId === null) return "auth0";
-    return auth0BridgeMethodForSubject(identifier.providerAccountId) ?? "auth0";
+    return this.bridgeMethodFor(identifier.providerAccountId) ?? "auth0";
+  }
+
+  /** The bridge's answer for a subject, under this deployment's mounted set —
+   *  the native method where the provider has been cut over, the branded
+   *  bridge method where it has not. */
+  private bridgeMethodFor(subject: string): string | null {
+    return auth0BridgeMethodForSubject({
+      subject,
+      mountedSocialMethodIds: this.mountedSocialMethodIds,
+    });
   }
 
   /** The same routing over the legacy answer, whose subjects ride beside the
@@ -161,7 +178,7 @@ export class ProjectionSignInAccountLookup implements SignInAccountLookupPort {
       return account.methods;
     }
     const routed = account.auth0Subjects.map(
-      (subject) => auth0BridgeMethodForSubject(subject) ?? "auth0",
+      (subject) => this.bridgeMethodFor(subject) ?? "auth0",
     );
     return {
       ...account.methods,

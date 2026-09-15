@@ -25,6 +25,14 @@ import {
  * (`auth0BridgeActive`) and every self-hosted Auth0 deployment keeps the
  * generic hand-off to Auth0's own screen. Enterprise strategies (`waad`,
  * `samlp`) are per-tenant-named and deliberately absent from the table.
+ *
+ * The bridge is also how the bridge ENDS, one provider at a time: mounting a
+ * native client for a bridged provider replaces that button in place
+ * (`auth0BridgeRailIds`) and re-routes its brokered accounts to the native
+ * method (`auth0BridgeMethodForSubject`). Credential presence is the
+ * activation switch — `@ee/sso/providers` already states that the
+ * credentials ARE the operator's intent — so cutting one provider over is an
+ * environment change, with no flag beside it to disagree.
  */
 
 export interface Auth0BridgeMethod {
@@ -34,13 +42,43 @@ export interface Auth0BridgeMethod {
    *  set when its own button for this provider was clicked. The strategy's
    *  default connection name, which is also the strategy itself. */
   connection: string;
+  /** The method id of the SAME provider once the deployment mounts it
+   *  natively — what this button becomes at activation. */
+  nativeMethodId: string;
 }
+
+/** The product method id a native provider is dialed under. better-auth
+ *  registers Microsoft as `microsoft`; everything outside it — the env, the
+ *  `Account` rows, the callback path, the labels — says `azure-ad`, and
+ *  `auth-client` maps one to the other at the moment of the dial. */
+const nativeMethodIdOf = (nativeProviderId: string): string =>
+  nativeProviderId === "microsoft" ? "azure-ad" : nativeProviderId;
 
 export const AUTH0_BRIDGE_METHODS: readonly Auth0BridgeMethod[] =
   AUTH0_SOCIAL_STRATEGIES.map((row) => ({
     methodId: `auth0-${row.nativeProviderId}`,
     connection: row.strategy,
+    nativeMethodId: nativeMethodIdOf(row.nativeProviderId),
   }));
+
+/**
+ * The method ids the bridge contributes to the sign-in rail, in rail order —
+ * with a provider the deployment mounts NATIVELY standing in its bridge
+ * slot. The moment the native client is mounted its bridge button steps
+ * aside, in place: the rail never draws two Google buttons, and the leading
+ * position never moves under the person reaching for it.
+ */
+export function auth0BridgeRailIds({
+  mountedSocialMethodIds,
+}: {
+  mountedSocialMethodIds: readonly string[];
+}): readonly string[] {
+  return AUTH0_BRIDGE_METHODS.map((method) =>
+    mountedSocialMethodIds.includes(method.nativeMethodId)
+      ? method.nativeMethodId
+      : method.methodId,
+  );
+}
 
 /** Whether this deployment offers the bridge at all. */
 export function auth0BridgeActive({
@@ -62,14 +100,33 @@ export function auth0BridgeConnectionOf(methodId: string): string | null {
 }
 
 /**
- * The bridge method a stored Auth0 subject belongs to, or null where none
- * does — the broker's own database users (`auth0|`), enterprise connections
- * (`samlp|`, `waad|`), and a bare strategy with no subject behind it. Null
- * keeps the plain `auth0` method, which is a real answer: those sign-ins
- * belong on Auth0's own screen.
+ * The method a stored Auth0 subject belongs to, or null where none does — the
+ * broker's own database users (`auth0|`), enterprise connections (`samlp|`,
+ * `waad|`), and a bare strategy with no subject behind it. Null keeps the
+ * plain `auth0` method, which is a real answer: those sign-ins belong on
+ * Auth0's own screen.
+ *
+ * It answers the NATIVE method for a provider this deployment has mounted,
+ * which is the cutover itself and has to move with the rail: ranking
+ * intersects an account's methods with the offered set
+ * (`rankAccountMethods`), so a brokered Google account still answered
+ * `auth0-google` after the native button replaced that slot would match
+ * nothing and land on the generic picker — the one screen it was routed
+ * through this module to avoid. Answering `google` sends them to Google's own
+ * screen in one step, and the callback resolves them through the identifier
+ * the backfill derived from this very subject (`upstreamOfAuth0Subject`).
  */
-export function auth0BridgeMethodForSubject(subject: string): string | null {
+export function auth0BridgeMethodForSubject({
+  subject,
+  mountedSocialMethodIds = [],
+}: {
+  subject: string;
+  mountedSocialMethodIds?: readonly string[];
+}): string | null {
   const row = auth0SocialStrategyOfSubject(subject);
   if (row === null) return null;
-  return `auth0-${row.nativeProviderId}`;
+  const nativeMethodId = nativeMethodIdOf(row.nativeProviderId);
+  return mountedSocialMethodIds.includes(nativeMethodId)
+    ? nativeMethodId
+    : `auth0-${row.nativeProviderId}`;
 }

@@ -105,12 +105,14 @@ function build({
   projectedHolder = null,
   identifiers = {},
   auth0Bridge = false,
+  mountedSocialMethodIds = [],
 }: {
   account?: LegacySignInAccount | null;
   latched?: boolean;
   projectedHolder?: { userId: string; identifierId: string } | null;
   identifiers?: Record<string, IdentifierFact>;
   auth0Bridge?: boolean;
+  mountedSocialMethodIds?: readonly string[];
 } = {}) {
   const isLatched: IdentityUserGate = async () => latched;
   return new ProjectionSignInAccountLookup({
@@ -118,6 +120,7 @@ function build({
     legacy: new FakeLegacyDirectory(account),
     isLatched,
     auth0BridgeIsActive: auth0Bridge,
+    mountedSocialMethodIds,
   });
 }
 
@@ -357,6 +360,52 @@ describe("ProjectionSignInAccountLookup legacy fallback", () => {
       await expect(
         lookup.findAccountMethods({ normalizedValue: EMAIL }),
       ).resolves.toMatchObject({ providerIds: ["auth0-google"] });
+    });
+
+    /** @scenario "A natively mounted provider takes over its own bridge button" */
+    it("routes a brokered account to the native method once that provider is mounted", async () => {
+      // The cutover for one provider. Ranking intersects the account's
+      // methods with the rail, and the rail now draws `google` — answering
+      // `auth0-google` here would match nothing and drop this person onto the
+      // generic picker.
+      const lookup = build({
+        account: legacyAccount({
+          methods: { providerIds: ["auth0"] },
+          auth0Subjects: ["google-oauth2|107698336211125"],
+        }),
+        auth0Bridge: true,
+        mountedSocialMethodIds: ["google"],
+      });
+
+      const decision = await routeAccount({
+        lookup,
+        methods: [
+          { id: "google", kind: "federated", connectionId: null },
+          AUTH0,
+        ],
+      });
+
+      expect(decision).toMatchObject({
+        outcome: "redirect_to_connection",
+        methodSet: [{ id: "google", kind: "federated", connectionId: null }],
+        reasonCode: "account_methods",
+      });
+    });
+
+    /** @scenario "A natively mounted provider takes over its own bridge button" */
+    it("leaves a provider that was not cut over on its bridge method", async () => {
+      const lookup = build({
+        account: legacyAccount({
+          methods: { providerIds: ["auth0"] },
+          auth0Subjects: ["github|839161"],
+        }),
+        auth0Bridge: true,
+        mountedSocialMethodIds: ["google"],
+      });
+
+      await expect(
+        lookup.findAccountMethods({ normalizedValue: EMAIL }),
+      ).resolves.toMatchObject({ providerIds: ["auth0-github"] });
     });
 
     it("changes nothing while the bridge is inactive", async () => {

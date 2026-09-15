@@ -332,6 +332,43 @@ describe("the instance sign-in method policy", () => {
       expect(methodIds(policy.defaultMethods)).toEqual(["auth0", "passkey"]);
     });
 
+    /** @scenario "A natively mounted provider takes over its own bridge button" */
+    it("draws one Google button when the native client is mounted beside the bridge", async () => {
+      // The cutover: the Google credentials land, and the bridge button for
+      // Google steps aside for the native one rather than standing beside it.
+      // Two buttons both reading "Continue with Google" is the failure this
+      // prevents — nothing on either would tell a person which is theirs.
+      envMock.IS_SAAS = true;
+      socialCredentials("google");
+
+      const policy = await resolveSignInMethodPolicy();
+
+      expect(methodIds(policy.defaultMethods)).toEqual([
+        "google",
+        "auth0-github",
+        "auth0-microsoft",
+        "auth0",
+        "passkey",
+      ]);
+    });
+
+    /** @scenario "A natively mounted provider takes over its own bridge button" */
+    it("cuts providers over one at a time, leaving the rest brokered", async () => {
+      envMock.IS_SAAS = true;
+      socialCredentials("google");
+      socialCredentials("azure-ad");
+
+      const policy = await resolveSignInMethodPolicy();
+
+      expect(methodIds(policy.defaultMethods)).toEqual([
+        "google",
+        "auth0-github",
+        "azure-ad",
+        "auth0",
+        "passkey",
+      ]);
+    });
+
     /** @scenario "Social providers mount on their credentials, not on the provider env" */
     it("mounts and offers nothing in email mode, whatever credentials linger", async () => {
       // Email mode is exactly what ADR-027 means by DENY, and the federation
