@@ -332,7 +332,9 @@ export async function listTriggers(): Promise<
  * ("how much traffic", "what's my p95") have a true answer.
  *
  * Without this, a fresh local project only contains Langy's own mirrored
- * runs (origin: langy), which rule 27 makes Langy exclude — so "no traces
+ * runs (origin: langy), which AGENTS.md's trace-origins rule makes Langy
+ * exclude ("Your own runs carry `langy`: exclude them unless the user asks
+ * about you") — so "no traces
  * in the last 24h" is CORRECT, and any judge that expects a non-zero count
  * is grading against data that does not exist. Spans carry no
  * langwatch.origin, which the platform coalesces to "application".
