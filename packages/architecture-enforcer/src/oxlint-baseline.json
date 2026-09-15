@@ -20111,6 +20111,678 @@
       "measured": "2026-09-10"
     },
     {
+      "key": "shared-setup-is-a-hook|apps/server/test/services/spawn-restart.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|apps/ui/src/features/annotation/ui/sections/__tests__/annotation-queue-walker-bar.integration.test.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|apps/ui/src/features/simulations/ui/__tests__/agent-list-drawer.integration.test.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|apps/ui/tests/posthog-analytics.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|apps/ui/tests/ui-feature-transport-subscriptions.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|apps/ui/tests/ui-outer-providers.unit.test.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|apps/worker/src/app/__tests__/worker-automation-settlement.composition.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|apps/worker/src/platform/liveness/__tests__/worker-metrics.liveness-thread.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|enterprise/modules/billing/server/src/services/__tests__/nurturing-prompt-creation.service.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|enterprise/modules/governance/server/src/eventing/__tests__/gateway-debit.process.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|enterprise/modules/governance/server/src/services/__tests__/copilotStudioDataverseSeats.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|enterprise/modules/governance/server/src/services/__tests__/databricks-genie-puller-sweep.integration.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|enterprise/modules/governance/web/src/features/ingestion-sources/__tests__/anomalyRulesComposer.integration.test.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|enterprise/modules/governance/web/src/features/ingestion-sources/__tests__/anomalyRulesScopeCoupling.integration.test.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|enterprise/modules/governance/web/src/features/ingestion-sources/__tests__/pull-cadence-field.integration.test.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|enterprise/modules/governance/web/src/ui/sections/governance/__tests__/costRefusedRead.integration.test.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|enterprise/modules/governance/web/src/ui/sections/governance/__tests__/peopleTabs.integration.test.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|enterprise/modules/governance/web/src/ui/sections/governance/__tests__/source-edit-destination.integration.test.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|enterprise/modules/licensing/server/src/__tests__/signing.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|enterprise/modules/licensing/web/src/ui/sections/global-upgrade-modal/__tests__/global-upgrade-modal.integration.test.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|enterprise/packages/composition/api/src/governance/__tests__/costRollupComparator.service.integration.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|enterprise/packages/composition/api/tests/governance/personal-usage-read.adapter.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|mcp/typescript/src/__tests__/datasets.integration.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|mcp/typescript/src/__tests__/langwatch-api.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|modules/agent/server/src/__tests__/connected-agent-project-isolation.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|modules/agent/web/src/ui/sections/__tests__/agent-management-page.test.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|modules/analytics/server/src/repositories/clickhouse/__tests__/memory-safety-structural-invariants.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|modules/analytics/web/src/model/__tests__/useDashboardAutoRefresh.integration.test.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|modules/analytics/web/src/ui/sections/__tests__/graph-card-menu.integration.test.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|modules/analytics/web/tests/browser/langwatch-ql-workbench.browser.test.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|modules/annotation/web/src/ui/blocks/__tests__/annotation-score-fields.integration.test.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|modules/api-key/web/src/ui/sections/__tests__/cli-auth-screen.test.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|modules/auth/web/src/ui/sections/__tests__/sign-in-method-picker.integration.test.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|modules/authz/server/src/repositories/prisma/__tests__/authz-migration.budget-seed.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|modules/authz/server/src/services/__tests__/observability.authz-metrics.adapter.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|modules/coding-agent/server/src/services/__tests__/coding-agent-session-read.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|modules/data-privacy/server/src/services/__tests__/otlp-span-pii-redaction.native-scoped-policy.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|modules/dataset/web/src/behavior/__tests__/DatasetEditorTable.search.integration.test.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|modules/evaluator/web/src/ui/elements/evaluations/__tests__/guardrails-drawer.integration.test.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|modules/experiment/server/src/processes/__tests__/experiment-cell-workflow.integration.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|modules/experiment/server/src/processes/__tests__/experiment-cell-workflow.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|modules/experiment/web/src/behavior/experiments-v3/__tests__/use-autosave-evaluations-v3.agent-durability.integration.test.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|modules/experiment/web/src/ui/elements/experiments-v3/__tests__/editable-heading.test.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|modules/experiment/web/src/ui/sections/batch-results/__tests__/batch-target-cell.test.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|modules/experiment/web/src/ui/sections/batch-results/__tests__/comparison-table.group-by-metadata.integration.test.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|modules/experiment/web/src/ui/sections/experiments-v3/TargetSection/__tests__/target-cell.integration.test.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|modules/experiment/web/src/ui/sections/experiments-v3/__tests__/run-via-api-button.integration.test.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|modules/feature-flag/server/src/__tests__/feature-flag.experiments.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|modules/gateway/server/src/repositories/prisma/__tests__/prisma.gateway-cache-rule.repository.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|modules/github/server/src/transport/__tests__/github-install.rest.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|modules/hosted-mcp/server/src/transport/__tests__/hosted-mcp.api.integration.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|modules/identity/server/src/__tests__/identity-storage-adapter-identity.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|modules/identity/server/src/app/__tests__/identity-composition.registration.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|modules/langy/server/src/__tests__/langyTurnAccess.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|modules/langy/server/src/services/__tests__/langy-local-call-permission-envelope.integration.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|modules/langy/server/src/services/__tests__/langy-ui-action.service.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|modules/langy/server/src/subscribers/__tests__/langy-conversation.subscriber.redelivery.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|modules/langy/web/src/behavior/__tests__/use-scrolled-from-top.unit.test.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|modules/langy/web/src/features/langy/behavior/logic/__tests__/langy-chat-transport.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|modules/langy/web/src/features/langy/ui/sections/__tests__/langy-conversation-history.integration.test.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|modules/langy/web/src/features/langy/ui/sections/__tests__/langy-external-link-guard.integration.test.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|modules/langy/web/src/features/langy/ui/sections/__tests__/langy-panel-header.integration.test.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|modules/model-provider/web/src/behavior/__tests__/use-provider-form-submit.integration.test.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|modules/model-provider/web/src/behavior/__tests__/useDrawer.liveFragment.integration.test.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|modules/model-provider/web/src/ui/sections/__tests__/edit-model-provider-drawer.integration.test.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|modules/model-provider/web/src/ui/sections/__tests__/model-provider-form.credential-preservation.integration.test.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|modules/navigation/web/src/ui/sections/__tests__/app-header-user-menu.integration.test.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|modules/ops/server/src/repositories/redis/__tests__/pending-counter-reconcile.integration.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|modules/ops/server/src/repositories/redis/__tests__/redis.anomaly-rate-tracker.repository.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|modules/organization/server/src/repositories/prisma/__tests__/prisma.organization-membership.repository.governance-filter.integration.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|modules/project/server/src/repositories/memory/__tests__/memory.project.repository.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|modules/prompt/server/src/__tests__/prompt-tag.service.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|modules/prompt/web/src/behavior/prompts/__tests__/use-prompt-config-form.dirty-baseline.integration.test.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|modules/prompt/web/src/ui/sections/llm-parameters/__tests__/parameter-config.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|modules/prompt/web/src/ui/sections/prompt-studio/browser/__tests__/experiment-from-playground-button.test.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|modules/prompt/web/src/ui/sections/prompt-studio/sidebar/__tests__/published-prompt-actions.integration.test.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|modules/prompt/web/src/ui/sections/variables/__tests__/variable-insert-menu.test.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|modules/prompt/web/src/ui/sections/variables/__tests__/variables-section.test.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|modules/prompt/web/src/ui/sections/variables/prompt-textarea/__tests__/prompt-textarea-with-variables.test.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|modules/prompt/web/src/ui/sections/variables/prompt-textarea/__tests__/template-logic-autocomplete.integration.test.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|modules/scenario/contract/src/evaluations/__tests__/scenarioEvaluations.job.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|modules/scenario/contract/src/voice/__tests__/voice-session.service.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|modules/scenario/server/src/__tests__/execution-pool-voice-filter.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|modules/scenario/server/src/__tests__/execution-pool.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|modules/scenario/server/src/__tests__/scenario-tab-registry.integration.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|modules/scenario/server/src/__tests__/serialized-adapters/serialized-http-agent-error.integration.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|modules/scenario/server/src/__tests__/serialized-code-agent.adapter.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|modules/scenario/web/src/__tests__/scenario-criteria-input.test.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|modules/scenario/web/src/behavior/suites/__tests__/simulations-page-quick-run-no-nav.integration.test.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|modules/scenario/web/src/ui/elements/agent-testing/shared/__tests__/parameter-line-field.integration.test.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|modules/scenario/web/src/ui/elements/agent-testing/shared/__tests__/run-settings.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|modules/scenario/web/src/ui/elements/suites/__tests__/scenario-input-mapping.integration.test.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|modules/scenario/web/src/ui/sections/agent-testing/cases/__tests__/case-modal.integration.test.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|modules/scenario/web/src/ui/sections/scenarios/__tests__/scenario-form-drawer-mapping-gate.integration.test.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|modules/scenario/web/src/ui/sections/scenarios/__tests__/scenario-form-drawer-save-and-run.integration.test.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|modules/scenario/web/src/ui/sections/scenarios/__tests__/scenario-form-drawer.integration.test.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|modules/scenario/web/src/ui/sections/scenarios/__tests__/scenario-form-parameters.integration.test.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|modules/scenario/web/src/ui/sections/shared/__tests__/ai-create-modal.integration.test.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|modules/scenario/web/src/ui/sections/suites/__tests__/suite-form-drawer.integration.test.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|modules/scenario/web/src/ui/sections/suites/__tests__/suite-sidebar.integration.test.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|modules/stored-object/server/src/repositories/azure/__tests__/azure.stored-object-blob.repository.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|modules/stored-object/server/src/services/__tests__/stored-objects.service.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|modules/suite/server/src/transport/__tests__/run-plans.rest.integration.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|modules/suite/web/src/__tests__/run-history-filters.unified-layout.integration.test.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|modules/topic/server/src/intents/__tests__/topic-clustering.intent.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|modules/topic/server/src/intents/__tests__/topic-clustering.runner.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|modules/trace/server/src/repositories/clickhouse/__tests__/trace-legacy-read.joined-fallback-cap.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|modules/trace/server/src/repositories/clickhouse/__tests__/trace-legacy-read.memory-safety.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|modules/trace/server/src/services/offload/__tests__/trace-blob-store.event-log.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|modules/trace/server/src/services/offload/__tests__/trace-offload-pipeline.integration.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|modules/trace/server/src/services/offload/__tests__/trace-offload-resolution-4888.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|modules/trace/server/src/services/offload/__tests__/trace-offload-resolution.service.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|modules/trace/server/src/services/offload/__tests__/trace-span-storage-offload-resolution.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|modules/trace/server/src/services/projection/__tests__/trace-projection-lean.service.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|modules/trace/server/src/services/query/__tests__/trace-export.service.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|modules/trace/server/src/subscribers/__tests__/custom-evaluation-sync.subscriber.redelivery.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|modules/trace/server/src/subscribers/__tests__/project-metadata.subscriber.redelivery.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|modules/trace/server/src/subscribers/__tests__/project-metadata.subscriber.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|modules/trace/server/src/subscribers/__tests__/simulation-metrics-sync.subscriber.redelivery.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|modules/trace/server/src/subscribers/__tests__/tracked-event-sync.subscriber.redelivery.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|modules/trace/web/src/behavior/__tests__/trace-edit.store.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|modules/trace/web/src/ui/sections/datasets/__tests__/dataset-mapping-preview.expansions.integration.test.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|modules/trace/web/src/ui/sections/explorer/filter-sidebar/__tests__/filter-sidebar.empty.integration.test.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|modules/trace/web/src/ui/sections/explorer/hooks/__tests__/trace-edit-exit-guards.integration.test.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|modules/trace/web/src/ui/sections/explorer/search-bar/__tests__/active-search-editor.browser.test.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|modules/trace/web/src/ui/sections/explorer/search-bar/__tests__/search-bar.error-banner.integration.test.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|modules/trace/web/src/ui/sections/explorer/trace-drawer/__tests__/attribute-value.format-select.integration.test.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|modules/trace/web/src/ui/sections/explorer/trace-drawer/conversation-view/__tests__/turn-separator-actions.integration.test.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|modules/trace/web/src/ui/sections/explorer/trace-drawer/drawer-header/__tests__/trace-overflow-menu.edit-trace.integration.test.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|modules/trace/web/src/ui/sections/explorer/trace-drawer/waterfall-view/__tests__/tree-row.comments.integration.test.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|modules/trace/web/src/ui/sections/explorer/trace-table/registry/addons/trace/__tests__/io-preview-addon.position.unit.test.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|modules/user/server/src/app/__tests__/user-change-password.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|modules/user/web/src/__tests__/personal-workspace-view-only-notice.integration.test.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|modules/user/web/src/ui/sections/personal-workspace/__tests__/authentication.screen.test.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|modules/webhook/server/src/repositories/__tests__/webhook-endpoint.repository.contract.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|modules/webhook/server/src/services/__tests__/sqs.webhook-destination.service.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|modules/workflow/web/src/behavior/__tests__/crisp-bubble-policy.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|modules/workflow/web/src/behavior/__tests__/workflow-picker-flows.unit.test.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|modules/workflow/web/src/ui/sections/optimization_studio/__tests__/version-to-be-used.model-gating.integration.test.tsx",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|packages/architecture-enforcer/tests/test-colocation.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|packages/eventing/src/commands/__tests__/command.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|packages/eventing/src/projections/__tests__/foldProjectionExecutor.refoldOnMiss.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|packages/eventing/src/projections/__tests__/foldProjectionExecutor.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|packages/eventing/src/projections/__tests__/projectionRouter.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|packages/eventing/src/projections/__tests__/redisCachedFoldStore.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|packages/eventing/src/projections/__tests__/repositoryFoldStore.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|packages/eventing/src/projections/__tests__/stateProjectionCoalesce.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|packages/eventing/src/queues/__tests__/memory.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|packages/eventing/src/services/__tests__/eventSourcingService.flows.recovery.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|packages/eventing/src/services/__tests__/eventSourcingService.flows.sequential.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|packages/eventing/src/services/__tests__/eventSourcingService.flows.storeEvents.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|packages/eventing/src/services/queues/__tests__/queueManager.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|packages/group-queue/src/__tests__/groupQueue.drainSendGate.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|packages/group-queue/src/__tests__/groupQueue.poisonGuard.integration.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|packages/observability/src/metrics/__tests__/instruments.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|packages/redis-client/src/__tests__/session-state-claim.integration.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|packages/task/src/__tests__/task-launcher.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|sdks/typescript/src/cli/commands/experiment/__tests__/results.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|sdks/typescript/src/cli/commands/langy/__tests__/session.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|sdks/typescript/src/cli/commands/langy/__tests__/ui.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|sdks/typescript/src/cli/commands/tag/__tests__/assign.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|sdks/typescript/src/cli/utils/__tests__/apiKey.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|sdks/typescript/src/cli/utils/governance/__tests__/shell-rc-ingestion-offer.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|sdks/typescript/src/client-sdk/services/experiments/__tests__/comparison-rows.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|sdks/typescript/src/client-sdk/services/experiments/__tests__/experiment.origin.integration.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|sdks/typescript/src/client-sdk/tracing/__tests__/create-tracing-proxy.unit.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|sdks/typescript/src/observability-sdk/__tests__/e2e/metadata-and-labels.e2e.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "shared-setup-is-a-hook|sdks/typescript/src/observability-sdk/setup/node/__tests__/integration/setup-tracer-functionality.integration.test.ts",
+      "measured": "2026-09-15"
+    },
+    {
       "key": "stand-in-cast|apps/api/src/app-static/__tests__/app-static-handler.unit.test.ts",
       "measured": "2026-09-15"
     },

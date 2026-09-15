@@ -37,6 +37,11 @@
     // Encodes the incident CLAUDE.md records: _count inside findMany becomes an
     // uncorrelated join the planner may re-run per listed row (2.3s per call).
     "langwatch/prisma-count-in-list-query": "error",
+    // Measured 2026-09-15: 223 reports across 168 files, baselined. Reports
+    // every describe whose sibling tests share a 3+ statement opening, not
+    // only the 10 that hoist mechanically — hoistability decides whether a
+    // fixer is worth its risk, not whether the finding is worth reading.
+    "langwatch/shared-setup-is-a-hook": "error",
     "langwatch/no-try-prefix": "error",
     "langwatch/return-await-outside-try": "error",
     // NOT enabled: `positional-parameter-list` is registered in the plugin

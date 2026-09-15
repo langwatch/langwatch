@@ -89,3 +89,4 @@ export { positionalParameterListRule } from "./rules/positional-parameter-list.r
 export { emDashInCopyRule } from "./rules/em-dash-in-copy.rule.mjs";
 export { unitTestDoesNotRenderRule } from "./rules/unit-test-does-not-render.rule.mjs";
 export { prismaCountInListQueryRule } from "./rules/prisma-count-in-list-query.rule.mjs";
+export { sharedSetupIsAHookRule } from "./rules/shared-setup-is-a-hook.rule.mjs";
