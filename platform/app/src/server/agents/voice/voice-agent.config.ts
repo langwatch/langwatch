@@ -39,16 +39,54 @@ export const phoneTransportSchema = z.object({
       "Enter the number in E.164 form, like +14155550123",
     ),
   /**
-   * The agent under test greets on connect; the run waits for its opening turn
-   * before the simulator speaks.
+   * Which way the call goes, which decides who speaks first.
+   *
+   * - "inbound": the agent under test answers an incoming call. It greets on
+   *   connect, so the run opens with the agent's own turn (the greeting is
+   *   captured first) before the simulated caller speaks.
+   * - "outbound" (default): the agent places the call and waits for the person
+   *   it reached to speak first, so the run opens with the caller. This keeps
+   *   the pre-reshape default behavior.
    */
-  isAgentSpeaksFirst: z.boolean().default(false),
+  callDirection: z.enum(["inbound", "outbound"]).default("outbound"),
 });
 
-export const voiceAgentConfigSchema = z.discriminatedUnion("transport", [
+const voiceAgentConfigUnion = z.discriminatedUnion("transport", [
   elevenLabsConvaiTransportSchema,
   phoneTransportSchema,
 ]);
+
+/**
+ * Backward compatibility for phone targets stored before the direction was
+ * reshaped. The old boolean `isAgentSpeaksFirst` (and an even older
+ * `agentSpeaksFirst`) meant "the agent under test greets first", which is now
+ * `callDirection: "inbound"`. A stored config with neither the new field nor a
+ * legacy `true` falls through to the schema's `"outbound"` default, so a target
+ * saved with the flag off keeps behaving the same. The legacy keys are stripped
+ * so they never reach the parsed shape; when `callDirection` is already present
+ * it wins and the legacy keys are ignored.
+ */
+function normalizeLegacyVoiceConfig(input: unknown): unknown {
+  if (typeof input !== "object" || input === null || Array.isArray(input)) {
+    return input;
+  }
+  const source = input as Record<string, unknown>;
+  const isLegacyInboundRequested =
+    source.callDirection === undefined &&
+    (source.isAgentSpeaksFirst === true || source.agentSpeaksFirst === true);
+  const normalized: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(source)) {
+    if (key === "isAgentSpeaksFirst" || key === "agentSpeaksFirst") continue;
+    normalized[key] = value;
+  }
+  if (isLegacyInboundRequested) normalized.callDirection = "inbound";
+  return normalized;
+}
+
+export const voiceAgentConfigSchema = z.preprocess(
+  normalizeLegacyVoiceConfig,
+  voiceAgentConfigUnion,
+);
 export type VoiceAgentConfig = z.infer<typeof voiceAgentConfigSchema>;
 
 /** The words a customer reads for each transport in the drawer. */
