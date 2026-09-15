@@ -1,4 +1,4 @@
-Feature: The identifier-first sign-in router - one auth screens, routed by data
+Feature: The identifier-first sign-in router - one auth screen, routed by data
   As a person signing in to LangWatch
   I need my email to route me to the right identity provider or method set
   So that every sign-in method works through one door and credential failures

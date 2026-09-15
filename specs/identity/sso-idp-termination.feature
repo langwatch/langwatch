@@ -292,7 +292,7 @@ Feature: Terminating an organization's identity provider - OpenID Connect and SA
   @unit
   Scenario: A deployment mounting its own provider still routes exactly as before
     Given this deployment mounts a provider from its environment
-    And an organization's connection names that provider
+    And an organization's grandfathered connection names that provider
     And the engine holds no per-organization provider for it
     When the router looks the connection's domain up
     Then the connection is configured
@@ -306,6 +306,22 @@ Feature: Terminating an organization's identity provider - OpenID Connect and SA
     When the router looks each connection's domain up
     Then both are configured
     And each was answered by its own side
+
+  # A customer names their own provider, and nothing stops them naming it the
+  # same thing this deployment happens to mount — `okta` is `okta`. What their
+  # connection is called must therefore decide nothing: a connection the
+  # organization registered is the ENGINE's to vouch for, and the engine is
+  # keyed by the connection id precisely so two organizations may both say
+  # `okta`. Deciding on the name let an unregistered connection inherit a
+  # stranger's provider, and sent the sign-in screen at a provider id that
+  # better-auth was never given.
+  @unit
+  Scenario: A self-serve connection naming the mounted provider is still decided by the engine
+    Given this deployment mounts a provider from its environment
+    And an organization registered its own connection under that same name
+    When the router looks the connection's domain up
+    Then the connection is configured only if the engine holds a provider for it
+    And what the sign-in surface dials is the connection's own id
 
   # The question a customer's administrator actually asks, and the one the
   # paragraph above only PROMISED: my people sign in through our identity

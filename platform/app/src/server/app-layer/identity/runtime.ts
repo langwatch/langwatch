@@ -174,6 +174,7 @@ import {
 } from "./repositories/signup-verification.prisma.repository";
 import { PrismaSsoAccountReconciliationRepository } from "./repositories/sso-account-reconciliation.prisma.repository";
 import { PrismaSsoBreakGlassRepository } from "./repositories/sso-break-glass.prisma.repository";
+import { PrismaSsoConnectionBackofficeRepository } from "./repositories/sso-connection-backoffice.prisma.repository";
 import { PrismaSsoConnectionIssuers } from "./repositories/sso-connection-issuers.prisma.repository";
 import { PrismaSsoConnectionProjectionRepository } from "./repositories/sso-connection-projection.prisma.repository";
 import {
@@ -219,6 +220,7 @@ import { SignUpVerificationService } from "./signup-verification.service";
 import { buildSignUpVerificationUrl } from "./signup-verification-link";
 import { SsoArrivalService } from "./sso-arrival.service";
 import { SsoAssertionService } from "./sso-assertion.service";
+import { SsoConnectionBackofficeService } from "./sso-connection-backoffice.service";
 import { SsoConnectionLedgerWriter } from "./sso-connection-ledger";
 import { HttpsDomainProofFileLookup } from "./sso-domain-file-lookup";
 import { HttpSsoIssuerDiscovery } from "./sso-issuer-discovery";
@@ -1166,6 +1168,22 @@ export function sessionRevocation({
   return new SessionRevocationService({
     records: new PrismaSessionRevocationRecords(client),
     cache: new RedisSessionRevocationCache(),
+  });
+}
+
+/**
+ * The back office's own view of connections (D05 tier 1).
+ *
+ * Composed here rather than in the tRPC router for the ordinary reason: a
+ * route names a service, and which store that service reads is the
+ * composition root's business. The router held the repository directly and
+ * therefore held `prisma` too, which is the one import that makes a transport
+ * file a persistence file.
+ */
+export function ssoConnectionBackoffice(): SsoConnectionBackofficeService {
+  return new SsoConnectionBackofficeService({
+    reads: new PrismaSsoConnectionBackofficeRepository(prisma),
+    connections: ssoConnections,
   });
 }
 

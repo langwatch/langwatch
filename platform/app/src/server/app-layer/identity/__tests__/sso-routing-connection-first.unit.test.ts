@@ -195,6 +195,7 @@ describe("given a deployment that mounts its own provider", () => {
 
     expect(
       await isConfigured({
+        source: "legacy-grandfathered",
         methodId: "auth0",
         connectionId: "legacy_acme",
         organizationId: "org_acme",
@@ -213,6 +214,7 @@ describe("given a deployment that mounts its own provider", () => {
 
     expect(
       await isConfigured({
+        source: "legacy-grandfathered",
         methodId: "auth0",
         connectionId: "legacy_acme",
         organizationId: "org_legacy",
@@ -220,6 +222,7 @@ describe("given a deployment that mounts its own provider", () => {
     ).toBe(true);
     expect(
       await isConfigured({
+        source: "self-serve",
         methodId: "okta",
         connectionId: "ssoconn_acme",
         organizationId: "org_acme",
@@ -234,11 +237,56 @@ describe("given a deployment that mounts its own provider", () => {
 
     expect(
       await isConfigured({
+        source: "self-serve",
         methodId: "okta",
         connectionId: "ssoconn_acme",
         organizationId: "org_acme",
       }),
     ).toBe(false);
+  });
+});
+
+describe("given a self-serve connection that borrowed the mounted provider's name", () => {
+  /** @scenario "A self-serve connection naming the mounted provider is still decided by the engine" */
+  it("refuses it when the engine holds no provider for the connection", async () => {
+    const engineHoldsProvider = vi.fn().mockResolvedValue(false);
+    const isConfigured = ssoMethodIsConfiguredWith({
+      mountedMethodId: async () => "okta",
+      engineHoldsProvider,
+    });
+
+    // `okta` is what THIS customer calls their provider and also what the
+    // deployment mounts. The connection is still theirs, and the engine is
+    // still the only thing that can say whether it was ever registered.
+    expect(
+      await isConfigured({
+        source: "self-serve",
+        methodId: "okta",
+        connectionId: "ssoconn_acme",
+        organizationId: "org_acme",
+      }),
+    ).toBe(false);
+    expect(engineHoldsProvider).toHaveBeenCalledWith({
+      connectionId: "ssoconn_acme",
+    });
+  });
+
+  /** @scenario "A self-serve connection naming the mounted provider is still decided by the engine" */
+  it("accepts it once the engine does hold one", async () => {
+    const isConfigured = ssoMethodIsConfiguredWith({
+      mountedMethodId: async () => "okta",
+      engineHoldsProvider: async ({ connectionId }) =>
+        connectionId === "ssoconn_acme",
+    });
+
+    expect(
+      await isConfigured({
+        source: "self-serve",
+        methodId: "okta",
+        connectionId: "ssoconn_acme",
+        organizationId: "org_acme",
+      }),
+    ).toBe(true);
   });
 });
 
@@ -252,6 +300,7 @@ describe("given a deployment in plain email mode", () => {
 
     expect(
       await isConfigured({
+        source: "self-serve",
         methodId: "okta",
         connectionId: "ssoconn_acme",
         organizationId: "org_acme",

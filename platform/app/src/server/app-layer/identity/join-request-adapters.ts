@@ -187,9 +187,16 @@ export class PrismaJoinOfferDismissals implements JoinOfferDismissalPort {
   }): Promise<void> {
     const held = await this.dismissedDomains({ userId });
     if (held.includes(domain)) return;
+    // APPEND, never rewrite. Waving two organizations away at once reads the
+    // same list twice, and a write of `[...held, domain]` would persist one
+    // snapshot over the other — the dismissal that lost would reappear as an
+    // offer on the next lookup. `push` is `array_append` in Postgres, so the
+    // two writes compose instead of racing. The read above stays as a cheap
+    // short-circuit, not as the value being written: the worst a lost race
+    // costs now is the same domain listed twice, which reads identically.
     await this.prisma.user.update({
       where: { id: userId },
-      data: { joinOfferDismissedDomains: [...held, domain] },
+      data: { joinOfferDismissedDomains: { push: domain } },
     });
   }
 }
