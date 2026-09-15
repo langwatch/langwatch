@@ -77,6 +77,22 @@
     "./feature-flag": {
       "types": "./dist/feature-flag.d.ts",
       "default": "./src/feature-flag.ts"
+    },
+    "./period-selector": {
+      "types": "./dist/period-selector.d.ts",
+      "default": "./src/period-selector.tsx"
+    },
+    "./markdown": {
+      "types": "./dist/markdown/index.d.ts",
+      "default": "./src/markdown/index.tsx"
+    },
+    "./isolated-error-boundary": {
+      "types": "./dist/isolated-error-boundary.d.ts",
+      "default": "./src/isolated-error-boundary.tsx"
+    },
+    "./copy-button": {
+      "types": "./dist/copy-button.d.ts",
+      "default": "./src/copy-button.tsx"
     }
   },
   "scripts": {
@@ -87,11 +103,19 @@
   "dependencies": {
     "@chakra-ui/react": "catalog:",
     "@langwatch/api-client-web": "workspace:*",
+    "@langwatch/design-system": "workspace:*",
     "@langwatch/enterprise-licensing-contract": "workspace:*",
     "@langwatch/feature-flag-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
+    "@langwatch/observability": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/ui-drawer": "workspace:*",
+    "lucide-react": "catalog:",
+    "react-error-boundary": "catalog:",
+    "react-feather": "catalog:",
+    "react-icons": "catalog:",
+    "react-markdown": "catalog:",
+    "remark-gfm": "catalog:",
     "zustand": "catalog:"
   },
   "devDependencies": {

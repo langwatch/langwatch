@@ -25,6 +25,9 @@
       "path": "../api-client-web/tsconfig.build.json"
     },
     {
+      "path": "../design-system/tsconfig.build.json"
+    },
+    {
       "path": "../../enterprise/modules/licensing/contract/tsconfig.build.json"
     },
     {
@@ -32,6 +35,9 @@
     },
     {
       "path": "../handled-error/tsconfig.build.json"
+    },
+    {
+      "path": "../observability/tsconfig.build.json"
     },
     {
       "path": "../time/tsconfig.build.json"

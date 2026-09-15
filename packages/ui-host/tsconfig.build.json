@@ -30,7 +30,11 @@
     "./src/upgrade-modal-store.ts",
     "./src/use-organization-team-project.ts",
     "./src/format-time-ago.ts",
-    "./src/feature-flag.ts"
+    "./src/feature-flag.ts",
+    "./src/period-selector.tsx",
+    "./src/markdown/index.tsx",
+    "./src/isolated-error-boundary.tsx",
+    "./src/copy-button.tsx"
   ],
   "include": ["src/**/*.ts", "src/**/*.tsx", "src/**/*.json"],
   "exclude": [
@@ -50,6 +54,9 @@
       "path": "../api-client-web/tsconfig.build.json"
     },
     {
+      "path": "../design-system/tsconfig.build.json"
+    },
+    {
       "path": "../../enterprise/modules/licensing/contract/tsconfig.build.json"
     },
     {
@@ -57,6 +64,9 @@
     },
     {
       "path": "../handled-error/tsconfig.build.json"
+    },
+    {
+      "path": "../observability/tsconfig.build.json"
     },
     {
       "path": "../time/tsconfig.build.json"
