@@ -17,10 +17,12 @@ function report(code) {
 describe("given a strict feature service module", () => {
   describe("when it imports a database client directly", () => {
     /** @scenario "A service importing a database client is reported" */
-    it("reports databaseClient", () => {
+    it("reports databaseClient naming the client and the target repository", () => {
       const found = report('import { PrismaClient } from "@prisma/client";');
 
       expect(found.map((entry) => entry.messageId)).toEqual(["databaseClient"]);
+      expect(found[0].message).toContain("`@prisma/client`");
+      expect(found[0].message).toContain("`repositories/agent.repository.ts`");
     });
   });
 
@@ -37,6 +39,7 @@ describe("given a strict feature service module", () => {
 
       expect(found.map((entry) => entry.messageId)).toEqual(["foreignRepository"]);
       expect(found[0].data.specifier).toBe("~/project/repositories/project.repository");
+      expect(found[0].message).toContain("Depend on `ProjectService` instead");
     });
   });
 
@@ -57,10 +60,12 @@ describe("given a strict feature service module", () => {
 
   describe("when it recovers the global application graph", () => {
     /** @scenario "Recovering the global application from a service is reported" */
-    it("reports globalApplication", () => {
+    it("reports globalApplication naming the recovery call", () => {
       const found = report('import { getApp } from "../../app-layer/app";');
 
       expect(found.map((entry) => entry.messageId)).toEqual(["globalApplication"]);
+      expect(found[0].message).toContain("`getApp`");
+      expect(found[0].message).toContain("calling `getApp()`");
     });
   });
 });

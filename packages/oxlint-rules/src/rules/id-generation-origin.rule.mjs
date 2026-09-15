@@ -25,6 +25,15 @@ function calleeName(callee) {
   return undefined;
 }
 
+// The example in the fix must name THIS file's own kind, not a fixed one —
+// a module file already carries it (`agent.service.ts` -> feature `agent`);
+// an `apps/*/src/features/<name>/...` process file names it in its path too.
+function likelyKindPrefix(file) {
+  if (file.feature) return file.feature;
+
+  return file.sourcePath?.match(/^features\/([^/]+)\//)?.[1];
+}
+
 export const idGenerationOriginRule = defineRule({
   name: "id-generation-origin",
   kind: "problem",
@@ -33,15 +42,17 @@ export const idGenerationOriginRule = defineRule({
     foreignIdModule: {
       what: "`{{name}}` mints ids outside the house scheme.",
       why: "A second id scheme neither sorts by time nor names its kind, and two schemes in one table are a migration.",
-      fix: "Import `generate` from `@langwatch/ksuid` and prefix the kind: `agent_${generate()}`.",
+      fix: "Import `generate` from `@langwatch/ksuid` and prefix the kind: `{{kindPrefix}}_${generate()}`.",
     },
     randomUuid: {
       what: "`randomUUID()` mints an id outside the house scheme.",
       why: "A UUID neither sorts by time nor names its kind, and two schemes in one table are a migration.",
-      fix: "Import `generate` from `@langwatch/ksuid` and prefix the kind: `agent_${generate()}`.",
+      fix: "Import `generate` from `@langwatch/ksuid` and prefix the kind: `{{kindPrefix}}_${generate()}`.",
     },
   },
-  create(context) {
+  create(context, file) {
+    const kindPrefix = likelyKindPrefix(file) ?? "<kind>";
+
     return {
       ImportDeclaration(node) {
         if (!FOREIGN_ID_MODULES.has(node.source.value)) return;
@@ -49,14 +60,14 @@ export const idGenerationOriginRule = defineRule({
         context.report({
           node: node.source,
           messageId: "foreignIdModule",
-          data: { name: node.source.value },
+          data: { kindPrefix, name: node.source.value },
         });
       },
       CallExpression(node) {
         if (calleeName(node.callee) !== "randomUUID") return;
         if (withinAnIdempotencyKey(node)) return;
 
-        context.report({ node: node.callee, messageId: "randomUuid" });
+        context.report({ node: node.callee, messageId: "randomUuid", data: { kindPrefix } });
       },
     };
   },

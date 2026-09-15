@@ -31,10 +31,21 @@ describe("given a strict feature or process source", () => {
     });
 
     /** @scenario "An import of nanoid or uuid is reported with the house import" */
-    it("reports the same in a process composition", () => {
+    it("reports the same in a process composition, naming that process's own kind", () => {
       const found = report('import { v4 } from "uuid";\n', APPLICATION);
 
       expect(found.map((entry) => entry.messageId)).toEqual(["foreignIdModule"]);
+      expect(found[0].message).toContain("`agent_${generate()}`");
+    });
+
+    /** @scenario "An import of nanoid or uuid is reported with the house import" */
+    it("falls back to a literal kind placeholder when none can be read from the path", () => {
+      const found = report(
+        'import { v4 } from "uuid";\n',
+        "apps/api/src/some-other-area/thing.ts",
+      );
+
+      expect(found[0].message).toContain("`<kind>_${generate()}`");
     });
   });
 

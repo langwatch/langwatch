@@ -72,21 +72,46 @@ function escapesRoot(root, target) {
   return path === ".." || path.startsWith(`..${sep}`) || isAbsolute(path);
 }
 
+// "Repository" -> "Repository" (already PascalCase, keep); "project" -> "Project".
+function toPascal(word) {
+  if (!word) return undefined;
+  if (/^[A-Z]/.test(word)) return word;
+  return word
+    .split("-")
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join("");
+}
+
+// The repository's own subject, read off whichever half of the import named
+// it: the file path (`.../project.repository`) or the imported symbol
+// (`ProjectRepository`). Used to name the exact service to depend on instead.
+function foreignSubjectOf(node) {
+  const pathBase = node.source.value
+    .split("/")
+    .at(-1)
+    ?.replace(/\.[cm]?[jt]s$/, "");
+  if (pathBase?.endsWith(".repository")) return pathBase.slice(0, -".repository".length);
+
+  const named = node.specifiers.find((specifier) => importedName(specifier)?.endsWith("Repository"));
+  const name = named ? importedName(named) : undefined;
+  return name ? name.slice(0, -"Repository".length) : undefined;
+}
+
 export const serviceDependenciesRule = defineRule({
   name: "service-dependencies",
   kind: "problem",
   messages: {
     databaseClient: {
-      what: "A service cannot import a database client; persistence belongs behind its own repository.",
-      fix: "Move the import behind a `*.repository.ts` and depend on that instead.",
+      what: "`{{specifier}}` is a database client; persistence belongs behind its own repository.",
+      fix: "Move the import into `repositories/{{subject}}.repository.ts` and depend on that instead.",
     },
     foreignRepository: {
       what: "`{{specifier}}` is another subject's repository.",
-      fix: "Depend on that subject's service instead; a service owns only its own repository.",
+      fix: "{{fixInstruction}}",
     },
     globalApplication: {
-      what: "A service cannot recover the global application graph.",
-      fix: "Inject the service dependency explicitly.",
+      what: "`{{name}}` recovers the global application graph from inside a service.",
+      fix: "Take the dependency as a parameter to the service's constructor or `create()` factory instead of calling `{{name}}()`.",
     },
   },
   create(context) {
@@ -99,19 +124,31 @@ export const serviceDependenciesRule = defineRule({
     return {
       ImportDeclaration(node) {
         if (importsDatabaseClient(node)) {
-          context.report({ node: node.source, messageId: "databaseClient" });
+          context.report({
+            node: node.source,
+            messageId: "databaseClient",
+            data: { specifier: node.source.value, subject },
+          });
         }
         if (importsGlobalApplication(node)) {
-          context.report({ node: node.source, messageId: "globalApplication" });
+          const global = node.specifiers.find((specifier) =>
+            /^(?:getApp|tryGetApp|initializeApp)$/.test(importedName(specifier) ?? ""),
+          );
+          const name = global ? importedName(global) : "getApp";
+          context.report({ node: node.source, messageId: "globalApplication", data: { name } });
         }
         if (!importsRepository(node)) return;
         const target = repositoryTarget(node.source.value, absoluteFilename);
         const foreignRepository = !target || escapesRoot(ownerRoot, target);
         if (foreignRepository) {
+          const suggestedService = toPascal(foreignSubjectOf(node));
+          const fixInstruction = suggestedService
+            ? `Depend on \`${suggestedService}Service\` instead; a service owns only its own repository.`
+            : "Depend on that subject's service instead; a service owns only its own repository.";
           context.report({
             node: node.source,
             messageId: "foreignRepository",
-            data: { specifier: node.source.value },
+            data: { fixInstruction, specifier: node.source.value },
           });
         }
       },

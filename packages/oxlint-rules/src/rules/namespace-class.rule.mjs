@@ -21,6 +21,12 @@ function isStaticBlock(member) {
   return member.type === "StaticBlock";
 }
 
+// A class name is always PascalCase in this codebase, so kebab-casing it
+// deterministically names the sibling `rules/` file to move its statics into.
+function toKebab(name) {
+  return name.replace(/([a-z0-9])([A-Z])/g, "$1-$2").toLowerCase();
+}
+
 export const namespaceClassRule = defineRule({
   name: "namespace-class",
   kind: "problem",
@@ -29,7 +35,7 @@ export const namespaceClassRule = defineRule({
     namespaceClass: {
       what: "`{{name}}` has only static members ({{count}}), so it is a module wearing a class.",
       why: "A class earns its name by holding state; a bag of statics hides plain functions behind a namespace and a `create` nobody calls.",
-      fix: "Export the functions from a `rules/` module and delete the class.",
+      fix: "Export the functions to `{{target}}` and delete the class.",
     },
   },
   create(context) {
@@ -51,10 +57,15 @@ export const namespaceClassRule = defineRule({
 
         if (behaviour.length === 0) return;
 
+        const name = node.id?.name;
         context.report({
           node: node.id ?? node,
           messageId: "namespaceClass",
-          data: { name: node.id?.name ?? "This class", count: members.length },
+          data: {
+            count: members.length,
+            name: name ?? "This class",
+            target: name ? `rules/${toKebab(name)}.rules.ts` : "rules/<name>.rules.ts",
+          },
         });
       },
     };
