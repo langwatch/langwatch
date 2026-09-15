@@ -73,10 +73,9 @@ function openaiKey(): string {
 }
 
 /**
- * Polls until `read` answers something truthy, then returns it.
- *
- * Every wait in this file goes through here so a timeout says what it was
- * waiting for rather than dying on an assertion three steps later.
+ * Polls until `read` answers something truthy, then returns it. Every wait
+ * goes through here so a timeout says what it was waiting for rather than
+ * dying on an assertion three steps later.
  */
 async function waitFor<T>({
   what,
@@ -272,21 +271,17 @@ async function pointSdkAtThisCheckout({
 }
 
 /**
- * A demo application as its own git repository, on `main`, with one commit.
- *
- * The install is what makes the folder real: Langy runs the project's own
- * checks on it, and a folder with no dependencies would push it into
- * installing them itself and grade the wrong thing.
+ * A demo application as its own git repository, on `main`, one commit. The
+ * install makes it real: Langy runs the project's own checks, and a folder
+ * with no dependencies would have it install them and grade the wrong thing.
  */
 /** How many finished runs keep their folder on disk. */
 const DEMO_REPOS_KEPT = 4;
 
 /**
- * The folders to delete, newest kept.
- *
- * An installed demo repository is about 400 MB, and one is made per scenario
- * run: a morning of runs filled the disk. The most recent few stay so a failed
- * run can still be read on disk.
+ * The folders to delete, newest kept. An installed demo repository is about
+ * 400 MB and one is made per scenario run, so a morning of them filled the
+ * disk; the most recent few stay so a failed run can still be read.
  */
 export function demoReposToPrune({
   existing,
@@ -410,12 +405,9 @@ const CLI_ENTRY = path.join(REPO_ROOT, "sdks", "typescript", "dist", "cli", "ind
 let cliBuildPromise: Promise<void> | null = null;
 
 /**
- * Build the command line once per test process.
- *
- * `tsup` is called rather than the package's `build` script because that
- * script runs a whole-tree `tsc --noEmit` first, which is the repository's
- * typecheck job and not this suite's. `LANGY_SKIP_CLI_BUILD=1` reuses whatever
- * is in `dist` already, for a quick re-run of a scenario.
+ * Build the command line once per test process, via `tsup` not the package's
+ * `build`: that runs a whole-tree `tsc --noEmit` first, the repository's
+ * typecheck job. `LANGY_SKIP_CLI_BUILD=1` reuses `dist` for a quick re-run.
  */
 export function buildCli(): Promise<void> {
   cliBuildPromise ??= (async () => {
@@ -449,12 +441,9 @@ export interface CliTerminal {
   /** Wait for the approve question and answer it with Approve. */
   approve: (timeoutMs?: number) => Promise<void>;
   /**
-   * Answer the next permission ask in the terminal, on the default option.
-   *
-   * Arm it BEFORE the message that raises the ask, and await it after: the
-   * selector opens while the turn is in flight, and Enter takes the first
-   * option, which is the session grant. Resolves with the terminal's own text
-   * once the settled line replaced the selector.
+   * Answer the next permission ask on its default option, the session grant.
+   * Arm BEFORE the message that raises it, await after: the selector opens
+   * mid-turn. Resolves with the terminal text once the settled line lands.
    */
   answerNextPermission: (
     timeoutMs?: number,
@@ -500,8 +489,7 @@ export async function cancelOpenControlRequests(): Promise<void> {
 
 /**
  * Start `langwatch langy --share-control` in the folder, in its own terminal.
- *
- * The command line waits when no request is open, so a scenario can start it
+ * The command line waits when no request is open, so a scenario may start it
  * before the ask or after it and the order does not matter.
  */
 export async function startShareControl({
@@ -712,19 +700,15 @@ export interface ConversationWatcher {
   permissions: PermissionAsk[];
   questions: QuestionAsk[];
   /**
-   * The developer's card answers since the last drain, one line each,
-   * emptying the list. The judge's conversation never sees these (the panel
-   * mutation answers a card the same way a developer does), so feed these
-   * lines in after each turn to put the developer's side in the record.
+   * The developer's card answers since the last drain, one line each, emptying
+   * the list. The judge never sees them -- a panel mutation answers a card as
+   * a developer does -- so feed them in each turn to record that side.
    */
   drainAnswerNotes: () => string[];
   /**
-   * Leave the next card whose command matches to the terminal, and answer
-   * nothing here for it.
-   *
-   * Arm it beside `CliTerminal.answerNextPermission`, which is what answers it
-   * there. Only ONE card is left: a second match is answered on the card as
-   * usual, so an unanswered selector can never stall the rest of the run.
+   * Leave the next matching card to the terminal, answering nothing here; arm
+   * it beside `CliTerminal.answerNextPermission`. Only ONE is left, a second
+   * match answering on the card, so a selector cannot stall the rest of a run.
    */
   leaveNextPermissionToTerminal: (match: RegExp) => void;
   /** `connected` and `disconnected` entries, in order. */
@@ -736,12 +720,9 @@ export interface ConversationWatcher {
   /** Wait for a turn other than the ones already known. */
   waitForNewTurn: (input: { knownTurnIds: string[]; timeoutMs?: number }) => Promise<string>;
   /**
-   * Wait until no turn is in flight.
-   *
-   * Idle says the turn ended, not that its answer is already readable: the
-   * fold and the message projection consume the same event on separate
-   * queues, so `currentTurnId` can be null a moment before the answer row
-   * exists. Ask for a turn's own messages with `turnId`, which waits for it.
+   * Wait until no turn is in flight. Idle means the turn ended, not that its
+   * answer is readable: fold and message projection take the same event on
+   * separate queues, so `currentTurnId` nulls first. Read with `turnId`.
    */
   waitForIdle: (timeoutMs?: number) => Promise<void>;
   /** The whole conversation, as the panel would render it. */
@@ -752,10 +733,9 @@ export interface ConversationWatcher {
    */
   lastAssistantText: (input?: { turnId?: string; timeoutMs?: number }) => Promise<string>;
   /**
-   * One turn's answer as a judge reads it: its tool calls and their answers,
-   * then its reply — needed because a panel-started turn never passes
-   * through the scenario adapter otherwise. Name the turn with `turnId`, or
-   * the read may return the previous turn's answer instead of this one's.
+   * One turn's answer as a judge reads it: tool calls, their answers, then the
+   * reply — a panel-started turn never reaches the scenario adapter otherwise.
+   * Name the turn with `turnId`, or the read may return the previous one's.
    */
   lastTurnMessages: (input?: { turnId?: string; timeoutMs?: number }) => Promise<JudgeMessage[]>;
   stop: () => void;
@@ -769,12 +749,9 @@ export interface StoredMessage {
 }
 
 /**
- * The stored answer of one turn.
- *
- * The answer message of a turn carries the turn id inside its own message id,
- * which is how the product keeps a turn's finalize idempotent. That is the one
- * link between a turn and its stored answer, so a read can wait for the right
- * message instead of taking whichever answer is last.
+ * The stored answer of one turn. Its answer message carries the turn id inside
+ * its own message id -- how the product keeps finalize idempotent, and the one
+ * link there is -- so a read can wait for it instead of taking the last.
  */
 export function answerOfTurn(messages: StoredMessage[], turnId: string): StoredMessage | null {
   return (
