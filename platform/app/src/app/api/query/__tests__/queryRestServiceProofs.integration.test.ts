@@ -1413,7 +1413,6 @@ describe("given the /api/v1/query REST family's service, isolation and policy pr
   });
 
   describe("when a caller reads the logs view", () => {
-    /** @scenario "log_records aliases the OTel correlation columns" */
     it("returns the correlation and provider-session values under TraceId/SpanId/SessionId", async () => {
       const body = await run(
         openProject,
@@ -1428,7 +1427,6 @@ describe("given the /api/v1/query REST family's service, isolation and policy pr
   });
 
   describe("when a merged-aggregate view is read", () => {
-    /** @scenario "An AggregatingMergeTree view finalises to the latest merged state" */
     it("returns simulation_metric_rollups finalised to the later of two partial states", async () => {
       const body = await run(
         openProject,
@@ -1446,7 +1444,6 @@ describe("given the /api/v1/query REST family's service, isolation and policy pr
   });
 
   describe("when a Map column on a derived view is read", () => {
-    /** @scenario "A Map column on a derived view is queryable by key" */
     it("returns coding_sessions.ToolDurationMs indexed by tool name", async () => {
       const body = await run(
         openProject,
