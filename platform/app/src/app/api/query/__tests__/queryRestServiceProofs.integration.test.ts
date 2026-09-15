@@ -75,6 +75,7 @@ import {
 import {
   isPostgresResident,
   type LangWatchQLViewDefinition,
+  lwqlPhysicalColumn,
 } from "~/server/analytics/lwql/catalog/types";
 import {
   lwqlViewSetupStatements,
@@ -238,6 +239,36 @@ async function seedTenant({
       },
       Cost: 0.0021,
     })),
+  });
+
+  // A `claude_code.tool` span, so `coding_tool_results` (a view over
+  // `stored_spans`) has a row for this tenant — every view in the catalog is
+  // asserted isolated elsewhere in this suite.
+  await admin.insert({
+    table: `${database}.stored_spans`,
+    format: "JSONEachRow",
+    values: [
+      {
+        ProjectionId: `${tenantId}/tool-span`,
+        TenantId: tenantId,
+        TraceId: `${tenantId}-tool-trace`,
+        SpanId: `${tenantId}-tool-span`,
+        Sampled: 1,
+        StartTime: SEED_AT,
+        EndTime: SEED_AT,
+        DurationMs: 40,
+        SpanName: "claude_code.tool",
+        SpanKind: 3,
+        ServiceName: "api",
+        ScopeName: "langwatch",
+        ResourceAttributes: {},
+        SpanAttributes: {
+          "langwatch.input": marks.spanInput,
+          "langwatch.output": marks.spanOutput,
+        },
+        Cost: 0,
+      },
+    ],
   });
 
   await admin.insert({
@@ -468,6 +499,141 @@ async function seedTenant({
       },
     ],
   });
+
+  // `logs` (log_records): one request-body record correlated to the first
+  // seeded trace, so the alias proof (TraceId/SpanId/SessionId <- Correlation*
+  // /ProviderSessionId) and the content-gate proof (BodyText) have a row.
+  await admin.insert({
+    table: `${database}.log_records`,
+    format: "JSONEachRow",
+    values: [
+      {
+        TenantId: tenantId,
+        CorrelationTraceId: traceIds[0]!,
+        CorrelationSpanId: `${tenantId}-span-0`,
+        ProviderSessionId: `${tenantId}-provider-session`,
+        TimeUnixMs: SEED_AT,
+        RecordId: `${tenantId}-log-record`.padEnd(64, "0"),
+        EventName: "api_request_body",
+        BodyText: `${marks.spanInput}-log-body`,
+      },
+    ],
+  });
+
+  // `langy_conversation_messages` (langy_messages): one message, content
+  // gated `output` by the derived classifier — the only column here a
+  // permission-less caller cannot read.
+  await admin.insert({
+    table: `${database}.langy_messages`,
+    format: "JSONEachRow",
+    values: [
+      {
+        TenantId: tenantId,
+        ConversationId: `${tenantId}-conversation`,
+        MessageId: `${tenantId}-message-0`,
+        Role: "assistant",
+        Parts: `${marks.spanOutput}-langy-message`,
+        CreatedAt: SEED_AT,
+        UpdatedAt: SEED_AT,
+      },
+    ],
+  });
+
+  // `experiment_items` (experiment_run_items): input/output/costs gated
+  // columns, per `overrides/experiments.ts`.
+  await admin.insert({
+    table: `${database}.experiment_run_items`,
+    format: "JSONEachRow",
+    values: [
+      {
+        TenantId: tenantId,
+        RunId: `${tenantId}-run-0`,
+        ExperimentId: `${tenantId}-experiment`,
+        ProjectionId: `${tenantId}/item-0`,
+        OccurredAt: SEED_AT,
+        DatasetEntry: `${marks.spanInput}-dataset-entry`,
+        Predicted: `${marks.spanOutput}-predicted`,
+        TargetCost: 0.03,
+        EvaluationCost: 0.01,
+      },
+    ],
+  });
+
+  // `simulation_metric_rollups` (simulation_run_metrics_rollup): an
+  // AggregatingMergeTree, so only reachable through *State() combinators. Two
+  // partial states for the SAME (TenantId, ScenarioRunId, TraceId) key, at two
+  // different OccurredAt values — the read path's `argMaxMerge` must resolve
+  // to the LATER one, which is the whole point of the engine choice.
+  const rollupKey = {
+    scenarioRunId: `${tenantId}-rollup-sim`,
+    traceId: `${tenantId}-rollup-trace`,
+  };
+  for (const part of [
+    { occurredAt: "2026-02-16 00:00:00.000", totalCost: 0.11 },
+    { occurredAt: "2026-02-20 12:00:00.000", totalCost: 0.87 },
+  ]) {
+    await admin.command({
+      query:
+        `INSERT INTO ${database}.simulation_run_metrics_rollup ` +
+        `(TenantId, ScenarioRunId, TraceId, TotalCost, RoleCosts, RoleLatencies, OccurredAt, PartitionMonth) ` +
+        `SELECT '${tenantId}', '${rollupKey.scenarioRunId}', '${rollupKey.traceId}', ` +
+        `argMaxState(toFloat64(${part.totalCost}), toDateTime64('${part.occurredAt}', 3)), ` +
+        `argMaxState(map('assistant', ${part.totalCost}), toDateTime64('${part.occurredAt}', 3)), ` +
+        `argMaxState(map('assistant', 120.0), toDateTime64('${part.occurredAt}', 3)), ` +
+        `maxState(toDateTime64('${part.occurredAt}', 3)), toYYYYMM(toDateTime64('${part.occurredAt}', 3))`,
+    });
+  }
+
+  // `gateway_budget_scope_totals`: the other AggregatingMergeTree table in
+  // the catalog, same reasoning as the rollup above — a plain INSERT cannot
+  // populate an AggregateFunction column.
+  await admin.command({
+    query:
+      `INSERT INTO ${database}.gateway_budget_scope_totals ` +
+      `(TenantId, Scope, ScopeId, Window, BudgetId, PeriodStart, SpendUSD, TokensInput, TokensOutput, TokensCacheRead, TokensCacheWrite, RequestCount, UpdatedAt, SpendNanoUSD) ` +
+      `SELECT '${tenantId}', 'project', '${tenantId}', 'day', 'budget-1', now64(3), ` +
+      `sumState(toDecimal64(1.5, 6)), sumState(toUInt64(100)), sumState(toUInt64(20)), sumState(toUInt64(5)), sumState(toUInt64(3)), countState(), now64(3), sumState(toInt64(1500000000))`,
+  });
+
+  // Every remaining ClickHouse-resident source table this suite's isolation
+  // proof reads but has no dedicated fixture above: one row per tenant so
+  // "reads every LangWatchQL view, seeing exactly its own tenant's rows" has
+  // something real to check rather than an empty result passing vacuously.
+  // Driven off `LWQL_VIEW_CATALOG` itself — see the identical sweep in
+  // `lwqlClickHouseHarness.ts`'s `seedRemainingDerivedSourceTables`.
+  const alreadySeededHere = new Set([
+    "trace_summaries",
+    "stored_spans",
+    "evaluation_runs",
+    "simulation_runs",
+    "trace_analytics",
+    "trace_analytics_rollup",
+    "evaluation_analytics",
+    "evaluation_analytics_rollup",
+    "coding_agent_sessions",
+    "coding_agent_session_events",
+    "log_records",
+    "langy_messages",
+    "experiment_run_items",
+    "simulation_run_metrics_rollup",
+    "gateway_budget_scope_totals",
+  ]);
+  const remainingSourceTables = new Set(
+    LWQL_VIEW_CATALOG.filter((view) => !isPostgresResident(view))
+      .map((view) => view.sourceTable)
+      .filter((table) => !alreadySeededHere.has(table)),
+  );
+  for (const table of remainingSourceTables) {
+    const view = LWQL_VIEW_CATALOG.find(
+      (candidate) => candidate.sourceTable === table,
+    )!;
+    const tenantColumn = lwqlPhysicalColumn(view, "TenantId");
+    await admin.insert({
+      table: `${database}.${table}`,
+      format: "JSONEachRow",
+      values: [{ [tenantColumn]: tenantId }],
+    });
+  }
 }
 
 describe("given the /api/v1/query REST family's service, isolation and policy proofs", () => {
@@ -608,10 +774,16 @@ describe("given the /api/v1/query REST family's service, isolation and policy pr
     view: LangWatchQLViewDefinition,
     tenantId: string,
   ) => {
+    // A PostgreSQL-resident source's engine table is already mapped onto the
+    // catalog's exposed names, so its physical tenant column IS `TenantId`;
+    // `stored_objects` (ClickHouse-resident) polices on `project_id`.
+    const tenantColumn = isPostgresResident(view)
+      ? "TenantId"
+      : lwqlPhysicalColumn(view, "TenantId");
     const [row] = await selectRows<{ value: string }>(
       harness.admin,
       `SELECT count() AS value FROM ${isPostgresResident(view) ? database : facts}.${view.sourceTable} ` +
-        `WHERE TenantId = '${tenantId}'`,
+        `WHERE ${tenantColumn} = '${tenantId}'`,
     );
     return Number(row!.value);
   };
@@ -1190,6 +1362,99 @@ describe("given the /api/v1/query REST family's service, isolation and policy pr
         `SELECT count() AS value FROM ${database}.traces`,
       );
       expect(Number(body.rows[0].value)).toBeGreaterThan(0);
+    });
+
+    /**
+     * The same content-gate proof as above, over three more datasets —
+     * #8085/#8116 Part B AC3: every input/output-gated column across the
+     * expanded catalog is refused by permission, not merely `traces`'.
+     */
+    it.each([
+      ["logs", "BodyText"],
+      ["langy_conversation_messages", "Parts"],
+      ["experiment_items", "DatasetEntry"],
+    ] as const)(
+      "refuses %s.%s for the gated caller, and answers it for the permitted one",
+      async (view, column) => {
+        // Built here, not in the table above: the table is evaluated once at
+        // collection time, before `beforeAll` assigns `database`.
+        const sql = `SELECT ${column} FROM ${database}.${view} LIMIT 1`;
+        const body = await refuse(gatedProject, sql);
+        expect(body.code, sql).toBe("lwql_not_permitted");
+        expect(
+          body.meta.violations.map((violation: any) => violation.code),
+          sql,
+        ).toContain("GATED_COLUMN");
+
+        const response = await post({ sql }, { token: openProject.apiKey });
+        expect(response.status, sql).toBe(200);
+      },
+    );
+
+    /**
+     * The `costs` gate is structurally the same mechanism (`GATED_COLUMN`,
+     * `validateLangWatchQL`'s `columnGates`), but every API-key caller through
+     * this REST family resolves `canSeeCosts: true` unconditionally —
+     * `getProtectionsForProject` in `~/server/api/utils.ts` grants cost:view
+     * to every API key regardless of the project's data-privacy policy ("API
+     * key holders have full project access — all roles grant cost:view").
+     * A costs-gated column can therefore never be refused through this
+     * surface today; this proves the column reads (not that it CAN be
+     * refused, which would be a false claim about current behavior) and
+     * documents why no refusal case exists here for it.
+     */
+    it("answers a costs-gated column (TargetCost) for every API-key caller, gated or not", async () => {
+      const sql = `SELECT TargetCost FROM ${database}.experiment_items LIMIT 1`;
+      for (const project of [openProject, gatedProject]) {
+        const response = await post({ sql }, { token: project.apiKey });
+        expect(response.status, project.slug).toBe(200);
+      }
+    });
+  });
+
+  describe("when a caller reads the logs view", () => {
+    /** @scenario "log_records aliases the OTel correlation columns" */
+    it("returns the correlation and provider-session values under TraceId/SpanId/SessionId", async () => {
+      const body = await run(
+        openProject,
+        `SELECT TraceId, SpanId, SessionId FROM ${database}.logs LIMIT 1`,
+      );
+      expect(body.rows).toHaveLength(1);
+      const [row] = body.rows;
+      expect(row.TraceId).toBe(`${openProject.id}-trace-0`);
+      expect(row.SpanId).toBe(`${openProject.id}-span-0`);
+      expect(row.SessionId).toBe(`${openProject.id}-provider-session`);
+    });
+  });
+
+  describe("when a merged-aggregate view is read", () => {
+    /** @scenario "An AggregatingMergeTree view finalises to the latest merged state" */
+    it("returns simulation_metric_rollups finalised to the later of two partial states", async () => {
+      const body = await run(
+        openProject,
+        `SELECT TotalCost, RoleCosts['assistant'] AS assistant_cost FROM ${database}.simulation_metric_rollups ` +
+          `WHERE ScenarioRunId = '${openProject.id}-rollup-sim'`,
+      );
+      expect(body.rows).toHaveLength(1);
+      // Seeded as two argMaxState parts: 0.11 at 2026-02-16, 0.87 at
+      // 2026-02-20 — argMax resolves to the later OccurredAt's value, over
+      // both the plain measure and the Map measure, proving the view merges
+      // rather than picking whichever part a read happens to see first.
+      expect(Number(body.rows[0].TotalCost)).toBeCloseTo(0.87);
+      expect(Number(body.rows[0].assistant_cost)).toBeCloseTo(0.87);
+    });
+  });
+
+  describe("when a Map column on a derived view is read", () => {
+    /** @scenario "A Map column on a derived view is queryable by key" */
+    it("returns coding_sessions.ToolDurationMs indexed by tool name", async () => {
+      const body = await run(
+        openProject,
+        `SELECT ToolDurationMs['Bash'] AS bash_ms FROM ${database}.coding_sessions ` +
+          `WHERE SessionId = '${openProject.id}-coding-session-0'`,
+      );
+      expect(body.rows).toHaveLength(1);
+      expect(Number(body.rows[0].bash_ms)).toBe(1200);
     });
   });
 
