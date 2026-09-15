@@ -95,3 +95,72 @@ the four new ones are NOT baselined and are reported.
 3. `fallible-result-naming` + `no-try-prefix` (2,103 together, one family):
    a `try*`/nullable-returning name must narrow its catch to the absence case,
    never blanket-catch behind a `find*` name.
+
+## The enforcer's 2.76 GiB — measured, 2026-09-15
+
+`architecture-enforcer lint` peaks at **2.76 GiB RSS in 19.9s**, which is why it
+holds a machine-wide check-queue slot. Attribution, by running each policy alone
+against a fresh snapshot:
+
+| | peak RSS |
+| --- | ---: |
+| workspace snapshot alone (files, catalogue, manifests) | 0.16 GiB |
+| `unused-module-export` | 2.44 GiB |
+| `source-folder-shape` | 1.29 GiB |
+| `service-projection-boundaries` | 1.01 GiB — **for 0 findings** |
+| `frontend-ui-boundaries` | 0.87 GiB |
+| everything else | ≤ 0.59 GiB |
+
+The snapshot is cheap. The cost is the shared syntax-tree cache in
+`src/workspace/module-graph.ts`.
+
+### The `WeakRef` in that cache does nothing, and cannot
+
+It is written to be collectable — the comment says "14,000 retained trees cost
+three gigabytes". Measured: **14,158 trees cached, 14,158 still alive after two
+forced collections, 0 collected, 2.09 GiB retained.** Yielding to the event loop
+once (`await setTimeout(0)`) collected all 14,158 and dropped the heap to
+**0.20 GiB**.
+
+The cause is `KeepDuringJob`: `new WeakRef(target)` and `deref()` both add the
+target to the *current job's* kept-alive list, and a whole lint run is one
+synchronous job. A weak cache needs a turn boundary to be weak. This one has
+none, so it behaves as an unbounded strong cache that merely reads as bounded.
+
+### Bounding it is not free
+
+Replacing the `WeakRef` with a bounded LRU, findings identical at 2761 across 55
+policies every time:
+
+| tree cache | peak RSS | wall |
+| ---: | ---: | ---: |
+| 512 | 1.54 GiB | 44.5s |
+| 2048 | 2.09 GiB | 31.5s |
+| 4096 | 2.70 GiB | 23.8s |
+| unbounded (today) | 2.76 GiB | 19.9s |
+
+The cache is earning its keep: policies re-read the same files, so a smaller
+cache buys memory with re-parsing, roughly linearly. Not shipped for that reason.
+
+### Could the policies just be oxlint rules?
+
+Mostly no, and the RAM is not the reason to want it. The expensive policies are
+expensive *because* they are whole-tree: `unused-module-export` asks "does any
+file in the repository import this name?", `boundary-signature-mirrors` and
+`memory-twin-drift` compare two files, `package-cycle` needs the import graph. An
+oxlint plugin rule sees one file at a time and cannot answer any of those. The
+policies that *could* move are the per-file ones, which are already the cheap
+ones — moving them would save little.
+
+### Where the wins actually are, cheapest first
+
+1. **`service-projection-boundaries`: 1.01 GiB to report nothing.** It holds
+   `Map<string, ts.SourceFile>` and `Map<ts.SourceFile, …>` strongly in
+   `packageTypes()`, pinning every tree it parses. Its tests are real and it is
+   a satisfied guard, not a dead one — but it should stream rather than retain.
+2. **Make the cache honest.** Either document it as the unbounded strong cache
+   it is, or give the whole-repo walks a turn boundary so the `WeakRef` works as
+   designed and memory is reclaimed under pressure rather than never.
+3. **Walk the tree once.** 55 policies each walk and re-parse; the cache exists
+   to paper over that. One walk with per-file policies run against each hot tree
+   removes both the re-parsing and the need to retain anything.
