@@ -4,52 +4,18 @@
  * @see specs/suites/run-plan-identity-by-name.feature
  */
 
-import { generate } from "@langwatch/ksuid";
 import { getSuiteSetId } from "@langwatch/suite-contract";
-import { useCallback, useRef } from "react";
+import { useCallback } from "react";
 import { useModelProvidersSettings } from "@langwatch/model-provider-web/surfaces/model-provider-settings";
 import { writeScenarioTarget } from "../../use-scenario-target.ts";
+import { type RunAttempt, useRunAttempt } from "../../../../behavior/suites/use-run-attempt.ts";
 import { api } from "../../../../behavior/scenario-api.ts";
-import { KSUID_RESOURCES } from "@langwatch/workflow-contract";
 import { useAgentTestingStore } from "../use-agent-testing-store.ts";
 import type { RunDialogSubmitInput, SuiteTargets } from "./use-run-dialog-submit.ts";
 import { flushSync } from "react-dom";
 import type { TargetValue } from "../../../../model/scenario-target.ts";
 import { type RunScope, toSuiteScope } from "./run-configuration.ts";
 import type { RunStartedInfo } from "./run-dialog-types.ts";
-
-type RunAttempt = {
-  /** What the person is queueing: subject, targets, note and parameters. */
-  key: string;
-  idempotencyKey: string;
-  batchRunId: string;
-};
-
-/**
- * Holds the identity of the run the person is trying to queue. A failed attempt keeps
- * its identity, so a retry of the same request deduplicates on the server instead of
- * queueing a second batch. A queued run drops it, so the next run is a new batch.
- */
-function useRunAttempt() {
-  const attemptRef = useRef<RunAttempt | null>(null);
-
-  const takeRunAttempt = useCallback((key: string): RunAttempt => {
-    if (attemptRef.current?.key !== key) {
-      attemptRef.current = {
-        key,
-        idempotencyKey: crypto.randomUUID(),
-        batchRunId: generate(KSUID_RESOURCES.SCENARIO_BATCH).toString(),
-      };
-    }
-    return attemptRef.current;
-  }, []);
-
-  const clearRunAttempt = useCallback(() => {
-    attemptRef.current = null;
-  }, []);
-
-  return { takeRunAttempt, clearRunAttempt };
-}
 
 export type BatchRunInput = RunDialogSubmitInput & {
   projectId: string;

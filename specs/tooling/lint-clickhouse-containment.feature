@@ -1,8 +1,13 @@
 Feature: The clickhouse-containment lint rule
-  ClickHouse gets the same containment Prisma has: `@langwatch/clickhouse-client`
-  is only value-importable from a `repositories/clickhouse/` repository, a
-  `clickhouse.<subject>.adapter.ts` composition adapter, or the process boot
-  files that construct the one connection a process holds. Everywhere else
+  ClickHouse gets the same containment Prisma and Redis have: a ClickHouse
+  client — `@langwatch/clickhouse-client` or the `@clickhouse/client` driver
+  underneath it — is only value-importable from a `repositories/clickhouse/`
+  repository, a `clickhouse.<subject>.adapter.ts` adapter, or the composition
+  root that builds the one connection a process holds. This tree spells that
+  root two ways, `*.composition.ts` in the applications and
+  `*-composition.build.ts` inside a module, and both are seams. Packages whose
+  whole domain is the store — the client wrapper, the shared infrastructure
+  members, the test harness — are outside the rule entirely. Everywhere else
   asks for the query through a service. Existing debt is recorded on a
   shrink-only baseline rather than fixed as part of shipping the rule.
 
@@ -14,6 +19,12 @@ Feature: The clickhouse-containment lint rule
     Given a service module that value-imports the ClickHouse client
     When the clickhouse-containment rule runs over it
     Then it reports clickhouseClient
+
+  @unit
+  Scenario: A service value-importing the ClickHouse driver is reported
+    Given a service module that value-imports the ClickHouse driver directly
+    When the clickhouse-containment rule runs over it
+    Then it reports clickhouseClient naming the driver it reached for
 
   @unit
   Scenario: A type-only ClickHouse import is allowed anywhere
@@ -40,6 +51,12 @@ Feature: The clickhouse-containment lint rule
     Then it reports clickhouseClient
 
   @unit
+  Scenario: A module composition build is allowed
+    Given a module composition build file that value-imports the ClickHouse client
+    When the clickhouse-containment rule runs over it
+    Then it reports nothing
+
+  @unit
   Scenario: An application composition root is allowed
     Given an application composition file that value-imports the ClickHouse client
     When the clickhouse-containment rule runs over it
@@ -52,8 +69,14 @@ Feature: The clickhouse-containment lint rule
     Then it reports nothing
 
   @unit
-  Scenario: An application config file is still governed
+  Scenario: An application config file is allowed
     Given an application config file that value-imports the ClickHouse client
+    When the clickhouse-containment rule runs over it
+    Then it reports nothing
+
+  @unit
+  Scenario: An application file outside every seam is reported
+    Given an application file that is neither a seam nor config and value-imports the client
     When the clickhouse-containment rule runs over it
     Then it reports clickhouseClient
 
@@ -64,10 +87,16 @@ Feature: The clickhouse-containment lint rule
     Then it reports nothing
 
   @unit
-  Scenario: A shared package outside the boot seam is still governed
+  Scenario: A package whose domain is the store is outside the rule
     Given a shared infrastructure package file that value-imports the ClickHouse client
     When the clickhouse-containment rule runs over it
-    Then it reports clickhouseClient
+    Then it reports nothing
+
+  @unit
+  Scenario: The ClickHouse client package is outside the rule
+    Given a file in the ClickHouse client package that value-imports the driver
+    When the clickhouse-containment rule runs over it
+    Then it reports nothing
 
   @unit
   Scenario: Re-exporting a client value is reported

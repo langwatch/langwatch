@@ -60,6 +60,33 @@ describe("given a strict feature or process source", () => {
     });
   });
 
+  describe("when the randomUUID mints an idempotency key", () => {
+    /** @scenario "An idempotency key is left to its own rule" */
+    it("reports nothing for the property, the variable or the caller's fallback", () => {
+      const found = report(
+        "export function run(app, input) {\n" +
+          "  const idempotencyKey = crypto.randomUUID();\n" +
+          "  app.run({ idempotencyKey: input.idempotencyKey ?? `api-${randomUUID()}` });\n" +
+          "  return idempotencyKey;\n" +
+          "}\n",
+      );
+
+      expect(found).toEqual([]);
+    });
+
+    /** @scenario "An idempotency key is left to its own rule" */
+    it("reports nothing for the key a form binds once through useState", () => {
+      const found = report(
+        "export function Form() {\n" +
+          "  const [idempotencyKey] = useState(() => crypto.randomUUID());\n" +
+          "  return idempotencyKey;\n" +
+          "}\n",
+      );
+
+      expect(found).toEqual([]);
+    });
+  });
+
   describe("when the module is a test", () => {
     it("reports nothing", () => {
       const found = report('import { nanoid } from "nanoid";\n', TEST);

@@ -75,14 +75,12 @@ describe("SuitesApiService.run()", () => {
   });
 
   describe("when called with neither", () => {
-    it("generates an idempotency key and leaves parameters off the wire", async () => {
+    it("sends no idempotency key, so the run is not deduplicated", async () => {
       const service = new SuitesApiService();
 
       await service.run("suite_1");
 
-      const body = await sentBody();
-      expect(Object.keys(body)).toEqual(["idempotencyKey"]);
-      expect(body.idempotencyKey).toEqual(expect.any(String));
+      expect(await sentBody()).toEqual({});
     });
   });
 });

@@ -403,14 +403,6 @@
       "measured": "2026-09-10"
     },
     {
-      "key": "clickhouse-containment|apps/api/src/platform/config/api.config.ts",
-      "measured": "2026-09-13"
-    },
-    {
-      "key": "clickhouse-containment|apps/worker/src/platform/config/worker.config.ts",
-      "measured": "2026-09-13"
-    },
-    {
       "key": "clickhouse-containment|modules/analytics/server/src/tasks/lwql-provision.task.ts",
       "measured": "2026-09-13"
     },
@@ -428,10 +420,6 @@
     },
     {
       "key": "clickhouse-containment|modules/trace/server/src/services/support/trace-retention-floor.service.ts",
-      "measured": "2026-09-13"
-    },
-    {
-      "key": "clickhouse-containment|packages/infrastructure/src/tenant-directory.ts",
       "measured": "2026-09-13"
     },
     {
@@ -8817,6 +8805,10 @@
     {
       "key": "id-generation-origin|modules/workflow/web/src/ui/sections/optimization_studio/use-run-evalution.ts",
       "measured": "2026-09-08"
+    },
+    {
+      "key": "idempotency-key-is-stable|modules/langy/web/src/features/langy/behavior/logic/langy-chat-transport.ts",
+      "measured": "2026-09-15"
     },
     {
       "key": "legacy-monolith-path|apps/api/src/__tests__/dockerfile-runtime-workspace-packages.unit.test.ts",
@@ -18885,6 +18877,30 @@
     {
       "key": "plan-literals|enterprise/modules/billing/server/src/repositories/prisma/prisma.subscription.repository.ts",
       "measured": "2026-09-07"
+    },
+    {
+      "key": "prisma-containment|enterprise/modules/audit-log/server/src/repositories/prisma/prisma.agent-audit-log-migration.repository.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "prisma-containment|enterprise/modules/scim/server/src/services/postgres-scim.service.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "prisma-containment|enterprise/packages/composition/api/src/governance/governanceCost.service.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "prisma-containment|modules/analytics/server/src/repositories/customGraphPlaygroundGate.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "prisma-containment|modules/analytics/server/src/repositories/dashboard-widgets/access.ts",
+      "measured": "2026-09-15"
+    },
+    {
+      "key": "prisma-containment|modules/analytics/server/src/repositories/dashboard-widgets/dashboardWidget.service.ts",
+      "measured": "2026-09-15"
     },
     {
       "key": "redis-containment|modules/agent/server/src/services/connected-agent.service.ts",

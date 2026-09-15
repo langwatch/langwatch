@@ -1,9 +1,11 @@
 import { defineRule } from "../define-rule.mjs";
+import { withinAnIdempotencyKey } from "./idempotency-key.mjs";
 
 // Every id the platform mints is a ksuid behind a kind prefix, so an id says
 // what it names and sorts by time. A `nanoid` import or a `randomUUID()` call
 // in a feature or a process starts a second scheme that neither sorts nor
-// names its kind.
+// names its kind. An `idempotencyKey` is not an id: `idempotency-key-is-stable`
+// governs it, because a ksuid there is one fresh random for another.
 
 const FOREIGN_ID_MODULES = new Set(["nanoid", "nanoid/non-secure", "uuid"]);
 
@@ -52,6 +54,7 @@ export const idGenerationOriginRule = defineRule({
       },
       CallExpression(node) {
         if (calleeName(node.callee) !== "randomUUID") return;
+        if (withinAnIdempotencyKey(node)) return;
 
         context.report({ node: node.callee, messageId: "randomUuid" });
       },

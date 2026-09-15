@@ -42,7 +42,8 @@ quotes a customer a different number on a different page.
 | Rule | Layer | Meaning |
 | --- | --- | --- |
 | `langwatch/temporal-only` | plugin | No `Date` in governed source: not `new Date`, `Date.now`, `Date.parse`, `Date.UTC`, nor a value typed `Date`. The Prisma seam, the two named conversion helpers and the time package keep theirs. |
-| `langwatch/id-generation-origin` | plugin | Ids are ksuids behind a kind prefix: no `nanoid`, no `uuid`, no `crypto.randomUUID()`. |
+| `langwatch/id-generation-origin` | plugin | Ids are ksuids behind a kind prefix: no `nanoid`, no `uuid`, no `crypto.randomUUID()`. An `idempotencyKey` is not an id and is exempt. |
+| `langwatch/idempotency-key-is-stable` | plugin | An `idempotencyKey` is not minted where the request is built, because every attempt would then carry a different key. Derive it from the request's own content, or bind it once for the operation it identifies. |
 | `langwatch/environment-boundaries` | plugin | Only a `platform/config/` module or a process boot file reads `process.env`. |
 | `langwatch/secrets-through-source` | plugin | A key classified in `@langwatch/secrets/keys.json` is never read straight from the environment. See ADR-132. |
 | `langwatch/service-loads-its-own-config` | plugin | A service or adapter under `server/src/{services,adapters}` does not declare its own `loadConfig`/`resolveConfig`/`readConfig` or read `process.env`; config is a named member of the argument `create` takes. See fc80f65635. |

@@ -2,7 +2,6 @@
  * Headless hook for running a suite with confirmation state management.
  */
 
-import { generate } from "@langwatch/ksuid";
 import { useCallback, useMemo, useRef, useState } from "react";
 import type { SimulationSuite } from "../../model/prisma-types.ts";
 import { useDrawer } from "@langwatch/ui-drawer";
@@ -14,7 +13,7 @@ import {
 } from "@langwatch/scenario-contract";
 import { targetLabelOf, parseSuiteTargets } from "@langwatch/suite-contract";
 import { api } from "../scenario-api.ts";
-import { KSUID_RESOURCES } from "@langwatch/workflow-contract";
+import { useRunAttempt } from "./use-run-attempt.ts";
 import {
   displayTypedValue,
   serializeOptionalTypedScalarValue,
@@ -159,10 +158,12 @@ export function useRunSuite(options: UseRunSuiteOptions = {}) {
   const [pendingBatchRunId, setPendingBatchRunId] = useState<string | null>(null);
   /** Only the names typed over in the confirmation, keyed by name. */
   const [parameterOverrides, setParameterOverrides] = useState<Record<string, string>>({});
+  const { takeRunAttempt, clearRunAttempt } = useRunAttempt();
 
   const runMutation = api.suites.run.useMutation({
     onSuccess: (result, variables) => {
       void utils.scenarios.getSuiteRunData.invalidate();
+      clearRunAttempt();
       setPendingSuite(null);
 
       const archivedCount =
@@ -271,19 +272,24 @@ export function useRunSuite(options: UseRunSuiteOptions = {}) {
 
   const confirmRun = useCallback(() => {
     if (!project || !pendingSuite || runMutation.isPending) return;
-    const batchRunId = generate(KSUID_RESOURCES.SCENARIO_BATCH).toString();
-    setPendingBatchRunId(batchRunId);
+    const parameters = toRunParameters({
+      definitions: parameterDefinitions,
+      values: parameterValues,
+    });
+    // The run being queued is the suite with these parameter values, and that
+    // is what the key identifies: a confirm that failed and is tried again
+    // carries the same key and the same batch id, so the server recognises it
+    // rather than queueing a second batch.
+    const attempt = takeRunAttempt(JSON.stringify([pendingSuite.id, parameters]));
+    setPendingBatchRunId(attempt.batchRunId);
     runMutation.mutate({
       projectId: project.id,
       id: pendingSuite.id,
-      idempotencyKey: crypto.randomUUID(),
-      batchRunId,
-      parameters: toRunParameters({
-        definitions: parameterDefinitions,
-        values: parameterValues,
-      }),
+      idempotencyKey: attempt.idempotencyKey,
+      batchRunId: attempt.batchRunId,
+      parameters,
     });
-  }, [project, pendingSuite, runMutation, parameterDefinitions, parameterValues]);
+  }, [project, pendingSuite, runMutation, parameterDefinitions, parameterValues, takeRunAttempt]);
 
   const cancelRun = useCallback(() => {
     if (runMutation.isPending) return;

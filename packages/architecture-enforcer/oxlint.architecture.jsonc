@@ -47,6 +47,11 @@
     "langwatch/namespace-class": "error",
     "langwatch/unbounded-loop": "error",
     "langwatch/id-generation-origin": "error",
+    // Measured 2026-09-15 over the `lint:oxlint` paths: 2 reports across 2
+    // files. One is fixed in the same change; the other is langy's chat
+    // transport, where a fresh key per send is the product decision, and it
+    // sits in the baseline rather than being rewritten.
+    "langwatch/idempotency-key-is-stable": "error",
     "langwatch/no-runtime-reflection": "error",
     "langwatch/feature-side-holds-no-app": "error",
     "langwatch/transport-middleware-is-a-gate": "error",

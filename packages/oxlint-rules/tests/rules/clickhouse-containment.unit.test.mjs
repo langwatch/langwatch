@@ -29,9 +29,21 @@ describe("given a feature package file", () => {
   describe("when a service value-imports the client", () => {
     /** @scenario "A service value-importing the ClickHouse client is reported" */
     it("reports clickhouseClient", () => {
-      expect(
-        ids('import { PLATFORM_TENANT } from "@langwatch/clickhouse-client";'),
-      ).toEqual(["clickhouseClient"]);
+      expect(ids('import { PLATFORM_TENANT } from "@langwatch/clickhouse-client";')).toEqual([
+        "clickhouseClient",
+      ]);
+    });
+  });
+
+  describe("when a service value-imports the ClickHouse driver directly", () => {
+    /** @scenario "A service value-importing the ClickHouse driver is reported" */
+    it("reports clickhouseClient naming the driver", () => {
+      expect(report('import { createClient } from "@clickhouse/client";')).toEqual([
+        expect.objectContaining({
+          messageId: "clickhouseClient",
+          data: { name: "@clickhouse/client" },
+        }),
+      ]);
     });
   });
 
@@ -49,7 +61,7 @@ describe("given a feature package file", () => {
     it("reports nothing", () => {
       expect(
         ids(
-          'import { ClickHouseQueryClient } from "@langwatch/clickhouse-client";',
+          'import { createClient } from "@clickhouse/client";',
           "modules/agent/server/src/repositories/clickhouse/clickhouse.agent.repository.ts",
         ),
       ).toEqual([]);
@@ -77,6 +89,18 @@ describe("given a feature package file", () => {
           "modules/agent/server/src/adapters/postgres.agent.adapter.ts",
         ),
       ).toEqual(["clickhouseClient"]);
+    });
+  });
+
+  describe("when a module's composition build value-imports the client", () => {
+    /** @scenario "A module composition build is allowed" */
+    it("reports nothing", () => {
+      expect(
+        ids(
+          'import { TupleParam } from "@clickhouse/client";',
+          "modules/agent/server/src/app/agent-composition.build.ts",
+        ),
+      ).toEqual([]);
     });
   });
 });
@@ -107,12 +131,24 @@ describe("given an application file", () => {
   });
 
   describe("when a config file value-imports the client", () => {
-    /** @scenario "An application config file is still governed" */
-    it("reports clickhouseClient", () => {
+    /** @scenario "An application config file is allowed" */
+    it("reports nothing", () => {
       expect(
         ids(
           'import { parseRoutingTable } from "@langwatch/clickhouse-client";',
           "apps/api/src/platform/config/api.config.ts",
+        ),
+      ).toEqual([]);
+    });
+  });
+
+  describe("when a file that is neither a seam nor config value-imports the client", () => {
+    /** @scenario "An application file outside every seam is reported" */
+    it("reports clickhouseClient", () => {
+      expect(
+        ids(
+          'import { PLATFORM_TENANT } from "@langwatch/clickhouse-client";',
+          "apps/worker/src/features/telemetry/telemetry-rollup.service.ts",
         ),
       ).toEqual(["clickhouseClient"]);
     });
@@ -120,27 +156,41 @@ describe("given an application file", () => {
 });
 
 describe("given a members file named by convention", () => {
-  describe("when a shared package's member file value-imports the client", () => {
+  describe("when a composition package's member file value-imports the client", () => {
     /** @scenario "A boot members file is allowed wherever it is built" */
     it("reports nothing", () => {
       expect(
         ids(
           'import { createClient } from "@langwatch/clickhouse-client";',
-          "packages/infrastructure/src/clickhouse-member.ts",
+          "enterprise/packages/composition/worker/src/members/worker-clickhouse.members.ts",
         ),
       ).toEqual([]);
     });
   });
+});
 
-  describe("when a shared package file that is not a member file value-imports the client", () => {
-    /** @scenario "A shared package outside the boot seam is still governed" */
-    it("reports clickhouseClient", () => {
+describe("given a package whose whole domain is ClickHouse", () => {
+  describe("when the shared infrastructure package value-imports the client", () => {
+    /** @scenario "A package whose domain is the store is outside the rule" */
+    it("reports nothing", () => {
       expect(
         ids(
           'import { PLATFORM_TENANT } from "@langwatch/clickhouse-client";',
           "packages/infrastructure/src/tenant-directory.ts",
         ),
-      ).toEqual(["clickhouseClient"]);
+      ).toEqual([]);
+    });
+  });
+
+  describe("when the client package itself value-imports the driver", () => {
+    /** @scenario "The ClickHouse client package is outside the rule" */
+    it("reports nothing", () => {
+      expect(
+        ids(
+          'import { createClient } from "@clickhouse/client";',
+          "packages/clickhouse-client/src/client.ts",
+        ),
+      ).toEqual([]);
     });
   });
 });
@@ -149,18 +199,18 @@ describe("given a re-export or dynamic import", () => {
   describe("when a value is re-exported from the client", () => {
     /** @scenario "Re-exporting a client value is reported" */
     it("reports clickhouseClient", () => {
-      expect(
-        ids('export { PLATFORM_TENANT } from "@langwatch/clickhouse-client";'),
-      ).toEqual(["clickhouseClient"]);
+      expect(ids('export { PLATFORM_TENANT } from "@langwatch/clickhouse-client";')).toEqual([
+        "clickhouseClient",
+      ]);
     });
   });
 
   describe("when only a type is re-exported from the client", () => {
     /** @scenario "Re-exporting a client type is allowed" */
     it("reports nothing", () => {
-      expect(
-        ids('export type { TenantDirectory } from "@langwatch/clickhouse-client";'),
-      ).toEqual([]);
+      expect(ids('export type { TenantDirectory } from "@langwatch/clickhouse-client";')).toEqual(
+        [],
+      );
     });
   });
 

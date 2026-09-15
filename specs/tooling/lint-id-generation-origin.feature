@@ -25,3 +25,10 @@ Feature: The id-generation-origin lint rule
     Given a strict feature module importing generate from @langwatch/ksuid
     When the id-generation-origin rule runs over it
     Then it reports nothing
+
+  @unit
+  Scenario: An idempotency key is left to its own rule
+    Given a strict feature module minting an idempotencyKey with randomUUID
+    When the id-generation-origin rule runs over it
+    Then it reports nothing, because a request-deduplication token is not an entity id
+    And langwatch/idempotency-key-is-stable is what governs where that key comes from

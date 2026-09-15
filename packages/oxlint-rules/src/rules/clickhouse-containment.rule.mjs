@@ -1,26 +1,30 @@
 import { isBaselined } from "../baseline.mjs";
 import { defineRule } from "../define-rule.mjs";
 
-// ClickHouse gets the same containment Prisma has (see prisma-containment):
-// only the repository that owns a table, or the composition root that builds
-// the one connection a process holds, may value-import the client package.
+// ClickHouse gets the same containment Prisma and Redis have: only the
+// repository that owns a table, the adapter beside it, or the composition root
+// that builds the one connection a process holds, may value-import a client.
 // Everywhere else asks for the query through a service, the way the rest of
 // the codebase already does for Postgres.
 
 const CLICKHOUSE_CLIENT = "@langwatch/clickhouse-client";
+const CLICKHOUSE_DRIVER = "@clickhouse/client";
 const APPLICATION_ROOTS = new Set(["ui", "api", "worker", "server"]);
 // The process-boot files that actually construct or shut down the client:
 // `<app>-clickhouse.members.ts`, `<app>-clickhouse.infrastructure.ts`,
 // `clickhouse-member.ts` and friends. Named by convention, not by folder, so
 // the allowance follows the file wherever it is built.
-const BOOT_MEMBERS_FILE = /(?:\.members\.ts|-member\.ts|\.infrastructure\.ts)$/;
+const BOOT_MEMBERS_FILE = /(?:\.members\.ts|-member\.ts|-members\.ts|\.infrastructure\.ts)$/;
+// Packages whose whole job is ClickHouse: the client wrapper itself, the
+// boot-time member construction every process composes from, and the test
+// harness that stands endpoints up. The driver is their domain, not a leak
+// out of one.
+const CLICKHOUSE_NATIVE_PACKAGE = /^packages\/(?:clickhouse-client|infrastructure|test-harness)\//;
 
 /**
  * The package a file belongs to, for the boundary rule that asks what kind of
  * package it is standing in. Mirrors `prisma-containment`'s own
- * `prismaPackageOf`, with `packages/infrastructure` recognised as a shared
- * root in place of Prisma's `config`/`design-system` since that is where the
- * boot-time ClickHouse construction for shared members actually lives.
+ * `prismaPackageOf`.
  */
 function clickhousePackageOf(workspacePath) {
   const feature = workspacePath.match(
@@ -39,26 +43,40 @@ function clickhousePackageOf(workspacePath) {
   if (composition) {
     return { kind: "enterprise-composition", relative: composition[2], workspacePath };
   }
-  const shared = workspacePath.match(/^packages\/infrastructure\/src\/(.+)$/);
-  if (shared) return { kind: "infrastructure", relative: shared[1], workspacePath };
   return undefined;
 }
 
+/**
+ * A composition seam. This tree spells composition roots two ways -
+ * `*.composition.ts` in the applications and `*-composition.build.ts` inside a
+ * module - and both build the connection a process holds, from the settings
+ * `platform/config/` reads.
+ */
 function isCompositionClickhouseSeam(relativePath) {
-  if (/\.composition\.ts$/.test(relativePath)) return true;
-  if (/\.mount\.ts$/.test(relativePath)) return true;
-  if (/\.adapter\.ts$/.test(relativePath)) return true;
-  return relativePath.startsWith("platform/infrastructure/");
+  if (relativePath.endsWith(".composition.ts")) return true;
+  if (relativePath.endsWith("-composition.build.ts")) return true;
+  if (relativePath.endsWith(".mount.ts")) return true;
+  if (relativePath.startsWith("platform/infrastructure/")) return true;
+  return relativePath.startsWith("platform/config/");
 }
 
 function isStrictClickhouseAdapter(pkg) {
   if (BOOT_MEMBERS_FILE.test(pkg.relative)) return true;
+  if (isCompositionClickhouseSeam(pkg.relative)) return true;
   if (pkg.kind === "application" || pkg.kind === "enterprise-composition") {
-    return isCompositionClickhouseSeam(pkg.relative);
+    return pkg.relative.endsWith(".adapter.ts");
   }
   if (pkg.kind !== "server") return false;
   if (pkg.relative.startsWith("repositories/clickhouse/")) return true;
+  // Named for the store it wraps: `postgres.*.adapter.ts` reaching for
+  // ClickHouse is the leak this rule exists to catch, not a second seam.
   return /^adapters\/clickhouse\.[^/]+\.adapter\.ts$/.test(pkg.relative);
+}
+
+/** Whether a specifier names a ClickHouse client, including its subpaths. */
+function isClickhouseSpecifier(specifier) {
+  if (specifier === CLICKHOUSE_DRIVER || specifier.startsWith(`${CLICKHOUSE_DRIVER}/`)) return true;
+  return specifier === CLICKHOUSE_CLIENT || specifier.startsWith(`${CLICKHOUSE_CLIENT}/`);
 }
 
 function importedSpecifier(node) {
@@ -83,24 +101,27 @@ export const clickhouseContainmentRule = defineRule({
   kind: "problem",
   messages: {
     clickhouseClient: {
-      what: "`@langwatch/clickhouse-client` is value-imported outside a ClickHouse repository or adapter.",
+      what: "`{{name}}` is value-imported outside a ClickHouse repository, adapter or composition root.",
       fix: "Move the query into a `repositories/clickhouse/*.repository.ts` file and call it through the service, or import the type only.",
     },
   },
   create(context, file) {
     if (!file.isProduction) return {};
+    if (CLICKHOUSE_NATIVE_PACKAGE.test(file.workspacePath)) return {};
     const pkg = clickhousePackageOf(file.workspacePath);
     if (!pkg) return {};
     if (isStrictClickhouseAdapter(pkg)) return {};
-    if (isBaselined({ cwd: context.cwd, file: file.workspacePath, rule: "clickhouse-containment" })) {
+    if (
+      isBaselined({ cwd: context.cwd, file: file.workspacePath, rule: "clickhouse-containment" })
+    ) {
       return {};
     }
 
     const check = (node) => {
       const specifier = importedSpecifier(node);
-      if (specifier !== CLICKHOUSE_CLIENT) return;
+      if (typeof specifier !== "string" || !isClickhouseSpecifier(specifier)) return;
       if (hasValueBinding(node)) {
-        context.report({ node, messageId: "clickhouseClient" });
+        context.report({ node, messageId: "clickhouseClient", data: { name: specifier } });
       }
     };
 

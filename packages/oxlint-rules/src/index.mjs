@@ -51,6 +51,7 @@ export { maxStatementsPerLineRule } from "./rules/max-statements-per-line.rule.m
 export { namespaceClassRule } from "./rules/namespace-class.rule.mjs";
 export { unboundedLoopRule } from "./rules/unbounded-loop.rule.mjs";
 export { idGenerationOriginRule } from "./rules/id-generation-origin.rule.mjs";
+export { idempotencyKeyIsStableRule } from "./rules/idempotency-key-is-stable.rule.mjs";
 export { noRawHonoMountRule } from "./rules/no-raw-hono-mount.rule.mjs";
 export { boundaryRule } from "./rules/package-boundaries.rule.mjs";
 export { planLiteralsRule } from "./rules/plan-literals.rule.mjs";

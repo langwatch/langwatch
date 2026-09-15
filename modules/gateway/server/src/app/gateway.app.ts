@@ -1,9 +1,7 @@
 /**
- * The gateway feature's application: the one typed thing every door is given, replacing seven
- * previously-separate bags that named the same members differently. Virtual-key WRITE
- * pre-flight, run identically by every door, lives here as shared behaviour rather than
- * duplicated per transport. A caller arrives as {@link GatewayActor}, an argument rather than
- * read from session/request, so one check serves both a browser session and an API key.
+ * The gateway feature's application: the one typed thing every door is given. A caller arrives
+ * as {@link GatewayActor}, an argument rather than read from session/request, so one check
+ * serves both a browser session and an API key.
  */
 import { toDate, type Instant } from "@langwatch/time";
 import type {
@@ -57,7 +55,7 @@ import {
   GatewayElevenLabsWebhookService,
   type ElevenLabsWebhookCollaborators,
 } from "../services/gateway-elevenlabs-webhook.service.ts";
-import { reads, type MembersRead } from "@langwatch/infrastructure/members";
+import { reads, type MembersRead, type ProcessMembers } from "@langwatch/infrastructure/members";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { WebhookApi } from "@langwatch/webhook-contract";
 import { AuthzApi } from "@langwatch/authz-contract";
@@ -77,7 +75,6 @@ import { eventMatches, WebhookEnvelopeService } from "@langwatch/webhook-server"
 // reachable": one taxonomy for an unreachable ClickHouse, shared with every
 // other read of it.
 import { ClickHouseUnavailableError } from "@langwatch/analytics-server";
-import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { FixedGatewaySettlementPolicyAdapter } from "../adapters/fixed-gateway-settlement.adapter.ts";
 import { GatewayEndUserCapsAdapter } from "../adapters/gateway-end-user-caps.adapter.ts";
 import { GatewaySpendScopeAdapter } from "../adapters/postgres.gateway-spend-scope.adapter.ts";
@@ -227,9 +224,8 @@ export type GatewayApplicableBudgetTarget = Readonly<{
 
 /**
  * What the process composes this application from: capabilities built over persistence this
- * package cannot reach, or decisions made against role bindings/memberships it cannot see.
- * Everything else (wire casing, cursors, money formatting, DTO projections) lives in this
- * package directly.
+ * package cannot reach, or decisions against role bindings/memberships it cannot see. Everything
+ * else lives in this package directly.
  */
 export type GatewayRestInfrastructure = Readonly<{
   /** Absent only where this process has no encryption and mounts no agent-cache family. */
@@ -455,12 +451,11 @@ export type GatewayInfrastructure = GatewayAppDependencies | GatewayRestInfrastr
 
 /**
  * What the billing reconciliation family reads that is neither the gateway's
- * own ledger nor a peer's application: the one guarded connection its two
- * Postgres resolutions run on, and how long after a request an outcome may
- * still arrive.
+ * own ledger nor a peer's application: the one guarded Postgres connection its
+ * two resolutions run on, and how long after a request an outcome may still arrive.
  */
 export type GatewaySpendCollaborators = Readonly<{
-  prisma: PrismaClient;
+  prisma: ProcessMembers["prisma"];
   webhooks: WebhookApi;
   settlementGraceMs: number;
 }>;
@@ -473,14 +468,18 @@ type GatewaySetup = FeatureSetup<
 
 export class GatewayApp implements GatewayApi {
   static readonly contract = GatewayApiToken;
-  /**
-   * `webhooks` is the SAME outbound platform a live spend push is delivered through — the
-   * reconciliation pull and the push must not disagree about what a customer already received.
-   * `entitlement` is declared HERE, though only the billing REST door ever asks it anything, so
-   * a process with no plan store refuses at boot rather than answering every org as entitled.
-   */
   static readonly dependencies = {
+    /**
+     * The SAME outbound platform a live spend push is delivered through — the
+     * reconciliation pull and the push must not disagree about what a customer
+     * already received.
+     */
     webhooks: WebhookApi,
+    /**
+     * Declared HERE though only the billing REST door ever asks it anything, so
+     * a process with no plan store refuses at boot rather than answering every
+     * org as entitled.
+     */
     entitlement: EntitlementApi,
     /**
      * The four capabilities the control plane reaches that belong to other features, resolved
@@ -495,9 +494,8 @@ export class GatewayApp implements GatewayApi {
   static readonly configSchema = gatewayServerConfigSchema;
   /**
    * `prisma` is the one guarded connection every gateway row read runs on.
-   * `clickhouse` is the process's ONE routing client, which the control plane
-   * resolves per tenant rather than opening a second pool over the same
-   * server — the spend ledger is a projection in that instance.
+   * `clickhouse` is the control plane's ONE routing client, resolved per tenant
+   * rather than a second pool — the spend ledger is a projection in that instance.
    */
   static readonly reads = reads("prisma", "clickhouse");
 
@@ -577,12 +575,10 @@ export class GatewayApp implements GatewayApi {
   }
 
   // ── The billing reconciliation family (ADR-072) ─────────────────────────
-  //
-  // The four `/api/gateway/v1` spend routes read the members below. They are
-  // answered HERE rather than filled by a process composition, so a
-  // deployment cannot mount the pull surface over a different envelope
-  // format, a different subscription grammar or a different settlement grace
-  // than the push half already uses.
+  // The four `/api/gateway/v1` spend routes read the members below, answered
+  // HERE rather than filled by composition, so a deployment cannot mix the
+  // pull surface's envelope/subscription/settlement-grace format with a
+  // different one than the push half already uses.
 
   /** The endpoint registry a replay names its destination in. */
   webhookEndpoints(): {
@@ -670,9 +666,8 @@ export class GatewayApp implements GatewayApi {
 
   /**
    * The spend-event ledger reader and the budget ledger, as the reconciliation
-   * routes read them. `undefined` where this process composed no gateway
-   * control plane, which the routes refuse by name rather than answering a
-   * reconciliation query with a confident zero.
+   * routes read them. `undefined` when this process composed no gateway control
+   * plane — the routes refuse by name rather than answering with a confident zero.
    */
   spendEvents(): GatewaySpendEventsService | undefined {
     return this.#coreDependencies?.spendEvents;
@@ -1053,11 +1048,9 @@ export class GatewayApp implements GatewayApi {
   // ── The virtual-key write pre-flights ────────────────────────────────────
 
   /**
-   * Scope set + trace destination are the caller's to choose: manage on every requested scope,
-   * each anchored to this org, and manage on the destination project too — NOT mere tenancy,
-   * since the destination also routes budget debits, and tenancy alone would let a team manager
-   * point a key at a sibling team's project and consume its budget. Separate from
-   * authorizeVirtualKeyCreate because previewing a draft's budgets needs exactly this.
+   * Requires manage on every requested scope (anchored to this org) and manage on the
+   * destination project too — NOT mere tenancy, since the destination also routes budget debits
+   * and tenancy alone would let a team manager point a key at a sibling team's budget.
    */
   async authorizeVirtualKeyScopeSelection(input: {
     actor: GatewayActor;
@@ -1081,10 +1074,9 @@ export class GatewayApp implements GatewayApi {
   }
 
   /**
-   * Everything that must hold before a key is minted, in order: scope selection, then guardrail
-   * attachments against the resolved project. Read-only, not folded into the mint — the public
-   * create dispatches the mint through an idempotency receipt, and a replay skipping this would
-   * trust a grant the caller held only yesterday.
+   * Everything that must hold before a key is minted: scope selection, then guardrail
+   * attachments against the resolved project. Read-only, not folded into the mint — the
+   * public create dispatches via an idempotency receipt, and skipping this trusts a stale grant.
    */
   async authorizeVirtualKeyCreate(input: {
     actor: GatewayActor;
@@ -1114,11 +1106,9 @@ export class GatewayApp implements GatewayApi {
   }
 
   /**
-   * Everything that must hold before editing an existing key, plus the key already read (so the
-   * caller doesn't re-read it). Mutating needs update on a scope the key ALREADY lives in;
-   * re-scoping additionally needs manage on every NEW scope. scopes/traceProjectId absent means
-   * "not changing": a scope change without re-sent config still revalidates STORED attachments
-   * against the new project, so a stale cross-project attachment can't survive the move.
+   * Mutating needs update on a scope the key ALREADY lives in; re-scoping additionally needs
+   * manage on every NEW scope. scopes/traceProjectId absent means "not changing" — but a scope
+   * change without re-sent config still revalidates STORED attachments against the new project.
    */
   async authorizeVirtualKeyUpdate(input: {
     actor: GatewayActor;

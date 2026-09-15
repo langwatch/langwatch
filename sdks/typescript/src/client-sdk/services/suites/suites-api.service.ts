@@ -33,9 +33,9 @@ export interface SuiteTarget {
 /** Options for `POST /api/v1/suites/{id}/run`. */
 export interface SuiteRunOptions {
   /**
-   * Key that makes the request safe to retry. Generated per call when omitted,
-   * so two retries of the same command schedule two runs unless the caller
-   * pins one.
+   * Makes the run safe to retry: the same key on a second call joins the batch
+   * the first started. Omitted, no key is sent and every call schedules its own
+   * run. Pin one per logical run, never per attempt.
    */
   idempotencyKey?: string;
   /**
@@ -171,13 +171,14 @@ export class SuitesApiService {
         : (optionsOrIdempotencyKey ?? {});
 
     const body: {
-      idempotencyKey: string;
+      idempotencyKey?: string;
       parameters?: Record<string, string | number | boolean>;
       note?: string;
-    } = {
-      idempotencyKey:
-        options.idempotencyKey ?? `cli-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-    };
+    } = {};
+    // Only the caller knows what makes two calls the same run, so an absent key
+    // stays absent. Minting one here says "retry-safe" and delivers nothing:
+    // every attempt would carry a different key.
+    if (options.idempotencyKey !== undefined) body.idempotencyKey = options.idempotencyKey;
     if (options.parameters !== undefined) body.parameters = options.parameters;
     // A note of only spaces is no note: sending "" would store an empty string
     // every reader then has to filter out.
