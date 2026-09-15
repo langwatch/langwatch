@@ -336,6 +336,11 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
             page: "pages/governance/people",
           },
           {
+            // The agents detected across the organization, as one list.
+            path: "/governance/agents",
+            page: "pages/governance/agents",
+          },
+          {
             // Behind release_ui_governance_billed_cost_enabled (the pages
             // guard themselves); the nav items are filtered on the same flag.
             path: "/governance/costs",
@@ -344,6 +349,21 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
           {
             path: "/governance/billed",
             page: "pages/governance/billed",
+          },
+          {
+            // The Platform placeholders, behind the same flag as costs/billed
+            // (each page carries its own guard; see
+            // specs/governance/governance-platform-placeholders.feature).
+            path: "/governance/insights",
+            page: "pages/governance/insights",
+          },
+          {
+            path: "/governance/analytics",
+            page: "pages/governance/analytics",
+          },
+          {
+            path: "/governance/signals",
+            page: "pages/governance/signals",
           },
           {
             // The people page has been cost centers and then departments; old

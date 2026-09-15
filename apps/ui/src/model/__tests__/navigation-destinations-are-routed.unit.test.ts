@@ -4,7 +4,11 @@
  */
 import { matchRoutes } from "react-router";
 import { describe, expect, it } from "vitest";
-import { projectNavItems } from "@langwatch/navigation-web/chrome";
+import {
+  gatewayNavItems,
+  governanceNavItems,
+  projectNavItems,
+} from "@langwatch/navigation-web/chrome";
 import { annotationRoutes } from "../../features/annotation/ui/sections/annotation-routes";
 import { uiRouteDescriptors, uiRouteTable } from "../ui-route-table";
 
@@ -62,7 +66,11 @@ const patterns = [
     .map((route) => route.path)
     .filter((path): path is string => typeof path === "string"),
 ];
-const declaredPaths = Object.values(projectNavItems).map((item) => item.path);
+const declaredPaths = [
+  ...Object.values(projectNavItems).map((item) => item.path),
+  ...governanceNavItems.map((item) => item.href),
+  ...gatewayNavItems.map((item) => item.href),
+];
 
 describe("given the destinations the app can navigate to", () => {
   // Both readings are of hand-maintained tables, so a rename that stops one
