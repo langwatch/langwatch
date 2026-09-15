@@ -316,6 +316,11 @@ export const organizationManagementRest = defineRestRouter(OrganizationApi)
     const created = await app.createInvitations(
       {
         organizationId: scope.id,
+        // Strict, as this family's published contract says above: a
+        // provisioning caller naming a team that is not in the organization is
+        // refused by name rather than told its batch succeeded with nobody in
+        // it.
+        validation: "strict",
         invites: input.invites.map((invite) => ({
           email: invite.email,
           role: invite.role as OrganizationUserRole,

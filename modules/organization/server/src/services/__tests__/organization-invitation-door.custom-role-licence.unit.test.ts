@@ -66,6 +66,7 @@ describe("given an invitation batch that names a custom team role", () => {
       await service.create(
         {
           organizationId: ORGANIZATION_ID,
+          validation: "lenient",
           invites: [
             {
               email: "new@acme.test",
@@ -98,6 +99,7 @@ describe("given an invitation batch that names a custom team role", () => {
         service.create(
           {
             organizationId: ORGANIZATION_ID,
+            validation: "lenient",
             invites: [
               {
                 email: "builtin@acme.test",
@@ -129,6 +131,7 @@ describe("given every invitation in the batch names a built-in team role", () =>
       await service.create(
         {
           organizationId: ORGANIZATION_ID,
+          validation: "lenient",
           invites: [
             {
               email: "new@acme.test",

@@ -3,6 +3,7 @@ import type {
   JoinRequestJoining,
   JoinRequestJoiningChanged,
   OrganizationInvite,
+  OrganizationInviteValidation,
   OrganizationListedInvite,
 } from "@langwatch/organization-contract";
 import type { PersonalWorkspaceResourceIds } from "../repositories/organization.repository.ts";
@@ -284,6 +285,12 @@ export interface OrganizationInvitations {
         teams?: readonly Readonly<{ teamId: string; role: string; customRoleId?: string }>[];
         role: "ADMIN" | "MEMBER" | "EXTERNAL";
       }>[];
+      /**
+       * Chosen by the transport that asked, never by the composition: a batch
+       * naming a team outside the organization is refused under `strict` and
+       * filtered under `lenient`.
+       */
+      validation: OrganizationInviteValidation;
     }>,
   ): Promise<OrganizationInvitesCreated>;
   revoke(input: Readonly<{ organizationId: string; inviteId: string }>): Promise<void>;

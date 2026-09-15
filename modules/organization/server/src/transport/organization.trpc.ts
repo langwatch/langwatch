@@ -153,10 +153,19 @@ export const organizationTrpcTransport = defineTrpcRouter(OrganizationApi, organ
   .withPermission("organization:manage")
   .handle(({ app, input, actor }, person) => app.getMemberOrRefuse(input, callerOf(actor, person)))
 
+  /**
+   * Lenient, which is what the invite form has always done: a team assignment
+   * that cannot be granted is dropped and the remaining invitations are still
+   * created, rather than the admin losing a batch they typed by hand. The
+   * management REST family asks for `strict` instead - see
+   * `organization-management.rest.ts`.
+   */
   .procedure("createInvites")
   .withFacts(organizationSessionPersonFact)
   .withPermission("organization:manage")
-  .handle(({ app, input, actor }, person) => app.createInvitations(input, callerOf(actor, person)))
+  .handle(({ app, input, actor }, person) =>
+    app.createInvitations({ ...input, validation: "lenient" }, callerOf(actor, person)),
+  )
 
   .procedure("deleteInvite")
   .withPermission("organization:manage")

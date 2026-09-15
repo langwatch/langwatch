@@ -22,10 +22,14 @@ import { ServerOrganizationApp, type ServerOrganizationAppDependencies } from ".
 const ORGANIZATION_ID = "org-1";
 const BASE_HOST = "https://app.langwatch.test";
 
-/** The invitation rows and the one organization the fake repository answers for. */
-function fakeInviteRepository() {
+/**
+ * The invitation rows and the one organization the fake repository answers
+ * for. `teamsInOrganization`, left unset, resolves every team asked for.
+ */
+function fakeInviteRepository(options: { teamsInOrganization?: readonly string[] } = {}) {
   const invites = new Map<string, OrganizationInvite>();
   let nextId = 1;
+  const teamsInOrganization = options.teamsInOrganization;
 
   const repository: OrganizationInviteRepository = {
     tryFindOrganizationWithMembers: async () => ({ ...makeOrganization({ id: ORGANIZATION_ID }), members: [] }),
@@ -33,7 +37,10 @@ function fakeInviteRepository() {
     tryFindOpenInviteForEmail: async () => null,
     findCustomRolePermissions: async () => [],
     tryFindPersonalTeamInScopes: async () => null,
-    findTeamIdsInOrganization: async ({ teamIds }) => teamIds,
+    findTeamIdsInOrganization: async ({ teamIds }) =>
+      teamsInOrganization === undefined
+        ? teamIds
+        : teamIds.filter((teamId: string) => teamsInOrganization.includes(teamId)),
     createPendingInvite: async (input) => {
       const invite: OrganizationInvite = {
         id: `invite-${nextId++}`,
@@ -80,8 +87,8 @@ function fakeInviteRepository() {
 }
 
 /** The invitation door as the composed process would hand it to `OrganizationInvitationDoorService`. */
-function invitations() {
-  const repository = fakeInviteRepository();
+function invitations(options: { teamsInOrganization?: readonly string[] } = {}) {
+  const repository = fakeInviteRepository(options);
   const throttle = InviteSendThrottleService.create(new FakeInviteRateLimit());
   const service = InviteService.create(makeInviteDeps({ invites: repository, throttle, baseHost: BASE_HOST }));
 
@@ -104,6 +111,7 @@ describe("given the invitation member the process composes", () => {
 
       const created = await door.create({
         organizationId: ORGANIZATION_ID,
+        validation: "lenient",
         invites: [{ email: "new@acme.test", role: "MEMBER", teamIds: "team-1" }],
       });
 
@@ -127,6 +135,7 @@ describe("given the invitation member the process composes", () => {
       const door = invitations();
       const created = await door.create({
         organizationId: ORGANIZATION_ID,
+        validation: "lenient",
         invites: [{ email: "revoke-me@acme.test", role: "MEMBER", teamIds: "team-1" }],
       });
       const inviteId = created.invites[0]!.invite.id;
@@ -151,6 +160,69 @@ describe("given the invitation member the process composes", () => {
   });
 });
 
+describe("given a batch naming a team that is not in the organization", () => {
+  describe("when the asking transport chose strict validation", () => {
+    /**
+     * Whole batch or nothing: the team check runs before the transaction opens,
+     * so the good invitation beside the bad one is not written either.
+     * @scenario "Creating invites naming a team outside the organization is refused"
+     */
+    it("refuses by name and writes none of the batch", async () => {
+      const door = invitations({ teamsInOrganization: ["team-1"] });
+
+      await expect(
+        door.create({
+          organizationId: ORGANIZATION_ID,
+          validation: "strict",
+          invites: [
+            { email: "good@acme.test", role: "MEMBER", teamIds: "team-1" },
+            { email: "elsewhere@acme.test", role: "MEMBER", teamIds: "team-elsewhere" },
+          ],
+        }),
+      ).rejects.toMatchObject({ code: "team_not_in_organization" });
+
+      await expect(door.list({ organizationId: ORGANIZATION_ID })).resolves.toHaveLength(0);
+    });
+  });
+
+  describe("when the asking transport chose lenient validation", () => {
+    /**
+     * The mode still works: the form drops what it cannot grant rather than
+     * losing a batch an admin typed by hand.
+     * @scenario "The invite form drops a team assignment it cannot grant"
+     */
+    it("drops that invitation and answers an empty batch", async () => {
+      const door = invitations({ teamsInOrganization: ["team-1"] });
+
+      const created = await door.create({
+        organizationId: ORGANIZATION_ID,
+        validation: "lenient",
+        invites: [{ email: "elsewhere@acme.test", role: "MEMBER", teamIds: "team-elsewhere" }],
+      });
+
+      expect(created.invites).toHaveLength(0);
+      await expect(door.list({ organizationId: ORGANIZATION_ID })).resolves.toHaveLength(0);
+    });
+  });
+});
+
+describe("given a batch naming only teams the organization has", () => {
+  describe("when the asking transport chose strict validation", () => {
+    it("creates the invitations", async () => {
+      const door = invitations({ teamsInOrganization: ["team-1"] });
+
+      const created = await door.create({
+        organizationId: ORGANIZATION_ID,
+        validation: "strict",
+        invites: [{ email: "good@acme.test", role: "MEMBER", teamIds: "team-1" }],
+      });
+
+      expect(created.invites).toHaveLength(1);
+      expect(created.invites[0]!.invite.email).toBe("good@acme.test");
+    });
+  });
+});
+
 describe("given a deployment that composed no invitation service", () => {
   describe("when an admin asks to create invitations", () => {
     /** @scenario "A deployment with no invitation service refuses by name" */
@@ -165,7 +237,10 @@ describe("given a deployment that composed no invitation service", () => {
       });
 
       await expect(
-        app.createInvitations({ organizationId: ORGANIZATION_ID, invites: [] }, { id: "user-1" }),
+        app.createInvitations(
+          { organizationId: ORGANIZATION_ID, validation: "strict", invites: [] },
+          { id: "user-1" },
+        ),
       ).rejects.toMatchObject({ code: "service_unavailable" });
     });
   });

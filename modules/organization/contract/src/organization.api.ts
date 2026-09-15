@@ -140,6 +140,22 @@ export type OrganizationWithMembersAndTheirTeams = Organization & {
   members: OrganizationMemberWithUser[];
 };
 
+/**
+ * What an invitation naming a team or custom role that cannot be assigned
+ * does to the batch: `strict` refuses the whole batch by name, `lenient`
+ * drops that assignment - or the invitation - and creates the rest.
+ *
+ * The TRANSPORT decides, never the composition: a provisioning caller that
+ * names the wrong team is told so, while the invite form keeps the
+ * drop-and-carry-on behaviour it has always had. It is deliberately NOT part
+ * of any request schema, so no client can pick its own validation.
+ */
+export type OrganizationInviteValidation = "strict" | "lenient";
+
+/** One invitation batch as a transport asks for it, with the mode it chose. */
+export type OrganizationApiCreateInvitationsInput = OrganizationApiCreateInvitesInput &
+  Readonly<{ validation: OrganizationInviteValidation }>;
+
 export interface OrganizationApi {
   createAndAssign(
     input: Readonly<{
@@ -383,7 +399,7 @@ export interface OrganizationApi {
   ): Promise<OrganizationMemberWithUser>;
 
   createInvitations(
-    input: OrganizationApiCreateInvitesInput,
+    input: OrganizationApiCreateInvitationsInput,
     by: OrganizationCaller,
   ): Promise<OrganizationInviteCreated[]>;
   revokeInvitation(input: OrganizationApiInviteScope): Promise<void>;

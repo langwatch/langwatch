@@ -9,7 +9,7 @@ import {
   MemberSeatLimitReachedError,
   OrganizationNotFoundError,
   isOrganizationApiCustomRole,
-  type OrganizationApiCreateInvitesInput,
+  type OrganizationApiCreateInvitationsInput,
   type OrganizationApiInviteScope,
   type OrganizationCaller,
   type OrganizationInviteAccepted,
@@ -53,12 +53,13 @@ export class OrganizationInvitationDoorService {
   private constructor(private readonly deps: OrganizationInvitationDoorDependencies) {}
 
   /**
-   * Invites a batch. Validation stays lenient, as this door has always been:
-   * an invalid team or custom role drops that assignment rather than refusing
-   * the whole batch.
+   * Invites a batch in the validation mode the ASKING TRANSPORT chose. Under
+   * `strict` a team or custom role that cannot be assigned refuses the whole
+   * batch by name; under `lenient` it drops that assignment - or the
+   * invitation - and the rest are created.
    */
   async create(
-    input: OrganizationApiCreateInvitesInput,
+    input: OrganizationApiCreateInvitationsInput,
     by: OrganizationCaller,
   ): Promise<OrganizationInviteCreated[]> {
     const namesCustomRole = input.invites.some((invite) =>
@@ -185,7 +186,7 @@ export class OrganizationInvitationDoorService {
     } as OrganizationInviteAccepted;
   }
 
-  async #createOrRefuse(input: OrganizationApiCreateInvitesInput) {
+  async #createOrRefuse(input: OrganizationApiCreateInvitationsInput) {
     try {
       return await this.deps.invitations.create(input);
     } catch (error) {

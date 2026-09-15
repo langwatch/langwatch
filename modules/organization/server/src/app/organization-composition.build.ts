@@ -245,9 +245,11 @@ export class InviteServiceOrganizationInvitations implements OrganizationInvitat
         ...(invite.teamIds === undefined ? {} : { teamIds: invite.teamIds }),
         ...(invite.teams === undefined ? {} : { teams: invite.teams.map((team) => ({ ...team })) }),
       })),
-      // The invite form's rule: an invitation naming a team the caller may not reach is
-      // dropped rather than refusing the whole batch, exactly as the deleted composition ran it.
-      validation: "lenient",
+      // Whichever mode the transport asked for. The composition deliberately
+      // picks none: hard-coding one here is what made the management API
+      // accept a batch naming a team outside the organization and answer 201
+      // with nothing created.
+      validation: input.validation,
     });
   }
 
