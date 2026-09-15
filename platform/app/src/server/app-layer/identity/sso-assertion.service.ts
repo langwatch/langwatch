@@ -1,12 +1,12 @@
 import { extractEmailDomain } from "@ee/sso/matching";
 import {
   isConfiguredLegacySsoRoute,
+  looksLikeSsoConnectionId,
   normalizeDomain,
   qualifySsoDomainOwnership,
   type SsoConnectionSource,
   type SsoDomainVerification,
 } from "@langwatch/identity";
-import { looksLikeSsoConnectionId } from "@langwatch/identity-server";
 
 /**
  * One connection, as the two sign-in decisions read it.

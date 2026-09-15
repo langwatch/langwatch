@@ -175,7 +175,6 @@ export {
   legacyReplacementConnectionId,
   newSsoBreakGlassBindingId,
   newSsoConnectionCommandId,
-  looksLikeSsoConnectionId,
   newSsoConnectionId,
   selfServeRegistrationCommandId,
   selfServeRegistrationConnectionId,

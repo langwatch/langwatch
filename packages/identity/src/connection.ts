@@ -1780,3 +1780,28 @@ export function compareConnectionRouting({
     connection: connectionFacts,
   };
 }
+
+/**
+ * Whether a string is SHAPED like a connection id — a provider that names an
+ * SSO CONNECTION rather than one this deployment mounts itself.
+ *
+ * A pre-filter and never the decision: what settles it is the row. better-auth
+ * stores the connection id as an account's provider, so every OAuth account
+ * the deployment mints — google, github, the brokered one — passes the same
+ * seam as a connection arrival, and asking the database about each of them is
+ * a round trip to learn "no". The prefix is a persisted contract, so reading
+ * it costs nothing and commits to nothing.
+ *
+ * Pure vocabulary, which is why it lives beside the rest of the connection
+ * vocabulary rather than with the id MINTING in `@langwatch/identity-server`:
+ * minting needs a ksuid generator, and asking the shape of a string given to
+ * you needs nothing. Three callers read it and one of them is a browser — the
+ * error route, deciding whether a refusal named a connection it may dial or a
+ * value somebody wrote into a query parameter.
+ *
+ * The environment prefixes ksuids (`local_ssoc_...`), and `ssocmd_` is a
+ * different form, so the underscore on both sides is load-bearing.
+ */
+export function looksLikeSsoConnectionId(value: string): boolean {
+  return /(?:^|_)ssoc_/.test(value);
+}

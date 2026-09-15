@@ -146,6 +146,7 @@ export {
   verificationHasExpired,
   verificationRequestedPayloadSchema,
   waitingDomainClaims,
+  looksLikeSsoConnectionId,
 } from "./connection";
 export {
   BREAK_GLASS_MAX_WINDOW_DAYS,
