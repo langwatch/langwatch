@@ -165,6 +165,27 @@ Feature: BetterAuth config (unmounted)
     Then the signin is rejected with an SSO_PROVIDER_NOT_ALLOWED error
     And pendingSsoSetup is left alone
 
+  # A provider is linked ONCE: better-auth writes the Account row the first
+  # time and only updates it on every sign-in after. So the refusal has to sit
+  # on both paths, or it closes the door to new links while every link the old
+  # soft block already wrote keeps letting its holder in.
+  Scenario: A native social sign-in on an already-linked account is refused too
+    Given an organization with ssoDomain "acme.com" and ssoProvider "waad|acme-conn" exists
+    And a user exists with email "existing@acme.com" whose Google account is already linked
+    When that user signs in via Google again
+    Then the signin is rejected with an SSO_PROVIDER_NOT_ALLOWED error
+
+  # The refusal is about a provider the organization did NOT choose. One it did
+  # choose is its own front door, whatever kind of provider it happens to be -
+  # so an organization pinned to Google signs in with Google, and refusing
+  # native providers ahead of that match would lock it out of its own setting.
+  Scenario: An organization pinned to Google still signs in with Google
+    Given an organization with ssoDomain "acme.com" and ssoProvider "google" exists
+    And a user exists with email "existing@acme.com" and pendingSsoSetup=false
+    When that user signs in via Google
+    Then signin succeeds
+    And pendingSsoSetup is left alone
+
   # ============================================================================
   # RETIRED at D06 — the legacy impersonation pair, and the plugin allow-list
   #
