@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import type { ScenarioEvaluationResult } from "~/server/scenarios/schemas/event-schemas";
+import type { ScenarioEvaluationResult } from "@langwatch/scenario-contract";
 // DANGLING: `RecordEvaluationsCommandData` was never ported off main's
 // ../schemas/commands. See handoff merge-scenario-dangling-imports.
 import type { RecordEvaluationsCommandData } from "../../schemas/commands";

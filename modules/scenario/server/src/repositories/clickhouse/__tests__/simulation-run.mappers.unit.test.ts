@@ -2,8 +2,8 @@ import { describe, expect, it } from "vitest";
 import {
   ScenarioRunStatus,
   Verdict,
-} from "~/server/scenarios/scenario-event.enums";
-import type { ScenarioEvaluationResult } from "~/server/scenarios/schemas/event-schemas";
+  type ScenarioEvaluationResult,
+} from "@langwatch/scenario-contract";
 import {
   columnsToEvaluations,
   evaluationsToColumns,

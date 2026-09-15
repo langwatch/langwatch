@@ -38,6 +38,12 @@ export const voiceAgentConfigSchema = z.discriminatedUnion("transport", [
 ]);
 export type VoiceAgentConfig = z.infer<typeof voiceAgentConfigSchema>;
 
+/** The transport's label in the "Reached via" select. */
+export const VOICE_TRANSPORT_LABELS: Record<VoiceTransport, string> = {
+  elevenlabs_convai: "ElevenLabs agent",
+  phone: "Phone number",
+};
+
 /** Model provider whose key signs sessions for this transport. */
 export const VOICE_TRANSPORT_PROVIDER: Record<
   VoiceTransport,

@@ -48,6 +48,7 @@ export * from "./scenario-rest.schemas.ts";
 export * from "./simulation-run.schemas.ts";
 export * from "./evaluator-attachments.ts";
 export * from "./suite-fields.ts";
+export * from "./evaluations/types.ts";
 export * from "./scenario-field-values.ts";
 export * from "./scenario-evaluation-gate.ts";
 export * from "./voice/caller-voice.config.ts";
@@ -59,6 +60,10 @@ export * from "./voice/caller-voice.config.ts";
 export * from "./voice/voice-agent.config.ts";
 export * from "./voice/voice-session-token.payload.ts";
 export * from "./voice/voice-transport.ts";
+// Pure, dependency-free math and constants the browser panel also needs:
+// remaining-time countdown and the operator's default call-length limit.
+export * from "./voice/voice-countdown.ts";
+export { VOICE_CALL_MAX_SECONDS_DEFAULT } from "./voice/voice-limits.ts";
 export type { CallRecord, CallTurn } from "./voice/call-record.ts";
 export type { VoiceSessionInfrastructure } from "./voice/voice-session.service.ts";
 export type { VoiceTransportCredential } from "./voice/voice-transport.registry.ts";

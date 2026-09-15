@@ -17,7 +17,7 @@ import {
 import userEvent from "@testing-library/user-event";
 import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { EvaluatorAttachment } from "~/server/scenarios/evaluator-attachments";
+import type { EvaluatorAttachment } from "@langwatch/scenario-contract";
 import { SUITE_EDITOR_DRAWER } from "../../../../sections/agent-testing/cases/drawer-keys.ts";
 // DANGLING: `SuiteEditorDrawer` / `useSuiteEditorStore` do not exist anywhere
 // in this tree - the whole never-ported suite-editor surface (also

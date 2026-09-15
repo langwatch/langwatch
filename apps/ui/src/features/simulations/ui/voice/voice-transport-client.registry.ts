@@ -6,7 +6,7 @@
  * the signed URL, the client opens the call from it.
  */
 
-import type { VoiceTransport } from "~/server/agents/voice/voice-agent.config";
+import type { VoiceTransport } from "@langwatch/scenario-contract";
 import { elevenLabsConvaiClient } from "./transports/elevenlabs-convai.client";
 
 /** One transcript turn as it arrives live from the transport. */

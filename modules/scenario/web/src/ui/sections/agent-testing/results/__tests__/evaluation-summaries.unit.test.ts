@@ -5,7 +5,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import type { ScenarioEvaluationResult } from "~/server/scenarios/schemas/event-schemas";
+import type { ScenarioEvaluationResult } from "@langwatch/scenario-contract";
 import {
   evaluationKind,
   failedRequiredEvaluatorName,

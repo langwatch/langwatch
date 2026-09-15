@@ -30,21 +30,21 @@ beforeAll(() => {
   Element.prototype.scrollTo = vi.fn();
 });
 
-vi.mock("~/hooks/useOrganizationTeamProject", () => ({
+vi.mock("../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({ project: { id: "project-1" } }),
 }));
 
-vi.mock("~/prompts/hooks/useAllPromptsForProject", () => ({
+vi.mock("../../../../behavior/prompts/use-all-prompts-for-project.ts", () => ({
   useAllPromptsForProject: () => ({ data: [] }),
 }));
 
-vi.mock("~/utils/api", () => ({
+vi.mock("../../../../behavior/scenario-api.ts", () => ({
   api: {
     agents: { getAll: { useQuery: () => ({ data: mockAgents }) } },
   },
 }));
 
-import { OFFLINE_AGENT_SELECT_COPY } from "~/components/agents/offlineAgentCopy";
+import { OFFLINE_AGENT_SELECT_COPY } from "../../../../behavior/scenarios/use-filtered-scenario-targets.ts";
 import { TargetSelector, type TargetValue } from "../target-selector.tsx";
 
 describe("given an offline connected agent", () => {

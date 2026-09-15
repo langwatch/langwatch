@@ -20,14 +20,14 @@ const state = vi.hoisted(() => ({
 
 const useFeatureFlagMock = vi.hoisted(() => vi.fn());
 
-vi.mock("~/hooks/useOrganizationTeamProject", () => ({
+vi.mock("@langwatch/ui-host/use-organization-team-project", () => ({
   useOrganizationTeamProject: () => ({
     project: state.project,
     organization: state.organization,
   }),
 }));
 
-vi.mock("~/hooks/useFeatureFlag", () => ({
+vi.mock("@langwatch/ui-host/feature-flag", () => ({
   useFeatureFlag: useFeatureFlagMock,
 }));
 

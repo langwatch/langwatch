@@ -1,6 +1,4 @@
 import { createLogger } from "@langwatch/observability";
-import type { RunEvaluators } from "~/server/scenarios/scenario-run-evaluators";
-import { extractSuiteId } from "~/server/suites/suite-set-id";
 import type { Command, CommandHandler } from "@langwatch/eventing";
 import {
   createTenantId,
@@ -15,10 +13,12 @@ import {
   SIMULATION_RUN_EVENT_TYPES,
 } from "@langwatch/scenario-contract";
 import type {
+  RunEvaluators,
   SimulationProcessingEvent,
   SimulationRunQueuedEvent,
 } from "@langwatch/scenario-contract";
 import { simulationRunQueuedEventDataSchema } from "@langwatch/scenario-contract";
+import { tryExtractSuiteId } from "@langwatch/suite-contract";
 
 const logger = createLogger("langwatch:simulation-processing:queue-run");
 
@@ -92,7 +92,9 @@ export class QueueRunCommand
       return await this.deps.loadRunAttachments({
         projectId: tenantId,
         scenarioId: data.scenarioId,
-        planId: data.scenarioSetId ? extractSuiteId(data.scenarioSetId) : null,
+        planId: data.scenarioSetId
+          ? tryExtractSuiteId(data.scenarioSetId)
+          : null,
       });
     } catch (error) {
       logger.warn(

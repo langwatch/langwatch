@@ -9,8 +9,14 @@
 import { useMemo } from "react";
 import { connectedAgentSelectability, ownerOnlyCopy } from "@langwatch/agent-contract";
 import { targetLabelOf } from "@langwatch/suite-contract";
-import { OFFLINE_AGENT_SELECT_COPY } from "../../../../../../apps/ui/src/features/simulations/ui/offlineAgentCopy.ts";
 import type { TargetValue } from "../../model/scenario-target.ts";
+
+/**
+ * Read where the action is choosing a run target: the run dialog target
+ * picker, the scenario target selector and the Save and run menu.
+ */
+export const OFFLINE_AGENT_SELECT_COPY =
+  "This agent is offline. Start the process that runs it to be able to select it.";
 
 /** Agent types that can be used as scenario targets */
 const SCENARIO_AGENT_TYPES: ReadonlySet<string> = new Set([

@@ -12,27 +12,28 @@ import {
   VStack,
 } from "@chakra-ui/react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { LuArrowLeft } from "react-icons/lu";
+import { ArrowLeft } from "lucide-react";
 
-import { Drawer } from "~/components/ui/drawer";
-import { Switch } from "~/components/ui/switch";
-import { Tooltip } from "~/components/ui/tooltip";
-import { showErrorToast } from "~/features/errors";
-import {
-  getComplexProps,
-  getFlowCallbacks,
-  useDrawer,
-  useDrawerParams,
-} from "~/hooks/useDrawer";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import type { AgentWithFields } from "~/server/agents/agent-fields";
+import { agentApi } from "@langwatch/agent-web/agent-client";
+import type { AgentWithFields } from "@langwatch/agent-contract";
+import { Drawer } from "@langwatch/design-system/drawer";
+import { Switch } from "@langwatch/design-system/switch";
+import { Tooltip } from "@langwatch/design-system/tooltip";
+import { modelProviderApi } from "@langwatch/model-provider-web/model-providers";
 import {
   E164_PHONE_PATTERN,
   VOICE_TRANSPORT_LABELS,
   VOICE_TRANSPORTS,
   type VoiceTransport,
-} from "~/server/agents/voice/voice-agent.config";
-import { api } from "~/utils/api";
+} from "@langwatch/scenario-contract";
+import {
+  getComplexProps,
+  getFlowCallbacks,
+  useDrawer,
+  useDrawerParams,
+} from "@langwatch/ui-drawer";
+import { showErrorToast } from "@langwatch/ui-host/errors";
+import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
 import { TalkToItPanel } from "./voice/TalkToItPanel";
 import { useVoiceAgentsEnabled } from "./voice/useVoiceAgentsEnabled";
 
@@ -321,7 +322,7 @@ function talkTooltipFor({
 // Hooks
 // ============================================================================
 
-type ApiUtils = ReturnType<typeof api.useUtils>;
+type ApiUtils = ReturnType<typeof agentApi.useUtils>;
 
 /** Form fields plus the effects that seed and persist them per drawer session. */
 function useVoiceFormState({
@@ -409,21 +410,21 @@ function useVoiceAgentMutations({
   onSave: AgentVoiceEditorDrawerProps["onSave"];
   onClose: () => void;
 }) {
-  const utils = api.useUtils();
-  const createMutation = api.agents.create.useMutation({
+  const utils = agentApi.useUtils();
+  const createMutation = agentApi.create.useMutation({
     onSuccess: (agent) => {
       if (projectId) clearDraft(projectId);
-      void utils.agents.getAll.invalidate({ projectId });
+      void utils.getAll.invalidate({ projectId });
       onSave?.(agent);
       onClose();
     },
     onError: (error) =>
       showErrorToast({ error, fallbackTitle: "Couldn't create agent" }),
   });
-  const updateMutation = api.agents.update.useMutation({
+  const updateMutation = agentApi.update.useMutation({
     onSuccess: (agent) => {
-      void utils.agents.getAll.invalidate({ projectId });
-      void utils.agents.getById.invalidate({ id: agent.id, projectId });
+      void utils.getAll.invalidate({ projectId });
+      void utils.getById.invalidate({ id: agent.id, projectId });
       onSave?.(agent);
       onClose();
     },
@@ -443,12 +444,12 @@ function useVoiceAgentData({
   projectId: string;
   isOpen: boolean;
 }) {
-  const agentQuery = api.agents.getById.useQuery(
+  const agentQuery = agentApi.getById.useQuery(
     { id: agentId ?? "", projectId },
     { enabled: !!agentId && !!projectId && isOpen },
   );
   const providersQuery =
-    api.modelProvider.listAllForProjectForFrontend.useQuery(
+    modelProviderApi.modelProvider.listAllForProjectForFrontend.useQuery(
       { projectId },
       { enabled: !!projectId && isOpen },
     );
@@ -847,7 +848,7 @@ function VoiceAgentHeader({
             minWidth="auto"
             data-testid="back-button"
           >
-            <LuArrowLeft size={20} />
+            <ArrowLeft size={20} />
           </Button>
         )}
         <Heading>{agentId ? "Edit Voice Agent" : "New Voice Agent"}</Heading>
@@ -895,7 +896,7 @@ function VoiceAgentTalkView({
         onClick={onBack}
         data-testid="voice-agent-talk-back"
       >
-        <LuArrowLeft size={16} /> Back
+        <ArrowLeft size={16} /> Back
       </Button>
       <TalkToItPanel
         projectId={projectId}
@@ -906,7 +907,7 @@ function VoiceAgentTalkView({
         name={name.trim() || undefined}
         onAgentCreated={(rowId) => {
           setCreatedAgentRowId(rowId);
-          void utils.agents.getAll.invalidate({ projectId });
+          void utils.getAll.invalidate({ projectId });
         }}
       />
     </VStack>

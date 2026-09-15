@@ -9,14 +9,23 @@ import type React from "react";
 import { type FieldValues, useForm } from "react-hook-form";
 import { vi } from "vitest";
 
+// DANGLING: `EvaluatorEditorShared` now lives at
+// @langwatch/evaluator-web/surfaces/evaluator-editor-shared (confirmed real:
+// modules/evaluator/web/src/ui/sections/evaluators/evaluator-editor-shared.tsx
+// exports EvaluatorEditorBody/EvaluatorEditorFooter/EvaluatorEditorController/
+// EvaluatorGateConfig), but @langwatch/scenario-web does not yet depend on
+// @langwatch/evaluator-web - needs that dependency added before this import
+// can be repointed. See handoff merge-scenario-dangling-imports.
 import {
   EvaluatorEditorBody,
   type EvaluatorEditorController,
   EvaluatorEditorFooter,
   type EvaluatorGateConfig,
 } from "~/components/evaluators/EvaluatorEditorShared";
-import type { EvaluatorAttachment } from "~/server/scenarios/evaluator-attachments";
-import { scenarioMappingSources } from "~/server/scenarios/evaluator-attachments";
+import {
+  type EvaluatorAttachment,
+  scenarioMappingSources,
+} from "@langwatch/scenario-contract";
 // DANGLING: `evaluators/attachment-rules` and `useOpenScenarioEvaluatorEditor`
 // do not exist anywhere in this tree - part of the never-ported
 // suite-editor/evaluator-attach surface. See handoff

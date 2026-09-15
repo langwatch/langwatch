@@ -4,10 +4,12 @@
  * @see specs/features/agents/voice-agents-v1.feature
  */
 
-import { useFeatureFlag } from "~/hooks/useFeatureFlag";
-import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
-import { NOT_TARGETED } from "@langwatch/feature-flag-contract";
-import { VOICE_AGENTS_FLAG_KEY } from "@langwatch/feature-flag-contract";
+import {
+  NOT_TARGETED,
+  VOICE_AGENTS_FLAG_KEY,
+} from "@langwatch/feature-flag-contract";
+import { useFeatureFlag } from "@langwatch/ui-host/feature-flag";
+import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
 
 export function useVoiceAgentsEnabled(): boolean {
   const { project, organization } = useOrganizationTeamProject({

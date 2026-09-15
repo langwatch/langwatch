@@ -18,7 +18,7 @@ import {
   chartGridBottomRow,
 } from "../chartGrid.ts";
 import { DASHBOARD_SRCDOC_CHART_KIND } from "@langwatch/analytics-contract";
-import { dashboardBelongsToProject } from "~/server/analytics/dashboardBelongsToProject";
+import { dashboardBelongsToProject } from "./dashboardBelongsToProject.ts";
 import {
   DASHBOARD_WIDGET_DEFINITION_VERSION,
   type DashboardWidgetDefinition,

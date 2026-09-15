@@ -10,7 +10,7 @@ import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { Dialog } from "~/components/ui/dialog";
+import { Dialog } from "@langwatch/design-system/studio-dialog";
 import { RunDialogFooter } from "../run-dialog-footer.tsx";
 import type { RunDialogController } from "../use-run-dialog-submit.ts";
 

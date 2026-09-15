@@ -1,8 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  ScenarioRunStatus,
-  Verdict,
-} from "~/server/scenarios/scenario-event.enums";
+import { ScenarioRunStatus, Verdict } from "@langwatch/scenario-contract";
 import {
   type ClickHouseSimulationRunRow,
   mapClickHouseRowToScenarioRunData,

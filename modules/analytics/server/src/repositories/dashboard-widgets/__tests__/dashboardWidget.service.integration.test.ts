@@ -10,20 +10,46 @@
  * @see specs/analytics/custom-chart-playground-dashboard-placement.feature
  */
 
+import { DASHBOARD_SRCDOC_CHART_KIND } from "@langwatch/analytics-contract";
 import { nanoid } from "nanoid";
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
-import { projectFactory } from "~/factories/project.factory";
+import {
+  PrismaConfigService,
+  PrismaConnectionService,
+  PrismaQueryGuard,
+  type PrismaQueryContext,
+  type PrismaQueryExecutor,
+} from "@langwatch/prisma-client";
 import type {
   Dashboard,
   Organization,
+  PrismaClient,
   Project,
   Team,
-} from "~/generated/prisma/client";
-import { prisma } from "~/server/db";
+} from "@langwatch/prisma-client/generated";
+import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
-import { DASHBOARD_SRCDOC_CHART_KIND } from "../../../../../web/src/model/chart-kinds.ts";
 import type { DashboardWidgetQuery } from "../../dashboardWidgetDefinition";
 import { DashboardWidgetService } from "../dashboardWidget.service";
+
+class AllowTestQueries extends PrismaQueryGuard {
+  execute(context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {
+    return next(context.args);
+  }
+}
+
+const databaseUrl = process.env.DATABASE_URL;
+const connection = databaseUrl
+  ? PrismaConnectionService.create({ guard: new AllowTestQueries() }).connect(
+      PrismaConfigService.create().resolve({ databaseUrl, log: ["error"] }),
+    )
+  : null;
+
+function database(): PrismaClient {
+  if (connection === null) {
+    throw new Error("DATABASE_URL is required for dashboard widget service tests");
+  }
+  return connection.client;
+}
 
 const QUERIES: DashboardWidgetQuery[] = [
   { name: "traces", sql: "SELECT count() AS value FROM analytics.traces" },
@@ -32,24 +58,30 @@ const OTHER_QUERIES: DashboardWidgetQuery[] = [
   { name: "errors", sql: "SELECT count() AS value FROM analytics.errors" },
 ];
 
-describe("dashboard widget service (integration)", () => {
+describe.skipIf(!databaseUrl)("dashboard widget service (integration)", () => {
   let service: DashboardWidgetService;
   let organization: Organization;
   let team: Team;
   let project: Project;
   let otherProject: Project;
 
-  const createProject = async () =>
-    await prisma.project.create({
+  const createProject = async () => {
+    const slug = nanoid();
+    return database().project.create({
       data: {
-        ...projectFactory.build({ slug: nanoid() }),
+        name: `Test Project ${slug}`,
+        slug,
+        apiKey: `test-api-key-${nanoid()}`,
         teamId: team.id,
+        language: "en",
+        framework: "langchain",
         personalFeatures: {},
       },
     });
+  };
 
   const createDashboard = async (ownerProject: Project): Promise<Dashboard> =>
-    await prisma.dashboard.create({
+    await database().dashboard.create({
       data: {
         id: nanoid(),
         name: "Test dashboard",
@@ -76,11 +108,11 @@ describe("dashboard widget service (integration)", () => {
     });
 
   beforeAll(async () => {
-    service = DashboardWidgetService.create(prisma);
-    organization = await prisma.organization.create({
+    service = DashboardWidgetService.create(database());
+    organization = await database().organization.create({
       data: { name: "Test Org", slug: `test-org-${nanoid()}` },
     });
-    team = await prisma.team.create({
+    team = await database().team.create({
       data: {
         name: "Test Team",
         slug: `test-team-${nanoid()}`,
@@ -92,20 +124,24 @@ describe("dashboard widget service (integration)", () => {
   });
 
   afterEach(async () => {
-    await prisma.customGraph.deleteMany({
+    await database().customGraph.deleteMany({
       where: { projectId: { in: [project.id, otherProject.id] } },
     });
-    await prisma.dashboard.deleteMany({
+    await database().dashboard.deleteMany({
       where: { projectId: { in: [project.id, otherProject.id] } },
     });
   });
 
   afterAll(async () => {
-    for (const { id } of [project, otherProject]) {
-      await prisma.project.delete({ where: { id } });
+    try {
+      for (const { id } of [project, otherProject]) {
+        await database().project.delete({ where: { id } });
+      }
+      await database().team.delete({ where: { id: team.id } });
+      await database().organization.delete({ where: { id: organization.id } });
+    } finally {
+      await connection?.closeOnce();
     }
-    await prisma.team.delete({ where: { id: team.id } });
-    await prisma.organization.delete({ where: { id: organization.id } });
   });
 
   describe("given another dashboard already carries a tall card", () => {
@@ -114,7 +150,7 @@ describe("dashboard widget service (integration)", () => {
       it("allocates its row from the target dashboard alone, not the whole project", async () => {
         const dashboardA = await createDashboard(project);
         const dashboardB = await createDashboard(project);
-        await prisma.customGraph.create({
+        await database().customGraph.create({
           data: {
             id: nanoid(),
             projectId: project.id,
@@ -154,7 +190,7 @@ describe("dashboard widget service (integration)", () => {
           { code: "dashboard_widget_not_found" },
         );
 
-        const written = await prisma.customGraph.count({
+        const written = await database().customGraph.count({
           where: { projectId: project.id, kind: DASHBOARD_SRCDOC_CHART_KIND },
         });
         expect(written).toBe(0);

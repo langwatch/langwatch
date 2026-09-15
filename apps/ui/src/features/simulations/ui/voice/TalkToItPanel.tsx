@@ -13,14 +13,12 @@ import { useCallback, useEffect, useReducer, useRef, useState } from "react";
 import { z } from "zod";
 
 import {
-  VOICE_TRANSPORTS,
-  type VoiceTransport,
-} from "~/server/agents/voice/voice-agent.config";
-import {
   isRedCountdown,
   remainingSeconds,
-} from "~/server/scenarios/voice/voice-countdown";
-import { VOICE_CALL_MAX_SECONDS_DEFAULT } from "~/server/scenarios/voice/voice-limits";
+  VOICE_CALL_MAX_SECONDS_DEFAULT,
+  VOICE_TRANSPORTS,
+  type VoiceTransport,
+} from "@langwatch/scenario-contract";
 import {
   CONSENT_NOTICE,
   CUT_AT_LIMIT_MESSAGE,

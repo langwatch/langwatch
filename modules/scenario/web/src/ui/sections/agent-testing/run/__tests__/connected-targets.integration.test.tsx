@@ -12,8 +12,10 @@ import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { scenarioAgentsOf } from "../../../../../behavior/scenarios/use-filtered-scenario-targets.ts";
-import { OFFLINE_AGENT_SELECT_COPY } from "../../../../../../../../../apps/ui/src/features/simulations/ui/offlineAgentCopy.ts";
+import {
+  OFFLINE_AGENT_SELECT_COPY,
+  scenarioAgentsOf,
+} from "../../../../../behavior/scenarios/use-filtered-scenario-targets.ts";
 import { OfflineTargetsNotice } from "../offline-targets-notice.tsx";
 import type { RunDialogAgent } from "../run-target-picker.tsx";
 import { TargetSection } from "../target-section.tsx";

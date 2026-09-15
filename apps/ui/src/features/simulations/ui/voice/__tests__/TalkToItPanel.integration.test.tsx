@@ -4,6 +4,7 @@
  * @see specs/features/agents/voice-agents-v1.feature
  */
 
+import "@testing-library/jest-dom/vitest";
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import type React from "react";

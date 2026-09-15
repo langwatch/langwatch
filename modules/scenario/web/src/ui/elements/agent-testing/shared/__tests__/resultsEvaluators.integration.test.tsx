@@ -10,13 +10,13 @@ import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { SCENARIO_RUN_STATUS_CONFIG } from "~/components/simulations/scenario-run-status-config";
 import {
   ScenarioRunStatus,
   Verdict,
-} from "~/server/scenarios/scenario-event.enums";
-import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
-import type { ScenarioEvaluationResult } from "~/server/scenarios/schemas/event-schemas";
+  type ScenarioEvaluationResult,
+  type ScenarioRunData,
+} from "@langwatch/scenario-contract";
+import { SCENARIO_RUN_STATUS_CONFIG } from "../../../../../model/scenario-run-status-config.ts";
 import { RunVerdictPanel } from "../../drawers/run-verdict-panel.tsx";
 import { summarizeEvaluations } from "../../../../sections/agent-testing/results/evaluation-summaries.ts";
 import {

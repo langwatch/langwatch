@@ -6,6 +6,7 @@
  * @see specs/features/agents/voice-agents-v1.feature
  */
 
+import "@testing-library/jest-dom/vitest";
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -47,7 +48,7 @@ vi.mock("next-auth/react", () => ({
   }),
 }));
 
-vi.mock("~/hooks/useOrganizationTeamProject", () => ({
+vi.mock("@langwatch/ui-host/use-organization-team-project", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "test-project", slug: "test-project" },
     organization: { id: "test-org" },
@@ -80,7 +81,7 @@ const mockGoBack = vi.fn();
 /** Overridden per test to simulate ?drawer.talk=1 from the card menu (#23). */
 let mockDrawerParams: Record<string, string | undefined> = {};
 
-vi.mock("~/hooks/useDrawer", () => ({
+vi.mock("@langwatch/ui-drawer", () => ({
   useDrawer: () => ({
     closeDrawer: mockCloseDrawer,
     openDrawer: vi.fn(),
@@ -93,24 +94,30 @@ vi.mock("~/hooks/useDrawer", () => ({
   getFlowCallbacks: () => ({}),
 }));
 
-vi.mock("~/utils/api", () => ({
-  api: {
-    agents: {
-      getById: {
-        useQuery: () => ({
-          data: mockAgentById,
-          isLoading: false,
-          error: null,
-        }),
-      },
-      getAll: { invalidate: vi.fn() },
-      create: {
-        useMutation: () => ({ mutate: createMock, isPending: false }),
-      },
-      update: {
-        useMutation: () => ({ mutate: updateMock, isPending: false }),
-      },
+vi.mock("@langwatch/agent-web/agent-client", () => ({
+  agentApi: {
+    getById: {
+      useQuery: () => ({
+        data: mockAgentById,
+        isLoading: false,
+        error: null,
+      }),
     },
+    create: {
+      useMutation: () => ({ mutate: createMock, isPending: false }),
+    },
+    update: {
+      useMutation: () => ({ mutate: updateMock, isPending: false }),
+    },
+    useUtils: () => ({
+      getAll: { invalidate: vi.fn() },
+      getById: { invalidate: vi.fn() },
+    }),
+  },
+}));
+
+vi.mock("@langwatch/model-provider-web/model-providers", () => ({
+  modelProviderApi: {
     modelProvider: {
       listAllForProjectForFrontend: {
         useQuery: () => ({
@@ -120,12 +127,6 @@ vi.mock("~/utils/api", () => ({
         }),
       },
     },
-    useUtils: () => ({
-      agents: {
-        getAll: { invalidate: vi.fn() },
-        getById: { invalidate: vi.fn() },
-      },
-    }),
   },
 }));
 

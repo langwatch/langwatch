@@ -16,10 +16,10 @@ import {
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { DatasetColumns } from "~/server/datasets/types";
-import { DatasetEditorTable } from "../DatasetEditorTable";
+import type { DatasetColumns } from "@langwatch/dataset-contract";
+import { DatasetEditorTable } from "../../ui/sections/datasets/editor/dataset-editor-table.tsx";
 
-vi.mock("~/hooks/useOrganizationTeamProject", () => ({
+vi.mock("@langwatch/ui-host/use-organization-team-project", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "proj-1", slug: "acme-app" },
     organization: { id: "org-1", name: "Acme" },
@@ -37,7 +37,11 @@ const listPaginatedQuery = vi.fn();
  *  that does nothing. */
 const refetchSpy = vi.fn();
 
-vi.mock("~/utils/api", () => ({
+// The editor screen and its debounced save loop (useDatasetRecordSync) both
+// read `datasetRecord`/`dataset` off the same workflow family's tRPC hooks
+// (the borrowed-procedures family it shares with the studio) - one module,
+// one mock.
+vi.mock("@langwatch/workflow-web/surfaces/workflow-api", () => ({
   api: {
     datasetRecord: {
       getAll: { useQuery: (...args: unknown[]) => listPaginatedQuery(...args) },
@@ -53,12 +57,6 @@ vi.mock("~/utils/api", () => ({
     },
     dataset: {
       upsert: { useMutation: () => ({ mutate: vi.fn(), isLoading: false }) },
-      validateDatasetName: {
-        useQuery: () => ({ data: null, isLoading: false }),
-      },
-    },
-    licenseEnforcement: {
-      checkLimit: { useQuery: () => ({ data: null, isLoading: false }) },
     },
     useUtils: () => ({}),
   },

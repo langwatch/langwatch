@@ -1,15 +1,14 @@
 import { createLogger } from "@langwatch/observability";
-import type { ScenarioEvaluationsJobPayload } from "~/server/scenarios/evaluations/types";
-import type { RunEvaluators } from "~/server/scenarios/scenario-run-evaluators";
-import { UNGRADED_RUN_STATUSES } from "~/server/scenarios/scenario-run-evaluators";
-import { extractSuiteId } from "~/server/suites/suite-set-id";
-import type { SubscriberSpec } from "../../../../../packages/eventing/src/pipeline/processManagerDefinition.ts";
-import { SIMULATION_RUN_EVENT_TYPES } from "@langwatch/scenario-contract";
+import type { SubscriberSpec } from "@langwatch/eventing";
+import { SIMULATION_RUN_EVENT_TYPES, UNGRADED_RUN_STATUSES } from "@langwatch/scenario-contract";
 import type {
+  RunEvaluators,
+  ScenarioEvaluationsJobPayload,
   SimulationProcessingEvent,
   SimulationRunFinishedEventData,
 } from "@langwatch/scenario-contract";
 import { isSimulationRunFinishedEvent } from "@langwatch/scenario-contract";
+import { tryExtractSuiteId } from "@langwatch/suite-contract";
 
 const logger = createLogger(
   "langwatch:simulation-processing:scenario-evaluations",
@@ -114,7 +113,7 @@ export function createScenarioEvaluationsSubscriber(
       });
       if (!evaluatedScenarioId) return;
 
-      const planId = scenarioSetId ? extractSuiteId(scenarioSetId) : null;
+      const planId = scenarioSetId ? tryExtractSuiteId(scenarioSetId) : null;
       const evaluators =
         event.data.evaluators ??
         (await deps.loadRunAttachments({

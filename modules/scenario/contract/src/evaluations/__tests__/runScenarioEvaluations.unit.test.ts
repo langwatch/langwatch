@@ -1,9 +1,11 @@
 import { describe, expect, it, vi } from "vitest";
-import type { Prisma } from "~/generated/prisma/client";
-import type { SingleEvaluationResult } from "~/server/evaluations/evaluators.generated";
-import type { EvaluatorWithFields } from "~/server/evaluators/evaluator.service";
-import type { Span } from "~/server/tracer/types";
+import type {
+  EvaluatorWithFields,
+  SingleEvaluationResult,
+} from "@langwatch/evaluator-contract";
+import type { Span } from "@langwatch/trace-contract";
 import type { EvaluatorAttachment } from "../../evaluator-attachments";
+import type { JsonValue } from "../../scenario.ts";
 import { runEvaluatorDefinitionOf } from "../../scenario-run-evaluators";
 import { MAX_STORED_INPUT_LENGTH } from "../constants";
 import {
@@ -93,7 +95,7 @@ const processed = (
 function makeDeps({
   attachments = [attachment()],
   evaluators = [evaluator()],
-  fields = { golden_sql: "SELECT 1" } as Prisma.JsonValue,
+  fields = { golden_sql: "SELECT 1" } as JsonValue,
   spans = [] as Span[],
   traceIds = ["trace-1"],
   result = processed({ passed: true, score: 1 }) as
@@ -102,7 +104,7 @@ function makeDeps({
 }: {
   attachments?: EvaluatorAttachment[];
   evaluators?: EvaluatorWithFields[];
-  fields?: Prisma.JsonValue;
+  fields?: JsonValue;
   spans?: Span[];
   traceIds?: string[];
   result?: SingleEvaluationResult | Error;

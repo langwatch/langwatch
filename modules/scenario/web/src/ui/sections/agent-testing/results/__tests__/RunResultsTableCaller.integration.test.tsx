@@ -9,8 +9,10 @@
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { ScenarioRunStatus } from "~/server/scenarios/scenario-event.enums";
-import type { ScenarioRunData } from "~/server/scenarios/scenario-event.types";
+import {
+  ScenarioRunStatus,
+  type ScenarioRunData,
+} from "@langwatch/scenario-contract";
 import { RunResultsTable } from "../run-results-table.tsx";
 
 afterEach(cleanup);
