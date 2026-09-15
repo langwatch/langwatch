@@ -21,8 +21,8 @@
       "default": "./src/index.ts"
     },
     "./streaming/langy-frame-auth": {
-      "types": "./dist/services/langy-frame-auth.service.d.ts",
-      "default": "./src/services/langy-frame-auth.service.ts"
+      "types": "./dist/rules/langy-frame-auth.rules.d.ts",
+      "default": "./src/rules/langy-frame-auth.rules.ts"
     },
     "./rules/langy-capability-progress": {
       "types": "./dist/rules/langy-capability-progress.rules.d.ts",
