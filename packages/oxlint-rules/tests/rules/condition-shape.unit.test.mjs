@@ -12,25 +12,45 @@ afterEach(() => resetBaselineCache());
 
 const SERVICE = "modules/agent/server/src/services/agent.service.ts";
 
+/** A deep chain that also combines, which is what the rule reports. */
+const DEEP_AND_COMBINING =
+  "export function deep(input) { if (input.meta.owner.name && input.active) { return 1; } return 0; }";
+
 function report(code, options = []) {
   return runRule(conditionShapeRule, { code, cwd: workspace.cwd, filename: SERVICE, options });
 }
 
 describe("given a strict feature service module", () => {
-  describe("when a condition chains more property hops than the limit", () => {
+  describe("when a condition chains more property hops than the limit and also combines", () => {
     /** @scenario "An unreadable condition is reported with its measured shape" */
     it("reports nameCondition with the shape it measured and the fix", () => {
-      const found = report(
-        "export function deep(input) { if (input.meta.owner.name) { return 1; } return 0; }",
-      );
+      const found = report(DEEP_AND_COMBINING);
 
       expect(found).toHaveLength(1);
       expect(found[0].messageId).toBe("nameCondition");
-      expect(found[0].data).toEqual({ calls: 0, hops: 3, operators: 0 });
+      expect(found[0].data).toEqual({ calls: 0, hops: 3, operators: 1 });
       expect(found[0].message).toBe(
-        "This condition takes 3 property hops, 0 calls and 0 logical operators to read." +
-          " Name it: assign it to a const and test the name.",
+        "This condition takes 3 property hops, 0 calls and 1 logical operators to read." +
+          " Assign it to a const named for what the branch means, not a restatement of the" +
+          " expression, and test that name.",
       );
+    });
+  });
+
+  describe("when a deep chain neither calls nor combines", () => {
+    /** @scenario "A property chain on its own is never reported" */
+    it("reports nothing, because naming it would only restate it", () => {
+      expect(
+        report(
+          "export function has(input) { if (input.plan.bindingIds.length > 0) { return 1; } return 0; }",
+        ),
+      ).toEqual([]);
+    });
+
+    it("reports nothing however deep the chain runs", () => {
+      expect(
+        report("export function deep(input) { if (input.a.b.c.d.e.f) { return 1; } return 0; }"),
+      ).toEqual([]);
     });
   });
 
@@ -46,19 +66,14 @@ describe("given a strict feature service module", () => {
   describe("when the caller raises maxHops", () => {
     /** @scenario "The option keys raise the limits the rule measures against" */
     it("reports nothing at the raised limit", () => {
-      expect(
-        report(
-          "export function deep(input) { if (input.meta.owner.name) { return 1; } return 0; }",
-          [{ maxHops: 3 }],
-        ),
-      ).toEqual([]);
+      expect(report(DEEP_AND_COMBINING, [{ maxHops: 3 }])).toEqual([]);
     });
   });
 
   describe("when a condition trips one of the other three measurements", () => {
     it("reports an optional chain deeper than the limit", () => {
       const found = report(
-        "export function optional(input) { if (input?.meta?.owner?.name) { return 1; } return 0; }",
+        "export function optional(input) { if (input?.meta?.owner?.name && input.active) { return 1; } return 0; }",
       );
 
       expect(found.map((entry) => entry.messageId)).toEqual(["nameCondition"]);
@@ -90,7 +105,7 @@ describe("given a strict feature service module", () => {
 
     it("reports the discriminant of a switch statement", () => {
       const found = report(
-        "export function pick(input) { switch (input.meta.owner.name) { default: return 0; } }",
+        "export function pick(input) { switch (input.meta.owner.name ?? fallback) { default: return 0; } }",
       );
 
       expect(found.map((entry) => entry.messageId)).toEqual(["nameCondition"]);
@@ -109,18 +124,14 @@ describe("given a strict feature service module", () => {
       );
       resetBaselineCache();
 
-      expect(
-        report(
-          "export function deep(input) { if (input.meta.owner.name) { return 1; } return 0; }",
-        ),
-      ).toEqual([]);
+      expect(report(DEEP_AND_COMBINING)).toEqual([]);
     });
   });
 
   describe("when the fixture workspace, not the repository, is the linter's root", () => {
     it("classifies a file the real repository has never contained", () => {
       const found = runRule(conditionShapeRule, {
-        code: "export function deep(input) { if (input.meta.owner.name) { return 1; } return 0; }",
+        code: DEEP_AND_COMBINING,
         cwd: workspace.cwd,
         filename: "modules/agent/server/src/services/invented.service.ts",
         options: [],

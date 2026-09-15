@@ -36,6 +36,17 @@ describe("given a strict feature port module", () => {
     });
   });
 
+  describe("when the try-prefix fix is read by the author", () => {
+    /** @scenario "Dropping the try prefix means throwing, not renaming to find" */
+    it("names the plain rename and refuses find as the alternative", () => {
+      const found = report("export abstract class AgentPort { abstract tryGetById(): string; }");
+
+      expect(found[0].message).toContain("Name it `getById`");
+      expect(found[0].message).toContain("make the body throw");
+      expect(found[0].message).toContain("is not the fix");
+    });
+  });
+
   describe("when a method uses the redundant require prefix", () => {
     /** @scenario "The require prefix is reported with a rename fix" */
     it("reports requirePrefix", () => {

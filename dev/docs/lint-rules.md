@@ -240,7 +240,7 @@ Messages:
 
 - `nameCondition`
   - what: This condition takes {{hops}} property hops, {{calls}} calls and {{operators}} logical operators to read.
-  - fix: Name it: assign it to a const and test the name.
+  - fix: Assign it to a const named for what the branch means, not a restatement of the expression, and test that name.
   - why: A test nobody can read at a glance is where the wrong branch hides.
 
 ## `langwatch/conditional-type-depth`
@@ -331,7 +331,7 @@ Messages:
   - fix: Rename the method without the `require` prefix.
 - `tryPrefix`
   - what: `{{name}}` hedges: a `try` method hands the caller a maybe instead of an answer.
-  - fix: Name it `{{plain}}` and throw the domain error when it cannot answer; only when absence is a normal outcome the caller branches on, name it `find<Noun>` for the thing it looks up and return undefined. `find` never wraps the old verb (`findGet`, `findUpdateStatus` are refusals, not fixes): a getter or a write keeps its verb and returns or throws. Rework the body to match either way: narrow any blanket try/catch to the one call whose failure means absence, so a real error propagates instead of reading as a miss.
+  - fix: Name it `{{plain}}` and make the body throw: delete the catch that turns a failure into a maybe, so the caller gets the answer or the reason there is none. Renaming it `find...` is not the fix — that moves the hedge into the name and leaves the swallowed error where it was.
 
 ## `langwatch/feature-module-classes`
 

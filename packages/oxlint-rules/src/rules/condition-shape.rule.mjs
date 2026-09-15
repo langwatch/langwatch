@@ -2,9 +2,11 @@ import { walk } from "../ast.mjs";
 import { isBaselined } from "../baseline.mjs";
 import { defineRule } from "../define-rule.mjs";
 
-// A condition is readable at a glance or it is named. The shape checks are
-// the four ways a test stops being glanceable: a deep property chain, more
-// than one call, a stack of logical operators, or a ternary inside the test.
+// A condition is readable at a glance or it is named. What costs a reader is
+// a test that calls or combines: more than one call, a stack of logical
+// operators, or a ternary inside the test. A property chain is a path to a
+// value rather than complexity of its own, so depth is only counted once the
+// test already does one of those.
 
 const CONDITION_LOGICAL_OPERATORS = new Set(["&&", "||", "??"]);
 
@@ -58,7 +60,9 @@ export const conditionShapeRule = defineRule({
     nameCondition: {
       what: "This condition takes {{hops}} property hops, {{calls}} calls and {{operators}} logical operators to read.",
       why: "A test nobody can read at a glance is where the wrong branch hides.",
-      fix: "Name it: assign it to a const and test the name.",
+      fix:
+        "Assign it to a const named for what the branch means, not a restatement of the"
+        + " expression, and test that name.",
     },
   },
   options: {
@@ -74,11 +78,14 @@ export const conditionShapeRule = defineRule({
       }
 
       const shape = conditionShape(test);
+      // Naming `a.b.c.length > 0` restates it and tells the reader nothing, so
+      // a chain on its own is never reported however deep it runs.
+      const combines = shape.calls > 0 || shape.operators > 0;
       const unreadable =
-        shape.hops > maxHops ||
         shape.calls > maxCalls ||
         shape.operators > maxOperators ||
-        shape.nestedTernary;
+        shape.nestedTernary ||
+        (combines && shape.hops > maxHops);
       if (!unreadable) return;
 
       context.report({
