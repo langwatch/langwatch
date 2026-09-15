@@ -27,10 +27,14 @@
 import type { ComponentProps } from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import type { ChartQueryError } from "~/features/custom-chart-playground/bridge/bridgeProtocol";
 import type { ChartFrameExecuteQuery } from "~/features/custom-chart-playground/bridge/frameBridge";
 import type { DashboardWidgetEditDrawer } from "~/features/custom-chart-playground/DashboardWidgetEditDrawer";
 import { useWidgetDraft } from "~/features/custom-chart-playground/useWidgetDraft";
-import type { DashboardWidgetQuery } from "~/server/analytics/dashboardWidgetDefinition";
+import {
+  type DashboardWidgetQuery,
+  validateDashboardWidgetQueryParams,
+} from "~/server/analytics/dashboardWidgetDefinition";
 
 import type { GovernanceWidget } from "./governanceWidgets";
 
@@ -63,7 +67,21 @@ const NO_PARAMS = Object.freeze({});
  * that refusal is the message worth showing: it says the statement is not one
  * of the four rather than that something broke.
  */
-function toRunError(error: unknown) {
+function toRunError(error: unknown): ChartQueryError {
+  // Deliberately NOT `explainAnyError` here, which is what a Run that reaches
+  // a server maps through (see the product's own executor). That rule exists
+  // because a wire error's `message` is a code slug and prose only by luck, so
+  // the registry has to supply the words instead.
+  //
+  // No Run on this page reaches a wire. The only two things that can reject
+  // are in `sampleWidgetAnswers.ts` — a statement with no invented answer
+  // written for it, and the sample choice being off — and both carry prose
+  // written to be read by the person who sees it. Sent through the registry
+  // they come out as "Something went wrong", which is worse than either, and
+  // reads as a broken page rather than as a switch nobody turned on.
+  //
+  // The guarantee that keeps this true is the page's own: nothing here can
+  // reach a server, and the source ban in the page test is what holds it.
   return {
     code: "unknown",
     title: "Query failed",
@@ -217,10 +235,28 @@ function useStatementRuns(executeQuery: ChartFrameExecuteQuery) {
     async (query: DashboardWidgetQuery) => {
       const record = (entry: GovernanceWidgetLastRuns[string]) =>
         setLastRuns((previous) => ({ ...previous, [query.name]: entry }));
+
+      // The same gate every other Run in the product goes through. The four
+      // statements shipped here declare no parameters, but the Queries tab is
+      // the product's own and a reader can add one — and a parameter added
+      // here has to mean what it means everywhere else. Standalone has no
+      // source of values, so every declared parameter is filled from its own
+      // default and one with no default simply fails the check, which is the
+      // "cannot run this on its own" answer reached through the one rule
+      // rather than through a second rule kept in step with it.
+      const validation = validateDashboardWidgetQueryParams({
+        query,
+        params: NO_PARAMS,
+      });
+      if (!validation.ok) {
+        record({ ranAt: Date.now(), error: validation.error });
+        return;
+      }
+
       try {
         const result = await executeQuery({
           queryName: query.name,
-          params: NO_PARAMS,
+          params: validation.params,
           // The factory never reaches anything, so there is nothing an abort
           // could stop; it takes a signal because every executor does.
           signal: new AbortController().signal,

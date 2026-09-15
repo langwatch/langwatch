@@ -664,6 +664,37 @@ describe("given a member who wants to see what one chart asks", () => {
     expect(screen.queryAllByText(/\d+ rows?/)).toHaveLength(0);
   });
 
+  /** @scenario "The editor draws no invented figures the reader has turned off" */
+  it("draws no chart and answers no run while the sample choice is off", async () => {
+    // The state the page OPENS in, and the state in which the banner that says
+    // the figures are invented is not on screen at all.
+    writeSampleChoice(false);
+    renderPage();
+    expect(screen.queryByText(/nothing here is real/i)).not.toBeInTheDocument();
+
+    const editor = await openQueryDrawer("Cost by department");
+
+    // The statement is the question, not a figure, so it stays readable.
+    expect(editor.value).toContain("governance_cost_rollup_1d");
+
+    // No chart anywhere — not on the card, and not in the editor either.
+    expect(recordedFrames()).toHaveLength(0);
+
+    // And a Run says which switch is off rather than handing over invented
+    // money the reader has just asked not to see.
+    fireEvent.click(screen.getByRole("button", { name: /^run$/i }));
+    // The refusal's OWN words, not merely that something refused: a generic
+    // "something went wrong" here would read as a broken page rather than as
+    // a switch the reader has not turned on, and only the words tell them
+    // apart.
+    await waitFor(() =>
+      expect(
+        screen.getByText(/nothing is drawn until you ask to see sample data/i),
+      ).toBeInTheDocument(),
+    );
+    expect(screen.queryAllByText(/\d+ rows?/)).toHaveLength(0);
+  });
+
   /** @scenario "An edit made in the editor lasts the visit and no longer" */
   it("keeps a saved change for the visit and loses it on the next one", async () => {
     renderPage();

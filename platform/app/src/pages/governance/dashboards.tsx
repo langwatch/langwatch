@@ -39,7 +39,10 @@ import { ChartGrid } from "~/components/analytics/reports/ChartGrid";
 import { GovernanceWidgetCard } from "~/components/governance/dashboards/GovernanceWidgetCard";
 import type { GovernanceWidget } from "~/components/governance/dashboards/governanceWidgets";
 import { GOVERNANCE_WIDGETS } from "~/components/governance/dashboards/governanceWidgets";
-import { createSampleExecuteQuery } from "~/components/governance/dashboards/sampleWidgetAnswers";
+import {
+  createSampleExecuteQuery,
+  refuseWhileSampleIsOff,
+} from "~/components/governance/dashboards/sampleWidgetAnswers";
 import {
   DEFAULT_TIME_FRAME,
   FilterChip,
@@ -142,9 +145,16 @@ function DashboardsPage() {
 
   // The invented figures follow the frame, so narrowing the window draws a
   // narrower series rather than the same twelve months relabelled.
+  //
+  // And they are only handed out at all once the reader has ASKED for them.
+  // The cards already draw nothing with sample off, but the editor behind a
+  // card has its own chart and its own Run, and neither is on the card's
+  // branch — so the rule is kept here, at the one source of every figure on
+  // this page, rather than at each of the three places one could be drawn.
   const executeQuery = useMemo(
-    () => createSampleExecuteQuery({ frame }),
-    [frame],
+    () =>
+      showSample ? createSampleExecuteQuery({ frame }) : refuseWhileSampleIsOff,
+    [frame, showSample],
   );
 
   return (

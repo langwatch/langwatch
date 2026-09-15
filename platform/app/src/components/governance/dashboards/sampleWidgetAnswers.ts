@@ -257,6 +257,28 @@ function sampleAnswerBuilder(
 }
 
 /**
+ * What answers a statement while the sample choice is OFF: nothing, with the
+ * reason.
+ *
+ * Sample off is a request — do not show me invented figures — and every figure
+ * this page can produce is invented. It is also the state the page OPENS in,
+ * and the banner that admits the figures are invented is only drawn with
+ * sample on. So an answer handed over in this state is invented money on
+ * screen with nothing anywhere saying so, which is the one thing this page
+ * exists not to do.
+ *
+ * A refusal rather than an empty result, for the same reason the factory below
+ * refuses an unknown query: no rows reads as an organization that spent
+ * nothing. This says which switch is off instead.
+ */
+export const refuseWhileSampleIsOff: ChartFrameExecuteQuery = () =>
+  Promise.reject(
+    new Error(
+      "Sample data is off. Every figure behind this widget is invented, so nothing is drawn until you ask to see sample data.",
+    ),
+  );
+
+/**
  * The answer factory the dashboards page hands its chart frames.
  *
  * A query with no answer written for it is REFUSED by name rather than

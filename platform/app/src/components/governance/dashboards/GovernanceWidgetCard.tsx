@@ -153,6 +153,7 @@ export function GovernanceWidgetCard({
       )}
       <WidgetQueryEditor
         editor={editor}
+        showSample={showSample}
         executeQuery={executeQuery}
         dashboardContext={dashboardContext}
       />
@@ -229,13 +230,21 @@ function NothingMeasuredYet() {
  * The preview inside it is a second frame over the SAME context the card's own
  * frame runs on — no project in it, so the preview can no more reach a row than
  * the card can.
+ *
+ * It also follows the SAME sample choice the card follows. Sample off is a
+ * request not to be shown invented figures, and the banner that admits they are
+ * invented is only on screen with sample on — so a chart drawn in here while it
+ * is off would be invented money with nothing anywhere saying so. The statement
+ * stays readable either way: it is the question, not a figure.
  */
 function WidgetQueryEditor({
   editor,
+  showSample,
   executeQuery,
   dashboardContext,
 }: {
   editor: ReturnType<typeof useGovernanceWidgetEditor>;
+  showSample: boolean;
   executeQuery: ChartFrameExecuteQuery;
   dashboardContext: ChartFrameDashboardContext;
 }) {
@@ -244,14 +253,18 @@ function WidgetQueryEditor({
       open={editor.isOpen}
       chart={
         editor.isOpen ? (
-          <SandboxedChartFrame
-            code={editor.previewCode}
-            executeQuery={executeQuery}
-            dashboardContext={dashboardContext}
-            params={NO_PARAMS}
-            onLog={discardFrameLog}
-            maxHeight={EDITOR_PREVIEW_HEIGHT_PX}
-          />
+          showSample ? (
+            <SandboxedChartFrame
+              code={editor.previewCode}
+              executeQuery={executeQuery}
+              dashboardContext={dashboardContext}
+              params={NO_PARAMS}
+              onLog={discardFrameLog}
+              maxHeight={EDITOR_PREVIEW_HEIGHT_PX}
+            />
+          ) : (
+            <NothingMeasuredYet />
+          )
         ) : null
       }
       name={editor.draft.draftName}

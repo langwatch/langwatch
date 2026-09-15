@@ -111,6 +111,24 @@ Feature: Governance dashboards — four cost widgets, sample answers only
     # and reads as four separate decisions.
 
   @integration
+  Scenario: The editor draws no invented figures the reader has turned off
+    Given sample mode is off
+    When the member opens the query behind one widget from that widget's card
+    Then the statement that widget asks is still shown
+    And no chart is drawn in the editor either
+    And running the statement says the sample choice is off rather than
+      answering with invented figures
+    # Sample off is a request: do not show me invented figures. It is also the
+    # state the page opens in, and the banner that says the figures are
+    # invented is only shown with sample ON. So a chart drawn inside the
+    # editor while sample is off is invented money on screen with nothing
+    # anywhere saying so — the exact thing this page exists not to do.
+    #
+    # The statement stays readable in both states, because it is not a figure.
+    # It is the question, and the question is true whether or not anybody has
+    # agreed to see invented answers to it.
+
+  @integration
   Scenario: Every widget is drawn in the colour mode the reader is in
     Given the member is reading in dark mode
     When the page renders
