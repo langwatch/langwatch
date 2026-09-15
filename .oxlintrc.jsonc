@@ -29,6 +29,18 @@
     // unions correctly. One sweep clears it and new code stays consistent.
     "typescript/array-type": ["error", { "default": "array" }],
 
+    // The vitest plugin is enabled for its test-quality rules, and this one
+    // rode along with them: 11,741 findings across 1,700 files, every one of
+    // them a `vi.fn()` written without a type parameter. Nothing chose it,
+    // nothing fixes it -- the type argument has to be the mocked function's
+    // real signature, so there is no codemod -- and `vi.fn()` bare is the
+    // idiom the whole suite is written in. A rule that reports half of every
+    // finding in the repository and can never reach zero is a rule that
+    // teaches people to read past the linter, so it is off rather than
+    // baselined: it only ever fires in tests, which makes a baseline and an
+    // off switch the same thing said at different lengths.
+    "vitest/require-mock-type-parameters": "off",
+
     // Vitest's `expect` takes a second argument — `expect(actual, message)` is
     // in its own types as `<T>(actual: T, message?: string): Assertion<T>` —
     // and the repo uses it to label which loop iteration failed. The rule's
