@@ -6,19 +6,13 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { Command } from "commander";
-import {
-  AGENT_MODE_ENV_VARS,
-  registerOutputOptions,
-  resolveActionOutputOptions,
-} from "../output";
+import { AGENT_MODE_ENV_VARS, registerOutputOptions, resolveActionOutputOptions } from "../output";
 
 /** Agent-mode env vars from the host (e.g. CLAUDECODE under Claude Code) must not leak into tests. */
 let savedAgentEnv: Record<string, string | undefined> = {};
 
 beforeEach(() => {
-  savedAgentEnv = Object.fromEntries(
-    AGENT_MODE_ENV_VARS.map((name) => [name, process.env[name]]),
-  );
+  savedAgentEnv = Object.fromEntries(AGENT_MODE_ENV_VARS.map((name) => [name, process.env[name]]));
   for (const name of AGENT_MODE_ENV_VARS) delete process.env[name];
   vi.spyOn(console, "log").mockImplementation(() => undefined);
 });
@@ -58,11 +52,9 @@ describe("registerOutputOptions", () => {
   it("makes the global flags parse BEFORE a subcommand too", () => {
     const program = build();
     let captured: Record<string, unknown> = {};
-    program
-      .command("status")
-      .action((opts: Record<string, unknown>, cmd: Command) => {
-        captured = cmd.optsWithGlobals();
-      });
+    program.command("status").action((opts: Record<string, unknown>, cmd: Command) => {
+      captured = cmd.optsWithGlobals();
+    });
 
     registerOutputOptions(program);
     program.parse(["node", "lw", "--agent", "status"]);
@@ -110,9 +102,9 @@ describe("registerOutputOptions", () => {
 
     registerOutputOptions(program);
 
-    expect(() =>
-      program.parse(["node", "lw", "status", "-o", "jsn"]),
-    ).toThrow(/Allowed choices are table, json, agents, yaml/);
+    expect(() => program.parse(["node", "lw", "status", "-o", "jsn"])).toThrow(
+      /Allowed choices are table, json, agents, yaml/,
+    );
   });
 
   it("does not constrain a command's own -o (trace export's file path)", () => {

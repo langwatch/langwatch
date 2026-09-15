@@ -44,16 +44,8 @@ import net from "node:net";
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import {
-  areEventsEnabled,
-  createCommandEvents,
-  redactSecrets,
-  resolveTransport,
-} from "../events";
-import {
-  LANGWATCH_EVENT_ATTRIBUTES as ATTR,
-  LANGWATCH_EVENTS,
-} from "../attributes";
+import { areEventsEnabled, createCommandEvents, redactSecrets, resolveTransport } from "../events";
+import { LANGWATCH_EVENT_ATTRIBUTES as ATTR, LANGWATCH_EVENTS } from "../attributes";
 
 const ENABLED_ENV = {
   LANGWATCH_OTEL_EVENTS: "1",
@@ -67,8 +59,7 @@ const emittedRecords = (): Record<string, unknown>[] =>
     return record.attributes;
   });
 
-const eventSequence = (): unknown[] =>
-  emittedRecords().map((attributes) => attributes[ATTR.event]);
+const eventSequence = (): unknown[] => emittedRecords().map((attributes) => attributes[ATTR.event]);
 
 describe("createCommandEvents()", () => {
   beforeEach(() => {
@@ -462,10 +453,13 @@ describe("the IPC transport", () => {
         // The socket write is async; give the server a tick to drain it.
         await vi.waitFor(() => expect(received.length).toBe(3));
 
-        const records = received.map((line) => JSON.parse(line) as {
-          event: string;
-          attributes: Record<string, unknown>;
-        });
+        const records = received.map(
+          (line) =>
+            JSON.parse(line) as {
+              event: string;
+              attributes: Record<string, unknown>;
+            },
+        );
 
         expect(records.map((r) => r.event)).toEqual([
           LANGWATCH_EVENTS.started,

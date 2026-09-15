@@ -1,0 +1,140 @@
+import type { AuthzApi } from "@langwatch/authz-contract";
+import type { OrganizationUserRole, TeamUserRole } from "@langwatch/organization-contract";
+import type { PlanProvider } from "@langwatch/entitlement-contract";
+import type { RoleApi } from "@langwatch/role-contract";
+
+/**
+ * The one role answer an invitation asks for: which of the roles it names may
+ * be granted in this organization. Narrowed rather than the whole API, because
+ * an invitation neither defines a role nor binds one.
+ */
+export type InviteAssignableRoles = Pick<RoleApi, "filterAssignableRoles">;
+import type { OrganizationInviteRepository } from "../repositories/organization-invite.repository.ts";
+import type {
+  OrganizationInviteMail,
+  OrganizationInviteSeatCensus,
+  OrganizationInviteWorkspaceCensus,
+} from "../app/organization.members.ts";
+import type { InviteSendThrottleService } from "../services/invite-send-throttle.service.ts";
+
+/**
+ * The KSUID resource prefix a role binding is minted under, restated next to every writer that
+ * mints one rather than in a constants module a package cannot see.
+ */
+export const ROLE_BINDING_KSUID_RESOURCE = "rolebinding";
+
+/**
+ * Duration in milliseconds before an invite expires (14 days, D11).
+ * Resend is one click, so the window can be generous; the old 48-hour
+ * window plus an ops-only resend was where invitations went to die.
+ */
+export const INVITE_EXPIRATION_MS = 14 * 24 * 60 * 60 * 1000;
+
+/**
+ * Ceiling on the batch-invite transaction: 50 invites × 2 statements apiece = 100 sequential
+ * indexed statements on one connection, ~20s at 200ms each — well past Prisma's 5s P2028 default.
+ */
+export const INVITE_BATCH_TXN_TIMEOUT_MS = 20_000;
+
+/**
+ * How long to wait for a connection before starting. Raised from Prisma's 2s
+ * default for the same reason the dataset mutations raise it: a busy pool
+ * should not fail a batch before it has done any work.
+ */
+export const INVITE_BATCH_TXN_MAX_WAIT_MS = 10_000;
+
+export interface TeamAssignmentInput {
+  teamId: string;
+  role: TeamUserRole;
+  customRoleId?: string;
+}
+
+/**
+ * Input for creating an admin invite (immediate PENDING status).
+ */
+export interface CreateAdminInviteInput {
+  email: string;
+  role: OrganizationUserRole;
+  organizationId: string;
+  teamIds: string;
+  teamAssignments?: TeamAssignmentInput[];
+}
+
+/**
+ * One requested invite for the {@link InviteService.createInvites} orchestrator. `teams` carries
+ * built-in team roles, `CUSTOM` with a `customRoleId`, or the invite form's `custom:{roleId}`
+ * string; `teamIds` is the legacy comma-separated default-role form.
+ */
+export interface CreateInvitesInviteInput {
+  email: string;
+  role: OrganizationUserRole;
+  teamIds?: string;
+  teams?: Array<{
+    teamId: string;
+    role: TeamUserRole | string;
+    customRoleId?: string;
+  }>;
+}
+
+/** The validated team side of one requested invite. */
+export interface ResolvedInviteTeams {
+  teamAssignments: TeamAssignmentInput[];
+  teamIdsString: string;
+}
+
+/**
+ * Input for creating a PAYMENT_PENDING invite (checkout flow).
+ */
+export interface CreatePaymentPendingInviteInput {
+  email: string;
+  role: OrganizationUserRole;
+  organizationId: string;
+  teamIds: string;
+  teamAssignments?: TeamAssignmentInput[];
+  subscriptionId: string;
+}
+
+/**
+ * Everything the invitation service is composed FROM.
+ */
+export type InviteServiceDependencies = Readonly<{
+  /** The invitations, and what an invitation is validated and settled against. */
+  invites: OrganizationInviteRepository;
+  /** The organization's seat census and the lite-seat rule. */
+  seats: OrganizationInviteSeatCensus;
+  /** Which plan the organization is on, and therefore how many seats it holds. */
+  plans: PlanProvider;
+  /**
+   * The ledger the accepted invitation's grants are written through. The whole
+   * authorization application rather than its grant half: acceptance attaches
+   * and revokes BINDINGS, which the grant commands alone cannot express.
+   */
+  grants: AuthzApi;
+  /**
+   * Where assignability is defined. Required rather than optional: an
+   * invitation validated against a different rule than `applyInvite` applies
+   * would be accepted here and silently dropped on acceptance.
+   */
+  roles: InviteAssignableRoles;
+  /** The shared per-invitation send window. */
+  throttle: InviteSendThrottleService;
+  /** This deployment's public origin, for the accept link. */
+  baseHost: string;
+  /**
+   * The mail gateway, where the deployment composed one. Absent is supported:
+   * every invitation still gets written and carries its accept URL, and the
+   * caller is told `emailNotSent`.
+   */
+  mail?: OrganizationInviteMail | undefined;
+  /**
+   * How many projects the organization already has, where the process composed
+   * the read. Absent means the invitation says nothing about it rather than
+   * saying zero.
+   */
+  workspace?: OrganizationInviteWorkspaceCensus | undefined;
+}>;
+
+/**
+ * Service that encapsulates invite creation, validation, and acceptance
+ * logic, extracted from the organization router.
+ */

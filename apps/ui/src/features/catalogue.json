@@ -1,0 +1,415 @@
+{
+  "version": 0,
+  "governedWebPackages": [
+    "@langwatch/agent-web",
+    "@langwatch/analytics-web",
+    "@langwatch/annotation-web",
+    "@langwatch/api-key-web",
+    "@langwatch/auth-web",
+    "@langwatch/authz-web",
+    "@langwatch/automation-web",
+    "@langwatch/data-privacy-web",
+    "@langwatch/data-retention-web",
+    "@langwatch/dataset-web",
+    "@langwatch/enterprise-billing-web",
+    "@langwatch/enterprise-governance-web",
+    "@langwatch/enterprise-licensing-web",
+    "@langwatch/enterprise-managed-provider-web",
+    "@langwatch/enterprise-scim-web",
+    "@langwatch/evaluator-web",
+    "@langwatch/experiment-web",
+    "@langwatch/gateway-web",
+    "@langwatch/github-web",
+    "@langwatch/langy-web",
+    "@langwatch/model-provider-web",
+    "@langwatch/monitor-web",
+    "@langwatch/navigation-web",
+    "@langwatch/notification-web",
+    "@langwatch/onboarding-web",
+    "@langwatch/ops-web",
+    "@langwatch/organization-web",
+    "@langwatch/project-web",
+    "@langwatch/prompt-web",
+    "@langwatch/scenario-web",
+    "@langwatch/secret-web",
+    "@langwatch/suite-web",
+    "@langwatch/topic-web",
+    "@langwatch/trace-web",
+    "@langwatch/user-web",
+    "@langwatch/workflow-web"
+  ],
+  "features": [
+    {
+      "id": "agent-management",
+      "root": "agent",
+      "uses": {
+        "screens": ["@langwatch/agent-web/agent-management"],
+        "surfaces": ["@langwatch/agent-web/agent-client", "@langwatch/organization-web/organization-client"]
+      }
+    },
+    {
+      "id": "analytics",
+      "root": "analytics",
+      "uses": {
+        "screens": ["@langwatch/analytics-web/analytics"],
+        "surfaces": []
+      }
+    },
+    {
+      "id": "annotation-scores",
+      "root": "annotation-scores",
+      "uses": {
+        "screens": ["@langwatch/annotation-web/annotation-scores"],
+        "surfaces": []
+      }
+    },
+    {
+      "id": "annotations",
+      "root": "annotation",
+      "uses": {
+        "screens": ["@langwatch/annotation-web/annotations"],
+        "surfaces": [
+          "@langwatch/organization-web/personal-workspace-features",
+          "@langwatch/trace-web/surfaces/annotation-queue-session",
+          "@langwatch/trace-web/surfaces/conversation-turns",
+          "@langwatch/trace-web/surfaces/conversation-view",
+          "@langwatch/trace-web/surfaces/isolated-error-boundary",
+          "@langwatch/trace-web/surfaces/legacy-trace-to-turn",
+          "@langwatch/trace-web/surfaces/trace-edit-mode",
+          "@langwatch/trace-web/surfaces/trace-host"
+        ]
+      }
+    },
+    {
+      "id": "api-key",
+      "root": "api-key",
+      "uses": {
+        "screens": ["@langwatch/api-key-web/api-keys"],
+        "surfaces": []
+      }
+    },
+    {
+      "id": "auth",
+      "root": "auth",
+      "uses": {
+        "screens": ["@langwatch/auth-web/auth"],
+        "surfaces": []
+      }
+    },
+    {
+      "id": "authorize",
+      "root": "authorize",
+      "uses": {
+        "screens": ["@langwatch/api-key-web/authorize"],
+        "surfaces": []
+      }
+    },
+    {
+      "id": "authz",
+      "root": "authz",
+      "uses": {
+        "screens": ["@langwatch/authz-web/authz"],
+        "surfaces": []
+      }
+    },
+    {
+      "id": "automations",
+      "root": "automations",
+      "uses": {
+        "screens": ["@langwatch/automation-web/automations"],
+        "surfaces": []
+      }
+    },
+    {
+      "id": "billing",
+      "root": "billing",
+      "uses": {
+        "screens": ["@langwatch/enterprise-billing-web/billing"],
+        "surfaces": [
+          "@langwatch/enterprise-billing-web/surfaces/contact-sales",
+          "@langwatch/enterprise-billing-web/surfaces/seat-proration-preview"
+        ]
+      }
+    },
+    {
+      "id": "chrome",
+      "root": "chrome",
+      "uses": {
+        "screens": [],
+        "surfaces": ["@langwatch/navigation-web/chrome"]
+      }
+    },
+    {
+      "id": "data-privacy",
+      "root": "data-privacy",
+      "uses": {
+        "screens": ["@langwatch/data-privacy-web/data-privacy"],
+        "surfaces": []
+      }
+    },
+    {
+      "id": "data-retention",
+      "root": "data-retention",
+      "uses": {
+        "screens": ["@langwatch/data-retention-web/data-retention"],
+        "surfaces": []
+      }
+    },
+    {
+      "id": "datasets",
+      "root": "dataset",
+      "uses": {
+        "screens": ["@langwatch/dataset-web/datasets"],
+        "surfaces": ["@langwatch/dataset-web/drawers"]
+      }
+    },
+    {
+      "id": "email-suppressions",
+      "root": "notification",
+      "uses": {
+        "screens": ["@langwatch/notification-web/email-suppressions"],
+        "surfaces": []
+      }
+    },
+    {
+      "id": "evaluation-edit",
+      "root": "evaluations",
+      "uses": {
+        "screens": ["@langwatch/evaluator-web/evaluation-edit"],
+        "surfaces": []
+      }
+    },
+    {
+      "id": "evaluators",
+      "root": "evaluator",
+      "uses": {
+        "screens": ["@langwatch/evaluator-web/evaluators"],
+        "surfaces": ["@langwatch/evaluator-web/drawers"]
+      }
+    },
+    {
+      "id": "experiments",
+      "root": "experiments",
+      "uses": {
+        "screens": ["@langwatch/experiment-web/experiments"],
+        "surfaces": []
+      }
+    },
+    {
+      "id": "gateway",
+      "root": "gateway",
+      "uses": {
+        "screens": ["@langwatch/gateway-web/gateway"],
+        "surfaces": []
+      }
+    },
+    {
+      "id": "governance",
+      "root": "governance",
+      "uses": {
+        "screens": ["@langwatch/enterprise-governance-web/governance"],
+        "surfaces": []
+      }
+    },
+    {
+      "id": "home",
+      "root": "home",
+      "uses": {
+        "screens": ["@langwatch/project-web/home"],
+        "surfaces": ["@langwatch/analytics-web/surfaces/analytics-host"]
+      }
+    },
+    {
+      "id": "integrations",
+      "root": "github",
+      "uses": {
+        "screens": ["@langwatch/github-web/integrations"],
+        "surfaces": []
+      }
+    },
+    {
+      "id": "langy",
+      "root": "langy",
+      "uses": {
+        "screens": ["@langwatch/langy-web/langy"],
+        "surfaces": ["@langwatch/langy-web/surfaces/langy-code-access-preference"]
+      }
+    },
+    {
+      "id": "licensing",
+      "root": "licensing",
+      "uses": {
+        "screens": ["@langwatch/enterprise-licensing-web/licensing"],
+        "surfaces": [
+          "@langwatch/enterprise-licensing-web/surfaces/resource-limits",
+          "@langwatch/enterprise-licensing-web/surfaces/seat-types",
+          "@langwatch/enterprise-licensing-web/surfaces/global-upgrade-modal",
+          "@langwatch/enterprise-licensing-web/surfaces/license-error-interceptor"
+        ]
+      }
+    },
+    {
+      "id": "model-provider",
+      "root": "model-provider",
+      "uses": {
+        "screens": ["@langwatch/model-provider-web/model-providers"],
+        "surfaces": [
+          "@langwatch/enterprise-managed-provider-web/surfaces/managed-provider-alert",
+          "@langwatch/model-provider-web/surfaces/model-error-interceptor"
+        ]
+      }
+    },
+    {
+      "id": "navigation",
+      "root": "navigation",
+      "uses": {
+        "screens": ["@langwatch/navigation-web/navigation"],
+        "surfaces": [
+          "@langwatch/langy-web/surfaces/langy-mark",
+          "@langwatch/langy-web/surfaces/langy-store",
+          "@langwatch/navigation-web/surfaces/command-bar",
+          "@langwatch/scenario-web/surfaces/simulations-preference",
+          "@langwatch/trace-web/surfaces/presence-menu-item"
+        ]
+      }
+    },
+    {
+      "id": "onboarding",
+      "root": "onboarding",
+      "uses": {
+        "screens": ["@langwatch/onboarding-web/onboarding"],
+        "surfaces": []
+      }
+    },
+    {
+      "id": "online-evaluations",
+      "root": "monitor",
+      "uses": {
+        "screens": ["@langwatch/monitor-web/online-evaluations"],
+        "surfaces": []
+      }
+    },
+    {
+      "id": "ops",
+      "root": "ops",
+      "uses": {
+        "screens": ["@langwatch/ops-web/ops"],
+        "surfaces": []
+      }
+    },
+    {
+      "id": "organization",
+      "root": "organization",
+      "uses": {
+        "screens": ["@langwatch/organization-web/organization"],
+        "surfaces": []
+      }
+    },
+    {
+      "id": "personal-workspace",
+      "root": "personal-workspace",
+      "uses": {
+        "screens": ["@langwatch/user-web/personal-workspace"],
+        "surfaces": ["@langwatch/langy-web/surfaces/langy-store"]
+      }
+    },
+    {
+      "id": "project-settings",
+      "root": "project",
+      "uses": {
+        "screens": ["@langwatch/project-web/project-settings"],
+        "surfaces": []
+      }
+    },
+    {
+      "id": "prompt-studio",
+      "root": "prompt",
+      "uses": {
+        "screens": ["@langwatch/prompt-web/prompt-studio"],
+        "surfaces": ["@langwatch/prompt-web/drawers"]
+      }
+    },
+    {
+      "id": "scim",
+      "root": "scim",
+      "uses": {
+        "screens": ["@langwatch/enterprise-scim-web/scim"],
+        "surfaces": []
+      }
+    },
+    {
+      "id": "secret",
+      "root": "secret",
+      "uses": {
+        "screens": ["@langwatch/secret-web/secrets"],
+        "surfaces": []
+      }
+    },
+    {
+      "id": "simulations",
+      "root": "simulations",
+      "uses": {
+        "screens": ["@langwatch/scenario-web/simulations"],
+        "surfaces": [
+          "@langwatch/scenario-web/drawers",
+          "@langwatch/scenario-web/scenario-mappings",
+          "@langwatch/suite-web/run-cards",
+          "@langwatch/suite-web/run-dialogs",
+          "@langwatch/suite-web/run-formatters",
+          "@langwatch/suite-web/run-history-store",
+          "@langwatch/suite-web/suite-form",
+          "@langwatch/suite-web/suite-pickers",
+          "@langwatch/agent-web/agent-editors",
+          "@langwatch/agent-web/agent-client",
+          "@langwatch/agent-web/agent-http-editor",
+          "@langwatch/agent-web/connected-agents",
+          "@langwatch/prompt-web/surfaces/variables",
+          "@langwatch/prompt-web/surfaces/outputs-section",
+          "@langwatch/workflow-web/surfaces/workflow-card",
+          "@langwatch/workflow-web/surfaces/workflow-api",
+          "@langwatch/workflow-web/surfaces/execution-state-error",
+          "@langwatch/workflow-web/surfaces/emoji-picker-modal",
+          "@langwatch/workflow-web/surfaces/workflow-icons",
+          "@langwatch/workflow-web/surfaces/workflow-templates",
+          "@langwatch/workflow-web/surfaces/code-block-editor",
+          "@langwatch/workflow-web/surfaces/code-editor-transport",
+          "@langwatch/workflow-web/surfaces/copy-button",
+          "@langwatch/trace-web/surfaces/setup-with-agent-button"
+        ]
+      }
+    },
+    {
+      "id": "topic-clustering",
+      "root": "topic",
+      "uses": {
+        "screens": ["@langwatch/topic-web/topic-clustering"],
+        "surfaces": []
+      }
+    },
+    {
+      "id": "traces",
+      "root": "traces",
+      "uses": {
+        "screens": ["@langwatch/trace-web/traces"],
+        "surfaces": [
+          "@langwatch/annotation-web/annotation-card",
+          "@langwatch/annotation-web/annotation-chips",
+          "@langwatch/annotation-web/annotation-form"
+        ]
+      }
+    },
+    {
+      "id": "workflows",
+      "root": "workflows",
+      "uses": {
+        "screens": ["@langwatch/workflow-web/workflows"],
+        "surfaces": [
+          "@langwatch/dataset-web/surfaces/dataset-drawer",
+          "@langwatch/dataset-web/surfaces/upload-csv-drawer",
+          "@langwatch/evaluator-web/editor-drawers",
+          "@langwatch/prompt-web/surfaces/prompt-editor-drawer"
+        ]
+      }
+    }
+  ]
+}

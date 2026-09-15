@@ -16,7 +16,10 @@ export class ExperimentError extends Error {
  * Thrown when initialization fails
  */
 export class ExperimentInitError extends ExperimentError {
-  constructor(message: string, public readonly cause?: Error) {
+  constructor(
+    message: string,
+    public readonly cause?: Error,
+  ) {
     super(message);
     this.name = "ExperimentInitError";
   }
@@ -29,7 +32,7 @@ export class ExperimentApiError extends ExperimentError {
   constructor(
     message: string,
     public readonly statusCode?: number,
-    public readonly cause?: Error
+    public readonly cause?: Error,
   ) {
     super(message);
     this.name = "ExperimentApiError";
@@ -43,13 +46,13 @@ export class TargetMetadataConflictError extends ExperimentError {
   constructor(
     public readonly targetName: string,
     public readonly existingMetadata: Record<string, unknown>,
-    public readonly newMetadata: Record<string, unknown>
+    public readonly newMetadata: Record<string, unknown>,
   ) {
     super(
       `Target '${targetName}' was previously registered with different metadata.\n` +
         `Original: ${JSON.stringify(existingMetadata)}\n` +
         `New: ${JSON.stringify(newMetadata)}\n` +
-        `If you want to use different metadata, please use a different target name.`
+        `If you want to use different metadata, please use a different target name.`,
     );
     this.name = "TargetMetadataConflictError";
   }
@@ -65,7 +68,7 @@ export class TargetMetadataConflictError extends ExperimentError {
 export class ComparisonError extends ExperimentError {
   constructor(
     message: string,
-    public readonly missingTargets: string[] = []
+    public readonly missingTargets: string[] = [],
   ) {
     super(message);
     this.name = "ComparisonError";
@@ -79,7 +82,7 @@ export class EvaluatorError extends ExperimentError {
   constructor(
     public readonly evaluatorSlug: string,
     message: string,
-    public readonly cause?: Error
+    public readonly cause?: Error,
   ) {
     super(`Evaluator '${evaluatorSlug}' failed: ${message}`);
     this.name = "EvaluatorError";

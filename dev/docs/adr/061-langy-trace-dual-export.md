@@ -63,7 +63,7 @@ the deployment default.
 
 Two hard rules regardless of tier:
 
-- **Self-skip:** a turn whose customer project *is* the prod Langy project
+- **Self-skip:** a turn whose customer project _is_ the prod Langy project
   never mirrors — the one genuine self-ingest loop, excluded by construction.
 - **This reverses a shipped promise.** The prior spec language ("LangWatch
   cannot see the customer's prompts…") described the structural tier and is

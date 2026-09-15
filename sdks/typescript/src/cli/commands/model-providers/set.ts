@@ -6,16 +6,8 @@ import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
 
 /**
- * Returns what was configured rather than printing it: the output port renders
- * it in whatever format the caller asked for (utils/output.ts).
- *
- * `data` keeps the shape the previous `--format json` branch established, which
- * deliberately does NOT echo `options.apiKey`. That value is key material the
- * caller supplied on the command line; the human output never showed it, and a
- * machine payload — far more likely to be logged or piped into an agent's
- * context — must not reintroduce it. The service's own response is not used
- * for the same reason: it is the whole provider map, and re-emitting every
- * provider's entry is more than this command was asked about.
+ * Return configuration without echoing apiKey (key material); never emit
+ * service's full provider map, just what was asked about.
  */
 export const setModelProviderCommand = async (
   provider: string,
@@ -48,9 +40,7 @@ export const setModelProviderCommand = async (
       ...(options.defaultModel && { defaultModel: options.defaultModel }),
     });
 
-    spinner.succeed(
-      `Configured model provider "${chalk.cyan(provider)}"`,
-    );
+    spinner.succeed(`Configured model provider "${chalk.cyan(provider)}"`);
 
     return {
       data: {

@@ -1,0 +1,58 @@
+/**
+ * What every test in this package needs before it renders anything.
+ */
+
+import { BrowserUiStorage, setUiStorage } from "@langwatch/ui-host/storage";
+import "@testing-library/jest-dom/vitest";
+import { cleanup } from "@testing-library/react";
+import { afterEach } from "vitest";
+
+// The stores remember a preference through the host's device-storage port. The
+// application installs the browser-backed one; a jsdom suite installs the same
+// one so what a store persists is what the test can read back.
+setUiStorage(new BrowserUiStorage());
+
+// Auto-cleanup only registers itself when a global afterEach exists at import
+// time; this package runs without vitest globals, so an explicit hook is what
+// keeps one test's rendered tree out of the next test's queries.
+afterEach(() => cleanup());
+
+if (typeof window !== "undefined") {
+  if (!window.matchMedia) {
+    Object.defineProperty(window, "matchMedia", {
+      configurable: true,
+      value: (query: string) => ({
+        matches: false,
+        media: query,
+        onchange: null,
+        addEventListener: () => undefined,
+        removeEventListener: () => undefined,
+        addListener: () => undefined,
+        removeListener: () => undefined,
+        dispatchEvent: () => false,
+      }),
+    });
+  }
+  if (!window.ResizeObserver) {
+    Object.defineProperty(window, "ResizeObserver", {
+      configurable: true,
+      // Writable as well as configurable: a suite that wants an observer of its
+      // own assigns `globalThis.ResizeObserver` directly, and a value-only
+      // definition makes that assignment throw rather than take.
+      writable: true,
+      value: class {
+        observe() {}
+        unobserve() {}
+        disconnect() {}
+      },
+    });
+  }
+  // jsdom implements no scrolling at all, and the virtualised turn list pins
+  // itself to the tail on mount. Without this every suite that renders a
+  // conversation fails inside an effect rather than on an assertion.
+  if (!Element.prototype.scrollIntoView) {
+    Element.prototype.scrollIntoView = function scrollIntoView() {
+      // Nothing to scroll in jsdom.
+    };
+  }
+}

@@ -1,11 +1,11 @@
 import { scopedApiKey } from "@/internal/credentialContext";
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
-import { resolveCredentials } from "../../utils/apiKey";
-import { readFetchFailure } from "../../utils/formatFetchError";
-import { failSpinner } from "../../utils/spinnerError";
-import { formatRelativeTime } from "../../utils/formatting";
-import type { CommandResult } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner.ts";
+import { resolveCredentials } from "../../utils/apiKey.ts";
+import { readFetchFailure } from "../../utils/formatFetchError.ts";
+import { failSpinner } from "../../utils/spinnerError.ts";
+import { formatRelativeTime } from "../../utils/formatting.ts";
+import type { CommandResult } from "../../utils/output.ts";
 import { buildAuthHeaders } from "@/internal/api/auth";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
@@ -35,10 +35,8 @@ type SimulationRunListPage = {
 };
 
 /**
- * The listing pages by batch, so one page can hold no run that matches a
- * status or name filter while later pages do. The scan keeps following the
- * cursor until it finds matches, up to this many runs, so `--status FAILED`
- * answers with the failed runs it can reach instead of an empty first page.
+ * The listing pages by batch, so one page can hold no run that matches a status or name
+ * filter while later pages do.
  */
 const FILTER_SCAN_RUN_CEILING = 500;
 
@@ -62,16 +60,14 @@ export const listSimulationRunsCommand = async (options: {
       limitOverride?: number,
     ): Promise<SimulationRunListPage> => {
       const params = new URLSearchParams();
-      if (options.scenarioSetId)
-        params.set("scenarioSetId", options.scenarioSetId);
+      if (options.scenarioSetId) params.set("scenarioSetId", options.scenarioSetId);
       if (options.batchRunId) params.set("batchRunId", options.batchRunId);
-      const limit =
-        limitOverride === undefined ? options.limit : String(limitOverride);
+      const limit = limitOverride === undefined ? options.limit : String(limitOverride);
       if (limit) params.set("limit", limit);
       if (cursor) params.set("cursor", cursor);
 
       const response = await langwatchFetch(
-        `${endpoint}/api/simulation-runs?${params.toString()}`,
+        `${endpoint}/api/v1/simulation-runs?${params.toString()}`,
         {
           method: "GET",
           headers: buildAuthHeaders({ apiKey }),
@@ -96,12 +92,10 @@ export const listSimulationRunsCommand = async (options: {
 
     const matchesFilters = (run: SimulationRunListItem): boolean => {
       if (options.status) {
-        if (run.status.toUpperCase() !== options.status.toUpperCase())
-          return false;
+        if (run.status.toUpperCase() !== options.status.toUpperCase()) return false;
       }
       if (options.name) {
-        if (!(run.name ?? "").toLowerCase().includes(options.name.toLowerCase()))
-          return false;
+        if (!(run.name ?? "").toLowerCase().includes(options.name.toLowerCase())) return false;
       }
       return true;
     };
@@ -117,12 +111,7 @@ export const listSimulationRunsCommand = async (options: {
     // cursor while it has found nothing, then stops at the first page with a
     // match: the pages come newest first, so that page holds the most recent
     // runs the filter reaches.
-    while (
-      hasClientFilters &&
-      runs.length === 0 &&
-      page.hasMore &&
-      page.nextCursor
-    ) {
+    while (hasClientFilters && runs.length === 0 && page.hasMore && page.nextCursor) {
       if (scanned >= FILTER_SCAN_RUN_CEILING) {
         scanStoppedEarly = true;
         break;
@@ -173,27 +162,36 @@ export const listSimulationRunsCommand = async (options: {
 
         console.log();
         for (const run of runs) {
-          const statusColor = run.status === "SUCCESS" ? chalk.green
-            : run.status === "FAILED" ? chalk.red
-            : run.status === "ERROR" ? chalk.red
-            : run.status === "IN_PROGRESS" || run.status === "RUNNING" ? chalk.yellow
-            : chalk.gray;
+          const statusColor =
+            run.status === "SUCCESS"
+              ? chalk.green
+              : run.status === "FAILED"
+                ? chalk.red
+                : run.status === "ERROR"
+                  ? chalk.red
+                  : run.status === "IN_PROGRESS" || run.status === "RUNNING"
+                    ? chalk.yellow
+                    : chalk.gray;
 
           const verdict = run.results?.verdict;
           const verdictStr = verdict ? ` (${verdict})` : "";
           const duration = run.durationInMs > 0 ? `${(run.durationInMs / 1000).toFixed(1)}s` : "—";
           const cost = run.totalCost ? `$${run.totalCost.toFixed(4)}` : "";
-          const when = run.timestamp ? formatRelativeTime(new Date(run.timestamp).toISOString()) : "—";
+          const when = run.timestamp
+            ? formatRelativeTime(new Date(run.timestamp).toISOString())
+            : "—";
 
           // The note and the version keep their place whether or not the run
           // carries them, so the block reads the same down the whole list.
           const note = run.note ?? chalk.gray("—");
-          const version = run.scenarioVersion
-            ? `v${run.scenarioVersion}`
-            : chalk.gray("—");
+          const version = run.scenarioVersion ? `v${run.scenarioVersion}` : chalk.gray("—");
 
-          console.log(`  ${statusColor("●")} ${chalk.cyan(run.name ?? run.scenarioId)} ${statusColor(run.status)}${verdictStr} ${chalk.gray(`· ${when}`)}`);
-          console.log(`    ${chalk.gray("Run ID:")} ${run.scenarioRunId}  ${chalk.gray("Duration:")} ${duration}  ${cost ? chalk.gray("Cost:") + " " + cost : ""}`);
+          console.log(
+            `  ${statusColor("●")} ${chalk.cyan(run.name ?? run.scenarioId)} ${statusColor(run.status)}${verdictStr} ${chalk.gray(`· ${when}`)}`,
+          );
+          console.log(
+            `    ${chalk.gray("Run ID:")} ${run.scenarioRunId}  ${chalk.gray("Duration:")} ${duration}  ${cost ? chalk.gray("Cost:") + " " + cost : ""}`,
+          );
           console.log(`    ${chalk.gray("Version:")} ${version}  ${chalk.gray("Note:")} ${note}`);
           console.log();
         }
@@ -203,7 +201,9 @@ export const listSimulationRunsCommand = async (options: {
         }
 
         console.log(
-          chalk.gray(`Use ${chalk.cyan("langwatch simulation-run get <runId>")} to view full details`),
+          chalk.gray(
+            `Use ${chalk.cyan("langwatch simulation-run get <runId>")} to view full details`,
+          ),
         );
       },
     };

@@ -1,32 +1,15 @@
-/**
- * Retrying a create is the one retry a caller cannot make safe alone: a
- * dropped connection after the write looks exactly like a dropped request, and
- * sending it again mints a second key, budget or endpoint. `idempotencyKey` is
- * how the caller says "these two are the same request", and it is worth
- * nothing unless the SDK actually puts it on the wire.
- *
- * All three creates are exercised here rather than once per service, because
- * the failure this guards against is one surface quietly not sending it.
- *
- * Spec: specs/ai-gateway/idempotency.feature
- */
+/** Idempotency keys prevent duplicate creates on retry. */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 
 import { GatewayBudgetsApiService } from "../../gateway-budgets/gateway-budgets-api.service";
 import { VirtualKeysApiService } from "../../virtual-keys/virtual-keys-api.service";
 import { WebhooksApiService } from "../../webhooks/webhooks-api.service";
-import {
-  IDEMPOTENCY_KEY_HEADER,
-  IDEMPOTENT_REPLAY_HEADER,
-} from "../mutation-options";
+import { IDEMPOTENCY_KEY_HEADER, IDEMPOTENT_REPLAY_HEADER } from "../mutation-options";
 
 const mockFetch = vi.fn();
 vi.stubGlobal("fetch", mockFetch);
 
-const jsonResponse = (
-  body: unknown,
-  init?: { status?: number; replayed?: boolean },
-): Response =>
+const jsonResponse = (body: unknown, init?: { status?: number; replayed?: boolean }): Response =>
   new Response(JSON.stringify(body), {
     status: init?.status ?? 201,
     headers: {
@@ -37,9 +20,7 @@ const jsonResponse = (
 
 /** The headers of one recorded call, however fetch was handed them. */
 const headersOf = (call: number): Headers =>
-  new Headers(
-    (mockFetch.mock.calls[call]?.[1] as RequestInit | undefined)?.headers,
-  );
+  new Headers((mockFetch.mock.calls[call]?.[1] as RequestInit | undefined)?.headers);
 
 const bodyOf = (call: number): string =>
   (mockFetch.mock.calls[call]?.[1] as RequestInit).body as string;
@@ -53,12 +34,8 @@ const CREATES = [
     surface: "virtual keys",
     response: { virtual_key: { id: "vk_1" }, secret: "sk-vk-1" },
     create: (options?: Parameters<VirtualKeysApiService["create"]>[1]) =>
-      new VirtualKeysApiService({ apiKey: "sk-lw-test" }).create(
-        { name: "checkout" },
-        options,
-      ),
-    idOf: (result: unknown) =>
-      (result as { virtual_key: { id: string } }).virtual_key.id,
+      new VirtualKeysApiService({ apiKey: "sk-lw-test" }).create({ name: "checkout" }, options),
+    idOf: (result: unknown) => (result as { virtual_key: { id: string } }).virtual_key.id,
     expectedId: "vk_1",
   },
   {
@@ -141,9 +118,7 @@ describe("Feature: retrying a create without minting a duplicate", () => {
       it("hands back the same resource both times", async () => {
         mockFetch
           .mockResolvedValueOnce(jsonResponse(surface.response))
-          .mockResolvedValueOnce(
-            jsonResponse(surface.response, { replayed: true }),
-          );
+          .mockResolvedValueOnce(jsonResponse(surface.response, { replayed: true }));
 
         const first = await surface.create({ idempotencyKey: "key-abc" });
         const second = await surface.create({ idempotencyKey: "key-abc" });
@@ -156,9 +131,7 @@ describe("Feature: retrying a create without minting a duplicate", () => {
       it("tells a caller who asked that the second answer was a replay", async () => {
         mockFetch
           .mockResolvedValueOnce(jsonResponse(surface.response))
-          .mockResolvedValueOnce(
-            jsonResponse(surface.response, { replayed: true }),
-          );
+          .mockResolvedValueOnce(jsonResponse(surface.response, { replayed: true }));
         const replays = vi.fn();
 
         await surface.create({
@@ -183,9 +156,7 @@ describe("Feature: retrying a create without minting a duplicate", () => {
 
         await surface.create({ signal: controller.signal });
 
-        expect((mockFetch.mock.calls[0]?.[1] as RequestInit).signal).toBe(
-          controller.signal,
-        );
+        expect((mockFetch.mock.calls[0]?.[1] as RequestInit).signal).toBe(controller.signal);
       });
     });
   });

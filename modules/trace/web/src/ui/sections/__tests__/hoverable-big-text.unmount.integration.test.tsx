@@ -1,0 +1,43 @@
+/**
+ * @vitest-environment jsdom
+ * HoverableBigText: measures box on timer after browser layout.
+ */
+import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { cleanup, render } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import { HoverableBigText } from "../hoverable-big-text.tsx";
+
+const renderText = () =>
+  render(<HoverableBigText>a very long value</HoverableBigText>, {
+    wrapper: ({ children }) => <ChakraProvider value={defaultSystem}>{children}</ChakraProvider>,
+  });
+
+describe("HoverableBigText overflow probe lifetime", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.useRealTimers();
+  });
+
+  describe("given the text is on the page with a measurement pending", () => {
+    describe("when it is unmounted before the measurement runs", () => {
+      /** @scenario The overflow measurement is dropped when the text is unmounted */
+      it("leaves nothing scheduled that could run after the page is gone", () => {
+        const view = renderText();
+        expect(
+          vi.getTimerCount(),
+          "the probe must be scheduled for this test to mean anything",
+        ).toBeGreaterThan(0);
+
+        view.unmount();
+
+        expect(vi.getTimerCount(), "no measurement may outlive the component").toBe(0);
+        expect(() => vi.runAllTimers()).not.toThrow();
+      });
+    });
+  });
+});

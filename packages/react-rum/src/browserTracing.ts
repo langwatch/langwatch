@@ -19,10 +19,7 @@ import { FetchInstrumentation } from "@opentelemetry/instrumentation-fetch";
 import { resourceFromAttributes } from "@opentelemetry/resources";
 import { BatchSpanProcessor } from "@opentelemetry/sdk-trace-base";
 import { WebTracerProvider } from "@opentelemetry/sdk-trace-web";
-import {
-  ATTR_SERVICE_NAME,
-  ATTR_SERVICE_VERSION,
-} from "@opentelemetry/semantic-conventions";
+import { ATTR_SERVICE_NAME, ATTR_SERVICE_VERSION } from "@opentelemetry/semantic-conventions";
 import { ATTR_DEPLOYMENT_ENVIRONMENT_NAME } from "@opentelemetry/semantic-conventions/incubating";
 
 import {
@@ -30,11 +27,11 @@ import {
   RUM_SERVICE_NAME,
   RUM_SESSION_HEADER,
   RUM_TRACES_PATH,
-} from "./constants";
-import { NavigationContextManager } from "./navigationContextManager";
-import { createBrowserSampler } from "./sampling";
-import { currentSessionId } from "./session";
-import { SessionSpanProcessor } from "./sessionSpanProcessor";
+} from "./constants.ts";
+import { NavigationContextManager } from "./navigationContextManager.ts";
+import { createBrowserSampler } from "./sampling.ts";
+import { currentSessionId } from "./session.ts";
+import { SessionSpanProcessor } from "./sessionSpanProcessor.ts";
 
 let started = false;
 
@@ -68,9 +65,7 @@ export function startBrowserTracing({
       resource: resourceFromAttributes({
         [ATTR_SERVICE_NAME]: RUM_SERVICE_NAME,
         ...(serviceVersion ? { [ATTR_SERVICE_VERSION]: serviceVersion } : {}),
-        ...(environment
-          ? { [ATTR_DEPLOYMENT_ENVIRONMENT_NAME]: environment }
-          : {}),
+        ...(environment ? { [ATTR_DEPLOYMENT_ENVIRONMENT_NAME]: environment } : {}),
       }),
       spanProcessors: [
         new SessionSpanProcessor(),
@@ -126,5 +121,4 @@ function sessionHeader(): Record<string, string> {
   return sessionId ? { [RUM_SESSION_HEADER]: sessionId } : {};
 }
 
-const escapeRegExp = (value: string): string =>
-  value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const escapeRegExp = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");

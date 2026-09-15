@@ -12,7 +12,11 @@ vi.mock("@/client-sdk/services/scenarios", async (importOriginal) => {
 });
 
 vi.mock("../../../utils/apiKey", () => ({
-  resolveCredentials: vi.fn(async () => ({ apiKey: "test-key", source: "env", endpoint: "https://app.langwatch.ai" })),
+  resolveCredentials: vi.fn(async () => ({
+    apiKey: "test-key",
+    source: "env",
+    endpoint: "https://app.langwatch.ai",
+  })),
 }));
 
 vi.mock("ora", () => ({
@@ -68,13 +72,15 @@ describe("listScenariosCommand()", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockGetAll = vi.fn();
-    vi.mocked(ScenariosApiService).mockImplementation(function () { return ({
-      getAll: mockGetAll,
-      get: vi.fn(),
-      create: vi.fn(),
-      update: vi.fn(),
-      delete: vi.fn(),
-    }) as unknown as ScenariosApiService; });
+    vi.mocked(ScenariosApiService).mockImplementation(function () {
+      return {
+        getAll: mockGetAll,
+        get: vi.fn(),
+        create: vi.fn(),
+        update: vi.fn(),
+        delete: vi.fn(),
+      } as unknown as ScenariosApiService;
+    });
     vi.spyOn(console, "log").mockImplementation(noop);
     vi.spyOn(console, "error").mockImplementation(noop);
     mockProcessExit();
@@ -103,9 +109,7 @@ describe("listScenariosCommand()", () => {
 
   describe("when the API call fails", () => {
     it("exits with code 1", async () => {
-      mockGetAll.mockRejectedValue(
-        new ScenariosApiError("Network error", "fetch all scenarios"),
-      );
+      mockGetAll.mockRejectedValue(new ScenariosApiError("Network error", "fetch all scenarios"));
 
       await expect(listScenariosCommand()).rejects.toThrow(ProcessExitError);
     });
@@ -118,13 +122,15 @@ describe("getScenarioCommand()", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockGet = vi.fn();
-    vi.mocked(ScenariosApiService).mockImplementation(function () { return ({
-      getAll: vi.fn(),
-      get: mockGet,
-      create: vi.fn(),
-      update: vi.fn(),
-      delete: vi.fn(),
-    }) as unknown as ScenariosApiService; });
+    vi.mocked(ScenariosApiService).mockImplementation(function () {
+      return {
+        getAll: vi.fn(),
+        get: mockGet,
+        create: vi.fn(),
+        update: vi.fn(),
+        delete: vi.fn(),
+      } as unknown as ScenariosApiService;
+    });
     vi.spyOn(console, "log").mockImplementation(noop);
     vi.spyOn(console, "error").mockImplementation(noop);
     mockProcessExit();
@@ -142,9 +148,7 @@ describe("getScenarioCommand()", () => {
 
   describe("when scenario is not found", () => {
     it("exits with code 1", async () => {
-      mockGet.mockRejectedValue(
-        new ScenariosApiError("Not found", "fetch scenario"),
-      );
+      mockGet.mockRejectedValue(new ScenariosApiError("Not found", "fetch scenario"));
 
       await expect(getScenarioCommand("nonexistent")).rejects.toThrow(ProcessExitError);
     });
@@ -157,13 +161,15 @@ describe("createScenarioCommand()", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockCreate = vi.fn();
-    vi.mocked(ScenariosApiService).mockImplementation(function () { return ({
-      getAll: vi.fn(),
-      get: vi.fn(),
-      create: mockCreate,
-      update: vi.fn(),
-      delete: vi.fn(),
-    }) as unknown as ScenariosApiService; });
+    vi.mocked(ScenariosApiService).mockImplementation(function () {
+      return {
+        getAll: vi.fn(),
+        get: vi.fn(),
+        create: mockCreate,
+        update: vi.fn(),
+        delete: vi.fn(),
+      } as unknown as ScenariosApiService;
+    });
     vi.spyOn(console, "log").mockImplementation(noop);
     vi.spyOn(console, "error").mockImplementation(noop);
     mockProcessExit();
@@ -207,13 +213,11 @@ describe("createScenarioCommand()", () => {
 
   describe("when creation fails", () => {
     it("exits with code 1", async () => {
-      mockCreate.mockRejectedValue(
-        new ScenariosApiError("Limit reached", "create scenario"),
-      );
+      mockCreate.mockRejectedValue(new ScenariosApiError("Limit reached", "create scenario"));
 
-      await expect(
-        createScenarioCommand("My Scenario", { situation: "test" }),
-      ).rejects.toThrow(ProcessExitError);
+      await expect(createScenarioCommand("My Scenario", { situation: "test" })).rejects.toThrow(
+        ProcessExitError,
+      );
     });
   });
 });
@@ -224,13 +228,15 @@ describe("updateScenarioCommand()", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockUpdate = vi.fn();
-    vi.mocked(ScenariosApiService).mockImplementation(function () { return ({
-      getAll: vi.fn(),
-      get: vi.fn(),
-      create: vi.fn(),
-      update: mockUpdate,
-      delete: vi.fn(),
-    }) as unknown as ScenariosApiService; });
+    vi.mocked(ScenariosApiService).mockImplementation(function () {
+      return {
+        getAll: vi.fn(),
+        get: vi.fn(),
+        create: vi.fn(),
+        update: mockUpdate,
+        delete: vi.fn(),
+      } as unknown as ScenariosApiService;
+    });
     vi.spyOn(console, "log").mockImplementation(noop);
     vi.spyOn(console, "error").mockImplementation(noop);
     mockProcessExit();
@@ -242,7 +248,9 @@ describe("updateScenarioCommand()", () => {
 
       await updateScenarioCommand("scenario_abc123", { name: "Updated Name" });
 
-      expect(mockUpdate).toHaveBeenCalledWith("scenario_abc123", { name: "Updated Name" });
+      expect(mockUpdate).toHaveBeenCalledWith("scenario_abc123", {
+        name: "Updated Name",
+      });
     });
   });
 
@@ -250,7 +258,9 @@ describe("updateScenarioCommand()", () => {
     it("parses comma-separated criteria", async () => {
       mockUpdate.mockResolvedValue(makeScenario());
 
-      await updateScenarioCommand("scenario_abc123", { criteria: "Criterion 1,Criterion 2" });
+      await updateScenarioCommand("scenario_abc123", {
+        criteria: "Criterion 1,Criterion 2",
+      });
 
       expect(mockUpdate).toHaveBeenCalledWith("scenario_abc123", {
         criteria: ["Criterion 1", "Criterion 2"],
@@ -260,13 +270,11 @@ describe("updateScenarioCommand()", () => {
 
   describe("when update fails", () => {
     it("exits with code 1", async () => {
-      mockUpdate.mockRejectedValue(
-        new ScenariosApiError("Not found", "update scenario"),
-      );
+      mockUpdate.mockRejectedValue(new ScenariosApiError("Not found", "update scenario"));
 
-      await expect(
-        updateScenarioCommand("nonexistent", { name: "Updated" }),
-      ).rejects.toThrow(ProcessExitError);
+      await expect(updateScenarioCommand("nonexistent", { name: "Updated" })).rejects.toThrow(
+        ProcessExitError,
+      );
     });
   });
 });
@@ -279,13 +287,15 @@ describe("deleteScenarioCommand()", () => {
     vi.clearAllMocks();
     mockGet = vi.fn();
     mockDelete = vi.fn();
-    vi.mocked(ScenariosApiService).mockImplementation(function () { return ({
-      getAll: vi.fn(),
-      get: mockGet,
-      create: vi.fn(),
-      update: vi.fn(),
-      delete: mockDelete,
-    }) as unknown as ScenariosApiService; });
+    vi.mocked(ScenariosApiService).mockImplementation(function () {
+      return {
+        getAll: vi.fn(),
+        get: mockGet,
+        create: vi.fn(),
+        update: vi.fn(),
+        delete: mockDelete,
+      } as unknown as ScenariosApiService;
+    });
     vi.spyOn(console, "log").mockImplementation(noop);
     vi.spyOn(console, "error").mockImplementation(noop);
     mockProcessExit();
@@ -305,9 +315,7 @@ describe("deleteScenarioCommand()", () => {
 
   describe("when scenario is not found", () => {
     it("exits with code 1 without calling delete", async () => {
-      mockGet.mockRejectedValue(
-        new ScenariosApiError("Not found", "fetch scenario"),
-      );
+      mockGet.mockRejectedValue(new ScenariosApiError("Not found", "fetch scenario"));
 
       await expect(deleteScenarioCommand("nonexistent")).rejects.toThrow(ProcessExitError);
       expect(mockDelete).not.toHaveBeenCalled();
@@ -317,9 +325,7 @@ describe("deleteScenarioCommand()", () => {
   describe("when delete API call fails", () => {
     it("exits with code 1", async () => {
       mockGet.mockResolvedValue(makeScenario());
-      mockDelete.mockRejectedValue(
-        new ScenariosApiError("Server error", "delete scenario"),
-      );
+      mockDelete.mockRejectedValue(new ScenariosApiError("Server error", "delete scenario"));
 
       await expect(deleteScenarioCommand("scenario_abc123")).rejects.toThrow(ProcessExitError);
     });

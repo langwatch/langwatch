@@ -9,7 +9,11 @@ language: TypeScript
 rule:
   pattern: import($MOD)
 files:
-  - "platform/app/src/**/*.ts"
+  - "apps/**/*.ts"
+  - "packages/**/*.ts"
 ignores:
   - "**/*.test.ts"
   - "**/*.spec.ts"
+  # The route table's page-loader install list: one lazy import per routed
+  # page, which is what code-splits the application.
+  - "**/legacy-page-loaders.ts"

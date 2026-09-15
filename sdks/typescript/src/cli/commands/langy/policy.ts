@@ -1,17 +1,7 @@
 /**
  * What Langy may run in the shared folder, decided here and nowhere else.
- *
- * The CLI is the trust boundary: it holds the folder root, the read-only set,
- * the grants the user gave this session and the skip state. The chat card is
- * only the way to get the user's answer. Nothing the model says about a
- * command is read; the command is parsed.
- *
- * The read-only set is an allowlist, not a blocklist. Every precedent that
- * used a blocklist, or trusted the model's own opinion of a command, was
- * bypassed.
- *
- * @see specs/langy/langy-local-permissions.feature
- * @see dev/docs/adr/129-langy-local-control.md
+ * The CLI is the trust boundary; the command is parsed, never trusted from
+ * what the model says about it. See dev/docs/adr/129-langy-local-control.md.
  */
 
 import * as fs from "node:fs";
@@ -108,13 +98,9 @@ export const READ_ONLY_GIT_SUBCOMMANDS: ReadonlySet<string> = new Set([
 ]);
 
 /**
- * Git subcommands whose operands decide what they do.
- *
- * The subcommand alone is not the answer: `git branch` lists the branches and
- * `git branch new-name` creates one, `git tag` lists the tags and `git tag v1`
- * writes one, `git remote show origin` reaches the network. Each subcommand
- * here reads in its bare form, when `bare` is true, and with the verbs named
- * here. Every other operand asks.
+ * Git subcommands whose operands decide what they do — e.g. `git branch`
+ * lists but `git branch new-name` creates. Each reads in its bare form when
+ * `bare` is true, and with the verbs named here; every other operand asks.
  */
 const GIT_OPERAND_RULES: ReadonlyMap<
   string,
@@ -128,11 +114,8 @@ const GIT_OPERAND_RULES: ReadonlyMap<
 
 /**
  * The options that make `git branch` and `git tag` list.
- *
- * With one of these the operands are patterns and references rather than the
- * name of something to write: `git branch --list "langy/*"` prints the
- * branches of a prefix, which is the first thing the skill asks Langy to do,
- * and it must not spend a card.
+ * With one of these the operands are patterns and references rather than
+ * the name of something to write, e.g. `git branch --list "langy/*"`.
  */
 const GIT_LIST_OPTIONS: ReadonlySet<string> = new Set([
   "--list",
@@ -173,12 +156,8 @@ const GIT_WRITE_ARGUMENTS: ReadonlySet<string> = new Set([
 ]);
 
 /**
- * The `gh` invocations that only read, written out in full.
- *
- * The sign-in check is the one Langy reached for most, and the answer is
- * already in the register frame as `ghAuthenticated`. It still cost a card in
- * every filmed run, so the check itself runs, and the skill says the workspace
- * facts are the answer. Everything else `gh` does reaches GitHub and asks.
+ * The `gh` invocations that only read, written out in full. Everything
+ * else `gh` does reaches GitHub and asks.
  */
 export const READ_ONLY_GH_ARGUMENTS: readonly (readonly string[])[] = [
   ["auth", "status"],
@@ -202,12 +181,7 @@ export const VERSION_ONLY_COMMANDS: ReadonlySet<string> = new Set([
   "git",
 ]);
 
-const VERSION_ARGUMENTS: ReadonlySet<string> = new Set([
-  "-v",
-  "-V",
-  "--version",
-  "version",
-]);
+const VERSION_ARGUMENTS: ReadonlySet<string> = new Set(["-v", "-V", "--version", "version"]);
 
 /** Running as another user is refused in every mode. */
 const PRIVILEGE_COMMANDS: ReadonlySet<string> = new Set(["sudo", "su", "doas"]);
@@ -224,11 +198,8 @@ const WRITE_FLAGS: ReadonlySet<string> = new Set([
 ]);
 
 /**
- * Read-only commands whose options or operands write something.
- *
- * The command name is not the whole answer: `sort -o out in` writes a file,
- * `uniq input output` writes its second operand, and `date -s` sets the clock
- * of the machine.
+ * Read-only commands whose options or operands write something, e.g.
+ * `sort -o out in` writes a file and `date -s` sets the clock.
  */
 const READ_ONLY_COMMAND_RULES: ReadonlyMap<
   string,
@@ -293,17 +264,12 @@ const SECRET_FILE_PATTERNS: readonly RegExp[] = [
 
 /**
  * Directories whose files are credentials whatever they are called, and the
- * files that carry one inside a folder that is otherwise ordinary.
- *
- * `.git/config` holds the remote urls, and a token written into one is read
- * by anything that prints that file.
+ * files that carry one inside a folder that is otherwise ordinary (e.g.
+ * `.git/config` holds the remote urls, including any token in one).
  */
 const SECRET_DIRECTORIES: readonly string[] = [".ssh", ".aws"];
 
-const SECRET_RELATIVE_PATHS: readonly string[] = [
-  ".git/config",
-  ".docker/config.json",
-];
+const SECRET_RELATIVE_PATHS: readonly string[] = [".git/config", ".docker/config.json"];
 
 /** True when the file name is one a secret usually lives in. */
 export function isSecretFileName(name: string): boolean {
@@ -317,22 +283,16 @@ export function isSecretFileName(name: string): boolean {
  * keeps credentials in under an ordinary name.
  */
 export function isSecretPath(target: string): boolean {
-  const parts = target
-    .split(/[/\\]/)
-    .filter((part) => part !== "" && part !== ".");
+  const parts = target.split(/[/\\]/).filter((part) => part !== "" && part !== ".");
   const name = parts[parts.length - 1] ?? "";
   if (isSecretFileName(name)) return true;
   const written = parts.join("/");
   if (
-    SECRET_RELATIVE_PATHS.some(
-      (secret) => written === secret || written.endsWith(`/${secret}`),
-    )
+    SECRET_RELATIVE_PATHS.some((secret) => written === secret || written.endsWith(`/${secret}`))
   ) {
     return true;
   }
-  return parts
-    .slice(0, -1)
-    .some((segment) => SECRET_DIRECTORIES.includes(segment));
+  return parts.slice(0, -1).some((segment) => SECRET_DIRECTORIES.includes(segment));
 }
 
 // ---------------------------------------------------------------------------
@@ -365,12 +325,9 @@ export interface ParsedCommand {
 const OPERATORS = ["&&", "||", ";", "|", "&", "\n"];
 
 /**
- * Splits a command into its parts and their tokens.
- *
- * Quotes are honored, so `echo "a && b"` is one part and `cat foo` inside a
- * single-quoted string is not a command. A substitution is reported rather
- * than parsed: what it expands to is not knowable here, so the whole command
- * asks.
+ * Splits a command into its parts and their tokens. Quotes are honored, so
+ * `echo "a && b"` is one part. A substitution is reported rather than
+ * parsed, since what it expands to is not knowable here.
  */
 export function parseCommand(command: string): ParsedCommand {
   const parts: CommandPart[] = [];
@@ -513,15 +470,9 @@ export function parseCommand(command: string): ParsedCommand {
 }
 
 /**
- * Interpreter names that run the same program under two spellings.
- *
- * A grant is keyed on the command name, so `python3 -m compileall` asked
- * again after the user had already allowed `python -m compileall`, and the
- * two cards read the same. The alias folds both spellings into one name, so
- * one answer covers both.
- *
- * Grants only. Nothing else in the policy reads this: the read-only set and
- * the refusals still see the name the command actually wrote.
+ * Interpreter names that run the same program under two spellings, so a
+ * grant on one spelling covers the other. Grants only: the read-only set
+ * and refusals still see the name the command actually wrote.
  */
 export const INTERPRETER_ALIASES: ReadonlyMap<string, string> = new Map([
   ["python", "python"],
@@ -538,17 +489,8 @@ export function grantName(name: string): string {
 }
 
 /**
- * The pattern "allow for this session" would grant for one command part.
- *
- * The pattern is the program and its first argument, and a first argument
- * that is a flag counts like any other: `.venv/bin/python -c 'code'` grants
- * one-line programs rather than every python invocation on this machine, and
- * `git commit` grants commits rather than every git command. Only a command
- * written with no argument at all grants its own name.
- *
- * A quoted first argument is text the command prints or matches, so it never
- * becomes the pattern: `printf '\nAPI_KEY=x\n' >> .env.example` would
- * otherwise offer the whole literal on the button.
+ * The pattern "allow for this session" would grant: the program and its
+ * first argument, so `git commit` grants commits, not every git command.
  */
 export function grantPatternFor({
   tokens,
@@ -585,18 +527,13 @@ export function grantsAllow({
 }
 
 /** True when the token names a program by its path rather than by its name. */
-const namesAPath = (token: string): boolean =>
-  token.includes("/") || token.includes("\\");
+const namesAPath = (token: string): boolean => token.includes("/") || token.includes("\\");
 
-const isEnvironmentAssignment = (token: string): boolean =>
-  /^[A-Za-z_][A-Za-z0-9_]*=/.test(token);
+const isEnvironmentAssignment = (token: string): boolean => /^[A-Za-z_][A-Za-z0-9_]*=/.test(token);
 
 /**
- * True when this part runs on its own, with no card.
- *
- * The classification is the whole answer. What the part does with the machine
- * is a separate question, answered by `effectOf`, because the card's reason
- * says what changes rather than repeating the command back.
+ * True when this part runs on its own, with no card. What the part does
+ * with the machine is a separate question, answered by `effectOf`.
  */
 function isReadOnlyPart(part: CommandPart): boolean {
   const [name, ...args] = part.tokens;
@@ -610,9 +547,7 @@ function isReadOnlyPart(part: CommandPart): boolean {
   if (name === "git") return isReadOnlyGit(args);
 
   if (name === "gh") {
-    return READ_ONLY_GH_ARGUMENTS.some(
-      (allowed) => allowed.join(" ") === args.join(" "),
-    );
+    return READ_ONLY_GH_ARGUMENTS.some((allowed) => allowed.join(" ") === args.join(" "));
   }
 
   if (VERSION_ONLY_COMMANDS.has(name)) {
@@ -644,17 +579,11 @@ function isReadOnlyPart(part: CommandPart): boolean {
 }
 
 /**
- * True when an argument carries one of these options, however it is written.
- *
- * A shell takes the value of a short option attached to it and lets short
- * options be written as one word, so `sort -o out`, `sort -oout`, `sort -ro`
- * and `sort --output=out` all write a file. Reading only the whole word left
- * the first spelling asking and the other three running.
+ * True when an argument carries one of these options, however it is
+ * written: a short option can attach to its value or combine with others,
+ * so `sort -o out`, `sort -oout` and `sort --output=out` all write a file.
  */
-export function carriesOption(
-  argument: string,
-  options: ReadonlySet<string>,
-): boolean {
+export function carriesOption(argument: string, options: ReadonlySet<string>): boolean {
   if (!argument.startsWith("-") || argument === "-" || argument === "--") {
     return false;
   }
@@ -668,10 +597,8 @@ export function carriesOption(
 }
 
 /**
- * True when a git command only reads the repository.
- *
- * The subcommand is where this starts and the operands are where it ends: a
- * read-only subcommand with a write operand still writes.
+ * True when a git command only reads the repository: a read-only subcommand
+ * with a write operand still writes.
  */
 export function isReadOnlyGit(args: string[]): boolean {
   if (args.some((argument) => GIT_WRITE_ARGUMENTS.has(argument))) return false;
@@ -694,12 +621,8 @@ export function isReadOnlyGit(args: string[]): boolean {
 
 /**
  * True when an `env` invocation only prepares the environment of a command
- * that is itself read-only.
- *
- * Every argument of `env --split-string='touch marker'` starts with a dash,
- * and the program it runs is inside one of them, so "no operand" is not the
- * same as "prints the environment". The forms written in `envCommandStart`
- * are the only ones that run without a question.
+ * that is itself read-only. The forms written in `envCommandStart` are the
+ * only ones that run without a question.
  */
 export function isReadOnlyEnv(part: CommandPart): boolean {
   const start = envCommandStart(part.tokens);
@@ -713,13 +636,8 @@ export function isReadOnlyEnv(part: CommandPart): boolean {
 }
 
 /**
- * Where the command an `env` runs starts, the length of the tokens when there
- * is none, and null when the arguments are not understood.
- *
- * Understood is a short list on purpose: `-i`, `-0`, `-u NAME` and a
- * `NAME=value` assignment change what the command inherits and nothing else.
- * Every other option can carry a program, a directory or a signal handler, so
- * it asks.
+ * Where the command an `env` runs starts, the token length when there is
+ * none, and null when the arguments are not understood.
  */
 export function envCommandStart(tokens: string[]): number | null {
   let index = 1;
@@ -748,12 +666,9 @@ export function envCommandStart(tokens: string[]): number | null {
 // ---------------------------------------------------------------------------
 
 /**
- * What one part of a command does to the machine.
- *
- * The card's reason used to restate the command (`"git fetch origin" is not a
- * read-only git command`), which tells the reader nothing they cannot see in
- * the command itself, and for a chain it named one segment. The reason is
- * built from these classes instead, so it says what the answer allows.
+ * What one part of a command does to the machine. The card's reason is built
+ * from these classes rather than restating the command, so it says what the
+ * answer allows.
  */
 export type CommandEffect =
   | "writes_files"
@@ -897,11 +812,8 @@ export function effectOf(part: CommandPart): CommandEffect {
 }
 
 /**
- * The reason the card shows: one sentence about what the answer allows.
- *
- * It never quotes the command, because the card already renders it and every
- * segment beside it. A quoted command was also where the stray quote came
- * from, on a chain whose own message carried one.
+ * The reason the card shows: one sentence about what the answer allows. It
+ * never quotes the command, since the card already renders it.
  */
 export function reasonFor(parts: CommandPart[]): string {
   const effects = new Set(parts.map(effectOf));
@@ -910,10 +822,7 @@ export function reasonFor(parts: CommandPart[]): string {
   );
   if (clauses.length === 0) return "This runs a command that is not read-only.";
   const last = clauses[clauses.length - 1]!;
-  const sentence =
-    clauses.length === 1
-      ? last
-      : `${clauses.slice(0, -1).join(", ")} and ${last}`;
+  const sentence = clauses.length === 1 ? last : `${clauses.slice(0, -1).join(", ")} and ${last}`;
   return `This ${sentence}.`;
 }
 
@@ -923,9 +832,7 @@ export function reasonFor(parts: CommandPart[]): string {
 
 /**
  * The real path of a target that may not exist yet: the deepest part that
- * does exist is resolved through its symlinks and the rest is appended. A
- * file about to be written is therefore checked against the boundary its
- * parents really have.
+ * does exist is resolved through its symlinks and the rest is appended.
  */
 const defaultRealpath = (target: string): string => {
   let current = path.resolve(target);
@@ -962,14 +869,11 @@ export function resolvePathInsideRoot({
 }): PathCheck {
   const home = homedir ?? process.env.HOME ?? "";
   const expanded =
-    target === "~" || target.startsWith("~/")
-      ? path.join(home, target.slice(1))
-      : target;
+    target === "~" || target.startsWith("~/") ? path.join(home, target.slice(1)) : target;
   const absolute = path.resolve(root, expanded);
   const resolved = realpath(absolute);
   const rootReal = realpath(root);
-  const inside =
-    resolved === rootReal || resolved.startsWith(`${rootReal}${path.sep}`);
+  const inside = resolved === rootReal || resolved.startsWith(`${rootReal}${path.sep}`);
   return { resolved, inside };
 }
 
@@ -995,11 +899,8 @@ const TEXT_MARKERS = /\\[ntrvfe0]|%[-+ #0-9.]*[sdiufgxXc%]/;
 
 /**
  * True when a quoted argument is text the command prints or matches rather
- * than a path it opens.
- *
- * `printf '\nDEFAULT=/etc/paths\n'` prints a format string, and reading it as
- * a path refused a command that touches nothing. A quoted argument to any
- * other command is still a path, so `cat '/etc/passwd'` stays refused.
+ * than a path it opens, e.g. `printf '\nDEFAULT=/etc/paths\n'`. A quoted
+ * argument to any other command is still a path.
  */
 export function isTextArgument({
   name,
@@ -1017,11 +918,8 @@ export function isTextArgument({
 
 /**
  * True when a shell argument is worth checking against the folder boundary.
- *
- * Best effort, and deliberately wide: every plain argument is a candidate,
- * because a bare name can be a symlink that leaves the folder. A word that is
- * not a path resolves inside the folder anyway, so a wide net costs nothing
- * and a narrow one misses `cat outside-link`.
+ * Best effort, and deliberately wide: a bare name can be a symlink that
+ * leaves the folder, e.g. `cat outside-link`.
  */
 export function looksLikeAPath(token: string): boolean {
   if (token === "" || token.startsWith("-")) return false;
@@ -1030,14 +928,9 @@ export function looksLikeAPath(token: string): boolean {
 }
 
 /**
- * Commands whose bare words are their own vocabulary rather than file names.
- *
- * `git symbolic-ref --short HEAD` writes a subcommand, an option flag and a
- * reference, and none of the three opens a file. Judging them as paths refused
- * a command that touches nothing, and named the folder in a message that had
- * no path to explain. These two commands read a file only when the argument
- * carries a path separator, starts a relative or home path, or comes after the
- * end-of-options marker.
+ * Commands whose bare words are their own vocabulary rather than file names,
+ * e.g. `git symbolic-ref --short HEAD`. These read a file only when the
+ * argument is written the way a path is written.
  */
 const VOCABULARY_COMMANDS: ReadonlySet<string> = new Set(["git", "gh"]);
 
@@ -1046,9 +939,8 @@ const WRITTEN_AS_A_PATH = /[/\\]|^[.~]/;
 
 /**
  * True when a token of this command is worth checking against the boundary.
- *
- * The net stays wide for every other command, because a bare name can be a
- * symlink that leaves the folder and `cat outside-link` must still be caught.
+ * The net stays wide for every other command: a bare name can be a symlink
+ * that leaves the folder.
  */
 export function isPathCandidate({
   name,
@@ -1116,9 +1008,7 @@ function decideFileTool({
   for (const target of pathsOf(call)) {
     const check = resolvePathInsideRoot({ target, root, realpath, homedir });
     if (!check.inside) {
-      return refusePath(
-        outsideMessage({ target, resolved: check.resolved, root }),
-      );
+      return refusePath(outsideMessage({ target, resolved: check.resolved, root }));
     }
     const name = path.basename(check.resolved);
     // Both spellings are read: the path as it was written, and the path it
@@ -1182,9 +1072,7 @@ function decideBash({
   // A part that names a file which may hold secrets is never read-only, so
   // the shell asks for the same answer a read of that file asks for.
   const readsOnly = (part: CommandPart): boolean =>
-    !parsed.hasSubstitution &&
-    isReadOnlyPart(part) &&
-    secretFileRead(part) === null;
+    !parsed.hasSubstitution && isReadOnlyPart(part) && secretFileRead(part) === null;
 
   const segments: CommandSegment[] = parsed.parts.map((part) => ({
     command: part.text,
@@ -1198,8 +1086,7 @@ function decideBash({
       summary: command,
       pattern: segments[0]!.pattern,
       patterns: segments.map((segment) => segment.pattern),
-      reason:
-        "This runs a command substitution, so what it does is not knowable before it runs.",
+      reason: "This runs a command substitution, so what it does is not knowable before it runs.",
       segments,
     };
   }
@@ -1215,14 +1102,10 @@ function decideBash({
   // rest under it.
   const patterns = [
     ...new Set(
-      writing.map((part) =>
-        grantPatternFor({ tokens: part.tokens, quoted: part.quoted }),
-      ),
+      writing.map((part) => grantPatternFor({ tokens: part.tokens, quoted: part.quoted })),
     ),
   ];
-  const secret = unanswered
-    .map((part) => secretFileRead(part))
-    .find((name) => name !== null);
+  const secret = unanswered.map((part) => secretFileRead(part)).find((name) => name !== null);
   return {
     kind: "ask",
     summary: command,
@@ -1240,17 +1123,8 @@ function decideBash({
 }
 
 /**
- * Every token of this part that names a file or a directory: the arguments
- * that are written the way a path is written, and the argument of `cd`, of a
- * directory flag and of a redirect whatever it looks like.
- *
- * The first token is the program, not a path the command reads: `/usr/bin/ls`
- * asks because it is not a bare name, which is a clearer answer than refusing
- * it for living outside the folder.
- *
- * A quoted string a command prints is text, so it is not named at all, and a
- * bare word of a command with its own vocabulary is a subcommand, a flag or a
- * reference rather than a file. See `isPathCandidate`.
+ * Every token of this part that names a file or a directory. The first
+ * token (the program) is never named. See `isPathCandidate`.
  */
 export function pathTokensOf(part: CommandPart): string[] {
   const name = part.tokens[0] ?? "";
@@ -1271,10 +1145,7 @@ export function pathTokensOf(part: CommandPart): string[] {
     if (equals) {
       const flag = equals[1]!;
       const value = equals[2]!;
-      if (
-        DIRECTORY_FLAGS.has(flag) ||
-        isPathCandidate({ name, token: value, afterEndOfOptions })
-      ) {
+      if (DIRECTORY_FLAGS.has(flag) || isPathCandidate({ name, token: value, afterEndOfOptions })) {
         named.add(value);
       }
       continue;
@@ -1313,15 +1184,13 @@ const SECRET_FILE_SAMPLES: readonly string[] = [
 ];
 
 /**
- * True when what the shell expands this name to could be a secret file.
- *
- * The expansion happens in the shell, so the name is measured against the
- * files a secret usually lives in: `.env*` and `*.pem` could each stand for
- * one, and `*.py` could not.
+ * True when what the shell expands this name to could be a secret file,
+ * e.g. `.env*` and `*.pem` could each stand for one, `*.py` could not.
  */
 function globCouldMatchSecret(name: string): boolean {
   if (!/[*?[]/.test(name)) return false;
-  const pattern = name.replace(/[.+^${}()|\\]/g, "\\$&")
+  const pattern = name
+    .replace(/[.+^${}()|\\]/g, "\\$&")
     .replace(/\*/g, ".*")
     .replace(/\?/g, ".");
   let expansion: RegExp;
@@ -1335,11 +1204,8 @@ function globCouldMatchSecret(name: string): boolean {
 
 /**
  * The name of a file that may hold secrets this command part would read, or
- * null when it names none.
- *
- * A read of `.env` asks for an answer, and `cat .env` is the same read
- * through another door, so it asks for the same answer. A wildcard asks too,
- * because what it stands for is known to the shell and not here.
+ * null when it names none. A wildcard asks too, since what it stands for is
+ * known to the shell and not here.
  */
 export function secretFileRead(part: CommandPart): string | null {
   // A bare word of a command with its own vocabulary is a reference or a
@@ -1383,12 +1249,9 @@ function boundaryEscape({
 }
 
 /**
- * What the CLI does with one call: run it, ask the user in the panel, or
- * refuse it with a pushback the model can act on.
- *
- * Skipping permission checks turns every ask into a run. It never turns a
- * refusal into a run: the folder boundary and the privilege rule hold in
- * every mode.
+ * What the CLI does with one call: run it, ask the user, or refuse with a
+ * pushback the model can act on. Skipping permission checks turns every ask
+ * into a run, but never a refusal: the boundary and privilege rule hold always.
  */
 export function decide({
   call,

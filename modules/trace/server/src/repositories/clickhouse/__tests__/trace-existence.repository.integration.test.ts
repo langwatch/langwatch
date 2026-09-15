@@ -1,0 +1,130 @@
+// Feature: specs/traces-v2/bulk-actions.feature
+// findExistingTraceIds filters bulk-action candidates to tenant-owned traces
+
+import type { ClickHouseClient } from "@clickhouse/client";
+import { nanoid } from "nanoid";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { ClickHouseTraceExistenceRepository } from "../trace-existence.repository.ts";
+import {
+  startMigratedTraceClickHouse,
+  testClickHouseConfigured,
+} from "./support/clickhouse-endpoint.support.ts";
+
+const tenantId = `test-texist-${nanoid()}`;
+const otherTenantId = `test-texist-other-${nanoid()}`;
+const liveTraceId = `trace-${nanoid()}`;
+const otherTenantTraceId = `trace-${nanoid()}`;
+const base = Date.now() - 60 * 60 * 1000;
+
+const clickHouseConfigured = testClickHouseConfigured();
+const integration = describe.skipIf(!clickHouseConfigured);
+
+let ch: ClickHouseClient;
+let repo: ClickHouseTraceExistenceRepository;
+
+function makeRow(tenant: string, traceId: string, occurredAtMs: number) {
+  return {
+    ProjectionId: `proj-${nanoid()}`,
+    TenantId: tenant,
+    TraceId: traceId,
+    Version: "v1",
+    Attributes: {},
+    OccurredAt: new Date(occurredAtMs),
+    CreatedAt: new Date(occurredAtMs),
+    UpdatedAt: new Date(occurredAtMs),
+    ComputedIOSchemaVersion: "v1",
+    ComputedInput: "input",
+    ComputedOutput: "output",
+    TimeToFirstTokenMs: null,
+    TimeToLastTokenMs: null,
+    TotalDurationMs: 100,
+    TokensPerSecond: null,
+    SpanCount: 1,
+    ContainsErrorStatus: false,
+    ContainsOKStatus: true,
+    ErrorMessage: null,
+    Models: [],
+    TotalCost: null,
+    TokensEstimated: false,
+    TotalPromptTokenCount: null,
+    TotalCompletionTokenCount: null,
+    OutputFromRootSpan: false,
+    OutputSpanEndTimeMs: 0,
+    BlockedByGuardrail: false,
+    TraceName: "trace",
+    RootSpanType: "",
+    ContainsAi: false,
+    ContainsPrompt: false,
+    AnnotationIds: [],
+    LastEventOccurredAt: new Date(occurredAtMs),
+    TopicId: null,
+    SubTopicId: null,
+  };
+}
+
+beforeAll(async () => {
+  if (!clickHouseConfigured) return;
+  ch = await startMigratedTraceClickHouse();
+  repo = ClickHouseTraceExistenceRepository.create({
+    resolveClient: async () => ch,
+  });
+
+  await ch.insert({
+    table: "trace_summaries",
+    values: [
+      makeRow(tenantId, liveTraceId, base),
+      makeRow(otherTenantId, otherTenantTraceId, base),
+    ],
+    format: "JSONEachRow",
+    clickhouse_settings: { async_insert: 0, wait_for_async_insert: 0 },
+  });
+}, 120_000);
+
+afterAll(async () => {
+  if (ch) {
+    await ch.exec({
+      query:
+        "ALTER TABLE trace_summaries DELETE WHERE TenantId IN ({tenantId:String}, {otherTenantId:String})",
+      query_params: { tenantId, otherTenantId },
+    });
+    await ch.close();
+  }
+});
+
+integration("ClickHouseTraceExistenceRepository.findExistingTraceIds (integration)", () => {
+  describe("when some of the candidates exist", () => {
+    /** @scenario Sending traces for annotation skips ids that resolve to no trace */
+    it("returns only the ids that resolve to a real trace", async () => {
+      const result = await repo.findExistingTraceIds({
+        projectId: tenantId,
+        traceIds: [liveTraceId, "trace-does-not-exist"],
+      });
+
+      expect(result).toEqual([liveTraceId]);
+    });
+  });
+
+  describe("when the candidate belongs to another project", () => {
+    /** @scenario Sending traces for annotation skips ids that resolve to no trace */
+    it("is excluded even though the id exists in ClickHouse", async () => {
+      const result = await repo.findExistingTraceIds({
+        projectId: tenantId,
+        traceIds: [otherTenantTraceId],
+      });
+
+      expect(result).toEqual([]);
+    });
+  });
+
+  describe("when there is nothing to check", () => {
+    /** @scenario Blank ids are dropped before anything is queued */
+    it("returns empty without querying ClickHouse", async () => {
+      const result = await repo.findExistingTraceIds({
+        projectId: tenantId,
+        traceIds: [],
+      });
+
+      expect(result).toEqual([]);
+    });
+  });
+});

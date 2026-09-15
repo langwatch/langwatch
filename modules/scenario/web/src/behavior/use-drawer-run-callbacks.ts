@@ -1,0 +1,25 @@
+import { useCallback } from "react";
+import { useRouter } from "@langwatch/ui-host/use-router";
+import { useOrganizationTeamProject } from "./use-organization-team-project.ts";
+
+/**
+ * Returns callbacks that navigate to the simulations page (runs list) when a scenario
+ * run completes or fails.
+ */
+export function useDrawerRunCallbacks() {
+  const router = useRouter();
+  const { project } = useOrganizationTeamProject();
+
+  const onRunComplete = useCallback(
+    (result: { scenarioRunId: string; batchRunId?: string }) => {
+      // Transient null during initial auth/project resolve. By the time a
+      // user can click Run Again from a drawer, project.slug is present.
+      if (!project?.slug) return;
+      const query = result.batchRunId ? `?pendingBatch=${result.batchRunId}` : "";
+      void router.push(`/${project.slug}/simulations${query}`);
+    },
+    [router, project?.slug],
+  );
+
+  return { onRunComplete, onRunFailed: onRunComplete };
+}

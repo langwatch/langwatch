@@ -1,20 +1,6 @@
 /**
- * `langwatch help [topic]` — help topics in the `gh help formatting` sense.
- *
- * Commander's built-in help command is intercepted internally (it never runs
- * an action of ours), so program.ts registers this as a REAL `help` command:
- * a registered `help` suppresses the implicit one, and `help <word>` then
- * reaches this action.
- *
- * Resolution order is COMMANDS FIRST, topics second — the same rule `gh`
- * follows. A help topic must never be able to shadow a real command: the CLI
- * registers a top-level `agent` group (agent definitions), so a topic also
- * named `agent` made `langwatch help agent` unreachable for the group and
- * silently swallowed `langwatch help agent list`. The topic is therefore
- * `agent-mode`, and the lookup order makes the same mistake impossible for
- * any topic added later. `HELP_TOPIC_NAMES` is asserted against the
- * registered command tree in the unit test, so a future collision fails CI
- * rather than shipping.
+ * Help topics (commands first, topics second). Topics cannot shadow registered
+ * commands: agent topic is agent-mode; collision tests run in CI.
  */
 import type { Command } from "commander";
 import { AGENT_MODE_ENV_VARS } from "../utils/output";
@@ -97,14 +83,8 @@ export const HELP_TOPICS: Record<string, () => string> = {
 export const HELP_TOPIC_NAMES = Object.keys(HELP_TOPICS);
 
 /**
- * The `help` command action: the named command's help, else a help topic.
- * Extra words walk into nested commands, so `help trace search` shows the
- * search command's help (stock commander showed only the top level; `gh help
- * issue list` shows the nested one — we follow gh).
- *
- * Commands are resolved BEFORE topics so a real command can never be shadowed
- * by a topic page. Topics are single-word only: `help agent-mode list` is an
- * error, not a page with `list` quietly discarded.
+ * Help command action: command's help, else help topic. Extra words walk into
+ * nested commands; commands override topics.
  */
 export const helpCommand = (program: Command, topics: string[]): void => {
   const [topic, ...rest] = topics;
@@ -116,9 +96,7 @@ export const helpCommand = (program: Command, topics: string[]): void => {
     (cmd) => cmd.name() === topic || cmd.aliases().includes(topic),
   );
   for (const word of rest) {
-    target = target?.commands.find(
-      (cmd) => cmd.name() === word || cmd.aliases().includes(word),
-    );
+    target = target?.commands.find((cmd) => cmd.name() === word || cmd.aliases().includes(word));
   }
   if (!target && rest.length === 0) {
     const renderTopic = HELP_TOPICS[topic];
@@ -130,9 +108,7 @@ export const helpCommand = (program: Command, topics: string[]): void => {
   if (!target) {
     // Mirror commander's own unknown-command error so scripts that probe
     // `help <word>` to test for a command keep working.
-    console.error(
-      `error: unknown command or help topic '${topics.join(" ")}'`,
-    );
+    console.error(`error: unknown command or help topic '${topics.join(" ")}'`);
     process.exitCode = 1;
     return;
   }

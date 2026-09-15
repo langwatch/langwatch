@@ -1,0 +1,117 @@
+/**
+ * What the Agents screen is mounted inside: its tRPC Provider and the host
+ * port for project, transport, replication, address and feedback. Reads the
+ * whole org graph since the replication picker offers every project.
+ */
+
+import {
+  AgentManagementHostProvider,
+  type AgentFailureNotice,
+  type AgentManagementHost,
+} from "@langwatch/agent-web/agent-management";
+import { organizationApi } from "@langwatch/organization-web/organization-client";
+import { useMemo, type ReactNode } from "react";
+import { useDrawer } from "@langwatch/ui-drawer";
+import { useUiCapabilities } from "@langwatch/ui-host/capabilities";
+import { resolveUiFailureCopy } from "../../../../behavior/ui-feedback";
+import { useUiRpc } from "../../../../behavior/ui-rpc";
+import { useUiShellFailure } from "../../../../behavior/ui-shell-failure";
+import { UiPageFailure, UiPageLoading } from "../../../../ui/sections/ui-page-fallbacks";
+import { openAgentEditor, openConnectedAgentDrawer } from "../../behavior/agent-editor";
+import { TrpcAgentClient } from "../../behavior/trpc-agent.client";
+import { agentCopyTargets } from "../../model/agent-copy-targets";
+
+export function AgentHost({ children }: { children: ReactNode }) {
+  const { openDrawer } = useDrawer();
+  const { session, navigation, route, feedback } = useUiCapabilities();
+  const scope = session.activeScope();
+  const rpc = useUiRpc();
+
+  const organizations = organizationApi.organization.getAll.useQuery({ isDemo: false });
+  const organizationQueries = organizationApi.useUtils();
+
+  // A refused graph is a state, not an empty one: the project below is read
+  // off this query, so a refusal left the agents screen empty forever.
+  const failure = useUiShellFailure({
+    error: organizations.error,
+    fallbackTitle: "Couldn't load your agents",
+  });
+
+  const agents = useMemo(() => TrpcAgentClient.create(rpc), [rpc]);
+
+  const project = useMemo(() => {
+    if (!scope.projectId) return void 0;
+    for (const organization of organizations.data ?? []) {
+      for (const team of organization.teams) {
+        const found = team.projects.find((candidate) => candidate.id === scope.projectId);
+        if (found) return { id: found.id, slug: found.slug, name: found.name };
+      }
+    }
+    return void 0;
+  }, [organizations.data, scope.projectId]);
+
+  const copyTargets = useMemo(
+    () =>
+      agentCopyTargets({
+        organizations: organizations.data ?? [],
+        userId: session.currentUser()?.id,
+      }),
+    [organizations.data, session],
+  );
+
+  const reading = route.reading();
+  const host = useMemo<AgentManagementHost>(
+    () => ({
+      project: () => project,
+      agents: () => agents,
+      copyTargets: () => copyTargets,
+      route: () => reading,
+      setQuery: (next, options) => route.setQuery(next, options),
+      navigate: (to) => navigation.navigate(to),
+      succeeded: (notice) => feedback.succeeded(notice),
+      failed: (failure) => feedback.failed(failure),
+      // The one line a surface too tight for a toast prints. Same copy the
+      // toast would have shown, so a failure never reads two different ways
+      // depending on where it surfaced.
+      describeFailure: (failure: AgentFailureNotice) =>
+        resolveUiFailureCopy({
+          error: failure.error,
+          fallbackTitle: failure.fallbackTitle,
+        }).title,
+      openAgentEditor: ({ drawer, agentId }) =>
+        openAgentEditor({
+          query: reading.query,
+          drawer,
+          agentId,
+          setQuery: (next) => route.setQuery(next),
+        }),
+      openConnectedAgent: (agentId) =>
+        openConnectedAgentDrawer({
+          query: reading.query,
+          agentId,
+          setQuery: (next) => route.setQuery(next),
+        }),
+      openTestRun: ({ scenarioRunId, batchRunId }) =>
+        openDrawer("scenarioRunDetail", {
+          urlParams: { variant: "agent-testing", scenarioRunId, batchRunId },
+        }),
+      refreshAgentLimit: () => organizationQueries.licenseEnforcement.checkLimit.invalidate(),
+    }),
+    [
+      project,
+      agents,
+      copyTargets,
+      reading,
+      route,
+      navigation,
+      feedback,
+      openDrawer,
+      organizationQueries,
+    ],
+  );
+
+  if (failure.departing) return <UiPageLoading />;
+  if (failure.copy) return <UiPageFailure copy={failure.copy} />;
+
+  return <AgentManagementHostProvider value={host}>{children}</AgentManagementHostProvider>;
+}

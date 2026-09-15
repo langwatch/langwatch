@@ -1,14 +1,7 @@
 /**
- * One shared connection per process to `/api/v1/agents/connect`.
- *
- * The client holds every agent the process defined, registers them all on
- * one socket, answers `call` frames by running the agent's function, and
- * reconnects with backoff when the platform goes away. Nothing in here throws
- * into customer code: every frame is handled under a catch that logs, and a
- * failure on the LangWatch side produces one warning that names the fix and
- * leaves the application running as if the wrapper were absent.
- *
- * @see dev/docs/adr/128-connected-agents.md
+ * One shared connection per process to `/api/v1/agents/connect`. Registers
+ * every agent, answers `call` frames, and reconnects with backoff. Nothing
+ * here throws into customer code.
  */
 
 import { context, propagation, trace } from "@opentelemetry/api";
@@ -186,7 +179,7 @@ export class AgentClient {
     return this.registered;
   }
 
-  /** True once the client gave up: refused, or no socket implementation. No timer is left behind. */
+  /** True once the client gave up: refused, or no socket implementation available. */
   get isStopped(): boolean {
     return this.stopped;
   }
@@ -206,7 +199,9 @@ export class AgentClient {
   addAgent(runtime: AgentRuntime): void {
     this.agents.push(runtime);
     if (this.gaveUp) {
-      this.logger.debug(`agent "${runtime.name}" ${NOT_CONNECTED}: the connection gave up earlier in this process`);
+      this.logger.debug(
+        `agent "${runtime.name}" ${NOT_CONNECTED}: the connection gave up earlier in this process`,
+      );
       return;
     }
     this.stopped = false;
@@ -397,7 +392,13 @@ export class AgentClient {
    * connection is lost, and silence while the retries run: the same notice
    * repeats only after the notice interval, and a reconnect resets it.
    */
-  private noteDisconnected({ wasRegistered, code }: { wasRegistered: boolean; code?: number }): void {
+  private noteDisconnected({
+    wasRegistered,
+    code,
+  }: {
+    wasRegistered: boolean;
+    code?: number;
+  }): void {
     const now = Date.now();
     if (wasRegistered) {
       this.logger.warn(
@@ -501,7 +502,8 @@ export class AgentClient {
       this.logger.info(`connected to LangWatch over HTTP long polling at ${this.httpUrl}`);
     }
     this.heartbeatIntervalMs = frame.heartbeatIntervalMs;
-    if (frame.instanceId && frame.instanceId !== this.instance.id) this.instance.id = frame.instanceId;
+    if (frame.instanceId && frame.instanceId !== this.instance.id)
+      this.instance.id = frame.instanceId;
     this.byId.clear();
     for (const entry of frame.agents) {
       const runtime = this.agents.find(
@@ -618,19 +620,13 @@ export class AgentClient {
   }
 
   /**
-   * Exports the spans of the call now instead of at the exporter's next
-   * schedule. The judge reads the agent's spans right after the last turn,
-   * and a batch exporter would otherwise hold them for seconds, which is what
-   * made the judge report the spans missing.
-   *
-   * The call awaits this before it sends its result or its error: the frame is
-   * what tells the platform the turn is over, so a frame that goes out first
-   * lets the judge read the call while its spans are still in the exporter.
+   * Exports the spans of the call now, since a batch exporter would
+   * otherwise hold them for seconds after the judge reads them. Awaited
+   * before the result or error frame goes out.
    */
   private async flushSpans(): Promise<void> {
     const provider = trace.getTracerProvider() as { getDelegate?: () => unknown };
-    const delegate =
-      typeof provider.getDelegate === "function" ? provider.getDelegate() : provider;
+    const delegate = typeof provider.getDelegate === "function" ? provider.getDelegate() : provider;
     const flush = (delegate as { forceFlush?: () => Promise<void> } | null)?.forceFlush;
     if (typeof flush !== "function") return;
     try {
@@ -666,27 +662,38 @@ export class AgentClient {
     const fromDeadline = frame.deadlineAt === null ? Infinity : frame.deadlineAt - Date.now();
     const limit = Math.min(fromDeadline, runtime.timeoutMs);
     if (!Number.isFinite(limit)) return;
-    const timer = setTimeout(() => {
-      entry.timer = null;
-      if (entry.cancelled) return;
-      // The handler keeps running: a function cannot be stopped from here.
-      // Its late result is dropped, because the platform has an answer.
-      entry.cancelled = true;
-      this.releaseCall({ callId: frame.callId, entry });
-      this.logger.warn(
-        `agent "${runtime.name}" call ${frame.callId} passed its ${limit} ms limit`,
-      );
-      this.sendError({
-        callId: frame.callId,
-        code: "agent_call_timeout",
-        message: `the call passed the ${limit} ms limit of agent "${runtime.name}"`,
-      });
-    }, Math.max(0, limit));
+    const timer = setTimeout(
+      () => {
+        entry.timer = null;
+        if (entry.cancelled) return;
+        // The handler keeps running: a function cannot be stopped from here.
+        // Its late result is dropped, because the platform has an answer.
+        entry.cancelled = true;
+        this.releaseCall({ callId: frame.callId, entry });
+        this.logger.warn(
+          `agent "${runtime.name}" call ${frame.callId} passed its ${limit} ms limit`,
+        );
+        this.sendError({
+          callId: frame.callId,
+          code: "agent_call_timeout",
+          message: `the call passed the ${limit} ms limit of agent "${runtime.name}"`,
+        });
+      },
+      Math.max(0, limit),
+    );
     timer.unref();
     entry.timer = timer;
   }
 
-  private sendError({ callId, code, message }: { callId: string; code: string; message: string }): void {
+  private sendError({
+    callId,
+    code,
+    message,
+  }: {
+    callId: string;
+    code: string;
+    message: string;
+  }): void {
     this.send({ type: "result", protocol: PROTOCOL_VERSION, callId, error: { code, message } });
   }
 
@@ -745,7 +752,15 @@ const removeShutdownHooks = (): void => {
 };
 
 /** One warning per process for a condition every agent definition would repeat. */
-export function warnOnce({ logger, key, message }: { logger: Logger; key: string; message: string }): void {
+export function warnOnce({
+  logger,
+  key,
+  message,
+}: {
+  logger: Logger;
+  key: string;
+  message: string;
+}): void {
   if (noticesGiven.has(key)) {
     logger.debug(message);
     return;

@@ -1,0 +1,262 @@
+/**
+ * The choices card — the one sanctioned UI for the decision that belongs to the user
+ * (ADR-060 §6).
+ */
+import { Box, Button, chakra, HStack, Text, VStack } from "@chakra-ui/react";
+import type {
+  LangyChoiceSelection,
+  LangyChoicesLockState,
+  LangyDerivedChoicesCard,
+} from "@langwatch/langy-contract";
+import { Check, CircleSlash } from "lucide-react";
+import { useState } from "react";
+
+import { LangyDerivedCardFrame } from "./langy-derived-card-frame.tsx";
+
+export type ChoicesRefRow =
+  | { state: "pending" }
+  | { state: "plain" }
+  | { state: "dead" }
+  | { state: "live"; primary?: string; secondary?: string };
+
+/**
+ * An option's label is the answer, not a name for the thing it points at: a
+ * live reference supplies the detail line, the label stays the row.
+ */
+function optionRowText({
+  option,
+  refRow,
+}: {
+  option: LangyDerivedChoicesCard["options"][number];
+  refRow: ChoicesRefRow;
+}): { primary: string; secondary?: string } {
+  if (refRow.state === "dead") {
+    return { primary: option.label, secondary: "No longer exists" };
+  }
+  const detail =
+    refRow.state === "live"
+      ? [refRow.primary, refRow.secondary]
+          .filter((part): part is string => !!part && part !== option.label)
+          .join(" · ")
+      : "";
+  const secondary = detail !== "" ? detail : option.description;
+  return { primary: option.label, ...(secondary !== undefined ? { secondary } : {}) };
+}
+
+/** The tint an option's glyph carries: picked, struck out, or plain. */
+function choiceMarkColor({ marked, dead }: { marked: boolean; dead: boolean }) {
+  if (marked) return "purple.fg";
+  return dead ? "fg.subtle" : "fg.muted";
+}
+
+/** The glyph beside an option: struck out, ticked, or an empty box waiting. */
+function ChoiceMark({ dead, marked, multi }: { dead: boolean; marked: boolean; multi: boolean }) {
+  if (dead) return <CircleSlash size={13} />;
+  if (marked) return <Check size={13} />;
+  return (
+    <Box
+      width="11px"
+      height="11px"
+      borderWidth="1px"
+      borderStyle="solid"
+      borderColor="border.emphasized"
+      borderRadius={multi ? "2px" : "full"}
+    />
+  );
+}
+
+export function LangyChoicesCard({
+  card,
+  lockState,
+  forming = false,
+  onSelect,
+  refRows: refRowsInput,
+}: {
+  card: LangyDerivedChoicesCard;
+  lockState: LangyChoicesLockState;
+  /** Still streaming — never answerable while forming. */
+  forming?: boolean;
+  /** Absent = read-only (time travel, shared views). */
+  onSelect?: (a: { selection: LangyChoiceSelection; card: LangyDerivedChoicesCard }) => void;
+  /** Fixture seam (gallery/tests): pre-resolved rows instead of fetching. */
+  refRows?: ReadonlyMap<string, ChoicesRefRow>;
+}) {
+  const refRows = refRowsInput ?? new Map<string, ChoicesRefRow>();
+  const [picked, setPicked] = useState<Set<string>>(() => new Set());
+  const [otherOpen, setOtherOpen] = useState(false);
+  const [otherText, setOtherText] = useState("");
+
+  const answered = lockState.status === "answered";
+  const superseded = lockState.status === "superseded";
+  const open = lockState.status === "open" && !forming && !!onSelect;
+  const multi = card.multiSelect === true;
+
+  const answer = (selection: LangyChoiceSelection): void => {
+    if (!open || !onSelect) return;
+    onSelect({ selection, card });
+  };
+
+  const toggle = (optionId: string): void => {
+    if (!open) return;
+    if (!multi) {
+      answer({ blockId: card.blockId, optionIds: [optionId] });
+      return;
+    }
+    setPicked((previous) => {
+      const next = new Set(previous);
+      if (next.has(optionId)) next.delete(optionId);
+      else next.add(optionId);
+      return next;
+    });
+  };
+
+  const chosen = new Set(answered ? lockState.optionIds : []);
+
+  return (
+    <LangyDerivedCardFrame
+      forming={forming}
+      superseded={superseded}
+      title={
+        <Text textStyle="xs" fontWeight="640" color="fg" lineHeight="1.3">
+          {card.question}
+        </Text>
+      }
+      actions={
+        open && multi ? (
+          <Button
+            size="xs"
+            colorPalette="orange"
+            disabled={picked.size === 0}
+            onClick={() => answer({ blockId: card.blockId, optionIds: [...picked] })}
+          >
+            <Check size={12} /> Answer
+          </Button>
+        ) : undefined
+      }
+    >
+      <VStack align="stretch" gap={1}>
+        {card.options.map((option) => {
+          const refRow = refRows.get(option.id) ?? { state: "plain" as const };
+          const dead = refRow.state === "dead";
+          const isChosen = chosen.has(option.id);
+          const isPicked = picked.has(option.id);
+          const marked = isChosen || isPicked;
+          const markColor = choiceMarkColor({ marked, dead });
+          const selectable = open && !dead;
+
+          const { primary, secondary } = optionRowText({ option, refRow });
+
+          return (
+            <chakra.button
+              key={option.id}
+              type="button"
+              disabled={!selectable}
+              onClick={() => toggle(option.id)}
+              display="flex"
+              alignItems="center"
+              gap={2}
+              textAlign="left"
+              paddingX={2}
+              paddingY={1.5}
+              borderWidth="1px"
+              borderStyle="solid"
+              borderColor={isChosen || isPicked ? "purple.emphasized" : "border.muted"}
+              borderRadius="md"
+              background={isChosen || isPicked ? "bg.muted" : "transparent"}
+              cursor={selectable ? "pointer" : "default"}
+              opacity={dead || (answered && !isChosen) ? 0.55 : 1}
+              aria-disabled={!selectable}
+              aria-pressed={marked}
+              _hover={selectable ? { background: "bg.muted" } : undefined}
+              transition="background 120ms ease, border-color 120ms ease"
+            >
+              <Box flexShrink={0} color={markColor} display="flex">
+                <ChoiceMark dead={dead} marked={marked} multi={multi} />
+              </Box>
+              <VStack align="stretch" gap={0} flex={1} minWidth={0}>
+                <Text textStyle="xs" color={dead ? "fg.muted" : "fg"} truncate>
+                  {primary}
+                </Text>
+                {secondary ? (
+                  <Text textStyle="2xs" color="fg.muted" truncate>
+                    {secondary}
+                  </Text>
+                ) : null}
+              </VStack>
+            </chakra.button>
+          );
+        })}
+
+        {answered && lockState.otherText ? (
+          <HStack gap={1.5} paddingX={2} paddingY={1}>
+            <Check size={12} color="var(--chakra-colors-purple-fg)" />
+            <Text textStyle="xs" color="fg">
+              {lockState.otherText}
+            </Text>
+          </HStack>
+        ) : null}
+
+        {open && card.allowOther === true && otherOpen && (
+          <HStack gap={1.5}>
+            <chakra.input
+              autoFocus
+              value={otherText}
+              onChange={(event) => setOtherText(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key !== "Enter" || otherText.trim() === "") return;
+                answer({
+                  blockId: card.blockId,
+                  optionIds: [],
+                  otherText: otherText.trim(),
+                });
+              }}
+              placeholder="Your own answer…"
+              flex={1}
+              textStyle="xs"
+              paddingX={2}
+              paddingY={1.5}
+              borderWidth="1px"
+              borderStyle="solid"
+              borderColor="border.muted"
+              borderRadius="md"
+              background="transparent"
+              color="fg"
+              _focus={{ borderColor: "purple.emphasized", outline: "none" }}
+            />
+            <Button
+              size="xs"
+              variant="outline"
+              disabled={otherText.trim() === ""}
+              onClick={() =>
+                answer({
+                  blockId: card.blockId,
+                  optionIds: [],
+                  otherText: otherText.trim(),
+                })
+              }
+            >
+              Send
+            </Button>
+          </HStack>
+        )}
+        {open && card.allowOther === true && !otherOpen && (
+          <Button
+            size="xs"
+            variant="ghost"
+            alignSelf="flex-start"
+            color="fg.muted"
+            onClick={() => setOtherOpen(true)}
+          >
+            Other…
+          </Button>
+        )}
+
+        {superseded ? (
+          <Text textStyle="2xs" color="fg.subtle" paddingX={2} paddingTop={0.5}>
+            The conversation moved on. This question is closed.
+          </Text>
+        ) : null}
+      </VStack>
+    </LangyDerivedCardFrame>
+  );
+}

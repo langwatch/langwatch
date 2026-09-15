@@ -17,11 +17,11 @@ This guide builds an experiment for a business coaching assistant, where the dat
 
 LangWatch ships three LLM-as-a-Judge evaluators. All three read the same inputs (`input`, `output` and, when you map it, `contexts`) and apply the criteria you write in the evaluator's prompt.
 
-| Evaluator | Returns | Use it when |
-|-----------|---------|-------------|
-| **LLM-as-a-Judge Boolean Evaluator** | Pass or fail | The output either meets the criteria or it does not. |
-| **LLM-as-a-Judge Score Evaluator** | A number on the scale your prompt defines. The default prompt asks for 0.0 to 1.0. | You want a graded verdict, for example how satisfied the user is likely to be. |
-| **LLM-as-a-Judge Category Evaluator** | One of the categories you define, each with a name and a description | You want to sort outputs into buckets, for example `on_topic`, `off_topic`, `refusal`. |
+| Evaluator                             | Returns                                                                            | Use it when                                                                            |
+| ------------------------------------- | ---------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| **LLM-as-a-Judge Boolean Evaluator**  | Pass or fail                                                                       | The output either meets the criteria or it does not.                                   |
+| **LLM-as-a-Judge Score Evaluator**    | A number on the scale your prompt defines. The default prompt asks for 0.0 to 1.0. | You want a graded verdict, for example how satisfied the user is likely to be.         |
+| **LLM-as-a-Judge Category Evaluator** | One of the categories you define, each with a name and a description               | You want to sort outputs into buckets, for example `on_topic`, `off_topic`, `refusal`. |
 
 ## Steps
 
@@ -31,7 +31,9 @@ Open [Experiments](https://app.langwatch.ai/@project/experiments), click **New E
 </Step>
 
 <Step title="Add a prompt column">
-Under **Prompts or Agents**, click **Add**, pick **Prompt**, then **New Prompt**. Pick the model, write the coaching assistant's system prompt, check that `input` maps to the dataset's `input` column under **Variables**, and click **Apply**.
+  Under **Prompts or Agents**, click **Add**, pick **Prompt**, then **New Prompt**. Pick the model,
+  write the coaching assistant's system prompt, check that `input` maps to the dataset's `input`
+  column under **Variables**, and click **Apply**.
 </Step>
 
 <Step title="Create the judge">
@@ -50,14 +52,18 @@ Fail the output if any criterion is not met, and name the criterion that failed.
 ```
 
 <Frame>
-<img src="/images/evaluations/workbench-llm-judge-editor.png" alt="The LLM-as-a-Judge Boolean evaluator editor with the criteria prompt" />
+  <img
+    src="/images/evaluations/workbench-llm-judge-editor.png"
+    alt="The LLM-as-a-Judge Boolean evaluator editor with the criteria prompt"
+  />
 </Frame>
 
 In **Variables**, map `input` to the dataset's `input` column and `output` to the prompt column's output. Click **Create Evaluator**. If a required field stays unmapped, the workbench opens the mapping editor. Map the field there and click **Apply**.
+
 </Step>
 
 <Step title="Run">
-Click **Run** in the header. Each row fills with the assistant's answer and the judge's verdict.
+  Click **Run** in the header. Each row fills with the assistant's answer and the judge's verdict.
 </Step>
 
 <Step title="Read the reasons">

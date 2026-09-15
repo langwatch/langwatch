@@ -1,0 +1,221 @@
+/**
+ * The body of the run dialog: the name of the run, the agent it goes against, what it covers when that is still
+ * being chosen, whatever the chips added, and then the chips themselves.
+ * @see specs/features/agent-testing/run-dialog.feature
+ */
+
+import { Box, chakra, VStack } from "@chakra-ui/react";
+import { readHandledError } from "@langwatch/handled-error/read-handled-error";
+import { useEffect, useRef } from "react";
+import { HandledErrorAlert } from "../../../../behavior/errors.tsx";
+import { MissingProviderNotice } from "../../../elements/agent-testing/run/missing-provider-notice.tsx";
+import { RunNoteField } from "../../../elements/agent-testing/run/run-note-field.tsx";
+import { CustomizeChips } from "../../../elements/agent-testing/shared/customize-chips.tsx";
+import { FieldLabel } from "../../../elements/agent-testing/shared/dialog-fields.tsx";
+import { CompareAgentsSection } from "./compare-agents-section.tsx";
+import { OfflineTargetsNotice } from "./offline-targets-notice.tsx";
+import { ParameterRowsEditor } from "./parameter-rows-editor.tsx";
+import { RunEvaluatorsSection } from "./RunEvaluatorsSection.tsx";
+import { RunNameField } from "./run-name-field.tsx";
+import { RepeatCountSection, SimulationModelsSection } from "./run-option-sections.tsx";
+import { RunParametersSection } from "./run-parameters-section.tsx";
+import { RunScopeSection } from "./run-scope-section.tsx";
+import { TargetSection } from "./target-section.tsx";
+import type { RunDialogForm } from "./use-run-dialog-form.ts";
+
+/** The blocks a chip added, in the order the chips offer them. */
+function AddedBlocks({ form, isBusy }: { form: RunDialogForm; isBusy: boolean }) {
+  return (
+    <>
+      {form.showModels && (
+        <SimulationModelsSection
+          simulatorModel={form.simulatorModel}
+          judgeModel={form.judgeModel}
+          onSimulatorChange={form.setSimulatorModel}
+          onJudgeChange={form.setJudgeModel}
+          onRemove={() => {
+            form.setShowModels(false);
+            form.setSimulatorModel(null);
+            form.setJudgeModel(null);
+          }}
+        />
+      )}
+
+      {form.showRepeat && (
+        <RepeatCountSection
+          repeatCount={form.repeatCount}
+          onChange={form.setRepeatCount}
+          onRemove={() => {
+            form.setShowRepeat(false);
+            form.setRepeatCount(1);
+          }}
+        />
+      )}
+
+      {form.showEvaluatorsSection && (
+        <RunEvaluatorsSection
+          inherited={form.inherited}
+          extras={form.extras}
+          evaluatorsById={form.evaluatorsById}
+          missingOf={form.missingOf}
+          onOpenInherited={form.openInherited}
+          onEditExtra={form.editExtra}
+          onAddExtra={form.addExtra}
+          onRemove={form.hasInherited ? undefined : form.removeEvaluatorsBlock}
+        />
+      )}
+
+      {form.showParams && !form.showCompare && <RunParametersSection form={form} isBusy={isBusy} />}
+
+      {form.showNote && (
+        <RunNoteField
+          value={form.note}
+          onChange={form.setNote}
+          onRemove={() => {
+            form.setShowNote(false);
+            form.setNote("");
+          }}
+        />
+      )}
+    </>
+  );
+}
+
+/**
+ * The targets of a comparison, and under them the secrets the scope declares: a secret
+ * is run-level, so one block serves every target.
+ */
+function ComparisonBlocks({ form, isBusy }: { form: RunDialogForm; isBusy: boolean }) {
+  return (
+    <>
+      <CompareAgentsSection
+        rows={form.compareRows}
+        agents={form.scenarioAgents}
+        onChangeRow={form.updateCompareRow}
+        onAddRow={form.addCompareRow}
+        canAddRow={form.canAddCompareRow}
+        onRemoveRow={form.removeCompareRow}
+        onRemove={form.removeComparison}
+        hasDuplicates={form.hasDuplicateCompareRows}
+        defaults={form.parameterDefaults}
+        definitions={form.parameterDefinitions}
+        declaredParametersOf={form.declaredParametersOf}
+        parameterError={form.parameterError}
+        isBusy={isBusy}
+      />
+      <VStack align="stretch" gap={0} data-testid="run-dialog-compare-secrets">
+        <FieldLabel>Secret parameters</FieldLabel>
+        <ParameterRowsEditor
+          rows={form.parameterRows}
+          onChangeRow={form.updateParameterRow}
+          onAddRow={form.addSecretParameterRow}
+          onRemoveRow={form.removeParameterRow}
+          declaredSecrets={form.secretDefinitions}
+          secretValues={form.secretValues}
+          onChangeSecretValue={form.setSecretValue}
+          definitions={form.parameterDefinitions}
+          disabled={isBusy}
+          secretOnly
+        />
+      </VStack>
+    </>
+  );
+}
+
+/**
+ * What the dialog says when the run cannot start, or did not.
+ */
+function RunDialogNotices({ form }: { form: RunDialogForm }) {
+  const alert = useRef<HTMLDivElement>(null);
+  const { inlineError } = form;
+
+  useEffect(() => {
+    if (inlineError == null) return;
+    alert.current?.scrollIntoView?.({ block: "nearest" });
+  }, [inlineError]);
+
+  return (
+    <>
+      {form.missingProvider && <MissingProviderNotice />}
+
+      <OfflineTargetsNotice
+        agents={form.scenarioAgents}
+        targets={form.showCompare ? form.compareRows.map((row) => row.target) : [form.target]}
+      />
+
+      {inlineError != null && (
+        <Box ref={alert} data-testid="run-dialog-error">
+          <HandledErrorAlert error={inlineError} fallbackTitle="Couldn't start the run" />
+          {readHandledError(inlineError)?.code === "suite_evaluator_mappings_missing" && (
+            <chakra.button
+              type="button"
+              marginTop={1}
+              fontSize="12px"
+              fontWeight="medium"
+              color="blue.fg"
+              cursor="pointer"
+              _hover={{ textDecoration: "underline" }}
+              onClick={() => form.openMappingsMissingRefusal(inlineError)}
+              data-testid="run-dialog-open-evaluator"
+            >
+              Configure the evaluator
+            </chakra.button>
+          )}
+        </Box>
+      )}
+    </>
+  );
+}
+
+export function RunDialogFields({
+  form,
+  isBusy,
+  onNameListOpenChange,
+}: {
+  form: RunDialogForm;
+  isBusy: boolean;
+  /** The dialog holds its own Escape handling off while the list is open. */
+  onNameListOpenChange: (isOpen: boolean) => void;
+}) {
+  return (
+    <VStack align="stretch" gap={4}>
+      <RunNameField
+        value={form.runName}
+        options={form.options}
+        onChange={form.setRunName}
+        onPick={form.applyConfiguration}
+        onListOpenChange={onNameListOpenChange}
+        isBusy={isBusy}
+      />
+
+      {form.showCompare ? (
+        <ComparisonBlocks form={form} isBusy={isBusy} />
+      ) : (
+        <TargetSection
+          mode={form.mode}
+          agents={form.scenarioAgents}
+          prompts={form.publishedPrompts}
+          target={form.target}
+          onSelect={form.setTarget}
+          onRemovePromptPicker={form.removePromptPicker}
+          onSetupAgent={form.handleSetupAgent}
+        />
+      )}
+
+      {form.isScopePicked && (
+        <RunScopeSection
+          scope={form.scope}
+          testSuites={form.testSuites}
+          scenarios={form.scopeScenarios}
+          onChange={form.setScope}
+        />
+      )}
+
+      <AddedBlocks form={form} isBusy={isBusy} />
+
+      <CustomizeChips title="Customize your run" chips={form.chips} testId="customize-run-chips" />
+
+      <RunDialogNotices form={form} />
+    </VStack>
+  );
+}

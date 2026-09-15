@@ -58,9 +58,7 @@ export async function handleGetSimulationRun(params: {
   if (run.messages && run.messages.length > 0) {
     lines.push("\n## Conversation");
     for (const msg of run.messages) {
-      const content = msg.content.length > 300
-        ? msg.content.slice(0, 300) + "..."
-        : msg.content;
+      const content = msg.content.length > 300 ? msg.content.slice(0, 300) + "..." : msg.content;
       lines.push(`**[${msg.role}]**: ${content}`);
     }
   }

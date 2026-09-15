@@ -37,7 +37,7 @@ The properties the contract guarantees:
   row and it returns to its legacy path fleet-wide within the gate's cache
   bound, with no restart. It is the only status the runner refuses to act
   on, which is what makes it stick — blanking the row or moving it back to
-  `migrated` does *not* roll a tenant back, because the next pass re-runs a
+  `migrated` does _not_ roll a tenant back, because the next pass re-runs a
   migration whose proof still passes and re-finalizes it minutes later.
 
 Storage-engine-free: the app implements `SystemMigrationStateRepository`

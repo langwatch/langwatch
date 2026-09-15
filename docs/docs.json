@@ -1045,12 +1045,15 @@
             "group": "Traces",
             "pages": [
               "api-reference/traces/overview",
+              "api-reference/traces/create-search",
+              "api-reference/traces/post-create-search",
               "api-reference/traces/search",
               "api-reference/traces/get-trace",
-              "api-reference/traces/get-transcript",
+              "api-reference/traces/get-2026-08-07-2026-08-07",
+              "api-reference/traces/get-latest",
               "api-reference/traces/update-trace-metadata",
-              "api-reference/traces/create-public-trace-path",
-              "api-reference/traces/delete-public-trace-path",
+              "api-reference/traces/patch-update-trace-metadata",
+              "api-reference/traces/patch-update-trace-metadata-metadata",
               "api-reference/traces/projection-dsl"
             ]
           },
@@ -1083,10 +1086,20 @@
             "pages": [
               "api-reference/evaluators-config/overview",
               "api-reference/evaluators-config/list-evaluators",
+              "api-reference/evaluators-config/list-2026-08-07-2026-08-07",
+              "api-reference/evaluators-config/list-latest",
               "api-reference/evaluators-config/create-evaluators",
+              "api-reference/evaluators-config/create-2026-08-07-2026-08-07",
+              "api-reference/evaluators-config/create-latest",
               "api-reference/evaluators-config/get-evaluators",
+              "api-reference/evaluators-config/get-2026-08-07-2026-08-07",
+              "api-reference/evaluators-config/get-latest",
               "api-reference/evaluators-config/update-evaluators",
-              "api-reference/evaluators-config/delete-evaluators"
+              "api-reference/evaluators-config/update-2026-08-07-2026-08-07",
+              "api-reference/evaluators-config/update-latest",
+              "api-reference/evaluators-config/delete-evaluators",
+              "api-reference/evaluators-config/delete-2026-08-07-2026-08-07",
+              "api-reference/evaluators-config/delete-latest"
             ]
           },
           {
@@ -1174,12 +1187,34 @@
               "api-reference/experiments/poll-a-run",
               "api-reference/experiments/read-run-results",
               "api-reference/experiments/report-dspy-optimizer-steps",
+              "api-reference/experiments/get-list-experiments-for-the-project",
+              "api-reference/experiments/get-list-runs-of-an-experiment",
+              "api-reference/experiments/get-list-experiments-for-the-project-",
+              "api-reference/experiments/get-list-runs-of-an-experiment-runs",
               "api-reference/experiments/post-create-an-experiment",
+              "api-reference/experiments/create-an-experiment-and-its-setup",
+              "api-reference/experiments/post-create-an-experiment-and-its-setup",
               "api-reference/experiments/read-one-experiment",
               "api-reference/experiments/list-an-experiment-s-versions",
               "api-reference/experiments/read-an-experiment-s-setup",
+              "api-reference/experiments/get-read-one-experiment",
+              "api-reference/experiments/get-list-an-experiment-s-versions",
+              "api-reference/experiments/get-read-an-experiment-s-setup",
+              "api-reference/experiments/get-poll-a-run",
+              "api-reference/experiments/get-read-run-results",
+              "api-reference/experiments/get-read-one-experiment-slug",
+              "api-reference/experiments/get-list-an-experiment-s-versions-versions",
+              "api-reference/experiments/get-read-an-experiment-s-setup-workbench-state",
+              "api-reference/experiments/get-poll-a-run-runId",
+              "api-reference/experiments/get-read-run-results-results",
               "api-reference/experiments/save-an-experiment-s-setup",
-              "api-reference/experiments/restore-an-experiment-version"
+              "api-reference/experiments/put-save-an-experiment-s-setup",
+              "api-reference/experiments/put-save-an-experiment-s-setup-workbench-state",
+              "api-reference/experiments/restore-an-experiment-version",
+              "api-reference/experiments/post-run-an-experiment",
+              "api-reference/experiments/post-restore-an-experiment-version",
+              "api-reference/experiments/post-run-an-experiment-run",
+              "api-reference/experiments/post-restore-an-experiment-version-restore"
             ]
           },
           {
@@ -1187,11 +1222,23 @@
             "pages": [
               "api-reference/monitors/overview",
               "api-reference/monitors/list-monitors",
+              "api-reference/monitors/list-2026-08-07-2026-08-07",
+              "api-reference/monitors/list-latest",
               "api-reference/monitors/create-monitors",
+              "api-reference/monitors/create-2026-08-07-2026-08-07",
+              "api-reference/monitors/create-latest",
               "api-reference/monitors/get-monitors",
+              "api-reference/monitors/get-2026-08-07-2026-08-07",
+              "api-reference/monitors/get-latest",
               "api-reference/monitors/update-monitors",
+              "api-reference/monitors/update-2026-08-07-2026-08-07",
+              "api-reference/monitors/update-latest",
               "api-reference/monitors/action-toggle",
-              "api-reference/monitors/delete-monitors"
+              "api-reference/monitors/post-action-toggle",
+              "api-reference/monitors/post-action-toggle-toggle",
+              "api-reference/monitors/delete-monitors",
+              "api-reference/monitors/delete-2026-08-07-2026-08-07",
+              "api-reference/monitors/delete-latest"
             ]
           },
           {
@@ -1230,13 +1277,29 @@
             "pages": [
               "api-reference/scenarios/overview",
               "api-reference/scenarios/list-scenarios",
+              "api-reference/scenarios/list-2026-08-07-2026-08-07",
+              "api-reference/scenarios/list-latest",
               "api-reference/scenarios/create-scenarios",
+              "api-reference/scenarios/create-2026-08-07-2026-08-07",
+              "api-reference/scenarios/create-latest",
               "api-reference/scenarios/get-scenarios",
               "api-reference/scenarios/list-a-scenario-s-versions",
               "api-reference/scenarios/read-one-scenario-version",
+              "api-reference/scenarios/get-2026-08-07-2026-08-07",
+              "api-reference/scenarios/get-versions",
+              "api-reference/scenarios/get-get-versions",
+              "api-reference/scenarios/get-latest",
+              "api-reference/scenarios/get-get-versions-versions",
+              "api-reference/scenarios/get-get-versions-version",
               "api-reference/scenarios/update-scenarios",
               "api-reference/scenarios/patch-update-scenarios",
-              "api-reference/scenarios/delete-scenarios"
+              "api-reference/scenarios/update-2026-08-07-2026-08-07",
+              "api-reference/scenarios/patch-update-2026-08-07-2026-08-07",
+              "api-reference/scenarios/update-latest",
+              "api-reference/scenarios/patch-update-latest",
+              "api-reference/scenarios/delete-scenarios",
+              "api-reference/scenarios/delete-2026-08-07-2026-08-07",
+              "api-reference/scenarios/delete-latest"
             ]
           },
           {
@@ -1244,8 +1307,14 @@
             "pages": [
               "api-reference/scenario-events/overview",
               "api-reference/scenario-events/create-scenario-events",
+              "api-reference/scenario-events/create-2026-08-07-2026-08-07",
+              "api-reference/scenario-events/create-browser-tab-browser-tab",
               "api-reference/scenario-events/create-browser-tab",
-              "api-reference/scenario-events/delete-scenario-events"
+              "api-reference/scenario-events/create-latest",
+              "api-reference/scenario-events/post-create-browser-tab-browser-tab",
+              "api-reference/scenario-events/delete-scenario-events",
+              "api-reference/scenario-events/delete-2026-08-07-2026-08-07",
+              "api-reference/scenario-events/delete-latest"
             ]
           },
           {
@@ -1253,9 +1322,17 @@
             "pages": [
               "api-reference/simulation-runs/overview",
               "api-reference/simulation-runs/list-simulation-runs",
+              "api-reference/simulation-runs/list-2026-08-07-2026-08-07",
               "api-reference/simulation-runs/list-list",
+              "api-reference/simulation-runs/get-list-list",
+              "api-reference/simulation-runs/list-latest",
+              "api-reference/simulation-runs/get-list-list-list",
               "api-reference/simulation-runs/get-simulation-runs",
-              "api-reference/simulation-runs/get-batches"
+              "api-reference/simulation-runs/get-2026-08-07-2026-08-07",
+              "api-reference/simulation-runs/get-batches",
+              "api-reference/simulation-runs/get-get-batches",
+              "api-reference/simulation-runs/get-latest",
+              "api-reference/simulation-runs/get-get-batches-batchRunId"
             ]
           },
           {
@@ -1286,29 +1363,37 @@
             "pages": [
               "api-reference/suites/overview",
               "api-reference/suites/list-suites",
+              "api-reference/suites/list-2026-08-07-2026-08-07",
+              "api-reference/suites/list-latest",
               "api-reference/suites/create-suites",
+              "api-reference/suites/create-2026-08-07-2026-08-07",
+              "api-reference/suites/create-latest",
               "api-reference/suites/get-suites",
+              "api-reference/suites/get-2026-08-07-2026-08-07",
+              "api-reference/suites/get-latest",
               "api-reference/suites/update-suites",
+              "api-reference/suites/update-2026-08-07-2026-08-07",
+              "api-reference/suites/update-latest",
               "api-reference/suites/action-duplicate",
               "api-reference/suites/action-run",
-              "api-reference/suites/delete-suites"
+              "api-reference/suites/post-action-duplicate",
+              "api-reference/suites/post-action-run",
+              "api-reference/suites/post-action-duplicate-duplicate",
+              "api-reference/suites/post-action-run-run",
+              "api-reference/suites/delete-suites",
+              "api-reference/suites/delete-2026-08-07-2026-08-07",
+              "api-reference/suites/delete-latest"
             ]
           },
           {
             "group": "Agents",
             "pages": [
               "api-reference/agents/overview",
-              "api-reference/agents/list-agents",
               "api-reference/agents/list-poll",
-              "api-reference/agents/create-agents",
               "api-reference/agents/create-frames",
               "api-reference/agents/create-register",
-              "api-reference/agents/get-agents",
-              "api-reference/agents/update-agents",
-              "api-reference/agents/put-update-agents",
               "api-reference/agents/action-call",
-              "api-reference/agents/action-test",
-              "api-reference/agents/delete-agents"
+              "api-reference/agents/action-test"
             ]
           },
           {
@@ -1317,7 +1402,9 @@
               "api-reference/coding-agents/overview",
               "api-reference/coding-agents/get-pull-request-coding-agent-usage",
               "api-reference/coding-agents/get-pull-request-usage",
-              "api-reference/coding-agents/list-coding-agent-session-events"
+              "api-reference/coding-agents/list-coding-agent-session-events",
+              "api-reference/coding-agents/get-list-coding-agent-session-events",
+              "api-reference/coding-agents/get-list-coding-agent-session-events-events"
             ]
           },
           {
@@ -1325,11 +1412,21 @@
             "pages": [
               "api-reference/triggers/overview",
               "api-reference/triggers/list-triggers",
+              "api-reference/triggers/list-2026-08-07-2026-08-07",
+              "api-reference/triggers/list-latest",
               "api-reference/triggers/create-a-slack-alert-trigger",
               "api-reference/triggers/create-triggers",
+              "api-reference/triggers/create-2026-08-07-2026-08-07",
+              "api-reference/triggers/create-latest",
               "api-reference/triggers/get-triggers",
+              "api-reference/triggers/get-2026-08-07-2026-08-07",
+              "api-reference/triggers/get-latest",
               "api-reference/triggers/update-triggers",
-              "api-reference/triggers/delete-triggers"
+              "api-reference/triggers/update-2026-08-07-2026-08-07",
+              "api-reference/triggers/update-latest",
+              "api-reference/triggers/delete-triggers",
+              "api-reference/triggers/delete-2026-08-07-2026-08-07",
+              "api-reference/triggers/delete-latest"
             ]
           },
           {
@@ -1337,7 +1434,8 @@
             "pages": [
               "api-reference/events/overview",
               "api-reference/events/create-track",
-              "api-reference/events/track-an-event-legacy-path"
+              "api-reference/events/post-create-track",
+              "api-reference/events/post-create-track-track"
             ]
           },
           {
@@ -1345,13 +1443,23 @@
             "pages": [
               "api-reference/workflows/overview",
               "api-reference/workflows/list-workflows",
+              "api-reference/workflows/list-2026-08-07-2026-08-07",
+              "api-reference/workflows/list-latest",
               "api-reference/workflows/get-workflows",
+              "api-reference/workflows/get-2026-08-07-2026-08-07",
+              "api-reference/workflows/get-latest",
               "api-reference/workflows/update-workflows",
+              "api-reference/workflows/update-2026-08-07-2026-08-07",
+              "api-reference/workflows/update-latest",
               "api-reference/workflows/run-a-workflow-version-legacy-path",
               "api-reference/workflows/action-evaluate",
               "api-reference/workflows/run-a-specific-workflow-version",
               "api-reference/workflows/run-a-workflow",
-              "api-reference/workflows/delete-workflows"
+              "api-reference/workflows/post-action-evaluate",
+              "api-reference/workflows/post-action-evaluate-evaluate",
+              "api-reference/workflows/delete-workflows",
+              "api-reference/workflows/delete-2026-08-07-2026-08-07",
+              "api-reference/workflows/delete-latest"
             ]
           },
           {
@@ -1359,11 +1467,23 @@
             "pages": [
               "api-reference/dashboards/overview",
               "api-reference/dashboards/list-dashboards",
+              "api-reference/dashboards/list-2026-08-07-2026-08-07",
+              "api-reference/dashboards/list-latest",
               "api-reference/dashboards/create-dashboards",
+              "api-reference/dashboards/create-2026-08-07-2026-08-07",
+              "api-reference/dashboards/create-latest",
               "api-reference/dashboards/get-dashboards",
+              "api-reference/dashboards/get-2026-08-07-2026-08-07",
+              "api-reference/dashboards/get-latest",
               "api-reference/dashboards/update-reorder",
+              "api-reference/dashboards/put-update-reorder",
+              "api-reference/dashboards/put-update-reorder-reorder",
               "api-reference/dashboards/update-dashboards",
-              "api-reference/dashboards/delete-dashboards"
+              "api-reference/dashboards/update-2026-08-07-2026-08-07",
+              "api-reference/dashboards/update-latest",
+              "api-reference/dashboards/delete-dashboards",
+              "api-reference/dashboards/delete-2026-08-07-2026-08-07",
+              "api-reference/dashboards/delete-latest"
             ]
           },
           {
@@ -1371,10 +1491,20 @@
             "pages": [
               "api-reference/graphs/overview",
               "api-reference/graphs/list-graphs",
+              "api-reference/graphs/list-2026-08-07-2026-08-07",
+              "api-reference/graphs/list-latest",
               "api-reference/graphs/create-graphs",
+              "api-reference/graphs/create-2026-08-07-2026-08-07",
+              "api-reference/graphs/create-latest",
               "api-reference/graphs/get-graphs",
+              "api-reference/graphs/get-2026-08-07-2026-08-07",
+              "api-reference/graphs/get-latest",
               "api-reference/graphs/update-graphs",
-              "api-reference/graphs/delete-graphs"
+              "api-reference/graphs/update-2026-08-07-2026-08-07",
+              "api-reference/graphs/update-latest",
+              "api-reference/graphs/delete-graphs",
+              "api-reference/graphs/delete-2026-08-07-2026-08-07",
+              "api-reference/graphs/delete-latest"
             ]
           },
           {
@@ -1382,7 +1512,9 @@
             "pages": [
               "api-reference/analytics/overview",
               "api-reference/analytics/query-analytics-timeseries-legacy-path",
-              "api-reference/analytics/create-timeseries"
+              "api-reference/analytics/create-timeseries",
+              "api-reference/analytics/post-create-timeseries",
+              "api-reference/analytics/post-create-timeseries-timeseries"
             ]
           },
           {
@@ -1398,10 +1530,15 @@
             "pages": [
               "api-reference/secrets/overview",
               "api-reference/secrets/list-secrets",
+              "api-reference/secrets/list-project-secrets",
               "api-reference/secrets/create-secrets",
+              "api-reference/secrets/create-a-project-secret",
               "api-reference/secrets/get-secrets",
+              "api-reference/secrets/get-project-secret-metadata",
               "api-reference/secrets/update-secrets",
-              "api-reference/secrets/delete-secrets"
+              "api-reference/secrets/replace-a-project-secret-value",
+              "api-reference/secrets/delete-secrets",
+              "api-reference/secrets/delete-a-project-secret"
             ]
           },
           {
@@ -1419,7 +1556,11 @@
             "pages": [
               "api-reference/model-providers/overview",
               "api-reference/model-providers/list-model-providers",
-              "api-reference/model-providers/update-model-providers"
+              "api-reference/model-providers/list-2026-08-07-2026-08-07",
+              "api-reference/model-providers/list-latest",
+              "api-reference/model-providers/update-model-providers",
+              "api-reference/model-providers/update-2026-08-07-2026-08-07",
+              "api-reference/model-providers/update-latest"
             ]
           },
           {
@@ -1427,12 +1568,26 @@
             "pages": [
               "api-reference/projects/overview",
               "api-reference/projects/list-projects",
+              "api-reference/projects/get-list-projects",
+              "api-reference/projects/get-list-projects-",
               "api-reference/projects/create-project",
+              "api-reference/projects/create-a-project",
+              "api-reference/projects/post-create-a-project",
               "api-reference/projects/get-project",
               "api-reference/projects/get-api-key",
+              "api-reference/projects/get-a-project",
+              "api-reference/projects/get-the-project-api-key",
+              "api-reference/projects/get-get-a-project",
+              "api-reference/projects/get-get-the-project-api-key",
               "api-reference/projects/update-project",
+              "api-reference/projects/update-a-project",
+              "api-reference/projects/patch-update-a-project",
               "api-reference/projects/regenerate-api-key",
-              "api-reference/projects/archive-project"
+              "api-reference/projects/regenerate-the-project-api-key",
+              "api-reference/projects/post-regenerate-the-project-api-key",
+              "api-reference/projects/archive-project",
+              "api-reference/projects/archive-a-project",
+              "api-reference/projects/delete-archive-a-project"
             ]
           },
           {
@@ -1440,14 +1595,32 @@
             "pages": [
               "api-reference/teams/overview",
               "api-reference/teams/list-teams",
+              "api-reference/teams/list-2026-08-07-2026-08-07",
+              "api-reference/teams/list-latest",
               "api-reference/teams/create-team",
+              "api-reference/teams/create-2026-08-07-2026-08-07",
+              "api-reference/teams/create-latest",
               "api-reference/teams/get-team",
               "api-reference/teams/list-members",
               "api-reference/teams/list-projects",
+              "api-reference/teams/get-2026-08-07-2026-08-07",
+              "api-reference/teams/get-members",
+              "api-reference/teams/get-projects",
+              "api-reference/teams/get-latest",
+              "api-reference/teams/get-get-members",
+              "api-reference/teams/get-get-projects",
               "api-reference/teams/update-team",
+              "api-reference/teams/update-2026-08-07-2026-08-07",
+              "api-reference/teams/update-latest",
               "api-reference/teams/add-member",
+              "api-reference/teams/action-members",
+              "api-reference/teams/post-action-members",
               "api-reference/teams/archive-team",
-              "api-reference/teams/remove-member"
+              "api-reference/teams/remove-member",
+              "api-reference/teams/delete-2026-08-07-2026-08-07",
+              "api-reference/teams/delete-members",
+              "api-reference/teams/delete-latest",
+              "api-reference/teams/delete-delete-members"
             ]
           },
           {
@@ -1455,16 +1628,38 @@
             "pages": [
               "api-reference/groups/overview",
               "api-reference/groups/list-groups",
+              "api-reference/groups/list-2026-08-07-2026-08-07",
+              "api-reference/groups/list-latest",
               "api-reference/groups/create-group",
+              "api-reference/groups/create-2026-08-07-2026-08-07",
+              "api-reference/groups/create-latest",
               "api-reference/groups/get-group",
               "api-reference/groups/list-bindings",
               "api-reference/groups/list-members",
+              "api-reference/groups/get-2026-08-07-2026-08-07",
+              "api-reference/groups/get-bindings",
+              "api-reference/groups/get-members",
+              "api-reference/groups/get-latest",
+              "api-reference/groups/get-get-bindings",
+              "api-reference/groups/get-get-members",
               "api-reference/groups/rename-group",
+              "api-reference/groups/update-2026-08-07-2026-08-07",
+              "api-reference/groups/update-latest",
               "api-reference/groups/add-binding",
               "api-reference/groups/add-member",
+              "api-reference/groups/action-bindings",
+              "api-reference/groups/action-members",
+              "api-reference/groups/post-action-bindings",
+              "api-reference/groups/post-action-members",
               "api-reference/groups/delete-group",
               "api-reference/groups/remove-binding",
-              "api-reference/groups/remove-member"
+              "api-reference/groups/remove-member",
+              "api-reference/groups/delete-2026-08-07-2026-08-07",
+              "api-reference/groups/delete-bindings",
+              "api-reference/groups/delete-members",
+              "api-reference/groups/delete-latest",
+              "api-reference/groups/delete-delete-bindings",
+              "api-reference/groups/delete-delete-members"
             ]
           },
           {
@@ -1472,7 +1667,27 @@
             "pages": [
               "api-reference/organization/overview",
               "api-reference/organization/get-organization",
-              "api-reference/organization/update-organization"
+              "api-reference/organization/list-2026-08-07-2026-08-07",
+              "api-reference/organization/list-invites",
+              "api-reference/organization/list-members",
+              "api-reference/organization/list-latest",
+              "api-reference/organization/get-list-invites",
+              "api-reference/organization/get-list-members",
+              "api-reference/organization/create-invites",
+              "api-reference/organization/post-create-invites",
+              "api-reference/organization/get-members",
+              "api-reference/organization/get-access",
+              "api-reference/organization/get-get-members",
+              "api-reference/organization/get-get-access",
+              "api-reference/organization/update-members",
+              "api-reference/organization/patch-update-members",
+              "api-reference/organization/delete-invites",
+              "api-reference/organization/delete-members",
+              "api-reference/organization/delete-delete-invites",
+              "api-reference/organization/delete-delete-members",
+              "api-reference/organization/update-organization",
+              "api-reference/organization/update-2026-08-07-2026-08-07",
+              "api-reference/organization/update-latest"
             ]
           },
           {
@@ -1504,7 +1719,19 @@
               "api-reference/roles/create-role",
               "api-reference/roles/get-role",
               "api-reference/roles/update-role",
-              "api-reference/roles/delete-role"
+              "api-reference/roles/delete-role",
+              "api-reference/roles/list-2026-08-07-2026-08-07",
+              "api-reference/roles/get-list-permissions",
+              "api-reference/roles/list-latest",
+              "api-reference/roles/get-list-permissions-permissions",
+              "api-reference/roles/create-2026-08-07-2026-08-07",
+              "api-reference/roles/create-latest",
+              "api-reference/roles/get-2026-08-07-2026-08-07",
+              "api-reference/roles/get-latest",
+              "api-reference/roles/update-2026-08-07-2026-08-07",
+              "api-reference/roles/update-latest",
+              "api-reference/roles/delete-2026-08-07-2026-08-07",
+              "api-reference/roles/delete-latest"
             ]
           },
           {
@@ -1512,9 +1739,17 @@
             "pages": [
               "api-reference/role-bindings/overview",
               "api-reference/role-bindings/list-role-bindings",
+              "api-reference/role-bindings/list-2026-08-07-2026-08-07",
+              "api-reference/role-bindings/list-latest",
               "api-reference/role-bindings/create-role-binding",
+              "api-reference/role-bindings/create-2026-08-07-2026-08-07",
+              "api-reference/role-bindings/create-latest",
               "api-reference/role-bindings/update-role-binding",
-              "api-reference/role-bindings/delete-role-binding"
+              "api-reference/role-bindings/update-2026-08-07-2026-08-07",
+              "api-reference/role-bindings/update-latest",
+              "api-reference/role-bindings/delete-role-binding",
+              "api-reference/role-bindings/delete-2026-08-07-2026-08-07",
+              "api-reference/role-bindings/delete-latest"
             ]
           },
           {
@@ -1522,8 +1757,14 @@
             "pages": [
               "api-reference/scim-tokens/overview",
               "api-reference/scim-tokens/list-scim-tokens",
+              "api-reference/scim-tokens/list-2026-08-07-2026-08-07",
+              "api-reference/scim-tokens/list-latest",
               "api-reference/scim-tokens/create-scim-token",
-              "api-reference/scim-tokens/revoke-scim-token"
+              "api-reference/scim-tokens/create-2026-08-07-2026-08-07",
+              "api-reference/scim-tokens/create-latest",
+              "api-reference/scim-tokens/revoke-scim-token",
+              "api-reference/scim-tokens/delete-2026-08-07-2026-08-07",
+              "api-reference/scim-tokens/delete-latest"
             ]
           },
           {
@@ -1552,8 +1793,14 @@
             "pages": [
               "api-reference/organizations/overview",
               "api-reference/organizations/list-organizations",
+              "api-reference/organizations/get-list-organizations",
+              "api-reference/organizations/get-list-organizations-",
               "api-reference/organizations/create-organization",
-              "api-reference/organizations/get-organization"
+              "api-reference/organizations/create-an-organization",
+              "api-reference/organizations/post-create-an-organization",
+              "api-reference/organizations/get-organization",
+              "api-reference/organizations/get-an-organization",
+              "api-reference/organizations/get-get-an-organization"
             ]
           },
           {
@@ -1561,10 +1808,20 @@
             "pages": [
               "api-reference/api-keys/overview",
               "api-reference/api-keys/list-api-keys",
+              "api-reference/api-keys/get-list-api-keys",
+              "api-reference/api-keys/get-list-api-keys-",
               "api-reference/api-keys/create-api-key",
+              "api-reference/api-keys/create-an-api-key",
+              "api-reference/api-keys/post-create-an-api-key",
               "api-reference/api-keys/get-api-key",
+              "api-reference/api-keys/get-an-api-key",
+              "api-reference/api-keys/get-get-an-api-key",
               "api-reference/api-keys/update-api-key",
-              "api-reference/api-keys/revoke-api-key"
+              "api-reference/api-keys/update-an-api-key",
+              "api-reference/api-keys/patch-update-an-api-key",
+              "api-reference/api-keys/revoke-api-key",
+              "api-reference/api-keys/revoke-an-api-key",
+              "api-reference/api-keys/delete-revoke-an-api-key"
             ]
           },
           {
@@ -1631,6 +1888,12 @@
               "api-reference/webhooks/roll-an-endpoint-s-signing-secret",
               "api-reference/webhooks/send-a-test-event-to-an-endpoint",
               "api-reference/webhooks/archive-a-webhook-endpoint"
+            ]
+          },
+          {
+            "group": "Platform Health",
+            "pages": [
+              "api-reference/platform-health/overview"
             ]
           }
         ]

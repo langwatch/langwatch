@@ -1,4 +1,3 @@
-
 // Utility type to pull out all values of keys on an object, and only allow types which
 
 import { type AttributeValue } from "@opentelemetry/api";

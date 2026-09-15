@@ -1,17 +1,13 @@
 /**
- * The `/api/scim-tokens` management family: the bearer tokens an identity
- * provider holds to reach `/api/scim/v2`.
- *
- * The token value exists in the create response and nowhere else; listing
- * describes tokens and never returns a value or a hash.
- *
- * CLI-only, and deliberately not exported from the client SDK's public index.
+ * The `/api/v1/scim-tokens` management family: the bearer tokens an identity provider
+ * holds to reach `/api/scim/v2`.
  */
 import { resolveEndpoint } from "@/internal/endpoint";
 import {
   createManagementRequest,
-  resolveManagementToken,
+  managementPath,
   type ManagementRequest,
+  resolveManagementToken,
 } from "../_shared/management-request";
 
 export interface ScimTokenSummary {
@@ -54,14 +50,14 @@ export class ScimTokensApiService {
   async list(): Promise<{ tokens: ScimTokenSummary[] }> {
     return this.#request({
       operation: "list SCIM tokens",
-      path: "/api/scim-tokens",
+      path: managementPath("/api/v1/scim-tokens"),
     });
   }
 
   async create(input: { description?: string } = {}): Promise<CreatedScimToken> {
     return this.#request({
       operation: "create SCIM token",
-      path: "/api/scim-tokens",
+      path: managementPath("/api/v1/scim-tokens"),
       method: "POST",
       body: input,
     });
@@ -70,7 +66,7 @@ export class ScimTokensApiService {
   async revoke(id: string): Promise<{ success: true }> {
     return this.#request({
       operation: `revoke SCIM token "${id}"`,
-      path: `/api/scim-tokens/${encodeURIComponent(id)}`,
+      path: managementPath(`/api/v1/scim-tokens/${encodeURIComponent(id)}`),
       method: "DELETE",
     });
   }

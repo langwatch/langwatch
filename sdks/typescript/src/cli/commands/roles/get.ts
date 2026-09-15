@@ -3,9 +3,7 @@ import { RolesApiService } from "@/client-sdk/services/roles/roles-api.service";
 import type { CommandResult } from "../../utils/output";
 import { asDate, orDash, printFacts, runManagement } from "../management/_shared";
 
-export const getRoleCommand = async (
-  id: string,
-): Promise<CommandResult | void> =>
+export const getRoleCommand = async (id: string): Promise<CommandResult | void> =>
   runManagement({
     action: "fetch custom role",
     pending: `Fetching custom role "${id}"...`,

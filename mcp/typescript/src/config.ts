@@ -6,19 +6,7 @@ export interface McpConfig {
   projectId?: string;
 }
 
-// ---------------------------------------------------------------------------
-// Singleton storage on globalThis
-//
-// When the langwatch app (CJS, no "type": "module") imports this module,
-// tsx creates a CJS-cached copy. When mcp-server's own ESM dist chunks
-// do `await import("./search-traces-*.js")`, Node creates a separate
-// ESM-cached copy. Module-level variables are NOT shared between them.
-//
-// By storing config on globalThis, both CJS and ESM instances read/write
-// the same object, fixing the "Config not initialized" error that occurs
-// when initConfig() runs on the CJS side but tool handlers execute on
-// the ESM side.
-// ---------------------------------------------------------------------------
+// Store on globalThis to share config between CJS and ESM module instances.
 
 const GLOBAL_KEY = "__langwatch_mcp_config" as const;
 const STORAGE_KEY = "__langwatch_mcp_config_storage" as const;
@@ -64,7 +52,7 @@ function normalizeEndpoint(endpoint: string): string {
   return trimmed.slice(0, end);
 }
 
-export function initConfig(args: { apiKey?: string; endpoint?: string }): void {
+export function initConfig(args: { apiKey?: string; endpoint?: string; projectId?: string }): void {
   const state = getGlobalState();
   state.globalConfig = {
     apiKey: args.apiKey || process.env.LANGWATCH_API_KEY,
@@ -72,19 +60,27 @@ export function initConfig(args: { apiKey?: string; endpoint?: string }): void {
       normalizeEndpoint(args.endpoint ?? "") ||
       normalizeEndpoint(process.env.LANGWATCH_ENDPOINT ?? "") ||
       "https://app.langwatch.ai",
-    projectId: process.env.LANGWATCH_PROJECT_ID,
+    projectId: args.projectId ?? process.env.LANGWATCH_PROJECT_ID,
   };
+}
+
+// Current config: per-request scoped if inside runWithConfig(), otherwise global.
+// Returns undefined rather than throwing so callers don't need try/catch.
+export function tryGetConfig(): McpConfig | undefined {
+  const state = getGlobalState();
+  return state.configStorage.getStore() ?? state.globalConfig;
 }
 
 /**
  * Returns the current config: the per-request scoped config if inside
  * a `runWithConfig()` callback, otherwise the global config.
+ *
+ * Throws when there is none, because every caller of this one needs it to
+ * proceed. A caller that can carry on without it asks `tryGetConfig()`.
  */
 export function getConfig(): McpConfig {
-  const state = getGlobalState();
-  const scoped = state.configStorage.getStore();
-  if (scoped) return scoped;
-  if (!state.globalConfig) {
+  const config = tryGetConfig();
+  if (!config) {
     console.error(
       "[MCP config] getConfig() failed: globalConfig is null, no scoped config active. " +
         "Was initConfig() called? Stack:",
@@ -92,7 +88,7 @@ export function getConfig(): McpConfig {
     );
     throw new Error("Config not initialized");
   }
-  return state.globalConfig;
+  return config;
 }
 
 export function requireApiKey(): string {
@@ -107,7 +103,7 @@ export function requireApiKey(): string {
       new Error().stack,
     );
     throw new Error(
-      "LANGWATCH_API_KEY is required. Set it via --apiKey flag or LANGWATCH_API_KEY environment variable."
+      "LANGWATCH_API_KEY is required. Set it via --apiKey flag or LANGWATCH_API_KEY environment variable.",
     );
   }
   return config.apiKey;

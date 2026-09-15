@@ -1,0 +1,118 @@
+/**
+ * Tests that ModelProviderApp.create builds collaborators from declared members and config,
+ * not from hand-composed infrastructure. Regression: before regaining build step, calls
+ * crashed on undefined errors (defaultFeatures, systemProviders, exists).
+ */
+import type { AuthzApi } from "@langwatch/authz-contract";
+import type { OrganizationApi } from "@langwatch/organization-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
+import type { RedisConnection } from "@langwatch/redis-client";
+import { ResourceScope } from "@langwatch/runtime-composition";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { describe, expect, it } from "vitest";
+import { MemoryModelProviderRepositories } from "../../repositories/memory/memory.model-provider.repositories.ts";
+import { ModelProviderApp } from "../model-provider.app.ts";
+
+function testProject(id: string) {
+  return {
+    id,
+    teamId: "team-1",
+    createdAt: new Date("2026-01-01T00:00:00.000Z"),
+    team: { id: "team-1", organizationId: "organization-1" },
+  };
+}
+
+/** A project read fuller than the shared fixture's: this suite also drives the scope derivation. */
+function createFullModelProviderTestProjects(): ProjectApi {
+  return createApiFixture<ProjectApi>({
+    getWithTeam: async (id: string) => testProject(id),
+    findWithTeam: async (id: string) => testProject(id),
+    listIdsByOrganization: async () => [],
+    listNamesByIds: async () => [],
+  });
+}
+
+/** An organization read fuller than the shared fixture's, for the same reason. */
+function createFullModelProviderTestOrganizations(): OrganizationApi {
+  return createApiFixture<OrganizationApi>({
+    getBillingProfile: async ({ organizationId }: { organizationId: string }) => ({
+      id: organizationId,
+      name: "Test Organization",
+    }),
+    listTeams: async () => ({
+      data: [],
+      pagination: { total: 0, page: 1, limit: 1_000 },
+    }),
+  });
+}
+
+/**
+ * The `redis` member, faked to the three calls this module's own connection
+ * counter makes. Not a full `RedisConnection` — nothing here reaches
+ * `testConnection` — so the cast at the boundary is the same "narrow double"
+ * idiom `modules/agent/server/src/app/__tests__/memory-redis.ts` uses for the
+ * same type.
+ */
+function fakeRedis(): RedisConnection {
+  return {
+    incr: async () => 1,
+    expire: async () => 1,
+    ttl: async () => 0,
+  } as unknown as RedisConnection;
+}
+
+/**
+ * Builds the app exactly the way boot does: through `create`, not test-only
+ * `createForTesting`.
+ */
+function createRealModelProviderApp(): ModelProviderApp {
+  return ModelProviderApp.create({
+    repositories: MemoryModelProviderRepositories.create(),
+    dependencies: {
+      projects: createFullModelProviderTestProjects(),
+      organizations: createFullModelProviderTestOrganizations(),
+      permissions: createApiFixture<AuthzApi>({ hasProjectPermission: async () => true }),
+    },
+    members: {
+      redis: fakeRedis(),
+    },
+    config: {
+      isSaas: false,
+      egress: { blockLocal: true, allowedHosts: [], verifyTls: true },
+      executionProxyBaseUrl: "http://nlp-engine-not-configured.invalid",
+      environment: {},
+    },
+    resources: new ResourceScope(),
+  });
+}
+
+describe("ModelProviderApp.create", () => {
+  describe("given only the process's own redis and secrets members", () => {
+    it("answers the default-models feature catalogue instead of crashing on undefined defaultFeatures", async () => {
+      const app = createRealModelProviderApp();
+
+      await expect(
+        app.getDefaultSnapshotUnattributed({ projectId: "project-1" }),
+      ).resolves.toBeDefined();
+    });
+
+    it("answers the provider list instead of crashing on undefined systemProviders", async () => {
+      const app = createRealModelProviderApp();
+
+      await expect(app.listForProject({ projectId: "project-1" })).resolves.toEqual([]);
+    });
+
+    it("recognizes a known provider instead of crashing on undefined exists", async () => {
+      const app = createRealModelProviderApp();
+
+      await expect(
+        app.upsertUnattributed({
+          projectId: "project-1",
+          provider: "openai",
+          enabled: true,
+          customKeys: { OPENAI_API_KEY: "sk-test" },
+        }),
+      ).resolves.toBeDefined();
+    });
+  });
+});

@@ -52,18 +52,14 @@ export const runExperimentCommand = async (
     if (status.status === "failed") {
       failSpinner({
         spinner: pollSpinner,
-        error: new Error(
-          `Experiment failed after ${status.progress}/${status.total} cells`,
-        ),
+        error: new Error(`Experiment failed after ${status.progress}/${status.total} cells`),
         action: "run experiment",
       });
       process.exit(1);
     }
 
     if (status.status === "completed") {
-      pollSpinner.succeed(
-        `Experiment completed! ${status.progress}/${status.total} cells`,
-      );
+      pollSpinner.succeed(`Experiment completed! ${status.progress}/${status.total} cells`);
     } else {
       pollSpinner.warn(`Experiment ${status.status}`);
     }
@@ -77,13 +73,21 @@ export const runExperimentCommand = async (
         if (status.status !== "completed" || !status.summary) return;
         console.log();
         console.log(chalk.bold("  Summary:"));
-        console.log(`    ${chalk.gray("Total cells:")}    ${status.summary.totalCells ?? status.total}`);
-        console.log(`    ${chalk.gray("Completed:")}      ${chalk.green(String(status.summary.completedCells ?? status.progress))}`);
+        console.log(
+          `    ${chalk.gray("Total cells:")}    ${status.summary.totalCells ?? status.total}`,
+        );
+        console.log(
+          `    ${chalk.gray("Completed:")}      ${chalk.green(String(status.summary.completedCells ?? status.progress))}`,
+        );
         if (status.summary.failedCells) {
-          console.log(`    ${chalk.gray("Failed:")}         ${chalk.red(String(status.summary.failedCells))}`);
+          console.log(
+            `    ${chalk.gray("Failed:")}         ${chalk.red(String(status.summary.failedCells))}`,
+          );
         }
         if (status.summary.duration) {
-          console.log(`    ${chalk.gray("Duration:")}       ${(status.summary.duration / 1000).toFixed(1)}s`);
+          console.log(
+            `    ${chalk.gray("Duration:")}       ${(status.summary.duration / 1000).toFixed(1)}s`,
+          );
         }
         if (status.summary.runUrl) {
           console.log(`    ${chalk.gray("View results:")}  ${status.summary.runUrl}`);

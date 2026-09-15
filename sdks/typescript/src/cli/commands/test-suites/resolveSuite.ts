@@ -1,8 +1,5 @@
 import chalk from "chalk";
-import type {
-  TestSuite,
-  TestSuitesApiService,
-} from "@/client-sdk/services/test-suites";
+import type { TestSuite, TestSuitesApiService } from "@/client-sdk/services/test-suites";
 import { createCliTestSuitesService } from "./cli-test-suites-service";
 
 /**
@@ -18,16 +15,7 @@ export class SuiteReferenceError extends Error {
   }
 }
 
-/**
- * Finds the test suite a reference names.
- *
- * An id is tried first, then an exact name, then a name compared without case.
- * A name two suites share is refused with both ids, because picking one for
- * the caller would file the scenario somewhere they did not ask for.
- *
- * @see specs/features/test-suite-cli.feature
- * @see specs/features/scenario-cli.feature
- */
+// Resolve test suite by id or name; rejects ambiguous names.
 export async function resolveSuiteReference({
   reference,
   service,
@@ -46,9 +34,7 @@ export async function resolveSuiteReference({
   const matches =
     exact.length > 0
       ? exact
-      : suites.filter(
-          (suite) => suite.name.toLowerCase() === wanted.toLowerCase(),
-        );
+      : suites.filter((suite) => suite.name.toLowerCase() === wanted.toLowerCase());
 
   if (matches.length === 1) return matches[0]!;
 

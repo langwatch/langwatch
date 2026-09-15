@@ -70,7 +70,7 @@ Feature: Experiments are archived, not hard-deleted
     # Idempotency: avoid spurious DB writes on duplicate clicks.
 
   # ============================================================================
-  # No ClickHouse / DSpy delete calls
+  # External data is not mutated during archive
   # ============================================================================
 
   Scenario: The delete-experiment code path does NOT contact ClickHouse
@@ -79,12 +79,6 @@ Feature: Experiments are archived, not hard-deleted
     When I call `experiments.deleteExperiment` for any experiment
     Then no ClickHouse mutation is issued
     And no S3 PUT / DELETE is triggered by the request
-
-  Scenario: The delete-experiment code path does NOT call the DSpy step cleanup
-    Given the test runner has wrapped getApp().dspySteps.steps.deleteByExperiment
-      with an assertion that fails on invocation
-    When I call `experiments.deleteExperiment` for any experiment
-    Then deleteByExperiment is never called
 
   # ============================================================================
   # Tenancy

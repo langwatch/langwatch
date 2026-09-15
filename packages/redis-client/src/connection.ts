@@ -13,8 +13,8 @@ import {
   type RedisConfigResolution,
   type RedisEnvironment,
   type RedisStandaloneConfig,
-} from "./config";
-import type { RedisConnection, RedisLogger } from "./types";
+} from "./config.ts";
+import type { RedisConnection, RedisLogger } from "./types.ts";
 
 export interface RedisConnectionServiceOptions {
   /** Receives connection lifecycle events and configuration warnings. */
@@ -73,11 +73,7 @@ export class RedisConnectionService {
    * own reasons — to log the mode, or to decide a code path — does not resolve
    * it twice.
    */
-  connectResolved({
-    config,
-  }: {
-    config: RedisConfigResolution;
-  }): RedisConnection | null {
+  connectResolved({ config }: { config: RedisConfigResolution }): RedisConnection | null {
     for (const warning of config.warnings) this.logger?.warn({}, warning);
 
     if (!config.configured) return null;
@@ -121,18 +117,12 @@ export class RedisConnectionService {
     // the guard is here so a future change to that resolution fails loudly
     // rather than silently handing back a cluster client.
     if (!config.configured || config.mode !== "standalone") {
-      throw new Error(
-        "Expected a standalone Redis configuration from a plain URL.",
-      );
+      throw new Error("Expected a standalone Redis configuration from a plain URL.");
     }
     return this.connectStandaloneResolved({ config });
   }
 
-  private connectStandaloneResolved({
-    config,
-  }: {
-    config: RedisStandaloneConfig;
-  }): Redis {
+  private connectStandaloneResolved({ config }: { config: RedisStandaloneConfig }): Redis {
     const connection = new IORedis(config.url, {
       ...SHARED_OPTIONS,
       db: config.db,
@@ -156,12 +146,8 @@ export class RedisConnectionService {
     if (!logger) return;
 
     connection.on("connect", () => logger.info(context, "connected"));
-    connection.on("ready", () =>
-      logger.info(context, "ready to accept commands"),
-    );
-    connection.on("error", (error: Error) =>
-      logger.error({ ...context, error }, "error"),
-    );
+    connection.on("ready", () => logger.info(context, "ready to accept commands"));
+    connection.on("error", (error: Error) => logger.error({ ...context, error }, "error"));
     connection.on("close", () => logger.info(context, "connection closed"));
     connection.on("reconnecting", () => logger.info(context, "reconnecting..."));
   }

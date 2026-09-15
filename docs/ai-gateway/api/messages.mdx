@@ -38,7 +38,7 @@ curl https://gateway.langwatch.ai/v1/messages \
   "id": "msg_01ABC",
   "type": "message",
   "role": "assistant",
-  "content": [{"type": "text", "text": "Hello!"}],
+  "content": [{ "type": "text", "text": "Hello!" }],
   "model": "claude-sonnet-4-5",
   "stop_reason": "end_turn",
   "stop_sequence": null,
@@ -53,19 +53,19 @@ curl https://gateway.langwatch.ai/v1/messages \
 
 ## Which providers serve it
 
-| Model resolves to | What the gateway does |
-|---|---|
-| Anthropic, or a custom Anthropic-compatible endpoint | Forwards the body as written. The answer is the provider's own bytes. |
+| Model resolves to                                    | What the gateway does                                                                                  |
+| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| Anthropic, or a custom Anthropic-compatible endpoint | Forwards the body as written. The answer is the provider's own bytes.                                  |
 | Bedrock, Vertex, Gemini, OpenAI, Azure OpenAI, codex | Translates the request into the provider's own format and rebuilds the answer as an Anthropic message. |
 
 ## Parameters the gateway changes or refuses
 
-| Parameter | What the gateway does |
-|---|---|
-| `model` | Resolved through the key's aliases, allowlist and routing policy, then rewritten to the provider's model id. Missing: `400 missing_model`. Outside the allowlist: `400 model_not_allowed`. |
-| `stream` | Read to choose the streaming path. |
+| Parameter       | What the gateway does                                                                                                                                                                                                                                                                |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `model`         | Resolved through the key's aliases, allowlist and routing policy, then rewritten to the provider's model id. Missing: `400 missing_model`. Outside the allowlist: `400 model_not_allowed`.                                                                                           |
+| `stream`        | Read to choose the streaming path.                                                                                                                                                                                                                                                   |
 | `cache_control` | Governed by the key's cache rules: `disable` strips every marker, `force` adds an ephemeral marker. When no rule matches and the provider needs an explicit marker, the gateway adds one and reports `X-LangWatch-Cache-Mode: auto`. See [Cache control](/ai-gateway/cache-control). |
-| `max_tokens` | Forwarded unchanged. Anthropic requires it and answers `400` without it; that answer is forwarded. |
+| `max_tokens`    | Forwarded unchanged. Anthropic requires it and answers `400` without it; that answer is forwarded.                                                                                                                                                                                   |
 
 The `X-LangWatch-End-User-Id`, `X-LangWatch-Metadata` and `Traceparent` request headers work as on [Chat Completions](/ai-gateway/api/chat-completions#request-headers-the-gateway-reads).
 

@@ -1,0 +1,48 @@
+{
+  "name": "@langwatch/test-harness",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The test harness every LangWatch process shares: which lane a test file belongs in, how a shard is weighted, the one TypeScript compiler session a static scan runs through, and the datastores an integration suite is handed.",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    "./api-fixture": {
+      "types": "./dist/api-fixture.d.ts",
+      "default": "./src/api-fixture.ts"
+    },
+    "./vitest-config": {
+      "types": "./dist/vitest-config.d.ts",
+      "default": "./src/vitest-config.ts"
+    },
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "pnpm -w typecheck:declarations --project . && tsc --noEmit",
+    "test": "vitest run --exclude \"**/*.integration.test.ts\"",
+    "test:unit": "vitest run --exclude \"**/*.integration.test.ts\"",
+    "test:integration": "vitest run --config vitest.integration.config.ts"
+  },
+  "dependencies": {
+    "@clickhouse/client": "catalog:",
+    "@langwatch/prisma-client": "workspace:*",
+    "@langwatch/time": "workspace:*",
+    "@testcontainers/clickhouse": "catalog:",
+    "nanoid": "catalog:",
+    "picomatch": "^4.0.4",
+    "pino": "catalog:",
+    "typescript": "catalog:"
+  },
+  "devDependencies": {
+    "@langwatch/workflow-server": "workspace:*",
+    "@types/node": "catalog:",
+    "@types/picomatch": "^4.0.2",
+    "vitest": "catalog:"
+  }
+}

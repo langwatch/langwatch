@@ -1,0 +1,71 @@
+{
+  "name": "@langwatch/organization-server",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Canonical server-side organization service.",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./dist/index.d.ts",
+  "imports": {
+    "#*": {
+      "types": "./dist/*.d.ts",
+      "default": "./src/*.ts"
+    }
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    },
+    "./composition/organization-invites": {
+      "types": "./dist/repositories/prisma/prisma.organization-invite.repository.d.ts",
+      "default": "./src/repositories/prisma/prisma.organization-invite.repository.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "pnpm -w typecheck:declarations --project . && tsc --noEmit",
+    "test": "vitest run",
+    "test:unit": "vitest run",
+    "test:integration": "vitest run --config vitest.integration.config.ts"
+  },
+  "dependencies": {
+    "@langwatch/actor": "workspace:*",
+    "@langwatch/api": "workspace:*",
+    "@langwatch/api-key-contract": "workspace:*",
+    "@langwatch/authz-contract": "workspace:*",
+    "@langwatch/clickhouse-client": "workspace:*",
+    "@langwatch/enterprise-licensing-contract": "workspace:*",
+    "@langwatch/enterprise-plan-gate": "workspace:*",
+    "@langwatch/entitlement-contract": "workspace:*",
+    "@langwatch/entitlement-server": "workspace:*",
+    "@langwatch/handled-error": "workspace:*",
+    "@langwatch/identity-contract": "workspace:*",
+    "@langwatch/infrastructure": "workspace:*",
+    "@langwatch/ksuid": "workspace:*",
+    "@langwatch/observability": "workspace:*",
+    "@langwatch/organization-contract": "workspace:*",
+    "@langwatch/prisma-client": "workspace:*",
+    "@langwatch/project-contract": "workspace:*",
+    "@langwatch/redis-client": "workspace:*",
+    "@langwatch/role-contract": "workspace:*",
+    "@langwatch/runtime-composition": "workspace:*",
+    "@langwatch/share-contract": "workspace:*",
+    "@langwatch/time": "workspace:*",
+    "@langwatch/user-contract": "workspace:*",
+    "@trpc/server": "catalog:",
+    "hono": "catalog:",
+    "hono-openapi": "catalog:",
+    "nanoid": "^6.0.0",
+    "slugify": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@langwatch/test-harness": "workspace:*",
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

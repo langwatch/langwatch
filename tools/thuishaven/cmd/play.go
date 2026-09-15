@@ -129,10 +129,7 @@ func runPlay(ctx context.Context, d deps, inv invocation) error {
 	// plain streaming; Ctrl-C (or the driver killing us) ends it and the
 	// deferred teardown still destroys everything.
 	if d.isAgent || !stdoutIsTTY() {
-		sandbox := app.PlaySandbox{
-			Number: pr.Number, Checkout: checkout,
-			LwDir: filepath.Join(checkout, "platform", "app"), Preset: preset,
-		}
+		sandbox := app.PlaySandbox{Number: pr.Number, Checkout: checkout, Preset: preset}
 		if err := d.orch.PlayLaunch(ctx, sandbox); err != nil && ctx.Err() == nil {
 			return err
 		}
@@ -275,6 +272,6 @@ func runPlayLaunchCmd(ctx context.Context, d deps, inv invocation) error {
 		preset = inv.args[1]
 	}
 	return d.orch.PlayLaunch(ctx, app.PlaySandbox{
-		Number: number, Checkout: d.worktree, LwDir: d.lwDir, Preset: preset,
+		Number: number, Checkout: d.worktree, Preset: preset,
 	})
 }

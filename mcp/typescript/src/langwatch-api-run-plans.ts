@@ -8,15 +8,8 @@ import type {
 } from "./schemas/run-plan.js";
 import type { EvaluatorAttachmentWire } from "./schemas/suite-fields.js";
 
-/**
- * Client for `/api/v1/run-plans`.
- *
- * A run plan is what you run, and its NAME identifies it: running against a
- * name that exists replaces that plan's configuration, running against a new
- * name creates one. Configuration is the scope, the targets, the repeat count
- * and the two models. Parameters, the note and the idempotency key belong to
- * one run, not to the plan.
- */
+// Client for /api/v1/run-plans. A run plan is identified by name; re-using the
+// name replaces its config while parameters/notes belong to one run only.
 
 /**
  * The shapes the run plan tools accept, taken from the zod that validates
@@ -96,19 +89,14 @@ export interface RunPlanArchiveResponse {
 }
 
 /** Lists the run plans of the project. */
-export async function listRunPlans(params?: {
-  includeArchived?: boolean;
-}): Promise<RunPlan[]> {
+export async function listRunPlans(params?: { includeArchived?: boolean }): Promise<RunPlan[]> {
   const query = params?.includeArchived ? "?includeArchived=true" : "";
   return makeRequest("GET", `/api/v1/run-plans${query}`) as Promise<RunPlan[]>;
 }
 
 /** Retrieves a single run plan by id. */
 export async function getRunPlan(id: string): Promise<RunPlan> {
-  return makeRequest(
-    "GET",
-    `/api/v1/run-plans/${encodeURIComponent(id)}`,
-  ) as Promise<RunPlan>;
+  return makeRequest("GET", `/api/v1/run-plans/${encodeURIComponent(id)}`) as Promise<RunPlan>;
 }
 
 /**
@@ -123,11 +111,7 @@ export async function runRunPlan(data: {
   parameters?: RunParameters;
   note?: string;
 }): Promise<RunPlanRunResult> {
-  return makeRequest(
-    "POST",
-    "/api/v1/run-plans/run",
-    data,
-  ) as Promise<RunPlanRunResult>;
+  return makeRequest("POST", "/api/v1/run-plans/run", data) as Promise<RunPlanRunResult>;
 }
 
 /** Runs a plan again with the configuration it already holds. */
@@ -147,9 +131,7 @@ export async function rerunRunPlan(
 }
 
 /** Archives a run plan. */
-export async function archiveRunPlan(
-  id: string,
-): Promise<RunPlanArchiveResponse> {
+export async function archiveRunPlan(id: string): Promise<RunPlanArchiveResponse> {
   return makeRequest(
     "DELETE",
     `/api/v1/run-plans/${encodeURIComponent(id)}`,

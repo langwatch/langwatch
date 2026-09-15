@@ -6,12 +6,7 @@
  */
 
 export { EvaluationsFacade } from "./evaluations.facade";
-export type {
-  EvaluationResult,
-  EvaluateOptions,
-  EvaluationStatus,
-  EvaluationCost,
-} from "./types";
+export type { EvaluationResult, EvaluateOptions, EvaluationStatus, EvaluationCost } from "./types";
 export {
   EvaluationError,
   EvaluatorCallError,

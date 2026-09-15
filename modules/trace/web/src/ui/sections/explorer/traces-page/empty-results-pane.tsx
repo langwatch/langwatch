@@ -1,0 +1,105 @@
+import { Box, Flex } from "@chakra-ui/react";
+import React from "react";
+import { EmptyStateOverlay } from "../onboarding/empty-state-overlay.tsx";
+import { SampleDataBanner } from "../../../elements/explorer/onboarding/sample-data-banner.tsx";
+import { OnboardingAurora } from "../onboarding/effects/onboarding-aurora.tsx";
+import { usePreviewTracesActive } from "../../../../behavior/explorer/onboarding/use-preview-traces-active.ts";
+import { useOnboardingStore } from "../../../../behavior/explorer/onboarding/store/onboarding-store.ts";
+import { Toolbar } from "../toolbar/toolbar.tsx";
+import { TraceTable } from "../trace-table/trace-table.tsx";
+
+export const EmptyResultsPane: React.FC = React.memo(() => {
+  // The trace list query short-circuits to `SAMPLE_PREVIEW_TRACES`
+  // (purely client-side) whenever this pane is rendered, so the table
+  // behind is always populated with interactive rows. The dim lifts
+  // the moment the user commits to an exit action (`setupDisengaged`)
+  // — sample data is already on screen, no waiting for ingestion.
+  const setupDisengaged = useOnboardingStore((s) => s.setupDisengaged);
+  const onboardingStage = useOnboardingStore((s) => s.stage);
+  const isPreviewActive = usePreviewTracesActive();
+  const isPostArrival = onboardingStage === "postArrival";
+
+  return (
+    <Flex
+      as="main"
+      role="main"
+      aria-label="Set up tracing"
+      direction="column"
+      flex={1}
+      minWidth={0}
+      height="full"
+      overflow="hidden"
+    >
+      {/* Toolbar stays fully interactive during the tour — it now
+          carries the "On safari" exit affordance, which is the only
+          way out of the journey. Dimming/inert-ing it would make
+          the tour feel like a trap. */}
+      <Toolbar />
+      {/* Sample-data banner — sits between toolbar and table so users
+          can read it before they touch a facet. Always-on while preview
+          is active; exit is the toolbar's "On safari" button, which
+          flips the dismissal flag and drops the user into the real
+          (empty) table. */}
+      <SampleDataBanner />
+      <Box flex={1} minHeight={0} position="relative" overflow="hidden">
+        <Box
+          position="absolute"
+          inset={0}
+          overflow="auto"
+          bg="bg.muted"
+          // Pre-disengaged: full opacity. Pointer events are suppressed so the table
+          // behind the empty-state hero isn't accidentally clickable through the
+          // overlay.
+          {...(setupDisengaged || isPostArrival
+            ? // Fully clickable during postArrival — the table takes
+              // the whole canvas and the user gets to explore.
+              {}
+            : ({
+                pointerEvents: "none",
+                "aria-disabled": true,
+                inert: "",
+              } as Record<string, unknown>))}
+        >
+          <TraceTable />
+        </Box>
+        {/* Diagonal-stripe overlay — purely peripheral signal that the
+            visible rows are sample data, not real traces. Transparent
+            orange stripes match the SampleDataBanner palette and are
+            faint enough to read as "preview mode" without fighting the
+            table content. Pointer-events:none so it never blocks clicks. */}
+        {isPreviewActive && (
+          <Box
+            position="absolute"
+            inset={0}
+            pointerEvents="none"
+            zIndex={0}
+            opacity={0.25}
+            color="orange.subtle"
+            backgroundImage="repeating-linear-gradient(45deg, transparent 0 14px, currentColor 14px 15px)"
+            aria-hidden="true"
+          />
+        )}
+        {/* Aurora ribbon — self-gates on stage, lazy-mounts only
+            during aurora stages. Owned by the onboarding module so
+            this pane doesn't have to know about `shouldShowAurora`
+            or the mask geometry; see
+            `onboarding/effects/OnboardingAurora.tsx`. */}
+        <OnboardingAurora />
+        {/* Outer wrapper is pointer-events:none so clicks fall
+            through to the table behind it (notably the highlighted
+            row during `postArrival`, which is otherwise eclipsed by
+            this scroll-container's hit area). The hero composition
+            inside `EmptyStateOverlay` sets pointer-events:auto on
+            its inner Box, so headings, CTAs, and density cards stay
+            clickable. We also drop `overflow:auto` here for the same
+            reason — overflow:auto creates a hit-testable scroll
+            container. The hero composition Flex inside has its own
+            overflow:auto for the rare tall-hero case. */}
+        <Box position="absolute" inset={0} zIndex={1} pointerEvents="none">
+          <EmptyStateOverlay />
+        </Box>
+      </Box>
+    </Flex>
+  );
+});
+EmptyResultsPane.displayName = "EmptyResultsPane";

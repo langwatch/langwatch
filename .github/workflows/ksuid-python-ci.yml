@@ -1,0 +1,65 @@
+name: ksuid-python-ci
+
+# The JavaScript half of ksuid needs no workflow of its own: it is a workspace
+# package with a `test` script, so the package-suite discovery in
+# langwatch-app-ci runs it. The Python half lives outside the pnpm workspace,
+# so it gets this small path-filtered job. Not a required check — a plain
+# `paths:` filter is fine here (see sdk-python-ci for the always-run pattern
+# required checks need).
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "packages/ksuid-python/**"
+      # The Python uv workspace root (ADR-145): a re-lock or a root
+      # resolution-setting change re-pins this package's dependencies.
+      - "uv.lock"
+      - "pyproject.toml"
+      - ".python-version"
+  pull_request:
+    paths:
+      - "packages/ksuid-python/**"
+      - "uv.lock"
+      - "pyproject.toml"
+      - ".python-version"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.13"]
+    env:
+      # Beats the workspace root's .python-version, which would otherwise pin
+      # every matrix leg to the same interpreter.
+      UV_PYTHON: ${{ matrix.python-version }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      - name: Set up Python
+        run: uv python install ${{ matrix.python-version }}
+
+      - name: Run tests
+        working-directory: packages/ksuid-python
+        run: |
+          uv sync --dev
+          uv run pytest tests/ -v
+
+      - name: Build package
+        working-directory: packages/ksuid-python
+        run: uv build --out-dir dist

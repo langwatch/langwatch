@@ -8,7 +8,8 @@ keywords: scim, groups, role mapping, provisioning, okta, azure ad, entra id, id
 A SCIM group is a group that your identity provider pushes into LangWatch. You bind roles to the group at the organization, team or project scope, and every member of the group holds those roles.
 
 <Info>
-  Groups are an **Enterprise** feature, whether they come from SCIM or are created by hand. Set up [SCIM Provisioning](/platform/scim) for users first.
+  Groups are an **Enterprise** feature, whether they come from SCIM or are created by hand. Set up
+  [SCIM Provisioning](/platform/scim) for users first.
 </Info>
 
 ---
@@ -27,12 +28,12 @@ A SCIM group is a group that your identity provider pushes into LangWatch. You b
 
 **Settings > Groups** lists every group. Each row shows:
 
-| Column | Description |
-|--------|-------------|
-| **Group** | The group name from the identity provider |
-| **Source** | `SCIM` for a pushed group, `Manual` for a group created in LangWatch |
-| **Access** | The role bindings of the group |
-| **Members** | The number of users in the group |
+| Column      | Description                                                          |
+| ----------- | -------------------------------------------------------------------- |
+| **Group**   | The group name from the identity provider                            |
+| **Source**  | `SCIM` for a pushed group, `Manual` for a group created in LangWatch |
+| **Access**  | The role bindings of the group                                       |
+| **Members** | The number of users in the group                                     |
 
 Click a row to open the group dialog, where you manage the bindings and, for manual groups, the members.
 
@@ -51,11 +52,11 @@ A group can hold several bindings, for example Member on the organization plus A
 
 ### Binding scopes
 
-| Scope | What it grants |
-|-------|---------------|
+| Scope            | What it grants                                         |
+| ---------------- | ------------------------------------------------------ |
 | **Organization** | The role on every team and project in the organization |
-| **Team** | The role on one team and all its projects |
-| **Project** | The role on one project |
+| **Team**         | The role on one team and all its projects              |
+| **Project**      | The role on one project                                |
 
 ---
 
@@ -104,21 +105,21 @@ Bindings work the same way on manual and SCIM groups. Members must already be in
 
 ## SCIM group endpoints
 
-| Endpoint | Methods |
-|----------|---------|
-| `/api/scim/v2/Groups` | `GET`, `POST` |
+| Endpoint                   | Methods                         |
+| -------------------------- | ------------------------------- |
+| `/api/scim/v2/Groups`      | `GET`, `POST`                   |
 | `/api/scim/v2/Groups/{id}` | `GET`, `PUT`, `PATCH`, `DELETE` |
 
 `POST` with the `displayName` of an existing group returns `409 Conflict`. `GET /Groups` returns SCIM groups only, at most 100 per page.
 
 ### Supported PATCH operations
 
-| Operation | Example | Effect |
-|-----------|---------|--------|
-| `add members` | Add users to the group | The users hold the group's bindings |
-| `remove members` | Remove users from the group | The group's bindings no longer apply to them |
-| `replace displayName` | Rename the group | The name changes in LangWatch |
-| `replace members` | Replace the member list | Adds the new members and removes the old ones |
+| Operation             | Example                     | Effect                                        |
+| --------------------- | --------------------------- | --------------------------------------------- |
+| `add members`         | Add users to the group      | The users hold the group's bindings           |
+| `remove members`      | Remove users from the group | The group's bindings no longer apply to them  |
+| `replace displayName` | Rename the group            | The name changes in LangWatch                 |
+| `replace members`     | Replace the member list     | Adds the new members and removes the old ones |
 
 A `replace` clears the membership only when `members` is an empty list or an explicit `null`. A `replace` with no `members` value, a `members` value that is not a list, or a list with entries that have no usable string `value` leaves the membership unchanged, so a malformed payload cannot revoke access. The other attributes in the same operation, such as `displayName`, still apply, and the unapplied part is written to the server log.
 
@@ -162,7 +163,8 @@ GET /api/scim/v2/Groups?filter=displayName eq "Engineering"
 The [Groups REST API](/api-reference/groups/overview) creates groups, sets their bindings and members, and deletes them, so you can script provisioning outside SCIM.
 
 <Info>
-  The name and the members of a SCIM group belong to the identity provider. The REST API and the settings page refuse to change them.
+  The name and the members of a SCIM group belong to the identity provider. The REST API and the
+  settings page refuse to change them.
 </Info>
 
 ---

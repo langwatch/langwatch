@@ -10,12 +10,8 @@
  * fresh work.
  */
 
-import type { AbortSignalLike, QueryRequest } from "./query";
-import {
-  isTransientClickHouseError,
-  jitteredBackoffMs,
-  retryNoticeLevel,
-} from "./resilience";
+import type { AbortSignalLike, QueryRequest } from "./query.ts";
+import { isTransientClickHouseError, jitteredBackoffMs, retryNoticeLevel } from "./resilience.ts";
 
 export interface RetryNotice {
   /**
@@ -75,8 +71,10 @@ export interface RetryAttemptNotice {
   level: "warn" | "debug";
 }
 
-export interface RunWithRetryOptions
-  extends Omit<RetryOptions, "onRetry" | "transientMessageFragments"> {
+export interface RunWithRetryOptions extends Omit<
+  RetryOptions,
+  "onRetry" | "transientMessageFragments"
+> {
   transientMessageFragments?: readonly string[] | undefined;
   onRetry?: ((notice: RetryAttemptNotice) => void) | undefined;
   /** Stop retrying once this reports true. Nobody is waiting any more. */
@@ -210,8 +208,7 @@ export class RetryPolicy {
       ...(onRetry === undefined
         ? {}
         : {
-            onRetry: (notice: Omit<RetryNotice, "request">) =>
-              onRetry({ ...notice, request }),
+            onRetry: (notice: Omit<RetryNotice, "request">) => onRetry({ ...notice, request }),
           }),
     });
   }

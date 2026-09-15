@@ -1,12 +1,5 @@
 /**
- * The `/api/groups` REST family, which shipped without a CLI.
- *
- * A group is a container of members that carries role bindings, so granting a
- * group access grants every member it. Groups are an Enterprise capability:
- * every route answers 402 `enterprise_plan_required` below that plan, which
- * the CLI renders with upgrade guidance.
- *
- * CLI-only, and deliberately not exported from the client SDK's public index.
+ * The `/api/v1/groups` REST family, which shipped without a CLI.
  */
 import { resolveEndpoint } from "@/internal/endpoint";
 import {
@@ -106,17 +99,14 @@ export class GroupsApiService {
     this.#request = createManagementRequest({
       endpoint: resolveEndpoint(config?.endpoint),
       token: resolveManagementToken({ apiKey: config?.apiKey }),
-      errorFactory: ({ message, operation, body }) =>
-        new GroupsApiError(message, operation, body),
+      errorFactory: ({ message, operation, body }) => new GroupsApiError(message, operation, body),
     });
   }
 
-  async list(
-    options: { page?: number; limit?: number } = {},
-  ): Promise<ListGroupsResponse> {
+  async list(options: { page?: number; limit?: number } = {}): Promise<ListGroupsResponse> {
     return this.#request({
       operation: "list groups",
-      path: "/api/groups",
+      path: "/api/v1/groups",
       query: { ...options },
     });
   }
@@ -124,14 +114,14 @@ export class GroupsApiService {
   async get(id: string): Promise<GroupDetail> {
     return this.#request({
       operation: `fetch group "${id}"`,
-      path: `/api/groups/${encodeURIComponent(id)}`,
+      path: `/api/v1/groups/${encodeURIComponent(id)}`,
     });
   }
 
   async create(input: CreateGroupInput): Promise<CreatedGroup> {
     return this.#request({
       operation: "create group",
-      path: "/api/groups",
+      path: "/api/v1/groups",
       method: "POST",
       body: input,
     });
@@ -146,7 +136,7 @@ export class GroupsApiService {
   }): Promise<{ id: string; name: string; slug: string }> {
     return this.#request({
       operation: `rename group "${id}"`,
-      path: `/api/groups/${encodeURIComponent(id)}`,
+      path: `/api/v1/groups/${encodeURIComponent(id)}`,
       method: "PATCH",
       body: input,
     });
@@ -155,7 +145,7 @@ export class GroupsApiService {
   async delete(id: string): Promise<{ success: boolean }> {
     return this.#request({
       operation: `delete group "${id}"`,
-      path: `/api/groups/${encodeURIComponent(id)}`,
+      path: `/api/v1/groups/${encodeURIComponent(id)}`,
       method: "DELETE",
     });
   }
@@ -163,7 +153,7 @@ export class GroupsApiService {
   async listMembers(groupId: string): Promise<{ data: GroupMember[] }> {
     return this.#request({
       operation: `list members of group "${groupId}"`,
-      path: `/api/groups/${encodeURIComponent(groupId)}/members`,
+      path: `/api/v1/groups/${encodeURIComponent(groupId)}/members`,
     });
   }
 
@@ -176,7 +166,7 @@ export class GroupsApiService {
   }): Promise<{ success: boolean }> {
     return this.#request({
       operation: `add a member to group "${groupId}"`,
-      path: `/api/groups/${encodeURIComponent(groupId)}/members`,
+      path: `/api/v1/groups/${encodeURIComponent(groupId)}/members`,
       method: "POST",
       body: input,
     });
@@ -191,7 +181,7 @@ export class GroupsApiService {
   }): Promise<{ success: boolean }> {
     return this.#request({
       operation: `remove member "${userId}" from group "${groupId}"`,
-      path: `/api/groups/${encodeURIComponent(groupId)}/members/${encodeURIComponent(userId)}`,
+      path: `/api/v1/groups/${encodeURIComponent(groupId)}/members/${encodeURIComponent(userId)}`,
       method: "DELETE",
     });
   }
@@ -199,7 +189,7 @@ export class GroupsApiService {
   async listBindings(groupId: string): Promise<{ data: GroupBinding[] }> {
     return this.#request({
       operation: `list bindings of group "${groupId}"`,
-      path: `/api/groups/${encodeURIComponent(groupId)}/bindings`,
+      path: `/api/v1/groups/${encodeURIComponent(groupId)}/bindings`,
     });
   }
 
@@ -212,7 +202,7 @@ export class GroupsApiService {
   }): Promise<CreatedGroupBinding> {
     return this.#request({
       operation: `add a binding to group "${groupId}"`,
-      path: `/api/groups/${encodeURIComponent(groupId)}/bindings`,
+      path: `/api/v1/groups/${encodeURIComponent(groupId)}/bindings`,
       method: "POST",
       body: input,
     });
@@ -227,7 +217,7 @@ export class GroupsApiService {
   }): Promise<{ success: boolean }> {
     return this.#request({
       operation: `remove binding "${bindingId}" from group "${groupId}"`,
-      path: `/api/groups/${encodeURIComponent(groupId)}/bindings/${encodeURIComponent(bindingId)}`,
+      path: `/api/v1/groups/${encodeURIComponent(groupId)}/bindings/${encodeURIComponent(bindingId)}`,
       method: "DELETE",
     });
   }

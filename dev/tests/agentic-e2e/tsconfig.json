@@ -1,0 +1,11 @@
+{
+  "extends": "../../../tsconfig.base.json",
+  "compilerOptions": {
+    "module": "CommonJS",
+    "lib": ["ES2023", "DOM"],
+    "types": ["node"],
+    "esModuleInterop": true,
+    "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo/agentic-e2e.tsbuildinfo"
+  },
+  "include": ["tests/**/*.ts", "playwright.config.ts"]
+}

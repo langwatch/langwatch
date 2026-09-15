@@ -96,6 +96,15 @@ Feature: Private ClickHouse Routing
     Then the returned client connects to the private ClickHouse
     And no project needs to exist for that id
 
+  @unit
+  Scenario: One directory places tenants for every process
+    Given the directory the API process and the worker process each compose
+    When it is asked for a project, for an organization and for a user
+    Then it answers the project's organization, the organization itself, and the shared instance
+    # One implementation, not one per process: the API resolved a tenant through
+    # the project table alone, so an organization- or user-tenanted read that the
+    # worker routed correctly was refused in the API.
+
   @integration
   Scenario: A tenant that names no project, organization or user is refused
     Given an id that matches no project, no organization and no user
@@ -107,17 +116,20 @@ Feature: Private ClickHouse Routing
   # Access discipline
   # ---------------------------------------------------------------------------
   # Routing is only safe while there is one road to a client. The composition
-  # root builds the resolvers once; everything else receives them through the
-  # app or an injected repository, so no module can quietly reach the wrong
-  # instance by importing its own way in.
+  # root builds the connection once and everything else receives a client from
+  # it, so a repository cannot reach an instance of its own choosing. What that
+  # is worth is only ever visible at the servers: a repository handed the
+  # routed connection writes where its tenant routes, and the other instance
+  # holds nothing of it.
   # ---------------------------------------------------------------------------
 
-  @unit
-  Scenario: The application reaches ClickHouse through the composition root alone
-    Given the composition root builds the tenant and organization resolvers once
-    When any other module needs a ClickHouse client
-    Then it receives one through the app or an injected repository
-    And no module outside the sanctioned boot paths imports the client module's functions directly
+  @integration
+  Scenario: A repository handed the routed connection cannot reach the other instance
+    Given the composition root builds one routed connection over both instances
+    And a repository that resolves its client from that connection
+    When it writes for a tenant routed to the private instance
+    Then the row is on the private instance
+    And the shared instance holds nothing of it
 
   # ---------------------------------------------------------------------------
   # Admin / migration operations

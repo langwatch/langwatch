@@ -1,23 +1,21 @@
 import type { paths } from "@/internal/generated/openapi/api-client";
-import {
-  createLangWatchApiClient,
-  type LangwatchApiClient,
-} from "@/internal/api/client";
+import { createLangWatchApiClient, type LangwatchApiClient } from "@/internal/api/client";
 import { type InternalConfig } from "@/client-sdk/types";
 import {
   extractStatusFromResponse,
   formatApiErrorForOperation,
 } from "@/client-sdk/services/_shared/format-api-error";
+import { unwrapApiResult } from "@/client-sdk/services/_shared/unwrap-api-result";
 
 export type TraceSearchBody = NonNullable<
-  paths["/api/traces/search"]["post"]["requestBody"]
+  paths["/api/v1/traces/search"]["post"]["requestBody"]
 >["content"]["application/json"];
 
 export type TraceSearchResponse =
-  paths["/api/traces/search"]["post"]["responses"]["200"]["content"]["application/json"];
+  paths["/api/v1/traces/search"]["post"]["responses"]["200"]["content"]["application/json"];
 
 type TraceGetResponseRaw =
-  paths["/api/traces/{traceId}"]["get"]["responses"]["200"]["content"]["application/json"];
+  paths["/api/v1/traces/{traceId}"]["get"]["responses"]["200"]["content"]["application/json"];
 
 export type TraceGetResponse = TraceGetResponseRaw extends string
   ? TraceGetResponseRaw
@@ -35,12 +33,6 @@ export class TracesApiError extends Error {
     public readonly originalError?: unknown,
     /**
      * The HTTP status the platform answered with.
-     *
-     * The client returns the `Response` alongside the error body and this used to
-     * be dropped, which meant a caller could recover WHAT went wrong (the body's
-     * error kind) but never whether the platform had declined the request (4xx) or
-     * fallen over (5xx) — a distinction the CLI's live error events, and anything
-     * else deciding whether to blame the user, depend on.
      */
     public readonly status?: number,
   ) {
@@ -56,37 +48,44 @@ export class TracesApiService {
     this.apiClient = config?.langwatchApiClient ?? createLangWatchApiClient();
   }
 
-  private handleApiError(
-    operation: string,
-    error: unknown,
-    response?: Response,
-  ): never {
+  private handleApiError(operation: string, error: unknown, response?: Response): never {
     const status = response?.status ?? extractStatusFromResponse(error);
-    const message = formatApiErrorForOperation({ operation: operation, error: error, options: {
-      status,
-    } });
+    const message = formatApiErrorForOperation({
+      operation: operation,
+      error: error,
+      options: {
+        status,
+      },
+    });
     throw new TracesApiError(message, operation, error, status);
   }
 
   async search(params: TraceSearchBody): Promise<TraceSearchResponse> {
-    const { data, error, response } = await this.apiClient.POST("/api/traces/search", {
+    const { data, error, response } = await this.apiClient.POST("/api/v1/traces/search", {
       body: params,
     });
-    if (error) this.handleApiError("search traces", error, response);
-    return data;
+    return unwrapApiResult({
+      operation: "search traces",
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    });
   }
 
   async get(traceId: string, options?: { format?: "digest" | "json" }): Promise<TraceGetResponse> {
-    const { data, error, response } = await this.apiClient.GET(
-      "/api/traces/{traceId}",
-      {
-        params: {
-          path: { traceId },
-          query: options,
-        },
+    const { data, error, response } = await this.apiClient.GET("/api/v1/traces/{traceId}", {
+      params: {
+        path: { traceId },
+        query: options,
       },
-    );
-    if (error) this.handleApiError(`get trace "${traceId}"`, error, response);
-    return data;
+    });
+    return unwrapApiResult({
+      operation: `get trace "${traceId}"`,
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    });
   }
 }

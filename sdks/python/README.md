@@ -5,7 +5,6 @@ The LangWatch Python SDK allows you to integrate LangWatch into your Python appl
 [![LangWatch Python SDK version](https://img.shields.io/pypi/v/langwatch)](https://pypi.org/project/langwatch/)
 [![LangWatch Repo](https://img.shields.io/github/stars/langwatch/langwatch?style=social)](https://github.com/langwatch/langwatch)
 
-
 ## Get your LangWatch API Key
 
 First, you need a LangWatch API key. Sign up at [app.langwatch.ai](https://app.langwatch.ai) and find your API key in your project settings. The SDK will automatically use the `LANGWATCH_API_KEY` environment variable if it is set.
@@ -38,10 +37,10 @@ If you have an existing OpenTelemetry setup in your application, please see the 
 
 LangWatch uses the concepts of Traces and Spans to capture your LLM pipeline:
 
-*   **Trace**: Represents a single, end-to-end operation, like processing a user message. Each message triggering your LLM pipeline as a whole is captured with a Trace.
-*   **Span**: Represents a specific step or unit of work within a Trace. This could be an LLM call, a database query for RAG retrieval, or a simple function transformation.
-    *   Different types of Spans capture different parameters.
-    *   Spans can be nested to capture the pipeline structure.
+- **Trace**: Represents a single, end-to-end operation, like processing a user message. Each message triggering your LLM pipeline as a whole is captured with a Trace.
+- **Span**: Represents a specific step or unit of work within a Trace. This could be an LLM call, a database query for RAG retrieval, or a simple function transformation.
+  - Different types of Spans capture different parameters.
+  - Spans can be nested to capture the pipeline structure.
 
 Traces can be grouped together on the LangWatch Dashboard by having the same `thread_id` in their metadata, making individual messages part of a conversation. It is also recommended to provide the `user_id` metadata to track user analytics.
 
@@ -189,16 +188,16 @@ print("LangWatch SDK fully configured.")
 
 ### `langwatch.setup()` Options
 
-*   **`api_key`** (`str | None`): Your LangWatch API key. If not provided, it uses the `LANGWATCH_API_KEY` environment variable.
-*   **`endpoint_url`** (`str | None`): The LangWatch endpoint URL. Defaults to the `LANGWATCH_ENDPOINT` environment variable or `https://app.langwatch.ai`.
-*   **`base_attributes`** (`dict[str, Any] | None`): A dictionary of attributes to add to all spans (e.g., service name, version). Automatically includes SDK name, version, and language.
-*   **`instrumentors`** (`Sequence[Instrumentor] | None`): A list of automatic instrumentors (e.g., `OpenAIInstrumentor`, `LangChainInstrumentor`) to capture data from supported libraries. Ensure these conform to the `Instrumentor` protocol expected by LangWatch.
-*   **`tracer_provider`** (`TracerProvider | None`): An existing OpenTelemetry `TracerProvider`. If provided, LangWatch will use it (adding its exporter) instead of creating a new one. If not provided, LangWatch checks the global provider or creates a new one.
-*   **`debug`** (`bool`, default: `False`): Enable debug logging for LangWatch. Defaults to `False` or checks if the `LANGWATCH_DEBUG` environment variable is set to `"true"`.
-*   **`disable_sending`** (`bool`, default: `False`): If `True`, disables sending traces to the LangWatch server. Useful for testing or development.
-*   **`flush_on_exit`** (`bool`, default: `True`): If `True` (the default), the tracer provider will attempt to flush all pending spans when the program exits via `atexit`.
-*   **`span_exclude_rules`** (`List[SpanProcessingExcludeRule] | None`): If provided, the SDK will exclude spans from being exported to LangWatch based on the rules defined in the list (e.g., matching span names).
-*   **`ignore_global_tracer_provider_override_warning`** (`bool`, default: `False`): If `True`, suppresses the warning message logged when an existing global `TracerProvider` is detected and LangWatch attaches its exporter to it instead of overriding it.
+- **`api_key`** (`str | None`): Your LangWatch API key. If not provided, it uses the `LANGWATCH_API_KEY` environment variable.
+- **`endpoint_url`** (`str | None`): The LangWatch endpoint URL. Defaults to the `LANGWATCH_ENDPOINT` environment variable or `https://app.langwatch.ai`.
+- **`base_attributes`** (`dict[str, Any] | None`): A dictionary of attributes to add to all spans (e.g., service name, version). Automatically includes SDK name, version, and language.
+- **`instrumentors`** (`Sequence[Instrumentor] | None`): A list of automatic instrumentors (e.g., `OpenAIInstrumentor`, `LangChainInstrumentor`) to capture data from supported libraries. Ensure these conform to the `Instrumentor` protocol expected by LangWatch.
+- **`tracer_provider`** (`TracerProvider | None`): An existing OpenTelemetry `TracerProvider`. If provided, LangWatch will use it (adding its exporter) instead of creating a new one. If not provided, LangWatch checks the global provider or creates a new one.
+- **`debug`** (`bool`, default: `False`): Enable debug logging for LangWatch. Defaults to `False` or checks if the `LANGWATCH_DEBUG` environment variable is set to `"true"`.
+- **`disable_sending`** (`bool`, default: `False`): If `True`, disables sending traces to the LangWatch server. Useful for testing or development.
+- **`flush_on_exit`** (`bool`, default: `True`): If `True` (the default), the tracer provider will attempt to flush all pending spans when the program exits via `atexit`.
+- **`span_exclude_rules`** (`List[SpanProcessingExcludeRule] | None`): If provided, the SDK will exclude spans from being exported to LangWatch based on the rules defined in the list (e.g., matching span names).
+- **`ignore_global_tracer_provider_override_warning`** (`bool`, default: `False`): If `True`, suppresses the warning message logged when an existing global `TracerProvider` is detected and LangWatch attaches its exporter to it instead of overriding it.
 
 ## Receiving Webhooks
 
@@ -275,9 +274,8 @@ Though OpenTelemetry, we also support all the frameworks and providers that supp
 
 You can find a [full guide](https://docs.langwatch.ai/integration/opentelemetry/guide) on our docs.
 
-
 ## Resources
 
-*   [LangWatch Python GitHub Repo](https://github.com/langwatch/langwatch) (Assuming this is the correct repo for the SDK)
-*   [LangWatch Website](https://langwatch.ai)
-*   [LangWatch Dashboard](https://app.langwatch.ai)
+- [LangWatch Python GitHub Repo](https://github.com/langwatch/langwatch) (Assuming this is the correct repo for the SDK)
+- [LangWatch Website](https://langwatch.ai)
+- [LangWatch Dashboard](https://app.langwatch.ai)

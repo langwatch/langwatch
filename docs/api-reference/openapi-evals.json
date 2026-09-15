@@ -3001,11 +3001,7 @@
         "properties": {
           "status": {
             "type": "string",
-            "enum": [
-              "processed",
-              "skipped",
-              "error"
-            ]
+            "enum": ["processed", "skipped", "error"]
           },
           "score": {
             "type": "number",
@@ -3058,9 +3054,7 @@
             "required": []
           }
         },
-        "required": [
-          "data"
-        ]
+        "required": ["data"]
       },
       "openai_moderationSettings": {
         "type": "object",
@@ -3111,9 +3105,7 @@
             "required": []
           }
         },
-        "required": [
-          "data"
-        ]
+        "required": ["data"]
       },
       "langevals_basicSettings": {
         "type": "object",
@@ -3153,9 +3145,7 @@
             "required": []
           }
         },
-        "required": [
-          "data"
-        ]
+        "required": ["data"]
       },
       "langevals_competitor_blocklistSettings": {
         "type": "object",
@@ -3163,11 +3153,7 @@
           "competitors": {
             "description": "The competitors that must not be mentioned.",
             "type": "array",
-            "default": [
-              "OpenAI",
-              "Google",
-              "Microsoft"
-            ]
+            "default": ["OpenAI", "Google", "Microsoft"]
           }
         }
       },
@@ -3193,9 +3179,7 @@
             "required": []
           }
         },
-        "required": [
-          "data"
-        ]
+        "required": ["data"]
       },
       "langevals_competitor_llmSettings": {
         "type": "object",
@@ -3244,9 +3228,7 @@
             "required": []
           }
         },
-        "required": [
-          "data"
-        ]
+        "required": ["data"]
       },
       "langevals_competitor_llm_function_callSettings": {
         "type": "object",
@@ -3274,11 +3256,7 @@
           "competitors": {
             "description": "The competitors that must not be mentioned.",
             "type": "array",
-            "default": [
-              "OpenAI",
-              "Google",
-              "Microsoft"
-            ]
+            "default": ["OpenAI", "Google", "Microsoft"]
           }
         }
       },
@@ -3301,15 +3279,10 @@
                 "description": "The expected output for comparison"
               }
             },
-            "required": [
-              "output",
-              "expected_output"
-            ]
+            "required": ["output", "expected_output"]
           }
         },
-        "required": [
-          "data"
-        ]
+        "required": ["data"]
       },
       "langevals_exact_matchSettings": {
         "type": "object",
@@ -3354,15 +3327,10 @@
                 "description": "The input text to evaluate"
               }
             },
-            "required": [
-              "output",
-              "expected_output"
-            ]
+            "required": ["output", "expected_output"]
           }
         },
-        "required": [
-          "data"
-        ]
+        "required": ["data"]
       },
       "langevals_llm_answer_matchSettings": {
         "type": "object",
@@ -3413,9 +3381,7 @@
             "required": []
           }
         },
-        "required": [
-          "data"
-        ]
+        "required": ["data"]
       },
       "langevals_llm_booleanSettings": {
         "type": "object",
@@ -3466,9 +3432,7 @@
             "required": []
           }
         },
-        "required": [
-          "data"
-        ]
+        "required": ["data"]
       },
       "langevals_llm_categorySettings": {
         "type": "object",
@@ -3533,9 +3497,7 @@
             "required": []
           }
         },
-        "required": [
-          "data"
-        ]
+        "required": ["data"]
       },
       "langevals_llm_scoreSettings": {
         "type": "object",
@@ -3572,14 +3534,10 @@
                 "description": "The input text to evaluate"
               }
             },
-            "required": [
-              "input"
-            ]
+            "required": ["input"]
           }
         },
-        "required": [
-          "data"
-        ]
+        "required": ["data"]
       },
       "langevals_off_topicSettings": {
         "type": "object",
@@ -3636,14 +3594,10 @@
                 "description": "Array of conversation turns for multi-turn evaluation"
               }
             },
-            "required": [
-              "conversation"
-            ]
+            "required": ["conversation"]
           }
         },
-        "required": [
-          "data"
-        ]
+        "required": ["data"]
       },
       "langevals_query_resolutionSettings": {
         "type": "object",
@@ -3682,9 +3636,7 @@
             "required": []
           }
         },
-        "required": [
-          "data"
-        ]
+        "required": ["data"]
       },
       "langevals_similaritySettings": {
         "type": "object",
@@ -3729,9 +3681,7 @@
             "required": []
           }
         },
-        "required": [
-          "data"
-        ]
+        "required": ["data"]
       },
       "langevals_valid_formatSettings": {
         "type": "object",
@@ -3765,15 +3715,10 @@
                 "description": "The expected output for comparison"
               }
             },
-            "required": [
-              "output",
-              "expected_output"
-            ]
+            "required": ["output", "expected_output"]
           }
         },
-        "required": [
-          "data"
-        ]
+        "required": ["data"]
       },
       "ragas_bleu_scoreSettings": {
         "type": "object",
@@ -3804,15 +3749,10 @@
                 "description": "The expected contexts for comparison"
               }
             },
-            "required": [
-              "contexts",
-              "expected_contexts"
-            ]
+            "required": ["contexts", "expected_contexts"]
           }
         },
-        "required": [
-          "data"
-        ]
+        "required": ["data"]
       },
       "ragas_context_f1Settings": {
         "type": "object",
@@ -3848,15 +3788,10 @@
                 "description": "The expected contexts for comparison"
               }
             },
-            "required": [
-              "contexts",
-              "expected_contexts"
-            ]
+            "required": ["contexts", "expected_contexts"]
           }
         },
-        "required": [
-          "data"
-        ]
+        "required": ["data"]
       },
       "ragas_context_precisionSettings": {
         "type": "object",
@@ -3892,15 +3827,10 @@
                 "description": "The expected contexts for comparison"
               }
             },
-            "required": [
-              "contexts",
-              "expected_contexts"
-            ]
+            "required": ["contexts", "expected_contexts"]
           }
         },
-        "required": [
-          "data"
-        ]
+        "required": ["data"]
       },
       "ragas_context_recallSettings": {
         "type": "object",
@@ -3930,15 +3860,10 @@
                 "description": "The expected output for comparison"
               }
             },
-            "required": [
-              "output",
-              "expected_output"
-            ]
+            "required": ["output", "expected_output"]
           }
         },
-        "required": [
-          "data"
-        ]
+        "required": ["data"]
       },
       "ragas_factual_correctnessSettings": {
         "type": "object",
@@ -3996,15 +3921,10 @@
                 "description": "The input text to evaluate"
               }
             },
-            "required": [
-              "output",
-              "contexts"
-            ]
+            "required": ["output", "contexts"]
           }
         },
-        "required": [
-          "data"
-        ]
+        "required": ["data"]
       },
       "ragas_faithfulnessSettings": {
         "type": "object",
@@ -4056,15 +3976,10 @@
                 "description": "The expected output for comparison"
               }
             },
-            "required": [
-              "input",
-              "contexts"
-            ]
+            "required": ["input", "contexts"]
           }
         },
-        "required": [
-          "data"
-        ]
+        "required": ["data"]
       },
       "ragas_response_context_precisionSettings": {
         "type": "object",
@@ -4111,17 +4026,10 @@
                 "description": "The expected output for comparison"
               }
             },
-            "required": [
-              "input",
-              "output",
-              "contexts",
-              "expected_output"
-            ]
+            "required": ["input", "output", "contexts", "expected_output"]
           }
         },
-        "required": [
-          "data"
-        ]
+        "required": ["data"]
       },
       "ragas_response_context_recallSettings": {
         "type": "object",
@@ -4157,15 +4065,10 @@
                 "description": "The output/response text to evaluate"
               }
             },
-            "required": [
-              "input",
-              "output"
-            ]
+            "required": ["input", "output"]
           }
         },
-        "required": [
-          "data"
-        ]
+        "required": ["data"]
       },
       "ragas_response_relevancySettings": {
         "type": "object",
@@ -4206,15 +4109,10 @@
                 "description": "The expected output for comparison"
               }
             },
-            "required": [
-              "output",
-              "expected_output"
-            ]
+            "required": ["output", "expected_output"]
           }
         },
-        "required": [
-          "data"
-        ]
+        "required": ["data"]
       },
       "ragas_rouge_scoreSettings": {
         "type": "object",
@@ -4254,15 +4152,10 @@
                 "description": "The expected output for comparison"
               }
             },
-            "required": [
-              "input",
-              "output"
-            ]
+            "required": ["input", "output"]
           }
         },
-        "required": [
-          "data"
-        ]
+        "required": ["data"]
       },
       "ragas_rubrics_based_scoringSettings": {
         "type": "object",
@@ -4325,16 +4218,10 @@
                 "description": "The expected contexts for comparison"
               }
             },
-            "required": [
-              "output",
-              "expected_output",
-              "expected_contexts"
-            ]
+            "required": ["output", "expected_output", "expected_contexts"]
           }
         },
-        "required": [
-          "data"
-        ]
+        "required": ["data"]
       },
       "ragas_sql_query_equivalenceSettings": {
         "type": "object",
@@ -4373,15 +4260,10 @@
                 "description": "Array of context strings used for RAG evaluation"
               }
             },
-            "required": [
-              "output",
-              "contexts"
-            ]
+            "required": ["output", "contexts"]
           }
         },
-        "required": [
-          "data"
-        ]
+        "required": ["data"]
       },
       "ragas_summarization_scoreSettings": {
         "type": "object",
@@ -4417,14 +4299,10 @@
                 "description": "The input text to evaluate"
               }
             },
-            "required": [
-              "output"
-            ]
+            "required": ["output"]
           }
         },
-        "required": [
-          "data"
-        ]
+        "required": ["data"]
       },
       "lingua_language_detectionSettings": {
         "type": "object",
@@ -4472,9 +4350,7 @@
             "required": []
           }
         },
-        "required": [
-          "data"
-        ]
+        "required": ["data"]
       },
       "azure_content_safetySettings": {
         "type": "object",
@@ -4516,14 +4392,10 @@
                 "description": "The input text to evaluate"
               }
             },
-            "required": [
-              "input"
-            ]
+            "required": ["input"]
           }
         },
-        "required": [
-          "data"
-        ]
+        "required": ["data"]
       },
       "azure_jailbreakSettings": {
         "type": "object",
@@ -4551,14 +4423,10 @@
                 "description": "Array of context strings used for RAG evaluation"
               }
             },
-            "required": [
-              "input"
-            ]
+            "required": ["input"]
           }
         },
-        "required": [
-          "data"
-        ]
+        "required": ["data"]
       },
       "azure_prompt_injectionSettings": {
         "type": "object",
@@ -4586,9 +4454,7 @@
             "required": []
           }
         },
-        "required": [
-          "data"
-        ]
+        "required": ["data"]
       },
       "presidio_pii_detectionSettings": {
         "type": "object",

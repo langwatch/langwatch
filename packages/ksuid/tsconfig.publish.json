@@ -1,0 +1,28 @@
+{
+  // The npm-publish declaration build only. Deliberately does NOT extend
+  // ../../tsconfig.base.json: the workspace base carries repo-wide options
+  // (baseUrl among them) that the pinned sdk-toolchain TypeScript rejects, and
+  // a published artifact should not inherit repo-internal path mapping anyway.
+  // Local typechecking goes through tsconfig.json like every other workspace
+  // package. `rewriteRelativeImportExtensions` turns the source's literal .ts
+  // specifiers into .js in the emitted declarations, so they resolve as
+  // sibling .d.ts files for npm consumers.
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "lib": ["ES2022"],
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "rewriteRelativeImportExtensions": true,
+    "isolatedModules": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "types": [],
+    "declaration": true,
+    "emitDeclarationOnly": true,
+    "rootDir": "src",
+    "outDir": "dist"
+  },
+  "include": ["src/**/*"],
+  "exclude": ["src/__tests__"]
+}

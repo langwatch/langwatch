@@ -32,6 +32,7 @@ Feature: AI Gateway — Virtual Key RBAC (Path B, scope-aware perms)
   # Create — by scope
   # ============================================================================
 
+  @integration
   Scenario: Creating an ORG-scoped VK requires virtualKeys:manage at ORGANIZATION scope
     Given user "alice@acme.test" has a custom RoleBinding granting "virtualKeys:manage" at ORGANIZATION "acme"
     And user "alice@acme.test" has NO legacy TeamUserRole.ADMIN binding
@@ -39,6 +40,7 @@ Feature: AI Gateway — Virtual Key RBAC (Path B, scope-aware perms)
     Then the call succeeds with a 201
     And the new VK has VirtualKeyScope rows: [{ORGANIZATION, "acme"}]
 
+  @integration
   Scenario: Creating an ORG-scoped VK without org:manage on virtualKeys is rejected
     Given user "bob@acme.test" has only `virtualKeys:manage` at TEAM "platform"
     When "bob@acme.test" calls `api.virtualKeys.create` with scope ORGANIZATION "acme"
@@ -46,16 +48,19 @@ Feature: AI Gateway — Virtual Key RBAC (Path B, scope-aware perms)
     And the error code is "permission_denied"
     And the message names the missing perm: "virtualKeys:manage at ORGANIZATION:acme"
 
+  @integration
   Scenario: Creating a TEAM-scoped VK requires virtualKeys:manage at that team
     Given user "carol@acme.test" has `virtualKeys:manage` at TEAM "platform"
     When "carol@acme.test" calls `api.virtualKeys.create` with scope TEAM "platform"
     Then the call succeeds with a 201
 
+  @integration
   Scenario: User with TEAM "platform" perm cannot create a VK in TEAM "data-sci"
     Given user "carol@acme.test" has `virtualKeys:manage` at TEAM "platform" only
     When "carol@acme.test" calls `api.virtualKeys.create` with scope TEAM "data-sci"
     Then the call returns 403 FORBIDDEN
 
+  @integration
   Scenario: Creating a PROJECT-scoped VK requires virtualKeys:manage at that project (or upward)
     Given user "dave@acme.test" has `virtualKeys:manage` at PROJECT "demo"
     When "dave@acme.test" calls `api.virtualKeys.create` with scope PROJECT "demo"
@@ -65,6 +70,7 @@ Feature: AI Gateway — Virtual Key RBAC (Path B, scope-aware perms)
   # Upward cascade — broader scope grants narrower
   # ============================================================================
 
+  @integration
   Scenario: virtualKeys:manage at ORGANIZATION scope allows creating VKs at any narrower scope
     Given user "eve@acme.test" has `virtualKeys:manage` at ORGANIZATION "acme"
     When "eve@acme.test" calls `api.virtualKeys.create` with scope TEAM "platform"
@@ -74,6 +80,7 @@ Feature: AI Gateway — Virtual Key RBAC (Path B, scope-aware perms)
     When "eve@acme.test" calls `api.virtualKeys.create` with scope ORGANIZATION "acme"
     Then the call succeeds
 
+  @integration
   Scenario: virtualKeys:manage at TEAM scope allows creating VKs at projects within that team
     Given user "frank@acme.test" has `virtualKeys:manage` at TEAM "platform"
     And project "demo" belongs to team "platform"
@@ -86,12 +93,14 @@ Feature: AI Gateway — Virtual Key RBAC (Path B, scope-aware perms)
   # Multi-scope create — all scopes must be authorised
   # ============================================================================
 
+  @integration
   Scenario: Creating a VK with multiple scopes requires manage on EACH scope (intersection of grants)
     Given user "grace@acme.test" has `virtualKeys:manage` at TEAM "platform" only
     When "grace@acme.test" calls `api.virtualKeys.create` with scopes [TEAM "platform", TEAM "data-sci"]
     Then the call returns 403 FORBIDDEN
     And the message names the unauthorised scope: "virtualKeys:manage at TEAM:data-sci"
 
+  @integration
   Scenario: User with manage at both teams can create the cross-team VK
     Given user "henry@acme.test" has `virtualKeys:manage` at TEAM "platform" AND TEAM "data-sci"
     When "henry@acme.test" calls `api.virtualKeys.create` with scopes [TEAM "platform", TEAM "data-sci"]
@@ -101,6 +110,7 @@ Feature: AI Gateway — Virtual Key RBAC (Path B, scope-aware perms)
   # Update / delete / rotate — same scope-aware check
   # ============================================================================
 
+  @integration
   Scenario: Updating a VK requires virtualKeys:update at one of the VK's scopes
     Given a VirtualKey "vk_demo" scoped to PROJECT "demo"
     And user "ian@acme.test" has `virtualKeys:update` at PROJECT "demo"
@@ -108,6 +118,7 @@ Feature: AI Gateway — Virtual Key RBAC (Path B, scope-aware perms)
     Then the call succeeds
     And the audit log records actor="ian@acme.test", action="virtualKey.update", target="vk_demo"
 
+  @integration
   Scenario: Rotating a VK requires virtualKeys:rotate
     Given a VirtualKey "vk_demo" scoped to TEAM "platform"
     And user "jane@acme.test" has `virtualKeys:rotate` at TEAM "platform"
@@ -115,6 +126,7 @@ Feature: AI Gateway — Virtual Key RBAC (Path B, scope-aware perms)
     Then a new secret is minted
     And `VirtualKey.revision` increments
 
+  @integration
   Scenario: Deleting a VK requires virtualKeys:delete at one of the VK's scopes
     Given a VirtualKey "vk_doomed" scoped to TEAM "platform"
     And user "karen@acme.test" has only `virtualKeys:view` at TEAM "platform"
@@ -125,6 +137,7 @@ Feature: AI Gateway — Virtual Key RBAC (Path B, scope-aware perms)
   # Personal VK — orthogonal lazy-mint path
   # ============================================================================
 
+  @integration
   Scenario: Any authenticated user can lazy-mint their own personal VK via CLI device-flow
     Given user "leo@acme.test" is a member of organization "acme"
     And "leo@acme.test" has NO explicit `virtualKeys:manage` grant
@@ -132,12 +145,14 @@ Feature: AI Gateway — Virtual Key RBAC (Path B, scope-aware perms)
     Then a personal VK is minted with `principalUserId="leo@acme.test"` and scope ORGANIZATION "acme"
     And the user receives the secret in the CLI bootstrap response
 
+  @integration
   Scenario: A user can view their own personal VK without any explicit grant
     Given user "leo@acme.test" has a personal VK "vk_leo"
     When "leo@acme.test" calls `api.personalVirtualKeys.list`
     Then the response contains "vk_leo"
     And the personalUserId-match path bypasses the standard `virtualKeys:view` check
 
+  @integration
   Scenario: A user cannot view another user's personal VK without virtualKeys:viewOtherPersonal
     Given user "leo@acme.test" has a personal VK "vk_leo"
     And user "maya@acme.test" has only `virtualKeys:view` at ORGANIZATION "acme" (no viewOtherPersonal)
@@ -145,6 +160,7 @@ Feature: AI Gateway — Virtual Key RBAC (Path B, scope-aware perms)
     Then the call returns 403 FORBIDDEN
     And the message names the missing perm: "virtualKeys:viewOtherPersonal"
 
+  @integration
   Scenario: Org admin with viewOtherPersonal can audit other users' personal VKs (offboarding sweep)
     Given user "admin@acme.test" has `virtualKeys:viewOtherPersonal` at ORGANIZATION "acme"
     And users "leo@acme.test" and "maya@acme.test" each have personal VKs
@@ -155,6 +171,7 @@ Feature: AI Gateway — Virtual Key RBAC (Path B, scope-aware perms)
   # Default role-template seeds (new perm reaches existing customers automatically)
   # ============================================================================
 
+  @integration
   Scenario: Existing org admins automatically gain virtualKeys:viewOtherPersonal on migrate
     Given the LegacyRoles migration adds `virtualKeys:viewOtherPersonal` to OrganizationUserRole.ADMIN + TeamUserRole.ADMIN templates
     And an existing customer org has user "old-admin@acme.test" with OrganizationUserRole.ADMIN binding
@@ -163,6 +180,7 @@ Feature: AI Gateway — Virtual Key RBAC (Path B, scope-aware perms)
     And no per-org backfill is required
     And the RoleBinding rows themselves are untouched (template lookup is at runtime)
 
+  @integration
   Scenario: Org member roles do NOT gain virtualKeys:viewOtherPersonal
     Given a user with OrganizationUserRole.MEMBER binding
     When the migration applies
@@ -172,6 +190,7 @@ Feature: AI Gateway — Virtual Key RBAC (Path B, scope-aware perms)
   # No-short-circuit regression contract
   # ============================================================================
 
+  @integration
   Scenario: New VK routes work for a non-ADMIN user with explicit perm grants
     Given user "no-shortcut@acme.test" has zero legacy ADMIN role bindings
     And "no-shortcut@acme.test" has only a custom RoleBinding granting `virtualKeys:manage` at PROJECT "demo"
@@ -185,6 +204,7 @@ Feature: AI Gateway — Virtual Key RBAC (Path B, scope-aware perms)
   # Listing — visibility intersection with membership
   # ============================================================================
 
+  @integration
   Scenario: A user sees VKs whose scopes intersect their membership set
     Given a VirtualKey "vk_org" scoped to ORGANIZATION "acme"
     And a VirtualKey "vk_team_platform" scoped to TEAM "platform"
@@ -195,6 +215,7 @@ Feature: AI Gateway — Virtual Key RBAC (Path B, scope-aware perms)
     And the response includes "vk_team_platform"
     And the response does NOT include "vk_team_data_sci"
 
+  @integration
   Scenario: An org ADMIN with no TeamUser rows sees project-scoped VKs (e.g. the auto-managed Langy VK) anywhere in the org
     Given user "admin@acme.test" has the ADMIN role on organization "acme"
     And "admin@acme.test" has no TeamUser rows in "acme"
@@ -207,6 +228,7 @@ Feature: AI Gateway — Virtual Key RBAC (Path B, scope-aware perms)
     # being explicitly enrolled in every team — otherwise admins can't audit or
     # rotate keys that the system minted on a project's behalf.
 
+  @integration
   Scenario: A plain MEMBER still does NOT see a sibling-team project VK — the admin short-circuit must not leak to members
     Given user "mona@acme.test" has the MEMBER role on organization "acme"
     And "mona@acme.test" is a member of TEAM "platform" only
@@ -218,6 +240,7 @@ Feature: AI Gateway — Virtual Key RBAC (Path B, scope-aware perms)
   # Scope ownership — every scope must belong to the key's own organization
   # ============================================================================
 
+  @integration
   Scenario: A create cannot bind a scope from a different org than its organizationId
     Given user "mallory@acme.test" has `virtualKeys:manage` at TEAM "platform" in organization "acme"
     When "mallory@acme.test" calls `api.virtualKeys.create` for organization "evilcorp" with a scope referencing TEAM "platform" (which belongs to "acme")
@@ -227,7 +250,50 @@ Feature: AI Gateway — Virtual Key RBAC (Path B, scope-aware perms)
     # so org ownership is the only thing standing between this and a
     # cross-org virtual key row.
 
+  @integration
   Scenario: An ORGANIZATION scope must equal the organizationId
     Given user "mallory@acme.test" has `virtualKeys:manage` at ORGANIZATION "acme"
     When "mallory@acme.test" calls `api.virtualKeys.create` for organization "evilcorp" with an ORGANIZATION scope of "acme"
     Then the call is rejected with a validation error
+
+  # ============================================================================
+  # virtual-key-authorization.service.ts, virtual-key-validation.service.ts,
+  # virtual-key-provisioning.service.ts, virtual-key-rotation.service.ts,
+  # virtual-key-status.service.ts, gateway-applicable-budgets.service.ts
+  # ============================================================================
+
+  @unit @unimplemented
+  Scenario: Creating a key needs manage on every scope it is requested for
+    Given an actor who may manage one of two requested scopes
+    When they create a virtual key across both
+    Then the creation is refused and no key exists
+
+  @unit @unimplemented
+  Scenario: A key cannot be moved to a scope in another organization
+    Given a virtual key in one organization
+    When an actor attaches it to a scope belonging to another organization
+    Then the attach is refused with the scope-mismatch error
+
+  @unit @unimplemented
+  Scenario: A key invisible to the actor's membership reads as not found
+    Given a virtual key in a scope the actor has no membership in
+    When the actor reads it by id
+    Then the read fails as not found rather than as forbidden
+
+  @unit @unimplemented
+  Scenario: A guardrail from another project cannot be attached
+    Given a guardrail belonging to a different project
+    When an actor attaches it to a virtual key
+    Then the attach is refused with the guardrail-mismatch error
+
+  @unit @unimplemented
+  Scenario: Rotating a key leaves the old secret unusable
+    Given a virtual key in use
+    When it is rotated
+    Then requests presenting the previous secret are refused
+
+  @unit @unimplemented
+  Scenario: A disabled key is refused before any budget is consulted
+    Given a virtual key whose status is disabled
+    When a request presents it
+    Then the request is refused and no spend is recorded

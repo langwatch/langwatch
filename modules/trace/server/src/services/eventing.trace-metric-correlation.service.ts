@@ -1,0 +1,88 @@
+import type { Command, CommandHandler } from "@langwatch/eventing";
+import { createTenantId, defineCommandSchema, EventUtils } from "@langwatch/eventing";
+import {
+  type RecordMetricCorrelationCommandData,
+  recordMetricCorrelationCommandDataSchema,
+} from "@langwatch/trace-contract";
+import {
+  METRIC_DATA_POINT_CORRELATED_EVENT_TYPE,
+  METRIC_DATA_POINT_CORRELATED_EVENT_VERSION_LATEST,
+  RECORD_METRIC_CORRELATION_COMMAND_TYPE,
+} from "@langwatch/trace-contract";
+import type { MetricDataPointCorrelatedEvent } from "@langwatch/trace-contract";
+
+const TRACE_ID_PATTERN = /^[a-f0-9]{32}$/i;
+const SPAN_ID_PATTERN = /^[a-f0-9]{16}$/i;
+const ALL_ZEROES_PATTERN = /^0+$/;
+
+/** A W3C identifier the exemplar can point at: right width, and not the all-zero id. */
+function isHexIdentifier(value: string, pattern: RegExp): boolean {
+  return pattern.test(value) && !ALL_ZEROES_PATTERN.test(value);
+}
+
+export class EventingTraceMetricCorrelationAdapter implements CommandHandler<
+  Command<RecordMetricCorrelationCommandData>,
+  MetricDataPointCorrelatedEvent
+> {
+  static create(): EventingTraceMetricCorrelationAdapter {
+    return new EventingTraceMetricCorrelationAdapter();
+  }
+
+  static readonly schema = defineCommandSchema(
+    RECORD_METRIC_CORRELATION_COMMAND_TYPE,
+    recordMetricCorrelationCommandDataSchema,
+    "Attach a valid metric exemplar correlation to a trace",
+  );
+
+  async handle(
+    command: Command<RecordMetricCorrelationCommandData>,
+  ): Promise<MetricDataPointCorrelatedEvent[]> {
+    const data = command.data;
+    const hasCorrelatableIds =
+      isHexIdentifier(data.traceId, TRACE_ID_PATTERN) &&
+      isHexIdentifier(data.spanId, SPAN_ID_PATTERN);
+    if (!hasCorrelatableIds) {
+      return [];
+    }
+    return [
+      EventUtils.createEvent<MetricDataPointCorrelatedEvent>({
+        aggregateType: "trace",
+        aggregateId: data.traceId,
+        tenantId: createTenantId(command.tenantId),
+        type: METRIC_DATA_POINT_CORRELATED_EVENT_TYPE,
+        version: METRIC_DATA_POINT_CORRELATED_EVENT_VERSION_LATEST,
+        data: {
+          traceId: data.traceId,
+          spanId: data.spanId,
+          pointId: data.pointId,
+          seriesId: data.seriesId,
+          metricName: data.metricName,
+          metricUnit: data.metricUnit,
+          metricKind: data.metricKind,
+          exemplarValue: data.exemplarValue,
+          exemplarTimeUnixMs: data.exemplarTimeUnixMs,
+        },
+        metadata: {},
+        occurredAt: data.occurredAt,
+        idempotencyKey: EventingTraceMetricCorrelationAdapter.makeJobId(data),
+      }),
+    ];
+  }
+
+  static getAggregateId(payload: RecordMetricCorrelationCommandData): string {
+    return payload.traceId;
+  }
+
+  /**
+   * Tenant-scoped like every other trace command's. A PointId already hashes
+   * its tenant transitively (via SeriesId), so a collision is not reachable
+   * today — but nothing states that invariant at this layer, and a dedup key
+   * that silently depends on it would suppress another tenant's work the day
+   * it changes.
+   */
+  static makeJobId(payload: RecordMetricCorrelationCommandData): string {
+    return `${payload.tenantId}:${payload.traceId}:metric_correlation:${payload.pointId}:${payload.spanId}`;
+  }
+}
+
+export const recordMetricCorrelationCommand = EventingTraceMetricCorrelationAdapter;

@@ -1,13 +1,13 @@
 import { scopedApiKey } from "@/internal/credentialContext";
-import { createSpinner } from "../../utils/spinner";
-import { resolveCredentials } from "../../utils/apiKey";
-import { failSpinnerFromResponse } from "../../utils/failFromResponse";
-import { failSpinner } from "../../utils/spinnerError";
-import { commandValidationError } from "../../utils/errorOutput";
+import { createSpinner } from "../../utils/spinner.ts";
+import { resolveCredentials } from "../../utils/apiKey.ts";
+import { failSpinnerFromResponse } from "../../utils/failFromResponse.ts";
+import { failSpinner } from "../../utils/spinnerError.ts";
+import { commandValidationError } from "../../utils/errorOutput.ts";
 import { buildAuthHeaders } from "@/internal/api/auth";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
-import type { CommandResult } from "../../utils/output";
+import type { CommandResult } from "../../utils/output.ts";
 import { langwatchFetch } from "@/internal/http/langwatchFetch";
 
 /**
@@ -48,7 +48,7 @@ export const updateTriggerCommand = async (
       process.exit(1);
     }
 
-    const response = await langwatchFetch(`${endpoint}/api/triggers/${encodeURIComponent(id)}`, {
+    const response = await langwatchFetch(`${endpoint}/api/v1/triggers/${encodeURIComponent(id)}`, {
       method: "PATCH",
       headers: {
         "Content-Type": "application/json",
@@ -62,7 +62,11 @@ export const updateTriggerCommand = async (
       process.exit(1);
     }
 
-    const trigger = await response.json() as { id: string; name: string; active: boolean };
+    const trigger = (await response.json()) as {
+      id: string;
+      name: string;
+      active: boolean;
+    };
     spinner.succeed(`Trigger "${trigger.name}" updated`);
 
     return {

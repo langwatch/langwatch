@@ -1,7 +1,7 @@
-import { describe, it, expect, vi, afterEach } from 'vitest';
-import { setupObservability } from '../../setup';
-import { trace } from '@opentelemetry/api';
-import { resetObservabilitySdkConfig } from '../../../../config.js';
+import { describe, it, expect, vi, afterEach } from "vitest";
+import { setupObservability } from "../../setup";
+import { trace } from "@opentelemetry/api";
+import { resetObservabilitySdkConfig } from "../../../../config.js";
 
 // Integration tests for shutdown behavior in setupObservability
 function createMockLogger() {
@@ -14,19 +14,25 @@ afterEach(() => {
   resetObservabilitySdkConfig();
 });
 
-describe('setupObservability Integration - Shutdown Behavior', () => {
-  it('provides a shutdown function that works', async () => {
+describe("setupObservability Integration - Shutdown Behavior", () => {
+  it("provides a shutdown function that works", async () => {
     const logger = createMockLogger();
-    const handle = setupObservability({ langwatch: { apiKey: 'test-key' }, debug: { logger } });
-    expect(typeof handle.shutdown).toBe('function');
+    const handle = setupObservability({
+      langwatch: { apiKey: "test-key" },
+      debug: { logger },
+    });
+    expect(typeof handle.shutdown).toBe("function");
     await expect(handle.shutdown()).resolves.toBeUndefined();
   });
 
-  it('handles shutdown errors gracefully', async () => {
+  it("handles shutdown errors gracefully", async () => {
     const logger = createMockLogger();
-    const handle = setupObservability({ langwatch: { apiKey: 'test-key' }, debug: { logger } });
+    const handle = setupObservability({
+      langwatch: { apiKey: "test-key" },
+      debug: { logger },
+    });
     // Mock shutdown to throw
-    handle.shutdown = vi.fn().mockRejectedValue(new Error('Shutdown failed'));
-    await expect(handle.shutdown()).rejects.toThrow('Shutdown failed');
+    handle.shutdown = vi.fn().mockRejectedValue(new Error("Shutdown failed"));
+    await expect(handle.shutdown()).rejects.toThrow("Shutdown failed");
   });
 });

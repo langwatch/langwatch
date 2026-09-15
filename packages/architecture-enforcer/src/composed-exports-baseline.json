@@ -1,0 +1,222 @@
+{
+  "version": 1,
+  "policy": "composed-exports",
+  "entries": [
+    {
+      "key": "enterprise/modules/billing/server|NullBillingOrganizationAdapter",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "enterprise/modules/billing/server|NullBillingWebhookSubscriptionAdapter",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "enterprise/modules/billing/server|NurturingActivityTrackingService",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "enterprise/modules/billing/server|NurturingFeatureAdoptionService",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "enterprise/modules/billing/server|NurturingProductInterestService",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "enterprise/modules/billing/server|NurturingPromptCreationService",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "enterprise/modules/billing/server|NurturingService",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "enterprise/modules/billing/server|NurturingSignupIdentificationService",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "enterprise/modules/billing/server|NurturingSsoAutoAddService",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "enterprise/modules/billing/server|NurturingUserSyncService",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "enterprise/modules/billing/server|PostgresNurturingProfileAdapter",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "enterprise/modules/billing/server|UsageLimitService",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "enterprise/modules/governance/server|PostgresGovernanceInstallationAdapter",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "enterprise/modules/licensing/server|PlanProviderService",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "enterprise/modules/scim/server|ScimApi",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "enterprise/modules/sso/server|BetterAuthSsoAdapter",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "modules/analytics/server|LoggingAnalyticsTripwireService",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "modules/auth/server|Auth0PasswordService",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "modules/coding-agent/server|OtelCodingAgentReadMetricsAdapter",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "modules/experiment/server|ExperimentRunStateStoreAdapter",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "modules/gateway/server|BudgetOverviewService",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "modules/identity/server|IdentitySsoConnectionGrandfatherMigrationAdapter",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "modules/identity/server|JoinRequestLifecycleDispatcherAdapter",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "modules/identity/server|ShadowComparingDomainRoutingAdapter",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "modules/identity/server|SignInCallbackLinkingService",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "modules/identity/server|SsoConnectionGrandfatherService",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "modules/identity/server|SsoConnectionTeardownDispatcherAdapter",
+      "measured": "2026-09-07"
+    },
+    {
+      "measured": "2026-09-10",
+      "key": "modules/langy/server|LangyAnalyticsEventMemoryRepository"
+    },
+    {
+      "key": "modules/log/server|LogRequestCollectionService",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "modules/log/server|LogRuntimeAdapter",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "modules/metric/server|MetricRequestCollectionService",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "modules/model-provider/server|UnavailableModelProviderCredentialProbeAdapter",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "modules/model-provider/server|UnmanagedModelProviderGatewayAdapter",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "modules/ops/server|NullEventExplorerAdapter",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "modules/ops/server|NullProcessOpsAdapter",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "modules/ops/server|NullReplayAdapter",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "modules/ops/server|SlackBugReportNotifierAdapter",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "modules/ops/server|SystemMigrationsService",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "modules/scenario/server|ChildEgressPolicyAdapter",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "modules/scenario/server|ChildLoggerAdapter",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "modules/scenario/server|ChildProcessSpawnAdapter",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "modules/scenario/server|ChildTlsEnvAdapter",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "modules/scenario/server|ComputeRunMetricsAdapter",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "modules/scenario/server|HttpAuthAdapter",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "modules/scenario/server|LitellmModelAdapter",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "modules/scenario/server|RemoteTraceRunAdapter",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "modules/scenario/server|ScenarioChildExecutionAdapter",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "modules/scenario/server|ScenarioRoleModelAdapter",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "modules/topic/server|LangevalsStagedPayloadAdapter",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "modules/topic/server|TopicClusteringProcessingProducerAdapter",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "modules/trace/server|ClickHouseSpanAttributeKeysFacetAdapter",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "modules/trace/server|TraceProjectionLeanEventingAdapter",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "modules/trace/server|TraceTtlCacheService",
+      "measured": "2026-09-07"
+    },
+    {
+      "key": "modules/webhook/server|PrismaWebhookRetentionRepository",
+      "measured": "2026-09-07"
+    }
+  ]
+}

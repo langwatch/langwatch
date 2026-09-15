@@ -6,7 +6,12 @@ keywords: scim, provisioning, deprovisioning, okta, azure ad, identity provider,
 ---
 
 <Note>
-  **Available on Enterprise plans.** SCIM provisioning needs an Enterprise plan, and a self-hosted deployment needs an Enterprise license. The plan is checked on every SCIM call, so when it lapses, existing tokens stop verifying and your identity provider's requests are refused with HTTP 403. The [SCIM Tokens API](/api-reference/scim-tokens/overview) refuses to mint a token without an Enterprise plan with HTTP 402 and the error code `enterprise_plan_required`. To enable it, contact [enterprise@langwatch.ai](mailto:enterprise@langwatch.ai).
+  **Available on Enterprise plans.** SCIM provisioning needs an Enterprise plan, and a self-hosted
+  deployment needs an Enterprise license. The plan is checked on every SCIM call, so when it lapses,
+  existing tokens stop verifying and your identity provider's requests are refused with HTTP 403.
+  The [SCIM Tokens API](/api-reference/scim-tokens/overview) refuses to mint a token without an
+  Enterprise plan with HTTP 402 and the error code `enterprise_plan_required`. To enable it, contact
+  [enterprise@langwatch.ai](mailto:enterprise@langwatch.ai).
 </Note>
 
 SCIM (System for Cross-domain Identity Management) 2.0 lets your identity provider create LangWatch users when people join your organization, deactivate them when they leave, and push groups that you map to roles.
@@ -50,10 +55,10 @@ You can create several tokens, for example one per integration, and revoke each 
 
 ### Step 3: Configure your identity provider
 
-| Setting | Value |
-|---------|-------|
+| Setting       | Value                                         |
+| ------------- | --------------------------------------------- |
 | SCIM Base URL | `https://<your-langwatch-domain>/api/scim/v2` |
-| Bearer Token | The token from step 2 |
+| Bearer Token  | The token from step 2                         |
 
 Where to enter them:
 
@@ -64,39 +69,39 @@ Where to enter them:
 
 ## Supported operations
 
-| Operation | Description |
-|-----------|-------------|
-| **Create User** | Creates the user and adds them to your organization as a Member. An address that is already a member gets `409 Conflict` |
-| **Get User** | Returns one user by id |
-| **List Users** | Lists the users in the organization, with an optional `userName eq` filter |
-| **Update User (PUT)** | Replaces the user's attributes |
-| **Update User (PATCH)** | Changes single attributes, for example `active` |
-| **Delete User** | Removes the membership and deactivates the account. The user's data stays |
+| Operation               | Description                                                                                                              |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| **Create User**         | Creates the user and adds them to your organization as a Member. An address that is already a member gets `409 Conflict` |
+| **Get User**            | Returns one user by id                                                                                                   |
+| **List Users**          | Lists the users in the organization, with an optional `userName eq` filter                                               |
+| **Update User (PUT)**   | Replaces the user's attributes                                                                                           |
+| **Update User (PATCH)** | Changes single attributes, for example `active`                                                                          |
+| **Delete User**         | Removes the membership and deactivates the account. The user's data stays                                                |
 
 ### SCIM endpoints
 
-| Endpoint | Methods |
-|----------|---------|
-| `/api/scim/v2/Users` | `GET`, `POST` |
-| `/api/scim/v2/Users/{id}` | `GET`, `PUT`, `PATCH`, `DELETE` |
-| `/api/scim/v2/Groups` | `GET`, `POST` |
-| `/api/scim/v2/Groups/{id}` | `GET`, `PUT`, `PATCH`, `DELETE` |
-| `/api/scim/v2/ServiceProviderConfig` | `GET` |
-| `/api/scim/v2/ResourceTypes` | `GET` |
-| `/api/scim/v2/Schemas` | `GET` |
+| Endpoint                             | Methods                         |
+| ------------------------------------ | ------------------------------- |
+| `/api/scim/v2/Users`                 | `GET`, `POST`                   |
+| `/api/scim/v2/Users/{id}`            | `GET`, `PUT`, `PATCH`, `DELETE` |
+| `/api/scim/v2/Groups`                | `GET`, `POST`                   |
+| `/api/scim/v2/Groups/{id}`           | `GET`, `PUT`, `PATCH`, `DELETE` |
+| `/api/scim/v2/ServiceProviderConfig` | `GET`                           |
+| `/api/scim/v2/ResourceTypes`         | `GET`                           |
+| `/api/scim/v2/Schemas`               | `GET`                           |
 
 `ServiceProviderConfig`, `ResourceTypes` and `Schemas` need no token. List endpoints return at most 100 rows per page; `startIndex` starts at 1. `ServiceProviderConfig` advertises `patch`, `filter` with `maxResults` 100, and no `bulk`, `sort`, `etag` or `changePassword`. `GET /Groups` accepts `excludedAttributes=members`.
 
 ### User attributes
 
-| SCIM attribute | LangWatch field | Notes |
-|----------------|-----------------|-------|
-| `externalId` | Identity provider id | The primary key. LangWatch matches a user on the connection and `externalId` first, then on the email |
-| `userName` | Email address | Must be an email. It is the account's address |
-| `name.givenName`, `name.familyName` | Name | Joined into the display name |
-| `emails` | | Accepted and ignored on write; the address comes from `userName`. Returned on read |
-| `active` | Account status | `false` deactivates the user |
-| `urn:ietf:params:scim:schemas:extension:enterprise:2.0:User` `costCenter` | Department | Assigns the user to the department with that name, and creates it when it does not exist. An empty value removes the assignment |
+| SCIM attribute                                                            | LangWatch field      | Notes                                                                                                                           |
+| ------------------------------------------------------------------------- | -------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| `externalId`                                                              | Identity provider id | The primary key. LangWatch matches a user on the connection and `externalId` first, then on the email                           |
+| `userName`                                                                | Email address        | Must be an email. It is the account's address                                                                                   |
+| `name.givenName`, `name.familyName`                                       | Name                 | Joined into the display name                                                                                                    |
+| `emails`                                                                  |                      | Accepted and ignored on write; the address comes from `userName`. Returned on read                                              |
+| `active`                                                                  | Account status       | `false` deactivates the user                                                                                                    |
+| `urn:ietf:params:scim:schemas:extension:enterprise:2.0:User` `costCenter` | Department           | Assigns the user to the department with that name, and creates it when it does not exist. An empty value removes the assignment |
 
 ---
 
@@ -126,7 +131,8 @@ A `DELETE` on a user:
 - `active: true` restores access
 
 <Info>
-  Use `active: false` for a temporary suspension and `DELETE` for permanent offboarding. After a `DELETE`, provisioning the user again starts with no bindings.
+  Use `active: false` for a temporary suspension and `DELETE` for permanent offboarding. After a
+  `DELETE`, provisioning the user again starts with no bindings.
 </Info>
 
 ---
@@ -135,11 +141,11 @@ A `DELETE` on a user:
 
 **Settings > SCIM Provisioning** lists the tokens of the organization:
 
-| Column | Description |
-|--------|-------------|
-| Description | The label given when the token was created |
-| Created | When the token was created |
-| Last Used | The last SCIM request authenticated with the token |
+| Column      | Description                                        |
+| ----------- | -------------------------------------------------- |
+| Description | The label given when the token was created         |
+| Created     | When the token was created                         |
+| Last Used   | The last SCIM request authenticated with the token |
 
 To revoke a token, click the delete icon on its row and confirm. The identity provider using that token loses access at once. The [SCIM Tokens API](/api-reference/scim-tokens/overview) lists and revokes tokens too, and each token created or revoked through the API is written to the [Audit Log](/platform/audit-log). Provisioning requests themselves are not in the audit log.
 

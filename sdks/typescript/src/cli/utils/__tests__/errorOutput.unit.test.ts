@@ -3,13 +3,10 @@
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import chalk from "chalk";
-import { readCliErrorDocument } from "@langwatch/langy/cards/handled-error";
+import { readCliErrorDocument } from "@langwatch/langy-contract/cards/handled-error";
 
 import { LangWatchHandledError } from "@/internal/api/errors";
-import {
-  ExecutionContext,
-  withExecutionContext,
-} from "../../daemon/execution";
+import { ExecutionContext, withExecutionContext } from "../../daemon/execution";
 import {
   commandValidationError,
   currentOutputScope,
@@ -31,10 +28,11 @@ const handledError = ({
   traceId = "4bf92f3577b34da6a3ce929d0e0e4736" as string | undefined,
   traceUrl = undefined as string | undefined,
   reasons = undefined as
-    | { kind: string; meta?: Record<string, unknown> }[]
+    | { kind: string; retryable?: boolean; meta?: Record<string, unknown> }[]
     | undefined,
   suggestions = undefined as string[] | undefined,
   docUrl = undefined as string | undefined,
+  retryable = false,
 } = {}) =>
   new LangWatchHandledError({
     handled: {
@@ -44,14 +42,18 @@ const handledError = ({
       httpStatus,
       meta,
       isHandled: true,
+      retryable,
       traceId,
       traceUrl,
-      reasons,
+      reasons: reasons?.map((reason) => ({
+        ...reason,
+        retryable: reason.retryable ?? false,
+      })),
       suggestions,
       docUrl,
     },
     body: { error: code, message, ...meta },
-    operation: "GET /api/dataset/sales-q3",
+    operation: "GET /api/v1/dataset/sales-q3",
     message,
   });
 
@@ -115,9 +117,7 @@ describe("given a failure the platform named", () => {
     });
 
     it("marks the document as a failure so it cannot be mistaken for a result", () => {
-      const parsed: unknown = JSON.parse(
-        renderErrorAsJson(readCommandError(handledError())),
-      );
+      const parsed: unknown = JSON.parse(renderErrorAsJson(readCommandError(handledError())));
 
       expect(parsed).toMatchObject({ ok: false });
     });
@@ -142,9 +142,7 @@ describe("given a failure the platform named", () => {
 describe("given an infrastructure failure the platform did NOT name", () => {
   describe("when rendering it for a person", () => {
     it("prints the sentence alone, inventing no kind the platform never gave", () => {
-      const rendered = renderErrorForHumans(
-        readCommandError(new Error("fetch failed")),
-      );
+      const rendered = renderErrorForHumans(readCommandError(new Error("fetch failed")));
 
       expect(rendered).toBe("fetch failed");
       expect(rendered).not.toContain("kind");
@@ -200,12 +198,6 @@ describe("given a server echoes a credential back in its message", () => {
 
 /**
  * The other half of the redaction contract, and the one it is easy to get wrong.
- *
- * `meta` is a payload the platform CURATES for a user to act on — it never holds
- * a secret by construction. Scrubbing it anyway would be worse than useless: the
- * credential patterns match legitimate identifiers, so an over-eager scrub turns
- * the id the user needed into `[redacted]` and hides the answer inside the error
- * that was supposed to give it.
  */
 describe("given a domain error whose meta holds an actionable identifier", () => {
   const withKeyLikeIds = () =>
@@ -227,9 +219,7 @@ describe("given a domain error whose meta holds an actionable identifier", () =>
 
   describe("when rendering it for a machine", () => {
     it("hands the identifier through so the agent can act on it", () => {
-      const parsed = readCliErrorDocument(
-        renderErrorAsJson(readCommandError(withKeyLikeIds())),
-      );
+      const parsed = readCliErrorDocument(renderErrorAsJson(readCommandError(withKeyLikeIds())));
 
       expect(parsed?.meta).toEqual({
         virtualKeyId: "vk-abc123def456",
@@ -337,17 +327,13 @@ describe("given a failure the platform sent advice with", () => {
 
       expect(rendered).toContain("Suggestions:");
       expect(rendered).toContain("  - Raise the budget in the gateway settings");
-      expect(rendered).toContain(
-        "Docs: https://langwatch.ai/docs/ai-gateway/budgets",
-      );
+      expect(rendered).toContain("Docs: https://langwatch.ai/docs/ai-gateway/budgets");
     });
   });
 
   describe("when rendering it for a machine", () => {
     it("carries the advice in the document", () => {
-      const parsed = readCliErrorDocument(
-        renderErrorAsJson(readCommandError(advised())),
-      );
+      const parsed = readCliErrorDocument(renderErrorAsJson(readCommandError(advised())));
 
       expect(parsed).toMatchObject({
         code: "budget_exceeded",
@@ -407,22 +393,15 @@ describe("given a failure the platform sent NO advice with", () => {
 });
 
 /**
- * The daemon runs requests that share an execution window CONCURRENTLY, and
- * they can disagree about `--format`/`--agent`. The output context is scoped
- * per request (AsyncLocalStorage, entered by withExecutionContext) precisely
- * so the second writer cannot clobber the first request's error rendering.
+ * The daemon runs requests that share an execution window CONCURRENTLY, and they can
+ * disagree about `--format`/`--agent`.
  */
 describe("given two concurrent daemon requests in one window", () => {
-  const contextFor = (id: string) =>
-    new ExecutionContext(id, () => undefined);
+  const contextFor = (id: string) => new ExecutionContext(id, () => undefined);
 
   describe("when they were invoked with different formats", () => {
     it("renders each request's errors in its OWN format", async () => {
-      const render = (
-        id: string,
-        format: string | undefined,
-        delayMs: number,
-      ): Promise<string> =>
+      const render = (id: string, format: string | undefined, delayMs: number): Promise<string> =>
         withExecutionContext(contextFor(id), async () => {
           setOutputFormat(format);
           // Interleave: yield so the other request records ITS format before
@@ -450,17 +429,14 @@ describe("given two concurrent daemon requests in one window", () => {
       try {
         chalk.level = 1;
 
-        const observed = await withExecutionContext(
-          contextFor("agent"),
-          async () => {
-            disableOutputColor();
-            await new Promise((resolve) => setTimeout(resolve, 1));
-            return {
-              scopeColor: currentOutputScope()?.hasColor,
-              level: chalk.level,
-            };
-          },
-        );
+        const observed = await withExecutionContext(contextFor("agent"), async () => {
+          disableOutputColor();
+          await new Promise((resolve) => setTimeout(resolve, 1));
+          return {
+            scopeColor: currentOutputScope()?.hasColor,
+            level: chalk.level,
+          };
+        });
 
         expect(observed.scopeColor).toBe(false);
         // The whole point: a concurrent request's colour is untouched, because

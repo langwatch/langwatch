@@ -7,8 +7,8 @@ metadata:
   category: recipe
 ---
 
-import CliSetup from '../../_shared/cli-setup.mdx'
-import ApiKeySetup from '../../_shared/api-key-setup.mdx'
+import CliSetup from "../../_shared/cli-setup.mdx";
+import ApiKeySetup from "../../_shared/api-key-setup.mdx";
 
 # Set Up the LangWatch CLI
 
@@ -24,7 +24,7 @@ For CI and agents, configure non-interactively, and never block on a browser. Ha
 # GitHub Actions; any secret store works the same way
 env:
   LANGWATCH_API_KEY: ${{ secrets.LANGWATCH_API_KEY }}
-  LANGWATCH_ENDPOINT: https://lw.acme.internal   # self-hosted only; omit for cloud
+  LANGWATCH_ENDPOINT: https://lw.acme.internal # self-hosted only; omit for cloud
 ```
 
 That variable is the whole of the CI setup: every command resolves the key from the environment, so there is no `login` call to make. Keep the key off the command line: an argument is readable by every other process on the machine, and in a shell it lands in your history file.
@@ -64,11 +64,11 @@ langwatch status          # resource counts: proves auth + endpoint + project in
 
 ## Troubleshooting
 
-| Symptom | Likely cause | Fix |
-|---------|--------------|-----|
-| `401` / `unauthorized` on every command | Wrong, revoked, or missing API key | Re-run `langwatch login`; check `LANGWATCH_API_KEY` in `.env` and the shell (shell wins) |
-| `401` with a PAT | Missing project id | `export LANGWATCH_PROJECT_ID=<your-project-id>` |
-| Connection refused / DNS errors | Self-hosted endpoint wrong or unreachable | Check `langwatch config get endpoint` and `LANGWATCH_ENDPOINT`; verify the instance URL loads in a browser from this machine |
-| Right credentials, wrong data | Talking to the wrong project or instance | `langwatch projects list`; re-login with a key from the intended project |
-| Old shell ignores new `.env` | Env vars already exported | Start a new shell, or `unset LANGWATCH_API_KEY LANGWATCH_ENDPOINT` so `.env` is re-read |
-| A command hangs waiting for input | Interactive prompt in a non-interactive context | No flag answers prompts globally. Set `LANGWATCH_API_KEY` so nothing needs `login`, then pass the flag that command takes: `--force` for `prompt tag delete`, `--force-local` or `--force-remote` for `prompt push`, `-y` for `logout`, `skills install`, `skills uninstall` and `skills update`. `-o json` only selects an output format; on `skills` it turns the confirmation into an error rather than a prompt, elsewhere it changes nothing |
+| Symptom                                 | Likely cause                                    | Fix                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| --------------------------------------- | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `401` / `unauthorized` on every command | Wrong, revoked, or missing API key              | Re-run `langwatch login`; check `LANGWATCH_API_KEY` in `.env` and the shell (shell wins)                                                                                                                                                                                                                                                                                                                                                          |
+| `401` with a PAT                        | Missing project id                              | `export LANGWATCH_PROJECT_ID=<your-project-id>`                                                                                                                                                                                                                                                                                                                                                                                                   |
+| Connection refused / DNS errors         | Self-hosted endpoint wrong or unreachable       | Check `langwatch config get endpoint` and `LANGWATCH_ENDPOINT`; verify the instance URL loads in a browser from this machine                                                                                                                                                                                                                                                                                                                      |
+| Right credentials, wrong data           | Talking to the wrong project or instance        | `langwatch projects list`; re-login with a key from the intended project                                                                                                                                                                                                                                                                                                                                                                          |
+| Old shell ignores new `.env`            | Env vars already exported                       | Start a new shell, or `unset LANGWATCH_API_KEY LANGWATCH_ENDPOINT` so `.env` is re-read                                                                                                                                                                                                                                                                                                                                                           |
+| A command hangs waiting for input       | Interactive prompt in a non-interactive context | No flag answers prompts globally. Set `LANGWATCH_API_KEY` so nothing needs `login`, then pass the flag that command takes: `--force` for `prompt tag delete`, `--force-local` or `--force-remote` for `prompt push`, `-y` for `logout`, `skills install`, `skills uninstall` and `skills update`. `-o json` only selects an output format; on `skills` it turns the confirmation into an error rather than a prompt, elsewhere it changes nothing |

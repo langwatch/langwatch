@@ -174,7 +174,10 @@ describe("pullPrompts", () => {
       await pullPrompts({ config, lock, promptsApiService, result, tag: "nonexistent" });
 
       expect(result.errors).toHaveLength(1);
-      expect(result.errors[0]).toMatchObject({ name: "my-prompt", error: "tag not found" });
+      expect(result.errors[0]).toMatchObject({
+        name: "my-prompt",
+        error: "tag not found",
+      });
     });
   });
 });

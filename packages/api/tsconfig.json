@@ -1,16 +1,40 @@
 {
-	"compilerOptions": {
-		"target": "ES2022",
-		"module": "ESNext",
-		"moduleResolution": "Bundler",
-		"lib": ["ES2022", "DOM", "DOM.Iterable"],
-		"strict": true,
-		"esModuleInterop": true,
-		"skipLibCheck": true,
-		"resolveJsonModule": true,
-		"rootDir": "src",
-		"types": ["node"],
-		"noEmit": true
-	},
-	"include": ["src/**/*"]
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "noEmit": true,
+    "module": "ESNext",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
+    "rootDir": ".",
+    "types": ["node"],
+
+    "rewriteRelativeImportExtensions": false
+  },
+  "include": ["src/**/*"],
+  "references": [
+    {
+      "path": "tsconfig.build.json"
+    },
+    {
+      "path": "../actor/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/authz/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../handled-error/tsconfig.build.json"
+    },
+    {
+      "path": "../observability/tsconfig.build.json"
+    },
+    {
+      "path": "../runtime-composition/tsconfig.build.json"
+    },
+    {
+      "path": "../time/tsconfig.build.json"
+    }
+  ]
 }

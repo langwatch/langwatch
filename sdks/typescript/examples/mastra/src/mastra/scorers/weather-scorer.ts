@@ -10,43 +10,41 @@ import {
 import { z } from "zod";
 
 export const toolCallAppropriatenessScorer = createToolCallAccuracyScorerCode({
-	expectedTool: "weatherTool",
-	strictMode: false,
+  expectedTool: "weatherTool",
+  strictMode: false,
 });
 
 export const completenessScorer = createCompletenessScorer();
 
 // Custom LLM-judged scorer: evaluates if non-English locations are translated appropriately
 export const translationScorer = createScorer({
-	id: "translation-quality-scorer",
-	name: "Translation Quality",
-	description:
-		"Checks that non-English location names are translated and used correctly",
-	type: "agent",
-	judge: {
-		model: "xai/grok-3-mini",
-		instructions:
-			"You are an expert evaluator of translation quality for geographic locations. " +
-			"Determine whether the user text mentions a non-English location and whether the assistant correctly uses an English translation of that location. " +
-			"Be lenient with transliteration differences and diacritics. " +
-			"Return only the structured JSON matching the provided schema.",
-	},
+  id: "translation-quality-scorer",
+  name: "Translation Quality",
+  description: "Checks that non-English location names are translated and used correctly",
+  type: "agent",
+  judge: {
+    model: "xai/grok-3-mini",
+    instructions:
+      "You are an expert evaluator of translation quality for geographic locations. " +
+      "Determine whether the user text mentions a non-English location and whether the assistant correctly uses an English translation of that location. " +
+      "Be lenient with transliteration differences and diacritics. " +
+      "Return only the structured JSON matching the provided schema.",
+  },
 })
-	.preprocess(({ run }) => {
-		const userText = getUserMessageFromRunInput(run.input) || "";
-		const assistantText = getAssistantMessageFromRunOutput(run.output) || "";
-		return { userText, assistantText };
-	})
-	.analyze({
-		description:
-			"Extract location names and detect language/translation adequacy",
-		outputSchema: z.object({
-			nonEnglish: z.boolean(),
-			translated: z.boolean(),
-			confidence: z.number().min(0).max(1).default(1),
-			explanation: z.string().default(""),
-		}),
-		createPrompt: ({ results }) => `
+  .preprocess(({ run }) => {
+    const userText = getUserMessageFromRunInput(run.input) || "";
+    const assistantText = getAssistantMessageFromRunOutput(run.output) || "";
+    return { userText, assistantText };
+  })
+  .analyze({
+    description: "Extract location names and detect language/translation adequacy",
+    outputSchema: z.object({
+      nonEnglish: z.boolean(),
+      translated: z.boolean(),
+      confidence: z.number().min(0).max(1).default(1),
+      explanation: z.string().default(""),
+    }),
+    createPrompt: ({ results }) => `
             You are evaluating if a weather assistant correctly handled translation of a non-English location.
             User text:
             """
@@ -68,21 +66,20 @@ export const translationScorer = createScorer({
             "explanation": string
             }
         `,
-	})
-	.generateScore(({ results }) => {
-		const r = (results as any)?.analyzeStepResult || {};
-		if (!r.nonEnglish) return 1; // If not applicable, full credit
-		if (r.translated)
-			return Math.max(0, Math.min(1, 0.7 + 0.3 * (r.confidence ?? 1)));
-		return 0; // Non-English but not translated
-	})
-	.generateReason(({ results, score }) => {
-		const r = (results as any)?.analyzeStepResult || {};
-		return `Translation scoring: nonEnglish=${r.nonEnglish ?? false}, translated=${r.translated ?? false}, confidence=${r.confidence ?? 0}. Score=${score}. ${r.explanation ?? ""}`;
-	});
+  })
+  .generateScore(({ results }) => {
+    const r = (results as any)?.analyzeStepResult || {};
+    if (!r.nonEnglish) return 1; // If not applicable, full credit
+    if (r.translated) return Math.max(0, Math.min(1, 0.7 + 0.3 * (r.confidence ?? 1)));
+    return 0; // Non-English but not translated
+  })
+  .generateReason(({ results, score }) => {
+    const r = (results as any)?.analyzeStepResult || {};
+    return `Translation scoring: nonEnglish=${r.nonEnglish ?? false}, translated=${r.translated ?? false}, confidence=${r.confidence ?? 0}. Score=${score}. ${r.explanation ?? ""}`;
+  });
 
 export const scorers = {
-	toolCallAppropriatenessScorer,
-	completenessScorer,
-	translationScorer,
+  toolCallAppropriatenessScorer,
+  completenessScorer,
+  translationScorer,
 };

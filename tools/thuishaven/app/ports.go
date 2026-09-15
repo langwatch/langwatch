@@ -24,8 +24,13 @@ type Proxy interface {
 	// on first run, so `haven up` self-bootstraps with no setup command at all.
 	// Idempotent; the CA trust is guarded so it does not re-prompt on every launch.
 	EnsureReady() error
-	// Install installs portless itself — `up`'s bootstrap when Installed() is
-	// false, so a fresh machine needs nothing but `haven up`.
+	// Version reports what the resolved binary says it is ("" when nothing is
+	// resolvable, or it will not answer), so `up` can tell the pinned version
+	// from another one without running an install to find out.
+	Version() string
+	// Install installs the pinned portless (domain.PortlessVersion) — `up`'s
+	// bootstrap when nothing is installed and its upgrade when the machine has a
+	// different version, so a fresh machine needs nothing but `haven up`.
 	Install() error
 	// Endpoint reports how the proxy is reachable (scheme, port) so URLs are
 	// correct on the default 443 or an unprivileged port.
@@ -39,8 +44,8 @@ type Proxy interface {
 	CACertPath() string
 }
 
-// Store persists everything under the thuishaven home dir plus the two
-// worktree-local files (the slug cache and the .env.portless overlay).
+// Store persists everything under the thuishaven home dir plus the worktree-local
+// files (the slug cache, the sticky selection and the HMR gate marker).
 type Store interface {
 	SaveStack(domain.Stack) error
 	RemoveStack(slug string)
@@ -52,7 +57,20 @@ type Store interface {
 	// runs here, surviving terminals and reboots. ok=false means never written.
 	ReadSelection(worktreeDir string) (domain.Selection, bool)
 	WriteSelection(worktreeDir string, sel domain.Selection) error
-	WriteOverlay(lwDir string, st domain.Stack) error
+	// The machine-wide "never ask me about this prerequisite again" set that
+	// `haven install` records. Machine-wide, not worktree-local, because the
+	// prerequisites are properties of the machine: a developer who declined
+	// the ClickHouse client once should not be asked by the next checkout.
+	// An absent or unreadable file is an empty set, never an error — a
+	// preference nobody has expressed yet is not a failure.
+	ReadPrereqSkips() map[string]bool
+	WritePrereqSkips(map[string]bool) error
+	// The machine's container posture, as the developer chose it. Same file
+	// and the same reasoning as the skips: it is a property of the machine,
+	// so every checkout on it gets the same answer. Empty means never chosen,
+	// which is what makes haven fall back to looking.
+	ReadContainerPosture() string
+	WriteContainerPosture(string) error
 	// HMR gate marker (worktree-local): expiry in unix-ms; 0/absent means no gate.
 	WriteHMRGate(lwDir string, expiryUnixMs int64) error
 	ReadHMRGate(lwDir string) (int64, bool)
@@ -92,6 +110,18 @@ type Store interface {
 	// ObserveDuration records how long a run actually took, so the next one can
 	// be decided on evidence rather than a default.
 	ObserveDuration(command string, took time.Duration)
+	// HeavyRunSnapshots lists the heavy runs currently holding a slot, with
+	// what a wait estimate needs: each one's own command and when it started.
+	// Same liveness and expiry as HeavyRuns - every run this lists is one
+	// HeavyRuns counts.
+	HeavyRunSnapshots() []HeavyRunSnapshot
+	// AppendRunHistory records one completed heavy run - kind, when it
+	// started, how long it took, how it exited - for the wait estimate.
+	// Best-effort: an unwritable history must never fail the run it documents.
+	AppendRunHistory(domain.RunRecord) error
+	// RunHistory reads the recent history the estimate is built from, capped
+	// at domain.RunHistoryCap by AppendRunHistory itself.
+	RunHistory() []domain.RunRecord
 	// AppendReapEvent records one daemon reclamation (bounded ring, oldest
 	// dropped) and ReapEvents reads the record newest-last — the hub's "what
 	// has the reaper been doing" feed. Append failures are the daemon's to
@@ -100,16 +130,21 @@ type Store interface {
 	ReapEvents() []domain.ReapEvent
 }
 
-// ClaudeSettings writes another tool's configuration, which is why it is not on
+// AgentHookSettings writes another tool's configuration, which is why it is not on
 // Store: everything Store persists is haven's OWN state — stacks, slugs,
 // selections, the daemon record, heavy-run slots. This edits a file in the
-// developer's repo that belongs to Claude Code, and only `haven setup` uses it.
-type ClaudeSettings interface {
+// developer's repo that belongs to an agent client, and only `haven setup` uses it.
+type AgentHookSettings interface {
 	// EnsureHook registers command as a PreToolUse hook in repoRoot's
-	// .claude/settings.local.json — untracked and per worktree. It merges: an
+	// local agent configuration — untracked and per worktree. It merges: an
 	// existing hooks block survives and an entry already present is left alone,
-	// so it reports whether anything actually changed.
+	// so it reports whether anything actually changed. A worktree opted out with
+	// Off leaves this a no-op.
 	EnsureHook(repoRoot, command string) (installed bool, err error)
+	// Off opts repoRoot out of the hook: it removes any existing registration
+	// and records the opt-out, so a later EnsureHook here - including the one
+	// `haven up` makes automatically - leaves it alone.
+	Off(repoRoot string) (turnedOff bool, err error)
 }
 
 // Supervisor runs child processes: one-shot prepare/seed steps and the
@@ -353,12 +388,44 @@ type Hygiene interface {
 	// "how long has this sat idle" signal interactive prune ranks and default-selects
 	// by; the bool is false only when neither can be established.
 	LastActivity(worktreeDir string) (t time.Time, ok bool)
+	// LastTouched is when the worktree DIRECTORY itself was last written — its own
+	// mtime, not its HEAD's committer date. LastActivity answers "how long has this
+	// branch sat", which for a diff drive checked out at an old ref reads as months
+	// idle the moment it is created; this answers "when did anything happen here",
+	// which is the only safe clock for deleting a tool's scratch out from under it.
+	LastTouched(worktreeDir string) (t time.Time, ok bool)
+	// MergedIntoMain reports whether the worktree's branch is already contained in
+	// origin/main (`git merge-base --is-ancestor`) — every commit on it is on main,
+	// so the directory is a copy of history rather than history. False for a
+	// detached HEAD, for a branch with commits main has not taken, and whenever git
+	// cannot tell, so an unanswerable question never reads as "safe to delete".
+	MergedIntoMain(worktreeDir, branch string) bool
 	// UpstreamGone reports whether the branch tracks an upstream whose remote-tracking
 	// ref no longer exists — the "merged, and the remote branch was deleted" signal
 	// that marks a worktree as a prime cleanup candidate. It reflects the local
 	// remote-tracking state, so it needs a prior `git fetch --prune` to be current;
 	// false for a branch with no upstream, a detached HEAD, or when git cannot tell.
 	UpstreamGone(worktreeDir, branch string) bool
+}
+
+// JobScratch is the agent job directories under ~/.claude/jobs. Each holds a
+// record of what the job was (state.json) and what it did (timeline.jsonl)
+// beside the scratch it produced getting there — a tmp/ tree, worktree copies,
+// logs — which is what runs a laptop out of disk. The port is deliberately
+// narrow: enumerate, size, and reclaim the scratch while keeping the record.
+type JobScratch interface {
+	// Jobs reads every job directory under root, parsing each state.json and
+	// walking the tree for its newest modification and access times. A directory
+	// whose state.json is missing or unreadable is still returned, with an empty
+	// State, so the age rule can still reclaim it. It never sets InUse: which jobs
+	// a live process is working in is read from the process table, which the app
+	// layer samples once per plan through System.
+	Jobs(root string) ([]domain.JobRecord, error)
+	// Size reports how much disk the job directory occupies.
+	Size(ctx context.Context, dir string) (bytes int64, ok bool)
+	// Reclaim deletes everything in dir except the named files, and reports how
+	// many bytes went. It never removes the directory itself.
+	Reclaim(dir string, keep []string) (freed int64, err error)
 }
 
 // Worktree is one entry from `git worktree list`.
@@ -378,6 +445,11 @@ type ContainerRuntime interface {
 	Ensure(ctx context.Context) (dockerHost string, err error)
 	// Profile is the colima profile name, for logs and error messages.
 	Profile() string
+	// Available reports whether the runtime can be reached on this machine at
+	// all, without starting anything. It answers the question the langy tier is
+	// resolved from before the stack is built — "can a container tier run here?"
+	// — which Ensure can only answer by doing the work.
+	Available(ctx context.Context) bool
 }
 
 // ContainerJanitor sweeps containers a testcontainers run left behind in the
@@ -395,4 +467,12 @@ type DaemonInfo struct {
 	PID  int    `json:"pid"`
 	Port int    `json:"port"`
 	URL  string `json:"url"`
+}
+
+// HeavyRunSnapshot is one heavy run currently holding a slot: its own
+// command and when it started - the raw material a wait estimate classifies
+// into a domain.HeldRun.
+type HeavyRunSnapshot struct {
+	Command   string
+	StartedAt time.Time
 }

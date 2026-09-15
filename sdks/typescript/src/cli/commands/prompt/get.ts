@@ -6,14 +6,7 @@ import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
 
 /**
- * Reads one prompt, the way every other resource reads one of its own.
- *
- * `versions` lists the rows around a prompt and `list` lists the prompts, so
- * without this the only way to read the prompt itself was to list everything
- * and filter. An agent asked to improve a prompt reaches for `get` first.
- *
- * Returns the prompt rather than printing it: the output port renders it in
- * whatever format the caller asked for (utils/output.ts).
+ * Fetch one prompt; agents improving prompts reach for get first.
  */
 export const promptGetCommand = async (
   handle: string,
@@ -50,9 +43,7 @@ export const promptGetCommand = async (
         }
 
         console.log(
-          chalk.gray(
-            `  Tip: See every version with: langwatch prompt versions ${handle}`,
-          ),
+          chalk.gray(`  Tip: See every version with: langwatch prompt versions ${handle}`),
         );
         console.log();
       },

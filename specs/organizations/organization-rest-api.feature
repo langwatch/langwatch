@@ -64,13 +64,15 @@ Feature: Organization REST API
   # Version namespaces
   # ============================================================================
   #
-  # One handler answers on three paths: the dated namespace an integration
-  # pins itself to, the moving latest alias, and the bare path the reference
-  # documents. The response says which one the caller took, so a client that
-  # believed it was pinned can tell that it is not.
+  # Amended with packages/api/adrs/002-explicit-version-namespaces.md: every
+  # URL names its namespace. One handler answers on the dated namespace an
+  # integration pins itself to and on the moving latest alias; the bare path
+  # is gone (404 via the namespace guard) and "unversioned" went with it. The
+  # response says which namespace answered, so a client that believed it was
+  # pinned can tell that it is not.
 
   @integration
-  Scenario: The organization endpoint answers on its dated, latest and bare paths
+  Scenario: The organization endpoint answers on its dated and latest paths
     When I fetch the organization through the dated version namespace
     Then the response status is 200
     And the response names that version and reports it as stable
@@ -78,7 +80,6 @@ Feature: Organization REST API
     Then the response status is 200
     And the response reports the version as latest
     When I fetch the organization through the bare path
-    Then the response status is 200
-    And the response names no version and reports it as unversioned
+    Then the response status is 404
     When I fetch the organization through a version namespace that does not exist
     Then the response status is 404

@@ -51,6 +51,7 @@ Today the per-worker Unix accounts are a **sibling-process boundary, not a full 
 The stock L7 egress adapter is **cooperative**, not mandatory. It enforces the allow-list only for traffic that goes through the proxy. A prompt-injected worker that ignores `HTTPS_PROXY` and dials an external IP directly on `:443` is **monitored, not blocked**, in the stock pod.
 
 The mandatory-enforcement end states (a Cilium `toFQDNs` policy, or a per-worker network namespace that needs `CAP_SYS_ADMIN`) are **designed, not shipped**. Do not read this page as a claim of hard tenant isolation by default.
+
 </Warning>
 
 The defence-in-depth mitigations that **are** shipped today:
@@ -60,7 +61,10 @@ The defence-in-depth mitigations that **are** shipped today:
 - **Public-subnet node placement (opt-in).** You can schedule the agent pod on a node group that has no route to your private data tier, so a full escape lands somewhere with no path to your databases.
 
 <Note>
-For a self-hosted install, egress is **denied by default**: `networkPolicy.allowExternalHttps` is `false`, so Langy cannot reach the internet at all until you enable it. Turning it on for GitHub is covered in [Networking and egress](/self-hosting/langy/networking-and-egress) and [the GitHub App setup](/self-hosting/langy/github-app).
+  For a self-hosted install, egress is **denied by default**: `networkPolicy.allowExternalHttps` is
+  `false`, so Langy cannot reach the internet at all until you enable it. Turning it on for GitHub
+  is covered in [Networking and egress](/self-hosting/langy/networking-and-egress) and [the GitHub
+  App setup](/self-hosting/langy/github-app).
 </Note>
 
 ## What the sandbox can and cannot reach
@@ -71,7 +75,9 @@ For a self-hosted install, egress is **denied by default**: `networkPolicy.allow
 - **Does not keep at rest:** the worker writes only to disposable storage. The manager wipes the sessions root on boot, and the idle reaper deletes a worker's home once it has been idle for 10 minutes, so clones and injected credentials do not survive.
 
 <Info>
-**Also check:** [Data flow and privacy](/langy/security/data-flow-and-privacy), [What Langy can do in your GitHub](/langy/security/github-access), [Self-hosting: networking and egress](/self-hosting/langy/networking-and-egress).
+  **Also check:** [Data flow and privacy](/langy/security/data-flow-and-privacy), [What Langy can do
+  in your GitHub](/langy/security/github-access), [Self-hosting: networking and
+  egress](/self-hosting/langy/networking-and-egress).
 </Info>
 
 ## Reference

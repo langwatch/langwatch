@@ -1,0 +1,194 @@
+import { Hono } from "hono";
+import { describe, expect, it, vi } from "vitest";
+import { ApiHttpListener } from "../api-http.listener.ts";
+
+describe("ApiHttpListener", () => {
+  it("serves the composed Hono graph then stops accepting requests on close", async () => {
+    const application = new Hono().get("/ready", (context) => context.text("ready"));
+    const listener = ApiHttpListener.create({
+      application,
+      host: "127.0.0.1",
+      port: 0,
+      drainGraceMs: 1,
+    });
+    const address = await listener.start();
+
+    const response = await fetch(`http://127.0.0.1:${address.port}/ready`);
+    expect(response.status).toBe(200);
+    await expect(response.text()).resolves.toBe("ready");
+
+    await Promise.all([listener.close(), listener.close()]);
+    await expect(fetch(`http://127.0.0.1:${address.port}/ready`)).rejects.toThrow();
+  });
+
+  /** @scenario A request in flight when the listener closes is allowed to finish */
+  it("drains an in-flight request before closing the process intake", async () => {
+    let release: (() => void) | undefined;
+    let markEntered: (() => void) | undefined;
+    const entered = new Promise<void>((resolve) => {
+      markEntered = resolve;
+    });
+    const application = new Hono().get("/slow", async (context) => {
+      markEntered?.();
+      await new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      return context.text("finished");
+    });
+    const listener = ApiHttpListener.create({
+      application,
+      host: "127.0.0.1",
+      port: 0,
+      drainGraceMs: 1_000,
+    });
+    const address = await listener.start();
+    const response = fetch(`http://127.0.0.1:${address.port}/slow`);
+    await entered;
+
+    let closed = false;
+    const closing = listener.close().then(() => {
+      closed = true;
+    });
+    await Promise.resolve();
+    expect(closed).toBe(false);
+
+    release?.();
+    await expect((await response).text()).resolves.toBe("finished");
+    await closing;
+  });
+
+  /** @scenario A connection outliving the grace is destroyed inside the phase */
+  it("reaps a request that outlives the bounded drain grace", async () => {
+    let markEntered: (() => void) | undefined;
+    const entered = new Promise<void>((resolve) => {
+      markEntered = resolve;
+    });
+    const logger = { info: vi.fn(), error: vi.fn() };
+    const application = new Hono().get("/stuck", async () => {
+      markEntered?.();
+      await new Promise<void>(() => undefined);
+      return new Response("unreachable");
+    });
+    const listener = ApiHttpListener.create({
+      application,
+      host: "127.0.0.1",
+      port: 0,
+      drainGraceMs: 1,
+      logger,
+    });
+    const address = await listener.start();
+    const response = fetch(`http://127.0.0.1:${address.port}/stuck`);
+    await entered;
+
+    await listener.close();
+
+    await expect(response).rejects.toThrow();
+    expect(logger.info).toHaveBeenCalledWith(
+      { drainGraceMs: 1 },
+      "API requests outlived the drain grace, closing remaining connections",
+    );
+  });
+
+  /** @scenario The drain grace is spent on requests, not on session teardown */
+  it("starts the grace at the close, not after the session teardown", async () => {
+    let markEntered: (() => void) | undefined;
+    const entered = new Promise<void>((resolve) => {
+      markEntered = resolve;
+    });
+    const logger = { info: vi.fn(), error: vi.fn() };
+    const application = new Hono().get("/stuck", async () => {
+      markEntered?.();
+      await new Promise<void>(() => undefined);
+      return new Response("unreachable");
+    });
+    const listener = ApiHttpListener.create({
+      application,
+      host: "127.0.0.1",
+      port: 0,
+      drainGraceMs: 50,
+      closeSessions: () => new Promise<void>((resolve) => setTimeout(resolve, 60)),
+      logger,
+    });
+    const address = await listener.start();
+    const response = fetch(`http://127.0.0.1:${address.port}/stuck`);
+    await entered;
+
+    await listener.close();
+
+    // The teardown alone outlasts the grace, so nothing is left of it for the
+    // request. Were the grace started after the teardown, it would have had the
+    // full 50ms afterwards and the reap below would never have happened.
+    await expect(response).rejects.toThrow();
+    expect(logger.info).toHaveBeenCalledWith(
+      { drainGraceMs: 50 },
+      "API requests outlived the drain grace, closing remaining connections",
+    );
+  });
+
+  /** @scenario Session teardown that fails still leaves the connections reaped */
+  it("reports a failing session teardown and still reaps the connections", async () => {
+    let markEntered: (() => void) | undefined;
+    const entered = new Promise<void>((resolve) => {
+      markEntered = resolve;
+    });
+    const logger = { info: vi.fn(), error: vi.fn() };
+    const application = new Hono().get("/stuck", async () => {
+      markEntered?.();
+      await new Promise<void>(() => undefined);
+      return new Response("unreachable");
+    });
+    const listener = ApiHttpListener.create({
+      application,
+      host: "127.0.0.1",
+      port: 0,
+      drainGraceMs: 1,
+      closeSessions: () => Promise.reject(new Error("mcp teardown failed")),
+      logger,
+    });
+    const address = await listener.start();
+    const response = fetch(`http://127.0.0.1:${address.port}/stuck`);
+    await entered;
+
+    await expect(listener.close()).resolves.toBeUndefined();
+
+    expect(logger.error).toHaveBeenCalledWith(
+      expect.objectContaining({ error: expect.any(Error) }),
+      "API session teardown failed during shutdown, draining connections anyway",
+    );
+    await expect(response).rejects.toThrow();
+    expect(logger.info).toHaveBeenCalledWith(
+      { drainGraceMs: 1 },
+      "API requests outlived the drain grace, closing remaining connections",
+    );
+  });
+
+  /** @scenario The phase outwaits its own drain grace */
+  it("reports a close-phase ceiling above the grace it hands out", async () => {
+    const application = new Hono();
+    const listener = ApiHttpListener.create({
+      application,
+      host: "127.0.0.1",
+      port: 0,
+      drainGraceMs: 5_000,
+    });
+
+    expect(listener.closePhaseTimeoutMs).toBeGreaterThan(5_000);
+    await listener.close();
+  });
+
+  it("is idempotent and rejects a second listener that cannot bind", async () => {
+    const application = new Hono().get("/ready", (context) => context.text("ready"));
+    const first = ApiHttpListener.create({ application, host: "127.0.0.1", port: 0 });
+    const firstAddress = await first.start();
+    await expect(first.start()).resolves.toEqual(firstAddress);
+
+    const second = ApiHttpListener.create({
+      application,
+      host: "127.0.0.1",
+      port: firstAddress.port,
+    });
+    await expect(second.start()).rejects.toMatchObject({ code: "EADDRINUSE" });
+    await Promise.all([second.close(), first.close(), first.close()]);
+    expect(() => first.start()).toThrow("closing");
+  });
+});

@@ -221,8 +221,10 @@ func cardRows(s domain.Stack, in renderInputs) (rows []rowView, up, total int) {
 			up++
 		}
 		rows = append(rows, rowView{DotClass: dotClass, Name: svc.Name, URL: svc.URL, Host: strings.TrimSuffix(svc.Hostname, base), Port: portText(svc.Port)})
-		// The API shares app's origin — show it as a sub-row so the single URL
-		// is unmistakable (no separate api.<slug> hostname).
+		// The same-origin path stays worth its own sub-row even though api
+		// also has its own hostname now (svc.Name == domain.APIService gets
+		// one from the loop above): app.<slug>.../api is what the browser and
+		// existing tooling reach the API through day to day.
 		if svc.Name == "app" && s.APIPort != 0 {
 			rows = append(rows, rowView{IsSub: true, Name: "└ api", URL: svc.URL + "/api", Host: strings.TrimSuffix(svc.Hostname, base) + "/api", Port: portText(s.APIPort)})
 		}

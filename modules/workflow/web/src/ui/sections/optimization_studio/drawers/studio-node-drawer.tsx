@@ -1,0 +1,198 @@
+import type { Node } from "@xyflow/react";
+import { useShallow } from "zustand/react/shallow";
+import { HttpConfigEditor, useHttpTest } from "../../../../behavior/agents/http/index.ts";
+import { CodeBlockEditor } from "../../blocks/code-block-editor.tsx";
+import { OutputsSection } from "@langwatch/prompt-web/surfaces/outputs-section";
+import { VariablesSection } from "@langwatch/prompt-web/surfaces/variables";
+import { useDrawer } from "@langwatch/ui-host/use-drawer";
+import type {
+  AgentComponent,
+  Component,
+  ComponentType,
+  End,
+  Entry,
+  Evaluator,
+  PromptingTechnique,
+  Retriever,
+} from "@langwatch/workflow-contract";
+import { useWorkflowStore } from "../../../../behavior/use-workflow-store.ts";
+import { LiquidConditionEditor } from "../../../elements/code/liquid-condition-editor.tsx";
+import { InsideDrawerProvider } from "../../../elements/studio-drawer-footer.tsx";
+import { CodePropertiesPanel as WorkflowCodePropertiesPanel } from "../../properties/workflow-code-properties-panel.tsx";
+import { EndPropertiesPanel as WorkflowEndPropertiesPanel } from "../../properties/workflow-end-properties-panel.tsx";
+import { EntryPointPropertiesPanel as WorkflowEntryPointPropertiesPanel } from "../../properties/workflow-entry-point-properties-panel.tsx";
+import { HttpPropertiesPanel as WorkflowHttpPropertiesPanel } from "../../properties/workflow-http-properties-panel.tsx";
+import { IfElsePropertiesPanel as WorkflowIfElsePropertiesPanel } from "../../properties/workflow-if-else-properties-panel.tsx";
+import { PromptingTechniquePropertiesPanel as WorkflowPromptingTechniquePropertiesPanel } from "../../properties/workflow-prompting-technique-properties-panel.tsx";
+import {
+  type WorkflowBasePropertiesPanelProps,
+  type WorkflowCodeEditorProps,
+  type WorkflowHttpConfigProps,
+  type WorkflowHttpTestConfig,
+  type WorkflowOutputsProps,
+  type WorkflowVariablesProps,
+} from "../../properties/workflow-properties.ports.ts";
+import { RetrievePropertiesPanel as WorkflowRetrievePropertiesPanel } from "../../properties/workflow-retrieve-properties-panel.tsx";
+import { DatasetModal } from "../dataset-modal.tsx";
+import { AgentPropertiesPanel } from "../properties/agent-properties-panel.tsx";
+import { BasePropertiesPanel, PropertySectionTitle } from "../properties/base-properties-panel.tsx";
+import { CustomPropertiesPanel } from "../properties/custom-properties-panel.tsx";
+import { EvaluatorPropertiesPanel } from "../properties/evaluator-properties-panel.tsx";
+import { useGetDatasetData } from "../../../../behavior/optimization_studio/use-get-dataset-data.ts";
+import { SignaturePromptEditorBridge } from "./signature-prompt-editor-bridge.tsx";
+import { StudioDrawerWrapper } from "./studio-drawer-wrapper.tsx";
+
+function CodePropertiesPanel({ node }: { node: Node<Component> }) {
+  return (
+    <WorkflowCodePropertiesPanel
+      node={node}
+      renderBase={(props: WorkflowBasePropertiesPanelProps) => <BasePropertiesPanel {...props} />}
+      renderCodeEditor={(props: WorkflowCodeEditorProps) => <CodeBlockEditor {...props} />}
+      renderVariables={(props: WorkflowVariablesProps) => <VariablesSection {...props} />}
+      renderOutputs={(props: WorkflowOutputsProps) => <OutputsSection {...props} />}
+    />
+  );
+}
+
+function EndPropertiesPanel({ node }: { node: Node<End> }) {
+  return (
+    <WorkflowEndPropertiesPanel
+      node={node}
+      renderBase={(props: WorkflowBasePropertiesPanelProps) => <BasePropertiesPanel {...props} />}
+      renderVariables={(props: WorkflowVariablesProps) => <VariablesSection {...props} />}
+    />
+  );
+}
+
+function EntryPointPropertiesPanel({ node }: { node: Node<Entry> }) {
+  const { total } = useGetDatasetData({ dataset: node.data.dataset, preview: true });
+
+  return (
+    <WorkflowEntryPointPropertiesPanel
+      node={node}
+      datasetTotal={total}
+      renderBase={(props: WorkflowBasePropertiesPanelProps) => <BasePropertiesPanel {...props} />}
+      renderVariables={(props: WorkflowVariablesProps) => <VariablesSection {...props} />}
+      renderDatasetModal={DatasetModal}
+      renderPropertySectionTitle={PropertySectionTitle}
+    />
+  );
+}
+
+function HttpPropertiesPanel({ node }: { node: Node<Component> }) {
+  return (
+    <WorkflowHttpPropertiesPanel
+      node={node}
+      useHttpTest={(config: WorkflowHttpTestConfig) => useHttpTest(config)}
+      renderBase={(props: WorkflowBasePropertiesPanelProps) => <BasePropertiesPanel {...props} />}
+      renderHttpConfig={(props: WorkflowHttpConfigProps) => <HttpConfigEditor {...props} />}
+      renderVariables={(props: WorkflowVariablesProps) => <VariablesSection {...props} />}
+      renderOutputs={(props: WorkflowOutputsProps) => <OutputsSection {...props} />}
+    />
+  );
+}
+
+function IfElsePropertiesPanel({ node }: { node: Node<Component> }) {
+  return (
+    <WorkflowIfElsePropertiesPanel
+      node={node}
+      renderBase={(props: WorkflowBasePropertiesPanelProps) => <BasePropertiesPanel {...props} />}
+      renderCodeEditor={(props: WorkflowCodeEditorProps) => <CodeBlockEditor {...props} />}
+      renderVariables={(props: WorkflowVariablesProps) => <VariablesSection {...props} />}
+      renderPropertySectionTitle={PropertySectionTitle}
+      renderLiquidConditionEditor={LiquidConditionEditor}
+    />
+  );
+}
+
+function PromptingTechniquePropertiesPanel({ node }: { node: Node<PromptingTechnique> }) {
+  return (
+    <WorkflowPromptingTechniquePropertiesPanel
+      node={node}
+      renderBase={(props: WorkflowBasePropertiesPanelProps) => <BasePropertiesPanel {...props} />}
+    />
+  );
+}
+
+function RetrievePropertiesPanel({ node }: { node: Node<Retriever> }) {
+  return (
+    <WorkflowRetrievePropertiesPanel
+      node={node}
+      renderBase={(props: WorkflowBasePropertiesPanelProps) => <BasePropertiesPanel {...props} />}
+    />
+  );
+}
+
+/**
+ * Panel map for all node types. Every node type goes through
+ * StudioDrawerWrapper for unified play/expand/close controls.
+ */
+const ComponentPropertiesPanelMap: Partial<
+  Record<ComponentType, React.FC<{ node: Node<Component> }>>
+> = {
+  entry: EntryPointPropertiesPanel as React.FC<{ node: Node<Component> }>,
+  end: EndPropertiesPanel as React.FC<{ node: Node<Component> }>,
+  signature: SignaturePromptEditorBridge as React.FC<{ node: Node<Component> }>,
+  code: CodePropertiesPanel,
+  http: HttpPropertiesPanel,
+  agent: AgentPropertiesPanel as React.FC<{ node: Node<Component> }>,
+  custom: CustomPropertiesPanel,
+  retriever: RetrievePropertiesPanel,
+  prompting_technique: PromptingTechniquePropertiesPanel,
+  evaluator: EvaluatorPropertiesPanel as React.FC<{ node: Node<Component> }>,
+  if_else: IfElsePropertiesPanel,
+};
+
+/**
+ * Subscribes to the workflow store's selected node and renders the right
+ * properties panel inside StudioDrawerWrapper — every node type goes
+ * through it for unified play/expand/close controls.
+ */
+export function StudioNodeDrawer() {
+  const { selectedNode, deselectAllNodes, isDraggingNode, clickedNodeId } = useWorkflowStore(
+    useShallow((state) => ({
+      selectedNode: state.nodes.find((n) => n.selected),
+      deselectAllNodes: state.deselectAllNodes,
+      isDraggingNode: state.isDraggingNode,
+      clickedNodeId: state.clickedNodeId,
+    })),
+  );
+
+  const { currentDrawer } = useDrawer();
+
+  // Don't open the drawer for evaluator/agent nodes without an entity set
+  // (they're still in the picker flow)
+  const isEmptyEvaluator =
+    selectedNode?.type === "evaluator" && !(selectedNode.data as Evaluator).evaluator;
+  const isEmptyAgent =
+    selectedNode?.type === "agent" && !(selectedNode.data as AgentComponent).agent;
+
+  // Suppress the StudioDrawerWrapper when a URL-based drawer (e.g.
+  // PromptListDrawer, EvaluatorListDrawer) is active. This prevents
+  // two drawers from rendering simultaneously. The URL drawer takes
+  // priority; once it closes, the StudioDrawerWrapper will naturally
+  // appear for the selected node.
+  const hasUrlDrawer = !!currentDrawer;
+
+  // Only open the drawer when onNodeClick has confirmed a genuine click
+  // (mousedown + mouseup without drag). This prevents the drawer from
+  // opening when the user merely drags a node (which selects it on mousedown).
+  const hasClickConfirmation = selectedNode && clickedNodeId === selectedNode.id;
+
+  const isNodeDrawerBlocked = hasUrlDrawer || isEmptyEvaluator || isEmptyAgent || isDraggingNode;
+  const effectiveNode = !isNodeDrawerBlocked && hasClickConfirmation ? selectedNode : undefined;
+
+  const PanelComponent = effectiveNode
+    ? ComponentPropertiesPanelMap[effectiveNode.type as ComponentType]
+    : undefined;
+
+  return (
+    <InsideDrawerProvider>
+      <StudioDrawerWrapper node={effectiveNode} onClose={deselectAllNodes}>
+        {effectiveNode && PanelComponent && (
+          <PanelComponent key={effectiveNode.id} node={effectiveNode} />
+        )}
+      </StudioDrawerWrapper>
+    </InsideDrawerProvider>
+  );
+}

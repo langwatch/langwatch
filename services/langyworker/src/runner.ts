@@ -18,11 +18,7 @@
 
 import { buildHandoffDigest } from "./digest.js";
 import { TurnEventMapper, type SessionEventLike } from "./events.js";
-import {
-  boundText,
-  type TerminalEvent,
-  type TurnCommand,
-} from "./protocol.js";
+import { boundText, type TerminalEvent, type TurnCommand } from "./protocol.js";
 import { prependResumeSeed } from "./system-prompt.js";
 import type { TurnContext } from "./tools/turn-context.js";
 import type { ProtocolWriter } from "./writer.js";
@@ -92,7 +88,9 @@ export class TurnRunner {
         void this.options.writer.emit(mapped);
       }
     } catch (error) {
-      this.warn(`event mapping failed (${event.type}): ${error instanceof Error ? error.message : String(error)}`);
+      this.warn(
+        `event mapping failed (${event.type}): ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   };
 
@@ -206,7 +204,9 @@ export class TurnRunner {
         type: "turn_done",
         turnId: command.turnId,
         outcome: "error",
-        errorMessage: boundText({ text: error instanceof Error ? error.message : String(error) }),
+        errorMessage: boundText({
+          text: error instanceof Error ? error.message : String(error),
+        }),
       };
     }
 
@@ -224,7 +224,9 @@ export class TurnRunner {
       try {
         seed = buildHandoffDigest({ messages: session.agent.state.messages });
       } catch (error) {
-        this.warn(`handoff digest failed: ${error instanceof Error ? error.message : String(error)}`);
+        this.warn(
+          `handoff digest failed: ${error instanceof Error ? error.message : String(error)}`,
+        );
       }
       return { type: "handoff", turnId: state.turnId, seed };
     }
@@ -236,7 +238,9 @@ export class TurnRunner {
         type: "turn_done",
         turnId: state.turnId,
         outcome: "error",
-        errorMessage: boundText({ text: thrown instanceof Error ? thrown.message : String(thrown) }),
+        errorMessage: boundText({
+          text: thrown instanceof Error ? thrown.message : String(thrown),
+        }),
       };
     }
     const assistantError = lastAssistantError(session.agent.state.messages);

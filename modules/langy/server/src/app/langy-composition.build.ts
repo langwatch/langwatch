@@ -1,0 +1,191 @@
+/**
+ * LangyApp infrastructure: built from prisma/redis and own classes. Pieces
+ * either stubs or redis-only (no token needed). commands/broadcast supplied
+ * externally (taken as dependency tokens).
+ */
+import { renderLangyTurnContext } from "@langwatch/langy-contract";
+import type { LangyServerConfig } from "@langwatch/langy-contract";
+import type { RedisConnection } from "@langwatch/redis-client";
+import { LangyNotEnabledError } from "@langwatch/langy-contract";
+import {
+  LangyGithubPrCounter,
+  LangyGithubPrQuotaService,
+  LANGY_GITHUB_PRS_PER_DAY,
+} from "../services/langy-github-pr-quota.service.ts";
+import { LangyGithubPermit } from "./langy.members.ts";
+import { LangyBlockOtelMetricsAdapter } from "../services/langy-block-metrics-otel.service.ts";
+import { OtelLangyWorkerMetricsAdapter } from "../services/langy-worker-metrics-otel.service.ts";
+import { UnavailableLangyWorkerAdapter } from "../services/langy-worker-unavailable.service.ts";
+import { LangyWorkerHttpAdapter } from "../services/langy-worker-http.service.ts";
+import { LangyTokenBufferRedisRepository } from "../repositories/redis/redis.langy-token-buffer.repository.ts";
+import type { LangyTurnTechnicalMembers } from "../services/langy-turn-shared.service.ts";
+import type {
+  LangyCredentialComposition,
+  LangyServiceCompositionOptions,
+} from "../services/langy-postgres.service.ts";
+import type { LangyRepositories } from "../repositories/langy-repositories.registry.ts";
+
+/** The Redis surface this file needs: exactly what `LangyGithubPrCounter` names. */
+export type LangyGithubPrRedis = Readonly<{
+  get(key: string): Promise<string | null>;
+  incr(key: string): Promise<number>;
+  decr(key: string): Promise<number>;
+  incrby(key: string, amount: number): Promise<number>;
+  expire(key: string, seconds: number): Promise<unknown>;
+  eval(script: string, numKeys: number, ...args: string[]): Promise<unknown>;
+}>;
+
+/**
+ * The daily pull-request counter, on this process's own Redis. `eval` is
+ * declared because the quota service releases a permit through a Lua
+ * check-and-decrement; without it the release falls back to a read-then-decr
+ * that can underflow the bucket and grant unlimited permits.
+ */
+class LangyGithubPrRedisCounter extends LangyGithubPrCounter {
+  static create(redis: LangyGithubPrRedis): LangyGithubPrRedisCounter {
+    return new LangyGithubPrRedisCounter(redis);
+  }
+
+  private constructor(private readonly redis: LangyGithubPrRedis) {
+    super();
+  }
+
+  tryGet(key: string): Promise<string | null> {
+    return this.redis.get(key);
+  }
+
+  incr(key: string): Promise<number> {
+    return this.redis.incr(key);
+  }
+
+  decr(key: string): Promise<number> {
+    return this.redis.decr(key);
+  }
+
+  incrby(key: string, amount: number): Promise<number> {
+    return this.redis.incrby(key, amount);
+  }
+
+  expire(key: string, seconds: number): Promise<unknown> {
+    return this.redis.expire(key, seconds);
+  }
+
+  eval(script: string, numKeys: number, ...args: string[]): Promise<unknown> {
+    return this.redis.eval(script, numKeys, ...args);
+  }
+}
+
+/** The turn's three permit calls, on the feature package's own quota service. */
+class LangyGithubPrPermitsAdapter extends LangyGithubPermit {
+  static create(quota: LangyGithubPrQuotaService): LangyGithubPrPermitsAdapter {
+    return new LangyGithubPrPermitsAdapter(quota);
+  }
+
+  private constructor(private readonly quota: LangyGithubPrQuotaService) {
+    super();
+  }
+
+  reserve(input: { userId: string }): Promise<{
+    reserved: boolean;
+    allowed: boolean;
+    resetAt: number;
+  }> {
+    return this.quota.reservePermit(input);
+  }
+
+  release(input: { userId: string }): Promise<void> {
+    return this.quota.releasePermit(input);
+  }
+
+  check(input: { userId: string }): Promise<{ allowed: boolean }> {
+    return this.quota.usage(input);
+  }
+}
+
+/**
+ * Everything `PostgresLangyAdapter.build` needs besides `commands`: the turn
+ * technical members, the credential stubs, and the process's own optional
+ * collaborators (events reader, block metrics, the feedback-prompt store).
+ */
+export type LangyBuiltInfrastructure = Omit<LangyServiceCompositionOptions, "commands">;
+
+export function buildLangyInfrastructure(input: {
+  redis: RedisConnection | null;
+  config: LangyServerConfig;
+  repositories: LangyRepositories;
+}): LangyBuiltInfrastructure {
+  const { redis, config, repositories } = input;
+
+  const workerMetrics = OtelLangyWorkerMetricsAdapter.create();
+  // No agent manager unless this process was started with the langyagent
+  // manager's address and shared secret (LANGY_AGENT_URL / LANGY_INTERNAL_SECRET,
+  // ADR-129) — a deployment without them refuses dispatch by name rather than
+  // guessing at an address.
+  const worker =
+    config.agentUrl && config.internalSecret
+      ? LangyWorkerHttpAdapter.create({
+          agentUrl: config.agentUrl,
+          internalSecret: config.internalSecret,
+          metrics: workerMetrics,
+        })
+      : UnavailableLangyWorkerAdapter.create(workerMetrics);
+
+  const permits = LangyGithubPrPermitsAdapter.create(
+    LangyGithubPrQuotaService.create({
+      counter: redis ? LangyGithubPrRedisCounter.create(redis) : null,
+    }),
+  );
+
+  const turns: LangyTurnTechnicalMembers = {
+    // Resolving the model a turn runs on refuses rather than inventing one: a
+    // guessed model bills a customer's key against a provider they did not
+    // choose (matches the deleted composition's own choice).
+    models: {
+      resolve: () => Promise.reject(new LangyNotEnabledError()),
+    },
+    worker,
+    tokenBuffer: redis ? LangyTokenBufferRedisRepository.create({ redis }) : null,
+    permits,
+    perDayPrCap: LANGY_GITHUB_PRS_PER_DAY,
+    sessionKeys: {
+      mint: () => Promise.reject(new LangyNotEnabledError()),
+      revoke: () => Promise.resolve(),
+    },
+    // The one turn port that answers for real here: rendering the composer's
+    // context chips is pure, and the contract package owns it.
+    context: { tryRender: renderLangyTurnContext },
+    // Fails toward the closed channel: nothing here resolves a project's
+    // rollout flag, so advertising the surface would be a lie.
+    uiActionSurface: { resolve: () => Promise.resolve(false) },
+    metrics: { count: () => undefined },
+    accessStore: repositories.turnAccess,
+    handoffStore: repositories.turnHandoff,
+  };
+
+  const credentials: LangyCredentialComposition = {
+    sessionKeys: {
+      mint: () => Promise.reject(new LangyNotEnabledError()),
+      revokeManaged: () => Promise.resolve("refused" as const),
+    },
+    virtualKeys: {
+      provision: () => Promise.reject(new LangyNotEnabledError()),
+    },
+    github: { enabled: false, mintTurnToken: () => Promise.resolve(null) },
+    runtime: {
+      workerCallbackUrl: undefined,
+      workerGatewayBaseUrl: undefined,
+      mirrorProjectId: undefined,
+    },
+  };
+
+  return {
+    turns,
+    credentials,
+    events: null,
+    blockMetrics: LangyBlockOtelMetricsAdapter.create(),
+    ...(redis ? { feedbackPromptRedis: redis } : {}),
+    // No relay: opening one needs this process's public origin, which is not
+    // among the two members `LangyApp` reads. A process that serves the
+    // relay wires it in later, over this same build.
+  };
+}

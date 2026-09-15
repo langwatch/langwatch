@@ -1,0 +1,42 @@
+{
+  "version": 1,
+  "policy": "memory-twin-drift",
+  "entries": [
+    {
+      "key": "enterprise/modules/governance/server|AdminWorkspaceViewAuditRepository|memory|seedTarget",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "enterprise/modules/governance/server|GovernanceSetupStateRepository|memory|record",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/auth/server|AuthSessionRepository|memory|put",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/monitor/server|MonitorRepository|memory|seed",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/organization/server|PersonalTeamScopeRepository|prisma|findSharedTeamIds",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/organization/server|TenantDirectoryRepository|memory|organizationForTenant",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/role/server|RoleRepository|memory|assign",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/role/server|RoleRepository|memory|forget",
+      "measured": "2026-09-10"
+    },
+    {
+      "key": "modules/role/server|RoleRepository|memory|save",
+      "measured": "2026-09-10"
+    }
+  ]
+}

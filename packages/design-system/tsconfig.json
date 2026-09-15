@@ -1,0 +1,34 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
+    "lib": ["es2022", "dom", "dom.iterable"],
+    "jsx": "react-jsx",
+    "noUncheckedIndexedAccess": true,
+    "verbatimModuleSyntax": true,
+
+    "noEmit": true,
+
+    "rootDir": ".",
+
+    "outDir": "dist",
+
+    "rewriteRelativeImportExtensions": false
+  },
+  "include": [
+    ".storybook/**/*.ts",
+    ".storybook/**/*.tsx",
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "stories/**/*.ts",
+    "stories/**/*.tsx",
+    "tests/**/*.ts",
+    "tests/**/*.tsx"
+  ],
+
+  "references": [
+    {
+      "path": "tsconfig.build.json"
+    }
+  ]
+}

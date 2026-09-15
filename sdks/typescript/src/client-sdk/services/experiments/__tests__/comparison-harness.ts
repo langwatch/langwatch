@@ -1,12 +1,6 @@
 /**
- * Shared setup for the Experiment.compare() unit suites, n-way judging of a
- * row's targets.
- *
+ * Shared setup for the Experiment.compare() unit suites, n-way judging of a row's targets.
  * Spec: specs/experiments/comparison-sdk.feature
- *
- * The transport is stubbed, so what those suites assert is the contract the
- * SDK speaks: which keys reach the judge, which are deliberately absent so the
- * judge's own defaults apply, and the shape of what lands in the batch.
  */
 
 import { afterEach, beforeEach, vi } from "vitest";
@@ -93,22 +87,17 @@ export const createHarness = () => {
   };
 
   globalThis.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-    const url =
-      typeof input === "string"
-        ? input
-        : input instanceof URL
-          ? input.href
-          : input.url;
+    const url = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
     const body = typeof init?.body === "string" ? JSON.parse(init.body) : {};
 
-    if (url.includes("/api/experiment/init")) {
+    if (url.includes("/api/v1/experiment/init")) {
       return new Response(
         JSON.stringify({
           slug: "comparison-test",
           path: "/acme/experiments/comparison-test",
           id: "experiment-id",
         }),
-        { status: 200 }
+        { status: 200 },
       );
     }
 
@@ -126,7 +115,7 @@ export const createHarness = () => {
       loggedDatasetTargets.push(
         ((body.dataset ?? []) as { target_id?: string | null }[])
           .map((entry) => entry.target_id)
-          .filter((target): target is string => typeof target === "string")
+          .filter((target): target is string => typeof target === "string"),
       );
       return new Response(JSON.stringify({}), { status: 200 });
     }
@@ -138,23 +127,10 @@ export const createHarness = () => {
 };
 
 /**
- * Register the lifecycle every comparison suite needs: a fresh harness and
- * stubbed transport per test, a quiet console, and an environment left exactly
- * as it was found.
- *
- * The harness arrives through a callback rather than a return value because
- * the stubbed fetch closes over the instance it was built with. Handing back a
- * long-lived object and refilling it each test would leave that closure
- * pointing at the previous one, so a `respond` a test installed would never be
- * the one called.
- *
- * `LANGWATCH_API_KEY` is unset for the duration so `ensureSetup()` stays a
- * no-op and every suite passes its key explicitly, which is what keeps a real
- * key in the developer's environment from changing what a test exercises.
+ * Register the lifecycle every comparison suite needs: a fresh harness and stubbed
+ * transport per test, a quiet console, and an environment left exactly as it was found.
  */
-export const useComparisonHarness = (
-  assign: (harness: ComparisonHarness) => void,
-): void => {
+export const useComparisonHarness = (assign: (harness: ComparisonHarness) => void): void => {
   const previousApiKey = process.env.LANGWATCH_API_KEY;
 
   beforeEach(() => {
@@ -194,7 +170,7 @@ export const runComparison = async (
   }: {
     outputs?: Record<string, unknown>;
     options?: Omit<Partial<ComparisonOptions>, "index">;
-  } = {}
+  } = {},
 ): Promise<{ verdict?: ComparisonVerdict; error?: unknown }> => {
   let verdict: ComparisonVerdict | undefined;
   let error: unknown;
@@ -202,8 +178,8 @@ export const runComparison = async (
   await experiment.run([{ question: "What is 2 + 2?" }], async ({ index }) => {
     await Promise.all(
       Object.entries(outputs).map(([target, output]) =>
-        experiment.withTarget(target, () => output)
-      )
+        experiment.withTarget(target, () => output),
+      ),
     );
 
     try {
@@ -220,5 +196,5 @@ export const comparisonEvaluations = (harness: {
   loggedEvaluations: LoggedEvaluation[];
 }): LoggedEvaluation[] =>
   harness.loggedEvaluations.filter(
-    (evaluation) => evaluation.evaluator === "langevals/select_best_compare"
+    (evaluation) => evaluation.evaluator === "langevals/select_best_compare",
   );

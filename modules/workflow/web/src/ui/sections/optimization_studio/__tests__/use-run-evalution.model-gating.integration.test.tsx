@@ -1,0 +1,140 @@
+/**
+ * @vitest-environment jsdom
+ *
+ * Without Fast model: autosaved version persists and commit-message generation is skipped.
+ */
+import { act, renderHook } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+const { mockResolvedDefault, mockGenerateMutateAsync, mockCommitMutateAsync, mockPostEvent } =
+  vi.hoisted(() => ({
+    mockResolvedDefault: { current: null as { model: string } | null },
+    mockGenerateMutateAsync: vi.fn().mockResolvedValue("generated message"),
+    mockCommitMutateAsync: vi.fn().mockResolvedValue({ id: "v-2" }),
+    mockPostEvent: vi.fn(),
+  }));
+
+vi.mock("../../../../behavior/use-workflow-store.ts", () => ({
+  useWorkflowStore: (selector: (s: unknown) => unknown) => selector(storeState),
+}));
+vi.mock("../../../../behavior/workflow-store.ts", () => ({
+  serializeWorkflow: (workflow: unknown) => workflow,
+}));
+vi.mock("../../../../behavior/studio-host/use-organization-team-project.ts", () => ({
+  useOrganizationTeamProject: () => ({
+    project: { id: "proj-1", slug: "test-project" },
+  }),
+}));
+
+vi.mock("../../../../model/workflow-api-client.ts", () => ({
+  api: {
+    useUtils: () => ({
+      workflow: { getVersions: { invalidate: vi.fn() } },
+    }),
+    modelProvider: {
+      getResolvedDefault: {
+        useQuery: () => ({
+          data: mockResolvedDefault.current,
+          isLoading: false,
+          isFetched: true,
+        }),
+      },
+    },
+    workflow: {
+      commitVersion: {
+        useMutation: () => ({ mutateAsync: mockCommitMutateAsync }),
+      },
+      generateCommitMessage: {
+        useMutation: () => ({ mutateAsync: mockGenerateMutateAsync }),
+      },
+    },
+  },
+}));
+
+vi.mock("../use-post-event.tsx", () => ({
+  usePostEvent: () => ({ postEvent: mockPostEvent, isLoading: false }),
+}));
+
+const storeState = {
+  setEvaluationState: vi.fn(),
+  setWorkflow: vi.fn(),
+  getWorkflow: () => ({
+    workflow_id: "wf-1",
+    name: "Test Workflow",
+    nodes: [],
+    edges: [],
+    state: {},
+  }),
+};
+
+vi.mock("../history.tsx", () => ({
+  useVersionState: () => ({
+    latestVersion: { id: "v-1-auto", autoSaved: true },
+    previousVersion: { id: "v-1", version: "1.0" },
+    // `useVersionState` parses the stored envelope into the typed Studio
+    // refinement once, where the version is read, so the hook takes the
+    // parsed workflow rather than `previousVersion.dsl`.
+    previousVersionDsl: {
+      spec_version: "1.5",
+      workflow_id: "wf-1",
+      name: "Prev",
+      icon: "",
+      description: "",
+      version: "1.0",
+      nodes: [
+        {
+          id: "old_node",
+          type: "entry",
+          position: { x: 0, y: 0 },
+          data: {},
+        },
+      ],
+      edges: [],
+      state: {},
+    },
+    nextVersion: "1.1",
+  }),
+}));
+
+const { useRunEvalution } = await import("../use-run-evalution.ts");
+
+describe("given an evaluation run auto-commits unsaved changes", () => {
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  describe("when no Fast model resolves at any scope", () => {
+    /** @scenario Evaluate-time autosave without a Fast model commits silently */
+    it("commits with the autosaved fallback and sends no generation request", async () => {
+      mockResolvedDefault.current = null;
+      const { result } = renderHook(() => useRunEvalution());
+
+      await act(async () => {
+        await result.current.runEvaluation({});
+      });
+
+      expect(mockGenerateMutateAsync).not.toHaveBeenCalled();
+      expect(mockCommitMutateAsync).toHaveBeenCalledTimes(1);
+      expect(mockCommitMutateAsync).toHaveBeenCalledWith(
+        expect.objectContaining({ commitMessage: "autosaved" }),
+      );
+      expect(mockPostEvent).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("when a Fast model resolves for the project", () => {
+    it("generates the description before committing", async () => {
+      mockResolvedDefault.current = { model: "openai/gpt-5-mini" };
+      const { result } = renderHook(() => useRunEvalution());
+
+      await act(async () => {
+        await result.current.runEvaluation({});
+      });
+
+      expect(mockGenerateMutateAsync).toHaveBeenCalledTimes(1);
+      expect(mockCommitMutateAsync).toHaveBeenCalledWith(
+        expect.objectContaining({ commitMessage: "generated message" }),
+      );
+    });
+  });
+});

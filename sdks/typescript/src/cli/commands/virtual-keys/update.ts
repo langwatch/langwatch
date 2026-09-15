@@ -8,12 +8,7 @@ import {
 } from "@/client-sdk/services/virtual-keys/virtual-keys-api.service";
 import { resolveCredentials } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
-import {
-  buildBudgetFlags,
-  formatScope,
-  parseRoutingModeArg,
-  parseScopeArg,
-} from "./_shared";
+import { buildBudgetFlags, formatScope, parseRoutingModeArg, parseScopeArg } from "./_shared";
 import type { CommandResult } from "../../utils/output";
 
 export interface UpdateVirtualKeyOptions {
@@ -34,13 +29,14 @@ export interface UpdateVirtualKeyOptions {
   configFile?: string;
 }
 
-
 function parseConfig(options: UpdateVirtualKeyOptions): Record<string, unknown> | undefined {
   if (options.configJson) {
     try {
       return JSON.parse(options.configJson) as Record<string, unknown>;
     } catch (err) {
-      throw new Error(`--config-json is not valid JSON: ${err instanceof Error ? err.message : String(err)}`);
+      throw new Error(
+        `--config-json is not valid JSON: ${err instanceof Error ? err.message : String(err)}`,
+      );
     }
   }
   if (options.configFile) {
@@ -52,7 +48,9 @@ function parseConfig(options: UpdateVirtualKeyOptions): Record<string, unknown> 
     try {
       return JSON.parse(raw) as Record<string, unknown>;
     } catch (err) {
-      throw new Error(`--config-file is not valid JSON: ${err instanceof Error ? err.message : String(err)}`);
+      throw new Error(
+        `--config-file is not valid JSON: ${err instanceof Error ? err.message : String(err)}`,
+      );
     }
   }
   return undefined;
@@ -142,10 +140,17 @@ export const updateVirtualKeyCommand = async (
         console.log();
         console.log(`${chalk.bold("ID:")}             ${updated.id}`);
         console.log(`${chalk.bold("Name:")}           ${chalk.cyan(updated.name)}`);
-        if (updated.description) console.log(`${chalk.bold("Description:")}    ${updated.description}`);
-        console.log(`${chalk.bold("Scopes:")}         ${updated.scopes.map(formatScope).join(", ") || chalk.gray("—")}`);
-        console.log(`${chalk.bold("Routing policy:")} ${updated.routing_policy_id ?? chalk.gray("(default)")}`);
-        console.log(`${chalk.bold("Updated:")}        ${new Date(updated.updated_at).toLocaleString()}`);
+        if (updated.description)
+          console.log(`${chalk.bold("Description:")}    ${updated.description}`);
+        console.log(
+          `${chalk.bold("Scopes:")}         ${updated.scopes.map(formatScope).join(", ") || chalk.gray("—")}`,
+        );
+        console.log(
+          `${chalk.bold("Routing policy:")} ${updated.routing_policy_id ?? chalk.gray("(default)")}`,
+        );
+        console.log(
+          `${chalk.bold("Updated:")}        ${new Date(updated.updated_at).toLocaleString()}`,
+        );
         console.log();
         console.log(chalk.gray("Config after update:"));
         console.log(JSON.stringify(updated.config, null, 2));

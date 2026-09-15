@@ -1,15 +1,15 @@
 import { scopedApiKey } from "@/internal/credentialContext";
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
-import { resolveCredentials } from "../../utils/apiKey";
-import { failSpinnerFromResponse } from "../../utils/failFromResponse";
-import { failSpinner } from "../../utils/spinnerError";
-import { commandValidationError, reportCommandError } from "../../utils/errorOutput";
+import { createSpinner } from "../../utils/spinner.ts";
+import { resolveCredentials } from "../../utils/apiKey.ts";
+import { failSpinnerFromResponse } from "../../utils/failFromResponse.ts";
+import { failSpinner } from "../../utils/spinnerError.ts";
+import { commandValidationError, reportCommandError } from "../../utils/errorOutput.ts";
 import { buildAuthHeaders } from "@/internal/api/auth";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
-import type { CommandResult } from "../../utils/output";
-import { redactTriggerSecrets } from "./redact";
+import type { CommandResult } from "../../utils/output.ts";
+import { redactTriggerSecrets } from "./redact.ts";
 import { langwatchFetch } from "@/internal/http/langwatchFetch";
 
 /**
@@ -28,12 +28,15 @@ export const createTriggerCommand = async (
 ): Promise<CommandResult | void> => {
   await resolveCredentials();
 
-  const validActions = ["SEND_EMAIL", "ADD_TO_DATASET", "ADD_TO_ANNOTATION_QUEUE", "SEND_SLACK_MESSAGE"];
+  const validActions = [
+    "SEND_EMAIL",
+    "ADD_TO_DATASET",
+    "ADD_TO_ANNOTATION_QUEUE",
+    "SEND_SLACK_MESSAGE",
+  ];
   if (!validActions.includes(options.action)) {
     reportCommandError({
-      error: commandValidationError(
-        `--action must be one of: ${validActions.join(", ")}`,
-      ),
+      error: commandValidationError(`--action must be one of: ${validActions.join(", ")}`),
     });
     process.exit(1);
   }
@@ -52,7 +55,7 @@ export const createTriggerCommand = async (
     const actionParams: Record<string, unknown> = {};
     if (options.slackWebhook) actionParams.slackWebhook = options.slackWebhook;
 
-    const response = await langwatchFetch(`${endpoint}/api/triggers`, {
+    const response = await langwatchFetch(`${endpoint}/api/v1/triggers`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -73,7 +76,12 @@ export const createTriggerCommand = async (
       process.exit(1);
     }
 
-    const trigger = await response.json() as { id: string; name: string; action: string; platformUrl?: string };
+    const trigger = (await response.json()) as {
+      id: string;
+      name: string;
+      action: string;
+      platformUrl?: string;
+    };
     spinner.succeed(`Trigger "${trigger.name}" created (${trigger.id})`);
 
     return {

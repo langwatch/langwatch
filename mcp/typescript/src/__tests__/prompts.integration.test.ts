@@ -35,13 +35,9 @@ beforeEach(() => {
 });
 
 /**
- * Fixtures below mirror the real `GET /api/prompts/:id` contract
- * (apiResponsePromptWithVersionDataSchema in
- * platform/app/src/app/api/prompts/[[...route]]/schemas/outputs.ts):
- * the returned version's data is flattened to the top level, `parameters`
- * is an object map (runtimeParametersSchema, defaulting to {}), `tags` is
- * an array of { name, versionId } objects, and there is NO nested
- * `versions` array — version history lives behind GET /:id/versions.
+ * Fixtures below mirror the real `GET /api/v1/prompts/:id` contract: the returned version's
+ * data is flattened to the top level, and there is NO nested `versions` array — version
+ * history lives behind GET /:id/versions.
  */
 
 describe("handleGetPrompt()", () => {
@@ -82,7 +78,6 @@ describe("handleGetPrompt()", () => {
         expect(result).not.toContain("[object Object]");
       });
     });
-
   });
   describe("when the returned version has none of those fields set", () => {
     /** @scenario "Omitting headings for fields absent from the API response" */
@@ -138,7 +133,7 @@ describe("handleGetPrompt()", () => {
 
       expect(mockGetPrompt).toHaveBeenCalledWith(
         "my-prompt",
-        expect.objectContaining({ version: 2 })
+        expect.objectContaining({ version: 2 }),
       );
       expect(result).toMatch(/parameters/i);
       expect(result).toMatch(/inputs/i);
@@ -356,17 +351,9 @@ describe("MCP server platform_get_prompt tool registration", () => {
 });
 
 /**
- * Write-path spec (issue #5666 AC5-9). After updatePrompt succeeds, the tool
- * re-fetches the prompt via getPrompt to derive authoritative state (the
- * mutation response alone does not carry applied tags). The GET response is
- * the prompt's latest version flattened to the top level, so the new version
- * is identified by matching the request's commitMessage against the
- * top-level commitMessage (falling back to GET /:id/versions), and
- * deployment state comes from the tags whose versionId points at it (the
- * built-in "latest" tag is never a deployment). On updatePrompt failure with
- * tags requested, the tool re-fetches and matches the same way to detect the
- * committed-but-untagged version (the platform commits the version before
- * assigning tags).
+ * Write-path spec (issue #5666 AC5-9). After updatePrompt succeeds, the tool re-fetches the
+ * prompt via getPrompt to derive authoritative state (the mutation response alone does not
+ * carry applied tags).
  */
 
 /** No single output line may pair a version number with a deployment tag name. */
@@ -628,7 +615,7 @@ describe("handleUpdatePrompt()", () => {
     it("reports the version as created and untagged, with its versionId and the failed tag", async () => {
       const { LangWatchApiError } = await import("../langwatch-api.js");
       mockUpdatePrompt.mockRejectedValue(
-        new LangWatchApiError("Tag assignment rejected", 422, "{}")
+        new LangWatchApiError("Tag assignment rejected", 422, "{}"),
       );
       mockGetPrompt.mockResolvedValue({
         id: "prompt_1",
@@ -657,7 +644,7 @@ describe("handleUpdatePrompt()", () => {
     it("reports a plain failure with no versionId", async () => {
       const { LangWatchApiError } = await import("../langwatch-api.js");
       mockUpdatePrompt.mockRejectedValue(
-        new LangWatchApiError("Tag assignment rejected", 422, "{}")
+        new LangWatchApiError("Tag assignment rejected", 422, "{}"),
       );
       mockGetPrompt.mockResolvedValue({
         id: "prompt_1",
@@ -690,9 +677,7 @@ describe("handleUpdatePrompt()", () => {
         id: "prompt_1",
         handle: "my-prompt",
       });
-      mockGetPrompt.mockRejectedValue(
-        new LangWatchApiError("boom", 500, "{}")
-      );
+      mockGetPrompt.mockRejectedValue(new LangWatchApiError("boom", 500, "{}"));
 
       const result = await handleUpdatePrompt({
         idOrHandle: "my-prompt",
@@ -714,11 +699,9 @@ describe("handleUpdatePrompt()", () => {
     it("reports the tag failure without claiming whether a version was created", async () => {
       const { LangWatchApiError } = await import("../langwatch-api.js");
       mockUpdatePrompt.mockRejectedValue(
-        new LangWatchApiError("Tag assignment rejected", 422, "{}")
+        new LangWatchApiError("Tag assignment rejected", 422, "{}"),
       );
-      mockGetPrompt.mockRejectedValue(
-        new LangWatchApiError("boom", 500, "{}")
-      );
+      mockGetPrompt.mockRejectedValue(new LangWatchApiError("boom", 500, "{}"));
 
       const result = await handleUpdatePrompt({
         idOrHandle: "my-prompt",

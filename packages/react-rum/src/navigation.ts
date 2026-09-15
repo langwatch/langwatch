@@ -22,22 +22,20 @@ import {
   SpanStatusCode,
   trace,
 } from "@opentelemetry/api";
-import {
-  ATTR_HTTP_ROUTE,
-  ATTR_URL_PATH,
-} from "@opentelemetry/semantic-conventions";
+import { ATTR_HTTP_ROUTE, ATTR_URL_PATH } from "@opentelemetry/semantic-conventions";
+import { nowInstant } from "@langwatch/time";
 
 import {
   ATTR_NAVIGATION_FROM_PATH,
   ATTR_NAVIGATION_SUPERSEDED,
   ATTR_NAVIGATION_TYPE,
   RUM_INSTRUMENTATION_NAME,
-} from "./constants";
+} from "./constants.ts";
 import {
   clearAmbientContext,
   resetAmbientContextForTesting,
   setAmbientContext,
-} from "./navigationContextManager";
+} from "./navigationContextManager.ts";
 
 /** How the navigation was resolved, for telling a lazy route from an instant one. */
 export type NavigationType = "resolved" | "instant";
@@ -127,7 +125,7 @@ function handleFor(span: Span, spanContext: Context): NavigationSpanHandle {
   return {
     commit({ route }: { route?: string }) {
       try {
-        committedAt ??= Date.now();
+        committedAt ??= nowInstant().epochMilliseconds;
         if (route) {
           span.updateName(navigationName(route));
           span.setAttribute(ATTR_HTTP_ROUTE, route);

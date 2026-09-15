@@ -1,0 +1,96 @@
+import { nowInstant, Temporal } from "@langwatch/time";
+import {
+  bucketPeriodFloorMs,
+  effectiveBudgetPeriod,
+  attributedUserBucketScopeId,
+  bucketScopeIdFor,
+  toWireEnum,
+  usdDisplayString,
+} from "@langwatch/gateway-contract";
+import type { GatewayBudgetSpend } from "../app/gateway.members.ts";
+import type {
+  AttributedUserBudgetTemplate,
+  GatewayBudgetRepository,
+} from "../repositories/gateway-budget.repository.ts";
+
+/**
+ * Attributed-user budget allowances for one end user, with spend. Two stores answer this:
+ * templates and bucket boundaries from Postgres via the budget repository, and spend from the
+ * ledger via the spend port. Neither is a PrismaClient: a service holds no database handle.
+ */
+export class GatewayEndUserCapsService {
+  static create(options: {
+    budgets: GatewayBudgetRepository;
+    spend: GatewayBudgetSpend;
+  }): GatewayEndUserCapsService {
+    return new GatewayEndUserCapsService(options.budgets, options.spend);
+  }
+
+  private constructor(
+    private readonly budgets: GatewayBudgetRepository,
+    private readonly spend: GatewayBudgetSpend,
+  ) {}
+
+  async forEndUser(input: {
+    organizationId: string;
+    endUserId: string;
+    tenantIds: string[];
+    virtualKeyId?: string;
+  }): Promise<Array<Record<string, unknown>>> {
+    const templates = await this.budgets.findAttributedUserTemplates({
+      organizationId: input.organizationId,
+      ...(input.virtualKeyId ? { virtualKeyId: input.virtualKeyId } : {}),
+    });
+    if (templates.length === 0 || input.tenantIds.length === 0) {
+      return [];
+    }
+
+    const boundaries = await this.budgets.findBucketBoundaries({
+      organizationId: input.organizationId,
+      budgetIds: templates.map((template) => template.id),
+    });
+    const boundaryByKey = new Map(
+      boundaries.map((boundary) => [`${boundary.budgetId}:${boundary.bucketScopeId}`, boundary]),
+    );
+    const bucketFor = (template: AttributedUserBudgetTemplate) =>
+      bucketScopeIdFor(template, attributedUserBucketScopeId(template.scopeId, input.endUserId));
+
+    const now = nowInstant();
+    const targets = templates.map((template) => {
+      const bucketScopeId = bucketFor(template);
+
+      return {
+        budgetId: template.id,
+        scope: template.scopeType,
+        scopeId: bucketScopeId,
+        window: template.window,
+        match: "exact" as const,
+        periodFloorMs: bucketPeriodFloorMs(
+          template,
+          boundaryByKey.get(`${template.id}:${bucketScopeId}`)?.periodStartedAt,
+          now,
+        ),
+      };
+    });
+    const spends = await this.spend.getSpendForTargetsAcrossTenants(input.tenantIds, targets, now);
+    const spentByBudget = new Map(spends.map((entry) => [entry.budgetId, entry.spentUsd]));
+
+    return templates.map((template) => {
+      const boundary = boundaryByKey.get(`${template.id}:${bucketFor(template)}`);
+      const periodFloorMs = bucketPeriodFloorMs(template, boundary?.periodStartedAt, now);
+
+      return {
+        budget_id: template.id,
+        anchor_id: template.scopeId,
+        window: toWireEnum(template.window),
+        on_breach: toWireEnum(template.onBreach),
+        limit_usd: usdDisplayString(template.limitUsd),
+        spent_usd: usdDisplayString(spentByBudget.get(template.id) ?? "0"),
+        period_started_at: Temporal.Instant.fromEpochMilliseconds(
+          periodFloorMs ??
+            effectiveBudgetPeriod(template, now).currentPeriodStartedAt.epochMilliseconds,
+        ).toString({ fractionalSecondDigits: 3 }),
+      };
+    });
+  }
+}

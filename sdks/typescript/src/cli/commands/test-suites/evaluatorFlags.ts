@@ -16,20 +16,7 @@ import {
   reportCommandError,
 } from "../../utils/errorOutput";
 
-/**
- * The `--evaluator` family of flags: which saved evaluators to attach, and
- * whether each one gates the scenario.
- *
- * `--evaluator <id|slug>` repeats, one evaluator per occurrence, and the
- * mappings of each one are inferred from its inputs against the suite's
- * fields, the way the platform infers them when an evaluator is picked in
- * the suite editor. `--required` and `--not-required` apply to the
- * `--evaluator` written just before them. `--evaluators-json` carries the
- * full attachments instead, for a mapping the rules do not infer, such as a
- * tool call.
- *
- * @see specs/features/test-suite-cli.feature
- */
+// The --evaluator family of flags; --required/--not-required apply to prior evaluator.
 
 export const EVALUATOR_FLAG = "--evaluator";
 export const EVALUATORS_JSON_FLAG = "--evaluators-json";
@@ -65,16 +52,7 @@ export interface ResolvedEvaluatorAttachment {
   missing: string[];
 }
 
-/**
- * Turns the `--evaluator` references into attachments.
- *
- * Every reference is read from the platform first, so a slug that names
- * nothing ends the command before anything is written. The gate defaults to
- * required for an evaluator that produces `passed`, and to reporting only for
- * a score-only one. A required input the rules cannot map is reported on
- * stderr rather than refused: the platform accepts the attachment and refuses
- * the run until the mapping is set.
- */
+// Convert --evaluator references to attachments after platform lookup.
 export async function resolveEvaluatorAttachments({
   refs,
   fields,

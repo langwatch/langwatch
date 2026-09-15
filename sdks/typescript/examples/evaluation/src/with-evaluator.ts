@@ -90,7 +90,7 @@ const main = async () => {
         data: { response },
       });
     },
-    { concurrency: 2 }
+    { concurrency: 2 },
   );
 
   console.log("\n✅ Evaluation complete!");

@@ -1,0 +1,21 @@
+import { useRouter } from "@langwatch/ui-host/use-router";
+import { useOrganizationTeamProject } from "../studio-host/use-organization-team-project.ts";
+import { workflowApi } from "../../model/workflow-api.ts";
+
+export const useLoadWorkflow = () => {
+  const router = useRouter();
+  const workflowId = typeof router.query.workflow === "string" ? router.query.workflow : undefined;
+  const { project } = useOrganizationTeamProject();
+  const workflow = workflowApi.workflow.getById.useQuery(
+    { workflowId: workflowId ?? "", projectId: project?.id ?? "" },
+    {
+      enabled: !!project && !!workflowId,
+      // One-shot bootstrap for the studio editor. The result feeds the
+      // Zustand workflow store and AutoSave writes back from there — a
+      // background refetch would clobber unsaved edits.
+      staleTime: Infinity,
+    },
+  );
+
+  return { workflow };
+};

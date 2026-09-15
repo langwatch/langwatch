@@ -14,6 +14,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/langwatch/langwatch/tools/thuishaven/adapters/fileregistry"
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/semaphore"
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
@@ -279,6 +280,135 @@ func captureStderr(t *testing.T, body func()) string {
 	return buf.String()
 }
 
+// captureStdout runs body with os.Stdout swapped for a pipe and returns what
+// was written - `haven slot explain` prints its answer there, the same place a
+// person reads it.
+func captureStdout(t *testing.T, body func()) string {
+	t.Helper()
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("pipe: %v", err)
+	}
+	orig := os.Stdout
+	os.Stdout = w
+	defer func() { os.Stdout = orig }()
+	body()
+	_ = w.Close()
+	os.Stdout = orig
+	var buf bytes.Buffer
+	if _, err := buf.ReadFrom(r); err != nil {
+		t.Fatalf("reading captured stdout: %v", err)
+	}
+	return buf.String()
+}
+
+// @scenario "The unit test worker cap is one machine-wide setting"
+func TestSlotExplainPrintsTheUnitTestWidthAndItsSource(t *testing.T) {
+	t.Run("given HAVEN_TEST_WORKERS is set, the way HAVEN_TYPECHECK_SLOTS is", func(t *testing.T) {
+		t.Setenv("HAVEN_TEST_WORKERS", "6")
+
+		t.Run("when haven slot explain runs", func(t *testing.T) {
+			out := captureStdout(t, func() {
+				if err := runSlot(context.Background(), deps{}, invocation{raw: []string{"explain"}}); err != nil {
+					t.Fatal(err)
+				}
+			})
+
+			t.Run("it prints the width and names the setting as its source", func(t *testing.T) {
+				if !strings.Contains(out, "unit_test_full_width=6 source=HAVEN_TEST_WORKERS") {
+					t.Fatalf("expected the configured width and its source, got %q", out)
+				}
+			})
+		})
+	})
+
+	t.Run("given HAVEN_TEST_WORKERS is unset", func(t *testing.T) {
+		t.Setenv("HAVEN_TEST_WORKERS", "")
+
+		t.Run("when haven slot explain runs", func(t *testing.T) {
+			out := captureStdout(t, func() {
+				if err := runSlot(context.Background(), deps{}, invocation{raw: []string{"explain"}}); err != nil {
+					t.Fatal(err)
+				}
+			})
+
+			t.Run("it derives the width from the machine instead", func(t *testing.T) {
+				if !strings.Contains(out, "unit_test_full_width=") || !strings.Contains(out, "source=machine") {
+					t.Fatalf("expected a machine-derived width, got %q", out)
+				}
+			})
+		})
+	})
+}
+
+// @scenario "haven slot explain shows each holder and waiter with class, age and effective priority"
+func TestExplainWaitersPrintsClassAgeAndEffectivePriority(t *testing.T) {
+	store := fileregistry.New(t.TempDir())
+
+	t.Run("with nobody queued it says so", func(t *testing.T) {
+		out := captureStdout(t, func() { explainWaiters(store) })
+		if strings.TrimSpace(out) != "waiters: none" {
+			t.Fatalf("expected \"waiters: none\", got %q", out)
+		}
+	})
+
+	release, err := store.ClaimWaiter(os.Getpid(), checkSlotName, fileregistry.WaiterClaim{
+		Command: "pnpm test:unit", Caller: domain.SubAgent, QueuedAt: time.Now().Add(-2 * time.Minute),
+	})
+	if err != nil {
+		t.Fatalf("claim: %v", err)
+	}
+	defer release()
+
+	out := captureStdout(t, func() { explainWaiters(store) })
+	for _, want := range []string{"waiter:", "sub-agent", "priority "} {
+		if !strings.Contains(out, want) {
+			t.Fatalf("expected the waiter line to mention %q, got %q", want, out)
+		}
+	}
+}
+
+// @scenario "An explicit HAVEN_PRIORITY=high in the caller's environment lets an agent state that this run matters"
+func TestResolvePriorityStateHonorsTheOverrideOncePerWindow(t *testing.T) {
+	store := fileregistry.New(t.TempDir())
+	t.Setenv("HAVEN_PRIORITY", "high")
+	t.Setenv("HAVEN_AGENT_ID", "agent_9")
+
+	agentID, caller, honored := resolvePriorityState(store)
+	if agentID != "agent_9" || caller != domain.SubAgent || !honored {
+		t.Fatalf("first claim: agentID=%q caller=%v honored=%v, want agent_9/SubAgent/true", agentID, caller, honored)
+	}
+
+	history := store.RunHistory()
+	if len(history) != 1 || !history[0].PriorityOverride || history[0].AgentID != "agent_9" {
+		t.Fatalf("the honored claim must be written to run-history.jsonl, got %+v", history)
+	}
+
+	t.Run("a second claim inside the window is refused", func(t *testing.T) {
+		_, _, honored := resolvePriorityState(store)
+		if honored {
+			t.Fatal("a claim from the same agent id within the window must not be honored twice")
+		}
+		if got := len(store.RunHistory()); got != 1 {
+			t.Fatalf("a refused claim must not write a second entry, history has %d", got)
+		}
+	})
+}
+
+// @scenario "An explicit HAVEN_PRIORITY=high in the caller's environment lets an agent state that this run matters"
+func TestResolvePriorityStateWithoutTheEnvVarNeverClaims(t *testing.T) {
+	store := fileregistry.New(t.TempDir())
+	t.Setenv("HAVEN_PRIORITY", "")
+	t.Setenv("HAVEN_AGENT_ID", "")
+
+	if _, _, honored := resolvePriorityState(store); honored {
+		t.Fatal("with no HAVEN_PRIORITY=high, nothing is ever honored")
+	}
+	if got := len(store.RunHistory()); got != 0 {
+		t.Fatalf("no claim must ever be written when none was requested, got %d entries", got)
+	}
+}
+
 // @scenario "A run queued inside haven says so"
 func TestSlotRunQueuesAndSaysSo(t *testing.T) {
 	sem := semaphore.New(t.TempDir())
@@ -316,6 +446,94 @@ func TestSlotRunQueuesAndSaysSo(t *testing.T) {
 	if !strings.Contains(report, "slot free after") {
 		t.Fatalf("a run that waited must report it, got %q", report)
 	}
+}
+
+// fakeWaiterRegistry is a waiterRegistry test double: ClaimWaiter is a no-op
+// (nothing here asserts on the registration itself) and WaiterSnapshots
+// always answers with a fixed, caller-supplied list of other waiters - what
+// lets shouldYieldToHigherPriority be tested as the pure decision it is,
+// without racing two goroutines that share this test's own pid (a real
+// `haven slot run` is always a separate OS process, so the production code
+// keys a claim by pid; two slotJobs in one test process would collide on
+// that same key, which is a test artifact this fake sidesteps entirely).
+type fakeWaiterRegistry struct{ snapshots []fileregistry.WaiterSnapshot }
+
+func (f *fakeWaiterRegistry) ClaimWaiter(int, string, fileregistry.WaiterClaim) (func(), error) {
+	return func() {}, nil
+}
+
+func (f *fakeWaiterRegistry) WaiterSnapshots(string) []fileregistry.WaiterSnapshot {
+	return f.snapshots
+}
+
+// @scenario "Priority classes rank a person above a main session above a sub-agent"
+func TestSlotJobYieldsToAHigherPriorityWaiter(t *testing.T) {
+	job := &slotJob{
+		caller:   domain.SubAgent,
+		queuedAt: time.Now(),
+		registry: &fakeWaiterRegistry{snapshots: []fileregistry.WaiterSnapshot{
+			{PID: os.Getpid() + 1, WaiterClaim: fileregistry.WaiterClaim{Caller: domain.Interactive, QueuedAt: time.Now()}},
+		}},
+	}
+	if !job.shouldYieldToHigherPriority() {
+		t.Fatal("a sub-agent queued at the same moment as a person must yield to them")
+	}
+}
+
+// @scenario "haven slot explain shows each holder and waiter with class, age and effective priority"
+func TestSlotJobDoesNotYieldToALowerPriorityWaiter(t *testing.T) {
+	job := &slotJob{
+		caller:   domain.Interactive,
+		queuedAt: time.Now(),
+		registry: &fakeWaiterRegistry{snapshots: []fileregistry.WaiterSnapshot{
+			{PID: os.Getpid() + 1, WaiterClaim: fileregistry.WaiterClaim{Caller: domain.SubAgent, QueuedAt: time.Now()}},
+		}},
+	}
+	if job.shouldYieldToHigherPriority() {
+		t.Fatal("a person must not yield to a sub-agent queued at the same moment")
+	}
+}
+
+// @scenario "Priority scheduling is additive: with no registry wired, nothing yields"
+func TestSlotJobNeverYieldsWithNoRegistryWired(t *testing.T) {
+	job := &slotJob{caller: domain.SubAgent, queuedAt: time.Now()}
+	if job.shouldYieldToHigherPriority() {
+		t.Fatal("with no registry wired, every existing call site must behave exactly as before")
+	}
+}
+
+// @scenario "haven slot explain shows each holder and waiter with class, age and effective priority"
+func TestSlotJobExcludesItsOwnRegistrationFromOthers(t *testing.T) {
+	job := &slotJob{
+		caller:   domain.Interactive,
+		queuedAt: time.Now(),
+		registry: &fakeWaiterRegistry{snapshots: []fileregistry.WaiterSnapshot{
+			// Same pid as this test process - i.e. this job's own claim.
+			{PID: os.Getpid(), WaiterClaim: fileregistry.WaiterClaim{Caller: domain.SubAgent, QueuedAt: time.Now()}},
+		}},
+	}
+	if job.shouldYieldToHigherPriority() {
+		t.Fatal("a job must not compare itself against its own registration")
+	}
+}
+
+// @scenario "An explicit HAVEN_PRIORITY=high in the caller's environment lets an agent state that this run matters"
+func TestSlotJobHonoredOverrideRaisesEffectivePriority(t *testing.T) {
+	other := fileregistry.WaiterSnapshot{PID: os.Getpid() + 1, WaiterClaim: fileregistry.WaiterClaim{Caller: domain.MainSession, QueuedAt: time.Now()}}
+
+	t.Run("without the override the sub-agent yields to a waiting main session", func(t *testing.T) {
+		job := &slotJob{caller: domain.SubAgent, queuedAt: time.Now(), registry: &fakeWaiterRegistry{snapshots: []fileregistry.WaiterSnapshot{other}}}
+		if !job.shouldYieldToHigherPriority() {
+			t.Fatal("a sub-agent must yield to a main session queued at the same moment")
+		}
+	})
+
+	t.Run("an honored override closes the gap", func(t *testing.T) {
+		job := &slotJob{caller: domain.SubAgent, queuedAt: time.Now(), overrideHonored: true, registry: &fakeWaiterRegistry{snapshots: []fileregistry.WaiterSnapshot{other}}}
+		if job.shouldYieldToHigherPriority() {
+			t.Fatal("an honored HAVEN_PRIORITY=high claim must close a one-class-step gap")
+		}
+	})
 }
 
 // @scenario "A borrowed held-marker does not turn the queue off"
@@ -372,7 +590,7 @@ func TestIsQueueCommand(t *testing.T) {
 		"   ",
 		"-zsh",
 		"/bin/bash -l",
-		"node /repo/platform/app/scripts/__tests__/check-queue.unit.test.ts",
+		"node /repo/dev/scripts/__tests__/check-queue.unit.test.ts",
 		"/opt/homebrew/bin/havenclone slot run",
 	}
 	for _, command := range refused {

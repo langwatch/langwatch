@@ -1,0 +1,14 @@
+# `new Date(iso)` bound to a name the file proves is an instant. The driver
+# admits a string or template LITERAL only: `Temporal.Instant.from` refuses a
+# date-only string and throws where `new Date` answered NaN, so a runtime
+# string — off a URL, a picker, a wire field — keeps its `Date` parse and is
+# left for hands. The pattern binds exactly one argument, so `new Date(y, m, d)`
+# never matches.
+id: temporal-instant-from-iso
+language: TypeScript
+severity: warning
+message: >
+  An ISO string becomes a moment through `Temporal.Instant.from`.
+rule:
+  pattern: new Date($ISO)
+fix: Temporal.Instant.from($ISO)

@@ -14,22 +14,8 @@ import { handledErrorFrom } from "./errors";
 import { langwatchFetch } from "../http/langwatchFetch";
 
 /**
- * Turns a NAMED failure into a typed throw, once, for every call that goes
- * through this client.
- *
- * This lives in the transport rather than in each service because it is a
- * property of the WIRE, not of any one resource: the platform answers a declined
- * request with a `HandledError` — a `kind`, a status, a `meta` bag — and that is
- * true of `/api/traces` and `/api/prompts` alike. Reading it here means no
- * service has to remember to, and a service added tomorrow gets it for free.
- *
- * WHAT IT DOES NOT DO is just as load-bearing: a response whose body is not a
- * domain error — a 5xx, a proxy's HTML error page, a truncated body, anything at
- * all it cannot read — is left completely alone. `onResponse` returns nothing,
- * openapi-fetch carries on and hands the service the `{ error }` it always did,
- * and the service throws the same generic error it always threw. This is a
- * strict superset of the old behaviour: it only ever ADDS a type where there was
- * a string.
+ * Turns a NAMED failure into a typed throw, once, for every call that goes through this
+ * client.
  */
 const handledErrorMiddleware: Middleware = {
   async onResponse({ request, response }) {
@@ -62,16 +48,10 @@ const handledErrorMiddleware: Middleware = {
   },
 };
 
-
 /**
  * Creates a new LangWatch API client.
- * @param apiKey - The API key or Personal Access Token used for authentication.
- *                 Defaults to `LANGWATCH_API_KEY`.
- * @param endpoint - The endpoint to use for the API client. Defaults to `LANGWATCH_ENDPOINT`
- *                   or the internal `DEFAULT_ENDPOINT`.
- * @param projectId - Project identifier. Required when `apiKey` is a PAT
- *                    (`pat-lw-*`). Defaults to `LANGWATCH_PROJECT_ID`.
- * @returns A new LangWatch API client.
+ * @param apiKey - The API key or Personal Access Token. Defaults to `LANGWATCH_API_KEY`.
+ * @param endpoint - The API endpoint. Defaults to `LANGWATCH_ENDPOINT` or `DEFAULT_ENDPOINT`.
  */
 export const createLangWatchApiClient = (
   // The request-scoped key (the CLI resolver's output) wins over the global
@@ -85,8 +65,7 @@ export const createLangWatchApiClient = (
   // resolver's output, personal by default and `--project` when given) wins
   // over the global env, and a plain SDK embed that scopes nothing falls back
   // to the environment unchanged.
-  projectId: string | undefined = scopedProjectId() ??
-    process.env.LANGWATCH_PROJECT_ID,
+  projectId: string | undefined = scopedProjectId() ?? process.env.LANGWATCH_PROJECT_ID,
 ) => {
   const client = openApiCreateClient<paths>({
     baseUrl: resolveEndpoint(endpoint),
@@ -106,6 +85,5 @@ export const createLangWatchApiClient = (
 
   return client;
 };
-
 
 export type LangwatchApiClient = ReturnType<typeof createLangWatchApiClient>;

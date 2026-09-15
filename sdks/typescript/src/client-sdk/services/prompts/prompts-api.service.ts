@@ -14,14 +14,10 @@ import {
   formatApiErrorForOperation,
   formatApiErrorMessage,
 } from "@/client-sdk/services/_shared/format-api-error";
+import { unwrapApiResult } from "@/client-sdk/services/_shared/unwrap-api-result";
 import type { RuntimeParameters } from "@/cli/types";
 
-const syncActionSchema = z.enum([
-  "created",
-  "updated",
-  "conflict",
-  "up_to_date",
-]);
+const syncActionSchema = z.enum(["created", "updated", "conflict", "up_to_date"]);
 
 export type SyncAction = z.infer<typeof syncActionSchema>;
 
@@ -42,11 +38,11 @@ const syncResultSchema = z.object({
 });
 
 export type AssignTagResult = NonNullable<
-  operations["putApiPromptsByIdTagsByTag"]["responses"]["200"]["content"]["application/json"]
+  operations["assignPromptTag"]["responses"]["200"]["content"]["application/json"]
 >;
 
 export type ConfigData = NonNullable<
-  paths["/api/prompts/{id}/sync"]["post"]["requestBody"]
+  paths["/api/v1/prompts/{id}/sync"]["post"]["requestBody"]
 >["content"]["application/json"]["configData"];
 
 export interface SyncResult {
@@ -62,15 +58,8 @@ export interface SyncResult {
 }
 
 /**
- * Service for managing prompt resources via the Langwatch API.
- * Constructor creates a proxy that wraps the service and traces all methods.
- *
- * Responsibilities:
- * - CRUD operations for prompts
- * - Creating prompt versions
- * - Error handling with contextual information
- *
- * All methods return raw PromptResponse data from the API.
+ * Service for managing prompt resources via the Langwatch API. Constructor creates a proxy
+ * that wraps the service and traces all methods.
  */
 export class PromptsApiService {
   private readonly apiClient: LangwatchApiClient;
@@ -81,24 +70,23 @@ export class PromptsApiService {
     /**
      * Wraps the service in a tracing proxy via the decorator.
      */
-    return createTracingProxy(
-      this as PromptsApiService,
-      tracer,
-      PromptServiceTracingDecorator,
-    );
+    return createTracingProxy(this as PromptsApiService, tracer, PromptServiceTracingDecorator);
   }
 
   /**
-   * Handles API errors by throwing a PromptsApiError with operation context.
+   * Handles API errors by throwing a PromptsApiError with operation context. @throws
    * @param operation Description of the operation being performed.
    * @param error The error object returned from the API client.
-   * @throws {PromptsApiError}
    */
-  private handleApiError(operation: string, error: any, status?: number): never {
-    const resolvedStatus = status ?? extractStatusFromResponse(error);
-    const message = formatApiErrorForOperation({ operation: operation, error: error, options: {
-      status: resolvedStatus,
-    } });
+  private handleApiError(operation: string, error: unknown, response?: Response): never {
+    const resolvedStatus = response?.status ?? extractStatusFromResponse(error);
+    const message = formatApiErrorForOperation({
+      operation: operation,
+      error: error,
+      options: {
+        status: resolvedStatus,
+      },
+    });
 
     throw new PromptsApiError(message, operation, error);
   }
@@ -109,52 +97,52 @@ export class PromptsApiService {
    * @throws {PromptsApiError} If the API call fails.
    */
   async getAll(): Promise<PromptResponse[]> {
-    const { data, error } =
-      await this.apiClient.GET("/api/prompts");
-    if (error) this.handleApiError("fetch all prompts", error);
-    return data;
+    const { data, error, response } = await this.apiClient.GET("/api/v1/prompts");
+    return unwrapApiResult({
+      operation: "fetch all prompts",
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    });
   }
 
   /**
    * Fetches a single prompt by its ID.
    * @param id The prompt's unique identifier.
-   * @param options Optional parameters for the request.
-   * @param options.version Specific version to fetch (numeric string or "latest").
-   * @param options.tag Tag to fetch (e.g., "production", "staging", or a custom tag).
-   * @returns Raw PromptResponse data.
-   * @throws {PromptsApiError} If the API call fails.
+   * @param options Optional version or tag to fetch.
    */
-  get = async (id: string, options?: { version?: string; tag?: string }): Promise<PromptResponse> => {
+  get = async (
+    id: string,
+    options?: { version?: string; tag?: string },
+  ): Promise<PromptResponse> => {
     // Parse version to number, skip for "latest" or invalid values
-    const versionNumber = options?.version && options.version !== "latest"
-      ? parseInt(options.version, 10)
-      : undefined;
+    const versionNumber =
+      options?.version && options.version !== "latest" ? parseInt(options.version, 10) : undefined;
 
-    const { data, error } = await this.apiClient.GET(
-      "/api/prompts/{id}",
-      {
-        params: {
-          path: { id },
-          query: {
-            version: Number.isNaN(versionNumber) ? undefined : versionNumber,
-            tag: options?.tag,
-          },
+    const { data, error, response } = await this.apiClient.GET("/api/v1/prompts/{id}", {
+      params: {
+        path: { id },
+        query: {
+          version: Number.isNaN(versionNumber) ? undefined : versionNumber,
+          tag: options?.tag,
         },
       },
-    );
+    });
 
-    if (error) {
-      this.handleApiError(`fetch prompt with ID "${id}"`, error);
-    }
-
-    return data;
-  }
+    return unwrapApiResult({
+      operation: `fetch prompt with ID "${id}"`,
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    });
+  };
 
   /**
-   * Validates if a prompt exists.
+   * Validates if a prompt exists. @throws {PromptsApiError} If the API call fails (not 404).
    * @param id The prompt's unique identifier.
    * @returns True if prompt exists, false otherwise.
-   * @throws {PromptsApiError} If the API call fails (not 404).
    */
   async exists(id: string): Promise<boolean> {
     try {
@@ -170,9 +158,10 @@ export class PromptsApiService {
       }
 
       const originalError = error instanceof PromptsApiError ? error.originalError : null;
-      const statusCode = originalError != null && typeof originalError === "object" && "statusCode" in originalError
-        ? (originalError as { statusCode: unknown }).statusCode
-        : null;
+      const statusCode =
+        originalError != null && typeof originalError === "object" && "statusCode" in originalError
+          ? (originalError as { statusCode: unknown }).statusCode
+          : null;
 
       if (statusCode === 404) {
         return false;
@@ -183,37 +172,40 @@ export class PromptsApiService {
   }
 
   /**
-   * Creates a new prompt.
+   * Creates a new prompt. @throws {PromptsApiError} If the API call fails.
    * @param params The prompt creation payload, matching the OpenAPI schema.
    * @returns Raw PromptResponse data of the created prompt.
-   * @throws {PromptsApiError} If the API call fails.
    */
   async create(params: CreatePromptBody): Promise<PromptResponse> {
-    const { data, error } = await this.apiClient.POST(
-      "/api/prompts",
-      {
-        body: params,
-      },
-    );
-    if (error) this.handleApiError("create prompt", error);
-    return data;
+    const { data, error, response } = await this.apiClient.POST("/api/v1/prompts", {
+      body: params,
+    });
+    return unwrapApiResult({
+      operation: "create prompt",
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    });
   }
 
   /**
-   * Updates an existing prompt.
    * @param id The prompt's unique identifier.
    * @param params The update payload, matching the OpenAPI schema.
    * @returns Raw PromptResponse data of the updated prompt.
-   * @throws {PromptsApiError} If the API call fails.
    */
   async update(id: string, params: UpdatePromptBody): Promise<PromptResponse> {
-    const { error, data: updatedPrompt } =
-      await this.apiClient.PUT("/api/prompts/{id}", {
-        params: { path: { id } },
-        body: params,
-      });
-    if (error) this.handleApiError(`update prompt with ID "${id}"`, error);
-    return updatedPrompt;
+    const { error, data, response } = await this.apiClient.PUT("/api/v1/prompts/{id}", {
+      params: { path: { id } },
+      body: params,
+    });
+    return unwrapApiResult({
+      operation: `update prompt with ID "${id}"`,
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    });
   }
 
   /**
@@ -222,23 +214,32 @@ export class PromptsApiService {
    * @throws {PromptsApiError} If the API call fails.
    */
   async listTags(): Promise<TagDefinition[]> {
-    const { data, error } = await this.apiClient.GET("/api/prompts/tags");
-    if (error) this.handleApiError("list tags", error);
-    return data;
+    const { data, error, response } = await this.apiClient.GET("/api/v1/prompts/tags");
+    return unwrapApiResult({
+      operation: "list tags",
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    });
   }
 
   /**
-   * Creates a custom prompt tag for the organization.
+   * Creates a custom prompt tag for the organization. @throws {PromptsApiError} If the API
    * @param params.name The tag name (must match /^[a-z][a-z0-9_-]*$/).
    * @returns The created tag.
-   * @throws {PromptsApiError} If the API call fails.
    */
   async createTag({ name }: { name: string }): Promise<CreatedTag> {
-    const { data, error } = await this.apiClient.POST("/api/prompts/tags", {
+    const { data, error, response } = await this.apiClient.POST("/api/v1/prompts/tags", {
       body: { name },
     });
-    if (error) this.handleApiError("create tag", error);
-    return data;
+    return unwrapApiResult({
+      operation: "create tag",
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    });
   }
 
   /**
@@ -247,25 +248,38 @@ export class PromptsApiService {
    * @throws {PromptsApiError} If the API call fails.
    */
   async deleteTag(tagName: string): Promise<void> {
-    const { error } = await this.apiClient.DELETE(
-      "/api/prompts/tags/{tag}" as any,
+    const { data, error, response } = await this.apiClient.DELETE(
+      "/api/v1/prompts/tags/{tag}" as any,
       { params: { path: { tag: tagName } } } as any,
     );
-    if (error) this.handleApiError(`delete tag "${tagName}"`, error);
+    unwrapApiResult({
+      operation: `delete tag "${tagName}"`,
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+      allowEmpty: true,
+    });
   }
 
   /**
-   * Renames an existing prompt tag.
+   * Renames an existing prompt tag. @throws {PromptsApiError} If the API call fails.
    * @param tag The current tag name.
    * @param name The new tag name.
-   * @throws {PromptsApiError} If the API call fails.
    */
   async renameTag({ tag, name }: { tag: string; name: string }): Promise<void> {
-    const { error } = await this.apiClient.PUT(
-      "/api/prompts/tags/{tag}",
-      { params: { path: { tag } }, body: { name } },
-    );
-    if (error) this.handleApiError(`rename tag "${tag}"`, error);
+    const { data, error, response } = await this.apiClient.PUT("/api/v1/prompts/tags/{tag}", {
+      params: { path: { tag } },
+      body: { name },
+    });
+    unwrapApiResult({
+      operation: `rename tag "${tag}"`,
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+      allowEmpty: true,
+    });
   }
 
   async assignTag({
@@ -277,15 +291,17 @@ export class PromptsApiService {
     tag: string;
     versionId: string;
   }): Promise<AssignTagResult> {
-    const { data, error } = await this.apiClient.PUT(
-      "/api/prompts/{id}/tags/{tag}",
-      {
-        params: { path: { id, tag } },
-        body: { versionId },
-      },
-    );
-    if (error) this.handleApiError(`assign tag "${tag}" to prompt "${id}"`, error);
-    return data;
+    const { data, error, response } = await this.apiClient.PUT("/api/v1/prompts/{id}/tags/{tag}", {
+      params: { path: { id, tag } },
+      body: { versionId },
+    });
+    return unwrapApiResult({
+      operation: `assign tag "${tag}" to prompt "${id}"`,
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    });
   }
 
   /**
@@ -294,42 +310,40 @@ export class PromptsApiService {
    * @throws {PromptsApiError} If the API call fails.
    */
   async delete(id: string): Promise<{ success: boolean }> {
-    const { data, error } = await this.apiClient.DELETE(
-      "/api/prompts/{id}",
-      {
-        params: { path: { id } },
-      },
-    );
-    if (error) this.handleApiError(`delete prompt with ID "${id}"`, error);
-
-    return data;
+    const { data, error, response } = await this.apiClient.DELETE("/api/v1/prompts/{id}", {
+      params: { path: { id } },
+    });
+    return unwrapApiResult({
+      operation: `delete prompt with ID "${id}"`,
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    });
   }
 
   /**
-   * Fetches all versions for a given prompt.
+   * Fetches all versions for a given prompt. @throws {PromptsApiError} If the API call
    * @param id The prompt's unique identifier.
    * @returns Array of raw PromptResponse data for each version.
-   * @throws {PromptsApiError} If the API call fails.
    */
   async getVersions(id: string): Promise<PromptResponse[]> {
-    const { data, error } = await this.apiClient.GET(
-      "/api/prompts/{id}/versions",
-      {
-        params: { path: { id } },
-      },
-    );
-    if (error)
-      this.handleApiError(`fetch versions for prompt with ID "${id}"`, error);
-
-    return data;
+    const { data, error, response } = await this.apiClient.GET("/api/v1/prompts/{id}/versions", {
+      params: { path: { id } },
+    });
+    return unwrapApiResult({
+      operation: `fetch versions for prompt with ID "${id}"`,
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    });
   }
 
   /**
-   * Upserts a prompt with local configuration - creates if doesn't exist, updates version if exists.
    * @param handle The prompt's handle/identifier.
    * @param config Local prompt configuration.
    * @returns Object with created flag and raw PromptResponse data.
-   * @throws {PromptsApiError} If the API call fails.
    */
   async upsert(
     handle: string,
@@ -399,36 +413,31 @@ export class PromptsApiService {
     }
     let response: SyncApiResponse | undefined;
     try {
-      response = await this.apiClient.POST(
-        "/api/prompts/{id}/sync",
-        {
-          params: { path: { id: params.name } },
-          body: {
-            configData: params.configData,
-            parameters: params.parameters ?? {},
-            localVersion: params.localVersion,
-            commitMessage: params.commitMessage,
-          },
+      response = await this.apiClient.POST("/api/v1/prompts/{id}/sync", {
+        params: { path: { id: params.name } },
+        body: {
+          configData: params.configData,
+          parameters: params.parameters ?? {},
+          localVersion: params.localVersion,
+          commitMessage: params.commitMessage,
         },
-      );
+      });
     } catch (error) {
       // Transport-level failures (network errors, timeouts, unresolved DNS)
       // surface here. Preserve the underlying message so the user knows
       // whether the API is reachable.
-      const message = formatApiErrorForOperation({ operation: "sync prompt", error: error });
+      const message = formatApiErrorForOperation({
+        operation: "sync prompt",
+        error: error,
+      });
       throw new PromptsApiError(message, "sync", error);
     }
 
     if (response?.error) {
       const err: unknown = response.error;
-      const status =
-        response.response?.status ?? extractStatusFromResponse(err);
+      const status = response.response?.status ?? extractStatusFromResponse(err);
       const message = formatApiErrorMessage({ error: err, options: { status } });
-      throw new PromptsApiError(
-        `Failed to sync prompt: ${message}`,
-        "sync",
-        err,
-      );
+      throw new PromptsApiError(`Failed to sync prompt: ${message}`, "sync", err);
     }
 
     // Validate the shape at the boundary so a malformed 2xx payload

@@ -1,6 +1,6 @@
 # D13 — Sign-in & sign-up screens (the first-party auth UI)
 
-Epic: `../identity-platform-redesign.md` · Plan: `delivery-plan.md` · Wave 2 · Depends on: D01 (identifier model); shipped with D03
+Epic: `../plans/identity-platform-redesign.md` · Plan: `delivery-plan.md` · Wave 2 · Depends on: D01 (identifier model); flips with D03 (same flag: `IDENTITY_ROUTER_V2`)
 
 # Overview
 
@@ -48,7 +48,7 @@ authenticated identity surfaces (later deliverables — listed for orientation)
 
 - Today's screens are thin because Auth0's Universal Login carried the weight; there is no first-party UI for method choice, verification states, or recovery guidance.
 - Sign-up today always lands in workspace creation — the direct source of the orphaned-organization problem (users create a solo org, later get invited to the real one, the solo org lingers forever).
-- Spec impacts: `specs/auth/auth-signin-flows.feature` ports to router + screens (with D03); `signup-does-not-strand-an-account.feature` anchors survive; `sign-in-failure-messages.feature` is an anchor — the new screens keep saying *why* a sign-in failed (wrong password, rate-limit wait, origin mismatch); new `.feature` files for the full screen set.
+- Spec impacts: `specs/auth/auth-signin-flows.feature` ports to router + screens (with D03); `signup-does-not-strand-an-account.feature` anchors survive; `sign-in-failure-messages.feature` is an anchor — the new screens keep saying _why_ a sign-in failed (wrong password, rate-limit wait, origin mismatch); new `.feature` files for the full screen set.
 
 # Technical Plan
 

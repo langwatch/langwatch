@@ -1,0 +1,387 @@
+// biome-ignore-all lint/suspicious/noEmptyBlockStatements: Null* repos are intentional no-ops.
+
+import type { AuthzCustomRole } from "@langwatch/authz-contract";
+import type {
+  CustomRole,
+  EnrichedAuditLog as ContractEnrichedAuditLog,
+  Organization,
+  OrganizationIntent,
+  OrganizationUser,
+  OrganizationUserRole,
+  PricingModel,
+  ProjectRow as Project,
+  RoleBindingScopeType,
+  Team,
+  TeamUser,
+  TeamUserRole,
+  User,
+} from "@langwatch/organization-contract";
+import type { TeamRoleUpdateOrigin } from "../services/compute-effective-team-role-updates.service.ts";
+
+export type TeamWithProjects = Team & {
+  projects: Project[];
+};
+
+export type TeamWithProjectsAndMembers = TeamWithProjects & {
+  members: (TeamUser & {
+    assignedRole?: CustomRole | null;
+  })[];
+};
+
+export type FullyLoadedOrganization = Organization & {
+  members: OrganizationUser[];
+  teams: TeamWithProjectsAndMembers[];
+};
+
+export type TeamMemberWithUser = TeamUser & {
+  user: Pick<User, "id" | "name" | "email" | "image">;
+  assignedRole?: AuthzCustomRole | null;
+};
+
+export type TeamMemberWithTeam = TeamUser & {
+  team: Team;
+  assignedRole?: CustomRole | null;
+};
+
+export type TeamWithProjectsAndMembersAndUsers = Team & {
+  members: TeamMemberWithUser[];
+  projects: Project[];
+};
+
+export type UserWithTeams = User & {
+  teamMemberships: TeamMemberWithTeam[];
+};
+
+export type OrganizationMemberWithUser = OrganizationUser & {
+  user: UserWithTeams;
+};
+
+export type OrganizationWithMembersAndTheirTeams = Organization & {
+  members: OrganizationMemberWithUser[];
+};
+
+/**
+ * Input for creating an organization and assigning the user as admin.
+ */
+export interface CreateAndAssignInput {
+  userId: string;
+  orgId: string;
+  orgName: string;
+  orgSlug: string;
+  teamId: string;
+  teamSlug: string;
+  phoneNumber?: string;
+  signUpData?: Record<string, unknown>;
+  /** ADR-038 signup intent; undefined/null persists NULL (legacy default). */
+  primaryIntent?: OrganizationIntent | null;
+  pricingModel: PricingModel;
+}
+
+/**
+ * Result of creating an organization and team.
+ */
+export interface CreateAndAssignResult {
+  organization: { id: string; name: string };
+  team: { id: string; slug: string; name: string };
+}
+
+/**
+ * Input for creating an organization with no user attached: the instance provisioning path.
+ * Unlike {@link CreateAndAssignInput}, no member is assigned — an admin API key mints afterwards.
+ */
+export interface CreateForProvisioningInput {
+  orgId: string;
+  orgName: string;
+  orgSlug: string;
+  teamId: string;
+  teamSlug: string;
+  pricingModel: PricingModel;
+}
+
+/**
+ * One organization as the instance provisioning surface reads it back: the natural key
+ * (`slug`) plus enough to tell entries apart. Deliberately not the settings shape: an
+ * instance administrator lists organizations to find one, not to manage it.
+ */
+export interface OrganizationProvisioningSummary {
+  id: string;
+  name: string;
+  slug: string;
+  createdAt: Organization["createdAt"];
+}
+
+/**
+ * Filter parameters for fetching audit logs.
+ */
+export interface AuditLogFilters {
+  organizationId: string;
+  projectId?: string;
+  userId?: string;
+  pageOffset: number;
+  pageSize: number;
+  action?: string;
+  startDate?: number;
+  endDate?: number;
+  /**
+   * Filter by gateway-resource kind, e.g. "virtual_key" / "budget" /
+   * "provider_binding" / "cache_rule". Only matches rows where the gateway
+   * services populated `targetKind` — platform-shape rows have null here.
+   */
+  targetKind?: string;
+  /**
+   * Filter to a single target-resource id. Used by the VK/Budget detail
+   * page deep-link pattern; pairs with `targetKind` for type safety.
+   */
+  targetId?: string;
+}
+
+/**
+ * Enriched audit log entry with resolved user and project data. Backed by one `AuditLog` table
+ * storing both gateway-shape and platform-shape rows; `source` is computed from `targetKind`.
+ */
+export interface EnrichedAuditLog {
+  id: string;
+  createdAt: ContractEnrichedAuditLog["createdAt"];
+  /** Nullable to support system-actor writes (background jobs, migrations). */
+  userId: string | null;
+  organizationId: string | null;
+  projectId: string | null;
+  action: string;
+  payload: unknown;
+  ipAddress: string | null;
+  userAgent: string | null;
+  error: string | null;
+  args: unknown;
+  user: { id: string; name: string | null; email: string | null } | null;
+  project: { id: string; name: string } | null;
+  /** Computed: gateway = `targetKind` populated, platform = otherwise. */
+  source: "platform" | "gateway";
+  /** Gateway resource kind — only set when source="gateway". */
+  targetKind: string | null;
+  /** Gateway resource id — only set when source="gateway". */
+  targetId: string | null;
+  /** Gateway-side diff (before state). Only set when source="gateway". */
+  before: unknown;
+  /** Gateway-side diff (after state). Only set when source="gateway". */
+  after: unknown;
+}
+
+/**
+ * A membership row with the user it belongs to, as the members management
+ * surface lists it. `disabledAt` is exposed rather than filtered so an admin
+ * can see who is disabled in order to re-enable them.
+ */
+export interface OrganizationMemberSummary {
+  userId: string;
+  organizationId: string;
+  role: OrganizationUserRole;
+  disabledAt: OrganizationUser["disabledAt"];
+  createdAt: OrganizationUser["createdAt"];
+  updatedAt: OrganizationUser["updatedAt"];
+  user: { id: string; name: string | null; email: string | null };
+}
+
+/**
+ * One team the member reaches through a TEAM-scoped role binding. Personal
+ * workspaces are excluded: they are not access an administrator granted or
+ * can take away, so the management surfaces never list them.
+ */
+export interface MemberTeamBinding {
+  teamId: string;
+  teamName: string;
+  role: TeamUserRole;
+  customRoleId: string | null;
+  customRoleName: string | null;
+}
+
+/**
+ * Input for deleting a member from an organization.
+ */
+export interface DeleteMemberInput {
+  organizationId: string;
+  userId: string;
+  /**
+   * Who removed them, when a person did. A service credential acts as
+   * nobody, so this is null there and the revocation is attributed to the
+   * organization service itself.
+   */
+  actingUserId?: string | null;
+}
+
+/**
+ * Input for disabling or re-enabling a membership. Disabling revokes the
+ * person's access to this organization and returns their licensed seat,
+ * without touching their role, department or history.
+ */
+export interface SetMemberDisabledInput {
+  organizationId: string;
+  userId: string;
+  disabled: boolean;
+}
+
+/**
+ * Input for updating a member's organization role and cascading team roles.
+ */
+export interface UpdateMemberRoleInput {
+  organizationId: string;
+  userId: string;
+  role: OrganizationUserRole;
+  effectiveTeamRoleUpdates: Array<{
+    teamId: string;
+    role: string;
+    customRoleId?: string;
+    origin: TeamRoleUpdateOrigin;
+  }>;
+  /**
+   * Null when the actor is a service credential rather than a person. Only
+   * self-comparisons read this, and a service credential is never the target
+   * member, so null simply keeps every self branch closed.
+   */
+  currentUserId: string | null;
+}
+
+/**
+ * What the seat change did that the admin who made it would not otherwise see.
+ */
+export interface UpdateMemberRoleResult {
+  teamsLeftWithoutAdmin: Array<{ id: string; name: string }>;
+}
+
+/**
+ * Input for updating a team member's role.
+ */
+export interface UpdateTeamMemberRoleInput {
+  teamId: string;
+  userId: string;
+  role: TeamUserRole;
+  customRoleId?: string;
+  currentUserId: string;
+}
+
+export abstract class OrganizationMembershipRepository {
+  abstract tryGetUserOrgRole(params: {
+    userId: string;
+    organizationId: string;
+  }): Promise<OrganizationUserRole | null>;
+  abstract findUserOrgRoleByTeamId(params: {
+    userId: string;
+    teamId: string;
+  }): Promise<OrganizationUserRole | null>;
+  abstract tryFindPrimaryIntentById(organizationId: string): Promise<OrganizationIntent | null>;
+
+  // --- New methods for router delegation ---
+
+  abstract createAndAssign(input: CreateAndAssignInput): Promise<CreateAndAssignResult>;
+
+  /**
+   * Creates an organization and its default team with no user attached (the instance
+   * provisioning path). Throws `OrganizationSlugTakenError` when the slug is already
+   * claimed, so provisioning tools get a deterministic 409 on the natural key.
+   */
+  abstract createForProvisioning(input: CreateForProvisioningInput): Promise<CreateAndAssignResult>;
+
+  /** Every organization on the instance, newest first. Instance-admin only. */
+  abstract findAllProvisioningSummaries(): Promise<OrganizationProvisioningSummary[]>;
+
+  abstract tryFindProvisioningSummaryById(
+    organizationId: string,
+  ): Promise<OrganizationProvisioningSummary | null>;
+
+  /**
+   * Removes an organization a provisioning run created but could not finish.
+   * Scoped to what provisioning creates before the first member ever signs
+   * in: role bindings, API keys, prompt tags, teams and the organization row.
+   */
+  abstract deleteProvisionedOrganization(organizationId: string): Promise<void>;
+
+  abstract getAllForUser(params: {
+    userId: string;
+    isDemo: boolean;
+    demoProjectUserId: string;
+    demoProjectId: string;
+  }): Promise<FullyLoadedOrganization[]>;
+
+  abstract findOrganizationWithMembers(params: {
+    organizationId: string;
+    userId: string;
+    includeDeactivated: boolean;
+  }): Promise<OrganizationWithMembersAndTheirTeams | null>;
+
+  abstract findMemberById(params: {
+    organizationId: string;
+    userId: string;
+    currentUserId: string;
+  }): Promise<OrganizationMemberWithUser | null>;
+
+  abstract getAllMembers(organizationId: string): Promise<User[]>;
+
+  /**
+   * A single membership row with its user, disabled or not. Unlike
+   * `findMemberById` there is no caller pre-check: the management surface
+   * authenticates through the organization credential, not a session user.
+   */
+  abstract tryFindMembership(params: {
+    organizationId: string;
+    userId: string;
+  }): Promise<OrganizationMemberSummary | null>;
+
+  /** Paginated membership list for the management surface. */
+  abstract findAllMembers(params: {
+    organizationId: string;
+    includeDisabled: boolean;
+    offset: number;
+    limit: number;
+  }): Promise<{ members: OrganizationMemberSummary[]; totalCount: number }>;
+
+  /**
+   * The member's TEAM-scoped role bindings with team names, personal
+   * workspaces excluded.
+   */
+  abstract findMemberTeamBindings(params: {
+    organizationId: string;
+    userId: string;
+  }): Promise<MemberTeamBinding[]>;
+
+  abstract deleteMember(input: DeleteMemberInput): Promise<void>;
+
+  abstract setMemberDisabled(input: SetMemberDisabledInput): Promise<void>;
+
+  /**
+   * The personal team a set of role-binding scopes reaches, by the name its
+   * owner sees, or null when they reach only shared ground. Both TEAM and
+   * PROJECT scopes resolve to the same private space.
+   */
+  abstract tryFindPersonalTeamInScopes(params: {
+    scopes: Array<{ scopeType: RoleBindingScopeType; scopeId: string }>;
+  }): Promise<{ name: string } | null>;
+
+  /**
+   * The teams an organization actually shares, which is every team except the
+   * personal workspace each member gets to themselves.
+   */
+  abstract findSharedTeamIds(params: { organizationId: string }): Promise<string[]>;
+
+  /** One member's team-scoped role bindings, restricted to the named teams. */
+  abstract findTeamRoleBindings(params: {
+    organizationId: string;
+    userId: string;
+    teamIds: string[];
+  }): Promise<Array<{ scopeId: string; role: TeamUserRole; customRoleId: string | null }>>;
+
+  /**
+   * The stored `permissions` value of each named custom role. A Json column,
+   * so the caller decides what a row's shape means.
+   */
+  abstract findCustomRolePermissions(params: {
+    organizationId: string;
+    customRoleIds: string[];
+  }): Promise<unknown[]>;
+
+  abstract updateMemberRole(input: UpdateMemberRoleInput): Promise<UpdateMemberRoleResult>;
+
+  abstract updateTeamMemberRole(input: UpdateTeamMemberRoleInput): Promise<void>;
+
+  abstract getAuditLogs(
+    filters: AuditLogFilters,
+  ): Promise<{ auditLogs: EnrichedAuditLog[]; totalCount: number }>;
+}

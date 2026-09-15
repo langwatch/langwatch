@@ -85,7 +85,7 @@ def test_teams_and_projects_resolve_from_the_package_entry_point(monkeypatch):
 def test_teams_create_and_list_routes():
     handler, calls = recorder(
         {
-            ("POST", "/api/teams"): {
+            ("POST", "/api/v1/teams"): {
                 "id": "team_1",
                 "name": "ACME Platform",
                 "slug": "acme-platform",
@@ -93,7 +93,7 @@ def test_teams_create_and_list_routes():
                 "createdAt": "2026-01-01T00:00:00Z",
                 "updatedAt": "2026-01-01T00:00:00Z",
             },
-            ("GET", "/api/teams"): {
+            ("GET", "/api/v1/teams"): {
                 "data": [{"id": "team_1", "name": "ACME Platform"}],
                 "pagination": {"page": 1, "limit": 50, "total": 1},
             },

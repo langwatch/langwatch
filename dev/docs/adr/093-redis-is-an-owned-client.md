@@ -2,9 +2,15 @@
 
 **Date:** 2026-08-10
 
-**Status:** Accepted
+**Status:** Accepted; physical composition ownership amended by
+[ADR-111](./111-physical-application-workspaces.md)
 
 **Related:** ADR-070 (modular package architecture — this is one bounded-context package cut from it), ADR-076 (single pnpm workspace), ADR-004 (dev environment — `REDIS_DB_INDEX` worktree isolation). Redis follows the ownership rule `@langwatch/clickhouse-client` already applies to ClickHouse.
+
+ADR-111 preserves explicit client ownership while replacing the global App
+composition: standalone API and worker processes each own one connection, and
+the contributor-only combined runtime may deliberately share one connection
+through its parent `ResourceScope`.
 
 ---
 
@@ -29,7 +35,7 @@ happened at import time, the module could not be allowed to run during a Next
 build, a vitest run, or in jsdom. So it grew `shouldSkipRedis()`, reading raw
 `process.env` (`NEXT_PHASE`, `BUILD_TIME`, `SKIP_REDIS`) and sniffing
 `typeof window !== "undefined"` — deliberately bypassing `@t3-oss/env`
-validation, because validated env access *itself* threw when reached from the
+validation, because validated env access _itself_ threw when reached from the
 wrong context. `vitest.config.ts` sets `BUILD_TIME: "1"` globally for exactly
 this reason, with a comment pointing at the file. None of those branches
 describe a product requirement. They exist to stop an import from connecting.
@@ -93,7 +99,7 @@ Three parts:
 
    Each of the three is a **service class** — `RedisConfigService`,
    `RedisConnectionService`, `RedisReadinessService` — following the idiom
-   `@langwatch/authz` sets: collaborators and the logger arrive once at
+   `@langwatch/authz-contract` sets: collaborators and the logger arrive once at
    construction, the methods take only what varies per call. `RedisConfigService`
    is stateless and pure, in the same sense as `AuthzEngine`, so it is
    constructed freely and shared; `RedisConnectionService` composes one rather
@@ -119,7 +125,7 @@ Three parts:
    — a handler that needs Redis and has no App has a boot-order bug, and it
    should say so rather than quietly take a lesser branch.
 
-   The exception is a consumer whose *documented contract* is to degrade, and
+   The exception is a consumer whose _documented contract_ is to degrade, and
    for those there is a named accessor, `tryGetApp(): App | null`.
 
    That exception turned out to cover most Redis consumers, and the reason is
@@ -169,7 +175,7 @@ converts a boot-order bug that used to surface as a silent no-op into an
 immediate error — but it does mean each call site had to move its resolution
 into the function that uses it. `better-auth` was the sharp edge: it decides
 whether to configure `secondaryStorage` at module scope, from whether a
-connection exists. That decision is now made from *configuration*
+connection exists. That decision is now made from _configuration_
 (`RedisConfigService.isConfigured`, a pure predicate over supplied env) while
 the connection itself is resolved lazily inside the storage callbacks, which
 preserves the existing behaviour exactly without needing a live client at module

@@ -2,10 +2,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { ExperimentsFacade } from "../experiments.facade";
 import { createLangWatchApiClient } from "@/internal/api/client";
 import { NoOpLogger } from "@/logger";
-import {
-  ExperimentNotFoundError,
-  ExperimentsApiError,
-} from "../platformErrors";
+import { ExperimentNotFoundError, ExperimentsApiError } from "../platformErrors";
 
 const mockFetch = vi.fn();
 vi.stubGlobal("fetch", mockFetch);
@@ -17,8 +14,7 @@ const jsonResponse = (body: unknown, init?: ResponseInit): Response =>
     ...init,
   });
 
-const requestAt = (call: number): Request =>
-  mockFetch.mock.calls[call]![0] as Request;
+const requestAt = (call: number): Request => mockFetch.mock.calls[call]![0] as Request;
 
 const ENDPOINT = "https://api.langwatch.test";
 
@@ -113,17 +109,13 @@ describe("ExperimentsFacade.runWithResults", () => {
         // 1) start
         const startReq = requestAt(0);
         expect(startReq.method).toBe("POST");
-        expect(startReq.url).toBe(
-          `${ENDPOINT}/api/evaluations/v3/my-experiment/run`,
-        );
+        expect(startReq.url).toBe(`${ENDPOINT}/api/evaluations/v3/my-experiment/run`);
         expect(await startReq.clone().json()).toEqual({
           data: [{ question: "What is 2 + 2?" }],
         });
 
         // 2) poll
-        expect(requestAt(1).url).toBe(
-          `${ENDPOINT}/api/evaluations/v3/runs/run_1`,
-        );
+        expect(requestAt(1).url).toBe(`${ENDPOINT}/api/evaluations/v3/runs/run_1`);
 
         // 3) results (with experimentSlug)
         expect(requestAt(2).url).toBe(
@@ -196,17 +188,15 @@ describe("ExperimentsFacade.runWithResults", () => {
   describe("given the run fails", () => {
     describe("when polling reports a failed status", () => {
       it("throws an ExperimentRunFailedError", async () => {
-        mockFetch
-          .mockResolvedValueOnce(jsonResponse(startResponse))
-          .mockResolvedValueOnce(
-            jsonResponse({
-              runId: "run_1",
-              status: "failed",
-              progress: 0,
-              total: 1,
-              error: "execution exploded",
-            }),
-          );
+        mockFetch.mockResolvedValueOnce(jsonResponse(startResponse)).mockResolvedValueOnce(
+          jsonResponse({
+            runId: "run_1",
+            status: "failed",
+            progress: 0,
+            total: 1,
+            error: "execution exploded",
+          }),
+        );
 
         const facade = makeFacade();
         const err = await facade
@@ -251,10 +241,7 @@ describe("ExperimentsFacade.runWithResults", () => {
           .mockResolvedValueOnce(jsonResponse(startResponse))
           .mockResolvedValueOnce(jsonResponse(completedStatus))
           .mockResolvedValueOnce(
-            jsonResponse(
-              { error: "Run not found or results not yet available" },
-              { status: 404 },
-            ),
+            jsonResponse({ error: "Run not found or results not yet available" }, { status: 404 }),
           )
           .mockResolvedValueOnce(jsonResponse(resultsResponse));
 
@@ -283,9 +270,7 @@ describe("ExperimentsFacade.runWithResults", () => {
         mockFetch
           .mockResolvedValueOnce(jsonResponse(startResponse))
           .mockResolvedValueOnce(jsonResponse(noRowsStatus))
-          .mockResolvedValueOnce(
-            jsonResponse({ error: "Unauthorized" }, { status: 401 }),
-          )
+          .mockResolvedValueOnce(jsonResponse({ error: "Unauthorized" }, { status: 401 }))
           // A second results response is queued but must never be reached: with
           // no rows expected, a thrown error is terminal, not a lag retry.
           .mockResolvedValueOnce(jsonResponse(resultsResponse));
@@ -316,9 +301,7 @@ describe("ExperimentsFacade.run error compatibility", () => {
       jsonResponse({ error: "Experiment not found" }, { status: 404 }),
     );
 
-    await expect(makeFacade().run("missing-experiment")).rejects.toThrow(
-      ExperimentNotFoundError,
-    );
+    await expect(makeFacade().run("missing-experiment")).rejects.toThrow(ExperimentNotFoundError);
   });
 
   it("keeps the public API error for invalid credentials", async () => {
@@ -326,8 +309,6 @@ describe("ExperimentsFacade.run error compatibility", () => {
       jsonResponse({ error: "Invalid credentials" }, { status: 401 }),
     );
 
-    await expect(makeFacade().run("my-experiment")).rejects.toThrow(
-      ExperimentsApiError,
-    );
+    await expect(makeFacade().run("my-experiment")).rejects.toThrow(ExperimentsApiError);
   });
 });

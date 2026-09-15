@@ -1,0 +1,548 @@
+# Drive: get `apidiff` to report no behavioural difference against `origin/main`
+
+Written 2026-09-12, end of the fourth session. **This is the ENTRY POINT.** It
+supersedes `handover-2026-09-12-apidiff-3.md`, which is now a reference for how
+the diagnosis was reached rather than for what to do next.
+
+Branch `feat/strict-feature-layout-v0`. Three commits added this session:
+
+    f754346275  the scenario contract owns its mapping shapes, and the SDK's copy step learns the new spelling
+    579a0da40c  apidiff passes --project-directory, so compose can find the .env it has always needed
+    e8b0a63c62  the tasks process boots again: a wrong channel import and three interfaces used as classes
+
+None pushed. The working tree carries two files owned by the visualdiff
+session (`tools/visualdiff/visualdiff.yaml`, `route-surface-parity-2026-09-12.md`),
+uncommitted on purpose.
+
+## Read this first: the pattern behind every wall this drive has hit
+
+Five times now — four this session — the thing blocking progress was **a
+measurement that read healthy while the tree was not**. Not one of them was a
+hard failure anyone could see; each was a number that looked fine because the
+tool that produced it had stopped early, looked in the wrong place, or asserted
+the bug was correct.
+
+- `openapi-check` reported 0 removed / 0 added / 0 changed, because once the
+  document is generated from the declarations an operation nothing declares is
+  simply absent rather than "removed". 70 unserved operations became invisible
+  the moment the document was refrozen.
+- `pnpm typecheck:one @langwatch/scenario-contract` reported **3** errors, because
+  the declarations walk stops at the first unresolvable import. Behind those 3
+  sat 64 more of the same class. The previous session reverted a correct change
+  on the strength of that number.
+- `TestComposeArgs` **passed**, because it asserted the argument list without
+  `--project-directory` — the exact shape that cannot work. A passing test
+  asserting a bug is worse than no test: it converts "nobody checked" into
+  "somebody checked and it is fine".
+- A glob of `modules/*/server/src/transport/*.rest.ts` returned a clean "no
+  declaration found", because it reached neither the enterprise tree nor the
+  `api-rest/` subdirectory naming.
+- `grep -cE 'error TS'` over a typecheck run returned **0** while that run was
+  exiting 1, because the output is a grouped summary and the pattern never
+  matched it.
+- The same grep returned **0** against a direct `tsc` run that reported 477
+  errors, because tsc colours its output: there is an ANSI escape between
+  "error" and "TS", so the literal string never appears. Run output through
+  `sed 's/\x1b\[[0-9;]*m//g'` before counting.
+
+Those last two are the same lesson by two different routes, and it generalises
+past greps: **the output of a tool is a format, not a fact, and a measurement
+taken over that output is a third thing that can be wrong on its own terms.**
+Both times the wrong number was zero, and zero is what you were hoping for.
+
+When a check on this branch says something is fine, ask what it would have to
+see to say otherwise. That question has been worth more this session than any
+individual fix.
+
+## Gates: what it actually takes to prepare an instance
+
+`dev/scripts/ensure-built.mjs:15-17` builds **three** packages, and visualdiff
+runs it. Gate 1 on the SDK alone was necessary but never sufficient:
+
+    pnpm --filter langwatch build             exit 0
+    pnpm --filter @langwatch/mcp-server build  exit 0
+    pnpm --filter @langwatch/mail build        exit 0
+
+All three are green as of `e8b0a63c62`. apidiff additionally runs
+`pnpm prisma:migrate`, which boots `apps/tasks` — that was the fourth wall and
+is fixed in the same commit.
+
+## The coupled pair, and why it must never be split
+
+`sdks/typescript/copy-types.sh` used to match this import **verbatim** with a
+regex and `process.exit(1)` when it missed:
+
+    import type { AvailableSource, NestedField } from "~/components/variables/VariableMappingInput";
+
+So removing that dangling monolith import from
+`modules/scenario/contract/src/evaluator-attachments.ts` — obviously the right
+thing — breaks `pnpm --filter langwatch build`, which is gate 1. The contract
+half and the SDK half are inseparable in both directions and landed as one
+commit.
+
+A plain `cp` is **not** the alternative: `sdks/typescript` has no dependency on
+`@langwatch/workflow-contract`, so copying the module verbatim ships an import
+the published tarball and all five release binaries cannot resolve, and it
+would surface at release rather than at build. The replacement step now lives
+in `sdks/typescript/scripts/generate-evaluator-attachments.mjs`, accepts both
+import spellings, and fails loudly naming what it looked for.
+
+**Delete the old spelling's branch in that script once the contract has
+settled.** It is there only so a revert could not re-break the build.
+
+## The 3 -> 134 typecheck number, and why reverting is wrong
+
+    pnpm typecheck                                   exit 1,   3 errors  ->  exit 1, 134 errors
+    pnpm typecheck:one @langwatch/scenario-contract   3 -> 67
+
+**Read the exit codes.** `pnpm typecheck` fails on this branch with or without
+the change; no gate changes colour. 126 of the 134 are TS2307, 110 of those
+dangling `~/` monolith paths, and **zero** are in either edited file.
+
+Proof the change did not author them, independent of any tool's traversal:
+
+    git grep -l 'from "~/' HEAD -- modules/scenario/contract/src/
+
+returns 22 files and 82 import lines in the committed tree, concentrated in
+`voice/` and `evaluations/`. Two contract dependencies cannot write 82 lines of
+`~/` imports.
+
+Repo-wide the masking is only three packages: `modules/scenario/contract` (22
+files), `modules/suite/contract` (1), `modules/feature-flag/contract` (1). That
+is a lane-sized job, not a drive-sized one.
+
+### A correction to f754346275's commit message
+
+That message quotes `pnpm typecheck` going "3 -> 134". Literally true as reported
+lines, and misleading: **134 is 67 x 2** — one set of 67 errors, reported once
+per application, not 134 distinct defects. Confirmed from both ends: the
+per-application split is 63 TS2307 + 3 TS7006 + 1 TS2366 = 67, and the fanout's
+is exactly double each. See the next section for why the applications' own
+`tsc` never ran on either side.
+
+## `pnpm typecheck` has never type-checked any application
+
+Found by the visualdiff session, corroborated here independently. Each
+application's `typecheck` script is:
+
+    pnpm -w typecheck:declarations --project ./tsconfig.declarations.json && tsc --noEmit -p tsconfig.test.json
+
+The declarations pre-pass fails (those 67), so **the `&&` short-circuits and
+`tsc --noEmit` never runs**. Everything in `apps/api`, `apps/worker` and
+`apps/ui` is currently unchecked and reads as checked, on this branch, in the
+command CLAUDE.md tells every contributor to run and the one CI runs.
+
+Run directly, bypassing the `&&`, the real numbers are:
+
+    pnpm exec tsc --noEmit -p apps/api/tsconfig.test.json      477 errors
+    pnpm exec tsc --noEmit -p apps/worker/tsconfig.test.json   615 errors
+
+**When somebody fixes the declarations pre-pass, the reported count will jump
+from 67 to roughly 1,100, and that jump is not a regression.** It is the
+short-circuit's standing cost becoming visible. This document's other big
+number was misread exactly that way once already, and a correct change was
+reverted over it; do not let it happen twice.
+
+**64 of the worker's errors are TS2689** — `Cannot extend an interface`. That
+is the ERASED class below, named by the compiler, and it settles whether those
+sites are real: a regex found 56, tsc names 64 of the same shape, and neither
+measurement depended on the other. The gap is that the detector only catches
+type-only-BOUND names while tsc also catches interfaces imported in value
+position, so it under-reports by design and now the amount is known.
+
+This is the single most consequential finding of the session, because every
+defect below accumulated behind it.
+
+## The boot walls, in the order they appear
+
+apidiff's `-no-haven` path runs install -> migrate -> seed -> start, per
+instance. Six walls sat behind gate 1, each invisible until the one before it
+was cleared. All are fixed except where noted.
+
+1. **SDK build** — the coupled pair. `f754346275`.
+2. **compose** — apidiff never passed `--project-directory`, so compose
+   resolved `env_file: .env` against `dev/`. Broke `up` as well as `down`.
+   A passing `TestComposeArgs` asserted the broken argument list. `579a0da40c`.
+3. **`apps/tasks` could not boot** — four defects in one chain: a channel
+   imported from the module that declares the abstract rather than the one
+   holding its memory twin, and three cases of `class X extends <interface>`.
+   `e8b0a63c62`.
+4. **goose was not installed** — `clickhouse-migrate` shells out to
+   `which goose`. `dev/compose.dev.yml:183` pins v3.26.0 and curls it, but only
+   INSIDE the container; nothing installs it on the host, so every non-container
+   ClickHouse migration hits this. Installed machine-wide with
+   `go install github.com/pressly/goose/v3/cmd/goose@v3.26.0` (lands in
+   `~/go/bin`, already on PATH beside haven; `rm ~/go/bin/goose` to undo).
+   **Not fixed in the repo** — nothing documents or installs it for the host.
+5. **seed referenced an undefined identifier** — `TEST_SUITE_ENTERPRISE_LICENSE_KEY`
+   at `packages/prisma-client/prisma/seed.ts:177`, with the import at line 70
+   binding `ENTERPRISE_LICENSE_KEY` and going unused. Merge fallout from
+   `b5320f7103`. Aliased.
+6. **the api could not boot, silently** — three defects. `70bc7a0ab6`, and the
+   next section, because the first of them is a lesson rather than a bug.
+
+## The api exited 1 having printed nothing
+
+`bootApi`'s catch was `catch { process.exitCode = 1 }`, with a comment
+explaining that a boot failure had already reached the error stream, so
+re-reporting would read as two failures. That holds **only once the process has
+a logger** — and the boot seam resolves secrets and parses config before that.
+So the failures most worth seeing were exactly the ones nothing had reported,
+and the process exited 1 with an empty log under a supervisor that can only say
+"exit status 1".
+
+`apps/tasks` has always logged here (`tasks.entrypoint.main.ts:106`). `apps/api`
+now does the same. Behind the silence were:
+
+- **An empty environment variable was not read as absent.**
+  `Config.optionalSecret` is `z.string().min(1).optional()`, and `""` is not
+  `undefined`, so the `optional()` branch was unreachable for any key written
+  `FOO=` — which is how every `.env.example` writes "not configured". The api
+  refused to boot over five credentials it does not need. Fixed in
+  `packages/config`, so every process gets it. `stated()` in
+  `gateway.config.ts` already had the right reading, one package over.
+- **Nothing provided the audit log.** `modules/audit-log` publishes a contract
+  and no core server half — the implementation is `enterprise/modules/audit-log`
+  — so a core build installs nothing for the `audit-log` token while `agent`,
+  `evaluator` and `ops` each declare a REQUIRED dependency on it.
+  `@langwatch/audit-log-null` exists for exactly this and both `apps/api` and
+  `apps/worker` already declared the dependency; only the install line was
+  missing. **`apps/worker` still does not install it** — expect the same
+  `MissingProviderError` once the worker gets past its own earlier walls.
+
+## Wall 7: the gateway secrets (fixed in the harness, open for haven)
+
+The api refuses to boot unless LW_GATEWAY_INTERNAL_SECRET, LW_GATEWAY_JWT_SECRET
+and LW_VIRTUAL_KEY_PEPPER are all absent or all at least 32 characters. This
+machine's `.env` carries 12-character placeholders in all three, so the refusal
+is **correct** — the code is working. apidiff now composes its own throwaway
+trio (`f38361a0c0`); the visualdiff session does the equivalent inside its own
+copied worktree `.env`, substituting only an absent-or-too-short value and
+announcing it per stack.
+
+Neither is a fix for a real local stack. `openssl rand -hex 32` for each is,
+and it is the user's call: rotating `LW_VIRTUAL_KEY_PEPPER` invalidates
+whatever virtual keys exist in their local database.
+
+## Wall 8: THIS IS WHERE THE DRIVE NOW STOPS
+
+The branch api gets through config, secrets and the audit-log provider, and
+then refuses at member claiming:
+
+    MissingMemberError: Module "model-provider" reads the "credentials" member,
+    which this process cannot supply.
+
+`PostgresModelProviderRepositories.requires` is `["prisma", "credentials"]`
+(`modules/model-provider/server/src/repositories/prisma/prisma.model-provider.repositories.ts:16`),
+and **`credentials` is not a platform member at all** — `MEMBER_NAMES`
+(`packages/infrastructure/src/members.ts:147`) lists fourteen and that is not
+one of them. It is a `ModelProviderCredentialCodec`, a module-specific
+abstract class (`encode`/`tryDecode`), and `ModelProviderInfrastructure` does
+not declare it either. So nothing on either side of the seam provides it.
+
+Note `modules/server-module-members.generated.ts` says `"model-provider": []`,
+which disagrees with the repository's own `requires`. That is the stale-generated-file
+trap the previous handover named, in a second instance.
+
+**The recovery source is known**, by this drive's own method:
+
+    git show b383462d96^:apps/api/src/app/api-model-provider.composition.ts
+
+266 lines, deleted by that commit. Its `apiModelProviderParts` returns exactly
+the missing set — `credentials`, `catalog`, `translation`, `ids`,
+`codexTokenRefresher`, `connectionRateLimiter` — and its own comment says the
+installed module asks this process for the same set through `withPersistence`
+and `withInfrastructure`. Restoring that wiring is the next action and it is a
+lane, not a patch: eight collaborators, and a decision about whether the codec
+is built from the platform's `encryption` member or stays a module answer.
+
+It was left undone deliberately. Improvising a module's dependency seam at
+00:40 without its owner is how a drive ships an architecture decision nobody
+made.
+
+## Two classes of defect that no check in this repository can see
+
+Both are shapes TypeScript accepts and Node's type-stripping runtime rejects.
+The fix for the class is to make one tool see what the other sees — a lint
+rule — not to fix the instances and move on.
+
+**ERASED** — `class X extends Y` where `Y` is an interface, or is imported with
+a `type` specifier. The type system is satisfied; the binding is erased; the
+failure is a `ReferenceError` at class-definition time, so it fails at BOOT,
+before any test or request. Three were fixed in `apps/tasks`. A detector the
+visualdiff session wrote and self-tests
+(`dev/scripts/find-erased-extends.mjs`, uncommitted) finds **56 more, all in
+apps/worker**. Not yet confirmed against a direct `tsc` run.
+
+**UNEXTENDED** — a relative import with no file extension. TypeScript accepts
+it; Node ESM under type-stripping does not, and it fails at **link** time,
+strictly before any module body evaluates. 3,930 repo-wide, but almost all in
+trees that are bundled (`sdks/typescript` by tsup, `apps/ui` by Vite) or
+resolved by vitest. Filtered to code that boots under Node ESM: **110
+specifiers across 51 files**, concentrated in `modules/scenario/contract` (41),
+`enterprise/packages/composition/api` (26), `enterprise/modules/governance/server`
+(25) and `modules/analytics/server` (13). All fixed by the visualdiff session.
+
+The worker dies on one of these before it reaches any of the 56, which is why
+the 56 are invisible even to a real boot: there is an earlier wall in front of
+them.
+
+## Ownership and coordination this session
+
+Two sessions worked the same checkout. It cost one run and produced the
+session's two best findings, so the arrangement is worth keeping, with the rule
+that was missing: **"no peer running" and "no peer editing" are different
+facts.** Re-ping before touching shared files, not just before booting.
+
+- This drive: `apps/api`, `apps/tasks`, `sdks/typescript`, `tools/apidiff`,
+  `packages/config`, `modules/**`.
+- The visualdiff session: `tools/visualdiff`, `.visualdiff`,
+  `specs/tooling/visualdiff*.feature`, plus `dev/scripts/find-erased-extends.mjs`.
+- Resource interlock: an apidiff run boots the branch **in place** and cannot
+  tolerate concurrency; visualdiff uses detached worktrees of committed refs
+  and can always be second.
+
+## The joint verdict: neither process boots, so neither tool can run
+
+Written after both sessions stopped. The visualdiff session's own handover is
+`dev/docs/plans/handover-2026-09-13-visualdiff.md`; this is the short version,
+and it supersedes any reading of this document that treats apidiff's remaining
+work as tool-shaped.
+
+    apps/api     stops at model-provider's `credentials` member (wall 8)
+    apps/worker  stops at 163 value imports that cannot resolve at link time
+
+apidiff boots only the api, so it is blocked by the first alone. visualdiff
+needs both, because haven's backend lane runs them in one process. **No flag on
+either tool changes this.** The next action for the drive is not another run: it
+is the composition lane, and `.claude/manifests/worker-composition-green.md`
+already exists as the right home for it.
+
+The worker's walls, cleared in this order by the visualdiff session and each
+hidden behind the one before — the same stacking property that produced this
+document's wall list:
+
+    1. 110 extensionless relative imports (UNEXTENDED)
+    2. a stale package `exports` entry pointing at a file f054ab2baf deleted
+    3. 19 interfaces imported in value position
+    4. 35 f054ab2baf renames, each now an interface, each needing three coupled
+       edits: rename + `import type` + `extends` -> `implements` with `super()` dropped
+
+Then the unresolvable value imports, of which none has a single unambiguous
+rename candidate — which is why that session stopped rather than guessing.
+Behind those sit the 56 ERASED, unreachable until link time succeeds.
+
+**CORRECTION: that figure was first reported as 163 and the real number is
+about two dozen** — 24 when re-measured from this session after the detector's
+own bugs were fixed. The 163 was the detector describing itself, not the tree:
+it judged `@langwatch/*` catalog dependencies resolved from node_modules as
+ABSENT (~111 of them), its declaration pattern did not allow
+`export async function`, and a stem heuristic proposed hundreds of candidates
+for two-word names. Both false-positive classes are now fixtures in its
+self-test.
+
+Note the direction: every other entry in this document's pattern list is a
+measurement that read HEALTHY while the tree was not. This one read UNHEALTHY,
+and would have sent a lane through 137 phantom defects. An over-reporting tool
+burns the same time as an under-reporting one — a number is not evidence until
+something has checked the tool against the thing it measures.
+
+The real ones, re-measured: **24 specifiers**, and they are one cluster plus a
+tail rather than a sweep — 17 in `enterprise/packages/composition` (14 of them
+`*TrpcApi` symbols across three trpc compositions, so almost certainly one
+cause), then `createTrpcService` x2, `featureFlagService` x2, and single sites
+in `modules/trace/server`, `apps/worker/src`, `tools/dev-runtime/src`,
+`modules/langy/server` and `modules/feature-flag/contract`.
+
+Two detectors are left in the tree, both self-testing before every scan, both
+verified from this session independently:
+
+    dev/scripts/find-erased-extends.mjs        56 sites
+    dev/scripts/find-unresolvable-imports.mjs  163 sites, a rename proposal per site
+
+The second is the one the lane wants: it prints `file:line Name -> proposal` and
+says "nothing declared; port it from history" where there is no candidate.
+Concentrations: `enterprise/packages/composition` 22, `modules/automation/server`
+15, `modules/trace/server` 11, `modules/scenario/server` 11, `apps/worker/src` 11.
+
+One warning from that session worth carrying, because it is this document's
+coupling lesson at smaller scale: a type-import pass converted
+`IngestionKeyRepository` to `import type` and left its `extends` in place,
+manufacturing a 57th ERASED site that had not existed. **The fix for one class
+can create another if you apply half of a coupled edit.** The detector caught
+it; a person would not have — and the reason is worth stating, because it is
+the argument for these detectors existing at all.
+
+Neither half of that edit reads as a defect. Converting a value import of an
+interface to `import type` is correct in isolation; the `extends` five lines
+below was correct before the edit. A reviewer reading the diff passes it. The
+only signal was **57 where there had been 56**, and that signal existed solely
+because something had counted before. A detector's value is not that it finds
+things — it is that it establishes a baseline, and a baseline is what turns an
+invisible half-edit into a visible number.
+
+That generalises past tonight. It is the same reason this session's 63/3/1
+per-application split was better evidence than the totals: a number you can
+compare against a prior number says things a number on its own cannot. Every
+wall in this document was a measurement that had no baseline to disagree with.
+
+**The visualdiff session's tree changes are uncommitted** — the 110-specifier
+pass, the exports repoint, the type-import pass, the 35 renames, the two
+detectors, the gateway-secret substitution and its handover. That session
+commits only when asked. Decide whether to commit them before anything else
+touches those files.
+
+## The composition lane, worked 2026-09-13
+
+Wall 8 turned out not to be a 266-line port, and neither did anything after it.
+Every remaining wall has been the same thing in a new costume: **b383462d96
+moved installation from hand-written per-process compositions to
+`withModules(serverModules)`, and the declarations those compositions used to
+bypass became load-bearing for the first time.** A hand composition called
+`definitions.postgres.create({ ... })` with arguments it built itself, so a
+tier's `requires` list was resolved against nothing and could say anything.
+`withModules` resolves it — against `ProcessMembers`, which has exactly fourteen
+keys — and every entry naming something else had been unsatisfiable all along.
+
+Fixed this session, in the order the boot found them:
+
+    517f15c0ad  model-provider claimed "credentials"          -> built from `encryption`
+    eed90917b9  trace claimed "defaultRetentionDays"          -> resolvePlatformDefaultRetentionDays
+                webhook claimed "ids"/"secrets"/"configuration" -> built in the tier
+    8acde0ff4b  no process passed `moduleConfig` at all       -> the api now maps 10 modules
+    e63a9f3a2b  analytics got a missing block, not an empty one
+
+**`"secrets"` deserves separate attention.** It IS a member name, so it
+resolved — and handed the webhook tier the process's `SecretResolver`
+(`read`/`find`) where an endpoint signing secret codec (`encrypt`/`decrypt`)
+was wanted. That would have passed boot and failed later as customer-visible
+signature-verification failures on deliveries. A name outside the system
+refuses loudly at boot; **a name inside it with the wrong type does not refuse
+at all.** Neither of this drive's detectors can see that, because both ask
+whether a name resolves rather than whether what it resolves to fits.
+
+`moduleConfig` is the same story one layer up: `createProcess` accepts it, boot
+hands each module `config[<name>]`, and **no process — api, worker or tasks —
+was passing it**, so every module declaring a `configSchema` got `undefined`.
+Which modules needed real values was measured, not guessed, by parsing `{}`
+against each installed schema: four refuse it (agent, analytics,
+data-retention, hosted-mcp) and the rest are wholly defaulted.
+
+### authz: the dispatcher, and the seam that already existed
+
+`AuthzApp` declared no `reads(...)`, so boot handed it `membersFor(members, [])`
+— an empty object — and `database` arrived `undefined`, surfacing five frames
+away as `Cannot read properties of undefined (reading 'auditLog')`. Nothing
+typed it, because the adapter reaches that repository through an
+`as unknown as` cast (`postgres-authz.build.ts:197`). **A cast is a third way
+for a wiring gap to survive typechecking**, alongside ERASED extends and
+unsatisfiable member claims.
+
+The harder half looked like a cycle: the adapter needs a dispatcher, the
+dispatcher needs senders, and senders only exist once the pipeline has been
+registered — which needs the definition the adapter produces. It is not a
+cycle, because **the runtime already has the two-step seam for exactly this**.
+`installModuleEventing` builds a module's definition, registers it, then calls
+the optional `connect({ app, commands })`. So `AuthzApp.create` builds the
+dispatcher and keeps it beside the pipeline it got back, `authzEventing.build`
+returns that same pipeline (never a second — a forked definition is two
+descriptions of one persisted event stream), and `connect` feeds the senders
+back through `app.connectCommands`.
+
+Same two steps, same order, as the composition deleted by b383462d96, whose own
+comment says why the order is load-bearing: "the ledger's write path opens here
+and nowhere else: until `connect` runs, a grant change waits for the senders
+and then refuses with a ledger-unavailable error rather than silently taking
+the imperative Prisma path."
+
+The design was never missing. It had moved into the runtime, and authz had not
+been reconnected to it — which is this whole lane in one sentence.
+
+`9ab4161571`. authz-server: 574 tests passing, typecheck 4 errors to 2, both
+pre-existing TS2883s.
+
+### Where it stops now: identity, and the shape repeats
+
+With authz composed, boot reaches the next module in install order and fails
+the same way:
+
+    TypeError: Cannot read properties of undefined (reading 'ttlMs')
+      at IdentityApp.create (modules/identity/server/src/app/identity.app.ts:51)
+
+`IdentityApp` reads `setup.members.latch` and `setup.members.ledger` and
+declares no `reads(...)`, so boot hands it `{}`. `IdentityInfrastructure` names
+five collaborators, none of them a platform member:
+
+    eventing   IdentityEventing — "a producer-only stand-in where the process
+               composed no queue"
+    operators  PlatformOperator, from ADMIN_EMAILS
+    mail       JoinRequestMail | null — null where the process composed no gateway
+    latch      { ttlMs, maxUsers, now } — "overridden only by tests", so the
+               default belongs in the module
+    ledger     IdentityLedger — "built by the process from its own Prisma
+               client and its own reservations row"
+
+Four of the five look constructible from the `prisma` and `eventing` members
+plus module defaults, which is the authz shape again. `operators` needs a
+config entry, so identity probably wants a `configSchema` and a line in
+`apiModuleConfig`.
+
+### What the rest of this lane looks like
+
+**Per-module App wiring**, not a single port: for each module that used to be
+hand-composed, its App must declare what it reads and build its own
+collaborators from members. authz was the expensive one because its dispatcher
+needed an eventing registration; identity is next. The boot names them one at a
+time, which has been a reliable and cheap loop all session.
+
+### How to run this loop
+
+`-no-haven` boots the branch IN PLACE, so working-tree edits take effect with
+no rebuild. Keep a work root alive and reuse it:
+
+    .bin/apidiff/apidiff run -no-haven -main-ref origin/main -json \
+      -work-root <existing> -reuse-worktrees -report <file>
+
+That skips both installs and reaches boot in about two minutes instead of ten.
+The branch instance's log is `<work-root>/logs/branch.log`; the failure is the
+last `"level":"error"` line, and `apps/api` now reports it rather than exiting
+silently.
+
+**The reuse only survives a run that ended on its own.** Killing one mid-flight
+leaves its main worktree half torn down, and the next run refuses it with
+`unrecognized layout (no apps/api @langwatch/platform-api, no platform/app
+@langwatch/web)` rather than reinstalling. Delete the work root and run fresh.
+Reading the branch log while the run is still inside its five-minute health
+wait is also ambiguous when the work root is reused, because the previous run's
+lines are still in the same file — compare timestamps, not just the last error.
+
+## What is still open
+
+1. **apidiff has still never produced a report**, and now stops at wall 8
+   above — the model-provider `credentials` member. Everything before it is
+   cleared: install, migrate, seed, scim provisioning, fixtures, and the api's
+   config, secrets and module composition. The command is unchanged:
+
+       .bin/apidiff/apidiff run -no-haven -main-ref origin/main -json \
+         -report dev/docs/plans/apidiff-report-2026-09-12.json
+
+   Exit 1 with findings is success. Exit 2 is another wall.
+2. **The 70 unserved documented operations** are untouched; see
+   `unserved-documented-operations-2026-09-12.md`. When a report exists, split
+   them three ways — documented-and-answering (the list is stale),
+   documented-and-declared-but-not-answering (an orphaned mount, the cheap
+   fix), documented-and-not-declared (genuinely dropped). Note apidiff excludes
+   `/api/gateway` by default, so those 8 cannot appear.
+3. **The worker cannot boot** — UNEXTENDED at link time, then probably 56
+   ERASED behind it, then probably the audit-log provider. A lane, in that
+   forced order.
+4. **`pnpm typecheck` checking nothing** wants fixing before anything else is
+   measured by it.
+5. **Gateway secrets in the developer `.env`** are 12-character placeholders.
+   The api's refusal is correct. apidiff injects its own; haven cannot, so a
+   real local stack needs the user to generate them
+   (`openssl rand -hex 32`). Not done here: rotating `LW_VIRTUAL_KEY_PEPPER`
+   invalidates existing local virtual keys, which is the user's call.
+6. **Enterprise tier still broken at dependency resolution** (open decision 1
+   from the previous handover, unchanged): `LANGWATCH_BUILD_TIER=enterprise`
+   dies on `Cannot find package '@langwatch/enterprise-licensing-server'`.

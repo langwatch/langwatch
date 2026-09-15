@@ -68,11 +68,7 @@ export const renderTargetOutput = (result: unknown): string => {
   if (typeof result === "string") {
     return result;
   }
-  if (
-    typeof result === "number" ||
-    typeof result === "boolean" ||
-    typeof result === "bigint"
-  ) {
+  if (typeof result === "number" || typeof result === "boolean" || typeof result === "bigint") {
     return String(result);
   }
   if (typeof result === "object" && !Array.isArray(result)) {
@@ -105,7 +101,7 @@ export const buildComparisonSettings = (
     | "swapAndReconcile"
     | "includeMetrics"
     | "temperature"
-  >
+  >,
 ): Record<string, unknown> => {
   const settings: Record<string, unknown> = {};
 
@@ -138,22 +134,20 @@ export const buildComparisonSettings = (
  */
 export const buildComparisonCandidates = (
   names: string[],
-  captured: Map<string, CapturedTargetOutput>
+  captured: Map<string, CapturedTargetOutput>,
 ): ComparisonCandidatePayload[] =>
   names.map((name) => {
     const output = captured.get(name);
     if (!output) {
       throw new ComparisonError(
         `Cannot compare: '${name}' was selected as a candidate but recorded no output.`,
-        [name]
+        [name],
       );
     }
     return {
       id: name,
       output: output.output,
-      ...(output.durationMs !== undefined
-        ? { duration: output.durationMs / 1000 }
-        : {}),
+      ...(output.durationMs !== undefined ? { duration: output.durationMs / 1000 } : {}),
     };
   });
 
@@ -225,9 +219,7 @@ export const toComparisonVerdict = ({
  * caller is handed are then two readings of one decision rather than two
  * decisions that can drift apart.
  */
-export const comparisonEntryStatus = (
-  status: ComparisonStatus
-): EvaluationStatus => {
+export const comparisonEntryStatus = (status: ComparisonStatus): EvaluationStatus => {
   switch (status) {
     case "decided":
     case "tie":

@@ -145,8 +145,6 @@ type NodeDataset struct {
 // EntrySelection is `Optional[str] | int` on the Python side. We carry
 // the raw value and expose typed accessors so callers don't have to
 // switch on `any`.
-//
-//nolint:recvcheck // UnmarshalJSON requires pointer receiver; read-only helpers (MarshalJSON, AsInt, AsString, IsSet) stay value-receiver so callers can use the type by value.
 type EntrySelection struct {
 	raw json.RawMessage
 }
@@ -269,8 +267,8 @@ type Component struct {
 	// Evaluator-specific
 	Evaluator *string `json:"evaluator,omitempty"`
 
-	// Signature/Prompt-specific — forwarded from the TS signatureComponentSchema
-	// (platform/app/src/optimization_studio/types/dsl.ts:414) so the engine can
+	// Signature/Prompt-specific — forwarded from the Workflow contract's
+	// signature component schema so the engine can
 	// stamp the PromptApiService.get + Prompt.compile span identity attrs.
 	// PromptDraft is true when the executed config diverges from the saved
 	// version (user edited inline without persisting); base configId / handle /
@@ -282,8 +280,8 @@ type Component struct {
 	PromptDraft     *bool                  `json:"promptDraft,omitempty"`
 }
 
-// PromptVersionMetadata mirrors signatureComponentSchema.versionMetadata
-// (platform/app/src/optimization_studio/types/dsl.ts:417-422). Kept as a
+// PromptVersionMetadata mirrors the Workflow contract's signature
+// versionMetadata. Kept as a
 // nested struct rather than three flat fields so the JSON round-trip
 // matches the TS wire format byte-for-byte.
 type PromptVersionMetadata struct {

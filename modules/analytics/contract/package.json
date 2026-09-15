@@ -1,0 +1,52 @@
+{
+  "name": "@langwatch/analytics-contract",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Portable Analytics timeseries contracts and Zod 4 schemas.",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    },
+    "./visualization": {
+      "types": "./dist/visualization/index.d.ts",
+      "default": "./src/visualization/index.ts"
+    },
+    "./visualization/validation": {
+      "types": "./dist/visualization/validation.d.ts",
+      "default": "./src/visualization/validation.ts"
+    },
+    "./testing": {
+      "types": "./dist/visualization/__tests__/fixtures/index.d.ts",
+      "default": "./src/visualization/__tests__/fixtures/index.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc --project tsconfig.build.json",
+    "generate:vega-validator": "node --experimental-transform-types scripts/generate-vega-lite-validator.ts",
+    "typecheck": "pnpm -w typecheck:declarations --project . && tsc --noEmit -p . && tsc --noEmit -p tsconfig.test.json",
+    "test": "vitest run",
+    "test:unit": "vitest run"
+  },
+  "dependencies": {
+    "@langwatch/api": "workspace:*",
+    "@langwatch/runtime-composition": "workspace:*",
+    "@langwatch/config": "workspace:*",
+    "@langwatch/handled-error": "workspace:*",
+    "ajv": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vega": "catalog:",
+    "vega-lite": "catalog:",
+    "vitest": "catalog:"
+  }
+}

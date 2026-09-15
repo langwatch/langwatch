@@ -6,10 +6,10 @@ license: MIT
 compatibility: Requires the `langwatch` CLI with a valid `LANGWATCH_API_KEY`. Works with Claude Code and similar coding agents.
 ---
 
-import CliSetup from '../_shared/cli-setup.mdx'
-import ProjectsAndApiKeys from '../_shared/projects-and-api-keys.mdx'
-import PlanLimits from '../_shared/plan-limits.mdx'
-import ImprovingTheAgent from '../_shared/improving-the-agent.mdx'
+import CliSetup from "../_shared/cli-setup.mdx";
+import ProjectsAndApiKeys from "../_shared/projects-and-api-keys.mdx";
+import PlanLimits from "../_shared/plan-limits.mdx";
+import ImprovingTheAgent from "../_shared/improving-the-agent.mdx";
 
 # Improve Your Agent, Hypothesis by Hypothesis
 
@@ -61,11 +61,13 @@ The only exception is an environment where asking is truly impossible (for examp
 Each hypothesis becomes real artifacts. Pick the right tool per case:
 
 ### Reproduce failures as scenario tests
+
 Turn real failing traces into scenario tests that fail today and pass once fixed. Fetch the exact inputs with `langwatch trace get <traceId> -f json`, then follow the `scenarios` skill (`langwatch scenario-docs getting-started`) to write them. Real production inputs beat invented ones.
 
 Sanitize before you commit: production traces can carry names, emails, account data, or secrets. Reproduce the STRUCTURE of the failing input (length, language, format, the property that triggers the failure) with the sensitive values replaced by realistic stand-ins, and reference the original as a trace link in the test's comment instead of pasting it. Never commit raw customer content into tests, fixtures, or PR descriptions.
 
 ### Change prompts and code as a reviewable PR
+
 Make the fix on a branch: prompt edits (versioned through the `prompts` skill when prompts are managed in LangWatch), retrieval or tool-code changes, guardrails. The PR description must tell the whole story: observation, hypothesis, evidence links, what changed, and which scenario test proves it. The user reviews and merges; you never push to main.
 
 Pick the layer before you edit, and report the prompt's size change in the PR:
@@ -73,6 +75,7 @@ Pick the layer before you edit, and report the prompt's size change in the PR:
 <ImprovingTheAgent />
 
 ### Capture production signals with evaluators and monitors
+
 When a hypothesis needs more production data, or a fixed issue must stay fixed, add detection:
 
 ```bash
@@ -83,6 +86,7 @@ langwatch monitor create ...                  # Watch the signal on live traffic
 Examples: an LLM-judge evaluator flagging stale-data answers, a monitor on refusal rate, a check for the specific failure mode you just fixed. These turn one-off findings into permanent signals for the next exploration.
 
 ### Settle open questions with experiments
+
 When two approaches compete (two prompts, two models, two retrieval settings), run an experiment instead of arguing: build a dataset from real traces (`datasets` skill), then run it once per variant with `langwatch experiment run <slug> --param model=<variant>` and compare. A `--param name=value` pair is a constant value merged into every dataset row, so each run pins one variant against the same dataset.
 
 <PlanLimits />

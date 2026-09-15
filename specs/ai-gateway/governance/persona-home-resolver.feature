@@ -16,7 +16,7 @@ Feature: Persona-aware home resolver
   Plus an override: `User.lastHomePath` (when explicitly set by user pinning).
 
   Spec scope: the resolver function contract and its 4 personas. Implementation
-  in `platform/app/src/server/governance/personaResolver.service.ts`. UI plumbing
+  in `enterprise/modules/governance/contract/src/persona-home.ts`. UI plumbing
   in `pages/index.tsx` via the existing client-side hook + redirect pattern
   (the Vite SPA architecture rarely uses `getServerSideProps`; the tRPC
   procedure `api.governance.resolveHome` runs the resolver server-side).
@@ -173,6 +173,12 @@ Feature: Persona-aware home resolver
     When the user navigates to "/"
     Then the existing signin redirect chain runs
     And the resolver does not execute
+
+  @unit
+  Scenario: The resolution carries the same project slug it routed with
+    Given the resolver is called with a caller-supplied firstProjectSlug
+    When it resolves a destination for any persona
+    Then the result echoes back the same firstProjectSlug the caller supplied
 
   # Client-side "/" landing is covered by specs/navigation/navigation-v2-landing.feature.
   # The device's per-organization product memory decides ahead of the server

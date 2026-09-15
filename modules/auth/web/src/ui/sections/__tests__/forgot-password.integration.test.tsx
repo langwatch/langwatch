@@ -1,0 +1,190 @@
+/**
+ * @vitest-environment jsdom
+ *
+ * Integration tests for the /auth/forgot-password page. The full component
+ * tree renders under Chakra; only the BetterAuth client (network boundary) and
+ * the public-env hook are mocked.
+ */
+import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import type { ReactNode } from "react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+const { mockRequestPasswordReset, publicEnvRef } = vi.hoisted(() => ({
+  mockRequestPasswordReset: vi.fn(),
+  publicEnvRef: {
+    // `IS_SAAS` is stated everywhere rather than left off, because it is the
+    // thing this screen now turns on: reset follows the IDENTIFIER, not the
+    // deployment, so the refusal is the HOSTED rule and a self-hosted install
+    // keeps the door open however it federates. A case that does not say
+    // which kind of deployment it is would be leaving out its own premise.
+    current: {
+      NEXTAUTH_PROVIDER: "email" as string | undefined,
+      HAS_EMAIL_PROVIDER_KEY: true,
+      IS_SAAS: false,
+    },
+  },
+}));
+
+vi.mock("../../../behavior/auth-client.tsx", () => ({
+  authClient: { requestPasswordReset: mockRequestPasswordReset },
+}));
+
+vi.mock("../../../behavior/use-public-env.ts", () => ({
+  usePublicEnv: () => ({ data: publicEnvRef.current }),
+}));
+
+vi.mock("../../../ui/elements/router-link.tsx", () => ({
+  default: ({ href, children, ...props }: { href: string; children: ReactNode }) => (
+    <a href={href} {...props}>
+      {children}
+    </a>
+  ),
+}));
+
+import ForgotPassword from "../forgot-password-screen.tsx";
+
+const renderPage = () =>
+  render(
+    <ChakraProvider value={defaultSystem}>
+      <ForgotPassword />
+    </ChakraProvider>,
+  );
+
+const submitEmail = (email: string) => {
+  fireEvent.change(screen.getByRole("textbox"), { target: { value: email } });
+  fireEvent.click(screen.getByRole("button", { name: /send reset link/i }));
+};
+
+describe("ForgotPassword page", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockRequestPasswordReset.mockResolvedValue({ data: {}, error: null });
+    publicEnvRef.current = {
+      NEXTAUTH_PROVIDER: "email",
+      HAS_EMAIL_PROVIDER_KEY: true,
+      IS_SAAS: false,
+    };
+  });
+
+  afterEach(() => {
+    cleanup();
+  });
+
+  describe("when the user submits their email in credential mode", () => {
+    /** @scenario Requesting a reset submits the entered email to the reset endpoint */
+    it("calls requestPasswordReset with the entered email", async () => {
+      renderPage();
+      submitEmail("forgot@acme.test");
+
+      await waitFor(() => {
+        expect(mockRequestPasswordReset).toHaveBeenCalledWith({
+          email: "forgot@acme.test",
+          redirectTo: "/auth/reset-password",
+        });
+      });
+    });
+
+    /** @scenario Requesting a reset always shows a neutral confirmation */
+    it("shows an enumeration-safe confirmation that does not reveal registration", async () => {
+      renderPage();
+      submitEmail("forgot@acme.test");
+
+      const confirmation = await screen.findByText(/if an account exists for/i);
+      expect(confirmation).toBeTruthy();
+      expect(confirmation.textContent).toContain("forgot@acme.test");
+      // No wording that distinguishes a registered from an unregistered email.
+      expect(screen.queryByText(/no account/i)).toBeNull();
+      expect(screen.queryByText(/not found/i)).toBeNull();
+    });
+  });
+
+  describe("when the reset screens are looked at beside the log-in screen", () => {
+    /** @scenario The reset screens are the same card as every other auth screens screen */
+    it("renders the one auth-screen card, with its fields and its primary action", () => {
+      const { container } = renderPage();
+
+      // The same card component every unauthenticated screen is, marked so
+      // the entrance can address it — not a settings panel that happens to
+      // hold a form.
+      expect(container.querySelector("[data-auth-card]")).toBeTruthy();
+      expect(container.querySelector("[data-auth-card-logo]")).toBeTruthy();
+      expect(container.querySelector(".lw-front-door-card")).toBeTruthy();
+      expect(container.querySelector("button.lw-front-door-primary")).toBeTruthy();
+      // The board's field, not the app's: a small mono label, no helper line
+      // restating it in different words.
+      const label = screen.getByText("Email");
+      expect(label.tagName.toLowerCase()).toBe("label");
+      expect(screen.getByRole("textbox").getAttribute("id")).toBe(label.getAttribute("for"));
+    });
+
+    /** @scenario The reset screens morph rather than replacing themselves */
+    it("becomes the same check-your-email the other doors show, in the same card", async () => {
+      const { container } = renderPage();
+      submitEmail("forgot@acme.test");
+
+      await screen.findByText(/if an account exists for/i);
+      // Still the one card: the content changed, the surface did not.
+      expect(container.querySelector("[data-auth-card]")).toBeTruthy();
+      expect(screen.getByRole("heading", { name: /check your email/i })).toBeTruthy();
+      // And it is not a dead end — the commonest reason to be staring at this
+      // card puzzled is that the address on it is wrong.
+      expect(screen.getByTestId("check-email-back")).toBeTruthy();
+    });
+  });
+
+  describe("when the deployment has no outbound email configured", () => {
+    beforeEach(() => {
+      publicEnvRef.current = {
+        NEXTAUTH_PROVIDER: "email",
+        HAS_EMAIL_PROVIDER_KEY: false,
+        IS_SAAS: false,
+      };
+    });
+
+    /** @scenario Password reset does not promise an email nobody can send */
+    it("says so instead of offering a form that would promise a link", () => {
+      renderPage();
+
+      expect(screen.getByText(/cannot send email/i)).toBeTruthy();
+      expect(screen.queryByRole("textbox")).toBeNull();
+      expect(screen.queryByRole("button", { name: /send reset link/i })).toBeNull();
+    });
+
+    it("points at the operator rather than leaving the user with nothing", () => {
+      renderPage();
+
+      expect(screen.getByText(/whoever operates it/i)).toBeTruthy();
+    });
+  });
+
+  describe("when the reset endpoint fails", () => {
+    /** @scenario A failure to dispatch the request still shows the neutral confirmation */
+    it("still shows the same neutral confirmation and no enumeration-leaking error", async () => {
+      mockRequestPasswordReset.mockRejectedValueOnce(new Error("network down"));
+      renderPage();
+      submitEmail("forgot@acme.test");
+
+      const confirmation = await screen.findByText(/if an account exists for/i);
+      expect(confirmation).toBeTruthy();
+      expect(screen.queryByText(/error/i)).toBeNull();
+    });
+  });
+
+  describe("when a hosted organization signs in through an identity provider", () => {
+    // Reset follows the IDENTIFIER, not the deployment: a self-hosted install
+    // keeps this door open however it federates, so the refusal is the hosted
+    // rule and names itself as one.
+    it("explains the password is managed by the provider instead of a form", () => {
+      publicEnvRef.current = {
+        NEXTAUTH_PROVIDER: "auth0",
+        IS_SAAS: true,
+        HAS_EMAIL_PROVIDER_KEY: true,
+      };
+      renderPage();
+
+      expect(screen.getByText(/managed by your identity provider/i)).toBeTruthy();
+      expect(screen.queryByRole("button", { name: /send reset link/i })).toBeNull();
+    });
+  });
+});

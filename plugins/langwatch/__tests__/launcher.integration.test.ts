@@ -206,8 +206,7 @@ const gitPath = execFileSync("sh", ["-c", "command -v git"], { encoding: "utf8" 
  * when the hook has already exited. Give it a moment before concluding nothing
  * was sent, otherwise the silent cases would pass for the wrong reason.
  */
-const settle = (): Promise<void> =>
-  new Promise((resolve) => setTimeout(resolve, 250));
+const settle = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 250));
 
 const sessionStart = (cwd: string) => ({
   session_id: "session-abc",
@@ -406,9 +405,7 @@ describe("the launcher running the session guidance hook", () => {
         hookSpecificOutput: { hookEventName: string; additionalContext: string };
       };
       expect(parsed.hookSpecificOutput.hookEventName).toBe("SessionStart");
-      expect(parsed.hookSpecificOutput.additionalContext).toContain(
-        "langwatch ingest context",
-      );
+      expect(parsed.hookSpecificOutput.additionalContext).toContain("langwatch ingest context");
     });
   });
 

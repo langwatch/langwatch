@@ -49,13 +49,13 @@ If you are not on an experiment (no slug in context), see "No experiment yet" be
 
 Take the evaluator type slug from `langwatch evaluator types --format json`, never from memory.
 
-| Signal in the data | Evaluator | Wire |
-|---|---|---|
-| Expected output is a short label, one of few distinct values | `langevals/exact_match` | `output` from the target, `expected_output` from the golden column |
-| Expected output is free text (question answering, drafting) | `langevals/llm_answer_match` | `input`, `output`, `expected_output` |
-| A contexts column exists (RAG) | `ragas/faithfulness` | wire `contexts`; consider expected contexts too |
-| The user names a quality dimension ("more polite", "shorter") with no golden answer | `langevals/llm_boolean` or `langevals/llm_score` | write a judge prompt that names exactly that dimension |
-| No golden answer at all | `langevals/select_best_compare` | comparison between the baseline and your candidate columns |
+| Signal in the data                                                                  | Evaluator                                        | Wire                                                               |
+| ----------------------------------------------------------------------------------- | ------------------------------------------------ | ------------------------------------------------------------------ |
+| Expected output is a short label, one of few distinct values                        | `langevals/exact_match`                          | `output` from the target, `expected_output` from the golden column |
+| Expected output is free text (question answering, drafting)                         | `langevals/llm_answer_match`                     | `input`, `output`, `expected_output`                               |
+| A contexts column exists (RAG)                                                      | `ragas/faithfulness`                             | wire `contexts`; consider expected contexts too                    |
+| The user names a quality dimension ("more polite", "shorter") with no golden answer | `langevals/llm_boolean` or `langevals/llm_score` | write a judge prompt that names exactly that dimension             |
+| No golden answer at all                                                             | `langevals/select_best_compare`                  | comparison between the baseline and your candidate columns         |
 
 **Attach it, never build a comparison column for it.** `workbench.addEvaluator` with no `comparison` field adds the evaluator as a score on every target column, so it grades the baseline now and the duplicate later with nothing to wire twice. A `comparison` field instead makes the evaluator a column of its own that judges the other columns against each other, and only the Comparison judge (`langevals/select_best_compare`) may be one. Any other type carrying a `comparison` is refused. The last row of the table is the only case that needs such a column.
 
@@ -72,9 +72,13 @@ Every write here is confirmed by its answer, not by the command exiting. The `re
 **Say what you are about to do, in one line, before each numbered step below.** The user is watching a page, not a log. Between two of your commands they see a status line and nothing else, and a step that takes two minutes without a word reads as a stall. One short sentence each time is enough: what you are doing and why this attempt. Write it before the command, not after: a line that arrives with the result explains a wait that is already over.
 
 1. **Score the baseline first.** Read the results the state already holds for the baseline column, or run that column on a 10 row subset to get them, with step 6's command and the baseline's `targetId`. The score counts only when the rows carry processed results. A cell reading "Waiting on", or one whose error names unresolved inputs (`evaluator_no_inputs_resolved`), is a mapping problem rather than a prompt problem: fix the mappings and run again before anything else. Read the error code and details first, because a row can also fail on the provider or at run time, and neither is fixed by remapping. A pass rate that lands before the mappings are set is empty judged against empty, and it reads as 100%. One exception: `langevals/select_best_compare` scores one column against another, so it has nothing to read until a candidate exists. With that evaluator, do step 3 first and let the first comparison run score the baseline and the candidate together.
+
 2. **Read the failures, not the score.** `langwatch experiment results <slug> --filter failed --format json` for row level detail. Read the actual outputs against the expected ones.
+
 3. **Duplicate the baseline,** now that it has a score you trust. `langwatch ui call workbench.duplicateTarget --payload '{"targetId":"<id>"}' --experiment <slug>`. The copy inherits the attached evaluator and the baseline's mappings, repointed at itself, so it is scored from its first run. Its id comes from the answer. Refer to it as the candidate.
+
 4. **State a hypothesis in one sentence:** the failure pattern and the edit that should fix it. If you cannot name a pattern, you have not read enough rows.
+
 5. **Edit the candidate's draft only.** The draft executes without touching the prompt library. Send the payload through a file, never inline: a prompt is prose, one apostrophe in it ends the shell's quoting, and the rest of your prompt then arrives as separate arguments and the edit is lost.
 
    ```bash
@@ -85,7 +89,9 @@ Every write here is confirmed by its answer, not by the command exiting. The `re
    ```
 
    `--payload-file -` reads stdin instead. Keep `--payload` for short payloads that are ids and numbers only.
+
 6. **Run scoped.** `langwatch ui call workbench.run --payload '{"targetIds":["<candidate>"]}' --experiment <slug>`, adding `"rowIndices"` for a subset. The candidate target only, on the failing rows or the first 10; move to the full dataset once the subset improves. Use this command, never `langwatch experiment run`: on the open page this one fills the cells one at a time in front of the user, and it falls back to the same server-side run on its own when no page answers.
+
 7. **Compare aggregates. Read them, never work them out yourself.** `langwatch workbench get-state <slug>` answers a block per column that already holds `overallPassRate`, each evaluator's `passRate`, `completedRows`, `totalRows`, `averageCost` and `averageLatency`, over the same denominator the page shows the user. Take the figures from there.
 
    Do not divide rows you fetched. `langwatch experiment results` answers one run, and without `--run-id` that is whichever run is newest at the moment you call, so a baseline you read before a run and a candidate you read after come from two different runs. Its `meta` says which run answered and how many rows matched: read both before you quote anything from it.
@@ -93,6 +99,7 @@ Every write here is confirmed by its answer, not by the command exiting. The `re
    **Quote the denominator next to the figure,** as "30 of 40 rows". A rate over a `completedRows` short of `totalRows` describes part of the dataset. Equal counts are not enough on their own: two columns can each answer 30 rows and answer different ones, because a scoped run picks its rows by `rowIndices`. Before you compare pass rate, cost or latency, run both columns over the whole dataset, or over one explicit `rowIndices` set you give them both. Otherwise the comparison is between two different dataset slices and says nothing.
 
    Cost and latency are part of the answer, not a footnote.
+
 8. **Go again.** Unless a stop condition holds, form the next hypothesis from the rows that still fail and repeat from step 4. Do not ask permission to continue and do not offer to continue: continuing is the job. When prompt edits stop paying, spend one attempt on a duplicate running a different model (`workbench.updateTargetModel`) as a cost and quality trade, and compare it like any other attempt.
 
 Keep every attempt as its own candidate column so the user can see the whole ladder, and carry the best one forward as the column to beat.

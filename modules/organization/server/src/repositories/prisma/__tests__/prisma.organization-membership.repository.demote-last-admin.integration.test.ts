@@ -1,0 +1,92 @@
+/**
+ * Repository invariant: demoting the last ADMIN is refused before plan checks.
+ * @vitest-environment node
+ * @see specs/licensing/seat-reconciliation.feature
+ */
+import { nanoid } from "nanoid";
+import { afterAll, describe, expect, it } from "vitest";
+import {
+  PrismaConfigService,
+  PrismaConnectionService,
+  PrismaTenancyGuardService,
+} from "@langwatch/prisma-client";
+import { OrganizationUserRole, type PrismaClient } from "@langwatch/prisma-client/generated";
+import { cleanupTestRows } from "@langwatch/test-harness";
+import type { AuthzGrantsService } from "@langwatch/authz-contract";
+import { PrismaOrganizationMembershipRepository } from "../prisma.organization-membership.repository.ts";
+
+const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL;
+
+const noopGrantsWriter = {
+  attachBindings: async () => ({ attached: [], duplicates: [] }),
+  revokeBindingsWhere: async () => 0,
+} as unknown as AuthzGrantsService;
+
+describe.skipIf(!DB_URL)(
+  "PrismaOrganizationMembershipRepository.updateMemberRole — last admin guard",
+  () => {
+    const testNamespace = `demote-last-admin-${nanoid(8)}`;
+
+    const connection = PrismaConnectionService.create({
+      guard: PrismaTenancyGuardService.create(),
+    }).connect(PrismaConfigService.create().resolve({ databaseUrl: DB_URL ?? "", log: ["error"] }));
+    const prisma = connection.client as PrismaClient;
+    const repository = PrismaOrganizationMembershipRepository.create({
+      database: prisma,
+      grants: noopGrantsWriter,
+    });
+
+    let organizationId: string;
+    let adminUserId: string;
+
+    afterAll(async () => {
+      if (!prisma) return;
+      await cleanupTestRows(prisma, [
+        ["organizationUser", { organizationId }],
+        ["organization", { id: organizationId }],
+        ["user", { id: adminUserId }],
+      ]);
+      await prisma.$disconnect();
+    });
+
+    describe("given the organization's only ADMIN", () => {
+      /** @scenario Demoting the last admin is refused */
+      it("refuses, so someone can always still sign in and fix it", async () => {
+        const organization = await prisma!.organization.create({
+          data: { name: "Last Admin Org", slug: `--test-org-${testNamespace}` },
+        });
+        organizationId = organization.id;
+
+        const admin = await prisma!.user.create({
+          data: { name: "Admin User", email: `admin-${testNamespace}@example.com` },
+        });
+        adminUserId = admin.id;
+
+        await prisma!.organizationUser.create({
+          data: {
+            userId: adminUserId,
+            organizationId,
+            role: OrganizationUserRole.ADMIN,
+          },
+        });
+
+        await expect(
+          repository.updateMemberRole({
+            organizationId,
+            userId: adminUserId,
+            role: OrganizationUserRole.MEMBER,
+            effectiveTeamRoleUpdates: [],
+            currentUserId: adminUserId,
+          }),
+        ).rejects.toMatchObject({ code: "cannot_demote_last_admin" });
+
+        // And the admin seat is genuinely untouched.
+        const reread = await prisma!.organizationUser.findUnique({
+          where: { userId_organizationId: { userId: adminUserId, organizationId } },
+          select: { role: true },
+        });
+        expect(reread?.role).toBe(OrganizationUserRole.ADMIN);
+      });
+    });
+  },
+);

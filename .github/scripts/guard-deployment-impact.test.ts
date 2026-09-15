@@ -104,10 +104,7 @@ describe("given a path with unusual but legal whitespace", () => {
       // "Chart.lock " is a different file from "Chart.lock". Trimming the two
       // together would exempt a PR that changed an unrecognised file.
       assert.equal(kindOf("charts/gateway/Chart.lock "), "other");
-      assert.equal(
-        requiresWriteup({ files: ["charts/gateway/Chart.lock "], author: BOT }),
-        true,
-      );
+      assert.equal(requiresWriteup({ files: ["charts/gateway/Chart.lock "], author: BOT }), true);
     });
   });
 
@@ -116,10 +113,7 @@ describe("given a path with unusual but legal whitespace", () => {
       // Line-delimited transport would split this into "evil" and
       // "uv.lock"; the second half alone would look exempt.
       assert.equal(kindOf("services/evil\nuv.lock"), "other");
-      assert.equal(
-        requiresWriteup({ files: ["services/evil\nuv.lock"], author: BOT }),
-        true,
-      );
+      assert.equal(requiresWriteup({ files: ["services/evil\nuv.lock"], author: BOT }), true);
     });
   });
 });

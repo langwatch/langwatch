@@ -154,21 +154,14 @@ describe("createCodexIOStreamer", () => {
 
       try {
         await streamer.harvest(1);
-        await appendFile(
-          rolloutFile(),
-          `\n${completedTurn("t-two", "t2", "again", "ok")}`,
-        );
+        await appendFile(rolloutFile(), `\n${completedTurn("t-two", "t2", "again", "ok")}`);
         await streamer.harvest(2);
 
         // The streamer re-offers every in-window session on every tick. The
         // stored fingerprint is what keeps that from re-posting a context
         // that has not changed.
-        expect(
-          urls.filter((u) => u === "http://collector.test/v1/logs"),
-        ).toHaveLength(1);
-        expect(
-          urls.filter((u) => u === "http://collector.test/v1/traces"),
-        ).toHaveLength(2);
+        expect(urls.filter((u) => u === "http://collector.test/v1/logs")).toHaveLength(1);
+        expect(urls.filter((u) => u === "http://collector.test/v1/traces")).toHaveLength(2);
       } finally {
         await rm(stateDir, { recursive: true, force: true });
       }

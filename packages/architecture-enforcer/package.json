@@ -1,0 +1,47 @@
+{
+  "name": "@langwatch/architecture-enforcer",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Executable package-boundary policies for the LangWatch monorepo.",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "lint": "node ../../dev/scripts/check-queue.mjs node --disable-warning=ExperimentalWarning --experimental-transform-types src/cli.ts --root ../.. --no-declarations --no-legacy-application-migration",
+    "lint:declarations": "node ../../dev/scripts/check-queue.mjs node --disable-warning=ExperimentalWarning --experimental-transform-types src/cli.ts --root ../.. --no-legacy-application-migration",
+    "lint:migration": "node ../../dev/scripts/check-queue.mjs node --disable-warning=ExperimentalWarning --experimental-transform-types src/cli.ts --root ../.. --no-declarations",
+    "review:comment-blocks": "node ../../dev/scripts/check-queue.mjs node --disable-warning=ExperimentalWarning --experimental-transform-types src/cli.ts --root ../.. --no-declarations --no-legacy-application-migration --review-comment-blocks --all-comment-blocks",
+    "review:test-quality": "node ../../dev/scripts/check-queue.mjs node --disable-warning=ExperimentalWarning --experimental-transform-types src/cli.ts --root ../.. --review-test-quality",
+    "rename-package": "node --experimental-transform-types src/tools/rename-workspace-package.cli.ts",
+    "rename-feature-sources": "node --experimental-transform-types src/tools/rename-feature-sources.cli.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:unit": "vitest run",
+    "colocate-tests": "node --experimental-transform-types src/tools/colocate-tests.cli.ts",
+    "check:ts-budget": "node --experimental-transform-types src/tools/declaration-budget.cli.ts --root ../..",
+    "check:feature-parity": "node --experimental-transform-types src/tools/check-feature-parity.ts",
+    "docs": "node src/lint-rules-doc.mjs"
+  },
+  "dependencies": {
+    "@langwatch/oxlint-rules": "workspace:*",
+    "@langwatch/time": "workspace:*",
+    "typescript": "catalog:sdk-toolchain",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@types/js-yaml": "catalog:",
+    "@types/node": "catalog:",
+    "js-yaml": "catalog:",
+    "oxlint": "catalog:",
+    "vitest": "catalog:"
+  }
+}

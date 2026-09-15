@@ -1,10 +1,5 @@
 /**
- * The permission selector: what the box says, and what each key answers.
- *
- * The box is rendered through a fake writer and driven through a fake
- * keypress source, so the test reads the words and the answer rather than the
- * escape sequences.
- *
+ * Permission selector box rendering and key handling.
  * @see specs/typescript-sdk/cli-langy-share-control.feature
  */
 

@@ -3,15 +3,7 @@
  * authentication, authorization, network failures, rate limiting,
  * and plan-limit responses.
  */
-import {
-  describe,
-  expect,
-  it,
-  beforeAll,
-  afterAll,
-  beforeEach,
-  afterEach,
-} from "vitest";
+import { describe, expect, it, beforeAll, afterAll, beforeEach, afterEach } from "vitest";
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
@@ -46,9 +38,7 @@ function matchKey(method: string, urlPath: string): string | undefined {
         (keyPath ?? "")
           .split("/")
           .map((segment) =>
-            segment.startsWith(":")
-              ? "[^/]+"
-              : segment.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
+            segment.startsWith(":") ? "[^/]+" : segment.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
           )
           .join("/") +
         "$",
@@ -150,7 +140,7 @@ describe("CLI error edge cases", () => {
   describe("when the API returns 401 unauthorized", () => {
     /** @scenario Invalid API key returns a clear authentication error, not a generic one */
     it("tells the user the API key is invalid", async () => {
-      pushResponse("GET", "/api/prompts", {
+      pushResponse("GET", "/api/v1/prompts", {
         status: 401,
         body: { error: "Unauthorized", message: "Invalid API key" },
       });
@@ -158,15 +148,13 @@ describe("CLI error edge cases", () => {
       const result = await runCli(["prompt", "list"], testDir);
 
       expect(result.exitCode).toBe(1);
-      expect(result.combined.toLowerCase()).toMatch(
-        /api key|unauthorized|invalid/,
-      );
+      expect(result.combined.toLowerCase()).toMatch(/api key|unauthorized|invalid/);
     });
   });
 
   describe("when the API returns 403 plan limit reached", () => {
     it("surfaces the plan-limit message to the user", async () => {
-      pushResponse("POST", "/api/dataset", {
+      pushResponse("POST", "/api/v1/dataset", {
         status: 403,
         body: {
           error: "PlanLimitReached",
@@ -174,15 +162,10 @@ describe("CLI error edge cases", () => {
         },
       });
 
-      const result = await runCli(
-        ["dataset", "create", "my-dataset"],
-        testDir,
-      );
+      const result = await runCli(["dataset", "create", "my-dataset"], testDir);
 
       expect(result.exitCode).toBe(1);
-      expect(result.combined.toLowerCase()).toMatch(
-        /limit|plan|upgrade|free plan/,
-      );
+      expect(result.combined.toLowerCase()).toMatch(/limit|plan|upgrade|free plan/);
     });
   });
 
@@ -202,7 +185,7 @@ describe("CLI error edge cases", () => {
 
   describe("when the API returns 429 rate limit", () => {
     it("shows the rate-limit message with the retry hint if provided", async () => {
-      pushResponse("GET", "/api/prompts", {
+      pushResponse("GET", "/api/v1/prompts", {
         status: 429,
         body: {
           error: "RateLimited",
@@ -231,9 +214,7 @@ describe("CLI error edge cases", () => {
         const result = await runCli(["prompt", "list"], testDir);
         expect(result.exitCode).toBe(1);
         // We accept either the message or just the 502 status as a signal.
-        expect(result.combined.toLowerCase()).toMatch(
-          /502|bad gateway|nginx|html/,
-        );
+        expect(result.combined.toLowerCase()).toMatch(/502|bad gateway|nginx|html/);
       } finally {
         server.removeAllListeners("request");
         for (const l of originalListeners) {

@@ -44,6 +44,16 @@ func (r Repo) Inputs(ctx context.Context, baseRef string) ([]Input, error) {
 		if err != nil {
 			return nil, err
 		}
+		var misplaced []string
+		for _, directory := range set.ForbiddenDirectories {
+			entries, err := r.entriesAt(ctx, "HEAD", directory)
+			if err != nil {
+				return nil, err
+			}
+			for _, entry := range entries {
+				misplaced = append(misplaced, directory+"/"+entry)
+			}
+		}
 		inputs = append(inputs, Input{
 			Set:       set,
 			BaseRef:   baseRef,
@@ -51,6 +61,7 @@ func (r Repo) Inputs(ctx context.Context, baseRef string) ([]Input, error) {
 			Head:      head,
 			MergeBase: forked,
 			Touched:   touched,
+			Misplaced: misplaced,
 		})
 	}
 	return inputs, nil

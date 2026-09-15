@@ -34,7 +34,7 @@ first principles:
 **Normal views, always `SQL SECURITY INVOKER`, never `MATERIALIZED`.** A
 `DEFINER` view reads its sources as its definer, so the caller's row policies do
 not apply to it — measured against 25.10.2.65, a `DEFINER` view over a policed
-table returned *both* tenants' rows to the restricted identity. A
+table returned _both_ tenants' rows to the restricted identity. A
 `MATERIALIZED VIEW` defaults to `DEFINER`. Both are reported by
 `definerViewAuditQuery`, which must stay empty.
 
@@ -62,7 +62,7 @@ partitions, read as the restricted identity (`read_rows` from
 | `FINAL`    | 4,010         | 508      | 2,002         |
 
 The `IN`-tuple view is pathological in a way the repository pattern is not. Only
-its *outer* scope prunes: the `max()` subquery carries no predicate from the
+its _outer_ scope prunes: the `max()` subquery carries no predicate from the
 caller's query and has no way to receive one, so it reads the tenant's whole
 history on every query — a one-week question costs more than reading the entire
 table undeduplicated, and the gap widens linearly with retained history. Nor can
@@ -75,11 +75,11 @@ stale data, no error, no gap.
 correct across partitions (`do_not_merge_across_partitions_select_final` is 0 by
 default; a version whose business time moved into a different week still
 resolves to the newer row). The repository guidance against `FINAL` is about
-*point lookups* dragging heavy columns through an on-the-fly merge; these views
+_point lookups_ dragging heavy columns through an on-the-fly merge; these views
 scan partitions, where the merge is the cheap half.
 
 **Captured content leaves the attribute maps and reappears as gated columns.**
-Column grants cannot reach keys *inside* a `Map`, so each exposed map is filtered
+Column grants cannot reach keys _inside_ a `Map`, so each exposed map is filtered
 with `mapFilter` against the content keys the data-privacy policy already
 defines (`CONTENT_KEY_CATALOG`), plus their exploded forms (`gen_ai.prompt.` for
 `gen_ai.prompt.0.content`). Content is then re-exposed only as dedicated columns
@@ -100,7 +100,7 @@ never hand-listed.
   catalog columns and its tenant.** This is structural, not an oversight: an
   `INVOKER` view only works if the caller holds grants on every source column the
   body reads, so `SELECT(SpanAttributes)` on the span table is unavoidable — and
-  a caller who names the physical table directly reads that map *unfiltered*.
+  a caller who names the physical table directly reads that map _unfiltered_.
   Rows stay tenant-scoped (the policy is on the source), and the gateway's
   `allowedTables` is what keeps the physical name unwritable, but map-key content
   gating is enforced by the gateway rather than by the database. A `DEFINER` view
@@ -109,7 +109,7 @@ never hand-listed.
   policy) for an unproven one.
 
 - A source column referenced by its bare name inside a view body resolves to a
-  *projection alias* of the same name, not to the table's column. The span view
+  _projection alias_ of the same name, not to the table's column. The span view
   exposes a filtered `SpanAttributes` and reads captured input out of the
   unfiltered one; written bare, the second reference picked up the first's alias
   and the content-gated column came back empty for every span while every other
@@ -131,7 +131,7 @@ Exposing the modern analytics projections
 ([#6856](https://github.com/langwatch/langwatch/issues/6856)) brought the first
 source tables that are **not** `ReplacingMergeTree`s: `trace_analytics_rollup`
 and `evaluation_analytics_rollup` are `AggregatingMergeTree`s, whose rows for one
-sort key are *summed* rather than one superseding the others.
+sort key are _summed_ rather than one superseding the others.
 
 The decision above holds for them: `FINAL` is what those views use, except
 where the published grain is narrower than the source key — see the `GROUP BY`
@@ -139,7 +139,7 @@ render below. Measured
 against 25.10.2.65 with merges stopped and a bucket written as two parts, `FINAL`
 over an `AggregatingMergeTree` returns one row per sort key with each
 `SimpleAggregateFunction(sum, …)` column summed across the parts. What changes is
-what the catalog has to *say*, and — for one dataset — which strategy it uses.
+what the catalog has to _say_, and — for one dataset — which strategy it uses.
 
 **A catalog entry declares an aggregating source explicitly**
 (`LangWatchQLViewDedup.aggregating`), and such an entry declares no version column.
@@ -153,7 +153,7 @@ on the flag rather than on the absence.
 enforces it** against `system.tables.sorting_key` and `engine`. Stating the rule
 was not enough: under the shipped `final` strategy the engine collapses on the
 table's own `ORDER BY` and on nothing an entry says, so a wrong declaration does
-not change a single returned number — it changes the *diagnostic*, which then
+not change a single returned number — it changes the _diagnostic_, which then
 describes a grain the engine is not using and reports fan-out on joins that do
 not fan out (or stays silent on ones that do). The rule is true by construction
 now rather than by review.
@@ -186,7 +186,7 @@ merge. A column of such a view that is neither grain nor a summed measure is a
 provisioning error rather than an arbitrary value. The per-model breakdown is
 its own dataset, `model_usage_by_minute`, at the full key with span-fact
 measures only. This does not reopen the `argMax` rejection below: that was
-aggregation as a *dedup* device on a detail dataset, where the group keys are
+aggregation as a _dedup_ device on a detail dataset, where the group keys are
 the sort key and a caller's predicates on anything else stop pruning. Here the
 group keys are the published grain of a rollup — `TenantId` and the partition
 column `BucketStart` — which is exactly where a caller's predicates already go.
@@ -195,7 +195,7 @@ column `BucketStart` — which is exactly where a caller's predicates already go
 .strategy`), the one entry in the catalog that does not take the measured
 default. `evaluation_analytics` folds its progress watermark —
 `max(previous, event time)` — straight into `OccurredAt`, which is second in its
-sort key, so two lifecycle versions of one evaluation are two *keys*: `FINAL`
+sort key, so two lifecycle versions of one evaluation are two _keys_: `FINAL`
 merges neither into the other and returns both. That is not a visible duplicate;
 it is every `count`, `sum` and `avg` a caller writes over the dataset silently
 counting the evaluation once per version. The owning repository refuses `FINAL`
@@ -237,7 +237,7 @@ which the column description states.
 the physical tables at all, closing the map-key gap at the database layer. Not
 taken: it depends on `getSetting()` resolving in the caller's session while
 access resolves in the definer's, which is unmeasured, and it puts the model's
-whole isolation guarantee on a mechanism whose *documented* behaviour is to
+whole isolation guarantee on a mechanism whose _documented_ behaviour is to
 bypass row policies. Revisit only with a measurement, and only alongside the
 audit that would catch a mis-provisioned definer.
 

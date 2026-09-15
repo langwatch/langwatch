@@ -18,11 +18,11 @@ describe("handleDatasetCommandError", () => {
     consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {
       /* suppress */
     });
-    processExitSpy = vi
-      .spyOn(process, "exit")
-      .mockImplementation(((_code?: number | string | null) => {
-        throw new Error("process.exit called");
-      }) as (code?: number | string | null) => never);
+    processExitSpy = vi.spyOn(process, "exit").mockImplementation(((
+      _code?: number | string | null,
+    ) => {
+      throw new Error("process.exit called");
+    }) as (code?: number | string | null) => never);
     spinnerFail = vi.fn();
     spinner = { fail: spinnerFail } as unknown as Ora;
   });
@@ -31,7 +31,10 @@ describe("handleDatasetCommandError", () => {
     vi.restoreAllMocks();
   });
 
-  function callHandler(error: unknown, context: string): { spinnerCalls: string[]; errorCalls: string[] } {
+  function callHandler(
+    error: unknown,
+    context: string,
+  ): { spinnerCalls: string[]; errorCalls: string[] } {
     try {
       handleDatasetCommandError({ spinner, error, context });
     } catch {
@@ -55,9 +58,7 @@ describe("handleDatasetCommandError", () => {
     /** @scenario "A missing dataset is reported as not found, not as a network error" */
     it("carries not_found at 404, never network_error", () => {
       setOutputFormat("json");
-      const consoleLogSpy = vi
-        .spyOn(console, "log")
-        .mockImplementation(() => undefined);
+      const consoleLogSpy = vi.spyOn(console, "log").mockImplementation(() => undefined);
       try {
         callHandler(new DatasetNotFoundError("my-ds"), "fetch dataset");
       } finally {
@@ -73,9 +74,7 @@ describe("handleDatasetCommandError", () => {
     /** @scenario "A dataset plan limit is reported with its own code" */
     it("carries plan_limit_reached at 403 with the usage in meta", () => {
       setOutputFormat("json");
-      const consoleLogSpy = vi
-        .spyOn(console, "log")
-        .mockImplementation(() => undefined);
+      const consoleLogSpy = vi.spyOn(console, "log").mockImplementation(() => undefined);
       try {
         callHandler(
           new DatasetPlanLimitError("Dataset limit reached for FREE plan", {
@@ -102,10 +101,11 @@ describe("handleDatasetCommandError", () => {
 
   describe("when the error is a DatasetPlanLimitError", () => {
     it("shows the 'Plan limit reached' prefix with current and max usage", () => {
-      const err = new DatasetPlanLimitError(
-        "Dataset limit reached for FREE plan (max 3)",
-        { limitType: "datasets", current: 3, max: 3 },
-      );
+      const err = new DatasetPlanLimitError("Dataset limit reached for FREE plan (max 3)", {
+        limitType: "datasets",
+        current: 3,
+        max: 3,
+      });
       const { spinnerCalls, errorCalls } = callHandler(err, "create dataset");
       expect(spinnerCalls.join("\n")).toContain("Plan limit reached");
       const combined = [...spinnerCalls, ...errorCalls].join("\n");
@@ -115,9 +115,7 @@ describe("handleDatasetCommandError", () => {
     });
 
     it("works without current/max fields", () => {
-      const err = new DatasetPlanLimitError(
-        "Dataset limit reached for FREE plan (max 3)",
-      );
+      const err = new DatasetPlanLimitError("Dataset limit reached for FREE plan (max 3)");
       const { spinnerCalls } = callHandler(err, "create dataset");
       expect(spinnerCalls.join("\n")).toContain("Plan limit reached");
     });
@@ -125,11 +123,7 @@ describe("handleDatasetCommandError", () => {
 
   describe("when the error is a generic DatasetApiError", () => {
     it("renders the error message on the spinner fail line", () => {
-      const err = new DatasetApiError(
-        "Failed to fetch dataset: unexpected payload",
-        500,
-        "fetch",
-      );
+      const err = new DatasetApiError("Failed to fetch dataset: unexpected payload", 500, "fetch");
       const { spinnerCalls } = callHandler(err, "fetch dataset");
       expect(spinnerCalls.join("\n")).toContain("unexpected payload");
     });

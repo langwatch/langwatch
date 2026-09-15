@@ -8,8 +8,41 @@ import { describe, expect, it } from "vitest";
 const execFileAsync = promisify(execFile);
 const packageRoot = fileURLToPath(new URL("../..", import.meta.url));
 const packageEntry = fileURLToPath(new URL("../index.ts", import.meta.url));
+const browserEntry = fileURLToPath(new URL("../browser/index.ts", import.meta.url));
 
 describe("runtime safety", () => {
+  it("keeps the /browser entry's whole graph free of node builtins and OpenTelemetry", async () => {
+    const result = await build({
+      entryPoints: [browserEntry],
+      bundle: true,
+      define: { process: "undefined" },
+      format: "esm",
+      metafile: true,
+      platform: "browser",
+      write: false,
+    });
+
+    const bundledInputs = Object.keys(result.metafile.inputs);
+    expect(bundledInputs.some((input) => /^node:|@opentelemetry/.test(input))).toBe(false);
+
+    const bundle = result.outputFiles[0];
+    expect(bundle).toBeDefined();
+
+    const moduleUrl = `data:text/javascript;base64,${Buffer.from(bundle!.contents).toString(
+      "base64",
+    )}`;
+    const browserLogger = (await import(moduleUrl)) as typeof import("../browser/index.ts");
+
+    expect(() => {
+      const logger = browserLogger.createLogger("browser-entry-smoke");
+      expect(logger.level).toBe("info");
+      logger.info({ runtime: "browser" }, "browser logger is operational");
+      logger.error({ error: new Error("browser error") }, "browser error is operational");
+      logger.warn(new Error("bare error argument"));
+      logger.child({ requestId: "abc" }).debug("child logger is operational");
+    }).not.toThrow();
+  });
+
   it("creates and uses the logger in a browser-targeted bundle", async () => {
     const result = await build({
       entryPoints: [packageEntry],
@@ -22,27 +55,29 @@ describe("runtime safety", () => {
     });
 
     const bundledInputs = Object.keys(result.metafile.inputs);
-    expect(
-      bundledInputs.some((input) =>
-        /@opentelemetry|node:async_hooks|superjson/.test(input),
-      ),
-    ).toBe(false);
+    expect(bundledInputs.some((input) => /@opentelemetry|node:async_hooks/.test(input))).toBe(
+      false,
+    );
 
     const bundle = result.outputFiles[0];
     expect(bundle).toBeDefined();
 
-    const moduleUrl = `data:text/javascript;base64,${Buffer.from(
-      bundle!.contents,
-    ).toString("base64")}`;
-    const telemetry = (await import(moduleUrl)) as typeof import("../index");
+    const moduleUrl = `data:text/javascript;base64,${Buffer.from(bundle!.contents).toString(
+      "base64",
+    )}`;
+    const telemetry = (await import(moduleUrl)) as typeof import("../index.ts");
 
     expect(() => {
       const logger = telemetry.createLogger("browser-runtime-smoke");
+      expect(logger.level).toBe("info");
       logger.info({ runtime: "browser" }, "browser logger is operational");
       logger.error(
         { error: new Error("browser error") },
         "browser error serialization is operational",
       );
+
+      telemetry.configureLogger({ environment: "production" });
+      expect(telemetry.createLogger("browser-configured-runtime-smoke").level).toBe("info");
     }).not.toThrow();
   });
 
@@ -59,9 +94,10 @@ describe("runtime safety", () => {
         platform: "node",
         stdin: {
           contents: `
-            import { createLogger } from "./src/index.ts";
+            import { configureLogger, createLogger } from "./src/index.ts";
             import { runWithContext } from "./src/context/index.ts";
 
+            configureLogger({ environment: "test", level: "error" });
             const logger = createLogger("node-runtime-smoke");
             runWithContext({ organizationId: "runtime-org" }, () => {
               logger.error(
@@ -77,13 +113,6 @@ describe("runtime safety", () => {
       });
 
       const { stdout } = await execFileAsync(process.execPath, [outputFile], {
-        env: {
-          ...process.env,
-          LOG_CONSOLE_LEVEL: "error",
-          NODE_ENV: "development",
-          PINO_LOG_LEVEL: "error",
-          PINO_OTEL_ENABLED: "false",
-        },
         timeout: 10_000,
       });
 

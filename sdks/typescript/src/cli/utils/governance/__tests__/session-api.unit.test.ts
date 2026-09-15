@@ -1,10 +1,5 @@
 /**
- * The session-authenticated exchange calls are on every command's credential
- * path, so their failure modes are pinned here: a black-holed control plane
- * must time out (so the resolver can fall back to the cached key) and a
- * malformed 200 must fail loudly instead of handing `undefined` to the .env
- * writer.
- *
+ * Tests session-authenticated exchange calls: timeouts and malformed responses.
  * Feature: specs/ai-governance/cli-onboarding/me-credentials.feature
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -15,11 +10,7 @@ vi.mock("../config", () => ({
   saveConfig: (...args: unknown[]) => saveConfig(...args),
 }));
 
-import {
-  fetchPersonalProject,
-  fetchProjectKeyBySlug,
-  SessionApiError,
-} from "../session-api";
+import { fetchPersonalProject, fetchProjectKeyBySlug, SessionApiError } from "../session-api";
 import { loadConfig } from "../config";
 import type { GovernanceConfig } from "../config";
 
@@ -68,15 +59,11 @@ describe("session-api request bounds", () => {
       const seen: string[] = [];
       const fetchImpl: typeof fetch = async (input, init) => {
         const url =
-          typeof input === "string"
-            ? input
-            : input instanceof URL
-              ? input.toString()
-              : input.url;
+          typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
         if (url.endsWith("/api/auth/cli/refresh")) {
-          const sent = JSON.parse(
-            typeof init?.body === "string" ? init.body : "{}",
-          ) as { refresh_token?: string };
+          const sent = JSON.parse(typeof init?.body === "string" ? init.body : "{}") as {
+            refresh_token?: string;
+          };
           seen.push(sent.refresh_token ?? "");
           if (sent.refresh_token === "lw_rt_spent") {
             return jsonResponse(401, { error: "unauthorized" });
@@ -130,9 +117,9 @@ describe("session-api request bounds", () => {
           project: { id: "p1", slug: "demo", name: "Demo" },
         });
 
-      await expect(
-        fetchProjectKeyBySlug(liveSession(), "demo", { fetchImpl }),
-      ).rejects.toThrow(SessionApiError);
+      await expect(fetchProjectKeyBySlug(liveSession(), "demo", { fetchImpl })).rejects.toThrow(
+        SessionApiError,
+      );
       await expect(
         fetchProjectKeyBySlug(liveSession(), "demo", { fetchImpl }),
       ).rejects.toMatchObject({ code: "malformed_response" });

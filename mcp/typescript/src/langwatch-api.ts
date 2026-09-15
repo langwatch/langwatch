@@ -1,7 +1,4 @@
-import type {
-  HandledErrorFault,
-  SerializedReason,
-} from "@langwatch/handled-error";
+import type { HandledErrorFault, SerializedReason } from "@langwatch/handled-error";
 import { getConfig, requireApiKey } from "./config.js";
 import type { EvaluationSummary } from "./utils/format-evaluations.js";
 
@@ -90,11 +87,7 @@ export interface PromptTag {
 export type PromptFieldList = Array<{ identifier: string; type: string }>;
 
 /**
- * A single versioned prompt payload. `GET /api/prompts/:id` returns the
- * requested version's data flattened to the top level (merged with the base
- * prompt data), and `GET /api/prompts/:id/versions` returns an array of
- * entries in this same shape — there is no nested `versions` array on the
- * detail response.
+ * A single versioned prompt payload.
  */
 export interface PromptVersion {
   versionId?: string;
@@ -134,10 +127,9 @@ export class LangWatchApiError extends Error {
   readonly docsUrl?: string;
   readonly fault?: HandledErrorFault;
   /**
-   * The per-field failures behind this error, verbatim from the envelope.
-   * A validation failure carries the offending field and the values it would
-   * have accepted here — the difference between an agent correcting its own
-   * request and an agent guessing again.
+   * The per-field failures behind this error, verbatim from the envelope. A validation failure
+   * carries the offending field and the values it would have accepted here — the difference
+   * between an agent correcting its own request and an agent guessing again.
    */
   readonly reasons?: SerializedReason[];
 
@@ -176,12 +168,7 @@ interface ParsedErrorBody {
 const VALID_FAULTS: readonly HandledErrorFault[] = ["customer", "platform", "provider"];
 
 /**
- * Parses an error response body as a handled-error envelope. Accepts three
- * shapes: the canonical v1 envelope
- * (`{ error: { type, code, message, meta?, trace_id } }`), the legacy REST
- * shape (`{ error: "<code>", message, tips?, docsUrl?, fault? }`) and the
- * serialized tRPC shape (`{ code, message?, tips?, docsUrl?, fault?, ... }`).
- * Returns an empty object when the body is not a recognizable error envelope.
+ * Parses an error response body as a handled-error envelope.
  */
 function parseErrorBody(responseBody: string): ParsedErrorBody {
   try {
@@ -199,9 +186,10 @@ function parseErrorBody(responseBody: string): ParsedErrorBody {
         ? (envelope.error as Record<string, unknown>)
         : null;
     const body = nested ?? envelope;
-    // Prefer `code` (the domain discriminant) over `error` — the
-    // packages/api unversioned envelope uses `error` for the HTTP status
-    // text ("Not Found") while `code` holds the real code.
+    // `code` is the domain discriminant. The `error` fallback reads the
+    // legacy envelope some non-framework families still send; the framework's
+    // own unversioned union envelope, which used `error` for the HTTP status
+    // text, is gone (packages/api/adrs/002).
     const code =
       typeof body.code === "string"
         ? body.code
@@ -221,8 +209,7 @@ function parseErrorBody(responseBody: string): ParsedErrorBody {
       ? (body.fault as HandledErrorFault)
       : undefined;
     const reasons =
-      Array.isArray(body.reasons) &&
-      body.reasons.every((r) => !!r && typeof r === "object")
+      Array.isArray(body.reasons) && body.reasons.every((r) => !!r && typeof r === "object")
         ? (body.reasons as SerializedReason[])
         : undefined;
     return { code, message, tips, docsUrl, fault, reasons };
@@ -232,13 +219,9 @@ function parseErrorBody(responseBody: string): ParsedErrorBody {
 }
 
 /**
- * The human line for one per-field failure: the field, what it would have
- * accepted, and what it got. Returns null when a reason names no field, so a
- * generic nested error adds no noise to the message.
- *
- * This exists because the MCP transport's only channel to the caller is the
- * error MESSAGE — an agent never sees the `reasons` array itself, so a
- * rejection whose remedy lives only there is unfollowable.
+ * The human line for one per-field failure: the field, what it would have accepted, and what it
+ * got. Returns null when a reason names no field, so a generic nested error adds no noise to
+ * the message.
  */
 function describeReason(reason: SerializedReason): string | null {
   const meta = reason.meta;
@@ -258,18 +241,14 @@ function describeReason(reason: SerializedReason): string | null {
 }
 
 /**
- * Sends an HTTP request to the LangWatch API.
- *
- * Builds the full URL from the configured endpoint, adds authentication,
- * and handles JSON serialization/deserialization.
- *
- * @throws LangWatchApiError with status code and response body when the
- * response is not OK.
+ * Sends an HTTP request to the LangWatch API. Builds the full URL from the configured endpoint,
+ * adds authentication, and handles JSON serialization/deserialization. @throws
+ * LangWatchApiError with status code and response body when the response is not OK.
  */
 export async function makeRequest(
   method: "GET" | "POST" | "PUT" | "PATCH" | "DELETE",
   path: string,
-  body?: unknown
+  body?: unknown,
 ): Promise<unknown> {
   const config = getConfig();
   const url = config.endpoint + path;
@@ -293,9 +272,7 @@ export async function makeRequest(
   if (!response.ok) {
     const responseBody = await response.text();
     const parsed = parseErrorBody(responseBody);
-    const lines = [
-      `LangWatch API error ${response.status}: ${parsed.message ?? responseBody}`,
-    ];
+    const lines = [`LangWatch API error ${response.status}: ${parsed.message ?? responseBody}`];
     const reasonLines = (parsed.reasons ?? [])
       .map(describeReason)
       .filter((line): line is string => line !== null);
@@ -308,18 +285,13 @@ export async function makeRequest(
     if (parsed.docsUrl) {
       lines.push(`Docs: ${parsed.docsUrl}`);
     }
-    throw new LangWatchApiError(
-      lines.join("\n"),
-      response.status,
-      responseBody,
-      {
-        code: parsed.code,
-        tips: parsed.tips,
-        docsUrl: parsed.docsUrl,
-        fault: parsed.fault,
-        reasons: parsed.reasons,
-      },
-    );
+    throw new LangWatchApiError(lines.join("\n"), response.status, responseBody, {
+      code: parsed.code,
+      tips: parsed.tips,
+      docsUrl: parsed.docsUrl,
+      fault: parsed.fault,
+      reasons: parsed.reasons,
+    });
   }
 
   if (response.status === 204 || response.headers?.get("content-length") === "0") {
@@ -329,12 +301,8 @@ export async function makeRequest(
 }
 
 /**
- * Searches traces with optional filters and pagination.
- *
- * Paging is by `scrollId` only: pass the one the previous response returned,
- * and stop when a response carries none. `pageOffset` used to be accepted here
- * but was never read by the server, so an offset walk silently re-served the
- * first page; it is rejected at the boundary now (#6808).
+ * Searches traces with optional filters and pagination. Paging is by `scrollId` only: pass the
+ * one the previous response returned, and stop when a response carries none.
  */
 export async function searchTraces(params: {
   query?: string;
@@ -346,7 +314,7 @@ export async function searchTraces(params: {
   format?: "digest" | "json";
 }): Promise<SearchTracesResponse> {
   const { format = "digest", ...rest } = params;
-  return makeRequest("POST", "/api/traces/search", {
+  return makeRequest("POST", "/api/v1/traces/search", {
     ...rest,
     format,
   }) as Promise<SearchTracesResponse>;
@@ -355,11 +323,11 @@ export async function searchTraces(params: {
 /** Retrieves a single trace by its ID. */
 export async function getTraceById(
   traceId: string,
-  format: "digest" | "json" = "digest"
+  format: "digest" | "json" = "digest",
 ): Promise<TraceDetailResponse> {
   return makeRequest(
     "GET",
-    `/api/traces/${encodeURIComponent(traceId)}?format=${format}`
+    `/api/v1/traces/${encodeURIComponent(traceId)}?format=${format}`,
   ) as Promise<TraceDetailResponse>;
 }
 
@@ -380,20 +348,20 @@ export async function getAnalyticsTimeseries(params: {
 }): Promise<AnalyticsTimeseriesResponse> {
   return makeRequest(
     "POST",
-    "/api/analytics/timeseries",
-    params
+    "/api/v1/analytics/timeseries",
+    params,
   ) as Promise<AnalyticsTimeseriesResponse>;
 }
 
 /** Lists all prompts in the project. */
 export async function listPrompts(): Promise<PromptSummary[]> {
-  return makeRequest("GET", "/api/prompts") as Promise<PromptSummary[]>;
+  return makeRequest("GET", "/api/v1/prompts") as Promise<PromptSummary[]>;
 }
 
 /** Retrieves a single prompt by ID or handle. */
 export async function getPrompt(
   idOrHandle: string,
-  options?: { version?: number; tag?: string }
+  options?: { version?: number; tag?: string },
 ): Promise<PromptDetailResponse> {
   const params = new URLSearchParams();
   if (options?.version != null) params.set("version", String(options.version));
@@ -401,17 +369,15 @@ export async function getPrompt(
   const query = params.toString() ? `?${params}` : "";
   return makeRequest(
     "GET",
-    `/api/prompts/${encodeURIComponent(idOrHandle)}${query}`
+    `/api/v1/prompts/${encodeURIComponent(idOrHandle)}${query}`,
   ) as Promise<PromptDetailResponse>;
 }
 
 /** Lists all versions of a prompt (versioned data only). */
-export async function getPromptVersions(
-  idOrHandle: string
-): Promise<PromptVersion[]> {
+export async function getPromptVersions(idOrHandle: string): Promise<PromptVersion[]> {
   return makeRequest(
     "GET",
-    `/api/prompts/${encodeURIComponent(idOrHandle)}/versions`
+    `/api/v1/prompts/${encodeURIComponent(idOrHandle)}/versions`,
   ) as Promise<PromptVersion[]>;
 }
 
@@ -422,11 +388,7 @@ export async function createPrompt(data: {
   model: string;
   tags?: string[];
 }): Promise<PromptMutationResponse> {
-  return makeRequest(
-    "POST",
-    "/api/prompts",
-    data
-  ) as Promise<PromptMutationResponse>;
+  return makeRequest("POST", "/api/v1/prompts", data) as Promise<PromptMutationResponse>;
 }
 
 /** Updates an existing prompt by ID or handle. */
@@ -437,12 +399,12 @@ export async function updatePrompt(
     model?: string;
     commitMessage: string;
     tags?: string[];
-  }
+  },
 ): Promise<PromptMutationResponse> {
   return makeRequest(
     "PUT",
-    `/api/prompts/${encodeURIComponent(idOrHandle)}`,
-    data
+    `/api/v1/prompts/${encodeURIComponent(idOrHandle)}`,
+    data,
   ) as Promise<PromptMutationResponse>;
 }
 
@@ -458,19 +420,19 @@ export async function assignPromptTag({
 }): Promise<unknown> {
   return makeRequest(
     "PUT",
-    `/api/prompts/${encodeURIComponent(idOrHandle)}/tags/${encodeURIComponent(tag)}`,
-    { versionId }
+    `/api/v1/prompts/${encodeURIComponent(idOrHandle)}/tags/${encodeURIComponent(tag)}`,
+    { versionId },
   );
 }
 
 /** Lists all prompt tag definitions for the organization. */
 export async function listPromptTags(): Promise<unknown> {
-  return makeRequest("GET", "/api/prompts/tags");
+  return makeRequest("GET", "/api/v1/prompts/tags");
 }
 
 /** Creates a custom prompt tag definition. */
 export async function createPromptTag(name: string): Promise<unknown> {
-  return makeRequest("POST", "/api/prompts/tags", { name });
+  return makeRequest("POST", "/api/v1/prompts/tags", { name });
 }
 
 /** Renames an existing prompt tag. */
@@ -481,17 +443,10 @@ export async function renamePromptTag({
   tag: string;
   name: string;
 }): Promise<unknown> {
-  return makeRequest(
-    "PUT",
-    `/api/prompts/tags/${encodeURIComponent(tag)}`,
-    { name }
-  );
+  return makeRequest("PUT", `/api/v1/prompts/tags/${encodeURIComponent(tag)}`, { name });
 }
 
 /** Deletes a prompt tag and all its assignments. */
 export async function deletePromptTag(tag: string): Promise<unknown> {
-  return makeRequest(
-    "DELETE",
-    `/api/prompts/tags/${encodeURIComponent(tag)}`
-  );
+  return makeRequest("DELETE", `/api/v1/prompts/tags/${encodeURIComponent(tag)}`);
 }

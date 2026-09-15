@@ -1,12 +1,12 @@
 import { scopedApiKey } from "@/internal/credentialContext";
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
-import { resolveCredentials } from "../../utils/apiKey";
-import { formatFetchError } from "../../utils/formatFetchError";
-import { failSpinner } from "../../utils/spinnerError";
-import { commandValidationError } from "../../utils/errorOutput";
+import { createSpinner } from "../../utils/spinner.ts";
+import { resolveCredentials } from "../../utils/apiKey.ts";
+import { formatFetchError } from "../../utils/formatFetchError.ts";
+import { failSpinner } from "../../utils/spinnerError.ts";
+import { commandValidationError } from "../../utils/errorOutput.ts";
 import { buildAuthHeaders } from "@/internal/api/auth";
-import type { CommandResult } from "../../utils/output";
+import type { CommandResult } from "../../utils/output.ts";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
 import { langwatchFetch } from "@/internal/http/langwatchFetch";
@@ -30,16 +30,14 @@ export const updateWorkflowCommand = async (
     if (Object.keys(body).length === 0) {
       failSpinner({
         spinner,
-        error: commandValidationError(
-          "No fields to update. Use --name, --icon, or --description.",
-        ),
+        error: commandValidationError("No fields to update. Use --name, --icon, or --description."),
         action: "update workflow",
       });
       process.exit(1);
     }
 
     const response = await langwatchFetch(
-      `${endpoint}/api/workflows/${encodeURIComponent(id)}`,
+      `${endpoint}/api/v1/workflows/${encodeURIComponent(id)}`,
       {
         method: "PATCH",
         headers: {
@@ -56,7 +54,7 @@ export const updateWorkflowCommand = async (
       process.exit(1);
     }
 
-    const workflow = await response.json() as {
+    const workflow = (await response.json()) as {
       id: string;
       name: string;
       icon: string | null;

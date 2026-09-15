@@ -1,25 +1,14 @@
 /**
- * What a re-keyed cause actually looks like once pino has written it.
- *
- * The other request-logging tests assert on the object handed to the logger,
- * which is one level above the bug this file exists for. pino applies
- * serializers by exact property name and warns about nothing when a key has
- * none: the value goes to `JSON.stringify`, and an `Error` has no enumerable
- * own properties, so it lands as `{}`. Moving a cause from `error` to
- * `requestError` without registering the second key therefore drops the
- * message and the stack - the only reasons the cause is logged at all - while
- * every assertion on the handed-over object still passes.
- *
- * So these tests read the emitted line, through the same serializer map
- * `createLogger` installs.
+ * Test emitted line through serializer map (catches errors pino silently drops).
+ * Catches missing serializers that JSON.stringify converts to {}.
  */
 
 import { Writable } from "node:stream";
 import pino from "pino";
 import { describe, expect, it } from "vitest";
-import { REQUEST_CAUSE_FIELD } from "../constants";
-import { NODE_LOG_SERIALIZERS } from "../logger";
-import { logHttpRequest } from "../request/requestLogging";
+import { REQUEST_CAUSE_FIELD } from "../constants.ts";
+import { NODE_LOG_SERIALIZERS } from "../logger.ts";
+import { logHttpRequest } from "../request/requestLogging.ts";
 
 /**
  * A pino logger wired to the real serializer map, writing where we can read it.
@@ -97,9 +86,7 @@ describe("emitted request-log records", () => {
     });
 
     it("does not emit the cause as an empty object", () => {
-      expect(
-        Object.keys(warnRecord()?.[REQUEST_CAUSE_FIELD] ?? {}),
-      ).not.toHaveLength(0);
+      expect(Object.keys(warnRecord()?.[REQUEST_CAUSE_FIELD] ?? {})).not.toHaveLength(0);
     });
 
     it("carries no field named error, so nothing downstream reads it as one", () => {

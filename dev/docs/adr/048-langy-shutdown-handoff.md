@@ -33,7 +33,7 @@ The constraint that shapes everything here: **on SIGTERM the pod has a bounded,
 uncatchable deadline.** Kubernetes sends SIGTERM, waits
 `terminationGracePeriodSeconds` (TGP), then sends SIGKILL, which no handler can
 intercept — the same honest limit ADR-044's telemetry flush lives with. So a
-graceful handoff can only ever be *best-effort*: it narrows the loss window, it
+graceful handoff can only ever be _best-effort_: it narrows the loss window, it
 does not close it. A hard OOM or a TGP overrun still loses the turn and falls
 back to today's cold restart.
 
@@ -41,7 +41,7 @@ Two more facts constrain the design:
 
 - **Only the model knows what is meaningfully complete.** The manager sees an
   opaque ndjson token stream; it cannot decide where a resumable boundary is.
-  The checkpoint must be *worker-authored* — `opencode` (or a small MCP tool it
+  The checkpoint must be _worker-authored_ — `opencode` (or a small MCP tool it
   calls) writes it — which makes this a protocol between `opencode` and the
   control plane, not just manager plumbing.
 - **The manager holds no durable state** (ADR-047: workers are in-memory,
@@ -65,7 +65,7 @@ On SIGTERM, **before** the worker pool's process-group kill, the manager POSTs
 control call uses). `deadline` is an absolute wall-clock instant (unix millis).
 
 This is wired as a `pkg/lifecycle` **Closer registered after the worker-pool**,
-so in the reverse-order stop sequence it runs *before* the worker-pool drain
+so in the reverse-order stop sequence it runs _before_ the worker-pool drain
 (which kills the process groups and tears down the authProxies). It waits,
 bounded by `deadline`, for each in-flight worker's turn to quiesce — i.e. for its
 `StreamEvents` loop to see the terminal `handoff` frame and let the still-open
@@ -74,7 +74,7 @@ handing control to the worker-pool drain.
 
 **Composition with the early-flush (PR3).** PR3's serve.go already has an
 `otel-early-flush` Closer — also a pre-drain SIGTERM step. This PR registers the
-handoff Closer *after* it, so the two coexist as sibling pre-drain Closers with
+handoff Closer _after_ it, so the two coexist as sibling pre-drain Closers with
 stop order **handoff → early-flush → http → worker-pool**: the handoff starts
 first because the worker-authored checkpoint is the scarce artifact that benefits
 most from a wall-clock head start, and the early-flush (bounded, operating on
@@ -99,7 +99,7 @@ sink and returns, ending the turn cleanly.
 
 **Token shape.** The token is **opaque to the manager and to the control plane**
 — the manager forwards it, the control plane persists it verbatim, only
-`opencode` authors and consumes it. The *recommended* shape `opencode` writes
+`opencode` authors and consumes it. The _recommended_ shape `opencode` writes
 (documented here, enforced nowhere outside `opencode`) is:
 
 ```json
@@ -176,7 +176,7 @@ Config: `LANGY_SHUTDOWN_HANDOFF_DEADLINE_MS` (default 5000) and
 ## Rationale / Trade-offs
 
 - **Why a durable pipeline event, not a Redis key?** ADR-044 already stashes the
-  *spawn inputs* in a short-lived Redis handoff. A resume token is different: it
+  _spawn inputs_ in a short-lived Redis handoff. A resume token is different: it
   is the durable "this conversation has unfinished, resumable work" fact that
   must outlive the pod and be replayable, so it belongs on the event log and the
   fold, exactly like `turn_finalized`. Using the ADR-046 command→event→fold
@@ -201,13 +201,13 @@ Config: `LANGY_SHUTDOWN_HANDOFF_DEADLINE_MS` (default 5000) and
   event to one, and `opencode`'s resume is itself idempotent (re-applying a
   checkpoint is safe). We do not add a distributed lock for a rare, benign race.
 
-- **Alternatives rejected.** (a) *Persisting the full turn transcript* — the
+- **Alternatives rejected.** (a) _Persisting the full turn transcript_ — the
   content already lives in `langy_messages`; re-deriving a resume point from it
-  server-side re-introduces the "manager guesses the boundary" problem. (b) *A
-  second HTTP channel from worker to control plane for the token* — the in-flight
+  server-side re-introduces the "manager guesses the boundary" problem. (b) _A
+  second HTTP channel from worker to control plane for the token_ — the in-flight
   `/chat` stream is already open and already flows worker→manager→control-plane;
-  reusing it needs no new auth surface. (c) *Blocking the whole grace window on
-  the handoff* — capped by `deadline` so a slow/dead worker can never eat the
+  reusing it needs no new auth surface. (c) _Blocking the whole grace window on
+  the handoff_ — capped by `deadline` so a slow/dead worker can never eat the
   drain budget out from under the process-group kill.
 
 ## Consequences

@@ -1,0 +1,380 @@
+/**
+ * @vitest-environment node
+ * Real Postgres + real ClickHouse. Debits used to be rounded to micro-USD before summing rather than summed then rounded, so totals drifted with request count. Spec: specs/ai-gateway/budgets.feature
+ */
+import { fromDate, nowInstant, toDate } from "@langwatch/time";
+
+/** A stored budget row, as the spend reads take it: the same columns, on instants. */
+function toBudgetRow<
+  Row extends {
+    currentPeriodStartedAt: Date;
+    resetsAt: Date;
+    lastResetAt: Date | null;
+    cycleAnchorAt: Date | null;
+    archivedAt: Date | null;
+    createdAt: Date;
+    updatedAt: Date;
+  },
+>(row: Row) {
+  return {
+    ...row,
+    currentPeriodStartedAt: fromDate(row.currentPeriodStartedAt),
+    resetsAt: fromDate(row.resetsAt),
+    lastResetAt: row.lastResetAt ? fromDate(row.lastResetAt) : null,
+    cycleAnchorAt: row.cycleAnchorAt ? fromDate(row.cycleAnchorAt) : null,
+    archivedAt: row.archivedAt ? fromDate(row.archivedAt) : null,
+    createdAt: fromDate(row.createdAt),
+    updatedAt: fromDate(row.updatedAt),
+  };
+}
+
+import { nanoid } from "nanoid";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+
+import {
+  PrismaConfigService,
+  PrismaConnectionService,
+  PrismaQueryGuard,
+  type PrismaQueryContext,
+  type PrismaQueryExecutor,
+} from "@langwatch/prisma-client";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import type { ProjectApi } from "@langwatch/project-contract";
+
+import { PrismaGatewayAdapter } from "../adapters/prisma.gateway.adapter.ts";
+import { GatewayBudgetDtoAdapter } from "../adapters/gateway-budget-dto.adapter.ts";
+import { attributedUserBucketScopeId } from "@langwatch/gateway-contract";
+import { GatewayBudgetClickHouseRepository } from "../repositories/clickhouse/clickhouse.gateway-budget.repository.ts";
+import {
+  createTestClickHouseClient,
+  testClickHouseUrl,
+} from "../repositories/clickhouse/__tests__/support/clickhouse-endpoint.support.ts";
+import type { GatewayService } from "../services/gateway.service.ts";
+import { TestProjectApi } from "./support/test-project-api.ts";
+
+const budgetDtos = GatewayBudgetDtoAdapter.create();
+class AllowTestQueries extends PrismaQueryGuard {
+  execute(context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {
+    return next(context.args);
+  }
+}
+
+const databaseUrl = process.env.DATABASE_URL;
+const chUrl = testClickHouseUrl();
+const connection = databaseUrl
+  ? PrismaConnectionService.create({ guard: new AllowTestQueries() }).connect(
+      PrismaConfigService.create().resolve({ databaseUrl, log: ["error"] }),
+    )
+  : null;
+const prisma = connection?.client as PrismaClient;
+
+const suffix = nanoid(8);
+const ORG_ID = `org-nano-${suffix}`;
+const TEAM_ID = `team-nano-${suffix}`;
+const PROJECT_ID = `proj-nano-${suffix}`;
+const USER_ID = `usr-nano-${suffix}`;
+
+const SINGLE_VK = `vk_nano_single_${suffix}`;
+const SPLIT_VK = `vk_nano_split_${suffix}`;
+const MANUAL_VK = `vk_nano_manual_${suffix}`;
+const SEAT_VK = `vk_nano_seat_${suffix}`;
+
+/**
+ * 24650 rounds to 25000 alone; three pre-rounded sum to 75000 vs the true
+ * 73950 — the 1050-nano gap that grows with every further request.
+ */
+const ODD_NANO = 73_950;
+const THIRD_NANO = 24_650;
+const ROUNDED_FIRST_NANO = 75_000;
+
+const LOOSE_LIMIT_USD = "5";
+
+/** The org's one project: the tenant every debit here lands in. */
+class SuiteProjectService extends TestProjectApi {
+  override async listIdsByOrganization(): ReturnType<ProjectApi["listIdsByOrganization"]> {
+    return [PROJECT_ID];
+  }
+}
+
+let service: GatewayService;
+let chRepo: GatewayBudgetClickHouseRepository;
+
+/** One served request's debit, as the spend pipeline mints it. */
+async function serveRequest(options: {
+  budgetId: string;
+  scopeType: "VIRTUAL_KEY" | "ATTRIBUTED_USER";
+  virtualKeyId: string;
+  window: "MONTH" | "MANUAL";
+  costNanoUsd: number;
+  endUserId?: string;
+}): Promise<void> {
+  await chRepo.insertDebitsForBudgets([
+    {
+      tenantId: PROJECT_ID,
+      budgetId: options.budgetId,
+      scope: options.scopeType,
+      scopeId: options.endUserId
+        ? attributedUserBucketScopeId(options.virtualKeyId, options.endUserId)
+        : options.virtualKeyId,
+      window: options.window,
+      virtualKeyId: options.virtualKeyId,
+      gatewayRequestId: `grq_${nanoid()}`,
+      amountNanoUsd: options.costNanoUsd,
+      tokensInput: 300,
+      tokensOutput: 150,
+      tokensCacheRead: 0,
+      tokensCacheWrite: 0,
+      model: "gpt-5-mini",
+      durationMs: 120,
+      status: "SUCCESS",
+      occurredAt: nowInstant(),
+    },
+  ]);
+}
+
+async function createVirtualKey(id: string): Promise<void> {
+  await prisma.virtualKey.create({
+    data: {
+      id,
+      organizationId: ORG_ID,
+      name: id,
+      hashedSecret: `hash-${id}`,
+      displayPrefix: "vk-lw-xxxxxxx",
+      principalUserId: USER_ID,
+      createdById: USER_ID,
+      traceProjectId: PROJECT_ID,
+      scopes: { create: [{ scopeType: "PROJECT", scopeId: PROJECT_ID }] },
+    },
+  });
+}
+
+async function createBudget(input: {
+  id: string;
+  virtualKeyId: string;
+  window: "MONTH" | "MANUAL";
+  scopeType?: "VIRTUAL_KEY" | "ATTRIBUTED_USER";
+}): Promise<void> {
+  await prisma.gatewayBudget.create({
+    data: {
+      id: input.id,
+      name: input.id,
+      organizationId: ORG_ID,
+      scopeType: input.scopeType ?? "VIRTUAL_KEY",
+      scopeId: input.virtualKeyId,
+      window: input.window,
+      limitUsd: LOOSE_LIMIT_USD,
+      onBreach: "BLOCK",
+      createdById: USER_ID,
+      resetsAt: toDate(nowInstant().add({ milliseconds: 86_400_000 })),
+    },
+  });
+}
+
+/** What the repository says one budget has spent, in both units. */
+async function spendFor(budgetId: string): Promise<{ spentNanoUsd: number; spentUsd: string }> {
+  const budget = await prisma.gatewayBudget.findUniqueOrThrow({ where: { id: budgetId } });
+  const [spend] = await chRepo.getSpendForBudgetsAcrossTenants([PROJECT_ID], [toBudgetRow(budget)]);
+  if (!spend) throw new Error(`no spend row for ${budgetId}`);
+  return { spentNanoUsd: spend.spentNanoUsd, spentUsd: spend.spentUsd };
+}
+
+/** The same budget as the public REST surface publishes it. */
+async function wireRowFor(budgetId: string) {
+  const listed = await service.list(ORG_ID);
+  const row = listed.find((b) => b.id === budgetId);
+  if (!row) throw new Error(`budget ${budgetId} missing from the list`);
+  return budgetDtos.toBudgetDto({ budget: row });
+}
+
+/** The nano sum the ledger itself holds, read straight out of ClickHouse. */
+async function ledgerNanoFor(budgetId: string): Promise<number> {
+  const client = createTestClickHouseClient(chUrl!);
+  const result = await client.query({
+    query: `
+      SELECT toString(sum(AmountNanoUSD)) AS nano
+      FROM gateway_budget_ledger_events FINAL
+      WHERE TenantId = {tenantId:String}
+        AND BudgetId = {budgetId:String}
+        AND Status = 'success'
+    `,
+    query_params: { tenantId: PROJECT_ID, budgetId },
+    format: "JSONEachRow",
+  });
+  const rows = (await result.json()) as Array<{ nano: string }>;
+  return Number(rows[0]?.nano ?? "0");
+}
+
+describe.skipIf(!databaseUrl || !chUrl)("nano-exact budget totals (real PG + real CH)", () => {
+  beforeAll(async () => {
+    await prisma.organization.create({
+      data: { id: ORG_ID, name: `Org ${suffix}`, slug: ORG_ID },
+    });
+    await prisma.team.create({
+      data: { id: TEAM_ID, name: `Team ${suffix}`, slug: TEAM_ID, organizationId: ORG_ID },
+    });
+    await prisma.project.create({
+      data: {
+        id: PROJECT_ID,
+        name: PROJECT_ID,
+        slug: PROJECT_ID,
+        teamId: TEAM_ID,
+        language: "en",
+        framework: "openai",
+        apiKey: `key-${PROJECT_ID}`,
+      },
+    });
+    await prisma.user.create({
+      data: { id: USER_ID, email: `${suffix}@acme.test`, name: "ACME Admin" },
+    });
+
+    for (const vk of [SINGLE_VK, SPLIT_VK, MANUAL_VK, SEAT_VK]) {
+      await createVirtualKey(vk);
+    }
+
+    await createBudget({
+      id: `bdg-nano-single-${suffix}`,
+      virtualKeyId: SINGLE_VK,
+      window: "MONTH",
+    });
+    await createBudget({
+      id: `bdg-nano-split-${suffix}`,
+      virtualKeyId: SPLIT_VK,
+      window: "MONTH",
+    });
+    // A MANUAL window carries a period floor, which sends the read down the
+    // raw-ledger path instead of the rollup. Both paths had to lose the
+    // rounding, so both are covered.
+    await createBudget({
+      id: `bdg-nano-manual-${suffix}`,
+      virtualKeyId: MANUAL_VK,
+      window: "MANUAL",
+    });
+    await createBudget({
+      id: `bdg-nano-seat-${suffix}`,
+      virtualKeyId: SEAT_VK,
+      window: "MONTH",
+      scopeType: "ATTRIBUTED_USER",
+    });
+
+    chRepo = new GatewayBudgetClickHouseRepository(async () => createTestClickHouseClient(chUrl!));
+    service = PrismaGatewayAdapter.create({
+      database: prisma,
+      projects: new SuiteProjectService(),
+      evaluators: {} as never,
+      monitors: {} as never,
+      changes: {} as never,
+      audit: {} as never,
+      budgetSpend: chRepo,
+    }).build();
+  }, 180_000);
+
+  afterAll(async () => {
+    const client = createTestClickHouseClient(chUrl!);
+    for (const table of ["gateway_budget_ledger_events", "gateway_budget_scope_totals"]) {
+      await client.command({
+        query: `DELETE FROM ${table} WHERE TenantId = {tenantId:String}`,
+        query_params: { tenantId: PROJECT_ID },
+      });
+    }
+    await prisma.gatewayBudget.deleteMany({ where: { organizationId: ORG_ID } });
+    await prisma.virtualKey.deleteMany({ where: { organizationId: ORG_ID } });
+    await prisma.user.deleteMany({ where: { id: USER_ID } });
+    await prisma.project.deleteMany({ where: { teamId: TEAM_ID } });
+    await prisma.team.deleteMany({ where: { id: TEAM_ID } });
+    await prisma.organization.deleteMany({ where: { id: ORG_ID } });
+  }, 120_000);
+
+  describe("given a request priced below one microdollar", () => {
+    const budgetId = `bdg-nano-single-${suffix}`;
+
+    /** @scenario "A budget totals a cost that is not a whole number of microdollars" */
+    it("totals the exact nano-USD the request was priced at", async () => {
+      await serveRequest({
+        budgetId,
+        scopeType: "VIRTUAL_KEY",
+        virtualKeyId: SINGLE_VK,
+        window: "MONTH",
+        costNanoUsd: ODD_NANO,
+      });
+
+      const spend = await spendFor(budgetId);
+      expect(spend.spentNanoUsd).toBe(ODD_NANO);
+      expect(spend.spentUsd).toBe("0.00007395");
+    });
+
+    /** @scenario "A budget and its spend events report the same integer" */
+    it("publishes that integer on the wire, with the string derived from it", async () => {
+      const row = await wireRowFor(budgetId);
+
+      expect(row.spent_nano_usd).toBe(ODD_NANO);
+      expect(row.spent_usd).toBe("0.00007395");
+      // The pair is one number in two units, so the ledger settles both.
+      expect(row.spent_nano_usd).toBe(await ledgerNanoFor(budgetId));
+    });
+  });
+
+  describe("when the same total arrives as several requests", () => {
+    const budgetId = `bdg-nano-split-${suffix}`;
+
+    /** @scenario "Per-request rounding does not accumulate across requests" */
+    it("adds the debits rather than adding what each rounds to", async () => {
+      for (let i = 0; i < 3; i++) {
+        await serveRequest({
+          budgetId,
+          scopeType: "VIRTUAL_KEY",
+          virtualKeyId: SPLIT_VK,
+          window: "MONTH",
+          costNanoUsd: THIRD_NANO,
+        });
+      }
+
+      const spend = await spendFor(budgetId);
+      expect(spend.spentNanoUsd).toBe(ODD_NANO);
+      expect(spend.spentNanoUsd).not.toBe(ROUNDED_FIRST_NANO);
+      expect(spend.spentUsd).toBe("0.00007395");
+    });
+  });
+
+  describe("when the budget reads from its own boundary rather than the rollup", () => {
+    const budgetId = `bdg-nano-manual-${suffix}`;
+
+    /** @scenario "A budget reading from its own boundary stays exact" */
+    it("keeps the raw-ledger total exact too", async () => {
+      for (let i = 0; i < 3; i++) {
+        await serveRequest({
+          budgetId,
+          scopeType: "VIRTUAL_KEY",
+          virtualKeyId: MANUAL_VK,
+          window: "MANUAL",
+          costNanoUsd: THIRD_NANO,
+        });
+      }
+
+      const spend = await spendFor(budgetId);
+      expect(spend.spentNanoUsd).toBe(ODD_NANO);
+      expect(spend.spentUsd).toBe("0.00007395");
+    });
+  });
+
+  describe("given a per-person template whose seats have spend", () => {
+    const budgetId = `bdg-nano-seat-${suffix}`;
+
+    it("reports the seats it is watching and no total of its own", async () => {
+      await serveRequest({
+        budgetId,
+        scopeType: "ATTRIBUTED_USER",
+        virtualKeyId: SEAT_VK,
+        window: "MONTH",
+        costNanoUsd: ODD_NANO,
+        endUserId: "person-a",
+      });
+
+      const row = await wireRowFor(budgetId);
+      // One allowance per person is not a total, and a number here reads as
+      // one. The seats are the honest answer.
+      expect(row.spent_usd).toBeNull();
+      expect(row.spent_nano_usd).toBeNull();
+      expect(row.end_users_seen).toBe(1);
+    });
+  });
+});

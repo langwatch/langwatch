@@ -64,9 +64,7 @@ async function fetchAndPrint(url: string): Promise<void> {
 
   if (!response.ok) {
     console.error(
-      chalk.red(
-        `Error fetching ${url}: HTTP ${response.status} ${response.statusText}`,
-      ),
+      chalk.red(`Error fetching ${url}: HTTP ${response.status} ${response.statusText}`),
     );
     process.exit(1);
   }

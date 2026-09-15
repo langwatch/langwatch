@@ -29,7 +29,8 @@ rule:
                     - kind: shorthand_property_identifier
                     - regex: "^signal$"
 files:
-  - "platform/app/src/**/*.ts"
+  - "apps/**/*.ts"
+  - "packages/**/*.ts"
   - "sdks/typescript/src/**/*.ts"
 ignores:
   - "**/*.test.ts"

@@ -1,5 +1,5 @@
 import { bench, describe } from "vitest";
-import { redactSecretsInText } from "../secrets.js";
+import { redactSecretsInText } from "../secrets.ts";
 
 /**
  * Redaction runs on every stored string at ingestion, so its cost is paid per
@@ -29,7 +29,7 @@ const PROSE = payloadOf(
 
 /** A coding-agent transcript: prose, code, JSON, paths, hashes, logs. */
 const MIXED = payloadOf(
-  "The agent read platform/app/src/server/traces/trace.service.ts:72 and " +
+  "The agent read modules/trace/server/src/services/trace-legacy-read.service.ts:72 and " +
     "found the redaction service constructed there.\n" +
     "const apiKey = process.env.OPENAI_API_KEY;\n" +
     '{"traceId":"4bf92f3577b34da6a3ce929d0e0e4736","model":"claude-opus-5"}\n' +

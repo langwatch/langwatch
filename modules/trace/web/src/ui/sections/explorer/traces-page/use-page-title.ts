@@ -1,0 +1,64 @@
+import { useEffect } from "react";
+import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
+import { useDrawerStore } from "../../../../behavior/drawer.store.ts";
+import { useFilterStore } from "../../../../behavior/filter.store.ts";
+
+const BASE_TITLE = "LangWatch";
+const TRACE_ID_LENGTH = 8;
+const MAX_QUERY_LENGTH = 60;
+
+function buildTitle({
+  projectName,
+  drawerTraceId,
+  queryText,
+  timeRangeLabel,
+}: {
+  projectName: string | undefined;
+  drawerTraceId: string | null;
+  queryText: string;
+  timeRangeLabel: string | undefined;
+}): string {
+  const prefix = projectName ? `${BASE_TITLE} – ${projectName}` : BASE_TITLE;
+
+  if (drawerTraceId) {
+    return `${prefix} – Trace ${drawerTraceId.slice(0, TRACE_ID_LENGTH)}`;
+  }
+
+  const trimmed = queryText.trim();
+  if (trimmed) {
+    const clipped =
+      trimmed.length > MAX_QUERY_LENGTH ? `${trimmed.slice(0, MAX_QUERY_LENGTH - 1)}…` : trimmed;
+    return `${prefix} – Traces · ${clipped}`;
+  }
+
+  if (timeRangeLabel) {
+    return `${prefix} – Traces · ${timeRangeLabel}`;
+  }
+
+  return `${prefix} – Traces`;
+}
+
+/**
+ * Keeps `document.title` in sync with the trace view's drawer + filter state.
+ */
+export function useTracesPageTitle(): void {
+  const { project } = useOrganizationTeamProject();
+  const drawerOpen = useDrawerStore((s) => s.isOpen);
+  const drawerTraceId = useDrawerStore((s) => s.traceId);
+  const queryText = useFilterStore((s) => s.queryText);
+  const timeRangeLabel = useFilterStore((s) => s.timeRange.label);
+
+  const activeTraceId = drawerOpen ? drawerTraceId : null;
+
+  useEffect(() => {
+    const title = buildTitle({
+      projectName: project?.name,
+      drawerTraceId: activeTraceId,
+      queryText,
+      timeRangeLabel,
+    });
+    queueMicrotask(() => {
+      document.title = title;
+    });
+  }, [project?.name, activeTraceId, queryText, timeRangeLabel]);
+}

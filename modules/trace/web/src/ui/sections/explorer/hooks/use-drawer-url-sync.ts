@@ -1,0 +1,187 @@
+import { useEffect, useMemo } from "react";
+import { useDrawerParams, useUpdateDrawerParams } from "../../../../behavior/use-drawer.ts";
+import { useRouter } from "@langwatch/ui-host/use-router";
+import {
+  type DrawerUrlState,
+  type DrawerViewMode,
+  isViewMode,
+  isVizTab,
+  parseEditParam,
+  parsePinnedSpansParam,
+  serializePinnedSpansParam,
+  useDrawerStore,
+  type VizTab,
+  viewModeForEditState,
+} from "../../../../behavior/drawer.store.ts";
+
+const DEFAULTS = {
+  // Mirror drawerStore's "summary" default so a popstate into an older
+  // drawer URL without `drawer.mode` doesn't hydrate the store back to
+  // Trace mode — the store's mount-time default is Summary, and the
+  // URL-sync default has to agree or the two paths diverge on back/forward.
+  mode: "summary" as DrawerViewMode,
+  viz: "waterfall" as VizTab,
+} as const;
+
+function parseMode(raw: string | undefined): DrawerViewMode {
+  return raw && isViewMode(raw) ? raw : DEFAULTS.mode;
+}
+
+function parseViz(raw: string | undefined): VizTab {
+  return raw && isVizTab(raw) ? raw : DEFAULTS.viz;
+}
+
+function readUrlState(): DrawerUrlState {
+  if (typeof window === "undefined") {
+    return {
+      viewMode: DEFAULTS.mode,
+      vizTab: DEFAULTS.viz,
+      selectedSpanId: null,
+      pinnedSpanIds: [],
+      isEditing: false,
+    };
+  }
+  const params = new URLSearchParams(window.location.search);
+  const span = params.get("drawer.span");
+  const isEditing = parseEditParam({
+    raw: params.get("drawer.edit"),
+    traceId: params.get("drawer.traceId"),
+  });
+  return {
+    viewMode: viewModeForEditState({
+      viewMode: parseMode(params.get("drawer.mode") ?? undefined),
+      isEditing,
+    }),
+    vizTab: parseViz(params.get("drawer.viz") ?? undefined),
+    selectedSpanId: span,
+    pinnedSpanIds: parsePinnedSpansParam(params.get("drawer.pinnedSpans")),
+    isEditing,
+  };
+}
+
+/**
+ * Single source of truth = `drawerStore`. The URL is a serialization for persistence
+ * (hard reload, deep links) and browser navigation.
+ */
+export function useDrawerUrlSync() {
+  const params = useDrawerParams();
+  const updateDrawerParams = useUpdateDrawerParams();
+  const router = useRouter();
+
+  // Only mirror view-state into the URL once the drawer is actually open in the URL — openDrawer's
+  // navigation is async, and syncing mid-transition would push drawer.mode off a stale asPath that
+  // has no drawer.open/traceId yet, clobbering them so a refresh loses the drawer.
+  const drawerOpenInUrl = router.query["drawer.open"] === "traceV2Details";
+
+  const viewMode = useDrawerStore((s) => s.viewMode);
+  const vizTab = useDrawerStore((s) => s.vizTab);
+  const selectedSpanId = useDrawerStore((s) => s.selectedSpanId);
+  const pinnedSpanIds = useDrawerStore((s) => s.pinnedSpanIds);
+  const isEditing = useDrawerStore((s) => s.isEditing);
+
+  // Parsed URL view of the same fields. We compare against these — not
+  // raw store-vs-store — so a freshly-clicked tab never re-pushes when the
+  // URL already reflects it.
+  const urlMode = parseMode(params.mode);
+  const urlViz = parseViz(params.viz);
+  const urlSpan = params.span ?? null;
+  // `params.pinnedSpans` is a comma string (or undefined). Serialise our
+  // store value the same way so the equality check is one cheap string ==.
+  const urlPinnedRaw = params.pinnedSpans ?? "";
+  const storePinnedRaw = useMemo(
+    () => serializePinnedSpansParam(pinnedSpanIds) ?? "",
+    [pinnedSpanIds],
+  );
+  // The same parser `readUrlState` hydrates through, so what the URL means here
+  // and what it means on a back/forward can never drift apart. A raw `=== "1"`
+  // reads edit mode into a URL the store will never enter it from, and the
+  // effect below then rewrites the URL to settle a disagreement of its own.
+  const isEditingInUrl = parseEditParam({
+    raw: params.edit,
+    traceId: params.traceId,
+  });
+
+  useEffect(() => {
+    if (!drawerOpenInUrl) return;
+    const updates = drawerParamUpdates({
+      isEditing,
+      isEditingInUrl,
+      selectedSpanId,
+      storePinnedRaw,
+      urlMode,
+      urlPinnedRaw,
+      urlSpan,
+      urlViz,
+      viewMode,
+      vizTab,
+    });
+    if (Object.keys(updates).length === 0) return;
+    // Replace, don't push: mode / viz / span / pinned are view-state WITHIN an
+    // already-open drawer, not separate destinations.
+    updateDrawerParams(updates, { push: false });
+  }, [
+    drawerOpenInUrl,
+    viewMode,
+    vizTab,
+    selectedSpanId,
+    storePinnedRaw,
+    isEditing,
+    urlMode,
+    urlViz,
+    urlSpan,
+    urlPinnedRaw,
+    isEditingInUrl,
+    updateDrawerParams,
+  ]);
+
+  useEffect(() => {
+    const onPopState = () => {
+      useDrawerStore.getState().hydrateUrlState(readUrlState());
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []);
+}
+
+/** The drawer params the URL disagrees with, keyed the way `useUpdateDrawerParams` takes them. */
+function drawerParamUpdates({
+  isEditing,
+  isEditingInUrl,
+  selectedSpanId,
+  storePinnedRaw,
+  urlMode,
+  urlPinnedRaw,
+  urlSpan,
+  urlViz,
+  viewMode,
+  vizTab,
+}: {
+  isEditing: boolean;
+  isEditingInUrl: boolean;
+  selectedSpanId: string | null;
+  storePinnedRaw: string;
+  urlMode: DrawerViewMode;
+  urlPinnedRaw: string;
+  urlSpan: string | null;
+  urlViz: VizTab;
+  viewMode: DrawerViewMode;
+  vizTab: VizTab;
+}): Record<string, string | undefined> {
+  const updates: Record<string, string | undefined> = {};
+  if (viewMode !== urlMode) updates.mode = viewMode;
+  if (vizTab !== urlViz) updates.viz = vizTab;
+  if (selectedSpanId !== urlSpan) {
+    updates.span = selectedSpanId ?? undefined;
+  }
+  if (storePinnedRaw !== urlPinnedRaw) {
+    // `undefined` removes the param when the store has zero pins —
+    // keeps the URL clean instead of trailing an empty `drawer.pinnedSpans=`.
+    updates.pinnedSpans = storePinnedRaw || undefined;
+  }
+  if (isEditing !== isEditingInUrl) {
+    // Absent rather than `drawer.edit=0` when reading: the URL only names
+    // the mode when it is on.
+    updates.edit = isEditing ? "1" : undefined;
+  }
+  return updates;
+}

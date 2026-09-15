@@ -1,13 +1,6 @@
 import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
-import {
-  afterAll,
-  beforeAll,
-  beforeEach,
-  describe,
-  expect,
-  it,
-} from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { initConfig } from "../config.js";
 import { createMcpServer } from "../create-mcp-server.js";
 import { handleReportIssue } from "../tools/report-issue.js";
@@ -76,9 +69,9 @@ describe("report_issue", () => {
 
   describe("given nothing to report", () => {
     it("asks for a summary or session content", async () => {
-      await expect(
-        handleReportIssue({ user_approved: true, title: "empty" }),
-      ).rejects.toThrow(/Nothing to report/);
+      await expect(handleReportIssue({ user_approved: true, title: "empty" })).rejects.toThrow(
+        /Nothing to report/,
+      );
     });
   });
 
@@ -139,9 +132,7 @@ describe("report_issue", () => {
         title: "linked",
         summary: "linked report",
       });
-      expect(received[0]?.headers.authorization).toBe(
-        "Bearer sk-lw-mcp-key-abcdef1234567890",
-      );
+      expect(received[0]?.headers.authorization).toBe("Bearer sk-lw-mcp-key-abcdef1234567890");
     });
   });
 });

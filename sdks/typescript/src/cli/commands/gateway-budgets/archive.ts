@@ -9,9 +9,7 @@ import type { CommandResult } from "../../utils/output";
  * Returns the archived budget rather than printing it: the output port renders
  * it in whatever format the caller asked for (utils/output.ts).
  */
-export const archiveGatewayBudgetCommand = async (
-  id: string,
-): Promise<CommandResult | void> => {
+export const archiveGatewayBudgetCommand = async (id: string): Promise<CommandResult | void> => {
   await resolveCredentials();
 
   const service = new GatewayBudgetsApiService();
@@ -26,7 +24,10 @@ export const archiveGatewayBudgetCommand = async (
       data: budget,
       table: () => {
         console.log();
-        console.log(chalk.gray("Archived at: ") + (budget.archived_at ? new Date(budget.archived_at).toLocaleString() : chalk.gray("—")));
+        console.log(
+          chalk.gray("Archived at: ") +
+            (budget.archived_at ? new Date(budget.archived_at).toLocaleString() : chalk.gray("—")),
+        );
         console.log();
       },
     };

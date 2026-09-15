@@ -36,7 +36,7 @@ import {
   type SamplingResult,
 } from "@opentelemetry/sdk-trace-base";
 
-import { currentSessionId } from "./session";
+import { currentSessionId } from "./session.ts";
 
 const SAMPLED: SamplingResult = {
   decision: SamplingDecision.RECORD_AND_SAMPLED,

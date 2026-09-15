@@ -1,0 +1,793 @@
+/**
+ * @vitest-environment jsdom
+ */
+import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { act, cleanup, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { Profiler } from "react";
+import { FormProvider, useForm } from "react-hook-form";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { type Variable, VariablesSection } from "../../../../variables/index.ts";
+import {
+  clearStoreInstances,
+  PromptPlaygroundChatProvider,
+  getStoreForTesting,
+  type PromptTabsCapabilities,
+  type TabData,
+} from "../../../studio-internals.ts";
+import { PromptTabbedSection } from "../prompt-tabbed-section.tsx";
+import { PromptHostProvider } from "../../../../../../model/prompt-host.ts";
+import { FakePromptHost } from "../../../../../../testing.tsx";
+import { type PromptConfigFormValues } from "@langwatch/prompt-contract";
+
+/**
+ * One host for the whole file: nothing here asserts on what the screen asked the
+ * application to do, so a default fake is the whole composition these components need.
+ */
+const testHost = new FakePromptHost();
+
+// Mock localStorage
+const localStorageMock = (() => {
+  let store: Record<string, string> = {};
+  return {
+    getItem: (key: string) => store[key] ?? null,
+    setItem: (key: string, value: string) => {
+      store[key] = value;
+    },
+    removeItem: (key: string) => {
+      delete store[key];
+    },
+    clear: () => {
+      store = {};
+    },
+    key: (index: number) => Object.keys(store)[index] ?? null,
+    get length() {
+      return Object.keys(store).length;
+    },
+  };
+})();
+
+vi.stubGlobal("localStorage", localStorageMock);
+
+/** The browser services the packaged tab store runs on inside this test. */
+const capabilities: PromptTabsCapabilities = {
+  storage: localStorageMock,
+  logger: {
+    info: () => undefined,
+    warn: () => undefined,
+    error: () => undefined,
+  },
+};
+
+const TEST_PROJECT_ID = "test-project";
+
+// Mock useOrganizationTeamProject
+vi.mock("../../../../../../behavior/use-prompt-project.ts", () => ({
+  usePromptProject: () => ({
+    project: { id: TEST_PROJECT_ID },
+    projectId: TEST_PROJECT_ID,
+  }),
+}));
+
+// The locked variables configuration from PromptTabbedSection
+const LOCKED_VARIABLES = new Set(["input"]);
+const VARIABLE_INFO: Record<string, string> = {
+  input: "This value comes from the Conversation tab input",
+};
+
+const renderVariablesSection = (props: {
+  variables: Variable[];
+  onChange?: (variables: Variable[]) => void;
+  values?: Record<string, string>;
+  onValueChange?: (identifier: string, value: string) => void;
+}) => {
+  const onChange = props.onChange ?? vi.fn();
+  const onValueChange = props.onValueChange ?? vi.fn();
+
+  return render(
+    <ChakraProvider value={defaultSystem}>
+      <PromptHostProvider value={testHost}>
+        <VariablesSection
+          variables={props.variables}
+          onChange={onChange}
+          values={props.values ?? {}}
+          onValueChange={onValueChange}
+          showMappings={false}
+          canAddRemove={true}
+          readOnly={false}
+          title="Variables"
+          lockedVariables={LOCKED_VARIABLES}
+          variableInfo={VARIABLE_INFO}
+        />
+      </PromptHostProvider>
+    </ChakraProvider>,
+  );
+};
+
+describe("Playground Variables Section Integration", () => {
+  afterEach(() => {
+    cleanup();
+  });
+
+  describe("locked input variable", () => {
+    it("shows input variable with info icon", () => {
+      renderVariablesSection({
+        variables: [{ identifier: "input", type: "str" }],
+      });
+
+      expect(screen.getByText("input")).toBeInTheDocument();
+      expect(screen.getByTestId("variable-info-input")).toBeInTheDocument();
+    });
+
+    it("does not show delete button for input variable", () => {
+      renderVariablesSection({
+        variables: [{ identifier: "input", type: "str" }],
+      });
+
+      expect(screen.queryByTestId("remove-variable-input")).not.toBeInTheDocument();
+    });
+
+    it("shows delete button for non-locked variables", () => {
+      renderVariablesSection({
+        variables: [
+          { identifier: "input", type: "str" },
+          { identifier: "context", type: "str" },
+        ],
+      });
+
+      // Input should not have delete button
+      expect(screen.queryByTestId("remove-variable-input")).not.toBeInTheDocument();
+      // Context should have delete button
+      expect(screen.getByTestId("remove-variable-context")).toBeInTheDocument();
+    });
+
+    it("prevents editing locked variable name by making it read-only", () => {
+      renderVariablesSection({
+        variables: [{ identifier: "input", type: "str" }],
+      });
+
+      // The variable name should have cursor: default (not pointer) since it's locked
+      const nameElement = screen.getByTestId("variable-name-input");
+      expect(nameElement).toHaveStyle({ cursor: "default" });
+    });
+  });
+
+  describe("adding and removing variables", () => {
+    it("can add a new variable", async () => {
+      const user = userEvent.setup();
+      const onChange = vi.fn();
+
+      renderVariablesSection({
+        variables: [{ identifier: "input", type: "str" }],
+        onChange,
+      });
+
+      // Open the type picker menu and select "Text"
+      await user.click(screen.getByTestId("add-variable-button"));
+      await user.click(screen.getByRole("menuitem", { name: /Text/ }));
+
+      // onChange should be called with the new variable added
+      expect(onChange).toHaveBeenCalledWith([
+        { identifier: "input", type: "str" },
+        { identifier: "input_1", type: "str" },
+      ]);
+    });
+
+    it("can remove a non-locked variable", async () => {
+      const user = userEvent.setup();
+      const onChange = vi.fn();
+
+      renderVariablesSection({
+        variables: [
+          { identifier: "input", type: "str" },
+          { identifier: "context", type: "str" },
+        ],
+        onChange,
+      });
+
+      await user.click(screen.getByTestId("remove-variable-context"));
+
+      // onChange should be called with only input remaining
+      expect(onChange).toHaveBeenCalledWith([{ identifier: "input", type: "str" }]);
+    });
+
+    it("cannot remove the locked input variable", () => {
+      renderVariablesSection({
+        variables: [
+          { identifier: "input", type: "str" },
+          { identifier: "context", type: "str" },
+        ],
+      });
+
+      // Input delete button should not exist
+      expect(screen.queryByTestId("remove-variable-input")).not.toBeInTheDocument();
+      // But we can still see the variable
+      expect(screen.getByText("input")).toBeInTheDocument();
+    });
+  });
+
+  describe("variable values", () => {
+    it("displays values for variables", () => {
+      renderVariablesSection({
+        variables: [
+          { identifier: "input", type: "str" },
+          { identifier: "context", type: "str" },
+        ],
+        values: {
+          input: "Hello world",
+          context: "Some context",
+        },
+      });
+
+      // Values should be shown in inputs
+      const inputs = screen.getAllByRole("textbox");
+      expect(inputs.some((input) => (input as HTMLInputElement).value === "Hello world")).toBe(
+        true,
+      );
+      expect(inputs.some((input) => (input as HTMLInputElement).value === "Some context")).toBe(
+        true,
+      );
+    });
+
+    it("calls onValueChange when value is edited", async () => {
+      const user = userEvent.setup();
+      const onValueChange = vi.fn();
+
+      renderVariablesSection({
+        variables: [{ identifier: "input", type: "str" }],
+        values: { input: "" },
+        onValueChange,
+      });
+
+      const inputs = screen.getAllByRole("textbox");
+      const valueInput = inputs.find((input) => (input as HTMLInputElement).value === "");
+
+      if (valueInput) {
+        await user.type(valueInput, "test");
+        expect(onValueChange).toHaveBeenCalled();
+      }
+    });
+  });
+});
+
+/**
+ * Helper to create a minimal TabData object for testing
+ */
+const createTabData = (overrides?: Partial<TabData>): TabData => ({
+  chat: {
+    initialMessagesFromSpanData: [],
+  },
+  form: {
+    currentValues: {},
+  },
+  meta: {
+    title: null,
+    versionNumber: undefined,
+    scope: undefined,
+  },
+  variableValues: {},
+  ...overrides,
+});
+
+describe("PromptTabbedSection Store Integration", () => {
+  let store: ReturnType<typeof getStoreForTesting>;
+
+  beforeEach(() => {
+    localStorage.clear();
+    clearStoreInstances();
+    store = getStoreForTesting({ projectId: TEST_PROJECT_ID, capabilities });
+  });
+
+  afterEach(() => {
+    cleanup();
+    clearStoreInstances();
+    localStorage.clear();
+  });
+
+  describe("variable values persistence", () => {
+    it("stores variable values in tab data", () => {
+      // Create tab with initial variable values
+      store.getState().addTab({
+        data: createTabData({
+          variableValues: {
+            name: "John",
+            context: "Some context",
+          },
+        }),
+      });
+
+      const tabId = store.getState().windows[0]?.tabs[0]?.id;
+      const tabData = store.getState().getByTabId(tabId!);
+
+      expect(tabData?.variableValues).toEqual({
+        name: "John",
+        context: "Some context",
+      });
+    });
+
+    it("updates variable values via updateTabData", () => {
+      store.getState().addTab({ data: createTabData() });
+
+      const tabId = store.getState().windows[0]?.tabs[0]?.id;
+      expect(tabId).toBeDefined();
+
+      // Simulate what handleValueChange does in PromptTabbedSection
+      store.getState().updateTabData({
+        tabId: tabId!,
+        updater: (data) => ({
+          ...data,
+          variableValues: {
+            ...data.variableValues,
+            name: "Updated value",
+          },
+        }),
+      });
+
+      const tabData = store.getState().getByTabId(tabId!);
+      expect(tabData?.variableValues.name).toBe("Updated value");
+    });
+
+    it("persists variable values to localStorage", () => {
+      const tabId = store.getState().addTab({
+        data: createTabData({
+          variableValues: { name: "Persisted" },
+        }),
+      });
+
+      // Tab data (including variableValues) is persisted under its own
+      // per-tab key, not the top-level window/tab-order index key.
+      const tabStorageKey = `${TEST_PROJECT_ID}:tab:${tabId}`;
+      const storedData = localStorage.getItem(tabStorageKey);
+      expect(storedData).toBeDefined();
+      expect(storedData).toContain("Persisted");
+    });
+
+    it("each tab maintains separate variable values", () => {
+      store.getState().addTab({
+        data: createTabData({ variableValues: { name: "Tab1Value" } }),
+      });
+      store.getState().addTab({
+        data: createTabData({ variableValues: { name: "Tab2Value" } }),
+      });
+
+      const tab1Id = store.getState().windows[0]?.tabs[0]?.id;
+      const tab2Id = store.getState().windows[0]?.tabs[1]?.id;
+
+      const tab1Data = store.getState().getByTabId(tab1Id!);
+      const tab2Data = store.getState().getByTabId(tab2Id!);
+
+      expect(tab1Data?.variableValues.name).toBe("Tab1Value");
+      expect(tab2Data?.variableValues.name).toBe("Tab2Value");
+
+      // Update tab1, tab2 should remain unchanged
+      store.getState().updateTabData({
+        tabId: tab1Id!,
+        updater: (data) => ({
+          ...data,
+          variableValues: { name: "Tab1Updated" },
+        }),
+      });
+
+      expect(store.getState().getByTabId(tab1Id!)?.variableValues.name).toBe("Tab1Updated");
+      expect(store.getState().getByTabId(tab2Id!)?.variableValues.name).toBe("Tab2Value");
+    });
+  });
+
+  describe("demonstrations tab logic", () => {
+    it("demonstrates transposeColumnsFirstToRowsFirstWithId returns empty for no data", async () => {
+      const { transposeColumnsFirstToRowsFirstWithId } =
+        await import("@langwatch/workflow-contract");
+
+      const result = transposeColumnsFirstToRowsFirstWithId({});
+      expect(result).toEqual([]);
+    });
+
+    it("demonstrates transposeColumnsFirstToRowsFirstWithId returns rows for data", async () => {
+      const { transposeColumnsFirstToRowsFirstWithId } =
+        await import("@langwatch/workflow-contract");
+
+      const records = {
+        input: ["hello", "world"],
+        output: ["hi", "earth"],
+      };
+
+      const result = transposeColumnsFirstToRowsFirstWithId(records);
+      expect(result).toHaveLength(2);
+      expect(result[0]).toHaveProperty("input", "hello");
+      expect(result[0]).toHaveProperty("output", "hi");
+    });
+  });
+});
+
+// Mock TabIdContext. tabIdRef lets a test point the component at a real store
+// tab id (defaults to a fixed value for tests that don't touch the store).
+const { tabIdRef } = vi.hoisted(() => ({
+  tabIdRef: { current: "test-tab-id" },
+}));
+vi.mock("../../../studio-internals.ts", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../../studio-internals.ts")>()),
+  useTabId: () => tabIdRef.current,
+}));
+// The chat input reads the tab id from the context module directly, so the
+// aggregator mock above does not reach it.
+vi.mock("../../../../../../model/prompt-tab-context.tsx", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../../../../../model/prompt-tab-context.tsx")>()),
+  useTabId: () => tabIdRef.current,
+}));
+
+// The chat input follows which tab is active; that subscription is its own
+// concern, so it is stubbed here to keep this file about the tab layout.
+vi.mock("../../../../../../behavior/use-is-tab-active.ts", () => ({
+  useIsTabActive: () => true,
+}));
+
+// The conversation pane posts to the playground execution endpoint; stub the
+// hook so this test stays about the tab layout.
+vi.mock("../../../../../../behavior/playground/use-prompt-execution.ts", () => ({
+  usePromptExecution: () => ({
+    messages: [],
+    errors: {},
+    isRunning: false,
+    send: vi.fn(),
+    stop: vi.fn(),
+    reset: vi.fn(),
+    deleteMessage: vi.fn(),
+    setMessages: vi.fn(),
+  }),
+}));
+
+/**
+ * Wrapper component that provides FormContext
+ */
+function FormWrapper({
+  children,
+  defaultValues,
+}: {
+  children: React.ReactNode;
+  defaultValues?: Partial<PromptConfigFormValues>;
+}) {
+  const methods = useForm<PromptConfigFormValues>({
+    defaultValues: {
+      ...defaultValues,
+      version: {
+        parameters: {},
+        configData: {
+          inputs: [],
+          demonstrations: { inline: { records: {} } },
+        },
+        ...defaultValues?.version,
+      },
+    },
+  });
+
+  return <FormProvider {...methods}>{children}</FormProvider>;
+}
+
+const renderPromptTabbedSection = (
+  props: Partial<Parameters<typeof PromptTabbedSection>[0]> = {},
+  formValues?: Partial<PromptConfigFormValues>,
+  host: FakePromptHost = testHost,
+) => {
+  const defaultProps = {
+    layoutMode: "vertical" as const,
+    isPromptExpanded: true,
+    onPositionChange: vi.fn(),
+    onDragEnd: vi.fn(),
+    onToggle: vi.fn(),
+    ...props,
+  };
+
+  return render(
+    <ChakraProvider value={defaultSystem}>
+      <PromptHostProvider value={host}>
+        <PromptPlaygroundChatProvider>
+          <FormWrapper defaultValues={formValues}>
+            <PromptTabbedSection {...defaultProps} />
+          </FormWrapper>
+        </PromptPlaygroundChatProvider>
+      </PromptHostProvider>
+    </ChakraProvider>,
+  );
+};
+
+describe("PromptTabbedSection Layout Modes", () => {
+  beforeEach(() => {
+    localStorage.clear();
+    clearStoreInstances();
+    // Initialize store with a tab
+    const store = getStoreForTesting({ projectId: TEST_PROJECT_ID, capabilities });
+    store.getState().addTab({ data: createTabData() });
+  });
+
+  afterEach(() => {
+    cleanup();
+    clearStoreInstances();
+    localStorage.clear();
+    // Always restore the shared useTabId mock, even if a test asserted and
+    // threw before its own reset, so it can't leak a stale id into later tests.
+    tabIdRef.current = "test-tab-id";
+  });
+
+  describe("vertical layout mode", () => {
+    it("shows resizable divider in vertical mode", () => {
+      renderPromptTabbedSection({ layoutMode: "vertical" });
+
+      expect(screen.getByTestId("resizable-divider")).toBeInTheDocument();
+    });
+
+    it("does not show border-bottom on tabs in vertical mode", () => {
+      renderPromptTabbedSection({ layoutMode: "vertical" });
+
+      // Tabs should not have explicit border-bottom (divider handles it)
+      const tabsList = screen.getByRole("tablist");
+      expect(tabsList).not.toHaveStyle({ borderBottom: "1px solid" });
+    });
+  });
+
+  describe("horizontal layout mode", () => {
+    it("hides resizable divider in horizontal mode", () => {
+      renderPromptTabbedSection({ layoutMode: "horizontal" });
+
+      expect(screen.queryByTestId("resizable-divider")).not.toBeInTheDocument();
+    });
+
+    it("shows border-bottom on tabs in horizontal mode", () => {
+      const { container } = renderPromptTabbedSection({
+        layoutMode: "horizontal",
+      });
+
+      // Tabs should have border-bottom in horizontal mode
+      const tabsList = container.querySelector('[role="tablist"]');
+      expect(tabsList).toBeInTheDocument();
+      // Check the computed style or CSS class
+      expect(tabsList).toHaveStyle({ borderBottomStyle: "solid" });
+    });
+  });
+
+  describe("common features", () => {
+    it("shows Conversation tab in both modes", () => {
+      renderPromptTabbedSection({ layoutMode: "vertical" });
+      expect(screen.getByRole("tab", { name: /conversation/i })).toBeInTheDocument();
+
+      cleanup();
+
+      renderPromptTabbedSection({ layoutMode: "horizontal" });
+      expect(screen.getByRole("tab", { name: /conversation/i })).toBeInTheDocument();
+    });
+
+    it("shows Reset chat button in both modes", () => {
+      renderPromptTabbedSection({ layoutMode: "vertical" });
+      expect(screen.getByRole("button", { name: /reset chat/i })).toBeInTheDocument();
+
+      cleanup();
+
+      renderPromptTabbedSection({ layoutMode: "horizontal" });
+      expect(screen.getByRole("button", { name: /reset chat/i })).toBeInTheDocument();
+    });
+
+    it("shows editable runtime parameters in the Parameters tab", async () => {
+      const user = userEvent.setup();
+      renderPromptTabbedSection(
+        { layoutMode: "vertical" },
+        {
+          version: {
+            parameters: { environment: "production" },
+            configData: {
+              inputs: [],
+              demonstrations: { inline: { records: {} } },
+            },
+          } as any,
+        },
+      );
+
+      await user.click(screen.getByRole("tab", { name: /parameters/i }));
+
+      expect(screen.getByTestId("param-key-0")).toHaveValue("environment");
+      expect(screen.getByTestId("param-value-0")).toHaveValue("production");
+      expect(screen.getByTestId("add-parameter-button")).toBeInTheDocument();
+    });
+
+    /** @scenario Parameters tab shows explanation text distinguishing parameters from variables */
+    it("shows explanation text on Parameters and Variables tabs", async () => {
+      const user = userEvent.setup();
+      renderPromptTabbedSection(
+        { layoutMode: "vertical" },
+        {
+          version: {
+            parameters: {},
+            configData: {
+              inputs: [{ identifier: "input", type: "str" }],
+              demonstrations: { inline: { records: {} } },
+            },
+          } as any,
+        },
+      );
+
+      await user.click(screen.getByRole("tab", { name: /parameters/i }));
+      expect(screen.getByText(/parameters are arbitrary configurations/i)).toBeInTheDocument();
+
+      await user.click(screen.getByRole("tab", { name: /variables/i }));
+      expect(screen.getByText(/variables are substituted into the prompt/i)).toBeInTheDocument();
+    });
+  });
+
+  describe("when the store updates something the section did not select", () => {
+    /** @scenario "The prompt tabbed section stays put on an unrelated store update" */
+    it("does not re-render on an unrelated store update", () => {
+      const store = getStoreForTesting({ projectId: TEST_PROJECT_ID, capabilities });
+      const tabId = store.getState().windows[0]?.tabs[0]?.id;
+      tabIdRef.current = tabId!;
+
+      let renderCount = 0;
+      render(
+        <ChakraProvider value={defaultSystem}>
+          <PromptHostProvider value={testHost}>
+            <PromptPlaygroundChatProvider>
+              <FormWrapper>
+                <Profiler
+                  id="PromptTabbedSection"
+                  onRender={() => {
+                    renderCount += 1;
+                  }}
+                >
+                  <PromptTabbedSection
+                    layoutMode="vertical"
+                    isPromptExpanded={true}
+                    onPositionChange={vi.fn()}
+                    onDragEnd={vi.fn()}
+                    onToggle={vi.fn()}
+                  />
+                </Profiler>
+              </FormWrapper>
+            </PromptPlaygroundChatProvider>
+          </PromptHostProvider>
+        </ChakraProvider>,
+      );
+
+      const renderCountAfterMount = renderCount;
+
+      // A second, unrelated tab is added; this section only selects the
+      // current tab's variableValues and the updateTabData action, so an
+      // addition elsewhere must not re-render it beyond whatever mount
+      // itself already triggered.
+      act(() => {
+        store.getState().addTab({ data: createTabData() });
+      });
+
+      expect(renderCount).toBe(renderCountAfterMount);
+    });
+  });
+
+  describe("when a variable value is edited and the tab unmounts immediately", () => {
+    it("flushes the pending write so the edit is not lost", async () => {
+      const user = userEvent.setup();
+      const store = getStoreForTesting({ projectId: TEST_PROJECT_ID, capabilities });
+      const tabId = store.getState().windows[0]?.tabs[0]?.id;
+      // Point the component's useTabId() at the real store tab so its writes land.
+      tabIdRef.current = tabId!;
+
+      const { unmount } = renderPromptTabbedSection(
+        { layoutMode: "vertical" },
+        {
+          version: {
+            parameters: {},
+            configData: {
+              inputs: [{ identifier: "topic", type: "str" }],
+              demonstrations: { inline: { records: {} } },
+            },
+          } as any,
+        },
+      );
+
+      await user.click(screen.getByRole("tab", { name: /variables/i }));
+      const textboxes = await screen.findAllByRole("textbox");
+      const valueInput = textboxes.find(
+        (el) => el.tagName === "INPUT" && (el as HTMLInputElement).value === "",
+      );
+      expect(valueInput).toBeDefined();
+      await user.type(valueInput!, "flushed");
+
+      // The 300ms debounce has NOT fired yet (test is faster). Unmounting the
+      // tab (as switching prompt tabs does) must flush the pending write rather
+      // than cancel it - otherwise the edit is lost.
+      unmount();
+
+      expect(store.getState().getByTabId(tabId!)?.variableValues.topic).toBe("flushed");
+      // (afterEach restores tabIdRef even if the assertion above throws)
+    });
+  });
+
+  describe("when a tab is switched away from and reopened", () => {
+    it("restores the variable value the user had typed", async () => {
+      const user = userEvent.setup();
+      const store = getStoreForTesting({ projectId: TEST_PROJECT_ID, capabilities });
+      const tabId = store.getState().windows[0]?.tabs[0]?.id;
+      tabIdRef.current = tabId!;
+
+      const formValues = {
+        version: {
+          parameters: {},
+          configData: {
+            inputs: [{ identifier: "topic", type: "str" }],
+            demonstrations: { inline: { records: {} } },
+          },
+        } as any,
+      };
+
+      // Mount, type a value, then unmount - this is "switch away".
+      const first = renderPromptTabbedSection({ layoutMode: "vertical" }, formValues);
+      await user.click(screen.getByRole("tab", { name: /variables/i }));
+      const emptyInput = (await screen.findAllByRole("textbox")).find(
+        (el) => el.tagName === "INPUT" && (el as HTMLInputElement).value === "",
+      );
+      await user.type(emptyInput!, "kept");
+      first.unmount();
+
+      // "Switch back": a fresh mount of the same tab must show the value again,
+      // proving the full round-trip (flush on unmount -> restore from store).
+      renderPromptTabbedSection({ layoutMode: "vertical" }, formValues);
+      await user.click(screen.getByRole("tab", { name: /variables/i }));
+      const restored = (await screen.findAllByRole("textbox")).find(
+        (el) => el.tagName === "INPUT" && (el as HTMLInputElement).value === "kept",
+      );
+      expect(restored).toBeDefined();
+    });
+  });
+});
+
+/**
+ * The Conversation tab on a deployment that runs no chat runtime.
+ */
+describe("given a deployment that runs no playground chat", () => {
+  const unavailableHost = new FakePromptHost({
+    playgroundChat: {
+      available: false,
+      title: "The playground chat isn't available here",
+      description: "This deployment doesn't run the chat playground.",
+    },
+  });
+
+  beforeEach(() => {
+    localStorage.clear();
+    clearStoreInstances();
+    const store = getStoreForTesting({ projectId: TEST_PROJECT_ID, capabilities });
+    store.getState().addTab({ data: createTabData() });
+  });
+
+  afterEach(() => {
+    cleanup();
+    clearStoreInstances();
+    localStorage.clear();
+    tabIdRef.current = "test-tab-id";
+  });
+
+  describe("when the reader opens the Conversation tab", () => {
+    /** @scenario "The Conversation tab explains an absent chat runtime" */
+    it("explains the absence instead of mounting a chat that cannot send", () => {
+      renderPromptTabbedSection({ layoutMode: "vertical" }, void 0, unavailableHost);
+
+      expect(screen.getByText("The playground chat isn't available here")).toBeInTheDocument();
+      expect(
+        screen.getByText("This deployment doesn't run the chat playground."),
+      ).toBeInTheDocument();
+      expect(screen.queryByPlaceholderText(/type your message here/i)).not.toBeInTheDocument();
+    });
+
+    /** @scenario "An absent chat runtime offers nothing to reset" */
+    it("offers no reset for a chat that is not there", () => {
+      renderPromptTabbedSection({ layoutMode: "vertical" }, void 0, unavailableHost);
+
+      expect(screen.queryByRole("button", { name: /reset chat/i })).not.toBeInTheDocument();
+    });
+  });
+
+  describe("when the deployment does run one", () => {
+    /** @scenario "The Conversation tab mounts the chat where a runtime is served" */
+    it("mounts the chat as before", () => {
+      renderPromptTabbedSection({ layoutMode: "vertical" });
+
+      expect(screen.getByPlaceholderText(/type your message here/i)).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /reset chat/i })).toBeInTheDocument();
+    });
+  });
+});

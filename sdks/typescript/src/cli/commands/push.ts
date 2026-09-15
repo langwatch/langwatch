@@ -11,11 +11,7 @@ import {
   PromptsError,
   type SyncAction,
 } from "@/client-sdk/services/prompts";
-import type {
-  PromptsConfig,
-  PromptsLock,
-  SyncResult,
-} from "../types";
+import type { PromptsConfig, PromptsLock, SyncResult } from "../types";
 import { FileManager } from "../utils/fileManager";
 import { ensureProjectInitialized } from "../utils/init";
 import { resolveCredentials } from "../utils/apiKey";
@@ -32,15 +28,13 @@ const handleConflict = async (
     remoteConfigData: any;
   },
 
-  forceResolution?: "local" | "remote"
+  forceResolution?: "local" | "remote",
 ): Promise<"local" | "remote" | "abort"> => {
-  console.log(
-    chalk.yellow(`\n⚠ Conflict detected for prompt: ${chalk.cyan(promptName)}`)
-  );
+  console.log(chalk.yellow(`\n⚠ Conflict detected for prompt: ${chalk.cyan(promptName)}`));
   console.log(
     chalk.gray(
-      `Local version: ${conflictInfo.localVersion}, Remote version: ${conflictInfo.remoteVersion}`
-    )
+      `Local version: ${conflictInfo.localVersion}, Remote version: ${conflictInfo.remoteVersion}`,
+    ),
   );
 
   if (conflictInfo.differences.length > 0) {
@@ -52,7 +46,11 @@ const handleConflict = async (
 
   // Auto-resolve if --force-local or --force-remote was passed
   if (forceResolution) {
-    console.log(chalk.yellow(`\nAuto-resolving conflict: using ${forceResolution} version (--force-${forceResolution})`));
+    console.log(
+      chalk.yellow(
+        `\nAuto-resolving conflict: using ${forceResolution} version (--force-${forceResolution})`,
+      ),
+    );
     return forceResolution;
   }
 
@@ -98,16 +96,12 @@ export const pushPrompts = async ({
   result: SyncResult;
   forceResolution?: "local" | "remote";
 }): Promise<void> => {
-  const localFileRefs = Object.entries(config.prompts).filter(
-    ([, dependency]) => {
-      return typeof dependency === "string" && dependency.startsWith("file:");
-    }
-  );
+  const localFileRefs = Object.entries(config.prompts).filter(([, dependency]) => {
+    return typeof dependency === "string" && dependency.startsWith("file:");
+  });
 
   if (localFileRefs.length > 0) {
-    const pushSpinner = createSpinner(
-      `Pushing ${localFileRefs.length} local prompts...`
-    ).start();
+    const pushSpinner = createSpinner(`Pushing ${localFileRefs.length} local prompts...`).start();
 
     for (const [promptName, dependency] of localFileRefs) {
       try {
@@ -121,17 +115,14 @@ export const pushPrompts = async ({
         // schema expands back into flat platform fields; a richer schema is
         // preserved verbatim as one json_schema output. Exact inverse of the
         // pull direction (outputsToResponseFormat) so push/pull is lossless.
-        const outputs: ConfigData["outputs"] =
-          (responseFormatToOutputs(
-            (localConfig as any).response_format,
-          ) as ConfigData["outputs"]) ?? [{ identifier: "output", type: "str" }];
+        const outputs: ConfigData["outputs"] = (responseFormatToOutputs(
+          (localConfig as any).response_format,
+        ) as ConfigData["outputs"]) ?? [{ identifier: "output", type: "str" }];
 
         const configData: ConfigData = {
           model: localConfig.model,
           prompt: PromptConverter.extractSystemPrompt(localConfig.messages),
-          messages: PromptConverter.filterNonSystemMessages(
-            localConfig.messages
-          ) as Array<{
+          messages: PromptConverter.filterNonSystemMessages(localConfig.messages) as Array<{
             role: "system" | "user" | "assistant";
             content: string;
           }>,
@@ -158,7 +149,7 @@ export const pushPrompts = async ({
           conflictResolution = await handleConflict(
             promptName,
             syncResult.conflictInfo!,
-            forceResolution
+            forceResolution,
           );
           if (conflictResolution === "abort") {
             result.errors.push({
@@ -169,15 +160,12 @@ export const pushPrompts = async ({
           }
 
           if (conflictResolution === "remote" && syncResult.conflictInfo) {
-            const remoteParameters =
-              syncResult.conflictInfo.remoteParameters ?? {};
+            const remoteParameters = syncResult.conflictInfo.remoteParameters ?? {};
             const remotePrompt = {
               model: syncResult.conflictInfo.remoteConfigData.model,
               modelParameters: {
-                temperature:
-                  syncResult.conflictInfo.remoteConfigData.temperature,
-                max_tokens:
-                  syncResult.conflictInfo.remoteConfigData.max_tokens,
+                temperature: syncResult.conflictInfo.remoteConfigData.temperature,
+                max_tokens: syncResult.conflictInfo.remoteConfigData.max_tokens,
               },
               messages: [
                 {
@@ -189,9 +177,7 @@ export const pushPrompts = async ({
               // Only write `parameters` when present, matching
               // PromptConverter.fromMaterializedToYaml — avoids writing an
               // empty `parameters: {}` into prompt files that have none.
-              ...(Object.keys(remoteParameters).length > 0
-                ? { parameters: remoteParameters }
-                : {}),
+              ...(Object.keys(remoteParameters).length > 0 ? { parameters: remoteParameters } : {}),
             };
 
             const yamlContent = yaml.dump(remotePrompt, {
@@ -224,7 +210,7 @@ export const pushPrompts = async ({
             const formattedConfig = PromptConverter.fromLocalToApiFormat(localConfig);
             const updatedPrompt = await promptsApiService.update(promptName, {
               ...formattedConfig,
-              commitMessage: `Updated via CLI: synced from local file`
+              commitMessage: `Updated via CLI: synced from local file`,
             });
             lock.prompts[promptName] = {
               version: updatedPrompt.version,
@@ -267,20 +253,13 @@ export const pushPrompts = async ({
           });
         }
 
-        pushSpinner.text = `${actionText} ${chalk.cyan(
-          promptName
-        )} ${chalk.gray(
+        pushSpinner.text = `${actionText} ${chalk.cyan(promptName)} ${chalk.gray(
           `(version ${
-            syncResult.prompt?.version ??
-            syncResult.conflictInfo?.remoteVersion ??
-            "unknown"
-          })`
-        )} ${conflictResolution === "remote" ? "to" : "from"} ${chalk.gray(
-          relativePath
-        )}`;
+            syncResult.prompt?.version ?? syncResult.conflictInfo?.remoteVersion ?? "unknown"
+          })`,
+        )} ${conflictResolution === "remote" ? "to" : "from"} ${chalk.gray(relativePath)}`;
       } catch (error) {
-        const errorMessage =
-          formatApiErrorMessage({ error });
+        const errorMessage = formatApiErrorMessage({ error });
         result.errors.push({ name: promptName, error: errorMessage });
       }
     }
@@ -298,10 +277,8 @@ export const pushPrompts = async ({
   if (orphanFiles.length > 0) {
     console.log(
       chalk.yellow(
-        `\n⚠ Found ${orphanFiles.length} orphan prompt file${
-          orphanFiles.length > 1 ? "s" : ""
-        }:`
-      )
+        `\n⚠ Found ${orphanFiles.length} orphan prompt file${orphanFiles.length > 1 ? "s" : ""}:`,
+      ),
     );
 
     for (const filePath of orphanFiles) {
@@ -309,37 +286,23 @@ export const pushPrompts = async ({
       const relativePath = path.relative(process.cwd(), filePath);
 
       console.log(chalk.yellow(`  ${relativePath}`));
-      console.log(
-        chalk.gray(
-          `    Add to prompts.json: "${promptName}": "file:${relativePath}"`
-        )
-      );
+      console.log(chalk.gray(`    Add to prompts.json: "${promptName}": "file:${relativePath}"`));
     }
 
-    console.log(
-      chalk.gray(
-        `\nTip: Add these to prompts.json to include them in push operations.`
-      )
-    );
+    console.log(chalk.gray(`\nTip: Add these to prompts.json to include them in push operations.`));
   }
 };
 
-const printPushResults = ({
-  result,
-  duration,
-}: {
-  result: SyncResult;
-  duration: string;
-}): void => {
+const printPushResults = ({ result, duration }: { result: SyncResult; duration: string }): void => {
   if (result.pushed.length > 0) {
     for (const { name, version } of result.pushed) {
       const localPath = `./prompts/${name}.prompt.yaml`;
       console.log(
         chalk.green(
           `✓ Pushed ${chalk.cyan(name)} ${chalk.gray(
-            `(version ${version})`
-          )} from ${chalk.gray(localPath)}`
-        )
+            `(version ${version})`,
+          )} from ${chalk.gray(localPath)}`,
+        ),
       );
     }
   }
@@ -349,9 +312,9 @@ const printPushResults = ({
       console.log(
         chalk.green(
           `✓ Pulled ${chalk.cyan(name)} ${chalk.gray(
-            `(version ${version})`
-          )} (resolved conflict with remote)`
-        )
+            `(version ${version})`,
+          )} (resolved conflict with remote)`,
+        ),
       );
     }
   }
@@ -368,18 +331,19 @@ const printPushResults = ({
     console.log(chalk.gray(`Pushed in ${duration}s, no changes`));
   } else {
     const summary = [];
-    if (result.pushed.length > 0)
-      summary.push(`${result.pushed.length} pushed`);
+    if (result.pushed.length > 0) summary.push(`${result.pushed.length} pushed`);
     if (result.fetched.length > 0)
       summary.push(`${result.fetched.length} pulled (conflict resolution)`);
-    if (result.errors.length > 0)
-      summary.push(`${result.errors.length} errors`);
+    if (result.errors.length > 0) summary.push(`${result.errors.length} errors`);
 
     console.log(chalk.gray(`Pushed ${summary.join(", ")} in ${duration}s`));
   }
 };
 
-export const pushCommand = async (options?: { forceLocal?: boolean; forceRemote?: boolean }): Promise<void> => {
+export const pushCommand = async (options?: {
+  forceLocal?: boolean;
+  forceRemote?: boolean;
+}): Promise<void> => {
   console.log("⬆️  Pushing local prompts...");
 
   const startTime = Date.now();
@@ -402,7 +366,13 @@ export const pushCommand = async (options?: { forceLocal?: boolean; forceRemote?
       errors: [],
     };
 
-    await pushPrompts({ config, lock, promptsApiService, result, forceResolution: options?.forceLocal ? "local" : options?.forceRemote ? "remote" : undefined });
+    await pushPrompts({
+      config,
+      lock,
+      promptsApiService,
+      result,
+      forceResolution: options?.forceLocal ? "local" : options?.forceRemote ? "remote" : undefined,
+    });
 
     FileManager.savePromptsLock(lock);
 
@@ -416,13 +386,7 @@ export const pushCommand = async (options?: { forceLocal?: boolean; forceRemote?
     if (error instanceof PromptsError) {
       console.error(chalk.red(`Error: ${error.message}`));
     } else {
-      console.error(
-        chalk.red(
-          `Unexpected error: ${
-            formatApiErrorMessage({ error })
-          }`
-        )
-      );
+      console.error(chalk.red(`Unexpected error: ${formatApiErrorMessage({ error })}`));
     }
     process.exit(1);
   }

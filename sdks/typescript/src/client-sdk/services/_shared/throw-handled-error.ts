@@ -12,10 +12,7 @@
  * behaviour byte for byte, including the message, because the sentence the
  * generic path already built is handed in and reused rather than rebuilt.
  */
-import {
-  handledErrorFrom,
-  type LangWatchHandledError,
-} from "@/internal/api/errors";
+import { handledErrorFrom, type LangWatchHandledError } from "@/internal/api/errors";
 import { extractStatusFromResponse } from "./format-api-error";
 
 export interface ThrowIfHandledErrorParams {
@@ -42,8 +39,7 @@ export function throwIfHandledError({
   status,
   message,
 }: ThrowIfHandledErrorParams): void {
-  const resolved =
-    status ?? response?.status ?? extractStatusFromResponse(error);
+  const resolved = status ?? response?.status ?? extractStatusFromResponse(error);
 
   const handledError: LangWatchHandledError | null = handledErrorFrom({
     operation,

@@ -15,15 +15,8 @@ export interface DefinitionFlags {
 export class WidgetInputError extends Error {}
 
 /**
- * Resolves the definition flags into the request's `{ code, queries }`, or
- * undefined when no definition flag was supplied at all (an update touching
- * only the name).
- *
- * `--code` and `--code-file` are mutually exclusive. Code and queries travel
- * together: the widget's `graph` blob holds both, so a definition needs the
- * source file (`--code`/`--code-file`) *and* its named queries
- * (`--queries-file`) — offering one without the other is refused here rather
- * than writing half a widget.
+ * Resolves definition flags to { code, queries }, refusing partial
+ * definitions (both source and queries required together).
  */
 export const resolveDefinitionInput = (
   flags: DefinitionFlags,

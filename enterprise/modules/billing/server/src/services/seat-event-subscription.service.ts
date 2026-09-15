@@ -1,0 +1,472 @@
+import { createLogger } from "@langwatch/observability";
+import { nanoid } from "nanoid";
+import type Stripe from "stripe";
+import {
+  AmbiguousSubscriptionError,
+  Currency,
+  type Currency as CurrencyType,
+  type BillingInterval,
+  createCheckoutLineItems,
+  GROWTH_SEAT_PLAN_TYPES,
+  isGrowthSeatPrice,
+  NoActiveSubscriptionError,
+  resolveGrowthSeatPlanType,
+  type StripePriceMap,
+  SubscriptionItemNotFoundError,
+  SubscriptionNotLinkedError,
+  SubscriptionStatus,
+} from "@langwatch/enterprise-billing-contract";
+import type { StripeCustomerCurrencyService } from "./stripe-customer-currency.service.ts";
+import {
+  type InviteInput,
+  type SeatEventDatabase,
+  type SeatEventProrationQuote,
+  quotedAmounts,
+  resolveProrationDate,
+  seatChangeParams,
+} from "../rules/seat-event-quote.rules.ts";
+import { nowInstant, Temporal, toDate } from "@langwatch/time";
+
+const logger = createLogger("langwatch:billing:seatEventSubscription");
+
+export class SeatEventSubscriptionService {
+  private constructor(
+    private readonly stripe: Stripe,
+    private readonly db: SeatEventDatabase,
+    private readonly prices: StripePriceMap,
+    private readonly customerCurrency: StripeCustomerCurrencyService,
+  ) {}
+
+  static create(options: {
+    stripe: Stripe;
+    database: SeatEventDatabase;
+    prices: StripePriceMap;
+    customerCurrency: StripeCustomerCurrencyService;
+  }): SeatEventSubscriptionService {
+    return new SeatEventSubscriptionService(
+      options.stripe,
+      options.database,
+      options.prices,
+      options.customerCurrency,
+    );
+  }
+
+  /**
+   * The subscription a seat change should act on, or a named reason there isn't one.
+   */
+  private async findSeatSubscription(organizationId: string) {
+    const candidates = await this.db.subscription.findMany({
+      where: {
+        organizationId,
+        status: {
+          in: [SubscriptionStatus.ACTIVE, SubscriptionStatus.CANCELLED],
+        },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    const linked = (subscription: (typeof candidates)[number]) =>
+      subscription.stripeSubscriptionId !== null;
+
+    const active = candidates.filter((s) => s.status === SubscriptionStatus.ACTIVE);
+
+    // Two live plans on one account: refuse, do not choose. There is no unique
+    // index on `organizationId`, and the backoffice form writes ACTIVE rows
+    // with no uniqueness check, so this state is reachable and the row that
+    // still carries a provider id is not reliably the one the operator meant
+    // to keep. Charging either is a coin flip against a customer's card.
+    if (active.length > 1) {
+      logger.error(
+        {
+          organizationId,
+          subscriptionIds: active.map((s) => s.id),
+          linkedCount: active.filter(linked).length,
+        },
+        "[billing] Organization has multiple active subscriptions; refusing to guess which one a seat change belongs to",
+      );
+
+      throw new AmbiguousSubscriptionError(active.length);
+    }
+
+    // A live subscription we can act on beats everything.
+    const activeLinked = candidates.find(
+      (s) => s.status === SubscriptionStatus.ACTIVE && linked(s),
+    );
+    if (activeLinked?.stripeSubscriptionId) {
+      return {
+        ...activeLinked,
+        stripeSubscriptionId: activeLinked.stripeSubscriptionId,
+      };
+    }
+
+    // An ACTIVE row with no link outranks any cancelled one: it is the
+    // organization's current plan, and it is the state only an operator can
+    // clear (nothing but the checkout webhook ever writes the link).
+    const activeUnlinked = candidates.find(
+      (s) => s.status === SubscriptionStatus.ACTIVE && !linked(s),
+    );
+    if (activeUnlinked) {
+      logger.error(
+        { organizationId, subscriptionId: activeUnlinked.id },
+        "[billing] Active subscription has no billing-provider link; seat changes need one to be connected by hand",
+      );
+
+      throw new SubscriptionNotLinkedError();
+    }
+
+    // Cancelled in our records but possibly still live at the provider —
+    // updating seats is how a customer reverses a scheduled cancellation.
+    const cancelledLinked = candidates.find((s) => linked(s));
+    if (cancelledLinked?.stripeSubscriptionId) {
+      return {
+        ...cancelledLinked,
+        stripeSubscriptionId: cancelledLinked.stripeSubscriptionId,
+      };
+    }
+
+    throw new NoActiveSubscriptionError();
+  }
+
+  /** The subscription, its provider record, and the seat line to change. */
+  private async loadSeatChangeTarget(organizationId: string) {
+    const subscription = await this.findSeatSubscription(organizationId);
+
+    const stripeSubscription = await this.stripe.subscriptions.retrieve(
+      subscription.stripeSubscriptionId,
+    );
+
+    // Must still be live at the provider, even if scheduled for cancellation.
+    if (stripeSubscription.status !== "active") {
+      throw new NoActiveSubscriptionError();
+    }
+
+    const seatItem = stripeSubscription.items.data.find((item) =>
+      isGrowthSeatPrice(item.price.id, this.prices),
+    );
+
+    if (!seatItem) {
+      throw new SubscriptionItemNotFoundError("seat");
+    }
+
+    return { subscription, stripeSubscription, seatItem };
+  }
+
+  async createSeatEventCheckout({
+    organizationId,
+    customerId,
+    baseUrl,
+    currency,
+    billingInterval,
+    membersToAdd,
+    isUpgradeFromTiered = false,
+    invites,
+  }: {
+    organizationId: string;
+    customerId: string;
+    baseUrl: string;
+    currency: CurrencyType;
+    billingInterval: BillingInterval;
+    membersToAdd: number;
+    isUpgradeFromTiered?: boolean;
+    invites?: InviteInput[];
+  }): Promise<{ url: string | null }> {
+    // Resolve the currency before touching the database. A checkout we cannot
+    // build in the customer's own currency will be rejected outright, and every
+    // write below this point would have to be cleaned up afterwards.
+    const checkoutCurrency = this.customerCurrency.getCurrency(
+      await this.customerCurrency.resolve({
+        stripe: this.stripe,
+        customerId,
+        organizationId,
+        requestedCurrency: currency,
+      }),
+    );
+
+    await this.cancelAbandonedCheckouts(organizationId);
+
+    // Build line items BEFORE persisting anything so a validation failure
+    // doesn't leave orphaned pending records in the database.
+    const lineItems = createCheckoutLineItems({
+      coreMembers: membersToAdd,
+      currency: checkoutCurrency,
+      interval: billingInterval,
+      prices: this.prices,
+    });
+
+    const subscription = await this.createPendingSubscription({
+      organizationId,
+      membersToAdd,
+      checkoutCurrency,
+      billingInterval,
+      invites,
+    });
+
+    const selectedOptionsMetadata = {
+      selectedCurrency: checkoutCurrency,
+      selectedBillingInterval: billingInterval,
+    };
+
+    // Anchor billing cycle to the 1st of next month for all plans.
+    // Customer pays prorated amount for the partial period (checkout → anchor),
+    // then full price (monthly or annual) starting on the 1st.
+    const now = nowInstant().toZonedDateTimeISO("UTC");
+    const billingCycleAnchor = Temporal.PlainDateTime.from({
+      year: now.year,
+      month: now.month,
+      day: 1,
+    })
+      .toZonedDateTime("UTC")
+      .add({ months: 1 })
+      .toInstant();
+    const subscriptionData: Stripe.Checkout.SessionCreateParams["subscription_data"] = {
+      metadata: selectedOptionsMetadata,
+      billing_cycle_anchor: Math.floor(billingCycleAnchor.epochMilliseconds / 1000),
+      proration_behavior:
+        "create_prorations" as Stripe.Checkout.SessionCreateParams.SubscriptionData.ProrationBehavior,
+    };
+
+    const session = await this.stripe.checkout.sessions.create({
+      mode: "subscription",
+      currency: checkoutCurrency.toLowerCase(),
+      ...({ adaptive_pricing: { enabled: false } } as Record<string, unknown>),
+      customer: customerId,
+      customer_update: {
+        address: "auto",
+        name: "auto",
+      },
+      automatic_tax: { enabled: true },
+      billing_address_collection: "required",
+      tax_id_collection: { enabled: true },
+      line_items: lineItems,
+      metadata: selectedOptionsMetadata,
+      subscription_data: subscriptionData,
+      success_url: `${baseUrl}/settings/subscription?success${isUpgradeFromTiered ? "&upgraded_from=tiered" : ""}`,
+      cancel_url: `${baseUrl}/settings/subscription`,
+      client_reference_id: `subscription_setup_${subscription.id}`,
+      allow_promotion_codes: true,
+    });
+
+    return { url: session.url };
+  }
+
+  /**
+   * Cancels the PENDING subscriptions abandoned checkouts left behind, and the
+   * PAYMENT_PENDING invites that hung off them.
+   */
+  private async cancelAbandonedCheckouts(organizationId: string): Promise<void> {
+    const where = {
+      organizationId,
+      plan: { in: [...GROWTH_SEAT_PLAN_TYPES] },
+      status: SubscriptionStatus.PENDING,
+    };
+    const staleSubs = await this.db.subscription.findMany({ where, select: { id: true } });
+    const staleSubIds = staleSubs.map((s) => s.id);
+
+    await this.db.subscription.updateMany({
+      where,
+      data: { status: SubscriptionStatus.CANCELLED, endDate: toDate(nowInstant()) },
+    });
+    if (staleSubIds.length === 0) {
+      return;
+    }
+
+    await this.db.organizationInvite.deleteMany({
+      where: {
+        organizationId,
+        status: "PAYMENT_PENDING",
+        subscriptionId: { in: staleSubIds },
+      },
+    });
+  }
+
+  /** The pending subscription and the payment-pending invites it pays for, written together. */
+  private async createPendingSubscription({
+    organizationId,
+    membersToAdd,
+    checkoutCurrency,
+    billingInterval,
+    invites,
+  }: {
+    organizationId: string;
+    membersToAdd: number;
+    checkoutCurrency: Currency;
+    billingInterval: BillingInterval;
+    invites?: InviteInput[];
+  }): Promise<{ id: string }> {
+    return this.db.$transaction(async (tx) => {
+      const sub = await tx.subscription.create({
+        data: {
+          organizationId,
+          status: SubscriptionStatus.PENDING,
+          plan: resolveGrowthSeatPlanType({
+            currency: checkoutCurrency,
+            interval: billingInterval,
+          }),
+          maxMembers: membersToAdd,
+        },
+      });
+
+      for (const invite of invites ?? []) {
+        // Skip duplicates: an existing PENDING or PAYMENT_PENDING invite.
+        const existing = await tx.organizationInvite.findFirst({
+          where: {
+            email: invite.email,
+            organizationId,
+            status: { in: ["PENDING", "PAYMENT_PENDING"] },
+            OR: [{ expiration: { gt: toDate(nowInstant()) } }, { expiration: null }],
+          },
+        });
+        if (existing) {
+          continue;
+        }
+
+        await tx.organizationInvite.create({
+          data: {
+            email: invite.email,
+            inviteCode: nanoid(),
+            expiration: null,
+            organizationId,
+            teamIds: invite.teamIds,
+            role: invite.role,
+            status: "PAYMENT_PENDING",
+            subscriptionId: sub.id,
+          },
+        });
+      }
+
+      return sub;
+    });
+  }
+
+  async updateSeatEventItems({
+    organizationId,
+    totalMembers,
+    quotedAt,
+  }: {
+    organizationId: string;
+    totalMembers: number;
+    /**
+     * The instant a quote for this change was priced, from
+     * {@link previewProration}. Omitted by callers acting without a quote on
+     * screen, which are then priced at the moment they run.
+     */
+    quotedAt?: number;
+  }): Promise<{ success: true }> {
+    // Every failure below throws rather than returning `{ success: false }`:
+    // a silent false used to resolve the mutation as a success, so the UI
+    // toasted "Seats updated successfully" over a seat count that never moved.
+
+    // First, so an expired quote is refused before the provider is touched.
+    const prorationDate = resolveProrationDate(quotedAt);
+
+    const { subscription, stripeSubscription, seatItem } =
+      await this.loadSeatChangeTarget(organizationId);
+
+    // Charges the proration immediately, and reactivates the subscription if
+    // it was scheduled for cancellation — the customer buying a seat is
+    // choosing to keep it.
+    await this.stripe.subscriptions.update(
+      subscription.stripeSubscriptionId,
+      seatChangeParams({
+        stripeSubscription,
+        seatItem,
+        quantity: totalMembers,
+        prorationDate,
+      }),
+    );
+
+    // Restore DB record to ACTIVE with updated seat count
+    await this.db.subscription.update({
+      where: { id: subscription.id },
+      data: {
+        status: SubscriptionStatus.ACTIVE,
+        maxMembers: totalMembers,
+        endDate: null,
+      },
+    });
+
+    return { success: true };
+  }
+
+  async previewProration({
+    organizationId,
+    newTotalSeats,
+  }: {
+    organizationId: string;
+    newTotalSeats: number;
+  }): Promise<SeatEventProrationQuote> {
+    const prorationDate = resolveProrationDate(undefined);
+
+    const { subscription, stripeSubscription, seatItem } =
+      await this.loadSeatChangeTarget(organizationId);
+
+    // Preview the exact change the confirm button performs. This goes through
+    // the Create Preview Invoice API, not the Upcoming Invoice API: Stripe
+    // rejects `retrieveUpcoming` for subscriptions on flexible billing mode on
+    // every API version, and subscriptions migrated to flexible billing are
+    // live customer state.
+    const preview = await this.stripe.invoices.createPreview({
+      subscription: subscription.stripeSubscriptionId,
+      subscription_details: seatChangeParams({
+        stripeSubscription,
+        seatItem,
+        quantity: newTotalSeats,
+        prorationDate,
+      }),
+    });
+
+    const currency = (preview.currency?.toUpperCase() ?? Currency.USD) as CurrencyType;
+    const billingInterval = seatItem.price.recurring?.interval ?? "month";
+
+    const { prorationCents, creditAppliedCents } = quotedAmounts(preview);
+
+    // Recurring total: new seat count × per-seat price.
+    const unitAmountCents = seatItem.price.unit_amount;
+    if (unitAmountCents === null) {
+      throw new SubscriptionItemNotFoundError("seat_unit_amount");
+    }
+
+    const recurringTotalCents = newTotalSeats * unitAmountCents;
+
+    const format = (cents: number) => {
+      const amount = cents / 100;
+
+      return new Intl.NumberFormat(currency === Currency.EUR ? "en-IE" : "en-US", {
+        style: "currency",
+        currency,
+        minimumFractionDigits: Number.isInteger(amount) ? 0 : 2,
+        maximumFractionDigits: 2,
+      }).format(amount);
+    };
+
+    return {
+      // Signed, so the dialog can tell a charge from a credit: removing
+      // seats previews a negative amount.
+      amountDueCents: prorationCents,
+      formattedAmountDue: format(prorationCents),
+      // Null rather than a formatted zero: the dialog should say nothing at
+      // all about credit on an account that has none.
+      formattedCreditApplied: creditAppliedCents > 0 ? format(creditAppliedCents) : null,
+      formattedRecurringTotal: format(recurringTotalCents),
+      billingInterval,
+      // The instant this quote priced. Sent back on confirm so the charge is
+      // computed against the same moment the customer was shown.
+      quotedAt: prorationDate,
+    };
+  }
+
+  async seatEventBillingPortalUrl({
+    customerId,
+    baseUrl,
+  }: {
+    customerId: string;
+    baseUrl: string;
+  }): Promise<{ url: string }> {
+    const session = await this.stripe.billingPortal.sessions.create({
+      customer: customerId,
+      return_url: `${baseUrl}/settings/subscription`,
+    });
+
+    return { url: session.url };
+  }
+}

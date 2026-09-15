@@ -17,11 +17,7 @@ const flatNotFound = {
   meta: {},
 };
 
-const clientWith = (result: {
-  data?: unknown;
-  error?: unknown;
-  response?: Response;
-}) => {
+const clientWith = (result: { data?: unknown; error?: unknown; response?: Response }) => {
   const calls = {
     GET: vi.fn(async (_path: string, _init?: RequestInit) => result),
     POST: vi.fn(async (_path: string, init?: { body?: Record<string, unknown> }) => {
@@ -35,11 +31,7 @@ const clientWith = (result: {
   return { client: calls as unknown as LangwatchApiClient, calls };
 };
 
-const serviceWith = (result: {
-  data?: unknown;
-  error?: unknown;
-  response?: Response;
-}) => {
+const serviceWith = (result: { data?: unknown; error?: unknown; response?: Response }) => {
   const { client, calls } = clientWith(result);
   return {
     service: new RunPlansApiService({ langwatchApiClient: client }),

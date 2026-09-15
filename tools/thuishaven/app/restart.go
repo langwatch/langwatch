@@ -49,7 +49,7 @@ func (o *Orchestrator) rebuildLangyImage(ctx context.Context, p UpParams, slug s
 	if !st.LangyTier.RunsInContainer() {
 		return fmt.Errorf("langy runs on the host here (no image) — a plain `haven restart langy` picks up source changes")
 	}
-	_, err := o.prepareLangyContainer(ctx, p.WorktreeDir, st.LangyImage, true)
+	_, err := o.prepareLangyContainer(ctx, st, langyImageOptions{RepoRoot: p.WorktreeDir, ForceRebuild: true})
 	return err
 }
 
@@ -120,25 +120,42 @@ func (o *Orchestrator) restartServices(slug, name string) ([]string, error) {
 
 // restartTargets resolves which children to bounce. Only supervised children
 // qualify: the routed per-worktree services this stack runs itself (not
-// baseline fallbacks), plus the API (a backend of app, on its own port) and the
-// standalone workers lane when it exists. The workers lane is a target only when
-// the stack actually runs one (HasStandaloneWorkers); in the default in-process
-// mode the API child holds WorkerMetricsPort, so exposing `workers` there would
-// bounce the API instead. name=="" means all of them.
+// baseline fallbacks) — the `app` port is the ui lane's, so it is offered under
+// that name — plus the backend lane on its API port.
+//
+// gateway and nlp share ONE process locally (ADR-004, amendment 2026-09-07), so
+// they are offered as the single `go` lane rather than as two names that would
+// each take the other down without saying so. Every lane is its own process
+// group, so bouncing one can never reach another's.
+//
+// name=="" means all of them.
 func restartTargets(st domain.Stack, name string) []restartTarget {
 	var all []restartTarget
+	var goPort int
+	// A monolith checkout runs each Go service in its own process (its
+	// mono-binary hosts no combined one) and serves the browser application and
+	// the API from one lane, so there is no `go` lane to collapse into and no
+	// `backend` lane to offer.
+	mono := st.Layout.IsMonolith()
 	for _, r := range domain.PerWorktreeServices {
 		for _, svc := range st.Services {
-			if svc.Name == r.Name && !svc.IsFallback && svc.Port != 0 {
-				all = append(all, restartTarget{Name: domain.CLIServiceName(svc.Name), Port: svc.Port})
+			if svc.Name != r.Name || svc.IsFallback || svc.Port == 0 {
+				continue
 			}
+			if !mono && (svc.Name == "gateway" || svc.Name == "nlp") {
+				if goPort == 0 {
+					goPort = svc.Port
+				}
+				continue
+			}
+			all = append(all, restartTarget{Name: domain.CLIServiceNameForLayout(svc.Name, st.Layout), Port: svc.Port})
 		}
 	}
-	if st.APIPort != 0 {
-		all = append(all, restartTarget{Name: "api", Port: st.APIPort})
+	if goPort != 0 {
+		all = append(all, restartTarget{Name: GoLane, Port: goPort})
 	}
-	if st.HasStandaloneWorkers && st.WorkerMetricsPort != 0 {
-		all = append(all, restartTarget{Name: "workers", Port: st.WorkerMetricsPort})
+	if st.APIPort != 0 && !mono {
+		all = append(all, restartTarget{Name: BackendLane, Port: st.APIPort})
 	}
 	if name == "" {
 		return all
@@ -173,7 +190,7 @@ func (o *Orchestrator) ResolveSelection(worktreeDir string, deltas []string) (do
 	if !found {
 		sel = domain.DefaultSelection()
 	}
-	sel, err := domain.ApplySelectionDeltas(sel, deltas)
+	sel, err := domain.ApplySelectionDeltasForLayout(sel, deltas, detectLayout(worktreeDir))
 	if err != nil {
 		return sel, err
 	}

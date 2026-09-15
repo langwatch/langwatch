@@ -36,6 +36,14 @@ Feature: ClickHouse backup status metrics are opt-out
     When the storage stats collector ticks
     Then backup status is collected from the ClickHouse backup log
 
+  @unit
+  Scenario: an instance with no backup log names the absence once at info
+    Given backup metrics collection is enabled
+    And the ClickHouse instance has never taken a backup, so there is no backup log
+    When the storage stats collector ticks repeatedly
+    Then the missing backup log is named once, as information rather than a warning
+    And no failure warning is logged for it
+
   Scenario: transient backup-log failure warns once until recovery
     Given backup metrics collection is enabled
     When the backup log query fails on consecutive ticks

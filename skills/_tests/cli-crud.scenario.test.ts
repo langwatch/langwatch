@@ -24,9 +24,7 @@ describe("LangWatch CLI CRUD — Agent Usability", () => {
   it.skipIf(isCI)(
     "agent uses CLI to list and create scenarios",
     async () => {
-      const tempFolder = fs.mkdtempSync(
-        path.join(os.tmpdir(), "langwatch-cli-scenarios-"),
-      );
+      const tempFolder = fs.mkdtempSync(path.join(os.tmpdir(), "langwatch-cli-scenarios-"));
 
       fs.writeFileSync(
         path.join(tempFolder, ".env"),
@@ -76,13 +74,8 @@ Then run CLI commands directly:
           ),
           scenario.agent(),
           (state) => {
-
             const allText = state.messages
-              .map((m) =>
-                typeof m.content === "string"
-                  ? m.content
-                  : JSON.stringify(m.content),
-              )
+              .map((m) => (typeof m.content === "string" ? m.content : JSON.stringify(m.content)))
               .join("\n");
 
             expect(allText).toMatch(/langwatch\s+scenario/);
@@ -99,9 +92,7 @@ Then run CLI commands directly:
   it.skipIf(isCI)(
     "agent uses CLI to upload a dataset and list records",
     async () => {
-      const tempFolder = fs.mkdtempSync(
-        path.join(os.tmpdir(), "langwatch-cli-datasets-"),
-      );
+      const tempFolder = fs.mkdtempSync(path.join(os.tmpdir(), "langwatch-cli-datasets-"));
 
       fs.writeFileSync(
         path.join(tempFolder, ".env"),
@@ -144,17 +135,12 @@ Then: \`langwatch dataset records list qa-test-set\`
         ],
         script: [
           scenario.user(
-            "Read the CLAUDE.md file first, then use the Bash tool to run these exact commands:\n1. `export PATH=\"./bin:$PATH\" && export $(grep LANGWATCH_API_KEY .env)`\n2. `langwatch dataset upload qa-test-set test-data.csv`\n3. `langwatch dataset records list qa-test-set`\n\nDo NOT use MCP tools. Use ONLY the Bash tool.",
+            'Read the CLAUDE.md file first, then use the Bash tool to run these exact commands:\n1. `export PATH="./bin:$PATH" && export $(grep LANGWATCH_API_KEY .env)`\n2. `langwatch dataset upload qa-test-set test-data.csv`\n3. `langwatch dataset records list qa-test-set`\n\nDo NOT use MCP tools. Use ONLY the Bash tool.',
           ),
           scenario.agent(),
           (state) => {
-
             const allText = state.messages
-              .map((m) =>
-                typeof m.content === "string"
-                  ? m.content
-                  : JSON.stringify(m.content),
-              )
+              .map((m) => (typeof m.content === "string" ? m.content : JSON.stringify(m.content)))
               .join("\n");
 
             expect(allText).toMatch(/langwatch\s+dataset/);
@@ -171,9 +157,7 @@ Then: \`langwatch dataset records list qa-test-set\`
   it.skipIf(isCI)(
     "agent uses CLI to query analytics",
     async () => {
-      const tempFolder = fs.mkdtempSync(
-        path.join(os.tmpdir(), "langwatch-cli-analytics-"),
-      );
+      const tempFolder = fs.mkdtempSync(path.join(os.tmpdir(), "langwatch-cli-analytics-"));
 
       fs.writeFileSync(
         path.join(tempFolder, ".env"),
@@ -210,17 +194,12 @@ Then: \`langwatch trace search --limit 5\`
         ],
         script: [
           scenario.user(
-            "Read the CLAUDE.md file first, then use the Bash tool to run these exact commands:\n1. `export PATH=\"./bin:$PATH\" && export $(grep LANGWATCH_API_KEY .env)`\n2. `langwatch analytics query --metric trace-count`\n3. `langwatch trace search --limit 5`\n\nDo NOT use MCP tools. Use ONLY the Bash tool.",
+            'Read the CLAUDE.md file first, then use the Bash tool to run these exact commands:\n1. `export PATH="./bin:$PATH" && export $(grep LANGWATCH_API_KEY .env)`\n2. `langwatch analytics query --metric trace-count`\n3. `langwatch trace search --limit 5`\n\nDo NOT use MCP tools. Use ONLY the Bash tool.',
           ),
           scenario.agent(),
           (state) => {
-
             const allText = state.messages
-              .map((m) =>
-                typeof m.content === "string"
-                  ? m.content
-                  : JSON.stringify(m.content),
-              )
+              .map((m) => (typeof m.content === "string" ? m.content : JSON.stringify(m.content)))
               .join("\n");
 
             const usedAnalytics = allText.match(/langwatch\s+analytics/);

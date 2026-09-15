@@ -1,0 +1,27 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["es2022"],
+    "types": ["node"],
+    "noUncheckedIndexedAccess": true,
+    "noImplicitReturns": true,
+    "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
+    "verbatimModuleSyntax": true,
+
+    "noEmit": true,
+
+    "rootDir": ".",
+
+    "outDir": "dist",
+
+    "rewriteRelativeImportExtensions": false
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["tests/**/*.ts"],
+
+  "references": [
+    {
+      "path": "tsconfig.build.json"
+    }
+  ]
+}

@@ -16,7 +16,7 @@ Sampled cold at four ceilings, the resident working set never left the
 2.3–3.5 GB band while the footprint tracked whatever it was allowed:
 
 | `GOMEMLIMIT` | max RSS | peak footprint |
-|--------------|---------|----------------|
+| ------------ | ------- | -------------- |
 | 9 GiB        | 2.29 GB | 9.08 GB        |
 | 6 GiB        | 2.26 GB | 6.57 GB        |
 | 5 GiB        | 3.10 GB | 7.77 GB        |
@@ -114,14 +114,14 @@ true by accident of the runner's kernel.
 What was measured, on the 18 GiB / 11-core machine described above, so a later
 reader does not have to trust a PR link:
 
-| | uncapped, red machine | pressured shape |
-|---|---|---|
-| `GOMEMLIMIT` | 6 GiB (the clamp) | 3 GiB (the floor) |
-| `GOMAXPROCS` | unset, 11 cores | 5 |
-| peak footprint | 7.26 GB | not comparable, see below |
-| max RSS | 1.9 GB | about 1 to 2 GB |
-| wall / user / system | 331 s / 80 s / 162 s | not established |
-| peak CPU | ~2.8 of 11 cores | not sampled |
+|                      | uncapped, red machine | pressured shape           |
+| -------------------- | --------------------- | ------------------------- |
+| `GOMEMLIMIT`         | 6 GiB (the clamp)     | 3 GiB (the floor)         |
+| `GOMAXPROCS`         | unset, 11 cores       | 5                         |
+| peak footprint       | 7.26 GB               | not comparable, see below |
+| max RSS              | 1.9 GB                | about 1 to 2 GB           |
+| wall / user / system | 331 s / 80 s / 162 s  | not established           |
+| peak CPU             | ~2.8 of 11 cores      | not sampled               |
 
 The pressured column is thinner on purpose. `--explain` resolved
 `pressure=red gomemlimit=3GiB gomaxprocs=5`, and this PR's own `typecheck:tests`

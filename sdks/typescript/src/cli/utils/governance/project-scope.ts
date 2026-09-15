@@ -12,35 +12,35 @@ import { SOURCE_TYPE_BY_TOOL } from "./otel-env-block";
  * key and never consult or rewrite the personal path.
  */
 export async function pinToolToProject({
-	cfg,
-	tool,
-	project,
+  cfg,
+  tool,
+  project,
 }: {
-	cfg: GovernanceConfig;
-	tool: string;
-	project: string;
+  cfg: GovernanceConfig;
+  tool: string;
+  project: string;
 }): Promise<{ label: string }> {
-	const sourceType = SOURCE_TYPE_BY_TOOL[tool];
-	if (!sourceType) {
-		throw new Error(
-			`--project is not supported for '${tool}': it has no direct OTLP ingestion path.`,
-		);
-	}
-	const minted = await mintProjectIngestionKey(cfg, {
-		sourceType,
-		project,
-		deviceLabel: deviceLabelForThisMachine(),
-	});
-	cfg.tool_project_keys = {
-		...(cfg.tool_project_keys ?? {}),
-		[tool]: {
-			secret: minted.token,
-			project_id: minted.project.id,
-			project_slug: minted.project.slug,
-		},
-	};
-	saveConfig(cfg);
-	return { label: minted.project.slug };
+  const sourceType = SOURCE_TYPE_BY_TOOL[tool];
+  if (!sourceType) {
+    throw new Error(
+      `--project is not supported for '${tool}': it has no direct OTLP ingestion path.`,
+    );
+  }
+  const minted = await mintProjectIngestionKey(cfg, {
+    sourceType,
+    project,
+    deviceLabel: deviceLabelForThisMachine(),
+  });
+  cfg.tool_project_keys = {
+    ...(cfg.tool_project_keys ?? {}),
+    [tool]: {
+      secret: minted.token,
+      project_id: minted.project.id,
+      project_slug: minted.project.slug,
+    },
+  };
+  saveConfig(cfg);
+  return { label: minted.project.slug };
 }
 
 /**
@@ -49,37 +49,37 @@ export async function pinToolToProject({
  * config's control plane.
  */
 export function pinToolToKey({
-	cfg,
-	tool,
-	key,
-	endpoint,
+  cfg,
+  tool,
+  key,
+  endpoint,
 }: {
-	cfg: GovernanceConfig;
-	tool: string;
-	key: string;
-	endpoint?: string;
+  cfg: GovernanceConfig;
+  tool: string;
+  key: string;
+  endpoint?: string;
 }): void {
-	cfg.tool_project_keys = {
-		...(cfg.tool_project_keys ?? {}),
-		[tool]: {
-			secret: key,
-			...(endpoint ? { endpoint } : {}),
-		},
-	};
-	saveConfig(cfg);
+  cfg.tool_project_keys = {
+    ...(cfg.tool_project_keys ?? {}),
+    [tool]: {
+      secret: key,
+      ...(endpoint ? { endpoint } : {}),
+    },
+  };
+  saveConfig(cfg);
 }
 
 /** Clear a tool's project pin. Returns false when there was none. */
 export function clearToolProjectPin({
-	cfg,
-	tool,
+  cfg,
+  tool,
 }: {
-	cfg: GovernanceConfig;
-	tool: string;
+  cfg: GovernanceConfig;
+  tool: string;
 }): boolean {
-	if (!cfg.tool_project_keys?.[tool]) return false;
-	const { [tool]: _dropped, ...rest } = cfg.tool_project_keys;
-	cfg.tool_project_keys = rest;
-	saveConfig(cfg);
-	return true;
+  if (!cfg.tool_project_keys?.[tool]) return false;
+  const { [tool]: _dropped, ...rest } = cfg.tool_project_keys;
+  cfg.tool_project_keys = rest;
+  saveConfig(cfg);
+  return true;
 }

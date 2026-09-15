@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
-import type { QueryRequest } from "../query";
-import { RetryPolicy, runWithRetry } from "../retry";
+import type { QueryRequest } from "../query.ts";
+import { RetryPolicy, runWithRetry } from "../retry.ts";
 
 const request: QueryRequest = {
   tenantId: "project_1",
@@ -8,8 +8,7 @@ const request: QueryRequest = {
   params: { tenantId: "project_1" },
 };
 
-const transient = () =>
-  Object.assign(new Error("socket"), { code: "ECONNRESET" });
+const transient = () => Object.assign(new Error("socket"), { code: "ECONNRESET" });
 const permanent = () => new Error("Code: 62. DB::Exception: Syntax error");
 
 /** Never actually waits, and records what the delays would have been. */
@@ -26,15 +25,13 @@ const fakeSleep = () => {
 describe("runWithRetry", () => {
   describe("given a degenerate attempt budget", () => {
     describe("when the operation is run", () => {
-      it.each([
-        0, -1, 2.5,
-      ])("refuses %s rather than throwing an undefined", async (maxAttempts) => {
+      it.each([0, -1, 2.5])("refuses %s rather than throwing an undefined", async (maxAttempts) => {
         // The loop would never run and `throw lastError` would throw
         // `undefined` - no message, no stack, and every instanceof handler
         // upstream misses it.
-        await expect(
-          runWithRetry(async () => "ok", { maxAttempts }),
-        ).rejects.toBeInstanceOf(RangeError);
+        await expect(runWithRetry(async () => "ok", { maxAttempts })).rejects.toBeInstanceOf(
+          RangeError,
+        );
       });
     });
   });
@@ -43,6 +40,7 @@ describe("runWithRetry", () => {
 describe("retry", () => {
   describe("given a transient failure that then succeeds", () => {
     describe("when the statement is executed", () => {
+      /** @scenario A read rejected for transient overload is retried and succeeds */
       it("returns the eventual result", async () => {
         const { sleep } = fakeSleep();
         const next = vi
@@ -50,7 +48,10 @@ describe("retry", () => {
           .mockRejectedValueOnce(transient())
           .mockResolvedValue({ rows: ["ok"] });
 
-        const result = await new RetryPolicy({ sleep, random: () => 0 }).run(() => (next as never)(request), { request });
+        const result = await new RetryPolicy({ sleep, random: () => 0 }).run(
+          () => (next as never)(request),
+          { request },
+        );
 
         expect(result.rows).toEqual(["ok"]);
         expect(next).toHaveBeenCalledTimes(2);
@@ -60,15 +61,18 @@ describe("retry", () => {
 
   describe("given a permanent failure", () => {
     describe("when the statement is executed", () => {
+      /** @scenario A read failing with a non-transient error fails fast */
       it("fails on the first attempt instead of spending the budget", async () => {
         // Retrying a syntax error costs the full budget and, when the failure
         // is an overload the retries caused, makes the overload worse.
         const { sleep } = fakeSleep();
         const next = vi.fn().mockRejectedValue(permanent());
 
-        await expect(new RetryPolicy({ sleep }).run(() => (next as never)(request), { request: request })).rejects.toThrow(
-          /Syntax error/,
-        );
+        await expect(
+          new RetryPolicy({ sleep }).run(() => (next as never)(request), {
+            request: request,
+          }),
+        ).rejects.toThrow(/Syntax error/);
         expect(next).toHaveBeenCalledTimes(1);
       });
     });
@@ -76,12 +80,15 @@ describe("retry", () => {
 
   describe("given a failure that never clears", () => {
     describe("when the attempt budget runs out", () => {
+      /** @scenario A read that keeps failing transiently eventually surfaces the error */
       it("stops at the attempt budget", async () => {
         const { sleep } = fakeSleep();
         const next = vi.fn().mockRejectedValue(transient());
 
         await expect(
-          new RetryPolicy({ maxAttempts: 3, sleep }).run(() => (next as never)(request), { request: request }),
+          new RetryPolicy({ maxAttempts: 3, sleep }).run(() => (next as never)(request), {
+            request: request,
+          }),
         ).rejects.toThrow("socket");
         expect(next).toHaveBeenCalledTimes(3);
       });
@@ -116,13 +123,19 @@ describe("retry", () => {
         });
 
         await expect(
-          new RetryPolicy({ maxAttempts: 5, sleep }).run(() => (next as never)({
-            ...request,
-            signal: controller.signal,
-          }), { request: {
-            ...request,
-            signal: controller.signal,
-          } }),
+          new RetryPolicy({ maxAttempts: 5, sleep }).run(
+            () =>
+              (next as never)({
+                ...request,
+                signal: controller.signal,
+              }),
+            {
+              request: {
+                ...request,
+                signal: controller.signal,
+              },
+            },
+          ),
         ).rejects.toThrow("socket");
         expect(next).toHaveBeenCalledTimes(1);
       });
@@ -140,13 +153,19 @@ describe("retry", () => {
         };
 
         await expect(
-          new RetryPolicy({ maxAttempts: 5, sleep }).run(() => (next as never)({
-            ...request,
-            signal: controller.signal,
-          }), { request: {
-            ...request,
-            signal: controller.signal,
-          } }),
+          new RetryPolicy({ maxAttempts: 5, sleep }).run(
+            () =>
+              (next as never)({
+                ...request,
+                signal: controller.signal,
+              }),
+            {
+              request: {
+                ...request,
+                signal: controller.signal,
+              },
+            },
+          ),
         ).rejects.toThrow("socket");
         expect(next).toHaveBeenCalledTimes(1);
       });
@@ -179,7 +198,9 @@ describe("retry", () => {
         const next = vi.fn().mockRejectedValue(transient());
 
         await expect(
-          new RetryPolicy({ maxAttempts: 2, sleep, onRetry }).run(() => (next as never)(request), { request: request }),
+          new RetryPolicy({ maxAttempts: 2, sleep, onRetry }).run(() => (next as never)(request), {
+            request: request,
+          }),
         ).rejects.toThrow();
 
         expect(onRetry).toHaveBeenCalledWith(
@@ -240,9 +261,7 @@ describe("retry", () => {
         const { sleep } = fakeSleep();
         const next = vi
           .fn()
-          .mockRejectedValueOnce(
-            new Error("Code: 202. Too many simultaneous queries."),
-          )
+          .mockRejectedValueOnce(new Error("Code: 202. Too many simultaneous queries."))
           .mockResolvedValue({ rows: [] });
 
         await new RetryPolicy({

@@ -28,7 +28,10 @@ function resolveScope(
   const kind: ScopeKind = options.scope ?? "project";
 
   if (options.scopeId) {
-    return { scopeType: kind.toUpperCase() as ModelDefaultScopeType, scopeId: options.scopeId };
+    return {
+      scopeType: kind.toUpperCase() as ModelDefaultScopeType,
+      scopeId: options.scopeId,
+    };
   }
   if (kind === "project") {
     return { scopeType: "PROJECT", scopeId: snapshotScope.projectId };
@@ -50,17 +53,8 @@ function resolveScope(
 }
 
 /**
- * Remove a single key from the config attached at the target scope.
- * If the config has no other keys left, deletes it outright — an empty
- * config doesn't carry any cascade signal and occupies the same-scope
- * tiebreak slot.
- *
- * Returns what it did rather than printing it: the output port renders the
- * result in whatever format the caller asked for (utils/output.ts). The two
- * mutating paths keep the shape the previous `--format json` branch
- * established. The no-op path used to emit NOTHING in json mode — a silent
- * exit 0 that a machine caller could not distinguish from a successful
- * removal — so it now answers the same shape carrying `noop: true`.
+ * Remove key from config at scope; delete config if empty.
+ * No-op path carries noop: true so callers distinguish from successful removal.
  */
 export const unsetModelDefaultCommand = async (
   key: string,
@@ -76,9 +70,7 @@ export const unsetModelDefaultCommand = async (
     const target = resolveScope(options, snapshot.scope);
 
     const existing = snapshot.configs.filter((c) =>
-      c.scopes.some(
-        (s) => s.type === target.scopeType && s.id === target.scopeId,
-      ),
+      c.scopes.some((s) => s.type === target.scopeType && s.id === target.scopeId),
     );
 
     if (existing.length === 0 || !existing.some((c) => key in c.config)) {
@@ -94,9 +86,7 @@ export const unsetModelDefaultCommand = async (
       };
     }
 
-    const sorted = [...existing].sort((a, b) =>
-      a.createdAt > b.createdAt ? -1 : 1,
-    );
+    const sorted = [...existing].sort((a, b) => (a.createdAt > b.createdAt ? -1 : 1));
     const current = sorted[0]!;
     const nextPayload: Record<string, string> = { ...current.config };
     delete nextPayload[key];

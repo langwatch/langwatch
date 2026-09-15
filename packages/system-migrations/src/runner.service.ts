@@ -1,9 +1,9 @@
 import { createLogger } from "@langwatch/observability";
-import type { MigrationLeaseRepository } from "./lease.repository";
-import type { SystemMigrationStateRepository } from "./state.repository";
-import type { SystemMigration } from "./system-migration";
-import type { TenantSource } from "./tenant-source";
-import { isTerminalTenantStatus, type MigrationPassSummary } from "./types";
+import type { MigrationLeaseRepository } from "./lease.repository.ts";
+import type { SystemMigrationStateRepository } from "./state.repository.ts";
+import type { SystemMigration } from "./system-migration.ts";
+import type { TenantSource } from "./tenant-source.ts";
+import { isTerminalTenantStatus, type MigrationPassSummary } from "./types.ts";
 
 const logger = createLogger("langwatch:system-migrations");
 
@@ -259,7 +259,7 @@ export class SystemMigrationRunnerService {
     summary: MigrationPassSummary;
   }): Promise<void> {
     const { state } = this.deps;
-    const existing = await state.findRecord({
+    const existing = await state.tryFindRecord({
       migrationName: migration.name,
       tenantId,
     });

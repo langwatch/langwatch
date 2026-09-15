@@ -74208,7 +74208,7 @@ func NewDeleteApiAgentCacheByNameRequest(server string, name string) (*http.Requ
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/agent-cache/%s", pathParam0)
+	operationPath := fmt.Sprintf("/api/v1/agent-cache/%s", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -74242,7 +74242,7 @@ func NewGetApiAgentCacheByNameRequest(server string, name string) (*http.Request
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/agent-cache/%s", pathParam0)
+	operationPath := fmt.Sprintf("/api/v1/agent-cache/%s", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -74287,7 +74287,7 @@ func NewPutApiAgentCacheByNameRequestWithBody(server string, name string, conten
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/agent-cache/%s", pathParam0)
+	operationPath := fmt.Sprintf("/api/v1/agent-cache/%s", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -74334,7 +74334,7 @@ func NewPostApiAgentCacheByNameClaimRequestWithBody(server string, name string, 
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/agent-cache/%s/claim", pathParam0)
+	operationPath := fmt.Sprintf("/api/v1/agent-cache/%s/claim", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -74374,7 +74374,7 @@ func NewPostApiAnalyticsRequestWithBody(server string, contentType string, body 
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/analytics")
+	operationPath := fmt.Sprintf("/api/v1/analytics")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -74414,7 +74414,7 @@ func NewPostApiAnalyticsTimeseriesRequestWithBody(server string, contentType str
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/analytics/timeseries")
+	operationPath := fmt.Sprintf("/api/v1/analytics/timeseries")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -74443,7 +74443,7 @@ func NewGetApiAnnotationsRequest(server string, params *GetApiAnnotationsParams)
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/annotations")
+	operationPath := fmt.Sprintf("/api/v1/annotations")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -74504,7 +74504,7 @@ func NewGetApiAnnotationsTraceIdRequest(server string, id string, params *GetApi
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/annotations/trace/%s", pathParam0)
+	operationPath := fmt.Sprintf("/api/v1/annotations/trace/%s", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -74576,7 +74576,7 @@ func NewPostApiAnnotationsTraceIdRequestWithBody(server string, id string, conte
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/annotations/trace/%s", pathParam0)
+	operationPath := fmt.Sprintf("/api/v1/annotations/trace/%s", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -74612,7 +74612,7 @@ func NewDeleteApiAnnotationsIdRequest(server string, id string) (*http.Request, 
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/annotations/%s", pathParam0)
+	operationPath := fmt.Sprintf("/api/v1/annotations/%s", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -74646,7 +74646,7 @@ func NewGetApiAnnotationsIdRequest(server string, id string) (*http.Request, err
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/annotations/%s", pathParam0)
+	operationPath := fmt.Sprintf("/api/v1/annotations/%s", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -74691,7 +74691,7 @@ func NewPatchApiAnnotationsIdRequestWithBody(server string, id string, contentTy
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/annotations/%s", pathParam0)
+	operationPath := fmt.Sprintf("/api/v1/annotations/%s", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -74720,7 +74720,7 @@ func NewListApiKeysRequest(server string) (*http.Request, error) {
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/api-keys")
+	operationPath := fmt.Sprintf("/api/v1/api-keys")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -74758,7 +74758,7 @@ func NewCreateApiKeyRequestWithBody(server string, contentType string, body io.R
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/api-keys")
+	operationPath := fmt.Sprintf("/api/v1/api-keys")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -74794,7 +74794,7 @@ func NewRevokeApiKeyRequest(server string, id string) (*http.Request, error) {
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/api-keys/%s", pathParam0)
+	operationPath := fmt.Sprintf("/api/v1/api-keys/%s", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -74828,7 +74828,7 @@ func NewGetApiKeyRequest(server string, id string) (*http.Request, error) {
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/api-keys/%s", pathParam0)
+	operationPath := fmt.Sprintf("/api/v1/api-keys/%s", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -74873,7 +74873,7 @@ func NewUpdateApiKeyRequestWithBody(server string, id string, contentType string
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/api-keys/%s", pathParam0)
+	operationPath := fmt.Sprintf("/api/v1/api-keys/%s", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -74902,7 +74902,7 @@ func NewGetApiCodingAgentPullRequestUsageRequest(server string, params *GetApiCo
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/coding-agent/pull-request-usage")
+	operationPath := fmt.Sprintf("/api/v1/coding-agent/pull-request-usage")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -74979,7 +74979,7 @@ func NewGetApiCodingAgentSessionsBySessionIdEventsRequest(server string, session
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/coding-agent/sessions/%s/events", pathParam0)
+	operationPath := fmt.Sprintf("/api/v1/coding-agent/sessions/%s/events", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -75081,7 +75081,7 @@ func NewGetApiDashboardsRequest(server string) (*http.Request, error) {
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/dashboards")
+	operationPath := fmt.Sprintf("/api/v1/dashboards")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -75119,7 +75119,7 @@ func NewPostApiDashboardsRequestWithBody(server string, contentType string, body
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/dashboards")
+	operationPath := fmt.Sprintf("/api/v1/dashboards")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -75159,7 +75159,7 @@ func NewPutApiDashboardsReorderRequestWithBody(server string, contentType string
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/dashboards/reorder")
+	operationPath := fmt.Sprintf("/api/v1/dashboards/reorder")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -75195,7 +75195,7 @@ func NewDeleteApiDashboardsByIdRequest(server string, id string) (*http.Request,
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/dashboards/%s", pathParam0)
+	operationPath := fmt.Sprintf("/api/v1/dashboards/%s", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -75229,7 +75229,7 @@ func NewGetApiDashboardsByIdRequest(server string, id string) (*http.Request, er
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/dashboards/%s", pathParam0)
+	operationPath := fmt.Sprintf("/api/v1/dashboards/%s", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -75274,7 +75274,7 @@ func NewPatchApiDashboardsByIdRequestWithBody(server string, id string, contentT
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/dashboards/%s", pathParam0)
+	operationPath := fmt.Sprintf("/api/v1/dashboards/%s", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -75303,7 +75303,7 @@ func NewGetApiDatasetRequest(server string, params *GetApiDatasetParams) (*http.
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/dataset")
+	operationPath := fmt.Sprintf("/api/v1/dataset")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -75380,7 +75380,7 @@ func NewPostApiDatasetRequestWithBody(server string, contentType string, body io
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/dataset")
+	operationPath := fmt.Sprintf("/api/v1/dataset")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -75409,7 +75409,7 @@ func NewPostApiDatasetDirectUploadRequest(server string) (*http.Request, error) 
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/dataset/direct-upload")
+	operationPath := fmt.Sprintf("/api/v1/dataset/direct-upload")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -75443,7 +75443,7 @@ func NewPutApiDatasetDirectUploadStagingByUploadIdRequest(server string, uploadI
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/dataset/direct-upload/staging/%s", pathParam0)
+	operationPath := fmt.Sprintf("/api/v1/dataset/direct-upload/staging/%s", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -75477,7 +75477,7 @@ func NewDeleteApiDatasetDirectUploadByDatasetIdRequest(server string, datasetId 
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/dataset/direct-upload/%s", pathParam0)
+	operationPath := fmt.Sprintf("/api/v1/dataset/direct-upload/%s", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -75511,7 +75511,7 @@ func NewPostApiDatasetDirectUploadByDatasetIdFinalizeRequest(server string, data
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/dataset/direct-upload/%s/finalize", pathParam0)
+	operationPath := fmt.Sprintf("/api/v1/dataset/direct-upload/%s/finalize", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -75545,7 +75545,7 @@ func NewPostApiDatasetDirectUploadByDatasetIdRetryRequest(server string, dataset
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/dataset/direct-upload/%s/retry", pathParam0)
+	operationPath := fmt.Sprintf("/api/v1/dataset/direct-upload/%s/retry", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -75583,7 +75583,7 @@ func NewPostApiDatasetEvaluateRequestWithBody(server string, contentType string,
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/dataset/evaluate")
+	operationPath := fmt.Sprintf("/api/v1/dataset/evaluate")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -75612,7 +75612,7 @@ func NewPostApiDatasetUploadRequest(server string) (*http.Request, error) {
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/dataset/upload")
+	operationPath := fmt.Sprintf("/api/v1/dataset/upload")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -75646,7 +75646,7 @@ func NewDeleteApiDatasetBySlugOrIdRequest(server string, slugOrId string) (*http
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/dataset/%s", pathParam0)
+	operationPath := fmt.Sprintf("/api/v1/dataset/%s", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -75680,7 +75680,7 @@ func NewGetApiDatasetBySlugOrIdRequest(server string, slugOrId string) (*http.Re
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/dataset/%s", pathParam0)
+	operationPath := fmt.Sprintf("/api/v1/dataset/%s", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -75725,7 +75725,7 @@ func NewPatchApiDatasetBySlugOrIdRequestWithBody(server string, slugOrId string,
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/dataset/%s", pathParam0)
+	operationPath := fmt.Sprintf("/api/v1/dataset/%s", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -75772,7 +75772,7 @@ func NewDeleteApiDatasetBySlugOrIdRecordsRequestWithBody(server string, slugOrId
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/dataset/%s/records", pathParam0)
+	operationPath := fmt.Sprintf("/api/v1/dataset/%s/records", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -75808,7 +75808,7 @@ func NewGetApiDatasetBySlugOrIdRecordsRequest(server string, slugOrId string, pa
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/dataset/%s/records", pathParam0)
+	operationPath := fmt.Sprintf("/api/v1/dataset/%s/records", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -75892,7 +75892,7 @@ func NewPostApiDatasetBySlugOrIdRecordsRequestWithBody(server string, slugOrId s
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/dataset/%s/records", pathParam0)
+	operationPath := fmt.Sprintf("/api/v1/dataset/%s/records", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -75946,7 +75946,7 @@ func NewPatchApiDatasetBySlugOrIdRecordsByRecordIdRequestWithBody(server string,
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/dataset/%s/records/%s", pathParam0, pathParam1)
+	operationPath := fmt.Sprintf("/api/v1/dataset/%s/records/%s", pathParam0, pathParam1)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -75982,7 +75982,7 @@ func NewPostApiDatasetBySlugOrIdUploadRequest(server string, slugOrId string) (*
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/dataset/%s/upload", pathParam0)
+	operationPath := fmt.Sprintf("/api/v1/dataset/%s/upload", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -76027,7 +76027,7 @@ func NewPostApiDatasetBySlugEntriesRequestWithBody(server string, slug string, c
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/dataset/%s/entries", pathParam0)
+	operationPath := fmt.Sprintf("/api/v1/dataset/%s/entries", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -76067,7 +76067,7 @@ func NewPostApiDspyLogStepsRequestWithBody(server string, contentType string, bo
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/dspy/log_steps")
+	operationPath := fmt.Sprintf("/api/v1/dspy/log_steps")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -76107,7 +76107,7 @@ func NewPostApiEvaluationsBatchLogResultsRequestWithBody(server string, contentT
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/evaluations/batch/log_results")
+	operationPath := fmt.Sprintf("/api/v1/evaluations/batch/log_results")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -76136,7 +76136,7 @@ func NewGetApiEvaluationsListRequest(server string) (*http.Request, error) {
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/evaluations/list")
+	operationPath := fmt.Sprintf("/api/v1/evaluations/list")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -76181,7 +76181,7 @@ func NewPostApiEvaluationsByEvaluatorEvaluateRequestWithBody(server string, eval
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/evaluations/%s/evaluate", pathParam0)
+	operationPath := fmt.Sprintf("/api/v1/evaluations/%s/evaluate", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -76235,7 +76235,7 @@ func NewPostApiEvaluationsByEvaluatorBySubpathEvaluateRequestWithBody(server str
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/evaluations/%s/%s/evaluate", pathParam0, pathParam1)
+	operationPath := fmt.Sprintf("/api/v1/evaluations/%s/%s/evaluate", pathParam0, pathParam1)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -76264,7 +76264,7 @@ func NewGetApiEvaluatorsRequest(server string) (*http.Request, error) {
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/evaluators")
+	operationPath := fmt.Sprintf("/api/v1/evaluators")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -76302,7 +76302,7 @@ func NewPostApiEvaluatorsRequestWithBody(server string, contentType string, body
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/evaluators")
+	operationPath := fmt.Sprintf("/api/v1/evaluators")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -76338,7 +76338,7 @@ func NewGetApiEvaluatorsByIdOrSlugRequest(server string, idOrSlug string) (*http
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/evaluators/%s", pathParam0)
+	operationPath := fmt.Sprintf("/api/v1/evaluators/%s", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -76372,7 +76372,7 @@ func NewDeleteApiEvaluatorsByIdRequest(server string, id string) (*http.Request,
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/evaluators/%s", pathParam0)
+	operationPath := fmt.Sprintf("/api/v1/evaluators/%s", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -76417,7 +76417,7 @@ func NewPutApiEvaluatorsByIdRequestWithBody(server string, id string, contentTyp
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/evaluators/%s", pathParam0)
+	operationPath := fmt.Sprintf("/api/v1/evaluators/%s", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -76446,7 +76446,7 @@ func NewPostApiEventsTrackRequest(server string) (*http.Request, error) {
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/events/track")
+	operationPath := fmt.Sprintf("/api/v1/events/track")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -76484,7 +76484,7 @@ func NewPostApiExperimentInitRequestWithBody(server string, contentType string, 
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/experiment/init")
+	operationPath := fmt.Sprintf("/api/v1/experiment/init")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -76513,7 +76513,7 @@ func NewGetApiExperimentsRequest(server string, params *GetApiExperimentsParams)
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/experiments")
+	operationPath := fmt.Sprintf("/api/v1/experiments")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -76590,7 +76590,7 @@ func NewPostApiExperimentsRequestWithBody(server string, contentType string, bod
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/experiments")
+	operationPath := fmt.Sprintf("/api/v1/experiments")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -76619,7 +76619,7 @@ func NewGetApiExperimentsRunsRequest(server string, params *GetApiExperimentsRun
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/experiments/runs")
+	operationPath := fmt.Sprintf("/api/v1/experiments/runs")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -76700,7 +76700,7 @@ func NewGetApiExperimentsRunsByRunIdRequest(server string, runId string) (*http.
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/experiments/runs/%s", pathParam0)
+	operationPath := fmt.Sprintf("/api/v1/experiments/runs/%s", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -76734,7 +76734,7 @@ func NewGetApiExperimentsRunsByRunIdResultsRequest(server string, runId string, 
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/experiments/runs/%s/results", pathParam0)
+	operationPath := fmt.Sprintf("/api/v1/experiments/runs/%s/results", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -76795,7 +76795,7 @@ func NewGetApiExperimentsBySlugRequest(server string, slug string) (*http.Reques
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/experiments/%s", pathParam0)
+	operationPath := fmt.Sprintf("/api/v1/experiments/%s", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -76840,7 +76840,7 @@ func NewPostApiExperimentsBySlugRunRequestWithBody(server string, slug string, c
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/experiments/%s/run", pathParam0)
+	operationPath := fmt.Sprintf("/api/v1/experiments/%s/run", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -76876,7 +76876,7 @@ func NewGetApiExperimentsBySlugVersionsRequest(server string, slug string, param
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/experiments/%s/versions", pathParam0)
+	operationPath := fmt.Sprintf("/api/v1/experiments/%s/versions", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -76956,7 +76956,7 @@ func NewPostApiExperimentsBySlugVersionsByVersionRestoreRequest(server string, s
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/experiments/%s/versions/%s/restore", pathParam0, pathParam1)
+	operationPath := fmt.Sprintf("/api/v1/experiments/%s/versions/%s/restore", pathParam0, pathParam1)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -76990,7 +76990,7 @@ func NewGetApiExperimentsBySlugWorkbenchStateRequest(server string, slug string,
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/experiments/%s/workbench-state", pathParam0)
+	operationPath := fmt.Sprintf("/api/v1/experiments/%s/workbench-state", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -77062,7 +77062,7 @@ func NewPutApiExperimentsBySlugWorkbenchStateRequestWithBody(server string, slug
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/experiments/%s/workbench-state", pathParam0)
+	operationPath := fmt.Sprintf("/api/v1/experiments/%s/workbench-state", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -78852,7 +78852,7 @@ func NewGetApiGovernanceIngestionTemplatesRequest(server string) (*http.Request,
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/governance/ingestion-templates")
+	operationPath := fmt.Sprintf("/api/v1/governance/ingestion-templates")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -78879,7 +78879,7 @@ func NewPostApiGovernanceIngestionTemplatesRequest(server string) (*http.Request
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/governance/ingestion-templates")
+	operationPath := fmt.Sprintf("/api/v1/governance/ingestion-templates")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -78906,7 +78906,7 @@ func NewGetApiGovernanceIngestionTemplatesAdminRequest(server string) (*http.Req
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/governance/ingestion-templates/admin")
+	operationPath := fmt.Sprintf("/api/v1/governance/ingestion-templates/admin")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -78933,7 +78933,7 @@ func NewPostApiGovernanceIngestionTemplatesCloneRequest(server string) (*http.Re
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/governance/ingestion-templates/clone")
+	operationPath := fmt.Sprintf("/api/v1/governance/ingestion-templates/clone")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -78967,7 +78967,7 @@ func NewDeleteApiGovernanceIngestionTemplatesByIdRequest(server string, id strin
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/governance/ingestion-templates/%s", pathParam0)
+	operationPath := fmt.Sprintf("/api/v1/governance/ingestion-templates/%s", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -79001,7 +79001,7 @@ func NewGetApiGovernanceIngestionTemplatesByIdRequest(server string, id string) 
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/governance/ingestion-templates/%s", pathParam0)
+	operationPath := fmt.Sprintf("/api/v1/governance/ingestion-templates/%s", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -79035,7 +79035,7 @@ func NewPatchApiGovernanceIngestionTemplatesByIdOttlRulesRequest(server string, 
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/governance/ingestion-templates/%s/ottl-rules", pathParam0)
+	operationPath := fmt.Sprintf("/api/v1/governance/ingestion-templates/%s/ottl-rules", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -79062,7 +79062,7 @@ func NewGetApiGraphsRequest(server string, params *GetApiGraphsParams) (*http.Re
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/graphs")
+	operationPath := fmt.Sprintf("/api/v1/graphs")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -79127,7 +79127,7 @@ func NewPostApiGraphsRequestWithBody(server string, contentType string, body io.
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/graphs")
+	operationPath := fmt.Sprintf("/api/v1/graphs")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -79163,7 +79163,7 @@ func NewDeleteApiGraphsByIdRequest(server string, id string) (*http.Request, err
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/graphs/%s", pathParam0)
+	operationPath := fmt.Sprintf("/api/v1/graphs/%s", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -79197,7 +79197,7 @@ func NewGetApiGraphsByIdRequest(server string, id string) (*http.Request, error)
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/graphs/%s", pathParam0)
+	operationPath := fmt.Sprintf("/api/v1/graphs/%s", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -79242,7 +79242,7 @@ func NewPatchApiGraphsByIdRequestWithBody(server string, id string, contentType 
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/graphs/%s", pathParam0)
+	operationPath := fmt.Sprintf("/api/v1/graphs/%s", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -79271,7 +79271,7 @@ func NewGetApiGroupsRequest(server string, params *GetApiGroupsParams) (*http.Re
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/groups")
+	operationPath := fmt.Sprintf("/api/v1/groups")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -79348,7 +79348,7 @@ func NewPostApiGroupsRequestWithBody(server string, contentType string, body io.
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/groups")
+	operationPath := fmt.Sprintf("/api/v1/groups")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -79384,7 +79384,7 @@ func NewDeleteApiGroupsByIdRequest(server string, id string) (*http.Request, err
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/groups/%s", pathParam0)
+	operationPath := fmt.Sprintf("/api/v1/groups/%s", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -79418,7 +79418,7 @@ func NewGetApiGroupsByIdRequest(server string, id string) (*http.Request, error)
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/groups/%s", pathParam0)
+	operationPath := fmt.Sprintf("/api/v1/groups/%s", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -79463,7 +79463,7 @@ func NewPatchApiGroupsByIdRequestWithBody(server string, id string, contentType 
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/groups/%s", pathParam0)
+	operationPath := fmt.Sprintf("/api/v1/groups/%s", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -79499,7 +79499,7 @@ func NewGetApiGroupsByIdBindingsRequest(server string, id string) (*http.Request
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/groups/%s/bindings", pathParam0)
+	operationPath := fmt.Sprintf("/api/v1/groups/%s/bindings", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -79544,7 +79544,7 @@ func NewPostApiGroupsByIdBindingsRequestWithBody(server string, id string, conte
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/groups/%s/bindings", pathParam0)
+	operationPath := fmt.Sprintf("/api/v1/groups/%s/bindings", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -79587,7 +79587,7 @@ func NewDeleteApiGroupsByIdBindingsByBindingIdRequest(server string, id string, 
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/groups/%s/bindings/%s", pathParam0, pathParam1)
+	operationPath := fmt.Sprintf("/api/v1/groups/%s/bindings/%s", pathParam0, pathParam1)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -79621,7 +79621,7 @@ func NewGetApiGroupsByIdMembersRequest(server string, id string) (*http.Request,
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/groups/%s/members", pathParam0)
+	operationPath := fmt.Sprintf("/api/v1/groups/%s/members", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -79666,7 +79666,7 @@ func NewPostApiGroupsByIdMembersRequestWithBody(server string, id string, conten
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/groups/%s/members", pathParam0)
+	operationPath := fmt.Sprintf("/api/v1/groups/%s/members", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -79709,7 +79709,7 @@ func NewDeleteApiGroupsByIdMembersByUserIdRequest(server string, id string, user
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/groups/%s/members/%s", pathParam0, pathParam1)
+	operationPath := fmt.Sprintf("/api/v1/groups/%s/members/%s", pathParam0, pathParam1)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -79754,7 +79754,7 @@ func NewPostApiGuardrailsByEvaluatorEvaluateRequestWithBody(server string, evalu
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/guardrails/%s/evaluate", pathParam0)
+	operationPath := fmt.Sprintf("/api/v1/guardrails/%s/evaluate", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -79783,7 +79783,7 @@ func NewGetApiMeProjectRequest(server string) (*http.Request, error) {
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/me/project")
+	operationPath := fmt.Sprintf("/api/v1/me/project")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -79810,7 +79810,7 @@ func NewGetApiMeUsageRequest(server string, params *GetApiMeUsageParams) (*http.
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/me/usage")
+	operationPath := fmt.Sprintf("/api/v1/me/usage")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -79876,7 +79876,7 @@ func NewGetApiModelDefaultsRequest(server string) (*http.Request, error) {
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/model-defaults")
+	operationPath := fmt.Sprintf("/api/v1/model-defaults")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -79914,7 +79914,7 @@ func NewPostApiModelDefaultsRequestWithBody(server string, contentType string, b
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/model-defaults")
+	operationPath := fmt.Sprintf("/api/v1/model-defaults")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -79950,7 +79950,7 @@ func NewDeleteApiModelDefaultsByIdRequest(server string, id string) (*http.Reque
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/model-defaults/%s", pathParam0)
+	operationPath := fmt.Sprintf("/api/v1/model-defaults/%s", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -79995,7 +79995,7 @@ func NewPutApiModelDefaultsByIdRequestWithBody(server string, id string, content
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/model-defaults/%s", pathParam0)
+	operationPath := fmt.Sprintf("/api/v1/model-defaults/%s", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -80024,7 +80024,7 @@ func NewGetApiModelProvidersRequest(server string) (*http.Request, error) {
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/model-providers")
+	operationPath := fmt.Sprintf("/api/v1/model-providers")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -80069,7 +80069,7 @@ func NewPutApiModelProvidersByProviderRequestWithBody(server string, provider st
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/model-providers/%s", pathParam0)
+	operationPath := fmt.Sprintf("/api/v1/model-providers/%s", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -80098,7 +80098,7 @@ func NewGetApiMonitorsRequest(server string) (*http.Request, error) {
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/monitors")
+	operationPath := fmt.Sprintf("/api/v1/monitors")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -80136,7 +80136,7 @@ func NewPostApiMonitorsRequestWithBody(server string, contentType string, body i
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/monitors")
+	operationPath := fmt.Sprintf("/api/v1/monitors")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -80172,7 +80172,7 @@ func NewDeleteApiMonitorsByIdRequest(server string, id string) (*http.Request, e
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/monitors/%s", pathParam0)
+	operationPath := fmt.Sprintf("/api/v1/monitors/%s", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -80206,7 +80206,7 @@ func NewGetApiMonitorsByIdRequest(server string, id string) (*http.Request, erro
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/monitors/%s", pathParam0)
+	operationPath := fmt.Sprintf("/api/v1/monitors/%s", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -80251,7 +80251,7 @@ func NewPatchApiMonitorsByIdRequestWithBody(server string, id string, contentTyp
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/monitors/%s", pathParam0)
+	operationPath := fmt.Sprintf("/api/v1/monitors/%s", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -80298,7 +80298,7 @@ func NewPostApiMonitorsByIdToggleRequestWithBody(server string, id string, conte
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/monitors/%s/toggle", pathParam0)
+	operationPath := fmt.Sprintf("/api/v1/monitors/%s/toggle", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -80352,7 +80352,7 @@ func NewPostApiOptimizationByWorkflowIdByVersionIdRequestWithBody(server string,
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/optimization/%s/%s", pathParam0, pathParam1)
+	operationPath := fmt.Sprintf("/api/v1/optimization/%s/%s", pathParam0, pathParam1)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -80381,7 +80381,7 @@ func NewGetOrganizationRequest(server string) (*http.Request, error) {
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/organization")
+	operationPath := fmt.Sprintf("/api/v1/organization")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -80419,7 +80419,7 @@ func NewUpdateOrganizationRequestWithBody(server string, contentType string, bod
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/organization")
+	operationPath := fmt.Sprintf("/api/v1/organization")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -80448,7 +80448,7 @@ func NewListOrganizationInvitesRequest(server string) (*http.Request, error) {
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/organization/invites")
+	operationPath := fmt.Sprintf("/api/v1/organization/invites")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -80486,7 +80486,7 @@ func NewCreateOrganizationInvitesRequestWithBody(server string, contentType stri
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/organization/invites")
+	operationPath := fmt.Sprintf("/api/v1/organization/invites")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -80522,7 +80522,7 @@ func NewRevokeOrganizationInviteRequest(server string, id string) (*http.Request
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/organization/invites/%s", pathParam0)
+	operationPath := fmt.Sprintf("/api/v1/organization/invites/%s", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -80549,7 +80549,7 @@ func NewListOrganizationMembersRequest(server string, params *ListOrganizationMe
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/organization/members")
+	operationPath := fmt.Sprintf("/api/v1/organization/members")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -80634,7 +80634,7 @@ func NewRemoveOrganizationMemberRequest(server string, userId string) (*http.Req
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/organization/members/%s", pathParam0)
+	operationPath := fmt.Sprintf("/api/v1/organization/members/%s", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -80668,7 +80668,7 @@ func NewGetOrganizationMemberRequest(server string, userId string) (*http.Reques
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/organization/members/%s", pathParam0)
+	operationPath := fmt.Sprintf("/api/v1/organization/members/%s", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -80713,7 +80713,7 @@ func NewUpdateOrganizationMemberRequestWithBody(server string, userId string, co
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/organization/members/%s", pathParam0)
+	operationPath := fmt.Sprintf("/api/v1/organization/members/%s", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -80749,7 +80749,7 @@ func NewGetOrganizationMemberAccessRequest(server string, userId string) (*http.
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/organization/members/%s/access", pathParam0)
+	operationPath := fmt.Sprintf("/api/v1/organization/members/%s/access", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -80776,7 +80776,7 @@ func NewListOrganizationsRequest(server string) (*http.Request, error) {
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/organizations")
+	operationPath := fmt.Sprintf("/api/v1/organizations")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -80814,7 +80814,7 @@ func NewProvisionOrganizationRequestWithBody(server string, contentType string, 
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/organizations")
+	operationPath := fmt.Sprintf("/api/v1/organizations")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -80850,7 +80850,7 @@ func NewGetOrganizationByIdRequest(server string, id string) (*http.Request, err
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/organizations/%s", pathParam0)
+	operationPath := fmt.Sprintf("/api/v1/organizations/%s", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -81166,7 +81166,7 @@ func NewGetApiPromptsRequest(server string) (*http.Request, error) {
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/prompts")
+	operationPath := fmt.Sprintf("/api/v1/prompts")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -81204,7 +81204,7 @@ func NewPostApiPromptsRequestWithBody(server string, contentType string, body io
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/prompts")
+	operationPath := fmt.Sprintf("/api/v1/prompts")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -81233,7 +81233,7 @@ func NewGetApiPromptsTagsRequest(server string) (*http.Request, error) {
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/prompts/tags")
+	operationPath := fmt.Sprintf("/api/v1/prompts/tags")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -81271,7 +81271,7 @@ func NewPostApiPromptsTagsRequestWithBody(server string, contentType string, bod
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/prompts/tags")
+	operationPath := fmt.Sprintf("/api/v1/prompts/tags")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -81307,7 +81307,7 @@ func NewDeleteApiPromptsTagsByTagRequest(server string, tag string) (*http.Reque
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/prompts/tags/%s", pathParam0)
+	operationPath := fmt.Sprintf("/api/v1/prompts/tags/%s", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -81352,7 +81352,7 @@ func NewPutApiPromptsTagsByTagRequestWithBody(server string, tag string, content
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/prompts/tags/%s", pathParam0)
+	operationPath := fmt.Sprintf("/api/v1/prompts/tags/%s", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -81388,7 +81388,7 @@ func NewDeleteApiPromptsByIdRequest(server string, id string) (*http.Request, er
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/prompts/%s", pathParam0)
+	operationPath := fmt.Sprintf("/api/v1/prompts/%s", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -81422,7 +81422,7 @@ func NewGetApiPromptsByIdRequest(server string, id string, params *GetApiPrompts
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/prompts/%s", pathParam0)
+	operationPath := fmt.Sprintf("/api/v1/prompts/%s", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -81506,7 +81506,7 @@ func NewPutApiPromptsByIdRequestWithBody(server string, id string, contentType s
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/prompts/%s", pathParam0)
+	operationPath := fmt.Sprintf("/api/v1/prompts/%s", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -81553,7 +81553,7 @@ func NewPostApiPromptsByIdSyncRequestWithBody(server string, id string, contentT
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/prompts/%s/sync", pathParam0)
+	operationPath := fmt.Sprintf("/api/v1/prompts/%s/sync", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -81607,7 +81607,7 @@ func NewPutApiPromptsByIdTagsByTagRequestWithBody(server string, id string, tag 
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/prompts/%s/tags/%s", pathParam0, pathParam1)
+	operationPath := fmt.Sprintf("/api/v1/prompts/%s/tags/%s", pathParam0, pathParam1)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -81643,7 +81643,7 @@ func NewGetApiPromptsByIdVersionsRequest(server string, id string) (*http.Reques
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/prompts/%s/versions", pathParam0)
+	operationPath := fmt.Sprintf("/api/v1/prompts/%s/versions", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -81684,7 +81684,7 @@ func NewPostApiPromptsByIdVersionsByVersionIdRestoreRequest(server string, id st
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/prompts/%s/versions/%s/restore", pathParam0, pathParam1)
+	operationPath := fmt.Sprintf("/api/v1/prompts/%s/versions/%s/restore", pathParam0, pathParam1)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -81711,7 +81711,7 @@ func NewListRoleBindingsRequest(server string, params *ListRoleBindingsParams) (
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/role-bindings")
+	operationPath := fmt.Sprintf("/api/v1/role-bindings")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -81848,7 +81848,7 @@ func NewCreateRoleBindingRequestWithBody(server string, contentType string, body
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/role-bindings")
+	operationPath := fmt.Sprintf("/api/v1/role-bindings")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -81884,7 +81884,7 @@ func NewDeleteRoleBindingRequest(server string, id string) (*http.Request, error
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/role-bindings/%s", pathParam0)
+	operationPath := fmt.Sprintf("/api/v1/role-bindings/%s", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -81929,7 +81929,7 @@ func NewUpdateRoleBindingRequestWithBody(server string, id string, contentType s
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/role-bindings/%s", pathParam0)
+	operationPath := fmt.Sprintf("/api/v1/role-bindings/%s", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -81958,7 +81958,7 @@ func NewListRolesRequest(server string) (*http.Request, error) {
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/roles")
+	operationPath := fmt.Sprintf("/api/v1/roles")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -81996,7 +81996,7 @@ func NewCreateRoleRequestWithBody(server string, contentType string, body io.Rea
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/roles")
+	operationPath := fmt.Sprintf("/api/v1/roles")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -82025,7 +82025,7 @@ func NewListRolePermissionsRequest(server string) (*http.Request, error) {
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/roles/permissions")
+	operationPath := fmt.Sprintf("/api/v1/roles/permissions")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -82059,7 +82059,7 @@ func NewDeleteRoleRequest(server string, id string) (*http.Request, error) {
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/roles/%s", pathParam0)
+	operationPath := fmt.Sprintf("/api/v1/roles/%s", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -82093,7 +82093,7 @@ func NewGetRoleRequest(server string, id string) (*http.Request, error) {
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/roles/%s", pathParam0)
+	operationPath := fmt.Sprintf("/api/v1/roles/%s", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -82138,7 +82138,7 @@ func NewUpdateRoleRequestWithBody(server string, id string, contentType string, 
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/roles/%s", pathParam0)
+	operationPath := fmt.Sprintf("/api/v1/roles/%s", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -82167,7 +82167,7 @@ func NewDeleteApiScenarioEventsRequest(server string, params *DeleteApiScenarioE
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/scenario-events")
+	operationPath := fmt.Sprintf("/api/v1/scenario-events")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -82244,7 +82244,7 @@ func NewPostApiScenarioEventsRequestWithBody(server string, contentType string, 
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/scenario-events")
+	operationPath := fmt.Sprintf("/api/v1/scenario-events")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -82284,7 +82284,7 @@ func NewPostApiScenarioEventsBrowserTabRequestWithBody(server string, contentTyp
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/scenario-events/browser-tab")
+	operationPath := fmt.Sprintf("/api/v1/scenario-events/browser-tab")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -82313,7 +82313,7 @@ func NewGetApiScenariosRequest(server string) (*http.Request, error) {
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/scenarios")
+	operationPath := fmt.Sprintf("/api/v1/scenarios")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -82351,7 +82351,7 @@ func NewPostApiScenariosRequestWithBody(server string, contentType string, body 
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/scenarios")
+	operationPath := fmt.Sprintf("/api/v1/scenarios")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -82387,7 +82387,7 @@ func NewDeleteApiScenariosByIdRequest(server string, id string) (*http.Request, 
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/scenarios/%s", pathParam0)
+	operationPath := fmt.Sprintf("/api/v1/scenarios/%s", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -82421,7 +82421,7 @@ func NewGetApiScenariosByIdRequest(server string, id string) (*http.Request, err
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/scenarios/%s", pathParam0)
+	operationPath := fmt.Sprintf("/api/v1/scenarios/%s", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -82466,7 +82466,7 @@ func NewPatchApiScenariosByIdRequestWithBody(server string, id string, contentTy
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/scenarios/%s", pathParam0)
+	operationPath := fmt.Sprintf("/api/v1/scenarios/%s", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -82513,7 +82513,7 @@ func NewPutApiScenariosByIdRequestWithBody(server string, id string, contentType
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/scenarios/%s", pathParam0)
+	operationPath := fmt.Sprintf("/api/v1/scenarios/%s", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -82549,7 +82549,7 @@ func NewGetApiScenariosByIdVersionsRequest(server string, id string, params *Get
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/scenarios/%s/versions", pathParam0)
+	operationPath := fmt.Sprintf("/api/v1/scenarios/%s/versions", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -82629,7 +82629,7 @@ func NewGetApiScenariosByIdVersionsByVersionRequest(server string, id string, ve
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/scenarios/%s/versions/%s", pathParam0, pathParam1)
+	operationPath := fmt.Sprintf("/api/v1/scenarios/%s/versions/%s", pathParam0, pathParam1)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -82656,7 +82656,7 @@ func NewListScimTokensRequest(server string) (*http.Request, error) {
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/scim-tokens")
+	operationPath := fmt.Sprintf("/api/v1/scim-tokens")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -82694,7 +82694,7 @@ func NewCreateScimTokenRequestWithBody(server string, contentType string, body i
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/scim-tokens")
+	operationPath := fmt.Sprintf("/api/v1/scim-tokens")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -82730,7 +82730,7 @@ func NewRevokeScimTokenRequest(server string, id string) (*http.Request, error) 
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/scim-tokens/%s", pathParam0)
+	operationPath := fmt.Sprintf("/api/v1/scim-tokens/%s", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -83541,7 +83541,7 @@ func NewGetApiSimulationRunsRequest(server string, params *GetApiSimulationRunsP
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/simulation-runs")
+	operationPath := fmt.Sprintf("/api/v1/simulation-runs")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -83643,7 +83643,7 @@ func NewGetApiSimulationRunsBatchesListRequest(server string, params *GetApiSimu
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/simulation-runs/batches/list")
+	operationPath := fmt.Sprintf("/api/v1/simulation-runs/batches/list")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -83724,7 +83724,7 @@ func NewGetApiSimulationRunsBatchesByBatchRunIdRequest(server string, batchRunId
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/simulation-runs/batches/%s", pathParam0)
+	operationPath := fmt.Sprintf("/api/v1/simulation-runs/batches/%s", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -83758,7 +83758,7 @@ func NewGetApiSimulationRunsByScenarioRunIdRequest(server string, scenarioRunId 
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/simulation-runs/%s", pathParam0)
+	operationPath := fmt.Sprintf("/api/v1/simulation-runs/%s", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -83785,7 +83785,7 @@ func NewGetApiSuitesRequest(server string, params *GetApiSuitesParams) (*http.Re
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/suites")
+	operationPath := fmt.Sprintf("/api/v1/suites")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -83850,7 +83850,7 @@ func NewPostApiSuitesRequestWithBody(server string, contentType string, body io.
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/suites")
+	operationPath := fmt.Sprintf("/api/v1/suites")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -83886,7 +83886,7 @@ func NewDeleteApiSuitesByIdRequest(server string, id string) (*http.Request, err
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/suites/%s", pathParam0)
+	operationPath := fmt.Sprintf("/api/v1/suites/%s", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -83920,7 +83920,7 @@ func NewGetApiSuitesByIdRequest(server string, id string) (*http.Request, error)
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/suites/%s", pathParam0)
+	operationPath := fmt.Sprintf("/api/v1/suites/%s", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -83965,7 +83965,7 @@ func NewPatchApiSuitesByIdRequestWithBody(server string, id string, contentType 
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/suites/%s", pathParam0)
+	operationPath := fmt.Sprintf("/api/v1/suites/%s", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -84001,7 +84001,7 @@ func NewPostApiSuitesByIdDuplicateRequest(server string, id string) (*http.Reque
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/suites/%s/duplicate", pathParam0)
+	operationPath := fmt.Sprintf("/api/v1/suites/%s/duplicate", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -84046,7 +84046,7 @@ func NewPostApiSuitesByIdRunRequestWithBody(server string, id string, contentTyp
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/suites/%s/run", pathParam0)
+	operationPath := fmt.Sprintf("/api/v1/suites/%s/run", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -84075,7 +84075,7 @@ func NewGetApiTeamsRequest(server string, params *GetApiTeamsParams) (*http.Requ
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/teams")
+	operationPath := fmt.Sprintf("/api/v1/teams")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -84152,7 +84152,7 @@ func NewPostApiTeamsRequestWithBody(server string, contentType string, body io.R
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/teams")
+	operationPath := fmt.Sprintf("/api/v1/teams")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -84188,7 +84188,7 @@ func NewDeleteApiTeamsByIdRequest(server string, id string) (*http.Request, erro
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/teams/%s", pathParam0)
+	operationPath := fmt.Sprintf("/api/v1/teams/%s", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -84222,7 +84222,7 @@ func NewGetApiTeamsByIdRequest(server string, id string) (*http.Request, error) 
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/teams/%s", pathParam0)
+	operationPath := fmt.Sprintf("/api/v1/teams/%s", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -84267,7 +84267,7 @@ func NewPatchApiTeamsByIdRequestWithBody(server string, id string, contentType s
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/teams/%s", pathParam0)
+	operationPath := fmt.Sprintf("/api/v1/teams/%s", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -84303,7 +84303,7 @@ func NewGetApiTeamsByIdMembersRequest(server string, id string) (*http.Request, 
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/teams/%s/members", pathParam0)
+	operationPath := fmt.Sprintf("/api/v1/teams/%s/members", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -84348,7 +84348,7 @@ func NewPostApiTeamsByIdMembersRequestWithBody(server string, id string, content
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/teams/%s/members", pathParam0)
+	operationPath := fmt.Sprintf("/api/v1/teams/%s/members", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -84391,7 +84391,7 @@ func NewDeleteApiTeamsByIdMembersByUserIdRequest(server string, id string, userI
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/teams/%s/members/%s", pathParam0, pathParam1)
+	operationPath := fmt.Sprintf("/api/v1/teams/%s/members/%s", pathParam0, pathParam1)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -84425,7 +84425,7 @@ func NewGetApiTeamsByIdProjectsRequest(server string, id string) (*http.Request,
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/teams/%s/projects", pathParam0)
+	operationPath := fmt.Sprintf("/api/v1/teams/%s/projects", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -84463,7 +84463,7 @@ func NewPostApiTraceSearchRequestWithBody(server string, contentType string, bod
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/trace/search")
+	operationPath := fmt.Sprintf("/api/v1/trace/search")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -84499,7 +84499,7 @@ func NewGetApiTraceIdRequest(server string, id string) (*http.Request, error) {
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/trace/%s", pathParam0)
+	operationPath := fmt.Sprintf("/api/v1/trace/%s", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -84533,7 +84533,7 @@ func NewPostApiTraceIdShareRequest(server string, id string) (*http.Request, err
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/trace/%s/share", pathParam0)
+	operationPath := fmt.Sprintf("/api/v1/trace/%s/share", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -84567,7 +84567,7 @@ func NewPostApiTraceIdUnshareRequest(server string, id string) (*http.Request, e
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/trace/%s/unshare", pathParam0)
+	operationPath := fmt.Sprintf("/api/v1/trace/%s/unshare", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -84605,7 +84605,7 @@ func NewPostApiTracesSearchRequestWithBody(server string, contentType string, bo
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/traces/search")
+	operationPath := fmt.Sprintf("/api/v1/traces/search")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -84641,7 +84641,7 @@ func NewGetApiTracesByTraceIdRequest(server string, traceId string, params *GetA
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/traces/%s", pathParam0)
+	operationPath := fmt.Sprintf("/api/v1/traces/%s", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -84725,7 +84725,7 @@ func NewPatchApiTracesByTraceIdMetadataRequestWithBody(server string, traceId st
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/traces/%s/metadata", pathParam0)
+	operationPath := fmt.Sprintf("/api/v1/traces/%s/metadata", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -84839,7 +84839,7 @@ func NewPostApiTriggerSlackRequestWithBody(server string, contentType string, bo
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/trigger/slack")
+	operationPath := fmt.Sprintf("/api/v1/trigger/slack")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -84868,7 +84868,7 @@ func NewGetApiTriggersRequest(server string) (*http.Request, error) {
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/triggers")
+	operationPath := fmt.Sprintf("/api/v1/triggers")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -84906,7 +84906,7 @@ func NewPostApiTriggersRequestWithBody(server string, contentType string, body i
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/triggers")
+	operationPath := fmt.Sprintf("/api/v1/triggers")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -84942,7 +84942,7 @@ func NewDeleteApiTriggersByIdRequest(server string, id string) (*http.Request, e
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/triggers/%s", pathParam0)
+	operationPath := fmt.Sprintf("/api/v1/triggers/%s", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -84976,7 +84976,7 @@ func NewGetApiTriggersByIdRequest(server string, id string) (*http.Request, erro
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/triggers/%s", pathParam0)
+	operationPath := fmt.Sprintf("/api/v1/triggers/%s", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -85021,7 +85021,7 @@ func NewPatchApiTriggersByIdRequestWithBody(server string, id string, contentTyp
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/triggers/%s", pathParam0)
+	operationPath := fmt.Sprintf("/api/v1/triggers/%s", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -87433,7 +87433,7 @@ func NewGetApiWorkflowsRequest(server string) (*http.Request, error) {
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/workflows")
+	operationPath := fmt.Sprintf("/api/v1/workflows")
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -87467,7 +87467,7 @@ func NewDeleteApiWorkflowsByIdRequest(server string, id string) (*http.Request, 
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/workflows/%s", pathParam0)
+	operationPath := fmt.Sprintf("/api/v1/workflows/%s", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -87501,7 +87501,7 @@ func NewGetApiWorkflowsByIdRequest(server string, id string) (*http.Request, err
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/workflows/%s", pathParam0)
+	operationPath := fmt.Sprintf("/api/v1/workflows/%s", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -87546,7 +87546,7 @@ func NewPatchApiWorkflowsByIdRequestWithBody(server string, id string, contentTy
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/workflows/%s", pathParam0)
+	operationPath := fmt.Sprintf("/api/v1/workflows/%s", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -87593,7 +87593,7 @@ func NewPostApiWorkflowsByIdEvaluateRequestWithBody(server string, id string, co
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/workflows/%s/evaluate", pathParam0)
+	operationPath := fmt.Sprintf("/api/v1/workflows/%s/evaluate", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -87640,7 +87640,7 @@ func NewPostApiWorkflowsByWorkflowIdRunRequestWithBody(server string, workflowId
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/workflows/%s/run", pathParam0)
+	operationPath := fmt.Sprintf("/api/v1/workflows/%s/run", pathParam0)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}
@@ -87694,7 +87694,7 @@ func NewPostApiWorkflowsByWorkflowIdByVersionIdRunRequestWithBody(server string,
 		return nil, err
 	}
 
-	operationPath := fmt.Sprintf("/api/workflows/%s/%s/run", pathParam0, pathParam1)
+	operationPath := fmt.Sprintf("/api/v1/workflows/%s/%s/run", pathParam0, pathParam1)
 	if operationPath[0] == '/' {
 		operationPath = "." + operationPath
 	}

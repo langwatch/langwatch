@@ -37,8 +37,51 @@ func (o *Orchestrator) DownStack(ctx context.Context, slug string) error {
 	}
 	for _, svc := range st.Services {
 		o.proxy.Remove(svc.Name, slug)
+		// The extra ways in go with it: an alias left registered keeps resolving
+		// to a port the kernel has since reissued.
+		for _, alias := range domain.ServiceHostAliases[svc.Name] {
+			o.proxy.Remove(alias, slug)
+		}
 	}
 	o.store.RemoveStack(slug)
+	return nil
+}
+
+// DestroyStack is DownStack plus the data: it stops the stack named by slug
+// and drops the ClickHouse + Postgres databases haven created for it. The
+// worktree is left alone - a stack is not a checkout, and a tool that boots a
+// throwaway stack inside a checkout it does not own (apidiff, one stack per
+// instance under its own run-scoped slug) must be able to take its own stack
+// and its own data away without touching the directory it borrowed.
+//
+// Naming the slug is the whole safety story: nothing here is derived from a
+// directory, so a run can only ever destroy the slugs it started. The shared
+// main database is refused outright, and a slug with no registered stack is
+// not an error - a boot that died before it registered still leaves the
+// databases its migrations created, and those are exactly what the caller is
+// asking to take away.
+func (o *Orchestrator) DestroyStack(ctx context.Context, slug string) error {
+	if !domain.ValidSlug(slug) {
+		return domain.ErrInvalidSlug(slug)
+	}
+	db := domain.DatabaseForSlug(slug)
+	if domain.IsProtectedDatabase(db) {
+		return fmt.Errorf("refusing to destroy %q - %s is the shared database every worktree without its own falls back to", slug, db)
+	}
+	var downed []int
+	if st, ok := o.stackBySlug(slug); ok {
+		if st.LauncherPID != 0 {
+			downed = append(downed, st.LauncherPID)
+		}
+		if err := o.DownStack(ctx, slug); err != nil {
+			return err
+		}
+	}
+	// Same ordering rule as stopAndDropForDir: the launcher's children must be
+	// gone before the databases they hold connections to are dropped.
+	o.waitForProcessesDead(downed)
+	o.dropWorktreeDatabases(ctx, slug)
+	fmt.Printf("stack %q destroyed (database %s dropped)\n", slug, db)
 	return nil
 }
 

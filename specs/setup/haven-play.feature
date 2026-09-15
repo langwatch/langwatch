@@ -249,5 +249,5 @@ Feature: haven play, a throwaway PR sandbox
   Scenario: A seeded sandbox lands end to end
     Given a terminal
     When the developer runs "haven play 4913 --seed demo"
-    Then the sandbox comes up past onboarding with its sample traces ingested
+    Then the sandbox comes up past onboarding with the demo preset's content
     And quitting the view tears the seeded databases down with everything else

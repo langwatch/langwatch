@@ -18,9 +18,7 @@ export interface SkillsListOptions extends RawOutputFlags {
   dir?: string;
 }
 
-export const skillsListCommand = async (
-  options: SkillsListOptions = {},
-): Promise<void> => {
+export const skillsListCommand = async (options: SkillsListOptions = {}): Promise<void> => {
   const root = resolveSkillsRoot(options.dir);
   const skills = SKILLS_BUNDLE.map((skill) => ({
     slug: skill.isRecipe ? `recipes/${skill.slug}` : skill.slug,
@@ -42,9 +40,7 @@ export const skillsListCommand = async (
           headers: ["SLUG", "INSTALLED", "DESCRIPTION"],
           colorMap: { SLUG: chalk.cyan },
         });
-        console.log(
-          chalk.gray(`\nInstall root: ${root} (bundle v${SKILLS_BUNDLE_VERSION})`),
-        );
+        console.log(chalk.gray(`\nInstall root: ${root} (bundle v${SKILLS_BUNDLE_VERSION})`));
       },
     },
   );

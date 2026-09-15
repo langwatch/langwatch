@@ -11,7 +11,13 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
-vi.mock("../../../utils/apiKey", () => ({ resolveCredentials: vi.fn(async () => ({ apiKey: "test-key", source: "env", endpoint: "https://app.langwatch.ai" })) }));
+vi.mock("../../../utils/apiKey", () => ({
+  resolveCredentials: vi.fn(async () => ({
+    apiKey: "test-key",
+    source: "env",
+    endpoint: "https://app.langwatch.ai",
+  })),
+}));
 
 vi.mock("ora", () => ({
   default: () => ({
@@ -101,16 +107,12 @@ describe("runWorkflowCommand()", () => {
     });
 
   const sentBody = (fetchSpy: ReturnType<typeof vi.spyOn>): unknown =>
-    JSON.parse(
-      (fetchSpy.mock.calls[0]![1] as { body: string }).body,
-    ) as unknown;
+    JSON.parse((fetchSpy.mock.calls[0]![1] as { body: string }).body) as unknown;
 
   describe("when --param pairs are given", () => {
     /** @scenario "The workflow run command merges param flags into its entry inputs" */
     it("sends each name as an entry input holding the flag's value", async () => {
-      const fetchSpy = vi
-        .spyOn(globalThis, "fetch")
-        .mockResolvedValue(okResponse());
+      const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(okResponse());
 
       await runWorkflowCommand({
         id: "wf_1",
@@ -127,9 +129,7 @@ describe("runWorkflowCommand()", () => {
     });
 
     it("wins over the same key in --input, and leaves the rest of it alone", async () => {
-      const fetchSpy = vi
-        .spyOn(globalThis, "fetch")
-        .mockResolvedValue(okResponse());
+      const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(okResponse());
 
       await runWorkflowCommand({
         id: "wf_1",
@@ -148,9 +148,7 @@ describe("runWorkflowCommand()", () => {
 
   describe("when only --input is given", () => {
     it("sends exactly the record it parsed, as it always did", async () => {
-      const fetchSpy = vi
-        .spyOn(globalThis, "fetch")
-        .mockResolvedValue(okResponse());
+      const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(okResponse());
 
       await runWorkflowCommand({
         id: "wf_1",

@@ -1,5 +1,10 @@
 {
   "extends": "./tsconfig.json",
+  "compilerOptions": {
+    // Its own, because it checks a wider file set than the build config does:
+    // sharing that file would make each run discard the other's cache.
+    "tsBuildInfoFile": "./node_modules/.cache/tsbuildinfo/langwatch-sdk-eslint.tsbuildinfo"
+  },
   "include": [
     "**/*.ts",
     "vitest.config.mts",
@@ -8,10 +13,5 @@
     "eslint.config.mjs",
     "__tests__/**/*.ts"
   ],
-  "exclude": [
-    "node_modules",
-    "./dist/**/*",
-    "./examples/**/*",
-    "./coverage/**/*"
-  ]
+  "exclude": ["node_modules", "./dist/**/*", "./examples/**/*", "./coverage/**/*"]
 }

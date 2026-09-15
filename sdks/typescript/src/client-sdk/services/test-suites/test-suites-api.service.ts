@@ -1,13 +1,11 @@
 import type { paths } from "@/internal/generated/openapi/api-client";
-import {
-  createLangWatchApiClient,
-  type LangwatchApiClient,
-} from "@/internal/api/client";
+import { createLangWatchApiClient, type LangwatchApiClient } from "@/internal/api/client";
 import type { InternalConfig } from "@/client-sdk/types";
 import {
   extractStatusFromResponse,
   formatApiErrorForOperation,
 } from "@/client-sdk/services/_shared/format-api-error";
+import { unwrapApiResult } from "@/client-sdk/services/_shared/unwrap-api-result";
 import { throwIfHandledError } from "@/client-sdk/services/_shared/throw-handled-error";
 import type { RunPlanRunResult } from "@/client-sdk/services/run-plans/run-plans-api.service";
 
@@ -38,14 +36,10 @@ export type RenameTestSuiteBody = Pick<UpdateTestSuiteBody, "name"> &
   Required<Pick<UpdateTestSuiteBody, "name">>;
 
 /** One field a test suite declares: an identifier and a type. */
-export type SuiteFieldDefinition = NonNullable<
-  UpdateTestSuiteBody["fields"]
->[number];
+export type SuiteFieldDefinition = NonNullable<UpdateTestSuiteBody["fields"]>[number];
 
 /** One evaluator attached to a test suite or a run plan, with its mappings. */
-export type EvaluatorAttachment = NonNullable<
-  UpdateTestSuiteBody["evaluators"]
->[number];
+export type EvaluatorAttachment = NonNullable<UpdateTestSuiteBody["evaluators"]>[number];
 
 /** Where one evaluator input reads its value: a source path or a literal. */
 export type ScenarioMapping = EvaluatorAttachment["mappings"][string];
@@ -73,11 +67,6 @@ export class TestSuitesApiError extends Error {
 
 /**
  * Typed client for the test suite family (`/api/v1/test-suites`).
- *
- * A test suite is a group of scenarios: a name, and the scenarios filed in it.
- * It holds no targets and no configuration, so running one sends its targets with
- * the request and the platform files the run under a run plan.
- *
  * @see specs/typescript-sdk/run-plans-and-test-suites.feature
  */
 export class TestSuitesApiService {
@@ -87,11 +76,7 @@ export class TestSuitesApiService {
     this.apiClient = config?.langwatchApiClient ?? createLangWatchApiClient();
   }
 
-  private handleApiError(
-    operation: string,
-    error: unknown,
-    response?: Response,
-  ): never {
+  private handleApiError(operation: string, error: unknown, response?: Response): never {
     const status = response?.status ?? extractStatusFromResponse(error);
     const message = formatApiErrorForOperation({
       operation,
@@ -104,34 +89,42 @@ export class TestSuitesApiService {
 
   /** The project's test suites. Archived suites are left out unless asked for. */
   async list(options?: { includeArchived?: boolean }): Promise<TestSuite[]> {
-    const { data, error, response } = await this.apiClient.GET(
-      "/api/v1/test-suites",
-      {
-        ...(options?.includeArchived
-          ? { params: { query: { includeArchived: "true" } } }
-          : {}),
-      },
-    );
-    if (error) this.handleApiError("list test suites", error, response);
-    return data as unknown as TestSuite[];
+    const { data, error, response } = await this.apiClient.GET("/api/v1/test-suites", {
+      ...(options?.includeArchived ? { params: { query: { includeArchived: "true" } } } : {}),
+    });
+    return unwrapApiResult({
+      operation: "list test suites",
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    }) as unknown as TestSuite[];
   }
 
   async create(params: CreateTestSuiteBody): Promise<TestSuite> {
-    const { data, error, response } = await this.apiClient.POST(
-      "/api/v1/test-suites",
-      { body: params },
-    );
-    if (error) this.handleApiError("create test suite", error, response);
-    return data as unknown as TestSuite;
+    const { data, error, response } = await this.apiClient.POST("/api/v1/test-suites", {
+      body: params,
+    });
+    return unwrapApiResult({
+      operation: "create test suite",
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    }) as unknown as TestSuite;
   }
 
   async get(id: string): Promise<TestSuiteDetail> {
-    const { data, error, response } = await this.apiClient.GET(
-      "/api/v1/test-suites/{id}",
-      { params: { path: { id } } },
-    );
-    if (error) this.handleApiError(`get test suite "${id}"`, error, response);
-    return data as unknown as TestSuiteDetail;
+    const { data, error, response } = await this.apiClient.GET("/api/v1/test-suites/{id}", {
+      params: { path: { id } },
+    });
+    return unwrapApiResult({
+      operation: `get test suite "${id}"`,
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    }) as unknown as TestSuiteDetail;
   }
 
   /**
@@ -140,33 +133,46 @@ export class TestSuitesApiService {
    * out keeps what the suite has.
    */
   async update(id: string, params: UpdateTestSuiteBody): Promise<TestSuite> {
-    const { data, error, response } = await this.apiClient.PATCH(
-      "/api/v1/test-suites/{id}",
-      { params: { path: { id } }, body: params },
-    );
-    if (error) this.handleApiError(`update test suite "${id}"`, error, response);
-    return data as unknown as TestSuite;
+    const { data, error, response } = await this.apiClient.PATCH("/api/v1/test-suites/{id}", {
+      params: { path: { id } },
+      body: params,
+    });
+    return unwrapApiResult({
+      operation: `update test suite "${id}"`,
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    }) as unknown as TestSuite;
   }
 
   /** Renames a suite. The slug is kept, so links and run history stay put. */
   async rename(id: string, params: RenameTestSuiteBody): Promise<TestSuite> {
-    const { data, error, response } = await this.apiClient.PATCH(
-      "/api/v1/test-suites/{id}",
-      { params: { path: { id } }, body: { name: params.name } },
-    );
-    if (error) this.handleApiError(`rename test suite "${id}"`, error, response);
-    return data as unknown as TestSuite;
+    const { data, error, response } = await this.apiClient.PATCH("/api/v1/test-suites/{id}", {
+      params: { path: { id } },
+      body: { name: params.name },
+    });
+    return unwrapApiResult({
+      operation: `rename test suite "${id}"`,
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    }) as unknown as TestSuite;
   }
 
   /** Archives a suite. The scenarios filed in it are archived with it. */
   async archive(id: string): Promise<{ id: string; archived: true }> {
-    const { data, error, response } = await this.apiClient.DELETE(
-      "/api/v1/test-suites/{id}",
-      { params: { path: { id } } },
-    );
-    if (error)
-      this.handleApiError(`archive test suite "${id}"`, error, response);
-    return data as unknown as { id: string; archived: true };
+    const { data, error, response } = await this.apiClient.DELETE("/api/v1/test-suites/{id}", {
+      params: { path: { id } },
+    });
+    return unwrapApiResult({
+      operation: `archive test suite "${id}"`,
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    }) as unknown as { id: string; archived: true };
   }
 
   /**
@@ -176,14 +182,16 @@ export class TestSuitesApiService {
   async run(id: string, body: RunTestSuiteBody): Promise<TestSuiteRunResult> {
     const note = body.note?.trim();
     const { note: _dropped, ...rest } = body;
-    const { data, error, response } = await this.apiClient.POST(
-      "/api/v1/test-suites/{id}/run",
-      {
-        params: { path: { id } },
-        body: note ? { ...rest, note } : rest,
-      },
-    );
-    if (error) this.handleApiError(`run test suite "${id}"`, error, response);
-    return data as unknown as TestSuiteRunResult;
+    const { data, error, response } = await this.apiClient.POST("/api/v1/test-suites/{id}/run", {
+      params: { path: { id } },
+      body: note ? { ...rest, note } : rest,
+    });
+    return unwrapApiResult({
+      operation: `run test suite "${id}"`,
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    }) as unknown as TestSuiteRunResult;
   }
 }

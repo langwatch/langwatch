@@ -1,9 +1,6 @@
 /**
- * `run()` used to take the idempotency key positionally, which left no room
- * for the values a run supplies for the parameters its scenarios declare. It
- * takes an options object now and still accepts the old positional string, so
- * both call forms are exercised here against the bytes that leave the process.
- *
+ * `run()` used to take the idempotency key positionally, which left no room for the values
+ * a run supplies for the parameters its scenarios declare.
  * Spec: specs/scenarios/scenario-run-parameters.feature
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
@@ -62,7 +59,7 @@ describe("SuitesApiService.run()", () => {
         parameters: { account_tier: "gold", seats: 12, beta: true },
       });
       expect((mockFetch.mock.calls[0]![0] as Request).url).toBe(
-        "https://api.langwatch.test/api/suites/suite_1/run",
+        "https://api.langwatch.test/api/v1/suites/suite_1/run",
       );
     });
   });

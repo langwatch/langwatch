@@ -1,0 +1,101 @@
+// Density is intentionally NOT serialised into the URL — it's a personal preference,
+// not a shareable view setting. Lives in `densityStore.ts`.
+
+export interface BarStateOverrides {
+  query?: string;
+  /** Rolling preset id (e.g. "7d"). When set, the range is computed at read
+   *  time and stays anchored to "now" — this is what keeps URLs from getting
+   *  stuck in the past. `timeFrom`/`timeTo` are only used for absolute ranges. */
+  preset?: string;
+  timeFrom?: number;
+  timeTo?: number;
+}
+
+export interface FragmentState {
+  lensId: string;
+  overrides: BarStateOverrides;
+}
+
+function safeDecode(value: string): string | null {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return null;
+  }
+}
+
+export function parseFragment(fragment: string): FragmentState | null {
+  const trimmed = fragment.replace(/^#/, "");
+  if (!trimmed) return null;
+
+  const [lensIdRaw, paramString] = trimmed.split("?", 2);
+  const lensId = safeDecode(lensIdRaw ?? "");
+  if (!lensId) return null;
+
+  return { lensId, overrides: paramString ? parseOverrides(paramString) : {} };
+}
+
+/** The bar-state overrides a fragment's query string carries. */
+function parseOverrides(paramString: string): BarStateOverrides {
+  const overrides: BarStateOverrides = {};
+  const params = new URLSearchParams(paramString);
+
+  const q = params.get("q");
+  if (q !== null) overrides.query = q;
+
+  const preset = params.get("preset");
+  if (preset) {
+    overrides.preset = preset;
+    return overrides;
+  }
+
+  const from = params.get("from");
+  const to = params.get("to");
+  if (from === null || to === null) return overrides;
+  const fromN = Number(from);
+  const toN = Number(to);
+  const bothFinite = Number.isFinite(fromN) && Number.isFinite(toN);
+  if (bothFinite) {
+    overrides.timeFrom = fromN;
+    overrides.timeTo = toN;
+  }
+  return overrides;
+}
+
+interface ComputeOverridesInput {
+  query: string;
+  timeRange: { from: number; to: number; presetId?: string };
+  defaultPresetId: string;
+}
+
+export function computeOverrides(input: ComputeOverridesInput): BarStateOverrides {
+  const overrides: BarStateOverrides = {};
+  if (input.query) overrides.query = input.query;
+  if (input.timeRange.presetId) {
+    if (input.timeRange.presetId !== input.defaultPresetId) {
+      overrides.preset = input.timeRange.presetId;
+    }
+  } else {
+    overrides.timeFrom = input.timeRange.from;
+    overrides.timeTo = input.timeRange.to;
+  }
+  return overrides;
+}
+
+export function buildFragment(lensId: string, overrides: BarStateOverrides): string {
+  const params = new URLSearchParams();
+  if (overrides.query) params.set("q", overrides.query);
+  if (overrides.preset) {
+    params.set("preset", overrides.preset);
+  } else if (overrides.timeFrom !== void 0 && overrides.timeTo !== void 0) {
+    params.set("from", String(overrides.timeFrom));
+    params.set("to", String(overrides.timeTo));
+  }
+  const encodedLens = encodeURIComponent(lensId);
+  const paramStr = params.toString();
+  return paramStr ? `${encodedLens}?${paramStr}` : encodedLens;
+}
+
+export function isOverridesEmpty(overrides: BarStateOverrides): boolean {
+  return Object.keys(overrides).length === 0;
+}

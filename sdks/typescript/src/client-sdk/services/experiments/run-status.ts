@@ -5,10 +5,7 @@
 // died before sending finished_at/stopped_at.
 
 import type { ExperimentRunSummary } from "./platformTypes";
-import {
-  ExperimentTimeoutError,
-  ExperimentRunFailedError,
-} from "./platformErrors";
+import { ExperimentTimeoutError, ExperimentRunFailedError } from "./platformErrors";
 
 export const INTERRUPTED_THRESHOLD_MS = 5 * 60 * 1000;
 
@@ -21,16 +18,10 @@ export interface RunTimestamps {
   stoppedAt?: number | null;
 }
 
-export const deriveRunStatus = (
-  timestamps: RunTimestamps,
-  now: number = Date.now(),
-): RunStatus => {
+export const deriveRunStatus = (timestamps: RunTimestamps, now: number = Date.now()): RunStatus => {
   if (timestamps.stoppedAt != null) return "stopped";
   if (timestamps.finishedAt != null) return "completed";
-  if (
-    timestamps.updatedAt != null &&
-    now - timestamps.updatedAt > INTERRUPTED_THRESHOLD_MS
-  ) {
+  if (timestamps.updatedAt != null && now - timestamps.updatedAt > INTERRUPTED_THRESHOLD_MS) {
     return "interrupted";
   }
   return "running";
@@ -59,8 +50,7 @@ export interface PollExperimentRunResult {
   summary: ExperimentRunSummary;
 }
 
-const sleep = (ms: number): Promise<void> =>
-  new Promise((resolve) => setTimeout(resolve, ms));
+const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
  * Poll a run to completion.
@@ -93,11 +83,7 @@ export const pollExperimentRun = async ({
   while (true) {
     if (now() - startTime > timeout) {
       const finalStatus = await getStatus(runId);
-      throw new ExperimentTimeoutError(
-        runId,
-        finalStatus.progress,
-        finalStatus.total,
-      );
+      throw new ExperimentTimeoutError(runId, finalStatus.progress, finalStatus.total);
     }
 
     await sleep(pollInterval);

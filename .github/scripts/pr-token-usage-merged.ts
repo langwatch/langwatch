@@ -59,11 +59,8 @@ export const mergeTargets = ({
   const merged = pullRequests.filter(
     (pull) => Boolean(pull.merged_at) && (pull.base?.ref ?? "") === branch,
   );
-  const isOwn = (pull: AssociatedPullRequest) =>
-    (pull.head?.repo?.full_name ?? "") === repository;
-  const numbers = (list: AssociatedPullRequest[]) => [
-    ...new Set(list.map((pull) => pull.number)),
-  ];
+  const isOwn = (pull: AssociatedPullRequest) => (pull.head?.repo?.full_name ?? "") === repository;
+  const numbers = (list: AssociatedPullRequest[]) => [...new Set(list.map((pull) => pull.number))];
   return {
     refresh: numbers(merged.filter(isOwn)),
     forks: numbers(merged.filter((pull) => !isOwn(pull))),
@@ -158,14 +155,11 @@ const fetchAssociatedPullRequests = async ({
   repository: string;
   sha: string;
 }): Promise<AssociatedPullRequest[]> => {
-  const response = await fetch(
-    `${apiUrl}/repos/${repository}/commits/${sha}/pulls?per_page=100`,
-    { headers: githubHeaders(token) },
-  );
+  const response = await fetch(`${apiUrl}/repos/${repository}/commits/${sha}/pulls?per_page=100`, {
+    headers: githubHeaders(token),
+  });
   if (!response.ok) {
-    throw new Error(
-      `Listing the pull requests for ${sha} failed with ${response.status}`,
-    );
+    throw new Error(`Listing the pull requests for ${sha} failed with ${response.status}`);
   }
   return (await response.json()) as AssociatedPullRequest[];
 };
@@ -246,8 +240,7 @@ const run = async (): Promise<void> => {
 };
 
 const isMain =
-  process.argv[1] !== undefined &&
-  import.meta.url === pathToFileURL(resolve(process.argv[1])).href;
+  process.argv[1] !== undefined && import.meta.url === pathToFileURL(resolve(process.argv[1])).href;
 
 if (isMain) {
   run().catch((error) => {

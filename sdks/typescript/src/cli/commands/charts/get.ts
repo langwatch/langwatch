@@ -54,9 +54,7 @@ export const getChartCommand = async (
         }
         if (chart.platformUrl) {
           console.log();
-          console.log(
-            `  ${chalk.bold("View:")}  ${chalk.underline(chart.platformUrl)}`,
-          );
+          console.log(`  ${chalk.bold("View:")}  ${chalk.underline(chart.platformUrl)}`);
         }
         console.log();
       },

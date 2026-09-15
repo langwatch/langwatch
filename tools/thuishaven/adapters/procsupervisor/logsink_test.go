@@ -185,3 +185,36 @@ func TestNilSinkIsANoOp(t *testing.T) {
 		t.Error("an empty path means no sink")
 	}
 }
+
+// @scenario "A log tab shows this up's output, not the last one's"
+func TestLogSinkStartsFreshOnANewUp(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "idp.log")
+	if err := os.WriteFile(path, []byte("2026-09-08T08:19:29Z old up\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	old := time.Now().Add(-2 * time.Hour)
+	if err := os.Chtimes(path, old, old); err != nil {
+		t.Fatal(err)
+	}
+
+	sink := newLogSinkSince(path, time.Now())
+	sink.writeLine("this up")
+
+	live, _ := os.ReadFile(path)
+	if strings.Contains(string(live), "old up") || !strings.Contains(string(live), "this up") {
+		t.Errorf("live capture = %q, want this up's line alone", live)
+	}
+	kept, _ := os.ReadFile(path + ".1")
+	if !strings.Contains(string(kept), "old up") {
+		t.Errorf("kept generation = %q, want the earlier up's lines", kept)
+	}
+
+	t.Run("when a lane restarts within the same up", func(t *testing.T) {
+		again := newLogSinkSince(path, sink.since)
+		again.writeLine("after restart")
+		live, _ := os.ReadFile(path)
+		if !strings.Contains(string(live), "this up") || !strings.Contains(string(live), "after restart") {
+			t.Errorf("live capture = %q, want both lines of this up", live)
+		}
+	})
+}

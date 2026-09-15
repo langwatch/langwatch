@@ -1,0 +1,189 @@
+/**
+ * The thinking line is a plain, non-interactive status line.
+ * @vitest-environment jsdom
+ */
+import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { act, cleanup, render, screen } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { ThinkingMessage } from "../langy-thinking-line.ts";
+import { THINKING_STUCK_MS } from "../langy-thinking-line.ts";
+import { LangyThinkingLine } from "../../ui/sections/langy-thinking-line.tsx";
+
+const REASONING_TEXT =
+  "The p95 spike is confined to one window. Checking whether the slow traces share anything.";
+
+function renderLine({ hasLiveReasoning }: { hasLiveReasoning: boolean }) {
+  return render(
+    <ChakraProvider value={defaultSystem}>
+      <LangyThinkingLine messages={[]} hasLiveReasoning={hasLiveReasoning} />
+    </ChakraProvider>,
+  );
+}
+
+/**
+ * Whether the leading orb is claiming the turn is alive. A stuck turn keeps
+ * the slot but drops the glow, which is the one state that must not claim it.
+ */
+const orbState = () => document.querySelector("[data-status-orb]")?.getAttribute("data-status-orb");
+
+beforeEach(() => {
+  vi.useFakeTimers();
+});
+afterEach(() => {
+  cleanup();
+  vi.useRealTimers();
+});
+
+describe("LangyThinkingLine", () => {
+  describe("given no reasoning is flowing", () => {
+    it("renders a plain status line with nothing to expand", () => {
+      renderLine({ hasLiveReasoning: false });
+      expect(screen.getByRole("status")).toBeDefined();
+      expect(screen.queryByRole("button")).toBeNull();
+    });
+
+    it("renders the text fully opaque, with no end-of-line fade mask", () => {
+      // The line used to wear a mask-image gradient that dissolved its last
+      // 1.5em to transparent — on a short "Thinking…" that faded the tail of
+      // the text itself. Overflow is clamped with an ellipsis instead; no
+      // rendered style may mask the text away.
+      renderLine({ hasLiveReasoning: false });
+      const styles = Array.from(document.querySelectorAll("style"))
+        .map((tag) => tag.textContent ?? "")
+        .join("\n");
+      expect(styles).not.toContain("mask-image");
+    });
+
+    it("leads with the shared status-orb slot so the line never jumps", () => {
+      // The startup sequence alternates this line with StreamingStatusLine's
+      // orb-led rows; both share STATUS_LINE_ROW, so the leading indicator
+      // slot exists here too and the text keeps one left offset throughout.
+      renderLine({ hasLiveReasoning: false });
+      expect(document.querySelector("[data-status-orb]")).not.toBeNull();
+    });
+  });
+
+  describe("given a running tool carries a long line", () => {
+    it("keeps the whole skill summary on one clamped status line", () => {
+      const describe = vi.fn(() => ({
+        title: "Using the GitHub skill",
+        detail: "Open a real pull request",
+      }));
+
+      // The exact overflow case: the github skill's line is its title plus its
+      // full summary — "Using the GitHub skill — Open a real pull request …" —
+      // which used to run off the panel's right edge. It must still surface in
+      // full (clamped by the renderer), so the content path is exercised, not
+      // just the CSS.
+      render(
+        <ChakraProvider value={defaultSystem}>
+          <LangyThinkingLine
+            messages={
+              [
+                {
+                  role: "user",
+                  parts: [{ type: "text", text: "open a PR" }],
+                },
+                {
+                  role: "assistant",
+                  parts: [
+                    {
+                      type: "tool-skill",
+                      state: "input-available",
+                      input: { name: "github" },
+                    },
+                  ],
+                },
+              ] satisfies ThinkingMessage[]
+            }
+            toolNarrator={{ describe }}
+          />
+        </ChakraProvider>,
+      );
+      const status = screen.getByRole("status");
+      expect(status.textContent).toContain("Using the GitHub skill");
+      expect(status.textContent).toContain("Open a real pull request");
+      expect(describe).toHaveBeenCalledWith({
+        name: "skill",
+        toolInput: { name: "github" },
+      });
+      expect(screen.queryByRole("button")).toBeNull();
+    });
+  });
+
+  describe("given a turn that has been running a long time", () => {
+    // The line's clock reads `Date.now()`, which the suite's default fake
+    // timers leave alone, so the wall clock has to be faked as well for the
+    // escalation to be reachable at all.
+    beforeEach(() => {
+      vi.useFakeTimers({
+        toFake: ["setTimeout", "clearTimeout", "setInterval", "clearInterval", "Date"],
+      });
+    });
+
+    /**
+     * The clock the escalation reads is silence, not turn length. It used to
+     * run from the moment the line mounted, so a turn that had answered a
+     * permission card and was running a local command, with output arriving
+     * in the terminal, was told it may be stuck while nothing was wrong.
+     *
+     * @scenario "The escalation measures silence, not how long the turn has run" */
+    it("drops the stuck line as soon as the turn produces something", () => {
+      const line = (activityKey: string) => (
+        <ChakraProvider value={defaultSystem}>
+          <LangyThinkingLine messages={[]} activityKey={activityKey} />
+        </ChakraProvider>
+      );
+      const { rerender } = render(line("calls:0"));
+
+      act(() => {
+        vi.advanceTimersByTime(THINKING_STUCK_MS + 2_000);
+      });
+      // The orb reads the tone directly, so it says what the line has decided
+      // without waiting on the text's crossfade.
+      expect(orbState()).toBe("idle");
+
+      // One tool call landed. The turn is working, so it may not read as
+      // stuck any more.
+      rerender(line("calls:1"));
+      expect(orbState()).toBe("active");
+    });
+
+    /** @scenario "A turn that really is silent still ends up looking stuck" */
+    it("keeps escalating while nothing at all happens", () => {
+      render(
+        <ChakraProvider value={defaultSystem}>
+          <LangyThinkingLine messages={[]} activityKey="quiet" />
+        </ChakraProvider>,
+      );
+      expect(orbState()).toBe("active");
+
+      act(() => {
+        vi.advanceTimersByTime(THINKING_STUCK_MS + 2_000);
+      });
+      expect(orbState()).toBe("idle");
+    });
+  });
+
+  describe("given reasoning is streaming on a live turn", () => {
+    it("says Thinking, so a working turn never reads as a silent one", () => {
+      // The escalation ladder itself is pinned on the pure logic
+      // (`langyThinkingLine.unit.test.ts`); what matters here is that the
+      // component forwards the boolean at all.
+      renderLine({ hasLiveReasoning: true });
+      const status = screen.getByRole("status");
+      expect(status.textContent).toContain("Thinking");
+    });
+
+    it("stays a non-interactive line with no reasoning surface", () => {
+      renderLine({ hasLiveReasoning: true });
+      act(() => {
+        vi.advanceTimersByTime(30_000);
+      });
+      // No expander, and nothing the user can open to read the model's
+      // thinking — the whole point of hiding reasoning.
+      expect(screen.queryByRole("button")).toBeNull();
+      expect(screen.queryByText(REASONING_TEXT)).toBeNull();
+    });
+  });
+});

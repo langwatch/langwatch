@@ -1,0 +1,58 @@
+{
+  "name": "@langwatch/auth-web",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Browser-safe front-door screens: sign in, sign up, password recovery, email verification, the invitation landing and the sign-in error page.",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "exports": {
+    "./auth": {
+      "langwatch-declaration-source": "./src/auth.ts",
+      "types": "./dist/auth.d.ts",
+      "default": "./src/auth.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "pnpm -w typecheck:declarations --project . && tsc --noEmit",
+    "test": "vitest run",
+    "test:unit": "vitest run"
+  },
+  "dependencies": {
+    "@better-auth/passkey": "catalog:",
+    "@hookform/resolvers": "catalog:",
+    "@langwatch/api": "workspace:*",
+    "@langwatch/design-system": "workspace:*",
+    "@langwatch/identity-contract": "workspace:*",
+    "@langwatch/time": "workspace:*",
+    "@paper-design/shaders-react": "catalog:",
+    "better-auth": "catalog:",
+    "lucide-react": "catalog:",
+    "motion": "catalog:",
+    "react-feather": "catalog:",
+    "react-hook-form": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@chakra-ui/react": "catalog:",
+    "@emotion/react": "catalog:",
+    "@testing-library/jest-dom": "catalog:",
+    "@testing-library/react": "catalog:",
+    "@testing-library/user-event": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "jsdom": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "react-router": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "peerDependencies": {
+    "@chakra-ui/react": "^3.36.0",
+    "@emotion/react": "^11.14.0",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7"
+  }
+}

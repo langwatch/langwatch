@@ -1,0 +1,51 @@
+/**
+ * The Langy home's opening, leaving.
+ *
+ * Scrolling down the home is leaving the question behind, so the greeting goes
+ * first: the line drifts UP SLOWER than the page (it lags, which reads as
+ * depth) and dissolves. The field itself is untouched — it simply scrolls away
+ * with the page, because it is the one thing here that stays useful the whole
+ * way down.
+ *
+ * The lantern's mesh is deliberately NOT part of this. It is the page's light
+ * and it morphs on its own clock; fading it on scroll flattened the one moving
+ * thing on the home into a static wash. The shader owns its own appearance.
+ *
+ * Driven entirely by the scroll position, with no scroll listener and no
+ * animation frame: `animation-timeline: scroll()` hands the whole thing to the
+ * compositor, so the page costs nothing per frame to run this. Where the
+ * timeline is unsupported the `@supports` block is skipped wholesale and the
+ * hero is simply static — the deliberate no-fallback choice, since the effect
+ * is atmosphere and its absence costs the reader nothing.
+ *
+ * A distance, not a proportion: the dissolve is tied to how far the reader has
+ * actually scrolled, so it plays the same on a short home and a long one.
+ *
+ * Spec: specs/home/langy-home.feature
+ */
+
+@supports (animation-timeline: scroll()) {
+  @media (prefers-reduced-motion: no-preference) {
+    /* The first thing that happens on the way down, not something the reader
+       watches: a short range, and then it is gone. */
+    .langy-home-greeting {
+      animation: langy-home-greeting-leave linear both;
+      animation-timeline: scroll(nearest block);
+      animation-range: 0px 260px;
+    }
+  }
+}
+
+@keyframes langy-home-greeting-leave {
+  from {
+    transform: translateY(0);
+    opacity: 1;
+  }
+  to {
+    /* Positive Y against a page moving up: the line falls behind, which is
+       what reads as parallax. Small — enough to feel, not enough to look
+       detached from the field under it. */
+    transform: translateY(34px);
+    opacity: 0;
+  }
+}

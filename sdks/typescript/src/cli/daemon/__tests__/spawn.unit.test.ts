@@ -7,13 +7,10 @@
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 
 const spawnMock = vi.hoisted(() =>
-  vi.fn(
-    (
-      _file: string,
-      _args: string[],
-      _options: { env: Record<string, string> },
-    ) => ({ unref: vi.fn(), on: vi.fn() }),
-  ),
+  vi.fn((_file: string, _args: string[], _options: { env: Record<string, string> }) => ({
+    unref: vi.fn(),
+    on: vi.fn(),
+  })),
 );
 vi.mock("node:child_process", () => ({ spawn: spawnMock }));
 

@@ -1,8 +1,4 @@
-import type {
-  LocalPromptConfig,
-  MaterializedPrompt,
-  RuntimeParameters,
-} from "../types";
+import type { LocalPromptConfig, MaterializedPrompt, RuntimeParameters } from "../types";
 import { type PromptResponse, type UpdatePromptBody } from "@/client-sdk/services/prompts/types";
 import {
   type CliOutput,
@@ -102,8 +98,7 @@ export class PromptConverter {
    */
   static fromLocalToApiFormat(
     config: LocalPromptConfig,
-  ): Omit<UpdatePromptBody, "commitMessage"> & { parameters?: RuntimeParameters }
-  {
+  ): Omit<UpdatePromptBody, "commitMessage"> & { parameters?: RuntimeParameters } {
     return {
       model: config.model,
       temperature: config.modelParameters?.temperature,
@@ -117,9 +112,7 @@ export class PromptConverter {
    * Extracts the system prompt from messages array.
    * Used when converting to API format that separates system prompt from messages.
    */
-  static extractSystemPrompt(
-    messages: Array<{ role: string; content: string }>,
-  ): string {
+  static extractSystemPrompt(messages: Array<{ role: string; content: string }>): string {
     return messages.find((m) => m.role === "system")?.content ?? "";
   }
 

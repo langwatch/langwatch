@@ -14,5 +14,17 @@
     "OTEL_EXPORTER_OTLP_PROTOCOL": "http/json",
     "OTEL_EXPORTER_OTLP_ENDPOINT": "https://app.langwatch.ai/api/otel",
     "OTEL_RESOURCE_ATTRIBUTES": "project.repo=langwatch/langwatch,cost_center=eng"
+  },
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash dev/scripts/coordinator-state.sh"
+          }
+        ]
+      }
+    ]
   }
 }

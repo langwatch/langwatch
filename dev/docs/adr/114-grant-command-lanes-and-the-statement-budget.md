@@ -57,7 +57,7 @@ no free slots and a saturated limiter. It would have made this worse.
 that touches ClickHouse slowed by roughly the same factor, customer span
 ingestion (`recordSpan`) included, because the limiter is first-come,
 first-served: it bounds total concurrency and bounds the wait queue, but it
-has no notion of what the statement is *for*. A bulk backfill and a customer's
+has no notion of what the statement is _for_. A bulk backfill and a customer's
 trace write are peers.
 
 ## Amendment (2026-08-23) — decision 1 traded away an ordering guarantee
@@ -68,9 +68,9 @@ withdrawn the same day, before the shape ever ran under load. This section
 records why, because the reasoning that justified it was wrong in a way worth
 keeping.
 
-The original text claimed: *"Different command **types** already sat in
+The original text claimed: _"Different command **types** already sat in
 different lanes (the job path carries the command name), so nothing that was
-ordered stops being ordered."* The first half is true. The second half does
+ordered stops being ordered."_ The first half is true. The second half does
 not follow.
 
 `buildGroupKey` composes `${tenantId}/${jobPath}/${aggregateType}:${key}`, and
@@ -87,7 +87,7 @@ immediately, so the skew between them was negligible and the reordering was
 theoretical. Sharding was designed to make lanes **deep** — that was the whole
 point. A deep attach lane next to a nearly empty revoke lane makes the skew
 proportional to the backlog. The guarantee was formally unchanged and the
-*behaviour* was not, and the ADR described only the former.
+_behaviour_ was not, and the ADR described only the former.
 
 **The projection cannot recover the order downstream.** The `occurredAt` guard
 in `authz-grants-write.prisma.repository.ts` adjudicates between two writes to
@@ -100,7 +100,7 @@ attach lands second ->  INSERT ... ON CONFLICT    ->  inserts a LIVE row
 ```
 
 The repository's own docblock names this and assigns the fix elsewhere:
-*"There is no honest fix at this layer … The fix belongs to the migration."*
+_"There is no honest fix at this layer … The fix belongs to the migration."_
 That assignment is only sound while ordinary traffic does not reorder. Making
 lanes deep breaks the premise it rests on.
 
@@ -113,7 +113,7 @@ silent grant of access. It was still a hazard the ADR had claimed not to
 introduce.
 
 **What replaced it is strictly stronger than what came before.**
-`serializeByAggregate: true` forces the key to the aggregate id *and* drops the
+`serializeByAggregate: true` forces the key to the aggregate id _and_ drops the
 command name from `jobPath`, so all three commands about one grant share one
 FIFO lane — closing a gap that predates this ADR entirely:
 
@@ -157,7 +157,7 @@ grant lane no longer shares it.
 command type that can change it.
 
 Distinct grants keep distinct lanes, so an organization's grant work is still
-as wide as the number of grants in flight; only the commands about *one* grant
+as wide as the number of grants in flight; only the commands about _one_ grant
 serialize, which is exactly the constraint the domain has.
 
 They also keep `coalesceMaxBatch`, which now means something narrower: it folds
@@ -170,7 +170,7 @@ gap the queue manager logs.
 
 **The fold is untouched.** ADR-110's aggregate stays the grant: fold state is
 still one grant, still `authz_grant:<grantId>`. What changes is only which
-queue lane a command *waits in* before it is handled.
+queue lane a command _waits in_ before it is handled.
 
 Role commands keep the default per-aggregate lane. A role is a rare,
 human-sized entity, an organization has a handful, and no bulk producer emits
@@ -202,7 +202,7 @@ for without a parameter on every call site.
 
 This is deferred rather than sketched-and-shipped because it is a piece of
 work on the scale of the dispatch water-fill itself, and it sits on a hot
-path every ClickHouse caller in the app crosses. It removes the *class* of
+path every ClickHouse caller in the app crosses. It removes the _class_ of
 incident; decision 1 no longer even attempts to.
 
 ## Rationale / Trade-offs

@@ -1,12 +1,12 @@
 import { scopedApiKey } from "@/internal/credentialContext";
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
-import { resolveCredentials } from "../../utils/apiKey";
-import { formatFetchError } from "../../utils/formatFetchError";
-import { failSpinner } from "../../utils/spinnerError";
-import { commandValidationError, reportCommandError } from "../../utils/errorOutput";
+import { createSpinner } from "../../utils/spinner.ts";
+import { resolveCredentials } from "../../utils/apiKey.ts";
+import { formatFetchError } from "../../utils/formatFetchError.ts";
+import { failSpinner } from "../../utils/spinnerError.ts";
+import { commandValidationError, reportCommandError } from "../../utils/errorOutput.ts";
 import { buildAuthHeaders } from "@/internal/api/auth";
-import type { CommandResult } from "../../utils/output";
+import type { CommandResult } from "../../utils/output.ts";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
 import { langwatchFetch } from "@/internal/http/langwatchFetch";
@@ -20,22 +20,19 @@ export const updateGraphCommand = async (
     name?: string;
     graph?: string;
     filters?: string;
-  }
+  },
 ): Promise<CommandResult | void> => {
   await resolveCredentials();
 
   if (!options.name && !options.graph && !options.filters) {
     reportCommandError({
-      error: commandValidationError(
-        "At least one of --name, --graph, or --filters is required",
-      ),
+      error: commandValidationError("At least one of --name, --graph, or --filters is required"),
     });
     process.exit(1);
   }
 
   const apiKey = scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
-  const endpoint =
-    resolveControlPlaneUrl();
+  const endpoint = resolveControlPlaneUrl();
 
   const spinner = createSpinner(`Updating graph "${id}"...`).start();
 
@@ -49,7 +46,7 @@ export const updateGraphCommand = async (
       body.filters = JSON.parse(options.filters) as Record<string, unknown>;
     }
 
-    const response = await langwatchFetch(`${endpoint}/api/graphs/${id}`, {
+    const response = await langwatchFetch(`${endpoint}/api/v1/graphs/${id}`, {
       method: "PATCH",
       headers: {
         "Content-Type": "application/json",

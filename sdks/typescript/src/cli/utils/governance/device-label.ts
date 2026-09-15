@@ -7,10 +7,10 @@ import * as os from "node:os";
  * to [a-z0-9-], truncated; empty when the hostname yields nothing usable.
  */
 export function deviceLabelForThisMachine(): string {
-	const raw = os.hostname().toLowerCase();
-	const cleaned = raw
-		.replace(/\.(local|lan|home|localdomain)$/i, "")
-		.replace(/[^a-z0-9-]+/g, "-")
-		.replace(/^-+|-+$/g, "");
-	return cleaned.slice(0, 24);
+  const raw = os.hostname().toLowerCase();
+  const cleaned = raw
+    .replace(/\.(local|lan|home|localdomain)$/i, "")
+    .replace(/[^a-z0-9-]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  return cleaned.slice(0, 24);
 }

@@ -1,0 +1,65 @@
+{
+  "name": "@langwatch/coding-agent-server",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Canonical coding-agent session read service.",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./dist/index.d.ts",
+  "imports": {
+    "#*": {
+      "types": "./dist/*.d.ts",
+      "default": "./src/*.ts"
+    }
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    },
+    "./testing": {
+      "types": "./dist/app/__tests__/coding-agent.fixture.d.ts",
+      "default": "./src/app/__tests__/coding-agent.fixture.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "pnpm -w typecheck:declarations --project . && tsc --noEmit",
+    "test": "vitest run",
+    "test:integration": "vitest run --config vitest.integration.config.ts"
+  },
+  "dependencies": {
+    "@langwatch/runtime-composition": "workspace:*",
+    "@clickhouse/client": "catalog:",
+    "@langwatch/api": "workspace:*",
+    "@langwatch/authz-contract": "workspace:*",
+    "@langwatch/clickhouse-client": "workspace:*",
+    "@langwatch/coding-agent-contract": "workspace:*",
+    "@langwatch/eventing": "workspace:*",
+    "@langwatch/github-contract": "workspace:*",
+    "@langwatch/handled-error": "workspace:*",
+    "@langwatch/log-contract": "workspace:*",
+    "@langwatch/metric-contract": "workspace:*",
+    "@langwatch/model-provider-contract": "workspace:*",
+    "@langwatch/observability": "workspace:*",
+    "@langwatch/project-contract": "workspace:*",
+    "@langwatch/time": "workspace:*",
+    "@langwatch/trace-contract": "workspace:*",
+    "@trpc/server": "catalog:",
+    "hono": "catalog:",
+    "hono-openapi": "catalog:",
+    "ioredis": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@langwatch/group-queue": "workspace:*",
+    "@langwatch/metric-server": "workspace:*",
+    "@langwatch/trace-server": "workspace:*",
+    "@testcontainers/redis": "catalog:",
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

@@ -1,0 +1,72 @@
+import { VStack } from "@chakra-ui/react";
+import type React from "react";
+import { useMemo } from "react";
+import { GenerateApiSnippetDialog } from "@langwatch/workflow-web/surfaces/generate-api-snippet-dialog";
+import { Link } from "@langwatch/ui-host/link";
+import { getGetPromptSnippets } from "../../../api-snippet.ts";
+
+interface GeneratePromptApiSnippetButtonProps {
+  promptHandle?: string | null;
+  apiKey?: string;
+  label?: string;
+  children?: React.ReactNode;
+}
+
+/**
+ * GeneratePromptApiSnippetDialog
+ */
+export function GeneratePromptApiSnippetDialog({
+  promptHandle,
+  apiKey,
+  label,
+  children,
+}: GeneratePromptApiSnippetButtonProps) {
+  // Memoized: GenerateApiSnippetDialog used to sync state via an effect keyed
+  // on `snippets`, so a fresh array identity every render caused infinite
+  // re-render loops. That effect is gone; keeping the identity stable while
+  // the inputs are unchanged still spares reference-sensitive consumers
+  // (memo comparisons, effect deps) from reacting to a rebuilt array.
+  const snippets = useMemo(
+    () =>
+      getGetPromptSnippets({
+        promptHandle: promptHandle ?? undefined,
+        apiKey,
+        label,
+      }),
+    [promptHandle, apiKey, label],
+  );
+
+  const targets = useMemo(() => snippets.map((snippet) => snippet.target), [snippets]);
+
+  if (!snippets) {
+    return children;
+  }
+
+  const description = (
+    <VStack alignItems="flex-start" gap={3} marginBottom={4}>
+      <Link
+        href="https://docs.langwatch.ai/api-reference/prompts/get-prompt"
+        isExternal
+        color="blue.fg"
+        _hover={{ textDecoration: "underline" }}
+        fontSize="xs"
+      >
+        📖 View API documentation
+      </Link>
+    </VStack>
+  );
+
+  return (
+    <GenerateApiSnippetDialog
+      snippets={snippets}
+      targets={targets}
+      title={label ? "Get Prompt by Tag" : "Get Prompt by ID"}
+      description={description}
+    >
+      {children}
+    </GenerateApiSnippetDialog>
+  );
+}
+
+// Re-export the Trigger subcomponent for composability
+GeneratePromptApiSnippetDialog.Trigger = GenerateApiSnippetDialog.Trigger;

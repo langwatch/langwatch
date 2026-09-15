@@ -10,14 +10,11 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
  */
 const mockList = vi.fn();
 
-vi.mock(
-  "@/client-sdk/services/gateway-budgets/gateway-budgets-api.service",
-  () => ({
-    GatewayBudgetsApiService: class {
-      list = mockList;
-    },
-  }),
-);
+vi.mock("@/client-sdk/services/gateway-budgets/gateway-budgets-api.service", () => ({
+  GatewayBudgetsApiService: class {
+    list = mockList;
+  },
+}));
 
 vi.mock("../../../utils/apiKey", () => ({
   resolveCredentials: vi.fn(async () => ({
@@ -55,19 +52,15 @@ function budget(overrides: Record<string, unknown> = {}) {
 }
 
 /** The rendered table, with colour codes stripped. */
-async function renderedTable(
-  rows: Array<Record<string, unknown>>,
-): Promise<string> {
+async function renderedTable(rows: Array<Record<string, unknown>>): Promise<string> {
   // `list()` walks the endpoint's pages to exhaustion, so what it hands the
   // command is the whole listing as a plain array, with no cursor left to
   // carry and no envelope to unwrap.
   mockList.mockResolvedValue(rows);
   const lines: string[] = [];
-  const spy = vi
-    .spyOn(console, "log")
-    .mockImplementation((...args: unknown[]) => {
-      lines.push(args.map(String).join(" "));
-    });
+  const spy = vi.spyOn(console, "log").mockImplementation((...args: unknown[]) => {
+    lines.push(args.map(String).join(" "));
+  });
   try {
     const result = await listGatewayBudgetsCommand();
     if (result && "table" in result) result.table?.();
@@ -99,9 +92,7 @@ describe("gateway-budgets list rendering a per-person template", () => {
 
   /** @scenario "A per-person template nobody has used yet says so instead of showing a dash" */
   it("says 0 of 0 for a template nobody has spent against", async () => {
-    const table = await renderedTable([
-      budget({ end_users_seen: 0, end_users_over: 0 }),
-    ]);
+    const table = await renderedTable([budget({ end_users_seen: 0, end_users_over: 0 })]);
 
     expect(table).toContain("0 of 0 over cap");
   });

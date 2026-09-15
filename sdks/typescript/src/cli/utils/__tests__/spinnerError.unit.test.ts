@@ -28,9 +28,7 @@ describe("failSpinner", () => {
           this.name = "AgentsApiError";
         }
       }
-      const err = new AgentsApiError(
-        "Failed to list agents: Unauthorized: Invalid API key",
-      );
+      const err = new AgentsApiError("Failed to list agents: Unauthorized: Invalid API key");
       const { spinner, calls } = makeSpinner();
       failSpinner({ spinner, error: err, action: "fetch agents" });
       expect(stripAnsi(String(calls[0]))).toBe(
@@ -50,9 +48,7 @@ describe("failSpinner", () => {
       const err = new SomeApiError("boom");
       const { spinner, calls } = makeSpinner();
       failSpinner({ spinner, error: err, action: "reticulate splines" });
-      expect(stripAnsi(String(calls[0]))).toBe(
-        "Failed to reticulate splines: boom",
-      );
+      expect(stripAnsi(String(calls[0]))).toBe("Failed to reticulate splines: boom");
     });
   });
 
@@ -61,9 +57,7 @@ describe("failSpinner", () => {
       const err = new Error("fetch failed");
       const { spinner, calls } = makeSpinner();
       failSpinner({ spinner, error: err, action: "list monitors" });
-      expect(stripAnsi(String(calls[0]))).toBe(
-        "Failed to list monitors: fetch failed",
-      );
+      expect(stripAnsi(String(calls[0]))).toBe("Failed to list monitors: fetch failed");
     });
   });
 
@@ -97,9 +91,7 @@ describe("failSpinner", () => {
       const err = new PromptsError("Failed to sync prompt: Internal server error");
       const { spinner, calls } = makeSpinner();
       failSpinner({ spinner, error: err, action: "sync prompt" });
-      expect(stripAnsi(String(calls[0]))).toBe(
-        "Failed to sync prompt: Internal server error",
-      );
+      expect(stripAnsi(String(calls[0]))).toBe("Failed to sync prompt: Internal server error");
     });
   });
 });

@@ -1,0 +1,129 @@
+/**
+ * StoredObjectBlobFilesystemRepository — byte operations over the local
+ * filesystem.
+ */
+import crypto from "node:crypto";
+import { createReadStream } from "node:fs";
+import fs from "node:fs/promises";
+import path from "node:path";
+import type { Readable } from "node:stream";
+import { createLogger } from "@langwatch/observability";
+import { getStoredObjectStorageScheme } from "@langwatch/stored-object-contract";
+import { ObjectNotFoundError } from "@langwatch/stored-object-contract";
+import type { StoredObjectStorageDriver } from "#repositories/stored-object-blob.repository";
+
+const logger = createLogger("langwatch:stored-objects:local-filesystem-driver");
+
+/**
+ * Converts a `file:` URI to an absolute filesystem path.
+ */
+function parseFileUri(uri: string): string {
+  const scheme = getStoredObjectStorageScheme(uri);
+  if (scheme !== "file") {
+    throw new Error(
+      `StoredObjectBlobFilesystemRepository only handles file: URIs, got: "${uri}"`,
+    );
+  }
+  const parsed = new URL(uri);
+  const decoded = decodeURIComponent(parsed.pathname);
+
+  // Path traversal guard: checks decoded path for ".." segments only.
+  const hasParentSegment = decoded.split("/").includes("..");
+  if (hasParentSegment) {
+    throw new Error(
+      `StoredObjectBlobFilesystemRepository refuses a file: URI whose decoded path contains a ".." segment — ` +
+        `it resolves outside the location it names. Keep every path segment a single component.`,
+    );
+  }
+  return path.resolve(decoded);
+}
+
+/**
+ * Storage driver backed by the local filesystem.
+ *
+ * See class-level JSDoc for single-replica constraints and atomicity guarantees.
+ */
+export class StoredObjectBlobFilesystemRepository implements StoredObjectStorageDriver {
+  static create(): StoredObjectBlobFilesystemRepository {
+    return new StoredObjectBlobFilesystemRepository();
+  }
+
+  /**
+   * Returns a readable stream for the bytes at the given `file://` URI.
+   *
+   * @throws {ObjectNotFoundError} if no file exists at the URI.
+   */
+  async get(uri: string): Promise<Readable> {
+    const filePath = parseFileUri(uri);
+    const stream = createReadStream(filePath);
+
+    return new Promise<Readable>((resolve, reject) => {
+      stream.once("error", (err: NodeJS.ErrnoException) => {
+        if (err.code === "ENOENT") {
+          reject(new ObjectNotFoundError(uri));
+        } else {
+          reject(err);
+        }
+      });
+      // Once the stream is open (or readable), it's safe to hand it back.
+      stream.once("open", () => resolve(stream));
+    });
+  }
+
+  /**
+   * Atomically writes `bytes` to the given `file://` URI.
+   */
+  async put(uri: string, bytes: Buffer, _mediaType: string): Promise<void> {
+    const finalPath = parseFileUri(uri);
+    const tmpPath = `${finalPath}.tmp.${crypto.randomBytes(6).toString("hex")}`;
+
+    await fs.mkdir(path.dirname(finalPath), { recursive: true });
+
+    try {
+      await fs.writeFile(tmpPath, bytes);
+      await fs.rename(tmpPath, finalPath);
+    } catch (err) {
+      // Best-effort cleanup of the orphaned tmp file. ENOENT is fine (the
+      // file was already gone). Any other unlink error is logged but does
+      // NOT mask the original write/rename error the caller cares about.
+      await fs.unlink(tmpPath).catch((unlinkErr: NodeJS.ErrnoException) => {
+        if (unlinkErr.code !== "ENOENT") {
+          logger.warn(
+            { tmpPath, finalPath, unlinkErr },
+            "failed to clean up orphaned tmp file after write failure",
+          );
+        }
+      });
+      throw err;
+    }
+  }
+
+  /**
+   * Deletes the file at the given `file://` URI.
+   *
+   * Deleting a non-existent file is a no-op (force: true ignores ENOENT).
+   */
+  async delete(uri: string): Promise<void> {
+    const filePath = parseFileUri(uri);
+    await fs.rm(filePath, { force: true });
+  }
+
+  /**
+   * Returns `true` if a file exists at the given `file://` URI, `false` if not.
+   *
+   * @throws for errors other than ENOENT (e.g. permission denied).
+   */
+  async exists(uri: string): Promise<boolean> {
+    const filePath = parseFileUri(uri);
+    try {
+      await fs.access(filePath);
+      return true;
+    } catch (err: unknown) {
+      const nodeErr = err as NodeJS.ErrnoException;
+      if (nodeErr.code === "ENOENT") {
+        return false;
+      }
+      throw err;
+    }
+  }
+}

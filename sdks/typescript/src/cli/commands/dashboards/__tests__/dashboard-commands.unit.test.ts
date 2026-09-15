@@ -11,7 +11,11 @@ vi.mock("@/client-sdk/services/dashboards/dashboards-api.service", async (import
 });
 
 vi.mock("../../../utils/apiKey", () => ({
-  resolveCredentials: vi.fn(async () => ({ apiKey: "test-key", source: "env", endpoint: "https://app.langwatch.ai" })),
+  resolveCredentials: vi.fn(async () => ({
+    apiKey: "test-key",
+    source: "env",
+    endpoint: "https://app.langwatch.ai",
+  })),
 }));
 
 vi.mock("ora", () => ({
@@ -49,13 +53,15 @@ describe("listDashboardsCommand()", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockList = vi.fn();
-    vi.mocked(DashboardsApiService).mockImplementation(function () { return ({
-      list: mockList,
-      get: vi.fn(),
-      create: vi.fn(),
-      rename: vi.fn(),
-      delete: vi.fn(),
-    }) as unknown as DashboardsApiService; });
+    vi.mocked(DashboardsApiService).mockImplementation(function () {
+      return {
+        list: mockList,
+        get: vi.fn(),
+        create: vi.fn(),
+        rename: vi.fn(),
+        delete: vi.fn(),
+      } as unknown as DashboardsApiService;
+    });
     vi.spyOn(console, "log").mockImplementation(noop);
     vi.spyOn(console, "error").mockImplementation(noop);
     mockProcessExit();
@@ -64,7 +70,16 @@ describe("listDashboardsCommand()", () => {
   describe("when dashboards exist", () => {
     it("calls list and prints output", async () => {
       mockList.mockResolvedValue({
-        data: [{ id: "d1", name: "My Dashboard", order: 0, graphCount: 3, createdAt: "2026-01-01", updatedAt: "2026-01-02" }],
+        data: [
+          {
+            id: "d1",
+            name: "My Dashboard",
+            order: 0,
+            graphCount: 3,
+            createdAt: "2026-01-01",
+            updatedAt: "2026-01-02",
+          },
+        ],
       });
 
       await listDashboardsCommand();
@@ -86,9 +101,7 @@ describe("listDashboardsCommand()", () => {
 
   describe("when the API call fails", () => {
     it("exits with code 1", async () => {
-      mockList.mockRejectedValue(
-        new DashboardsApiError("Network error", "list dashboards"),
-      );
+      mockList.mockRejectedValue(new DashboardsApiError("Network error", "list dashboards"));
 
       await expect(listDashboardsCommand()).rejects.toThrow(ProcessExitError);
     });
@@ -101,13 +114,15 @@ describe("createDashboardCommand()", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockCreate = vi.fn();
-    vi.mocked(DashboardsApiService).mockImplementation(function () { return ({
-      list: vi.fn(),
-      get: vi.fn(),
-      create: mockCreate,
-      rename: vi.fn(),
-      delete: vi.fn(),
-    }) as unknown as DashboardsApiService; });
+    vi.mocked(DashboardsApiService).mockImplementation(function () {
+      return {
+        list: vi.fn(),
+        get: vi.fn(),
+        create: mockCreate,
+        rename: vi.fn(),
+        delete: vi.fn(),
+      } as unknown as DashboardsApiService;
+    });
     vi.spyOn(console, "log").mockImplementation(noop);
     vi.spyOn(console, "error").mockImplementation(noop);
     mockProcessExit();
@@ -125,9 +140,7 @@ describe("createDashboardCommand()", () => {
 
   describe("when creation fails", () => {
     it("exits with code 1", async () => {
-      mockCreate.mockRejectedValue(
-        new DashboardsApiError("Limit reached", "create dashboard"),
-      );
+      mockCreate.mockRejectedValue(new DashboardsApiError("Limit reached", "create dashboard"));
 
       await expect(createDashboardCommand("My Dashboard")).rejects.toThrow(ProcessExitError);
     });
@@ -140,13 +153,15 @@ describe("deleteDashboardCommand()", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockDelete = vi.fn();
-    vi.mocked(DashboardsApiService).mockImplementation(function () { return ({
-      list: vi.fn(),
-      get: vi.fn(),
-      create: vi.fn(),
-      rename: vi.fn(),
-      delete: mockDelete,
-    }) as unknown as DashboardsApiService; });
+    vi.mocked(DashboardsApiService).mockImplementation(function () {
+      return {
+        list: vi.fn(),
+        get: vi.fn(),
+        create: vi.fn(),
+        rename: vi.fn(),
+        delete: mockDelete,
+      } as unknown as DashboardsApiService;
+    });
     vi.spyOn(console, "log").mockImplementation(noop);
     vi.spyOn(console, "error").mockImplementation(noop);
     mockProcessExit();
@@ -164,9 +179,7 @@ describe("deleteDashboardCommand()", () => {
 
   describe("when deletion fails", () => {
     it("exits with code 1", async () => {
-      mockDelete.mockRejectedValue(
-        new DashboardsApiError("Not found", "delete dashboard"),
-      );
+      mockDelete.mockRejectedValue(new DashboardsApiError("Not found", "delete dashboard"));
 
       await expect(deleteDashboardCommand("nonexistent")).rejects.toThrow(ProcessExitError);
     });

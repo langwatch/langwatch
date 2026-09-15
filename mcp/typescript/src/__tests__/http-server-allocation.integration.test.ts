@@ -166,8 +166,8 @@ describe("Limits", () => {
               Authorization: `Bearer ${VALID_KEY}`,
             },
             body: initializeBody(),
-          })
-        )
+          }),
+        ),
       );
 
       const opened = responses.filter((response) => response.status === 200);
@@ -232,9 +232,7 @@ describe("Verification against the LangWatch API", () => {
       res.writeHead(401).end();
     });
 
-    await new Promise<void>((resolve) =>
-      upstream.listen(0, "127.0.0.1", resolve)
-    );
+    await new Promise<void>((resolve) => upstream.listen(0, "127.0.0.1", resolve));
     upstreamUrl = `http://127.0.0.1:${(upstream.address() as AddressInfo).port}`;
   });
 
@@ -242,13 +240,13 @@ describe("Verification against the LangWatch API", () => {
     await new Promise<void>((resolve) => upstream.close(() => resolve()));
   });
 
-  it("checks a key against GET /api/me/project with the key in a header", async () => {
+  it("checks a key against GET /api/v1/me/project with the key in a header", async () => {
     const verifier = createApiKeyVerifier({ endpoint: upstreamUrl });
 
     await expect(verifier.verify(VALID_KEY)).resolves.toBe(true);
     await expect(verifier.verify("sk-lw-fake")).resolves.toBe(false);
 
-    expect(seenUrls).toEqual(["/api/me/project", "/api/me/project"]);
+    expect(seenUrls).toEqual(["/api/v1/me/project", "/api/v1/me/project"]);
     expect(seenAuthHeaders).toEqual([VALID_KEY, "sk-lw-fake"]);
   });
 

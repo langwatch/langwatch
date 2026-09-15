@@ -23,14 +23,8 @@
 import { readFile, stat } from "node:fs/promises";
 import { basename } from "node:path";
 
-import {
-  type CodexRolloutMeta,
-  parseCodexRollout,
-} from "./codex-rollout";
-import {
-  defaultCodexSessionsRoot,
-  findRecentRollouts,
-} from "./codex-rollout-otlp";
+import { type CodexRolloutMeta, parseCodexRollout } from "./codex-rollout";
+import { defaultCodexSessionsRoot, findRecentRollouts } from "./codex-rollout-otlp";
 
 /** How recently a rollout must have been written to count as live. */
 export const LIVE_ROLLOUT_WINDOW_MS = 15 * 60_000;
@@ -54,8 +48,7 @@ export const ROLLOUT_SESSION_ID =
   /-([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\.jsonl$/i;
 
 /** A candidate key that is a session id rather than a path standing in for one. */
-const UUID =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export interface LiveCodexSession {
   sessionId: string;
@@ -103,8 +96,7 @@ export async function resolveLiveCodexSession({
   for (const file of files) {
     try {
       const s = await stat(file);
-      const key =
-        ROLLOUT_SESSION_ID.exec(basename(file))?.[1]?.toLowerCase() ?? file;
+      const key = ROLLOUT_SESSION_ID.exec(basename(file))?.[1]?.toLowerCase() ?? file;
       const seen = candidates.get(key);
       if (!seen || s.mtimeMs > seen.mtimeMs) {
         candidates.set(key, { path: file, mtimeMs: s.mtimeMs });
@@ -119,9 +111,7 @@ export async function resolveLiveCodexSession({
   if (candidates.size === 1) {
     chosen = [...candidates.values()][0]!;
   } else {
-    const hot = [...candidates].filter(
-      ([, candidate]) => nowMs - candidate.mtimeMs <= hotWindowMs,
-    );
+    const hot = [...candidates].filter(([, candidate]) => nowMs - candidate.mtimeMs <= hotWindowMs);
     if (hot.length !== 1) {
       const named = hot.length > 1 ? hot : [...candidates];
       return {
@@ -146,10 +136,7 @@ export async function resolveLiveCodexSession({
     /* an unreadable transcript still names its session in the filename */
   }
 
-  const sessionId =
-    ROLLOUT_SESSION_ID.exec(basename(chosen.path))?.[1] ??
-    meta?.sessionId ??
-    null;
+  const sessionId = ROLLOUT_SESSION_ID.exec(basename(chosen.path))?.[1] ?? meta?.sessionId ?? null;
   // The filename branch already yields a session id in codex's own shape. The
   // transcript branch is a fallback for a name codex changes the shape of, so
   // it is held to the same shape rather than trusted to carry anything.

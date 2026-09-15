@@ -1,0 +1,224 @@
+import type { PresenceSession } from "@langwatch/presence-contract";
+import { describe, expect, it, vi } from "vitest";
+import {
+  createPresenceTestProjects,
+  RecordingPresenceBroadcast,
+  RecordingPresenceDiagnostics,
+} from "../../app/__tests__/presence.fixture.ts";
+import { PresenceRepository } from "../../repositories/presence.repository.ts";
+import { PresenceService } from "../presence.service.ts";
+
+const session: PresenceSession = {
+  projectId: "project-1",
+  sessionId: "tab-1",
+  user: { id: "user-1", name: "Ada", image: null },
+  location: { lens: "traces", route: { traceId: "trace-1" } },
+  updatedAt: 1,
+};
+
+class StubRepository extends PresenceRepository {
+  current: PresenceSession | undefined;
+  upsert = vi.fn(async () => undefined);
+  remove = vi.fn(async () => true);
+  listByProject = vi.fn(async () => (this.current ? [this.current] : []));
+  findSession = vi.fn(async () => this.current);
+}
+
+function createService(options: { enabled?: boolean } = {}) {
+  const repository = new StubRepository();
+  const broadcast = new RecordingPresenceBroadcast();
+  const projects = createPresenceTestProjects(options.enabled ?? true);
+  const service = PresenceService.create({
+    repository,
+    broadcast,
+    projects,
+    diagnostics: new RecordingPresenceDiagnostics(),
+    now: () => 42,
+  });
+  return { service, repository, broadcast, projects };
+}
+
+describe("PresenceService", () => {
+  /** @scenario "Presence uses Project-owned policy" */
+  it("uses the canonical Project service for the effective policy", async () => {
+    const { service } = createService({ enabled: false });
+    await expect(service.isEnabledForProject({ projectId: "project-1" })).resolves.toBe(false);
+  });
+
+  /** @scenario "A first heartbeat joins a project" */
+  it("persists and broadcasts the first session heartbeat", async () => {
+    const { service, repository, broadcast } = createService();
+    await expect(
+      service.update({
+        projectId: session.projectId,
+        sessionId: session.sessionId,
+        user: session.user,
+        location: session.location,
+      }),
+    ).resolves.toMatchObject({
+      updatedAt: 42,
+    });
+    expect(repository.upsert).toHaveBeenCalledWith(expect.objectContaining({ updatedAt: 42 }), 30);
+    expect(broadcast.publish).toHaveBeenCalledWith(
+      expect.objectContaining({
+        projectId: "project-1",
+        channel: "presence_updated",
+        rateLimited: false,
+        event: JSON.stringify({
+          kind: "join",
+          session: {
+            ...session,
+            updatedAt: 42,
+          },
+        }),
+      }),
+    );
+  });
+
+  it("publishes an update only when the location changes", async () => {
+    const { service, repository, broadcast } = createService();
+    repository.current = session;
+
+    await service.update({
+      projectId: session.projectId,
+      sessionId: session.sessionId,
+      user: session.user,
+      location: {
+        ...session.location,
+        route: { conversationId: "conversation-1" },
+      },
+    });
+
+    expect(broadcast.publish).toHaveBeenCalledWith(
+      expect.objectContaining({
+        event: JSON.stringify({
+          kind: "update",
+          session: {
+            ...session,
+            location: {
+              ...session.location,
+              route: { conversationId: "conversation-1" },
+            },
+            updatedAt: 42,
+          },
+        }),
+      }),
+    );
+  });
+
+  /** @scenario "An unchanged heartbeat refreshes only the TTL" */
+  it("refreshes an unchanged session without broadcasting a delta", async () => {
+    const { service, repository, broadcast } = createService();
+    repository.current = session;
+    await service.update({
+      projectId: session.projectId,
+      sessionId: session.sessionId,
+      user: session.user,
+      location: session.location,
+    });
+    expect(repository.upsert).toHaveBeenCalledOnce();
+    expect(broadcast.publish).not.toHaveBeenCalled();
+  });
+
+  /** @scenario "Leaving twice is idempotent" */
+  it("makes leave idempotent", async () => {
+    const { service, repository, broadcast } = createService();
+    repository.remove.mockResolvedValue(false);
+    await expect(
+      service.leave({ projectId: "project-1", sessionId: "missing", userId: "user-1" }),
+    ).resolves.toBeUndefined();
+    expect(broadcast.publish).not.toHaveBeenCalled();
+  });
+
+  describe("when the session belongs to another member", () => {
+    /** @scenario "A member cannot remove another member's presence session" */
+    it("refuses the removal and leaves the session published", async () => {
+      const { service, repository, broadcast } = createService();
+      repository.current = session;
+
+      await expect(
+        service.leave({ projectId: "project-1", sessionId: "tab-1", userId: "user-2" }),
+      ).rejects.toMatchObject({ code: "insufficient_permissions" });
+
+      expect(repository.remove).not.toHaveBeenCalled();
+      expect(broadcast.publish).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the session belongs to the caller", () => {
+    /** @scenario "Leaving the project removes the session immediately" */
+    it("removes it and tells peers", async () => {
+      const { service, repository, broadcast } = createService();
+      repository.current = session;
+
+      await service.leave({ projectId: "project-1", sessionId: "tab-1", userId: "user-1" });
+
+      expect(repository.remove).toHaveBeenCalledWith({
+        projectId: "project-1",
+        sessionId: "tab-1",
+      });
+      expect(broadcast.publish).toHaveBeenCalledWith(
+        expect.objectContaining({
+          event: JSON.stringify({ kind: "leave", sessionId: "tab-1" }),
+        }),
+      );
+    });
+  });
+
+  it("publishes cursor ticks through the rate-limited channel", async () => {
+    const { service, broadcast } = createService();
+    await service.broadcastCursor({
+      projectId: "project-1",
+      sessionId: "tab-1",
+      user: session.user,
+      payload: { anchor: "trace:trace-1", x: 0.25, y: 0.75 },
+    });
+    expect(broadcast.publish).toHaveBeenCalledWith(
+      expect.objectContaining({
+        projectId: "project-1",
+        channel: "presence_cursor",
+        rateLimited: true,
+        event: JSON.stringify({
+          projectId: "project-1",
+          sessionId: "tab-1",
+          user: session.user,
+          anchor: "trace:trace-1",
+          x: 0.25,
+          y: 0.75,
+          emittedAt: 42,
+        }),
+      }),
+    );
+  });
+
+  it("keeps broadcast failures off the persistence path", async () => {
+    const broadcast = new RecordingPresenceBroadcast();
+    broadcast.publish.mockRejectedValue(new Error("broadcast unavailable"));
+    const diagnostics = new RecordingPresenceDiagnostics();
+    const repository = new StubRepository();
+    const service = PresenceService.create({
+      repository,
+      broadcast,
+      projects: createPresenceTestProjects(),
+      diagnostics,
+      now: () => 42,
+    });
+
+    await expect(
+      service.update({
+        projectId: session.projectId,
+        sessionId: session.sessionId,
+        user: session.user,
+        location: session.location,
+      }),
+    ).resolves.toMatchObject({ updatedAt: 42 });
+    expect(repository.upsert).toHaveBeenCalledOnce();
+    expect(diagnostics.warn).toHaveBeenCalledWith(
+      "Failed to broadcast presence event",
+      expect.objectContaining({
+        projectId: "project-1",
+        channel: "presence_updated",
+      }),
+    );
+  });
+});

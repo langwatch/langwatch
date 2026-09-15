@@ -1,22 +1,39 @@
 {
+  "extends": "../../tsconfig.base.json",
   "compilerOptions": {
+    "rootDir": "src",
+    "noEmit": true,
     "target": "es2020",
-    "module": "preserve",
-    "moduleResolution": "bundler",
     "lib": ["es2020"],
-    "strict": true,
     "noUncheckedIndexedAccess": true,
-    "incremental": true,
-    "tsBuildInfoFile": "./node_modules/.cache/tsbuildinfo/clickhouse-client.tsbuildinfo",
+    "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
     "declaration": true,
     "emitDeclarationOnly": true,
     "outDir": "./dist",
-    "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true,
-    "verbatimModuleSyntax": true
+    "verbatimModuleSyntax": true,
+
+    "rewriteRelativeImportExtensions": false
   },
   "include": ["src/**/*.ts"],
-  // Exclude Vitest tests from the source typecheck and declaration build;
-  // Vitest is a test-only dependency.
-  "exclude": ["src/**/*.test.ts"]
+  "exclude": ["src/**/*.test.ts"],
+  "references": [
+    {
+      "path": "tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/data-retention/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../observability/tsconfig.build.json"
+    },
+    {
+      "path": "../task/tsconfig.build.json"
+    },
+    {
+      "path": "../time/tsconfig.build.json"
+    },
+    {
+      "path": "../test-harness/tsconfig.build.json"
+    }
+  ]
 }

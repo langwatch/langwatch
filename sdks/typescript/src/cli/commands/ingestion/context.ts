@@ -1,49 +1,14 @@
 /**
- * `langwatch ingest context`: the agent declares the repository and branch it
- * is working on, itself, from inside the checkout.
- *
- * The hooks report the directory the agent PROCESS runs in, which is correct
- * until the agent works somewhere else: a claude session that only `cd`s
- * inside its shell tool, or a codex agent that lives for weeks in a scratch
- * directory and reviews one checkout after another. Codex records its
- * directory once at session start and nothing moves it, so a standing agent
- * reports no repository, no branch and no pull request, however much it
- * works. This command is the way out: run from inside a checkout, it posts
- * the same session-context record the hooks post, for the session the agent
- * is running in, and the always-loaded guidance the CLI installs tells every
- * session to run it when it switches.
- *
- * Which session that is is decided in `context-session.ts`.
- *
- * Unlike the hooks this command talks to whoever ran it: its stdout is the
- * agent's tool result, so it says in one line what it declared or why it
- * declared nothing. It still never exits non-zero and never throws, because
- * the caller is a live session and a broken declaration must cost the agent
- * one line, not the turn.
- *
- * Fingerprint state is shared with the hooks and the codex turn harvest, so
- * a declaration a hook already made posts nothing, and the titles ride along
- * exactly as each agent's own seam sends them, or the fingerprints could
- * never match. After a declaration, the next hook may re-post the process's
- * own directory once; the platform folds branches by appending, so that is
- * expected and harmless.
- *
- * Spec: specs/ai-governance/cli-wrappers/session-context-declare.feature
+ * `langwatch ingest context`: the agent declares its repository and branch
+ * from inside the checkout, fixing a standing agent whose hooks only ever
+ * report its launch directory. Never exits non-zero or throws.
  */
 
 import { loadConfig } from "@/cli/utils/governance/config";
 import { LANGWATCH_SDK_VERSION } from "@/internal/constants";
 
-import {
-  type CliTelemetryConfig,
-  postSessionContext,
-  resolveTarget,
-} from "./hook";
-import {
-  type GitRunner,
-  readSessionContext,
-  runGitCommand,
-} from "./git-context";
+import { type CliTelemetryConfig, postSessionContext, resolveTarget } from "./hook.ts";
+import { type GitRunner, readSessionContext, runGitCommand } from "./git-context.ts";
 import {
   defaultStateDir,
   readFingerprint,
@@ -69,10 +34,7 @@ import {
 import { defaultCodexSessionsRoot } from "@/cli/utils/governance/codex-rollout-otlp";
 import type { AncestorProbe } from "@/cli/utils/governance/codex-ancestor-session";
 
-import {
-  type ResolvedSession,
-  resolveSession,
-} from "./context-session";
+import { type ResolvedSession, resolveSession } from "./context-session.ts";
 import { langwatchFetch } from "@/internal/http/langwatchFetch";
 
 export interface ContextCommandOptions {
@@ -156,10 +118,7 @@ async function declare({
   readCliConfig,
   writeLine,
 }: Required<
-  Omit<
-    ContextCommandOptions,
-    "sessionId" | "agent" | "claudeRegistryDir" | "ancestorProbe"
-  >
+  Omit<ContextCommandOptions, "sessionId" | "agent" | "claudeRegistryDir" | "ancestorProbe">
 > &
   Pick<
     ContextCommandOptions,
@@ -209,15 +168,14 @@ async function declare({
       ? normalizeSessionName(
           readClaudeSessionName({
             sessionId: session.sessionId,
-            registryDir:
-              claudeRegistryDir ?? defaultClaudeSessionRegistryDir(env),
+            registryDir: claudeRegistryDir ?? defaultClaudeSessionRegistryDir(env),
           }),
         )
       : session.agent === "codex"
         ? normalizeSessionName(
-            (
-              await readCodexThreadNames(codexSessionIndexPath(codexSessionsRoot))
-            ).get(session.sessionId),
+            (await readCodexThreadNames(codexSessionIndexPath(codexSessionsRoot))).get(
+              session.sessionId,
+            ),
           )
         : null;
 
@@ -260,9 +218,7 @@ async function declare({
         payload,
         now,
       });
-      writeLine(
-        `Queued ${declared}; it will be sent when this session next reports.`,
-      );
+      writeLine(`Queued ${declared}; it will be sent when this session next reports.`);
     } catch (error) {
       writeLine(
         `LangWatch did not accept the declaration and it could not be queued: ${(error as Error).message}`,

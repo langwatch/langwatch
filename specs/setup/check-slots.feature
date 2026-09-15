@@ -1,42 +1,35 @@
 Feature: Machine-wide slots for whole-repo checks
   As a developer whose laptop runs several worktrees and agents at once
-  I want `pnpm typecheck` and `pnpm lint` to queue instead of piling up
+  I want opted-in agent checks and explicit Haven runs to queue instead of piling up
   So that N parallel checks never take the machine down, and a slow one
   explains itself instead of looking hung
 
-  # Both checks saturate the machine on purpose. A typecheck peaks around 3 to 4
-  # GiB and uses every core; a biome run over 6,800 files spends 38 CPU-seconds
-  # in 4 seconds of wall clock. That is the right trade for one run, and capping
-  # either tool's threads only stretches the same CPU cost over 5x the wall
-  # clock. Three or four at once, which is the normal state of a laptop driving
-  # several worktrees or agents, is what makes the machine unusable, and neither
-  # command knew another was already running.
-  #
-  # `platform/app`'s typecheck, lint and format scripts now run through
-  # dev/scripts/check-queue.mjs, a thin wrapper that takes a machine-wide
-  # slot, runs the real command, and releases. ONE counter covers all of them,
-  # because they compete for the same cores. The state is a directory of
-  # per-run JSON entries (pid, arrival sequence, label, state) under the
-  # system temp dir, so every worktree, terminal and agent on the machine
-  # counts against the same total. Waiters are served in arrival order.
-  #
-  # The wrapper is deliberately boring on the happy path: with a free slot it
-  # prints nothing at all and passes stdio, exit code and signals straight
-  # through. It only speaks when a run has to wait, which is exactly when an
-  # agent needs to know that the extra minutes were queueing rather than a
-  # hung tool.
-  #
-  # Knobs, all optional:
-  #   CHECK_SLOTS=N            how many may run at once (0 disables the gate,
-  #                            from a person's shell; agent shells cannot)
-  #   CHECK_PRESSURE=<level>   force the memory-pressure level (green/amber/red)
-  #   CHECK_QUEUE_DIR=<path>   where the shared state lives
-  #   CHECK_QUEUE_POLL_MS=N    how often a waiter re-checks
-  #   CHECK_QUEUE_HEARTBEAT_MS how often a waiting run repeats itself
-  #   CHECK_QUEUE_MAX_WAIT_MS  after this, run anyway rather than hang
-  #
-  # `haven typecheck` keeps its own RAM slot (ADR-064) and turns this gate off
-  # for the run it spawns, so a run is never counted by both.
+  # Optional Haven hooks own agent admission (haven-agent-hooks.feature).
+  # Repository scripts and pnpm-generated tool launchers run directly.
+  # `haven slot run -- <command>` provides explicit terminal admission;
+  # check-queue.mjs remains a legacy entrypoint with a JS fallback.
+  # Flock waiters retry every 100 ms without changing capacity or memory limits.
+
+  @unit
+  Scenario: Installing dependencies retires automatic bin shims
+    Given the bin entries contain legacy queue shims and their original launchers
+    When the postinstall cleanup runs
+    Then the original executable launchers are restored
+    And repeating cleanup leaves them unchanged
+
+  @unit
+  Scenario: Cleanup preserves a newly generated launcher
+    Given pnpm has replaced a legacy shim with a fresh launcher
+    And an older launcher backup remains
+    When the postinstall cleanup runs
+    Then the fresh launcher remains in place
+
+  @unit
+  Scenario: Cleanup reports an incomplete legacy installation
+    Given a legacy shim has no original launcher backup
+    When the postinstall cleanup runs
+    Then it reports that restoration failed
+    And it preserves the current entry
 
   # --- The happy path stays invisible ---
 
@@ -312,24 +305,9 @@ Feature: Machine-wide slots for whole-repo checks
     Then the interrupt reaches the command
     And the check still reports how the command ended
 
-  # --- The bin shims: the package scripts are not the only way in ---
-
-  # Wrapping the scripts left every other route to the binary uncounted, and
-  # they get used: `pnpm exec tsc --noEmit -p tsconfig.tsgo.json`,
-  # `./node_modules/.bin/tsc`, and the standing advice to iterate with
-  # targeted checks, widened to the whole project. Observed in the wild as
-  # three compiler processes on an 18 GB laptop with the limit set to 2, one of
-  # them started from the same worktree as a properly queued run.
-  #
-  # The compiler answers to two names — typescript@7 installs it as `tsc`,
-  # @typescript/native-preview as `tsgo` — so the shims cover both and so does
-  # haven's gate (ADR-095).
-  #
-  # dev/scripts/install-check-shims.mjs makes platform/app's bin entries
-  # themselves the boundary, so the route into the tool stops mattering. Only
-  # platform/app's: sdks/typescript's build runs `tsc --noEmit` on the way to
-  # `pnpm dev`, and a dev server that waits for a typecheck slot before it
-  # boots is not an improvement.
+  # Explicit legacy shim installation remains available for existing users.
+  # The following scenarios apply after manually running the legacy installer;
+  # postinstall now removes those shims instead of installing them.
 
   @unit
   Scenario: A whole-project run counts however it was started
@@ -338,7 +316,7 @@ Feature: Machine-wide slots for whole-repo checks
 
   @unit
   Scenario: A run over a directory counts
-    When I run "biome check ./src ./ee"
+    When I run a check over a directory rather than a named file
     Then the run counts against the limit
 
   @unit
@@ -350,7 +328,7 @@ Feature: Machine-wide slots for whole-repo checks
   # file to check is what turns a whole-project run into one nothing waits for.
   @unit
   Scenario: A subcommand or a flag's value is not a target
-    When I run "biome check" with no paths, or "tsc --pretty false"
+    When I run a check with a bare subcommand and no paths, or "tsc --pretty false"
     Then the run counts against the limit, because neither names a file and both walk the project
 
   @unit
@@ -379,13 +357,13 @@ Feature: Machine-wide slots for whole-repo checks
   @unit
   Scenario: Reinstalling leaves the tools working
     Given the bin entries already route whole-project runs through the queue
-    When "pnpm install" runs again
+    When the legacy installer runs again
     Then the tools still run, and still count the same runs
 
   @unit
   Scenario: A fresh install restores the counting pnpm overwrote
     Given "pnpm install" has replaced the bin entries with its own
-    When the postinstall step runs
+    When the legacy installer runs
     Then whole-project runs count again
 
   # Otherwise a fix to how runs are classified would never reach a checkout
@@ -393,30 +371,30 @@ Feature: Machine-wide slots for whole-repo checks
   @unit
   Scenario: An earlier version of the routing is brought up to date
     Given the bin entries were routed through the queue by an earlier version of the installer
-    When the postinstall step runs
+    When the legacy installer runs
     Then they are replaced with the current one, and the tools still run
 
   @unit
   Scenario: An install that cannot write leaves the tool working
     Given the bin directory cannot be written to
-    When the postinstall step runs
+    When the legacy installer runs
     Then the tool still runs, because losing the count is survivable and losing the tool is not
 
   # The shims are a laptop concern, and neither environment below is a laptop.
   # CI turns the queue off anyway, so a shim there only puts a node process in
-  # front of every tsc and biome to decide nothing, and an install in an image
+  # front of every tsc run to decide nothing, and an install in an image
   # or on a server has no bin entries worth rewriting.
 
   @unit
   Scenario: CI installs are left alone
     Given CI is set to anything but "0" or "false"
-    When the postinstall step runs
+    When the legacy installer runs
     Then it changes nothing, and says which environment it stood down for
 
   @unit
   Scenario: Production installs are left alone
     Given NODE_ENV is production
-    When the postinstall step runs
+    When the legacy installer runs
     Then it changes nothing
 
   # --- The queue lives inside haven ---
@@ -481,3 +459,122 @@ Feature: Machine-wide slots for whole-repo checks
     When it runs "pnpm typecheck"
     Then it passes CHECK_SLOTS=0 to that run
     And the run is counted once, by haven's slot
+
+  # --- How long the wait actually is ---
+
+  # haven keeps a short history of completed heavy runs (kind, started at,
+  # duration, exit status) beside the semaphore, so a queued run can be told
+  # roughly how long the wait is instead of only how many runs are ahead.
+
+  @unit
+  Scenario: A queued run says roughly how long the wait is
+    Given recent history for a kind of run, and a run of that kind already holding the only slot
+    When another run of that kind is queued behind it
+    Then it reports being queued behind 1 run
+    And it reports roughly how long that wait is expected to be
+
+  @unit
+  Scenario: With no history the gate does not guess
+    Given no run of any kind has ever been recorded
+    When a run is queued behind another
+    Then it reports being queued behind 1 run
+    And it says nothing about how long the wait might be, exactly as before the estimate existed
+
+  # --- vitest joins the shimmed tools ---
+
+  # A bare `vitest` or `vitest run` with no path spins up every suite in the
+  # workspace member it runs from, at the same cost as a whole-tree
+  # typecheck - and until now it was the one gap the gate's own prediction
+  # could describe but nothing downstream enforced. vitest now takes a slot
+  # through `haven slot run` on its own, the same way tsc/tsgo/oxlint/oxfmt
+  # already do, so the gate's prediction and the enforcement agree for every
+  # heavy command it classifies.
+  #
+  # The mechanism (dev/scripts/install-check-shims.mjs, TOOLS) is shared,
+  # tool-agnostic code already proven for tsc/tsgo/oxlint/oxfmt by
+  # packages/architecture-enforcer/tests/check-shims.test.ts, which is outside
+  # this lane's touched paths for this change. Tagged @unimplemented here
+  # rather than left silently unbound: the code change (vitest added to
+  # TOOLS) shipped in this change, the dedicated test naming vitest did not.
+
+  @unimplemented
+  Scenario: vitest takes a slot on its own, the same way tsc and oxlint do
+    Given the check-shims installer has shimmed vitest beside tsc, tsgo, oxlint and oxfmt
+    When a bare "vitest" or "vitest run" with no path is run
+    Then it counts against the machine-wide check slot
+    And "vitest run src/foo.test.ts" naming a real file stays instant and unqueued
+    And "vitest --watch" starts without waiting, because it holds its slot for the whole session
+
+  # --- Priority with ageing ---
+
+  # The shared slot used to serve waiters strictly in arrival order. A person
+  # is worth more than an agent's own turn: their wait is not backed by a
+  # prompt cache with its own clock running out, and nobody wants to watch a
+  # laptop finish somebody else's queued sub-agent before their own `pnpm
+  # test:unit` starts. domain.CallerKind already ranks who is asking -
+  # Interactive above MainSession above SubAgent; this adds two things on
+  # top: a queued run's effective priority rises with how long it has
+  # waited, so a lower-ranked run is never starved forever, only ever slower
+  # than a caller who has waited exactly as long; and an agent's own
+  # HAVEN_PRIORITY=high claim that a run matters, metered so it is a claim
+  # and not a lever. Same-rank waiters keep arrival order in practice: ageing
+  # is monotonic with wait time, so the one that queued first keeps a strictly
+  # higher effective priority at every check, all the way to a tie only the
+  # flock itself resolves.
+
+  @unit
+  Scenario: Priority classes rank a person above a main session above a sub-agent
+    Given a sub-agent and a person queued for the same slot at the same moment
+    When the slot frees
+    Then the person's effective priority outranks the sub-agent's
+    And the sub-agent yields its attempt on that poll tick to the person
+
+  @unit
+  Scenario: A queued run's effective priority rises with how long it has waited
+    Given a run that has been queued for a while
+    When its effective priority is computed again
+    Then it is higher than it was when the run had waited less
+    And ageing never adds more than one caller-rank's worth on its own
+
+  @unit
+  Scenario: Aging alone lets a sub-agent catch up to a main session, never past a person waiting the same time
+    Given a sub-agent that has waited long enough for ageing to reach its cap
+    When its effective priority is compared to a main session that just queued
+    Then the two are equal
+    But a person who queued at the same moment as the sub-agent still outranks it
+
+  @unit
+  Scenario: An explicit HAVEN_PRIORITY=high raises effective priority by one class step
+    Given two otherwise identical queued runs, one with an honored HAVEN_PRIORITY=high claim
+    When their effective priorities are compared
+    Then the claiming run's priority is higher by exactly one caller-rank's worth
+    And the claim alone never lets a sub-agent outrank a person who queued at the same moment
+
+  @unit
+  Scenario: An honored HAVEN_PRIORITY=high claim is limited to once per agent id per 10 minutes
+    Given an agent id whose claim was already honored
+    When the same agent id claims HAVEN_PRIORITY=high again inside 10 minutes
+    Then the second claim is refused
+    And a claim from the same agent id 10 minutes or more after the first is honored again
+
+  @unit
+  Scenario: An explicit HAVEN_PRIORITY=high in the caller's environment lets an agent state that this run matters
+    Given a caller sets HAVEN_PRIORITY=high in its own shell environment before a shimmed command runs
+    When the claim is honored
+    Then the run's effective priority carries the override for the rest of its own wait
+    And an honored claim is written to run-history.jsonl so it is visible
+    And with HAVEN_PRIORITY unset, or a claim inside the metering window, nothing is claimed and nothing is written
+
+  @unit
+  Scenario: haven slot explain shows each holder and waiter with class, age and effective priority
+    Given at least one run holding the shared slot and at least one run queued behind it
+    When "haven slot explain" runs
+    Then each holder is listed with its own kind and how long it has held the slot
+    And each waiter is listed with its caller class, how long it has waited, and its effective priority right now
+
+  @unit
+  Scenario: Priority scheduling is additive: with no registry wired, nothing yields
+    Given a slot run built with no waiter registry at all
+    When it decides whether to yield this poll tick
+    Then it never yields
+    And it behaves exactly as the queue did before priority scheduling existed

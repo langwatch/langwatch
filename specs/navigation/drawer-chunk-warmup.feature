@@ -11,20 +11,10 @@ Feature: A screen fetches a drawer's code before the person opens it
 
   Rule: A screen warms the drawers it opens
 
-    @integration
-    Scenario: The scenario library warms the scenario editor
-      Given the scenario library is on screen
-      When the browser becomes idle
-      Then the scenario editor's code is fetched
-
-    # A screen warms every drawer it opens, not only the one its rows open. The
-    # runs page opens a run's detail from the rows and the run plan editor from
-    # the sidebar, and both wait on the same kind of download.
-    @integration
-    Scenario: The runs page warms the drawers its rows and sidebar open
-      Given the runs page is on screen
-      When the browser becomes idle
-      Then the code of the run detail and the run plan editor is fetched
+    # The two screen-level warm-ups ("The scenario library warms the scenario
+    # editor", "The runs page warms the drawers its rows and sidebar open") were
+    # retired on 2026-09-05: dev/docs/plans/restore-or-retire-2026-09-05.md marks
+    # them "retire — use-preload-drawer is a documented no-op".
 
     # Fetching the code is not the whole of it. A drawer keeps its own record of
     # whether it is ready, so a drawer whose code is in memory still reports

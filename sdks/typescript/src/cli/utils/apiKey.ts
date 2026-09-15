@@ -1,27 +1,12 @@
 import chalk from "chalk";
 import { config } from "dotenv";
-import {
-  setResolvedApiKey,
-  setResolvedProjectId,
-} from "@/internal/credentialContext";
+import { setResolvedApiKey, setResolvedProjectId } from "@/internal/credentialContext";
 import { getEndpoint } from "./endpoint";
 import { getOutputFormat, renderErrorAsJson } from "./errorOutput";
 import { maybePrintIdentityNotice } from "./identityNotice";
-import {
-  type GovernanceConfig,
-  isLoggedIn,
-  loadConfig,
-  saveConfig,
-} from "./governance/config";
-import {
-  fetchPersonalProject,
-  SessionApiError,
-} from "./governance/session-api";
-import {
-  projectScopeErrorLines,
-  ProjectScopeError,
-  resolveProjectSelector,
-} from "./projectScope";
+import { type GovernanceConfig, isLoggedIn, loadConfig, saveConfig } from "./governance/config";
+import { fetchPersonalProject, SessionApiError } from "./governance/session-api";
+import { projectScopeErrorLines, ProjectScopeError, resolveProjectSelector } from "./projectScope";
 
 /**
  * Re-read the caller's .env, applying only the LANGWATCH_* keys.
@@ -176,8 +161,7 @@ export const resolveCredentials = async (
       // personal project is the default only when no flag says otherwise,
       // and a flag that does not resolve must leave no target behind at all.
       const projectId =
-        (await applyProjectScope({ project: opts.project, cfg })) ??
-        session.projectId;
+        (await applyProjectScope({ project: opts.project, cfg })) ?? session.projectId;
       setResolvedProjectId(projectId);
       // An explicit --project names the identity on the command line, so
       // there is nothing implicit left to warn about.
@@ -233,6 +217,7 @@ function reportProjectScopeError(error: ProjectScopeError): never {
         httpStatus: 0,
         meta: { project: error.project },
         isHandled: true,
+        retryable: false,
       }),
     );
     console.error(chalk.red(`Error: ${error.message}`));
@@ -308,8 +293,7 @@ async function resolveSessionCredential(
   // is what either key's continued validity rests on.
   const cached = loginKey ?? personalKey;
   const validatedAtMs = (cfg.personal_project?.validated_at ?? 0) * 1000;
-  const isFresh =
-    !!cached && Date.now() - validatedAtMs < SESSION_REVALIDATE_WINDOW_MS;
+  const isFresh = !!cached && Date.now() - validatedAtMs < SESSION_REVALIDATE_WINDOW_MS;
   if (isFresh) {
     return {
       apiKey: cached,
@@ -348,10 +332,7 @@ async function resolveSessionCredential(
       isLoginKey: loginKey !== undefined,
     };
   } catch (err) {
-    if (
-      err instanceof SessionApiError &&
-      (err.status === 401 || err.status === 403)
-    ) {
+    if (err instanceof SessionApiError && (err.status === 401 || err.status === 403)) {
       // Session revoked, expired or refused: sever access. Drop both cached
       // keys so the retained config can no longer authenticate. 403 counts
       // the same as 401 — a session the server refuses is one the CLI must
@@ -427,11 +408,10 @@ function reportMissingCredentials(endpoint: string): never {
         httpStatus: 0,
         meta: { authUrl },
         isHandled: true,
+        retryable: false,
       }),
     );
-    console.error(
-      chalk.red("Error: you're not logged in, and LANGWATCH_API_KEY is not set."),
-    );
+    console.error(chalk.red("Error: you're not logged in, and LANGWATCH_API_KEY is not set."));
     process.exit(1);
   }
 
@@ -467,6 +447,7 @@ export const checkOrgApiKey = (): string => {
         httpStatus: 0,
         meta: { settingsUrl },
         isHandled: true,
+        retryable: false,
       }),
     );
     console.error(chalk.red("Error: LANGWATCH_API_KEY not found."));

@@ -1,34 +1,13 @@
 /**
- * The permission question, answered in the terminal.
- *
- * A call that is not read-only stops on two screens at once: the card in the
- * LangWatch panel and this selector, drawn at the bottom of the transcript.
- * The first answer wins, and the CLI applies it here rather than waiting for
- * the platform to relay it back.
- *
- * The box is drawn by hand with chalk over a small keypress loop rather than
- * with the `prompts` package the request picker uses: `prompts` renders its
- * own list style and gives no way to put a framed command and a reason above
- * the choices, which is the whole point of this screen. No dependency is
- * added for it.
- *
- * @see specs/typescript-sdk/cli-langy-share-control.feature
- * @see dev/docs/adr/129-langy-local-control.md
+ * The permission question, answered in the terminal. A call that is not
+ * read-only stops on two screens at once; the first answer wins. Drawn by
+ * hand with chalk since `prompts` can't frame a command above the choices.
  */
 
 import * as readline from "node:readline";
 import chalk from "chalk";
-import type {
-  LocalCall,
-  TerminalPermissionDecision,
-} from "../../../agent/local-control-protocol";
-import {
-  patternPhrase,
-  shorten,
-  terminalWidth,
-  wrapWords,
-  type UiWriter,
-} from "./ui";
+import type { LocalCall, TerminalPermissionDecision } from "../../../agent/local-control-protocol";
+import { patternPhrase, shorten, terminalWidth, wrapWords, type UiWriter } from "./ui";
 
 /** One row of a box. */
 export interface BoxOption<T> {
@@ -81,8 +60,7 @@ export const APPROVAL_HINT =
   "Enter or a number to answer · ↑↓ to choose · Esc to deny · or answer on the card in LangWatch";
 
 /** What the developer typed, after choosing to deny. */
-export const DENY_REASON_QUESTION =
-  "Tell Langy what to do instead, or press Enter to skip: ";
+export const DENY_REASON_QUESTION = "Tell Langy what to do instead, or press Enter to skip: ";
 
 /** The keys the selector reads. */
 export interface KeyEvent {
@@ -158,8 +136,7 @@ export function approvalCardFor({
   patterns: string[];
   timeoutSeconds?: number;
 }): ApprovalCard {
-  const limit =
-    timeoutSeconds === undefined ? "" : ` ${timeLimitSentence(timeoutSeconds)}`;
+  const limit = timeoutSeconds === undefined ? "" : ` ${timeLimitSentence(timeoutSeconds)}`;
   return {
     title: approvalTitle({ call, workspaceName }),
     subject: summary,
@@ -172,12 +149,9 @@ export function approvalCardFor({
 }
 
 /**
- * What the session grant covers, in one sentence under the options.
- *
- * The developer answered "allow for this session" without being told what
- * the grant lets through afterwards, and one of those grants covered every
- * python command on the machine. The sentence names the same patterns the
- * option names, so the two read as one answer.
+ * What the session grant covers, in one sentence under the options — so the
+ * developer isn't answering "allow for this session" blind to how wide it
+ * reaches (a bare pattern once covered every python command on the machine).
  */
 export function grantCoverageSentence(patterns: string[]): string | null {
   const covered = patterns
@@ -194,13 +168,10 @@ export function grantCoverageSentence(patterns: string[]): string | null {
 /** The widest the box is drawn, however wide the terminal is. */
 export const MAX_BOX_WIDTH = 100;
 
-
 /**
- * The box, as the lines it occupies.
- *
- * Every line is exactly as wide as the box, so the writer can count the rows
- * it drew and move the cursor back over exactly those rows when the selection
- * moves or the box is erased.
+ * The box, as the lines it occupies. Every line is exactly as wide as the
+ * box, so the writer can count the rows it drew and move the cursor back
+ * over exactly those rows on redraw or erase.
  */
 export function renderBox<T>({
   card,
@@ -234,12 +205,10 @@ export function renderBox<T>({
     const marker = `${chosen ? " ❯ " : "   "}${index + 1}. `;
     // A label of a chain names every pattern, so it is wrapped like any other
     // line rather than pushed through the frame.
-    wrapWords(option.label, textWidth - marker.length + 3).forEach(
-      (line, part) => {
-        const row = `${part === 0 ? marker : " ".repeat(marker.length)}${line}`;
-        plain(row, chosen ? chalk.cyan(row) : row);
-      },
-    );
+    wrapWords(option.label, textWidth - marker.length + 3).forEach((line, part) => {
+      const row = `${part === 0 ? marker : " ".repeat(marker.length)}${line}`;
+      plain(row, chosen ? chalk.cyan(row) : row);
+    });
   });
   const coverage = grantCoverageSentence(card.patterns ?? []);
   if (coverage !== null) {
@@ -274,14 +243,10 @@ export function renderBox<T>({
 
 /**
  * Keys from the real terminal, in raw mode for as long as one ask is open.
- *
  * Raw mode stops the terminal from turning Ctrl-C into a signal, so this
- * raises it instead. Without that, Ctrl-C did nothing at all while a question
- * was on the screen and the only way out was to kill the process.
+ * raises it instead.
  */
-export function createStdinKeySource(
-  stdin: NodeJS.ReadStream = process.stdin,
-): KeySource {
+export function createStdinKeySource(stdin: NodeJS.ReadStream = process.stdin): KeySource {
   return {
     listen: (onKey) => {
       readline.emitKeypressEvents(stdin);
@@ -352,11 +317,9 @@ export interface OpenBox<T> {
 }
 
 /**
- * Draws one box and reads the answer. Every question the terminal asks goes
- * through this: the permission selector, and the request to share the folder.
- *
- * The box owns the bottom of the screen while it is open, so a command that
- * finishes under it neither erases it nor scrolls it away.
+ * Draws one box and reads the answer; every question the terminal asks goes
+ * through this. The box owns the bottom of the screen while open, so a
+ * command that finishes under it neither erases nor scrolls it away.
  */
 export function askBox<TValue, TAnswer = TValue>({
   card,

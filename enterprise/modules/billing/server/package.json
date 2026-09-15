@@ -1,0 +1,63 @@
+{
+  "name": "@langwatch/enterprise-billing-server",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Server-side LangWatch Enterprise billing services and adapters.",
+  "license": "SEE LICENSE IN ../../../LICENSE.md",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "pnpm -w typecheck:declarations --project . && tsc --noEmit",
+    "test": "vitest run",
+    "test:unit": "vitest run",
+    "test:integration": "vitest run --config vitest.integration.config.ts"
+  },
+  "dependencies": {
+    "@clickhouse/client": "catalog:",
+    "@langwatch/api": "workspace:*",
+    "@langwatch/authz-contract": "workspace:*",
+    "@langwatch/clickhouse-client": "workspace:*",
+    "@langwatch/data-retention-contract": "workspace:*",
+    "@langwatch/enterprise-billing-contract": "workspace:*",
+    "@langwatch/enterprise-licensing-contract": "workspace:*",
+    "@langwatch/entitlement-contract": "workspace:*",
+    "@langwatch/entitlement-server": "workspace:*",
+    "@langwatch/evaluation-contract": "workspace:*",
+    "@langwatch/eventing": "workspace:*",
+    "@langwatch/handled-error": "workspace:*",
+    "@langwatch/ksuid": "workspace:*",
+    "@langwatch/notification-contract": "workspace:*",
+    "@langwatch/observability": "workspace:*",
+    "@langwatch/organization-contract": "workspace:*",
+    "@langwatch/plans": "workspace:*",
+    "@langwatch/prisma-client": "workspace:*",
+    "@langwatch/runtime-composition": "workspace:*",
+    "@langwatch/scenario-contract": "workspace:*",
+    "@langwatch/task": "workspace:*",
+    "@langwatch/time": "workspace:*",
+    "@langwatch/trace-contract": "workspace:*",
+    "@slack/webhook": "catalog:",
+    "@trpc/server": "catalog:",
+    "geoip-country": "^5.0.202607010001",
+    "ioredis": "catalog:",
+    "nanoid": "catalog:",
+    "posthog-node": "catalog:",
+    "stripe": "^15.12.0",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

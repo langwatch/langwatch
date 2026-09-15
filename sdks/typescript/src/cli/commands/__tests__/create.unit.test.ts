@@ -6,7 +6,13 @@ vi.mock("fs", () => ({
   writeFileSync: vi.fn(),
 }));
 
-vi.mock("../../utils/apiKey", () => ({ resolveCredentials: vi.fn(async () => ({ apiKey: "test-key", source: "env", endpoint: "https://app.langwatch.ai" })) }));
+vi.mock("../../utils/apiKey", () => ({
+  resolveCredentials: vi.fn(async () => ({
+    apiKey: "test-key",
+    source: "env",
+    endpoint: "https://app.langwatch.ai",
+  })),
+}));
 vi.mock("../../utils/init", () => ({
   ensureProjectInitialized: vi.fn().mockResolvedValue(undefined),
 }));
@@ -14,9 +20,7 @@ vi.mock("../../utils/fileManager", () => ({
   FileManager: {
     loadPromptsConfig: vi.fn().mockReturnValue({ prompts: {} }),
     savePromptsConfig: vi.fn(),
-    loadPromptsLock: vi
-      .fn()
-      .mockReturnValue({ lockfileVersion: 1, prompts: {} }),
+    loadPromptsLock: vi.fn().mockReturnValue({ lockfileVersion: 1, prompts: {} }),
     savePromptsLock: vi.fn(),
   },
 }));

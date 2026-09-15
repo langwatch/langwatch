@@ -1,0 +1,153 @@
+{
+  "name": "@langwatch/prompt-web",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Browser-safe Prompt UI primitives and presentation helpers.",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "exports": {
+    "./surfaces/llm-config-constants": {
+      "langwatch-declaration-source": "./src/model/llmPromptConfigs/constants.ts",
+      "types": "./dist/model/llmPromptConfigs/constants.d.ts",
+      "default": "./src/model/llmPromptConfigs/constants.ts"
+    },
+    "./surfaces/llm-config-field": {
+      "langwatch-declaration-source": "./src/ui/elements/llmPromptConfigs/llm-config-field.tsx",
+      "types": "./dist/ui/elements/llmPromptConfigs/llm-config-field.d.ts",
+      "default": "./src/ui/elements/llmPromptConfigs/llm-config-field.tsx"
+    },
+    "./surfaces/llm-config-popover": {
+      "langwatch-declaration-source": "./src/ui/elements/llmPromptConfigs/llm-config-popover.tsx",
+      "types": "./dist/ui/elements/llmPromptConfigs/llm-config-popover.d.ts",
+      "default": "./src/ui/elements/llmPromptConfigs/llm-config-popover.tsx"
+    },
+    "./surfaces/llm-model-display": {
+      "langwatch-declaration-source": "./src/ui/elements/llmPromptConfigs/llm-model-display.tsx",
+      "types": "./dist/ui/elements/llmPromptConfigs/llm-model-display.d.ts",
+      "default": "./src/ui/elements/llmPromptConfigs/llm-model-display.tsx"
+    },
+    "./surfaces/outputs-section": {
+      "langwatch-declaration-source": "./src/ui/elements/outputs/outputs-section.tsx",
+      "types": "./dist/ui/elements/outputs/outputs-section.d.ts",
+      "default": "./src/ui/elements/outputs/outputs-section.tsx"
+    },
+    "./surfaces/prompt-editor-drawer": {
+      "langwatch-declaration-source": "./src/ui/sections/prompts/prompt-editor-drawer.tsx",
+      "types": "./dist/ui/sections/prompts/prompt-editor-drawer.d.ts",
+      "default": "./src/ui/sections/prompts/prompt-editor-drawer.tsx"
+    },
+    "./drawers": {
+      "langwatch-declaration-source": "./src/ui/sections/drawers.ts",
+      "types": "./dist/ui/sections/drawers.d.ts",
+      "default": "./src/ui/sections/drawers.ts"
+    },
+    "./surfaces/latest-prompt-version": {
+      "langwatch-declaration-source": "./src/behavior/prompts/use-latest-prompt-version.ts",
+      "types": "./dist/behavior/prompts/use-latest-prompt-version.d.ts",
+      "default": "./src/behavior/prompts/use-latest-prompt-version.ts"
+    },
+    "./surfaces/llm-prompt-config-utils": {
+      "langwatch-declaration-source": "./src/behavior/prompts/llm-prompt-config-utils.ts",
+      "types": "./dist/behavior/prompts/llm-prompt-config-utils.d.ts",
+      "default": "./src/behavior/prompts/llm-prompt-config-utils.ts"
+    },
+    "./prompt-studio": {
+      "langwatch-declaration-source": "./src/prompt-studio.ts",
+      "types": "./dist/prompt-studio.d.ts",
+      "default": "./src/prompt-studio.ts"
+    },
+    "./surfaces/api-snippet": {
+      "langwatch-declaration-source": "./src/api-snippet.ts",
+      "types": "./dist/api-snippet.d.ts",
+      "default": "./src/api-snippet.ts"
+    },
+    "./surfaces/llm-parameters": {
+      "langwatch-declaration-source": "./src/llm-parameters.ts",
+      "types": "./dist/llm-parameters.d.ts",
+      "default": "./src/llm-parameters.ts"
+    },
+    "./surfaces/prompt-form": {
+      "langwatch-declaration-source": "./src/prompt-form.ts",
+      "types": "./dist/prompt-form.d.ts",
+      "default": "./src/prompt-form.ts"
+    },
+    "./surfaces/prompt-reference": {
+      "langwatch-declaration-source": "./src/prompt-reference.ts",
+      "types": "./dist/prompt-reference.d.ts",
+      "default": "./src/prompt-reference.ts"
+    },
+    "./surfaces/prompt-version": {
+      "langwatch-declaration-source": "./src/prompt-version.ts",
+      "types": "./dist/prompt-version.d.ts",
+      "default": "./src/prompt-version.ts"
+    },
+    "./surfaces/variables": {
+      "langwatch-declaration-source": "./src/variables.ts",
+      "types": "./dist/variables.d.ts",
+      "default": "./src/variables.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "pnpm -w typecheck:declarations --project . && tsc --noEmit",
+    "test": "vitest run",
+    "test:unit": "vitest run"
+  },
+  "dependencies": {
+    "@chakra-ui/react": "catalog:",
+    "@dnd-kit/core": "catalog:",
+    "@dnd-kit/sortable": "catalog:",
+    "@dnd-kit/utilities": "catalog:",
+    "@hookform/resolvers": "catalog:",
+    "@langwatch/api": "workspace:*",
+    "@langwatch/dataset-contract": "workspace:*",
+    "@langwatch/dataset-web": "workspace:*",
+    "@langwatch/design-system": "workspace:*",
+    "@langwatch/experiment-contract": "workspace:*",
+    "@langwatch/experiment-web": "workspace:*",
+    "@langwatch/model-provider-contract": "workspace:*",
+    "@langwatch/model-provider-web": "workspace:*",
+    "@langwatch/observability": "workspace:*",
+    "@langwatch/onboarding-web": "workspace:*",
+    "@langwatch/prompt-contract": "workspace:*",
+    "@langwatch/time": "workspace:*",
+    "@langwatch/topic-contract": "workspace:*",
+    "@langwatch/trace-contract": "workspace:*",
+    "@langwatch/trace-web": "workspace:*",
+    "@langwatch/ui-drawer": "workspace:*",
+    "@langwatch/ui-host": "workspace:*",
+    "@langwatch/workflow-contract": "workspace:*",
+    "@langwatch/workflow-web": "workspace:*",
+    "@xyflow/react": "catalog:",
+    "ajv": "catalog:",
+    "clsx": "2.1.1",
+    "diff": "catalog:",
+    "immer": "^11.1.8",
+    "langwatch": "workspace:*",
+    "lodash-es": "catalog:",
+    "lucide-react": "catalog:",
+    "react": "catalog:",
+    "react-feather": "catalog:",
+    "react-hook-form": "catalog:",
+    "react-icons": "catalog:",
+    "rich-textarea": "^0.27.0",
+    "usehooks-ts": "catalog:",
+    "zod": "catalog:",
+    "zod-validation-error": "catalog:",
+    "zustand": "catalog:"
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "catalog:",
+    "@testing-library/react": "catalog:",
+    "@testing-library/user-event": "catalog:",
+    "@types/lodash-es": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "jsdom": "catalog:",
+    "react-dom": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vitest": "catalog:"
+  }
+}

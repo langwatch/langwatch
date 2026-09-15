@@ -1,13 +1,12 @@
 import type { paths } from "@/internal/generated/openapi/api-client";
-import {
-  createLangWatchApiClient,
-  type LangwatchApiClient,
-} from "@/internal/api/client";
+import { createLangWatchApiClient, type LangwatchApiClient } from "@/internal/api/client";
 import { type InternalConfig } from "@/client-sdk/types";
 import {
   extractStatusFromResponse,
   formatApiErrorForOperation,
 } from "@/client-sdk/services/_shared/format-api-error";
+import { unwrapApiResult } from "@/client-sdk/services/_shared/unwrap-api-result";
+import type { ExperimentRunSummary } from "./platformTypes";
 
 export interface ExperimentRunStartResponse {
   runId: string;
@@ -29,9 +28,6 @@ export interface ExperimentRunStartRequest {
 
 /**
  * Build the snake_case run-start request body from camelCase options.
- *
- * Returns `undefined` when no overrides are provided so the caller can send a
- * body-less request (the server then uses the configured inputs).
  */
 export const toRunStartRequest = ({
   data,
@@ -52,15 +48,50 @@ export const toRunStartRequest = ({
   return Object.keys(body).length > 0 ? body : undefined;
 };
 
-export type ExperimentRunStatusResponse =
-  paths["/api/experiments/runs/{runId}"]["get"]["responses"]["200"]["content"]["application/json"];
+/**
+ * `GET /api/v1/experiments/runs/{runId}` is declared `withRawResponse`
+ * (`modules/experiment/server/src/transport/experiment-v3.rest.ts:430`), so
+ * `assertSchemaAnswerFree` forbids it from publishing a response schema and no
+ * document will ever type this body. Restored from the last document that
+ * had it (`openapi-document.json` at `0a0f549cfd^`), not invented from a call
+ * site.
+ */
+export interface ExperimentRunStatusResponse {
+  runId: string;
+  status: "pending" | "running" | "completed" | "failed" | "stopped";
+  /** Cells finished so far */
+  progress: number;
+  /** Cells in the run */
+  total: number;
+  /** Unix milliseconds */
+  startedAt?: number;
+  /** Unix milliseconds; set once the run is no longer running */
+  finishedAt?: number;
+  /** Present when completed */
+  summary?: ExperimentRunSummary & {
+    /** Non-zero means some rows may be missing from the stored results */
+    chDispatchFailures?: number;
+  };
+  /** Stable failure code, present when failed. Not display copy. */
+  error?: string;
+  /** The full failure envelope, when the failure carried one */
+  domainError?: {
+    code: string;
+    kind: string;
+    message?: string;
+    meta?: Record<string, unknown>;
+    httpStatus?: number;
+    fault?: string;
+    traceId?: string;
+    tips?: string[];
+    docsUrl?: string;
+  };
+  /** Trace id for failures that carry no code, to quote in support */
+  traceId?: string;
+}
 
 /**
  * Status payload for `GET /api/evaluations/v3/runs/{runId}` (polling).
- *
- * Hand-written because the v3 path is served via a legacy-alias that rewrites
- * to `/api/experiments/...`, so only the legacy path is declared in the
- * generated OpenAPI types. Kept structurally aligned with that legacy schema.
  */
 export interface ExperimentV3RunStatusResponse {
   runId: string;
@@ -89,7 +120,7 @@ export interface ExperimentV3RunStatusResponse {
 }
 
 /**
- * Summary entry returned by `GET /api/experiments`. Mirrors
+ * Summary entry returned by `GET /api/v1/experiments`. Mirrors
  * `experimentSummarySchema` from the control-plane Hono route. Hand-written
  * because the route is not yet exposed via the generated OpenAPI types.
  */
@@ -118,7 +149,7 @@ export interface ExperimentListResponse {
 }
 
 /**
- * Per-run entry returned by `GET /api/experiments/runs?experimentSlug=...`.
+ * Per-run entry returned by `GET /api/v1/experiments/runs?experimentSlug=...`.
  * Mirrors `ExperimentRun` from the control plane.
  */
 export interface ExperimentRunSummaryEntry {
@@ -161,11 +192,6 @@ export interface ExperimentRunsListResponse {
 
 /**
  * Per-row results for a completed experiment run.
- *
- * Mirrors `ExperimentRunWithItems` from the control plane
- * (`platform/app/src/server/experiments-v3/services/types.ts`). Hand-written
- * because the `/runs/{runId}/results` route is not yet exposed via the
- * generated OpenAPI types.
  */
 export interface ExperimentRunDatasetEntry {
   index: number;
@@ -211,54 +237,89 @@ export interface ExperimentRunResultsResponse {
 }
 
 /**
- * The workbench types below are projections of the generated OpenAPI `paths`,
- * never hand-written copies of them. The control plane owns these shapes, so a
- * restated interface can only drift out of date, and a cast onto it would hide
- * the drift instead of failing the build.
+ * The workbench types below are projections of the generated OpenAPI `paths`, never
+ * hand-written copies of them.
  */
 
 /**
- * The experiment setup as the API carries it: datasets, targets and
- * evaluators. Read it, change it, send it back whole. The canonical shape is
- * the control plane's `persistedEvaluationsV3StateSchema`, which validates
- * every write, so this stays open rather than restating it here.
+ * The experiment setup as the API carries it: datasets, targets and evaluators. Read it,
+ * change it, send it back whole.
  */
 export type ExperimentWorkbenchState =
-  paths["/api/experiments/{slug}/workbench-state"]["put"]["requestBody"]["content"]["application/json"]["state"];
+  paths["/api/v1/experiments/{slug}/workbench-state"]["put"]["requestBody"]["content"]["application/json"]["state"];
 
 export type ExperimentCreateResponse =
-  paths["/api/experiments"]["post"]["responses"]["200"]["content"]["application/json"];
+  paths["/api/v1/experiments"]["post"]["responses"]["200"]["content"]["application/json"];
 
 /**
+ * `GET /api/v1/experiments/{slug}/workbench-state`,
+ * `PUT /api/v1/experiments/{slug}/workbench-state`,
+ * `GET /api/v1/experiments/{slug}/versions` and
+ * `POST /api/v1/experiments/{slug}/versions/{version}/restore` are all
+ * declared `withRawResponse` (`experiment-v3.rest.ts:589, 625, 667, 722`), so
+ * none of their responses can come from the document. Restored from the last
+ * document that had them (`openapi-document.json` at `0a0f549cfd^`).
+ *
  * The read answers one of two documents, chosen by the `fields` query. The
  * full setup is the one carrying `state`, so that field is what splits the
  * union into the two shapes the overloads promise.
  */
-type WorkbenchStateReadResponse =
-  paths["/api/experiments/{slug}/workbench-state"]["get"]["responses"]["200"]["content"]["application/json"];
-
-export type ExperimentWorkbenchStateResponse = Extract<
-  WorkbenchStateReadResponse,
-  { state: unknown }
->;
+export interface ExperimentWorkbenchStateResponse {
+  id: string;
+  slug: string;
+  name: string | null;
+  state: ExperimentWorkbenchState | null;
+  /** Send this back as expectedVersion to save safely */
+  version: number;
+  /** ISO 8601 timestamp of the last save */
+  updatedAt: string;
+}
 
 /** What `fields: "version"` answers: the staleness probe without the setup. */
-export type ExperimentWorkbenchVersionProbe = Exclude<
-  WorkbenchStateReadResponse,
-  { state: unknown }
->;
+export interface ExperimentWorkbenchVersionProbe {
+  id: string;
+  slug: string;
+  version: number;
+  updatedAt: string;
+}
 
-export type ExperimentSaveWorkbenchStateResponse =
-  paths["/api/experiments/{slug}/workbench-state"]["put"]["responses"]["200"]["content"]["application/json"];
+export interface ExperimentSaveWorkbenchStateResponse {
+  /** The version the save produced */
+  version: number;
+}
 
-export type ExperimentRestoreVersionResponse =
-  paths["/api/experiments/{slug}/versions/{version}/restore"]["post"]["responses"]["200"]["content"]["application/json"];
+export interface ExperimentRestoreVersionResponse {
+  /** The new version the restore wrote. History is never rewritten, so the
+   * restored version is still in the list. */
+  version: number;
+}
 
-export type ExperimentVersionsResponse =
-  paths["/api/experiments/{slug}/versions"]["get"]["responses"]["200"]["content"]["application/json"];
+export interface ExperimentVersionSummary {
+  /** Restore this version by this number. Named versions run 1, 2, 3 with no
+   * gaps. The autosave row also has a number, but it changes with every
+   * save, so read it as a handle and not as a place in the history. */
+  version: number;
+  /** The setup version this row was written at. */
+  counterVersion: number;
+  /** True for the single autosave row, which every ordinary save rewrites in place */
+  autoSaved: boolean;
+  commitMessage: string | null;
+  /** Who wrote it: user, langy or api */
+  authorLabel: string;
+  /** User id, when a person wrote it */
+  authorId: string | null;
+  /** ISO 8601 timestamp of the first write */
+  createdAt: string;
+  /** ISO 8601 timestamp of the last write */
+  updatedAt: string;
+}
 
-export type ExperimentVersionSummary =
-  ExperimentVersionsResponse["versions"][number];
+export interface ExperimentVersionsResponse {
+  /** Newest first, by `counterVersion` */
+  versions: ExperimentVersionSummary[];
+  /** Pass as `cursor` to read the next page, null on the last one */
+  nextCursor: number | null;
+}
 
 export class ExperimentsApiServiceError extends Error {
   constructor(
@@ -278,10 +339,14 @@ export class ExperimentsApiService {
     this.apiClient = config?.langwatchApiClient ?? createLangWatchApiClient();
   }
 
-  private handleApiError(operation: string, error: unknown): never {
-    const message = formatApiErrorForOperation({ operation: operation, error: error, options: {
-      status: extractStatusFromResponse(error),
-    } });
+  private handleApiError(operation: string, error: unknown, response?: Response): never {
+    const message = formatApiErrorForOperation({
+      operation: operation,
+      error: error,
+      options: {
+        status: response?.status ?? extractStatusFromResponse(error),
+      },
+    });
     throw new ExperimentsApiServiceError(message, operation, error);
   }
 
@@ -308,8 +373,13 @@ export class ExperimentsApiService {
       this.handleApiError(operation, error);
     }
 
-    if (result.error) this.handleApiError(operation, result.error);
-    return result.data as T;
+    return unwrapApiResult({
+      operation,
+      data: result.data,
+      error: result.error,
+      response: result.response,
+      onError: this.handleApiError.bind(this),
+    }) as T;
   }
 
   private async postUndeclaredEndpoint<T>({
@@ -338,15 +408,17 @@ export class ExperimentsApiService {
       this.handleApiError(operation, error);
     }
 
-    if (result.error) this.handleApiError(operation, result.error);
-    return result.data as T;
+    return unwrapApiResult({
+      operation,
+      data: result.data,
+      error: result.error,
+      response: result.response,
+      onError: this.handleApiError.bind(this),
+    }) as T;
   }
 
   /**
    * Start a saved experiment by slug.
-   *
-   * The body stays off the wire entirely when no overrides are given, so the
-   * run uses the inputs the experiment is configured with.
    */
   async startRun(
     slug: string,
@@ -355,23 +427,21 @@ export class ExperimentsApiService {
     } = {},
   ): Promise<ExperimentRunStartResponse> {
     const body = toRunStartRequest({ parameters: options.parameters });
-    const { data, error } = await this.apiClient.POST(
-      "/api/experiments/{slug}/run",
-      {
-        params: { path: { slug } },
-        ...(body !== undefined ? { body } : {}),
-      },
-    );
-    if (error) this.handleApiError(`start experiment run for "${slug}"`, error);
-    return data as unknown as ExperimentRunStartResponse;
+    const { data, error, response } = await this.apiClient.POST("/api/v1/experiments/{slug}/run", {
+      params: { path: { slug } },
+      ...(body !== undefined ? { body } : {}),
+    });
+    return unwrapApiResult({
+      operation: `start experiment run for "${slug}"`,
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    }) as unknown as ExperimentRunStartResponse;
   }
 
   /**
    * Create an experiment.
-   *
-   * Sending no state creates a blank workbench with one inline dataset, so a
-   * caller that only wants somewhere to put its setup does not have to build
-   * one first.
    */
   async create({
     name,
@@ -380,22 +450,23 @@ export class ExperimentsApiService {
     name?: string;
     state?: ExperimentWorkbenchState;
   } = {}): Promise<ExperimentCreateResponse> {
-    const { data, error } = await this.apiClient.POST("/api/experiments", {
+    const { data, error, response } = await this.apiClient.POST("/api/v1/experiments", {
       body: {
         ...(name !== undefined ? { name } : {}),
         ...(state !== undefined ? { state } : {}),
       },
     });
-    if (error) this.handleApiError("create experiment", error);
-    return data;
+    return unwrapApiResult({
+      operation: "create experiment",
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    });
   }
 
   /**
    * Read an experiment's setup, with the version to send back when saving.
-   *
-   * `fields: "version"` answers with the version and timestamp only, which is
-   * what a poller checking for changes wants: it costs the same round trip and
-   * none of the payload.
    */
   async getWorkbenchState(options: {
     slug: string;
@@ -412,8 +483,8 @@ export class ExperimentsApiService {
     slug: string;
     fields?: "version";
   }): Promise<ExperimentWorkbenchStateResponse | ExperimentWorkbenchVersionProbe> {
-    const { data, error } = await this.apiClient.GET(
-      "/api/experiments/{slug}/workbench-state",
+    const { data, error, response } = await this.apiClient.GET(
+      "/api/v1/experiments/{slug}/workbench-state",
       {
         params: {
           path: { slug },
@@ -421,18 +492,21 @@ export class ExperimentsApiService {
         },
       },
     );
-    if (error) {
-      this.handleApiError(`get workbench state for "${slug}"`, error);
-    }
-    return data;
+    // The endpoint is declared `withRawResponse`, so the document cannot
+    // describe `data`'s shape (it types as `undefined`); the response type
+    // is asserted explicitly here rather than inferred, restored from the
+    // last document that had it.
+    return unwrapApiResult<ExperimentWorkbenchStateResponse | ExperimentWorkbenchVersionProbe>({
+      operation: `get workbench state for "${slug}"`,
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    });
   }
 
   /**
    * Save an experiment's setup.
-   *
-   * Send `expectedVersion` with the version you read and the platform refuses
-   * the save with a 409 when someone else wrote first, instead of overwriting
-   * their work.
    */
   async setWorkbenchState({
     slug,
@@ -445,8 +519,8 @@ export class ExperimentsApiService {
     expectedVersion?: number;
     commitMessage?: string;
   }): Promise<ExperimentSaveWorkbenchStateResponse> {
-    const { data, error } = await this.apiClient.PUT(
-      "/api/experiments/{slug}/workbench-state",
+    const { data, error, response } = await this.apiClient.PUT(
+      "/api/v1/experiments/{slug}/workbench-state",
       {
         params: { path: { slug } },
         body: {
@@ -456,10 +530,14 @@ export class ExperimentsApiService {
         },
       },
     );
-    if (error) {
-      this.handleApiError(`save workbench state for "${slug}"`, error);
-    }
-    return data;
+    // Declared `withRawResponse`; see getWorkbenchState above.
+    return unwrapApiResult<ExperimentSaveWorkbenchStateResponse>({
+      operation: `save workbench state for "${slug}"`,
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    });
   }
 
   /** The experiment's saved versions, newest first. */
@@ -472,22 +550,28 @@ export class ExperimentsApiService {
     limit?: number;
     cursor?: number;
   }): Promise<ExperimentVersionsResponse> {
-    const { data, error } = await this.apiClient.GET(
-      "/api/experiments/{slug}/versions",
+    const { data, error, response } = await this.apiClient.GET(
+      "/api/v1/experiments/{slug}/versions",
       {
         params: {
           path: { slug },
+          // Both are described as string query parameters; the serialised
+          // query string is the same either way.
           query: {
-            ...(limit !== undefined ? { limit } : {}),
-            ...(cursor !== undefined ? { cursor } : {}),
+            ...(limit !== undefined ? { limit: String(limit) } : {}),
+            ...(cursor !== undefined ? { cursor: String(cursor) } : {}),
           },
         },
       },
     );
-    if (error) {
-      this.handleApiError(`list versions for experiment "${slug}"`, error);
-    }
-    return data;
+    // Declared `withRawResponse`; see getWorkbenchState above.
+    return unwrapApiResult<ExperimentVersionsResponse>({
+      operation: `list versions for experiment "${slug}"`,
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    });
   }
 
   /**
@@ -501,36 +585,36 @@ export class ExperimentsApiService {
     slug: string;
     version: number;
   }): Promise<ExperimentRestoreVersionResponse> {
-    const { data, error } = await this.apiClient.POST(
-      "/api/experiments/{slug}/versions/{version}/restore",
-      { params: { path: { slug, version } } },
+    const { data, error, response } = await this.apiClient.POST(
+      "/api/v1/experiments/{slug}/versions/{version}/restore",
+      { params: { path: { slug, version: String(version) } } },
     );
-    if (error) {
-      this.handleApiError(
-        `restore version ${version} of experiment "${slug}"`,
-        error,
-      );
-    }
-    return data;
+    // Declared `withRawResponse`; see getWorkbenchState above.
+    return unwrapApiResult<ExperimentRestoreVersionResponse>({
+      operation: `restore version ${version} of experiment "${slug}"`,
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    });
   }
 
   async getRunStatus(runId: string): Promise<ExperimentRunStatusResponse> {
-    const { data, error } = await this.apiClient.GET(
-      "/api/experiments/runs/{runId}",
-      {
-        params: { path: { runId } },
-      },
-    );
-    if (error) this.handleApiError(`get run status for "${runId}"`, error);
-    return data;
+    const { data, error, response } = await this.apiClient.GET("/api/v1/experiments/runs/{runId}", {
+      params: { path: { runId } },
+    });
+    // Declared `withRawResponse`; see getWorkbenchState above.
+    return unwrapApiResult<ExperimentRunStatusResponse>({
+      operation: `get run status for "${runId}"`,
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    });
   }
 
   /**
    * List experiments for the current project.
-   *
-   * Hits `GET /api/experiments` through the configured API client transport.
-   * The route is not yet declared in generated OpenAPI types, so the path is
-   * dispatched through a narrow untyped helper.
    */
   async listExperiments({
     pageSize,
@@ -544,17 +628,13 @@ export class ExperimentsApiService {
     if (page !== undefined) search.set("page", String(page));
     const qs = search.toString();
     return this.getUndeclaredEndpoint<ExperimentListResponse>({
-      path: `/api/experiments${qs ? `?${qs}` : ""}`,
+      path: `/api/v1/experiments${qs ? `?${qs}` : ""}`,
       operation: "list experiments",
     });
   }
 
   /**
    * List experiment runs for an experiment slug.
-   *
-   * Hits `GET /api/experiments/runs?experimentSlug=...` through the
-   * configured API client transport because the route is not yet declared in
-   * the generated OpenAPI.
    */
   async listRuns({
     experimentSlug,
@@ -570,17 +650,13 @@ export class ExperimentsApiService {
     if (pageSize !== undefined) search.set("pageSize", String(pageSize));
     if (page !== undefined) search.set("page", String(page));
     return this.getUndeclaredEndpoint<ExperimentRunsListResponse>({
-      path: `/api/experiments/runs?${search.toString()}`,
+      path: `/api/v1/experiments/runs?${search.toString()}`,
       operation: `list runs for experiment "${experimentSlug}"`,
     });
   }
 
   /**
    * Fetch per-row results for a completed experiment run.
-   *
-   * Hits `GET /api/experiments/runs/{runId}/results` through the
-   * configured API client transport because the route is not yet declared in
-   * the generated OpenAPI `paths`.
    */
   async getRunResults({
     runId,
@@ -592,10 +668,8 @@ export class ExperimentsApiService {
     const search = new URLSearchParams();
     if (experimentSlug) search.set("experimentSlug", experimentSlug);
     const qs = search.toString() ? `?${search.toString()}` : "";
-    const body = await this.getUndeclaredEndpoint<
-      ExperimentRunResultsResponse | null
-    >({
-      path: `/api/experiments/runs/${encodeURIComponent(runId)}/results${qs}`,
+    const body = await this.getUndeclaredEndpoint<ExperimentRunResultsResponse | null>({
+      path: `/api/v1/experiments/runs/${encodeURIComponent(runId)}/results${qs}`,
       operation: `get run results for "${runId}"`,
     });
     if (body === null) {
@@ -608,13 +682,8 @@ export class ExperimentsApiService {
   }
 
   /**
-   * Start a saved Evaluations V3 experiment by slug through the unified
-   * evaluations-v3 backend.
-   *
-   * Hits `POST /api/evaluations/v3/{slug}/run`. The optional body overrides
-   * the configured inputs (`data` / `dataset_id` are mutually exclusive on the
-   * server). The route accepts a body, but the generated OpenAPI types declare
-   * it body-less, so the call is dispatched through a narrow untyped helper.
+   * Start a saved Evaluations V3 experiment by slug through the unified evaluations-v3
+   * backend.
    */
   async startV3Run({
     slug,
@@ -644,9 +713,6 @@ export class ExperimentsApiService {
 
   /**
    * Fetch per-row results for an Evaluations V3 run.
-   *
-   * Hits `GET /api/evaluations/v3/runs/{runId}/results`. `experimentSlug` is
-   * optional for runs created in the last 24h and required afterwards.
    */
   async getV3RunResults({
     runId,
@@ -658,9 +724,7 @@ export class ExperimentsApiService {
     const search = new URLSearchParams();
     if (experimentSlug) search.set("experimentSlug", experimentSlug);
     const qs = search.toString() ? `?${search.toString()}` : "";
-    const body = await this.getUndeclaredEndpoint<
-      ExperimentRunResultsResponse | null
-    >({
+    const body = await this.getUndeclaredEndpoint<ExperimentRunResultsResponse | null>({
       path: `/api/evaluations/v3/runs/${encodeURIComponent(runId)}/results${qs}`,
       operation: `get run results for "${runId}"`,
     });

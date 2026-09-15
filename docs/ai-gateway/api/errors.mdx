@@ -19,7 +19,10 @@ Every error the LangWatch AI Gateway writes itself uses one JSON envelope:
     },
     "trace_id": "0af7651916cd43dd8448eb211c80319c",
     "span_id": "b7ad6b7169203331",
-    "tips": ["Contact your LangWatch admin to raise the project spending limit", "Switch to a cheaper model or reduce request volume to stay within the limit"],
+    "tips": [
+      "Contact your LangWatch admin to raise the project spending limit",
+      "Switch to a cheaper model or reduce request volume to stay within the limit"
+    ],
     "docs_url": "https://docs.langwatch.ai/ai-gateway/budgets",
     "fault": "customer"
   }
@@ -30,57 +33,57 @@ The OpenAI, Anthropic and Google SDKs parse this shape and raise their usual typ
 
 ## Fields
 
-| Field | Always present | What it is |
-|---|---|---|
-| `type` | yes | The coarse discriminant provider SDKs branch on. It carries the same value as `code`. |
-| `code` | yes | The stable machine name for what happened. Branch on this field. |
-| `message` | yes | One sentence for a person. Wording changes, so never parse it. When the failing code attached no message, it repeats the code. |
-| `meta` | no | Structured detail the sentence leaves out, in `lower_snake_case` keys. A `402` carries `budget_id`, `budget_scope`, `budget_window`, and `budget_provider` when a provider-filtered budget emptied the candidate chain. |
-| `trace_id`, `span_id` | no | Correlation handles for the failing request, present when it was traced. Quote them in a support ticket. |
-| `tips` | no | Up to four remediation sentences, in the order to try them. |
-| `docs_url` | no | An absolute link to the page that explains the refusal. |
-| `fault` | no | Who has to act: `customer`, `provider`, or `platform`. |
-| `reasons` | no | The chain of wrapped errors, each in this same shape. |
+| Field                 | Always present | What it is                                                                                                                                                                                                              |
+| --------------------- | -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `type`                | yes            | The coarse discriminant provider SDKs branch on. It carries the same value as `code`.                                                                                                                                   |
+| `code`                | yes            | The stable machine name for what happened. Branch on this field.                                                                                                                                                        |
+| `message`             | yes            | One sentence for a person. Wording changes, so never parse it. When the failing code attached no message, it repeats the code.                                                                                          |
+| `meta`                | no             | Structured detail the sentence leaves out, in `lower_snake_case` keys. A `402` carries `budget_id`, `budget_scope`, `budget_window`, and `budget_provider` when a provider-filtered budget emptied the candidate chain. |
+| `trace_id`, `span_id` | no             | Correlation handles for the failing request, present when it was traced. Quote them in a support ticket.                                                                                                                |
+| `tips`                | no             | Up to four remediation sentences, in the order to try them.                                                                                                                                                             |
+| `docs_url`            | no             | An absolute link to the page that explains the refusal.                                                                                                                                                                 |
+| `fault`               | no             | Who has to act: `customer`, `provider`, or `platform`.                                                                                                                                                                  |
+| `reasons`             | no             | The chain of wrapped errors, each in this same shape.                                                                                                                                                                   |
 
 Ignore fields you do not recognize. New ones are added over time and none of them changes an existing one.
 
 ## Error codes
 
-| `code` | HTTP | Cause | What the caller does |
-|---|---|---|---|
-| `invalid_api_key` | 401 | The presented credential matches no virtual key. | Check the key in `Authorization`, `X-Api-Key`, `X-Goog-Api-Key` or `Xi-Api-Key`. |
-| `virtual_key_revoked` | 403 | The key was revoked. Revocation is one way. | Mint a new key. |
-| `virtual_key_disabled` | 403 | The key was disabled. The secret is intact. | Ask an administrator to enable it. |
-| `virtual_key_expired` | 403 | The key's expiration date has passed. | Extend the expiration date, or create a new key. |
-| `budget_exceeded` | 402 | A budget that applies to this request is over its limit. | Raise the limit named in `meta`, or wait for the window to roll over. |
-| `rate_limited` | 429 | The key is over its requests-per-minute or requests-per-day ceiling. | Back off and retry. |
-| `realtime_session_limit` | 429 | The key already holds its maximum of open realtime voice sessions. | Retry when a call ends. |
-| `guardrail_blocked` | 403 | A pre-call or post-call guardrail returned `block`. | Change the content, or change the guardrail on the key. |
-| `guardrail_upstream_unavailable` | 503 | A guardrail evaluator could not be reached, and the key fails closed. | Retry, or set the key's guardrails to fail open. |
-| `policy_violation` | 403 | The request content matched a deny rule in the key's policy rules. | Change the request, or change the policy rule. |
-| `model_not_allowed` | 400 | The model is outside the key's allowlist, or its provider access or routing policy leaves the model's provider out of the chain. | Send a model the key allows, or widen the key. |
-| `model_provider_not_bound` | 400 | The request names a provider the key holds no credential for. | Bind that provider to the key, or send the model to a provider the key holds. |
-| `model_not_recognized` | 400 | No provider on the key declares the model, its name matches no vendor prefix, and the key holds more than one provider. | Send the model as `provider/model`. |
-| `missing_model` | 400 | The request names no model. `meta.request_type` says where the endpoint expects one. | Add the model to the request. |
-| `unsupported_parameter` | 400 | The target lane cannot honor a parameter, or `drop_tuning_params` is `false` and the lane has no mapping for it. | Remove the parameter, or allow the drop. |
-| `end_user_required` | 400 | A per-end-user budget is active on the key and the request carried no end-user id. | Send the `user` body field or the `X-LangWatch-End-User-Id` header, then retry. |
-| `no_provider_configured` | 400 | The key's bundle carries no provider credential at all. | Configure a model provider for the organization. |
-| `provider_credential_invalid` | 400 | The stored credential cannot produce an authenticated call, so the request never left LangWatch. | Re-save the credential in Settings, Model Providers. Retrying does not clear it. |
-| `provider_config_invalid` | 400 | The provider slot cannot serve this request: no key declares the model, a deployment mapping is missing, or the provider does not implement the operation. | Add the model or the deployment mapping to the provider. |
-| `provider_credential_rejected` | 401 | The provider received the credential and refused it. | Check the key or service account is not revoked, expired, or short of permission for the model. |
-| `bad_request` | 400 | The request body or a required part failed validation. | Read `message` for the field, and send the request again. |
-| `payload_too_large` | 413 | The body is over the server's maximum request size. It is rejected at the edge, before auth and before any provider call. | Send a smaller body. |
-| `not_found` | 404 | The resource the request named does not exist. | Check the path. |
-| `provider_error` | 502 | An upstream provider failed and no credential in the chain answered. | Retry with backoff, then check the provider's status page. |
-| `provider_timeout` | 504 | The provider accepted the request and did not answer in time. | Retry with backoff. |
-| `provider_connection_failed` | 502 | The provider's address did not answer, so the request never reached it. | Retry. Check a custom base URL is correct and reachable. |
-| `chain_exhausted` | 502 | Every credential in the fallback chain failed. | Retry, then check the providers on the key. |
-| `circuit_open` | 503 | Repeated upstream failures opened the credential's circuit breaker, so the gateway declined to dial the provider. | Retry after the cooldown. Answered 4xx responses never open the breaker. |
-| `codex_session_expired` | 401 | The codex provider's OpenAI sign-in is dead. | Sign in with OpenAI again on the model provider. |
-| `request_abandoned` | 499 | The caller disconnected, or its deadline expired before the provider answered. | Send the request again if you still need the answer. |
-| `auth_upstream_unavailable` | 503 | The gateway could not reach the LangWatch control plane to resolve the key. | Retry. |
-| `realtime_registry_unavailable` | 503 | The control plane could not record a realtime voice session, so the gateway did not mint a session. | Retry. |
-| `internal_error` | 500 | An unclassified gateway failure. | Retry, and quote `trace_id` in a support ticket. |
+| `code`                           | HTTP | Cause                                                                                                                                                      | What the caller does                                                                            |
+| -------------------------------- | ---- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| `invalid_api_key`                | 401  | The presented credential matches no virtual key.                                                                                                           | Check the key in `Authorization`, `X-Api-Key`, `X-Goog-Api-Key` or `Xi-Api-Key`.                |
+| `virtual_key_revoked`            | 403  | The key was revoked. Revocation is one way.                                                                                                                | Mint a new key.                                                                                 |
+| `virtual_key_disabled`           | 403  | The key was disabled. The secret is intact.                                                                                                                | Ask an administrator to enable it.                                                              |
+| `virtual_key_expired`            | 403  | The key's expiration date has passed.                                                                                                                      | Extend the expiration date, or create a new key.                                                |
+| `budget_exceeded`                | 402  | A budget that applies to this request is over its limit.                                                                                                   | Raise the limit named in `meta`, or wait for the window to roll over.                           |
+| `rate_limited`                   | 429  | The key is over its requests-per-minute or requests-per-day ceiling.                                                                                       | Back off and retry.                                                                             |
+| `realtime_session_limit`         | 429  | The key already holds its maximum of open realtime voice sessions.                                                                                         | Retry when a call ends.                                                                         |
+| `guardrail_blocked`              | 403  | A pre-call or post-call guardrail returned `block`.                                                                                                        | Change the content, or change the guardrail on the key.                                         |
+| `guardrail_upstream_unavailable` | 503  | A guardrail evaluator could not be reached, and the key fails closed.                                                                                      | Retry, or set the key's guardrails to fail open.                                                |
+| `policy_violation`               | 403  | The request content matched a deny rule in the key's policy rules.                                                                                         | Change the request, or change the policy rule.                                                  |
+| `model_not_allowed`              | 400  | The model is outside the key's allowlist, or its provider access or routing policy leaves the model's provider out of the chain.                           | Send a model the key allows, or widen the key.                                                  |
+| `model_provider_not_bound`       | 400  | The request names a provider the key holds no credential for.                                                                                              | Bind that provider to the key, or send the model to a provider the key holds.                   |
+| `model_not_recognized`           | 400  | No provider on the key declares the model, its name matches no vendor prefix, and the key holds more than one provider.                                    | Send the model as `provider/model`.                                                             |
+| `missing_model`                  | 400  | The request names no model. `meta.request_type` says where the endpoint expects one.                                                                       | Add the model to the request.                                                                   |
+| `unsupported_parameter`          | 400  | The target lane cannot honor a parameter, or `drop_tuning_params` is `false` and the lane has no mapping for it.                                           | Remove the parameter, or allow the drop.                                                        |
+| `end_user_required`              | 400  | A per-end-user budget is active on the key and the request carried no end-user id.                                                                         | Send the `user` body field or the `X-LangWatch-End-User-Id` header, then retry.                 |
+| `no_provider_configured`         | 400  | The key's bundle carries no provider credential at all.                                                                                                    | Configure a model provider for the organization.                                                |
+| `provider_credential_invalid`    | 400  | The stored credential cannot produce an authenticated call, so the request never left LangWatch.                                                           | Re-save the credential in Settings, Model Providers. Retrying does not clear it.                |
+| `provider_config_invalid`        | 400  | The provider slot cannot serve this request: no key declares the model, a deployment mapping is missing, or the provider does not implement the operation. | Add the model or the deployment mapping to the provider.                                        |
+| `provider_credential_rejected`   | 401  | The provider received the credential and refused it.                                                                                                       | Check the key or service account is not revoked, expired, or short of permission for the model. |
+| `bad_request`                    | 400  | The request body or a required part failed validation.                                                                                                     | Read `message` for the field, and send the request again.                                       |
+| `payload_too_large`              | 413  | The body is over the server's maximum request size. It is rejected at the edge, before auth and before any provider call.                                  | Send a smaller body.                                                                            |
+| `not_found`                      | 404  | The resource the request named does not exist.                                                                                                             | Check the path.                                                                                 |
+| `provider_error`                 | 502  | An upstream provider failed and no credential in the chain answered.                                                                                       | Retry with backoff, then check the provider's status page.                                      |
+| `provider_timeout`               | 504  | The provider accepted the request and did not answer in time.                                                                                              | Retry with backoff.                                                                             |
+| `provider_connection_failed`     | 502  | The provider's address did not answer, so the request never reached it.                                                                                    | Retry. Check a custom base URL is correct and reachable.                                        |
+| `chain_exhausted`                | 502  | Every credential in the fallback chain failed.                                                                                                             | Retry, then check the providers on the key.                                                     |
+| `circuit_open`                   | 503  | Repeated upstream failures opened the credential's circuit breaker, so the gateway declined to dial the provider.                                          | Retry after the cooldown. Answered 4xx responses never open the breaker.                        |
+| `codex_session_expired`          | 401  | The codex provider's OpenAI sign-in is dead.                                                                                                               | Sign in with OpenAI again on the model provider.                                                |
+| `request_abandoned`              | 499  | The caller disconnected, or its deadline expired before the provider answered.                                                                             | Send the request again if you still need the answer.                                            |
+| `auth_upstream_unavailable`      | 503  | The gateway could not reach the LangWatch control plane to resolve the key.                                                                                | Retry.                                                                                          |
+| `realtime_registry_unavailable`  | 503  | The control plane could not record a realtime voice session, so the gateway did not mint a session.                                                        | Retry.                                                                                          |
+| `internal_error`                 | 500  | An unclassified gateway failure.                                                                                                                           | Retry, and quote `trace_id` in a support ticket.                                                |
 
 ## Provider errors
 
@@ -90,18 +93,23 @@ When only the status and the message are available, the gateway writes the same 
 
 ## Response headers
 
-| Header | When present | Value |
-|---|---|---|
-| `X-LangWatch-Gateway-Version` | Every response | The gateway build version. |
-| `X-LangWatch-Handled-Error` | The gateway wrote the error | The body's `error.code`. It is removed from a forwarded provider response, so it tells the two apart. |
-| `X-LangWatch-Provider` | A provider error was forwarded and the provider is known | The provider that answered. |
-| `Retry-After`, `x-should-retry` | The provider sent them | The provider's own values, forwarded. |
-| `X-LangWatch-Gateway-Request-Id` | A successful response, and any response a keep-alive byte committed | The request id, and the `gateway_request_id` on spend events. |
-| `X-LangWatch-Budget-Warning` | A budget is at or over its warning threshold | `<scope>:<percent>`, or `<scope>/<model provider id>:<percent>` for a provider-filtered budget. Comma separated. |
+| Header                           | When present                                                        | Value                                                                                                            |
+| -------------------------------- | ------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `X-LangWatch-Gateway-Version`    | Every response                                                      | The gateway build version.                                                                                       |
+| `X-LangWatch-Handled-Error`      | The gateway wrote the error                                         | The body's `error.code`. It is removed from a forwarded provider response, so it tells the two apart.            |
+| `X-LangWatch-Provider`           | A provider error was forwarded and the provider is known            | The provider that answered.                                                                                      |
+| `Retry-After`, `x-should-retry`  | The provider sent them                                              | The provider's own values, forwarded.                                                                            |
+| `X-LangWatch-Gateway-Request-Id` | A successful response, and any response a keep-alive byte committed | The request id, and the `gateway_request_id` on spend events.                                                    |
+| `X-LangWatch-Budget-Warning`     | A budget is at or over its warning threshold                        | `<scope>:<percent>`, or `<scope>/<model provider id>:<percent>` for a provider-filtered budget. Comma separated. |
 
 `X-LangWatch-Budget-Warning` is set on successful responses. A budget in warning never becomes an error envelope.
 
-<Note>A non-streaming call that runs long writes a keep-alive byte, which commits status `200` before the outcome is known. The response then carries `X-LangWatch-Heartbeat-Active: true`, and the body still holds an `error` key when the call failed. Read the body rather than the status on those responses.</Note>
+<Note>
+  A non-streaming call that runs long writes a keep-alive byte, which commits status `200` before
+  the outcome is known. The response then carries `X-LangWatch-Heartbeat-Active: true`, and the body
+  still holds an `error` key when the call failed. Read the body rather than the status on those
+  responses.
+</Note>
 
 ## Streaming errors
 

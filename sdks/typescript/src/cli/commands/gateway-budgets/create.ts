@@ -78,9 +78,7 @@ export const createGatewayBudgetCommand = async (
   // is always lowercase.
   const window = options.window.toLowerCase() as BudgetWindow;
   if (!(ALLOWED_WINDOWS as readonly BudgetWindow[]).includes(window)) {
-    console.error(
-      chalk.red(`Error: --window must be one of ${ALLOWED_WINDOWS.join(", ")}`),
-    );
+    console.error(chalk.red(`Error: --window must be one of ${ALLOWED_WINDOWS.join(", ")}`));
     process.exit(1);
   }
 

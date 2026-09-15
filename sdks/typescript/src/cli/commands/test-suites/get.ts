@@ -12,9 +12,7 @@ import { resolveSuiteId } from "./resolveSuite";
  *
  * @see specs/features/test-suite-cli.feature
  */
-export const getTestSuiteCommand = async (
-  reference: string,
-): Promise<CommandResult | void> => {
+export const getTestSuiteCommand = async (reference: string): Promise<CommandResult | void> => {
   await resolveCredentials();
 
   const service = createCliTestSuitesService();

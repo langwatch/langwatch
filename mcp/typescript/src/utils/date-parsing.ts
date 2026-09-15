@@ -24,7 +24,7 @@ export function parseRelativeDate(input: string): number {
   const parsed = Date.parse(input);
   if (Number.isNaN(parsed)) {
     throw new Error(
-      `Invalid date: "${input}". Use a relative duration (e.g. "24h", "7d", "4w") or an ISO date string.`
+      `Invalid date: "${input}". Use a relative duration (e.g. "24h", "7d", "4w") or an ISO date string.`,
     );
   }
   return parsed;

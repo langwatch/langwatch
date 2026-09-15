@@ -1,22 +1,9 @@
 /**
  * The raw-fetch request path the management API services share.
- *
- * Every one of them talks to an organization-scoped REST family with the same
- * three-step failure handling the api-keys service established: read the body,
- * build the English sentence, raise the typed `LangWatchHandledError` when the
- * platform NAMED the failure, and otherwise throw the family's own error class
- * with that same sentence. Nine copies of that would drift; this is the one
- * copy, parameterised by the family's error constructor.
- *
- * The families answer two error envelopes and both land here unchanged:
- * `@langwatch/api` services send `{code, message, meta, tips?, docsUrl?}`,
- * while api-keys, teams, groups and the instance-admin family send the legacy
- * `{error, message}`. `handledErrorFrom` reads either, so the caller never has
- * to know which family it is holding.
  */
 import { scopedApiKey } from "@/internal/credentialContext";
-import { formatApiErrorForOperation } from "./format-api-error";
-import { throwIfHandledError } from "./throw-handled-error";
+import { formatApiErrorForOperation } from "./format-api-error.ts";
+import { throwIfHandledError } from "./throw-handled-error.ts";
 import { langwatchFetch } from "@/internal/http/langwatchFetch";
 
 /** Builds the family's own error for a failure the platform did not name. */
@@ -34,16 +21,11 @@ export type ManagementErrorFactory = (params: {
 export const MANAGEMENT_REQUEST_TIMEOUT_MS = 30_000;
 
 /**
- * The organization credential every management family except the
- * instance-provisioning one runs with, resolved once rather than in each
- * constructor. An empty token is refused here so the caller reads what is
- * missing instead of a 401 from the platform.
+ * The organization credential every management family except the instance-provisioning one
+ * runs with, resolved once rather than in each constructor. An empty token is refused here
+ * so the caller reads what is missing instead of a 401 from the platform.
  */
-export const resolveManagementToken = ({
-  apiKey,
-}: {
-  apiKey?: string;
-}): string => {
+export const resolveManagementToken = ({ apiKey }: { apiKey?: string }): string => {
   const token = apiKey ?? scopedApiKey() ?? process.env.LANGWATCH_API_KEY;
   if (!token) {
     throw new Error(
@@ -64,7 +46,7 @@ export interface ManagementRequestConfig {
 export interface ManagementRequestParams {
   /** What was being attempted, e.g. `list custom roles`. */
   operation: string;
-  /** Path from the endpoint root, e.g. `/api/roles`. */
+  /** Path from the endpoint root, e.g. `/api/v1/roles`. */
   path: string;
   method?: "GET" | "POST" | "PATCH" | "DELETE";
   /** JSON request body; omitted for reads. */
@@ -106,18 +88,15 @@ export const createManagementRequest = ({
     query,
     signal,
   }: ManagementRequestParams): Promise<T> => {
-    const response = await langwatchFetch(
-      `${endpoint}${path}${buildQueryString(query)}`,
-      {
-        ...(method ? { method } : {}),
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
-        signal: signal ?? AbortSignal.timeout(MANAGEMENT_REQUEST_TIMEOUT_MS),
+    const response = await langwatchFetch(`${endpoint}${path}${buildQueryString(query)}`, {
+      ...(method ? { method } : {}),
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
       },
-    );
+      ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+      signal: signal ?? AbortSignal.timeout(MANAGEMENT_REQUEST_TIMEOUT_MS),
+    });
 
     if (!response.ok) {
       // One read: a body consumed by a failed `json()` cannot be read again,
@@ -153,3 +132,14 @@ export const createManagementRequest = ({
 };
 
 export type ManagementRequest = ReturnType<typeof createManagementRequest>;
+
+/**
+ * The version namespace every management call addresses, spelled into the path, under the
+ * canonical `/api/v1` prefix (packages/api/adrs/002 §1): the framework families serve
+ * dated namespaces and `latest`, and the SDK tracks `latest`.
+ */
+export const managementPath = (path: string): string =>
+  path.replace(
+    /^(\/api\/v1\/[^/]+)(\/.*)?$/,
+    (_match, base: string, rest?: string) => `${base}/latest${rest ?? "/"}`,
+  );

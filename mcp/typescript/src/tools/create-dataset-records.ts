@@ -15,9 +15,7 @@ export async function handleCreateDatasetRecords(params: {
 
   const lines: string[] = [];
   lines.push(`${count} record(s) created successfully!\n`);
-  lines.push(
-    "> Use `platform_get_dataset` to see the updated dataset with all records.",
-  );
+  lines.push("> Use `platform_get_dataset` to see the updated dataset with all records.");
 
   return lines.join("\n");
 }

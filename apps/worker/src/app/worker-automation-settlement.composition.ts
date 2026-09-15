@@ -1,0 +1,634 @@
+import { AnnotationAnnotatorReferenceInvalidError } from "@langwatch/annotation-contract";
+import type {
+  AutomationPersistCapBreach,
+  DatasetActionParams,
+} from "@langwatch/automation-contract";
+import {
+  LegacyFilterMatchingService,
+  PreconditionTraceDataService,
+} from "@langwatch/analytics-server";
+import { TRACE_EXPANSIONS, type DatasetRecordEntry } from "@langwatch/dataset-contract";
+import {
+  type AutomationClock,
+  AutomationDatasetMapper,
+  AutomationPersistActionService,
+  AutomationPersistCapService,
+  AutomationPersistActionWriter,
+  AutomationScheduledIntent,
+  AutomationSettlementBreach,
+  AutomationSettlementDispatchService,
+  AutomationSettlementEvaluationReader,
+  AutomationSettlementFilterEvaluator,
+  AutomationSettlementMatchConfirmationService,
+  AutomationSettlementObservability,
+  OtelAutomationSettlementObservabilityAdapter,
+  AutomationSettlementTraceReader,
+  AutomationEmailCapService,
+  AutomationHeartbeat,
+  AutomationLogger,
+  AutomationNotificationDelivery,
+  createAutomationsPipeline,
+  GraphTriggerHeartbeatService,
+  OtelAutomationRunawayMetricsAdapter,
+  PrismaAutomationSettlementLedgerRepository,
+  PrismaGraphTriggerSentRepository,
+  PrismaTriggerRepository,
+  PrismaWebhookDeliveryRepository,
+  RunawayContainmentService,
+  AutomationSlackSecretsService,
+  AutomationWebhookSecretsService,
+  type AutomationEvent,
+  type AutomationGraphActivity,
+  type AutomationIntentRetention,
+  type AutomationProjectIdentityPort,
+  type AutomationSettlementLedgerDatabase,
+  type AutomationSecretCrypto,
+} from "@langwatch/automation-server";
+import type { DatasetService } from "@langwatch/dataset-contract";
+import type { EvaluationRunData } from "@langwatch/evaluation-contract";
+import { DispatchError } from "@langwatch/eventing";
+import { createLogger, type Logger } from "@langwatch/observability";
+import type { ProjectApi } from "@langwatch/project-contract";
+import type { EmailDelivery } from "@langwatch/notification-server";
+import type { RedisConnection } from "@langwatch/redis-client";
+import {
+  traceSchema,
+  type DerivedTraceEvent,
+  type TraceRecord,
+  type TraceSummaryData,
+} from "@langwatch/trace-contract";
+import { mapTraceToDatasetEntry } from "@langwatch/dataset-contract";
+import { ClickhouseTraceQueryEvaluationRepository } from "@langwatch/trace-server";
+import {
+  WorkerAutomationRunawayAdapter,
+  type WorkerAutomationNextStepResolver,
+  type WorkerAutomationRunawayDirectories,
+  type WorkerRunawayClickHouseResolver,
+} from "../features/automation/automation-runaway.adapter.ts";
+import type { AutomationWorkerCapability } from "../features/automation/automation-worker-feature.installer.ts";
+import type { WorkerConfig } from "../platform/config/worker.config.ts";
+import type { Instant } from "@langwatch/time";
+
+export type WorkerAutomationSettlementCompositionOptions = Readonly<{
+  config: WorkerConfig;
+  prisma: AutomationSettlementLedgerDatabase;
+  clock: AutomationClock;
+  /**
+   * The transports a settled digest leaves through, and the origin its links
+   * point at. Absent exactly when this deployment named no `BASE_HOST`.
+   */
+  notifications?: AutomationSettlementNotifications | undefined;
+  projects: AutomationProjectIdentityPort;
+  traces: AutomationSettlementTraceReader;
+  evaluations: AutomationSettlementEvaluationReader;
+  /** The graph half, when this process composed one. */
+  graphActivity?: AutomationGraphActivity | undefined;
+  /** Reads the recency the heartbeat sweep decides absence from. */
+  heartbeat: AutomationHeartbeat;
+  /**
+   * Where an `ADD_TO_DATASET` automation appends its mapped rows. The dataset feature's own
+   * service, narrowed to the one call this path makes. Absent exactly when this graph composed no
+   * typed Prisma client, in which case the record it would map cannot be read either.
+   */
+  datasets?: WorkerAutomationDatasetWriter | undefined;
+  /**
+   * Where an `ADD_TO_ANNOTATION_QUEUE` automation puts the trace it settled. Annotation's own
+   * queueing call plus the existence check it asks for, which is trace storage's answer rather than
+   * Annotation's.
+   */
+  annotations?: WorkerAutomationAnnotationWriter | undefined;
+  /**
+   * Which plan a project's organization is on, for the daily persist ceiling.
+   */
+  plans?: WorkerAutomationPlanSource | undefined;
+  /**
+   * What this process does about an automation that ran past its daily ceiling.
+   */
+  containment?: WorkerAutomationContainment | undefined;
+  redis?: RedisConnection | null;
+  absence?: WorkerAutomationSettlementAbsenceReport;
+  logger?: Logger;
+}>;
+
+/**
+ * The delivery collaborators settlement SHARES with the graph vertical. Shared deliberately.
+ */
+export type AutomationSettlementDeliveryComposition = Readonly<{
+  delivery: AutomationNotificationDelivery;
+  emailCaps: AutomationEmailCapService;
+  crypto: AutomationSecretCrypto;
+}>;
+
+/** Those transports plus the origin every link in a digest is built from. */
+export type AutomationSettlementNotifications = AutomationSettlementDeliveryComposition &
+  Readonly<{ baseHost: string }>;
+
+/**
+ * The ONE dataset write `ADD_TO_DATASET` makes, declared where it is made. `DatasetService` is
+ * twenty-odd methods over datasets, records, uploads and chunked content; this path reaches one,
+ * and it is the same one the application called.
+ */
+export type WorkerAutomationDatasetWriter = Pick<DatasetService, "batchCreateRecords">;
+
+/**
+ * The annotation-queue write, and the trace-existence check it asks for.
+ */
+export type WorkerAutomationPlanSource = Readonly<{
+  plans: import("@langwatch/entitlement-contract").EntitlementApi;
+  projects: ProjectApi;
+}>;
+
+/**
+ * The three substrates runaway containment adds on top of settlement's own.
+ */
+export type WorkerAutomationContainment = Readonly<{
+  mailer: EmailDelivery;
+  directories: WorkerAutomationRunawayDirectories;
+  resolveClickHouseClient: WorkerRunawayClickHouseResolver;
+  /**
+   * Where a project's organization can go for a higher ceiling. Absent on a
+   * deployment that composed no self-serve plan catalogue, in which case a
+   * ceiling-reached notice names no upgrade.
+   */
+  nextStep?: WorkerAutomationNextStepResolver | undefined;
+}>;
+
+export interface WorkerAutomationAnnotationWriter {
+  queueTraces(
+    input: import("@langwatch/annotation-contract").QueueAnnotationTracesInput,
+  ): Promise<void>;
+}
+
+/**
+ * What this process CANNOT do about a settled match, said once at composition.
+ */
+export abstract class WorkerAutomationSettlementAbsenceReport {
+  /**
+   * The full trace record, spans and all. Two paths want it: the digest's fallback when the summary
+   * fold has not landed, and `ADD_TO_DATASET`'s row mapping.
+   */
+  abstract withoutTraceRecordRead(): void;
+
+  /**
+   * `ADD_TO_DATASET`'s WRITE. The row MAPPING is composed unconditionally —
+   * `mapTraceToDatasetEntry` is Dataset's and `TRACE_EXPANSIONS` is Trace's, so the
+   * columns this process fills are the columns the customer previewed.
+   */
+  abstract withoutDatasetPersist(): void;
+
+  /**
+   * `ADD_TO_ANNOTATION_QUEUE`, whose writer is Annotation's own service.
+   */
+  abstract withoutAnnotationQueuePersist(): void;
+
+  /**
+   * Runaway containment. Reported when this graph composed no outbound mail or no tenancy — the
+   * first leaves a limit notice with no origin to link back to, the second leaves nobody to send it
+   * to, since an automation's administrators are its ORGANIZATION's role bindings.
+   */
+  abstract withoutRunawayContainment(): void;
+
+  /**
+   * The plan lookup behind the daily persist ceiling. Reported when this graph composed no typed
+   * Prisma client, which is when the subscription rows a tier is read from cannot be reached.
+   */
+  abstract withoutPlanResolvedPersistCap(): void;
+
+  /** The graph-alert evaluator the 30-second sweep re-evaluates through. */
+  abstract withoutGraphAlertEvaluation(): void;
+
+  /**
+   * Every outbound transport a settled digest would leave through. Reported when the deployment
+   * named no `BASE_HOST`.
+   */
+  abstract withoutNotificationDelivery(): void;
+}
+
+/**
+ * Automation's settlement half, composed from this process's own substrates. The pipeline itself
+ * was already packaged — `createAutomationsPipeline` is the feature's own definition and takes
+ * exactly three collaborators.
+ */
+export function createWorkerAutomationSettlement(
+  options: WorkerAutomationSettlementCompositionOptions,
+): AutomationWorkerCapability<AutomationEvent> {
+  const logger = options.logger ?? createLogger("langwatch:automation:settlement");
+  const absence = options.absence;
+  if (!options.graphActivity) absence?.withoutGraphAlertEvaluation();
+  if (!options.notifications) absence?.withoutNotificationDelivery();
+  if (!options.datasets) absence?.withoutDatasetPersist();
+  if (!options.annotations) absence?.withoutAnnotationQueuePersist();
+  if (!options.notifications || !options.containment) absence?.withoutRunawayContainment();
+  if (!options.plans) absence?.withoutPlanResolvedPersistCap();
+
+  // The ceiling's tier, resolved through Automation's own cap service so that
+  // the hop from project to organization, the contract override and the
+  // ten-minute cache are the ones the interactive process uses. Only the
+  // resolution is taken: the COUNTING stays on the ledger's Redis slot, and two
+  // services counting the same slot would give one fleet two tallies.
+  const persistCaps = options.plans
+    ? AutomationPersistCapService.create({
+        projects: options.plans.projects,
+        planProvider: options.plans.plans,
+        config: {
+          free: options.config.automation.persistDailyCapFree,
+          paid: options.config.automation.persistDailyCapPaid,
+          enterprise: options.config.automation.persistDailyCapEnterprise,
+        },
+      })
+    : undefined;
+  // Containment and the ledger each need the other: the ledger is what raises the breach, and the
+  // notice containment sends is filtered through the ledger's own suppression rows — the SAME rows
+  // a digest is filtered through, because two readers of that table would let one half of
+  // automation honour an unsubscribe the other ignored. The knot is tied with one late read rather
+  // than a second suppression reader.
+  let containment: RunawayContainmentService | undefined;
+  const ledger = PrismaAutomationSettlementLedgerRepository.create({
+    prisma: options.prisma,
+    clock: options.clock,
+    redis: options.redis ?? null,
+    persistCap: persistCaps
+      ? { kind: "resolved", resolve: (projectId) => persistCaps.resolvePersistDailyCap(projectId) }
+      : // The paid ceiling, stated rather than resolved. See the config leaf.
+        { kind: "fixed", cap: options.config.automation.persistDailyCapPaid },
+    breach: new WorkerSettlementBreach(logger, () => containment),
+  });
+  const notifications = options.notifications ?? unavailableNotifications();
+  if (options.notifications && options.containment) {
+    containment = RunawayContainmentService.create({
+      runaway: WorkerAutomationRunawayAdapter.create({
+        redis: options.redis ?? null,
+        directories: options.containment.directories,
+        suppression: ledger,
+        mailer: options.containment.mailer,
+        resolveClickHouseClient: options.containment.resolveClickHouseClient,
+        nextStep: options.containment.nextStep ?? null,
+        metrics: OtelAutomationRunawayMetricsAdapter.create(),
+        baseHost: options.notifications.baseHost,
+        logger,
+      }),
+      triggers: PrismaTriggerRepository.create(options.prisma, options.clock),
+      clock: options.clock,
+    });
+  }
+  const settlement = AutomationSettlementDispatchService.create({
+    automation: ledger,
+    projects: options.projects,
+    traces: options.traces,
+    baseHost: notifications.baseHost,
+    confirmation: AutomationSettlementMatchConfirmationService.create({
+      evaluations: options.evaluations,
+      traces: options.traces,
+      filterEvaluator: new WorkerSettlementFilterEvaluator(),
+    }),
+    persistActions: AutomationPersistActionService.create({
+      automation: ledger,
+      projects: options.projects,
+      traces: options.traces,
+      mapper: new WorkerAutomationDatasetMapper(),
+      writer: new WorkerAutomationPersistActionWriter(options.datasets, options.annotations),
+    }),
+    delivery: notifications.delivery,
+    emailCaps: notifications.emailCaps,
+    slack: AutomationSlackSecretsService.create(notifications.crypto),
+    webhooks: AutomationWebhookSecretsService.create(notifications.crypto),
+    clock: options.clock,
+    observability: WorkerSettlementObservability.create(logger),
+    emailHourlyCap: options.config.automation.emailHourlyCap,
+    tenantDailyCap: options.config.automation.tenantDailyCap,
+  });
+  const scheduledIntents = WorkerAutomationScheduledIntents.create({
+    prisma: options.prisma,
+    clock: options.clock,
+    heartbeat: options.heartbeat,
+    logger,
+    ...(options.graphActivity ? { graphActivity: options.graphActivity } : {}),
+  });
+
+  return {
+    buildPipeline: ({ retention }: { retention: AutomationIntentRetention }) =>
+      createAutomationsPipeline({ scheduledIntents, settlement, retention }),
+  };
+}
+
+/**
+ * The transports of a process that has none, refusing by name.
+ */
+function unavailableNotifications(): AutomationSettlementNotifications {
+  const message =
+    "This process composes no outbound automation delivery: it named no BASE_HOST, so a digest would carry links back to nowhere. Set BASE_HOST to send settled notifications from here.";
+  const refuse = (): never => {
+    throw new DispatchError({ message, retryable: false });
+  };
+
+  return {
+    baseHost: "",
+    delivery: new UnavailableNotificationDelivery(message),
+    emailCaps: AutomationEmailCapService.create({ store: null }),
+    crypto: { encrypt: refuse, decrypt: refuse },
+  };
+}
+
+class UnavailableNotificationDelivery extends AutomationNotificationDelivery {
+  constructor(private readonly message: string) {
+    super();
+  }
+
+  sendLegacyEmail(): Promise<void> {
+    return this.refuse();
+  }
+  sendEmail(): Promise<void> {
+    return this.refuse();
+  }
+  sendSlackWebhook(): Promise<void> {
+    return this.refuse();
+  }
+  sendLegacySlackWebhook(): Promise<void> {
+    return this.refuse();
+  }
+  sendSlackBot(): Promise<void> {
+    return this.refuse();
+  }
+  sendWebhook(): Promise<never> {
+    return this.refuse();
+  }
+
+  private refuse(): Promise<never> {
+    return Promise.reject(new DispatchError({ message: this.message, retryable: false }));
+  }
+}
+
+/**
+ * A settled match's re-check against its own trace, over the two grammars automations are written
+ * in. Both halves are the packaged decision, so an automation confirms here the way it confirmed in
+ * the application.
+ */
+class WorkerSettlementFilterEvaluator extends AutomationSettlementFilterEvaluator {
+  private readonly legacy = LegacyFilterMatchingService.create();
+  private readonly traceData = PreconditionTraceDataService.create();
+
+  matchesFilterQuery(input: {
+    query: string;
+    foldState: TraceSummaryData;
+    evaluations: EvaluationRunData[] | null;
+    events: DerivedTraceEvent[] | null;
+  }): boolean {
+    return ClickhouseTraceQueryEvaluationRepository.mat(input.query, {
+      summary: input.foldState,
+      evaluations: input.evaluations,
+      events: input.events,
+      spans: null,
+    });
+  }
+
+  matchesTraceFilters(input: {
+    filters: Record<string, unknown>;
+    foldState: TraceSummaryData;
+    events: DerivedTraceEvent[] | null;
+  }): boolean {
+    return this.legacy.matchesTraceFilters({
+      traceData: this.traceData.fromFoldState({
+        foldState: input.foldState,
+        events: input.events,
+      }),
+      filters: input.filters,
+    });
+  }
+
+  matchesEvaluationFilters(input: {
+    filters: Record<string, unknown>;
+    evaluations: EvaluationRunData[];
+  }): boolean {
+    return this.legacy.matchesEvaluationFilters({
+      evaluations: input.evaluations,
+      filters: input.filters,
+    });
+  }
+}
+
+/**
+ * `ADD_TO_DATASET`'s row mapping, over the rules the customer previewed with.
+ */
+class WorkerAutomationDatasetMapper extends AutomationDatasetMapper {
+  map(input: {
+    trace: TraceRecord;
+    mapping: DatasetActionParams["datasetMapping"]["mapping"];
+    expansions: readonly string[];
+  }): Array<Record<string, string | number>> {
+    const trace = traceSchema.parse(input.trace);
+    const expansions = new Set(
+      input.expansions.filter(
+        (value): value is keyof typeof TRACE_EXPANSIONS => value in TRACE_EXPANSIONS,
+      ),
+    );
+
+    return mapTraceToDatasetEntry(trace, input.mapping, expansions);
+  }
+}
+
+/**
+ * The two persist writes, both of them the feature's own packaged call.
+ */
+class WorkerAutomationPersistActionWriter extends AutomationPersistActionWriter {
+  constructor(
+    private readonly datasets: WorkerAutomationDatasetWriter | undefined,
+    private readonly annotations: WorkerAutomationAnnotationWriter | undefined,
+  ) {
+    super();
+  }
+
+  async addToAnnotationQueue(input: {
+    traceIds: string[];
+    projectId: string;
+    annotators: string[];
+    userId: string;
+  }): Promise<void> {
+    const annotations = this.annotations;
+    if (!annotations) {
+      throw new DispatchError({
+        message:
+          "This process composes no annotation queue writer, so an automation cannot add a trace to one from here: the queueing service is composed over the typed Prisma client this graph was given, and it was given none.",
+        retryable: false,
+      });
+    }
+
+    try {
+      await annotations.queueTraces(input);
+    } catch (error) {
+      // Annotation answers a caller who sent a malformed annotator reference with a 400, which is
+      // right for the surface a person typed it into and wrong for this one: the reference is SAVED
+      // on the automation, so it parses the same way on every redelivery. Settlement retries
+      // anything that is not a terminal `DispatchError`, so left alone this would be a page that
+      // fails forever.
+      if (error instanceof AnnotationAnnotatorReferenceInvalidError) {
+        throw new DispatchError({
+          message: `This automation names an annotator that parses as neither a queue nor a member (${String(error.meta?.annotator ?? "")}), so a queue item cannot be written for it. Re-save the automation with a queue or a member that still exists.`,
+          retryable: false,
+        });
+      }
+      throw error;
+    }
+  }
+
+  async addToDataset(input: {
+    datasetId: string;
+    projectId: string;
+    datasetRecords: DatasetRecordEntry[];
+  }): Promise<void> {
+    const datasets = this.datasets;
+    if (!datasets) {
+      throw new DispatchError({
+        message:
+          "This process composes no dataset writer, so an automation cannot add a trace to a dataset from here: the write is composed over the typed Prisma client this graph was given, and it was given none.",
+        retryable: false,
+      });
+    }
+
+    await datasets.batchCreateRecords({
+      slugOrId: input.datasetId,
+      projectId: input.projectId,
+      entries: input.datasetRecords,
+    });
+  }
+}
+
+/**
+ * The two schedules, and the graph evaluation one of them drives.
+ */
+class WorkerAutomationScheduledIntents extends AutomationScheduledIntent {
+  static create(input: {
+    prisma: AutomationSettlementLedgerDatabase;
+    clock: AutomationClock;
+    heartbeat: AutomationHeartbeat;
+    logger: Logger;
+    graphActivity?: AutomationGraphActivity;
+  }): WorkerAutomationScheduledIntents {
+    return new WorkerAutomationScheduledIntents(
+      GraphTriggerHeartbeatService.create({
+        triggers: PrismaTriggerRepository.create(input.prisma, input.clock),
+        triggerSent: PrismaGraphTriggerSentRepository.create(input.prisma),
+        heartbeat: input.heartbeat,
+        logger: new WorkerSettlementLogger(input.logger),
+      }),
+      PrismaWebhookDeliveryRepository.create(input.prisma),
+      input.graphActivity,
+    );
+  }
+
+  private constructor(
+    private readonly heartbeat: GraphTriggerHeartbeatService,
+    private readonly deliveries: { pruneExpired(now?: Instant): Promise<number> },
+    private readonly graphActivity: AutomationGraphActivity | undefined,
+  ) {
+    super();
+  }
+
+  decideGraphTriggerHeartbeat(input: { now: Instant }) {
+    return this.heartbeat.decide(input);
+  }
+
+  evaluateGraphTrigger(input: {
+    triggerId: string;
+    projectId: string;
+    reason: Parameters<AutomationGraphActivity["evaluateGraphTrigger"]>[0]["reason"];
+  }) {
+    if (!this.graphActivity) {
+      return Promise.reject(
+        new DispatchError({
+          message:
+            "This process composes no graph-alert vertical, so a sweep candidate cannot be evaluated here. Set BASE_HOST to compose one.",
+          retryable: false,
+        }),
+      );
+    }
+
+    return this.graphActivity.evaluateGraphTrigger(input);
+  }
+
+  pruneWebhookDeliveries(now?: Instant): Promise<number> {
+    return this.deliveries.pruneExpired(now);
+  }
+}
+
+/** Automation's logger port, over this process's own logger. */
+class WorkerSettlementLogger extends AutomationLogger {
+  constructor(private readonly logger: Logger) {
+    super();
+  }
+
+  error(fields: Record<string, unknown>, message: string): void {
+    this.logger.error(fields, message);
+  }
+  debug(fields: Record<string, unknown>, message: string): void {
+    this.logger.debug(fields, message);
+  }
+  info(fields: Record<string, unknown>, message: string): void {
+    this.logger.info(fields, message);
+  }
+  warn(fields: Record<string, unknown>, message: string): void {
+    this.logger.warn(fields, message);
+  }
+}
+
+/**
+ * Settlement's two observability calls: the overflow lands on the published series AND in this
+ * process's log, because the counter answers how often the fleet flushes early and the log line is
+ * what names the settlement that did.
+ */
+class WorkerSettlementObservability extends AutomationSettlementObservability {
+  static create(logger: Logger): WorkerSettlementObservability {
+    return new WorkerSettlementObservability(
+      logger,
+      OtelAutomationSettlementObservabilityAdapter.create({
+        capture: (error, extra) =>
+          logger.error({ ...extra, error: error.message }, "Automation settlement dispatch failed"),
+      }),
+    );
+  }
+
+  private constructor(
+    private readonly logger: Logger,
+    private readonly metrics: AutomationSettlementObservability,
+  ) {
+    super();
+  }
+
+  recordOverflow(flushed: number): void {
+    this.logger.warn({ flushed }, "Automation settlement flushed matches early to stay in bounds");
+    this.metrics.recordOverflow(flushed);
+  }
+
+  capture(error: Error, extra: Record<string, unknown>): void {
+    this.metrics.capture(error, extra);
+  }
+}
+
+/**
+ * What this process does about an automation past its ceiling. Containment is resolved LATE — the
+ * containment service reads the suppression rows off the ledger this port is handed to — so the
+ * thunk is the knot, not an optional dependency nobody supplies.
+ */
+class WorkerSettlementBreach extends AutomationSettlementBreach {
+  constructor(
+    private readonly logger: Logger,
+    private readonly resolve: () => RunawayContainmentService | undefined,
+  ) {
+    super();
+  }
+
+  async handle(input: AutomationPersistCapBreach): Promise<void> {
+    const containment = this.resolve();
+    if (containment) return containment.handle(input);
+
+    this.logger.error(
+      {
+        projectId: input.projectId,
+        triggerId: input.trigger.id,
+        cap: input.cap,
+        count: input.count,
+        skipped: input.skipped,
+      },
+      "Automation passed its daily ceiling on confirmed matches and further matches are being skipped; this process composed no outbound mail or no tenancy, so nobody has been notified and the automation has not been paused",
+    );
+  }
+}

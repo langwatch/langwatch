@@ -1,4 +1,4 @@
-# Plan: dev/docs/ops-process-manager-visibility-plan.md. Phase 1 (read-only
+# Plan: dev/docs/plans/ops-process-manager-visibility-plan.md. Phase 1 (read-only
 # fleet + instance drawer) and the phase-2 safe actions are built; the
 # remaining @unimplemented scenarios are phase 3 (signals/alerting).
 
@@ -130,3 +130,12 @@ Feature: Process-manager visibility in ops
     When the operator releases the lease
     Then the message becomes due immediately
     And a live lease cannot be released from under its delivery
+
+  # ── The API process's own composition ──────────────────────────────────
+
+  @unit
+  Scenario: The operator fleet is read from the process-manager tables
+    Given the API process composed its operator back office
+    When the operator opens the fleet
+    Then the rows come from the process-manager instance and outbox tables
+    And a process the registry cannot name is shown as unregistered rather than hidden

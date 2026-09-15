@@ -4,32 +4,29 @@ Practical examples implementing LangWatch design guidelines.
 
 ## Page Layout
 
-Standard page with header, actions, and content. Use `compactMenu` for content-heavy pages.
+Standard page with header, actions, and content.
 
 ```tsx
 import { HStack, Spacer, VStack } from "@chakra-ui/react";
 import { Plus } from "lucide-react";
-import { DashboardLayout } from "~/components/DashboardLayout";
-import { PageLayout } from "../../components/ui/layouts/PageLayout";
+import { PageLayout } from "@langwatch/design-system/page-layout";
 
 export function ExamplePage() {
   return (
-    <DashboardLayout compactMenu={false}> {/* true for content-heavy pages */}
-      <PageLayout.Container>
-        <PageLayout.Header>
-          <PageLayout.Heading>Page Title</PageLayout.Heading>
-          <Spacer />
-          <HStack gap={2}>
-            <PageLayout.HeaderButton onClick={handleCreate}>
-              <Plus /> Create New
-            </PageLayout.HeaderButton>
-          </HStack>
-        </PageLayout.Header>
-        <VStack gap={4} padding={6} align="stretch">
-          {/* Page content */}
-        </VStack>
-      </PageLayout.Container>
-    </DashboardLayout>
+    <PageLayout.Container>
+      <PageLayout.Header>
+        <PageLayout.Heading>Page Title</PageLayout.Heading>
+        <Spacer />
+        <HStack gap={2}>
+          <PageLayout.HeaderButton onClick={handleCreate}>
+            <Plus /> Create New
+          </PageLayout.HeaderButton>
+        </HStack>
+      </PageLayout.Header>
+      <VStack gap={4} padding={6} align="stretch">
+        {/* Page content */}
+      </VStack>
+    </PageLayout.Container>
   );
 }
 ```
@@ -40,7 +37,7 @@ Use for resource creation, editing, and selection flows.
 
 ```tsx
 import { Button, Field, Input, useDisclosure, VStack } from "@chakra-ui/react";
-import { Drawer } from "../../components/ui/drawer";
+import { Drawer } from "@langwatch/design-system/drawer";
 
 export function ResourceDrawer() {
   const { open, onOpen, onClose } = useDisclosure();
@@ -68,7 +65,9 @@ export function ResourceDrawer() {
             </VStack>
           </Drawer.Body>
           <Drawer.Footer>
-            <Button variant="outline" onClick={onClose}>Cancel</Button>
+            <Button variant="outline" onClick={onClose}>
+              Cancel
+            </Button>
             <Button colorPalette="blue">Save</Button>
           </Drawer.Footer>
         </Drawer.Content>
@@ -84,14 +83,16 @@ Use for destructive action confirmations only.
 
 ```tsx
 import { Button, useDisclosure, Text } from "@chakra-ui/react";
-import { Dialog } from "../../components/ui/dialog";
+import { Dialog } from "@langwatch/design-system/dialog";
 
 export function DeleteConfirmDialog({ itemName, onConfirm }) {
   const { open, onOpen, onClose } = useDisclosure();
 
   return (
     <>
-      <Button colorPalette="red" variant="outline" onClick={onOpen}>Delete</Button>
+      <Button colorPalette="red" variant="outline" onClick={onOpen}>
+        Delete
+      </Button>
       <Dialog.Root open={open} onOpenChange={({ open }) => !open && onClose()}>
         <Dialog.Content>
           <Dialog.CloseTrigger />
@@ -102,8 +103,16 @@ export function DeleteConfirmDialog({ itemName, onConfirm }) {
             <Text>This action cannot be undone.</Text>
           </Dialog.Body>
           <Dialog.Footer>
-            <Button variant="outline" onClick={onClose}>Cancel</Button>
-            <Button colorPalette="red" onClick={() => { onConfirm(); onClose(); }}>
+            <Button variant="outline" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button
+              colorPalette="red"
+              onClick={() => {
+                onConfirm();
+                onClose();
+              }}
+            >
               Delete
             </Button>
           </Dialog.Footer>
@@ -136,28 +145,34 @@ For custom translucent containers (overlay components have this built-in).
 ```tsx
 import { Button } from "@chakra-ui/react";
 import { MoreVertical, Pencil, Trash } from "lucide-react";
-import { Menu } from "../../components/ui/menu";
+import { Menu } from "@langwatch/design-system/menu";
 
 <Menu.Root>
   <Menu.Trigger asChild>
-    <Button variant="ghost" size="sm"><MoreVertical /></Button>
+    <Button variant="ghost" size="sm">
+      <MoreVertical />
+    </Button>
   </Menu.Trigger>
   <Menu.Content>
-    <Menu.Item value="edit"><Pencil /> Edit</Menu.Item>
-    <Menu.Item value="delete" color="red.500"><Trash /> Delete</Menu.Item>
+    <Menu.Item value="edit">
+      <Pencil /> Edit
+    </Menu.Item>
+    <Menu.Item value="delete" color="red.500">
+      <Trash /> Delete
+    </Menu.Item>
   </Menu.Content>
-</Menu.Root>
+</Menu.Root>;
 ```
 
 ## Nested Drawer Navigation
 
-Pattern for multi-step flows (e.g., type → list → editor). See `evaluations-v3` for the canonical implementation.
+Pattern for multi-step flows (e.g., type → list → editor). See `dev/docs/best_practices/drawers.md` ("Going to another drawer and back") for the canonical walkthrough.
 
 ```tsx
 import { Button, Heading, HStack } from "@chakra-ui/react";
 import { ArrowLeft } from "lucide-react";
-import { Drawer } from "../../components/ui/drawer";
-import { useDrawer } from "~/hooks/useDrawer";
+import { Drawer } from "@langwatch/design-system/drawer";
+import { useDrawer } from "@langwatch/ui-drawer";
 
 // Parent: Set callbacks and start flow
 export function StartFlow() {
@@ -232,6 +247,7 @@ export function ItemDrawer() {
 ```
 
 **Key points:**
+
 - `canGoBack` / `goBack()` - back button in drawer header
 - `closeDrawer()` - close entire flow
 - `setFlowCallbacks()` / `getFlowCallbacks()` - persist callbacks across navigation
@@ -241,16 +257,22 @@ export function ItemDrawer() {
 ```tsx
 import { Button, Text } from "@chakra-ui/react";
 import { Info } from "lucide-react";
-import { Popover } from "../../components/ui/popover";
+import { Popover } from "@langwatch/design-system/popover";
 
 <Popover.Root positioning={{ placement: "bottom-start" }}>
   <Popover.Trigger asChild>
-    <Button variant="ghost" size="sm"><Info /></Button>
+    <Button variant="ghost" size="sm">
+      <Info />
+    </Button>
   </Popover.Trigger>
   <Popover.Content>
     <Popover.Arrow />
-    <Popover.Header><Popover.Title>Title</Popover.Title></Popover.Header>
-    <Popover.Body><Text fontSize="sm">Content</Text></Popover.Body>
+    <Popover.Header>
+      <Popover.Title>Title</Popover.Title>
+    </Popover.Header>
+    <Popover.Body>
+      <Text fontSize="sm">Content</Text>
+    </Popover.Body>
   </Popover.Content>
-</Popover.Root>
+</Popover.Root>;
 ```

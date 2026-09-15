@@ -9,9 +9,7 @@ const parseGridFlag = (name: string, raw: string | undefined): number | undefine
   if (raw === undefined) return undefined;
   const value = Number(raw);
   if (!Number.isInteger(value) || value < 0) {
-    console.error(
-      chalk.red(`Error: ${name} must be a whole number`),
-    );
+    console.error(chalk.red(`Error: ${name} must be a whole number`));
     process.exit(1);
   }
   return value;
@@ -72,9 +70,7 @@ export const placeChartCommand = async (
           `  ${chalk.gray("Grid:")} column ${chart.gridColumn}, row ${chart.gridRow}, spans ${chart.colSpan}x${chart.rowSpan}`,
         );
         if (chart.platformUrl) {
-          console.log(
-            `  ${chalk.bold("View:")} ${chalk.underline(chart.platformUrl)}`,
-          );
+          console.log(`  ${chalk.bold("View:")} ${chalk.underline(chart.platformUrl)}`);
         }
         console.log();
       },

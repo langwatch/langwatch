@@ -14,6 +14,10 @@ Feature: Postgres access through the Prisma driver adapter
   # pg Pool config. Separately, `~/server/db` sits on half the server module
   # graph; constructing the client at import time would hand every script,
   # worker and unit suite a connection pool it never asked for.
+  #
+  # ADR-111 moves this behaviour into @langwatch/prisma-client. The deprecated
+  # ~/server/db scenario below characterizes the current migration seam; the
+  # explicit-construction scenario is the replacement contract.
 
   @unit
   Scenario: The schema URL parameter routes both model queries and raw SQL
@@ -42,13 +46,30 @@ Feature: Postgres access through the Prisma driver adapter
     Then creation does not throw
     And only an actual query attempt surfaces the connection failure
 
-  @unit
+  # `~/server/db` went with platform/app: there is no global client module to
+  # import, and the composition root owns the one connection (the scenario
+  # below). What survives of this scenario is bound by "Importing the Prisma
+  # client package has no process side effects" in
+  # packages/prisma-client/src/import-side-effects.test.ts. Parked rather than
+  # deleted because retiring a scenario needs a ruling
+  # (dev/docs/plans/restore-or-retire-2026-09-05.md).
+  @deprecated @unimplemented
   Scenario: Importing the db module does not construct a client
     Given a module that imports "~/server/db"
     When the module is imported
     Then no Prisma client (and no pg pool) is constructed
-    When a property of the exported client is first accessed
-    Then exactly one guarded client is constructed and reused thereafter
+    When a property of the exported client is accessed before composition
+    Then still nothing is constructed, and the access is refused
+    When the composition root supplies the one process connection
+    Then every access delegates to that client and constructs nothing of its own
+
+  @unimplemented @unit
+  Scenario: A composition root constructs and owns the Prisma client explicitly
+    Given validated PostgreSQL configuration
+    When a process calls the @langwatch/prisma-client connection service
+    Then one guarded Prisma client and pg pool are returned
+    And no ready-made client, lazy proxy or module singleton is exported
+    And the process resource scope closes the client
 
   # Prisma 7 removed `$use`; the tenancy guard chain re-attaches as a query
   # extension. These scenarios drive real queries through the exported client

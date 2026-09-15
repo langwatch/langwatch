@@ -4,9 +4,7 @@ import { formatTable } from "../../utils/formatting";
 import type { CommandResult } from "../../utils/output";
 import { counted, orDash, printEmpty, runManagement } from "../management/_shared";
 
-export const listGroupMembersCommand = async (
-  groupId: string,
-): Promise<CommandResult | void> =>
+export const listGroupMembersCommand = async (groupId: string): Promise<CommandResult | void> =>
   runManagement({
     action: "list group members",
     pending: `Fetching members of group "${groupId}"...`,
@@ -46,9 +44,7 @@ export const addGroupMemberCommand = async ({
     succeed: () => `Added member "${userId}" to group "${groupId}"`,
     table: () => {
       console.log();
-      console.log(
-        chalk.gray("The member now has everything the group's bindings grant."),
-      );
+      console.log(chalk.gray("The member now has everything the group's bindings grant."));
       console.log();
     },
   });
@@ -67,9 +63,7 @@ export const removeGroupMemberCommand = async ({
     succeed: () => `Removed member "${userId}" from group "${groupId}"`,
     table: () => {
       console.log();
-      console.log(
-        chalk.gray("The member loses the access this group granted them."),
-      );
+      console.log(chalk.gray("The member loses the access this group granted them."));
       console.log();
     },
   });

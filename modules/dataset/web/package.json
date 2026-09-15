@@ -1,0 +1,122 @@
+{
+  "name": "@langwatch/dataset-web",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Browser-safe Dataset UI, state, and upload helpers.",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "langwatch-declaration-source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    },
+    "./surfaces/dataset-drawer": {
+      "langwatch-declaration-source": "./src/ui/sections/datasets/add-or-edit-dataset-drawer.tsx",
+      "types": "./dist/ui/sections/datasets/add-or-edit-dataset-drawer.d.ts",
+      "default": "./src/ui/sections/datasets/add-or-edit-dataset-drawer.tsx"
+    },
+    "./surfaces/dataset-picker-list": {
+      "langwatch-declaration-source": "./src/ui/sections/dataset-picker-list.tsx",
+      "types": "./dist/ui/sections/dataset-picker-list.d.ts",
+      "default": "./src/ui/sections/dataset-picker-list.tsx"
+    },
+    "./surfaces/dataset-editor-table": {
+      "langwatch-declaration-source": "./src/ui/sections/datasets/editor/dataset-editor-table.tsx",
+      "types": "./dist/ui/sections/datasets/editor/dataset-editor-table.d.ts",
+      "default": "./src/ui/sections/datasets/editor/dataset-editor-table.tsx"
+    },
+    "./surfaces/render-dataset-image": {
+      "langwatch-declaration-source": "./src/ui/elements/datasets/editor/render-dataset-image.tsx",
+      "types": "./dist/ui/elements/datasets/editor/render-dataset-image.d.ts",
+      "default": "./src/ui/elements/datasets/editor/render-dataset-image.tsx"
+    },
+    "./surfaces/dataset-record-sync": {
+      "langwatch-declaration-source": "./src/behavior/datasets/editor/use-dataset-record-sync.ts",
+      "types": "./dist/behavior/datasets/editor/use-dataset-record-sync.d.ts",
+      "default": "./src/behavior/datasets/editor/use-dataset-record-sync.ts"
+    },
+    "./surfaces/upload-csv-drawer": {
+      "langwatch-declaration-source": "./src/ui/sections/datasets/upload-csv-drawer.tsx",
+      "types": "./dist/ui/sections/datasets/upload-csv-drawer.d.ts",
+      "default": "./src/ui/sections/datasets/upload-csv-drawer.tsx"
+    },
+    "./drawers": {
+      "langwatch-declaration-source": "./src/ui/sections/drawers.ts",
+      "types": "./dist/ui/sections/drawers.d.ts",
+      "default": "./src/ui/sections/drawers.ts"
+    },
+    "./datasets": {
+      "langwatch-declaration-source": "./src/datasets.ts",
+      "types": "./dist/datasets.d.ts",
+      "default": "./src/datasets.ts"
+    },
+    "./surfaces/dataset-table": {
+      "langwatch-declaration-source": "./src/dataset-table.ts",
+      "types": "./dist/dataset-table.d.ts",
+      "default": "./src/dataset-table.ts"
+    },
+    "./surfaces/dataset-preview-table": {
+      "langwatch-declaration-source": "./src/ui/blocks/dataset-preview-table.tsx",
+      "types": "./dist/ui/blocks/dataset-preview-table.d.ts",
+      "default": "./src/ui/blocks/dataset-preview-table.tsx"
+    },
+    "./surfaces/dataset-image-preview-table": {
+      "langwatch-declaration-source": "./src/ui/blocks/datasets/editor/dataset-preview-table.tsx",
+      "types": "./dist/ui/blocks/datasets/editor/dataset-preview-table.d.ts",
+      "default": "./src/ui/blocks/datasets/editor/dataset-preview-table.tsx"
+    }
+  },
+  "scripts": {
+    "typecheck": "pnpm -w typecheck:declarations --project . && tsc --noEmit",
+    "test": "vitest run",
+    "test:unit": "vitest run"
+  },
+  "dependencies": {
+    "@chakra-ui/react": "catalog:",
+    "@dnd-kit/core": "catalog:",
+    "@dnd-kit/sortable": "catalog:",
+    "@dnd-kit/utilities": "catalog:",
+    "@emotion/react": "catalog:",
+    "@hookform/resolvers": "catalog:",
+    "@langwatch/api": "workspace:*",
+    "@langwatch/csv": "workspace:*",
+    "@langwatch/dataset-contract": "workspace:*",
+    "@langwatch/design-system": "workspace:*",
+    "@langwatch/handled-error": "workspace:*",
+    "@langwatch/observability": "workspace:*",
+    "@langwatch/time": "workspace:*",
+    "@langwatch/ui-drawer": "workspace:*",
+    "@langwatch/ui-host": "workspace:*",
+    "@langwatch/workflow-web": "workspace:*",
+    "@tanstack/react-query": "catalog:",
+    "@tanstack/react-table": "catalog:",
+    "@tanstack/react-virtual": "catalog:",
+    "lucide-react": "catalog:",
+    "nanoid": "catalog:",
+    "papaparse": "catalog:",
+    "react": "catalog:",
+    "react-feather": "catalog:",
+    "react-hook-form": "catalog:",
+    "react-papaparse": "^4.4.0",
+    "use-debounce": "catalog:",
+    "zustand": "catalog:"
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "catalog:",
+    "@testing-library/react": "catalog:",
+    "@testing-library/user-event": "catalog:",
+    "@types/node": "catalog:",
+    "@types/papaparse": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "jsdom": "catalog:",
+    "react-dom": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

@@ -1,0 +1,64 @@
+---
+title: "Platform Health"
+description: "One endpoint an external monitor polls to learn whether LangWatch is working right now."
+---
+
+## What it answers
+
+`GET /api/v1/platform-health` runs every subsystem probe this deployment has and reports what each one said. It is built for an uptime monitor such as Better Stack: one URL, one status code to alert on, and a body that names which subsystem is at fault.
+
+Each subsystem is also reachable on its own path, for a monitor that wants a separate check per subsystem:
+
+```
+GET /api/v1/platform-health/collector
+GET /api/v1/platform-health/evaluations
+GET /api/v1/platform-health/processor
+GET /api/v1/platform-health/triggers
+GET /api/v1/platform-health/workflows
+```
+
+## Authentication
+
+The family takes a deployment-wide monitoring key, not a project API key: a monitor is not a tenant, and the answer carries no tenant data.
+
+```
+Authorization: Bearer <PLATFORM_HEALTH_API_KEY>
+```
+
+A missing or wrong key answers `401` with the code `platform_health_unauthorized`, and no probe runs. On a deployment that configured no monitoring key the endpoints are not served at all, so an unconfigured instance answers `404` rather than opening a platform-wide probe to anyone.
+
+## The response
+
+```json
+{
+  "status": "healthy",
+  "checkedAt": "2026-09-07T10:15:03.412Z",
+  "checks": [
+    { "name": "collector", "status": "healthy", "durationMs": 412 },
+    { "name": "processor", "status": "healthy", "durationMs": 2106 },
+    {
+      "name": "triggers",
+      "status": "not_configured",
+      "detail": "this request named no target for the probe to check"
+    }
+  ]
+}
+```
+
+| Overall status | Status code | What it means                                                                 |
+| -------------- | ----------- | ----------------------------------------------------------------------------- |
+| `healthy`      | `200`       | Every subsystem answered.                                                     |
+| `degraded`     | `200`       | Nothing is broken, but at least one probe was pointed at nothing to check.    |
+| `unhealthy`    | `503`       | At least one subsystem did not answer. Alert on this.                         |
+
+A subsystem entry carries `name`, its own `status` of `healthy`, `unhealthy` or `not_configured`, how long the probe took in `durationMs`, and, where it did not pass, a short `detail` in LangWatch's own words. A probe that fails never takes the others down, so one broken subsystem still leaves you a full report.
+
+## Pointing the trigger and workflow probes
+
+Those two probes check something specific, so name it in the request:
+
+```
+GET /api/v1/platform-health?triggerId=trigger_abc&workflowId=workflow_xyz
+```
+
+Named nothing, they report `not_configured` and the overall status becomes `degraded`. That is deliberate: an unpointed probe is a gap in your monitoring configuration, not an outage.

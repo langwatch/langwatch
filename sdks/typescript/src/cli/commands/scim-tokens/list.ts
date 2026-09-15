@@ -2,13 +2,7 @@ import chalk from "chalk";
 import { ScimTokensApiService } from "@/client-sdk/services/scim-tokens/scim-tokens-api.service";
 import { formatTable } from "../../utils/formatting";
 import type { CommandResult } from "../../utils/output";
-import {
-  asDate,
-  counted,
-  orDash,
-  printEmpty,
-  runManagement,
-} from "../management/_shared";
+import { asDate, counted, orDash, printEmpty, runManagement } from "../management/_shared";
 
 /**
  * List the organization's SCIM bearer tokens. Token values and hashes are

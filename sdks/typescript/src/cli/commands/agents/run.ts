@@ -1,18 +1,18 @@
 import { scopedApiKey } from "@/internal/credentialContext";
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
+import { createSpinner } from "../../utils/spinner.ts";
 import {
   AgentsApiService,
   type AgentCallBody,
   type AgentCallMessage,
   type AgentParameterSpec,
 } from "@/client-sdk/services/agents/agents-api.service";
-import { resolveCredentials } from "../../utils/apiKey";
-import { formatFetchError } from "../../utils/formatFetchError";
-import { failSpinner } from "../../utils/spinnerError";
+import { resolveCredentials } from "../../utils/apiKey.ts";
+import { formatFetchError } from "../../utils/formatFetchError.ts";
+import { failSpinner } from "../../utils/spinnerError.ts";
 import { buildAuthHeaders } from "@/internal/api/auth";
-import { parseRunParameterFlags } from "../../utils/keyValueFlags";
-import type { CommandResult } from "../../utils/output";
+import { parseRunParameterFlags } from "../../utils/keyValueFlags.ts";
+import type { CommandResult } from "../../utils/output.ts";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
 import { langwatchFetch } from "@/internal/http/langwatchFetch";
@@ -26,13 +26,17 @@ export interface RunAgentOptions {
 
 const isMessageList = (value: unknown): value is AgentCallMessage[] =>
   Array.isArray(value) &&
-  value.every((item) => typeof item === "object" && item !== null && typeof (item as AgentCallMessage).role === "string");
+  value.every(
+    (item) =>
+      typeof item === "object" &&
+      item !== null &&
+      typeof (item as AgentCallMessage).role === "string",
+  );
 
 /**
- * The relay body for a connected agent: `--message` is one user turn,
- * `--input` is the body itself (it must carry `messages`), `--param` gives
- * the run parameters and `--thread-id` continues a conversation. A `--param`
- * value is read as the type the agent declares for it.
+ * The relay body for a connected agent: `--message` is one user turn, `--input` is the
+ * body itself (it must carry `messages`), `--param` gives the run parameters and
+ * `--thread-id` continues a conversation.
  */
 export function buildRelayBody({
   input,
@@ -58,7 +62,8 @@ export function buildRelayBody({
     return "a connected agent takes a conversation: give --message <text>, or --input with a messages list.";
   }
   const body: AgentCallBody = { messages };
-  const threadId = options.threadId ?? (typeof input.threadId === "string" ? input.threadId : undefined);
+  const threadId =
+    options.threadId ?? (typeof input.threadId === "string" ? input.threadId : undefined);
   if (threadId) body.threadId = threadId;
   if (isMessageList(input.newMessages)) body.newMessages = input.newMessages;
   if (input.session !== undefined) body.session = input.session;
@@ -71,11 +76,8 @@ export function buildRelayBody({
 }
 
 /**
- * Returns the run's response rather than printing it: the output port renders
- * it in whatever format the caller asked for (utils/output.ts). Three paths
- * return their own result: the relay for a connected agent, the URL for an
- * HTTP agent, the workflow engine for a workflow-linked one.
- *
+ * Returns the run's response rather than printing it: the output port renders it in
+ * whatever format the caller asked for (utils/output.ts).
  * @see specs/typescript-sdk/cli-agents.feature
  */
 export const runAgentCommand = async (
@@ -134,7 +136,7 @@ export const runAgentCommand = async (
       const result = await service.call(agent.id, body);
       const where = result.instance?.label
         ? `${result.instance.hostname} (${result.instance.label})`
-        : result.instance?.hostname ?? "an instance";
+        : (result.instance?.hostname ?? "an instance");
       runSpinner.succeed(`Agent "${agent.name}" answered from ${where} in ${result.durationMs} ms`);
 
       return {
@@ -142,14 +144,17 @@ export const runAgentCommand = async (
         table: () => {
           console.log();
           console.log(chalk.bold("  Output:"));
-          const output = typeof result.output === "string"
-            ? result.output
-            : JSON.stringify(result.output, null, 2);
+          const output =
+            typeof result.output === "string"
+              ? result.output
+              : JSON.stringify(result.output, null, 2);
           console.log(`    ${output.split("\n").join("\n    ")}`);
           if (result.session !== undefined && result.session !== null) {
             console.log();
             console.log(chalk.bold("  Session:"));
-            console.log(`    ${JSON.stringify(result.session, null, 2).split("\n").join("\n    ")}`);
+            console.log(
+              `    ${JSON.stringify(result.session, null, 2).split("\n").join("\n    ")}`,
+            );
           }
           console.log();
         },
@@ -170,13 +175,15 @@ export const runAgentCommand = async (
 
     const runSpinner = createSpinner(`Calling HTTP agent at ${url}...`).start();
     try {
+      // The customer's own endpoint, not LangWatch: it keeps the plain fetch,
+      // and raw-fetch-guard.unit.test.ts allows this one call.
       const response = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(input),
       });
 
-      const result = await response.json() as Record<string, unknown>;
+      const result = (await response.json()) as Record<string, unknown>;
       runSpinner.succeed(`HTTP agent responded (${response.status})`);
 
       return {
@@ -200,18 +207,20 @@ export const runAgentCommand = async (
     // Check if agent has a linked workflow
     const workflowId = config?.workflowId as string | undefined;
     if (!workflowId) {
-      console.error(chalk.yellow(
-        `Agent "${agent.name}" (type: ${agent.type}) cannot be executed directly from CLI.\n` +
-        `Only connected agents, HTTP agents and workflow-linked agents can be run.\n` +
-        `To test this agent, use it within a workflow in the UI.`,
-      ));
+      console.error(
+        chalk.yellow(
+          `Agent "${agent.name}" (type: ${agent.type}) cannot be executed directly from CLI.\n` +
+            `Only connected agents, HTTP agents and workflow-linked agents can be run.\n` +
+            `To test this agent, use it within a workflow in the UI.`,
+        ),
+      );
       process.exit(1);
     }
 
     const runSpinner = createSpinner(`Running agent via workflow ${workflowId}...`).start();
     try {
       const response = await langwatchFetch(
-        `${endpoint}/api/workflows/${encodeURIComponent(workflowId)}/run`,
+        `${endpoint}/api/v1/workflows/${encodeURIComponent(workflowId)}/run`,
         {
           method: "POST",
           headers: {
@@ -228,7 +237,7 @@ export const runAgentCommand = async (
         process.exit(1);
       }
 
-      const result = await response.json() as Record<string, unknown>;
+      const result = (await response.json()) as Record<string, unknown>;
       runSpinner.succeed(`Agent "${agent.name}" executed successfully`);
 
       return {
@@ -237,9 +246,10 @@ export const runAgentCommand = async (
           console.log();
           if (result.output !== undefined) {
             console.log(chalk.bold("  Output:"));
-            const output = typeof result.output === "string"
-              ? result.output
-              : JSON.stringify(result.output, null, 2);
+            const output =
+              typeof result.output === "string"
+                ? result.output
+                : JSON.stringify(result.output, null, 2);
             console.log(`    ${output.split("\n").join("\n    ")}`);
           } else {
             console.log(chalk.bold("  Result:"));

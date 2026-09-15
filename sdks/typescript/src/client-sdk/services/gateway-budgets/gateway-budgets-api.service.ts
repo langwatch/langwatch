@@ -38,11 +38,9 @@ export interface GatewayBudget {
   window: BudgetWindow;
   on_breach: BudgetOnBreach;
   /**
-   * For `group` rows this is the PER-MEMBER allowance, not a group total;
-   * `spent_usd` sums the whole group and `member_count` says how many
-   * members the allowance currently covers. For `attributed_user` rows it is
-   * the PER-PERSON cap, and `end_users_seen` / `end_users_over` carry the
-   * standing instead of `spent_usd`.
+   * For `group` rows, the PER-MEMBER allowance (`member_count` says how many
+   * it covers); for `attributed_user` rows, the PER-PERSON cap, with
+   * `end_users_seen`/`end_users_over` as the standing instead of `spent_usd`.
    */
   limit_usd: string;
   /** Canonical integer limit, nano-USD. Null past the safe integer range. */
@@ -74,11 +72,9 @@ export interface GatewayBudget {
 }
 
 /**
- * One page of the budget listing, exactly as the wire serves it.
- *
- * Budgets come back in an envelope where virtual keys come back as a bare
- * array because `spend_available` is a correctness flag about the whole page,
- * and an array cannot carry it.
+ * One page of the budget listing, exactly as the wire serves it. An envelope,
+ * not a bare array, because `spend_available` is a correctness flag about the
+ * whole page and an array cannot carry it.
  */
 export interface GatewayBudgetPage {
   data: GatewayBudget[];
@@ -120,10 +116,9 @@ export interface CreateGatewayBudgetInput {
   /** ModelProvider id to pin the budget to one provider. */
   provider_key?: string | null;
   /**
-   * RFC3339 instant that phases the budget's cycle instead of the calendar:
-   * a `month` budget anchored `2026-01-17T09:00:00Z` rolls every 17th at
-   * 09:00 UTC. Omit for calendar alignment. Immutable once created, and
-   * rejected on the windows that never cycle (`total`, `manual`).
+   * RFC3339 instant phasing the cycle instead of the calendar (a `month`
+   * anchored `2026-01-17T09:00:00Z` rolls every 17th at 09:00 UTC). Immutable
+   * once created; rejected on windows that never cycle (`total`, `manual`).
    */
   cycle_anchor_at?: string;
   /**
@@ -159,12 +154,9 @@ export class GatewayBudgetsApiError extends Error {
 }
 
 /**
- * Client for the gateway budget surface (/api/gateway/v1).
- *
- * Entity types and the create/update bodies mirror the wire verbatim, so
- * their fields are lowercase snake_case. Call options this SDK invents (query
- * filters, per-call behaviour, action arguments) are camelCase like the rest
- * of the SDK.
+ * Client for the gateway budget surface (/api/gateway/v1). Entity/body fields
+ * mirror the wire verbatim (snake_case); options this SDK invents (filters,
+ * per-call behaviour, actions) are camelCase like the rest.
  */
 export class GatewayBudgetsApiService {
   private readonly endpoint: string;
@@ -223,13 +215,9 @@ export class GatewayBudgetsApiService {
   }
 
   /**
-   * ONE page of non-archived budgets, exactly as the wire serves it. Pass
-   * `next_cursor` back as `cursor` for the next page, verbatim: a cursor this
-   * endpoint did not issue answers 400 rather than restarting the walk.
-   *
-   * `limit` is the page size (server default 50, capped at 200). Prefer
-   * `list()` unless you mean to page deliberately: a full page is not a
-   * promise of more, and a null `next_cursor` is the only end of the walk.
+   * ONE page of non-archived budgets. Pass `next_cursor` back as `cursor`
+   * verbatim: an unissued cursor answers 400 rather than restarting the walk.
+   * `limit` is the page size (default 50, capped 200) — prefer `list()`.
    */
   async listPage(options?: {
     scopeTypes?: BudgetScopeKind[];
@@ -259,24 +247,9 @@ export class GatewayBudgetsApiService {
   }
 
   /**
-   * Every non-archived budget in the organization across all seven scope
-   * types, optionally filtered by `scopeTypes`.
-   *
-   * The endpoint pages; this follows `next_cursor` until it comes back null,
-   * so the result is the complete listing and carries no cursor of its own.
-   * Callers that count, total, or decide an all-clear on this list need that
-   * completeness for correctness, not just for display.
-   *
-   * `limit` sizes each request in the walk, it does NOT cap what comes back.
-   * `cursor` resumes an interrupted walk. Take a single page with
-   * `listPage()`, or stream the walk with `iterate()`.
-   *
-   * A plain array, like every other exhaustive `list()` in the SDK: a walk
-   * that ran to the end has no cursor left to report. Null `spent_usd` /
-   * `spent_nano_usd` on a row is not by itself "spend unavailable": an
-   * `attributed_user` template row serves null deliberately, because one
-   * allowance per person has no single total. Use `listPage()` when you need
-   * `spend_available` stated outright.
+   * Every non-archived budget across all scope types, following `next_cursor`
+   * to completion — callers that count/total need that. Plain array, no
+   * cursor; `limit` sizes requests but doesn't cap the result.
    */
   async list(options?: {
     scopeTypes?: BudgetScopeKind[];
@@ -306,10 +279,8 @@ export class GatewayBudgetsApiService {
 
   /**
    * Every non-archived budget, one row at a time, fetching each page only
-   * when the consumer reaches it.
-   *
-   * A null `spent_usd` means spend could not be totalled rather than that
-   * nothing was spent.
+   * when the consumer reaches it. A null `spent_usd` means spend could not
+   * be totalled, not that nothing was spent.
    */
   async *iterate(options?: {
     scopeTypes?: BudgetScopeKind[];
@@ -340,21 +311,15 @@ export class GatewayBudgetsApiService {
   }
 
   /**
-   * One budget by id, in the same row shape the listing serves.
-   *
-   * Archived budgets are not served, so a budget that existed yesterday can
-   * answer 404 today. A null `spent_usd` means spend could not be totalled
-   * rather than that nothing was spent, which is the same signal the listing
-   * carries as `spend_available`.
+   * One budget by id, in the same row shape the listing serves. Archived
+   * budgets are not served, so a budget that existed yesterday can answer
+   * 404 today.
    */
   async get(id: string): Promise<GatewayBudget> {
     const { budget } = await this.request<{
       budget: GatewayBudget;
       spend_available: boolean;
-    }>(
-      `get gateway budget "${id}"`,
-      `/api/gateway/v1/budgets/${encodeURIComponent(id)}`,
-    );
+    }>(`get gateway budget "${id}"`, `/api/gateway/v1/budgets/${encodeURIComponent(id)}`);
     return budget;
   }
 
@@ -387,10 +352,7 @@ export class GatewayBudgetsApiService {
     return budget;
   }
 
-  async archive(
-    id: string,
-    options?: MutationOptions,
-  ): Promise<GatewayBudget> {
+  async archive(id: string, options?: MutationOptions): Promise<GatewayBudget> {
     const { budget } = await this.request<{ budget: GatewayBudget }>(
       `archive gateway budget "${id}"`,
       `/api/gateway/v1/budgets/${encodeURIComponent(id)}`,
@@ -407,9 +369,7 @@ export class GatewayBudgetsApiService {
     id: string,
     options: { endUserId?: string; reason?: string } & MutationOptions = {},
   ): Promise<GatewayBudget> {
-    const query = options.endUserId
-      ? `?end_user_id=${encodeURIComponent(options.endUserId)}`
-      : "";
+    const query = options.endUserId ? `?end_user_id=${encodeURIComponent(options.endUserId)}` : "";
     const { budget } = await this.request<{ budget: GatewayBudget }>(
       `reset gateway budget "${id}"`,
       `/api/gateway/v1/budgets/${encodeURIComponent(id)}/reset${query}`,

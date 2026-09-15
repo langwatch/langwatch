@@ -1,0 +1,44 @@
+{
+  "name": "@langwatch/config",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Shared runtime configuration parsing and validation conventions.",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    },
+    "./docs-url": {
+      "types": "./dist/docs-url.d.ts",
+      "default": "./src/docs-url.ts"
+    },
+    "./public-app-config": {
+      "types": "./dist/public-app-config.d.ts",
+      "default": "./src/public-app-config.ts"
+    },
+    "./public-app-config/projection": {
+      "types": "./dist/public-app-config.projection.d.ts",
+      "default": "./src/public-app-config.projection.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "pnpm -w typecheck:declarations --project . && tsc --noEmit -p tsconfig.test.json",
+    "test": "vitest run",
+    "test:unit": "vitest run"
+  },
+  "dependencies": {
+    "zod": "catalog:",
+    "zod-validation-error": "catalog:"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

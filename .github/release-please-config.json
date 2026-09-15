@@ -8,11 +8,11 @@
       "include-component-in-tag": true,
       "tag-separator": "@",
       "changelog-sections": [
-        {"type": "feat",     "section": "Features"},
-        {"type": "fix",      "section": "Bug Fixes"},
-        {"type": "chore",    "section": "Miscellaneous",    "hidden": false},
-        {"type": "docs",     "section": "Documentation",    "hidden": false},
-        {"type": "refactor", "section": "Code Refactoring", "hidden": false}
+        { "type": "feat", "section": "Features" },
+        { "type": "fix", "section": "Bug Fixes" },
+        { "type": "chore", "section": "Miscellaneous", "hidden": false },
+        { "type": "docs", "section": "Documentation", "hidden": false },
+        { "type": "refactor", "section": "Code Refactoring", "hidden": false }
       ],
       "extra-files": [
         {
@@ -70,9 +70,7 @@
           "hidden": false
         }
       ],
-      "extra-files": [
-        "version.go"
-      ]
+      "extra-files": ["version.go"]
     },
     "sdks/typescript": {
       "release-type": "node",
@@ -146,9 +144,7 @@
           "hidden": false
         }
       ],
-      "extra-files": [
-        "src/langwatch/__version__.py"
-      ]
+      "extra-files": ["src/langwatch/__version__.py"]
     },
     "mcp/typescript": {
       "release-type": "node",
@@ -305,6 +301,80 @@
         }
       ]
     },
+    "packages/ksuid": {
+      "release-type": "node",
+      "package-name": "@langwatch/ksuid",
+      "prerelease": false,
+      "component": "ksuid",
+      "include-component-in-tag": true,
+      "tag-separator": "@",
+      "changelog-sections": [
+        {
+          "type": "feat",
+          "section": "Features"
+        },
+        {
+          "type": "fix",
+          "section": "Bug Fixes"
+        },
+        {
+          "type": "chore",
+          "section": "Miscellaneous",
+          "hidden": false
+        },
+        {
+          "type": "docs",
+          "section": "Documentation",
+          "hidden": false
+        },
+        {
+          "type": "refactor",
+          "section": "Code Refactoring",
+          "hidden": false
+        }
+      ],
+      "extra-files": [
+        {
+          "type": "json",
+          "path": "package.json",
+          "jsonpath": "$.version"
+        }
+      ]
+    },
+    "packages/ksuid-python": {
+      "release-type": "python",
+      "package-name": "langwatch-ksuid",
+      "prerelease": false,
+      "component": "ksuid-python",
+      "include-component-in-tag": true,
+      "tag-separator": "@",
+      "changelog-sections": [
+        {
+          "type": "feat",
+          "section": "Features"
+        },
+        {
+          "type": "fix",
+          "section": "Bug Fixes"
+        },
+        {
+          "type": "chore",
+          "section": "Miscellaneous",
+          "hidden": false
+        },
+        {
+          "type": "docs",
+          "section": "Documentation",
+          "hidden": false
+        },
+        {
+          "type": "refactor",
+          "section": "Code Refactoring",
+          "hidden": false
+        }
+      ],
+      "extra-files": ["langwatch_ksuid/__init__.py"]
+    },
     ".": {
       "release-type": "simple",
       "package-name": "langwatch",
@@ -322,9 +392,10 @@
         "sdks/python",
         "skills",
         "plugins/langwatch",
+        "packages/ksuid",
+        "packages/ksuid-python",
         ".github",
-        ".cursor",
-        "assets"
+        ".cursor"
       ],
       "changelog-sections": [
         {
@@ -385,12 +456,12 @@
         },
         {
           "type": "json",
-          "path": "platform/app/package.json",
+          "path": "apps/api/package.json",
           "jsonpath": "$.version"
         },
         {
           "type": "json",
-          "path": "package.json",
+          "path": "apps/server/package.json",
           "jsonpath": "$.version"
         }
       ]
@@ -427,9 +498,7 @@
           "hidden": false
         }
       ],
-      "extra-files": [
-        "skills/version.txt"
-      ]
+      "extra-files": ["skills/version.txt"]
     }
   },
   "bootstrap-sha": "HEAD",

@@ -1,0 +1,182 @@
+/**
+ * `POST /api/scenario/generate` - the scenario editor's author-assist. The
+ * caller's session is resolved and probed for `scenarios:manage` in the
+ * handler rather than at the door, because the permission is asked against a
+ * `projectId` the BODY names, not one the credential already scoped - so the
+ * route declares `deferredScope` and answers its own JSON bodies (ADR-045:
+ * the browser keys its own copy off `error.code`).
+ */
+import { deferredScope } from "@langwatch/api/access";
+import { defineRestRouter, MANAGEMENT_API_VERSION } from "@langwatch/api/rest";
+import {
+  ScenarioApi,
+  scenarioGenerateResultSchema,
+  scenarioGenerateRequestSchema,
+} from "@langwatch/scenario-contract";
+import { createLogger } from "@langwatch/observability";
+import { generateObject, type LanguageModel } from "ai";
+import type { ContentfulStatusCode } from "hono/utils/http-status";
+import { z } from "zod";
+
+import {
+  isAbortLikeError,
+  nlpgoHandledErrorFrom,
+} from "../rules/scenario-generate-nlpgo-error.rules.ts";
+
+const logger = createLogger("langwatch:api:scenario:generate");
+
+/** The signed-in person this door reads. */
+export type ScenarioGenerateRestSession = Readonly<{ user: Readonly<{ id: string }> }>;
+
+/** The feature key the author-assist's model is resolved and priced on. */
+export const SCENARIO_GENERATE_FEATURE_KEY = "scenarios.generator";
+
+/** What the author-assist reaches that it does not own. */
+export interface ScenarioGenerateRestPorts<TSession extends ScenarioGenerateRestSession> {
+  /** The live session behind this request, or null when there is none. */
+  resolveSession(request: Request): Promise<TSession | null>;
+  /** Whether that session holds `scenarios:manage` on the project. */
+  probeProjectPermission(
+    session: TSession,
+    projectId: string,
+    permission: "scenarios:manage",
+  ): Promise<boolean>;
+  /** The model a feature key resolves to on this deployment. */
+  resolveModel(input: { projectId: string; featureKey: string }): Promise<LanguageModel>;
+  /**
+   * How long one generation may run before it is aborted, in milliseconds. A port because the cap
+   * is what keeps a hung gateway from reaching the front proxy's timeout, and that budget belongs
+   * to the deployment.
+   */
+  timeoutMs(): number;
+}
+
+/** The generation's own default cap; a process may state a different one. */
+export const SCENARIO_GENERATE_DEFAULT_TIMEOUT_MS = 30_000;
+
+const SCENARIO_GENERATE_MAX_RETRIES = 1;
+
+const SYSTEM_PROMPT = `You are a scenario generation assistant for LangWatch. Your job is to help users create behavioral test scenarios for their AI agents. You will respond with a JSON object containing the scenario details.
+
+Given a description of an agent and desired scenario, generate:
+
+1. **name**: A clear, concise name (3-6 words, e.g., "Angry refund request")
+
+2. **situation**: A detailed context formatted with clear sections separated by blank lines:
+   - User persona (who they are)
+   - Emotional state (frustrated, confused, rushed, etc.)
+   - Background context (what happened before)
+   - What they're trying to accomplish
+
+   Format the situation with labeled sections on separate lines, like:
+   "User persona: [description]
+
+   Emotional state: [description]
+
+   Background: [description]
+
+   Goal: [description]"
+
+3. **criteria**: 3-6 success criteria that:
+   - Are observable from the conversation
+   - Test one specific behavior each
+   - Use clear, judgeable language (e.g., "Agent must acknowledge the error" not "Agent is helpful")
+
+When refining an existing scenario, incorporate the user's feedback while preserving the overall structure and any parts they haven't asked to change.`;
+
+/** A JSON answer this door writes itself, in the shape the browser has always read. */
+const answer = (status: ContentfulStatusCode, body: object) => ({
+  status,
+  headers: { "content-type": "application/json" },
+  body: JSON.stringify(body),
+});
+
+const DOOR_REASON =
+  "the caller's projectId arrives in the body, not the credential's own scope, so the session and its scenarios:manage permission are resolved and probed in the handler";
+
+/** `/api/scenario/generate`, bound to one process's ports. */
+export function createScenarioGenerateRest<TSession extends ScenarioGenerateRestSession>(
+  ports: ScenarioGenerateRestPorts<TSession>,
+) {
+  return defineRestRouter(ScenarioApi)
+    .withNamespace("scenario")
+    .withVersion(MANAGEMENT_API_VERSION)
+    .withAddressing("literal", { v1Twin: false })
+
+    .post("/generate", "generateScenario")
+    .withRawBody("text", { mediaType: "application/json" })
+    .withAccess(deferredScope({ reason: DOOR_REASON }))
+    .withRawResponse({ produces: "application/json" })
+    .withDocs({ description: "Generate or refine a scenario with the author-assist model" })
+    .handle(async ({ raw, request }) => {
+      const session = await ports.resolveSession(request);
+      if (!session) {
+        return answer(401, { error: "You must be logged in to access this endpoint." });
+      }
+
+      let body: z.infer<typeof scenarioGenerateRequestSchema>;
+      try {
+        body = scenarioGenerateRequestSchema.parse(JSON.parse(raw));
+      } catch (error) {
+        logger.error({ error }, "Invalid request body");
+        return answer(400, { error: "Invalid request body" });
+      }
+
+      const { prompt, currentScenario, projectId } = body;
+
+      if (!(await ports.probeProjectPermission(session, projectId, "scenarios:manage"))) {
+        return answer(403, { error: "You do not have permission to access this endpoint." });
+      }
+
+      try {
+        const model = await ports.resolveModel({
+          projectId,
+          featureKey: SCENARIO_GENERATE_FEATURE_KEY,
+        });
+
+        const userPrompt = currentScenario
+          ? `Current scenario:\n${JSON.stringify(currentScenario, null, 2)}\n\nUser request: ${prompt}`
+          : prompt;
+
+        const result = await generateObject({
+          model,
+          schema: scenarioGenerateResultSchema,
+          system: SYSTEM_PROMPT,
+          prompt: userPrompt,
+          maxRetries: SCENARIO_GENERATE_MAX_RETRIES,
+          abortSignal: AbortSignal.timeout(ports.timeoutMs()),
+        });
+
+        return answer(200, { scenario: result.object });
+      } catch (error) {
+        // A refusal the Go engine named arrives as a typed envelope on the AI
+        // SDK error. Forward the CODE and the serialized form - the message is
+        // server copy and stays server-side.
+        const handled = nlpgoHandledErrorFrom(error);
+        if (handled) {
+          logger.warn(
+            { error: handled.serialize() },
+            "Scenario generation rejected by LLM gateway",
+          );
+          return answer(handled.httpStatus as ContentfulStatusCode, {
+            error: handled.code,
+            domainError: handled.serialize(),
+          });
+        }
+
+        if (isAbortLikeError(error)) {
+          logger.warn({ error }, "Scenario generation timed out");
+          return answer(504, {
+            error:
+              "Scenario generation took too long and was stopped. This is usually temporary - please try again in a moment.",
+          });
+        }
+
+        logger.error({ error }, "Error generating scenario");
+        // Generic on purpose (ADR-045): the cause is on the log line above.
+        return answer(500, { error: "Failed to generate scenario" });
+      }
+    })
+
+    .build();
+}

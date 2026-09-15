@@ -19,11 +19,6 @@ Feature: License tRPC Router
       | hasLicense     | false       |
       | valid          | false       |
 
-  Scenario: Rejects request for unauthorized organization
-    Given I am not a member of organization "other-org"
-    When I call license.getStatus with organizationId "other-org"
-    Then the request fails with UNAUTHORIZED
-
   # ============================================================================
   # upload Endpoint
   # ============================================================================

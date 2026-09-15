@@ -88,7 +88,7 @@ class TriggersFacade:
         Returns:
             Dictionary with trigger data.
         """
-        response = self._http().get("/api/triggers")
+        response = self._http().get("/api/v1/triggers")
         _raise_for_status(response, operation="list")
         return response.json()
 
@@ -102,7 +102,7 @@ class TriggersFacade:
         Returns:
             Dictionary containing the trigger data.
         """
-        response = self._http().get(f"/api/triggers/{_quote(trigger_id)}")
+        response = self._http().get(f"/api/v1/triggers/{_quote(trigger_id)}")
         _raise_for_status(response, operation="get")
         return response.json()
 
@@ -121,7 +121,7 @@ class TriggersFacade:
             Dictionary containing the created trigger data.
         """
         body = params or {}
-        response = self._http().post("/api/triggers", json=body)
+        response = self._http().post("/api/v1/triggers", json=body)
         _raise_for_status(response, operation="create")
         return response.json()
 
@@ -143,7 +143,7 @@ class TriggersFacade:
         """
         body = params or {}
         response = self._http().patch(
-            f"/api/triggers/{_quote(trigger_id)}", json=body
+            f"/api/v1/triggers/{_quote(trigger_id)}", json=body
         )
         _raise_for_status(response, operation="update")
         return response.json()
@@ -158,6 +158,6 @@ class TriggersFacade:
         Returns:
             Dictionary with deletion result.
         """
-        response = self._http().delete(f"/api/triggers/{_quote(trigger_id)}")
+        response = self._http().delete(f"/api/v1/triggers/{_quote(trigger_id)}")
         _raise_for_status(response, operation="delete")
         return response.json()

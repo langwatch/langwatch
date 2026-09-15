@@ -1,0 +1,126 @@
+import {
+  CONFIRM_MFA_COMMAND_TYPE,
+  CONSUME_BACKUP_CODE_COMMAND_TYPE,
+  confirmMfaCommandDataSchema,
+  consumeBackupCodeCommandDataSchema,
+  DISABLE_MFA_COMMAND_TYPE,
+  disableMfaCommandDataSchema,
+  ENROLL_MFA_COMMAND_TYPE,
+  EXPIRE_MFA_ENROLLMENT_COMMAND_TYPE,
+  enrollMfaCommandDataSchema,
+  expireMfaEnrollmentCommandDataSchema,
+  type MfaCommand,
+  RECORD_MFA_VERIFICATION_FAILURE_COMMAND_TYPE,
+  REGENERATE_BACKUP_CODES_COMMAND_TYPE,
+  recordMfaVerificationFailureCommandDataSchema,
+  regenerateBackupCodesCommandDataSchema,
+} from "@langwatch/identity-contract";
+import type { MfaGuardsService } from "../services/mfa-guards.service.ts";
+import type { ZodTypeAny, z } from "zod";
+import { type Command, type CommandHandler, type CommandSchema, defineCommandSchema } from "@langwatch/eventing";
+import type { MfaEvent } from "../projections/mfa-enrollment-state.projection.ts";
+import { mfaEventsFor } from "../intents/mfa-events.intent.ts";
+
+/**
+ * The seven two-step verification verbs, as the queue's STAGED RE-RUN of each: the same guard the
+ * calling path ran, the same envelope. A retried command carries the same commandId, so the re-run
+ * costs no second event.
+ */
+
+type GuardVerb = {
+  [K in keyof MfaGuardsService]: MfaGuardsService[K] extends (data: never) => Promise<unknown>
+    ? K
+    : never;
+}[keyof MfaGuardsService];
+
+interface MfaCommandConstructor<Schema extends ZodTypeAny> {
+  new (guards: MfaGuardsService): {
+    handle(command: Command<z.infer<Schema>>): Promise<MfaEvent[]>;
+  };
+  readonly schema: CommandSchema<z.infer<Schema>, MfaCommand["type"]>;
+  getAggregateId(payload: { userId: string }): string;
+}
+
+function mfaCommand<Schema extends ZodTypeAny>({
+  type,
+  schema,
+  description,
+  verb,
+}: {
+  type: MfaCommand["type"];
+  schema: Schema;
+  description: string;
+  verb: GuardVerb;
+}): MfaCommandConstructor<Schema> {
+  type Data = z.infer<Schema>;
+  return class MfaCommandHandler implements CommandHandler<Command<Data>, MfaEvent> {
+    static readonly schema = defineCommandSchema(type, schema, description);
+
+    /** The PERSON is the aggregate. One person's two-step commands share a
+     *  lane, which is what serializes two setup attempts at once into one
+     *  winner and one refusal rather than two enrollments. */
+    static getAggregateId(payload: { userId: string }): string {
+      return payload.userId;
+    }
+
+    constructor(private readonly guards: MfaGuardsService) {}
+
+    async handle(command: Command<Data>): Promise<MfaEvent[]> {
+      const data = command.data as never;
+      const facts = await (this.guards[verb] as (input: never) => Promise<never[]>)(data);
+      return mfaEventsFor({
+        command: { type, data } as MfaCommand,
+        facts,
+      });
+    }
+  };
+}
+
+export const EnrollMfaCommand = mfaCommand({
+  type: ENROLL_MFA_COMMAND_TYPE,
+  schema: enrollMfaCommandDataSchema,
+  description: "Start setting up two-step verification for a person",
+  verb: "enrollMfa",
+});
+
+export const ConfirmMfaCommand = mfaCommand({
+  type: CONFIRM_MFA_COMMAND_TYPE,
+  schema: confirmMfaCommandDataSchema,
+  description: "Finish a two-step verification setup a correct code proved",
+  verb: "confirmMfa",
+});
+
+export const ExpireMfaEnrollmentCommand = mfaCommand({
+  type: EXPIRE_MFA_ENROLLMENT_COMMAND_TYPE,
+  schema: expireMfaEnrollmentCommandDataSchema,
+  description: "Expire a setup that was started and never finished",
+  verb: "expireMfaEnrollment",
+});
+
+export const DisableMfaCommand = mfaCommand({
+  type: DISABLE_MFA_COMMAND_TYPE,
+  schema: disableMfaCommandDataSchema,
+  description: "Turn two-step verification off for a person",
+  verb: "disableMfa",
+});
+
+export const ConsumeBackupCodeCommand = mfaCommand({
+  type: CONSUME_BACKUP_CODE_COMMAND_TYPE,
+  schema: consumeBackupCodeCommandDataSchema,
+  description: "Spend one backup code position",
+  verb: "consumeBackupCode",
+});
+
+export const RegenerateBackupCodesCommand = mfaCommand({
+  type: REGENERATE_BACKUP_CODES_COMMAND_TYPE,
+  schema: regenerateBackupCodesCommandDataSchema,
+  description: "Issue a fresh set of backup codes, discarding what was left",
+  verb: "regenerateBackupCodes",
+});
+
+export const RecordMfaVerificationFailureCommand = mfaCommand({
+  type: RECORD_MFA_VERIFICATION_FAILURE_COMMAND_TYPE,
+  schema: recordMfaVerificationFailureCommandDataSchema,
+  description: "Record a failed verification attempt as evidence",
+  verb: "recordVerificationFailure",
+});

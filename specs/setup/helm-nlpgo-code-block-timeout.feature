@@ -9,8 +9,8 @@ Feature: One checked code-block ceiling reaches every process that talks to nlpg
   #     (the check and the value) and langwatch.assertNoReservedTimeoutEnvs.
   #   charts/langwatch/templates/{app,workers,langwatch_nlp}/deployment.yaml —
   #     the three places the number is emitted.
-  #   platform/app/src/server/nlpgo/timeouts.ts — the client side, which DERIVES
-  #     its fetch deadline from this number.
+  #   [absent] the client side that DERIVES its fetch deadline from this number
+  #     has no home in this tree yet — see the nlpgo timeout notes.
   #   charts/langwatch/tests/nlpgo-timeout-guard.sh — the test that renders the
   #     chart and asserts what each component receives.
   #

@@ -34,7 +34,7 @@ func TestTypecheckDisablesTheScriptsOwnQueue(t *testing.T) {
 		log: zap.NewNop(),
 	}
 
-	if err := orch.Typecheck(context.Background(), "/repo/platform/app", nil, 3, 0); err != nil {
+	if err := orch.Typecheck(context.Background(), "/repo", nil, 3, 0); err != nil {
 		t.Fatalf("Typecheck: %v", err)
 	}
 
@@ -60,11 +60,24 @@ func TestTypecheckCountsAgainstTheSharedChecksSemaphore(t *testing.T) {
 		log: zap.NewNop(),
 	}
 
-	if err := orch.Typecheck(context.Background(), "/repo/platform/app", nil, 1, 0); err != nil {
+	if err := orch.Typecheck(context.Background(), "/repo", nil, 1, 0); err != nil {
 		t.Fatalf("Typecheck: %v", err)
 	}
 
 	if sem.lastName != "checks" {
 		t.Fatalf("typecheck must gate on the shared %q semaphore, got %q", "checks", sem.lastName)
+	}
+}
+
+func TestTypecheckDefaultUsesTheSharedCapacityPolicy(t *testing.T) {
+	sem := &fakeSemaphore{}
+	orch := runOrch(&fakeStore{}, &fakeSupervisor{})
+	orch.sem = sem
+	orch.cfg.CheckEnv.CheckSlots = "2"
+	if err := orch.Typecheck(context.Background(), "/repo", nil, 0, 0); err != nil {
+		t.Fatal(err)
+	}
+	if sem.lastSlots != 2 {
+		t.Fatalf("typecheck ignored the shared queue capacity: %d", sem.lastSlots)
 	}
 }

@@ -60,7 +60,9 @@ export const updateProjectCommand = async (
         console.log(`${chalk.bold("Language:")}        ${updated.language}`);
         console.log(`${chalk.bold("Framework:")}       ${updated.framework}`);
         console.log(`${chalk.bold("PII Redaction:")}   ${updated.piiRedactionLevel}`);
-        console.log(`${chalk.bold("Updated:")}         ${new Date(updated.updatedAt).toLocaleString()}`);
+        console.log(
+          `${chalk.bold("Updated:")}         ${new Date(updated.updatedAt).toLocaleString()}`,
+        );
         console.log();
       },
     };

@@ -1,13 +1,13 @@
 import { scopedApiKey } from "@/internal/credentialContext";
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
-import { resolveCredentials } from "../../utils/apiKey";
-import { formatFetchError } from "../../utils/formatFetchError";
-import { failSpinner } from "../../utils/spinnerError";
+import { createSpinner } from "../../utils/spinner.ts";
+import { resolveCredentials } from "../../utils/apiKey.ts";
+import { formatFetchError } from "../../utils/formatFetchError.ts";
+import { failSpinner } from "../../utils/spinnerError.ts";
 import { buildAuthHeaders } from "@/internal/api/auth";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
-import type { CommandResult } from "../../utils/output";
+import type { CommandResult } from "../../utils/output.ts";
 import { langwatchFetch } from "@/internal/http/langwatchFetch";
 
 /**
@@ -19,24 +19,29 @@ import { langwatchFetch } from "@/internal/http/langwatchFetch";
  */
 export const updateSecretCommand = async (
   id: string,
-  options: { value: string }
+  options: { value: string },
 ): Promise<CommandResult | void> => {
-  await resolveCredentials();
+  const credentials = await resolveCredentials();
+  if (!credentials.projectId) {
+    throw new Error("A project must be selected for secret operations");
+  }
 
   const apiKey = scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
-  const endpoint =
-    resolveControlPlaneUrl();
+  const endpoint = resolveControlPlaneUrl();
 
   const spinner = createSpinner(`Updating secret "${id}"...`).start();
 
   try {
-    const response = await langwatchFetch(`${endpoint}/api/secrets/${id}`, {
+    const response = await langwatchFetch(`${endpoint}/api/v1/secret/${encodeURIComponent(id)}`, {
       method: "PUT",
       headers: {
         "Content-Type": "application/json",
         ...buildAuthHeaders({ apiKey }),
       },
-      body: JSON.stringify({ value: options.value }),
+      body: JSON.stringify({
+        projectId: credentials.projectId,
+        value: options.value,
+      }),
     });
 
     if (!response.ok) {

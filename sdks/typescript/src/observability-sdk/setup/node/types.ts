@@ -1,7 +1,11 @@
 import { type Logger } from "../../../logger";
 import { type Instrumentation } from "@opentelemetry/instrumentation";
 import { type SpanExporter, type SpanProcessor } from "@opentelemetry/sdk-trace-base";
-import { type ContextManager, type TextMapPropagator, type TracerProvider } from "@opentelemetry/api";
+import {
+  type ContextManager,
+  type TextMapPropagator,
+  type TracerProvider,
+} from "@opentelemetry/api";
 import { type LogRecordProcessor } from "@opentelemetry/sdk-logs";
 import { type IMetricReader } from "@opentelemetry/sdk-metrics";
 import { type ViewOptions } from "@opentelemetry/sdk-metrics";
@@ -13,29 +17,7 @@ import { type DataCaptureOptions } from "../../features/data-capture/types";
 
 /**
  * Configuration options for setting up LangWatch observability.
- *
- * This interface provides comprehensive configuration for initializing
- * LangWatch tracing with a familiar flat structure for main options
- * and grouped sections for debug and advanced configuration.
- *
- * @example
- * ```typescript
- * const options: SetupObservabilityOptions = {
- *   langwatch: {
- *     apiKey: "sk-lw-1234567890abcdef"
- *   },
- *   serviceName: "my-service",
- *   attributes: {
- *     "service.version": "1.0.0",
- *     "deployment.environment": "production"
- *   },
- *   spanProcessors: [new BatchSpanProcessor(new JaegerExporter())],
- *   debug: {
- *     consoleTracing: true,
- *     logLevel: 'debug'
- *   }
- * };
- * ```
+ * See the docs for example configuration and field-by-field details.
  */
 export interface SetupObservabilityOptions {
   /**

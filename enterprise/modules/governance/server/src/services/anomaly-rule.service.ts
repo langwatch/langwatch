@@ -1,0 +1,250 @@
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+
+import {
+  ANOMALY_RULE_SCOPES,
+  ANOMALY_RULE_SEVERITIES,
+  AnomalyRuleNotFoundError,
+  type AnomalyRule,
+  type CreateAnomalyRuleInput,
+  restoreKeptSharedSecrets,
+  unsupportedValue,
+  type UpdateAnomalyRuleInput,
+  validateDestinationConfig,
+  validateThresholdConfig,
+} from "@langwatch/enterprise-governance-contract";
+import type { AnomalyRuleChanges, AnomalyRuleRepository } from "../repositories/policy/anomaly-rule.repository.ts";
+import { type Instant, nowInstant, toDate } from "@langwatch/time";
+
+export class AnomalyRuleService {
+  private constructor(
+    private readonly repository: AnomalyRuleRepository,
+    private readonly now: () => Instant,
+  ) {}
+
+  static create(options: { repository: AnomalyRuleRepository; now?: () => Instant }): AnomalyRuleService {
+    return new AnomalyRuleService(options.repository, options.now ?? nowInstant);
+  }
+
+  async list(organizationId: string): Promise<AnomalyRule[]> {
+    return this.repository.list(organizationId);
+  }
+
+  async findById({
+    id,
+    organizationId,
+  }: {
+    id: string;
+    organizationId: string;
+  }): Promise<AnomalyRule | null> {
+    const row = await this.repository.findById(id);
+    if (!row || row.organizationId !== organizationId) {
+      return null;
+    }
+
+    return row;
+  }
+
+  /**
+   * `findById`, for the mutations that cannot proceed without the row. Which org asked is a
+   * debugging detail: it goes to the log, not into an error a customer reads (see
+   * {@link AnomalyRuleNotFoundError}).
+   */
+  async getById({
+    id,
+    organizationId,
+  }: {
+    id: string;
+    organizationId: string;
+  }): Promise<AnomalyRule> {
+    const existing = await this.findById({ id, organizationId });
+    if (!existing) {
+      throw new AnomalyRuleNotFoundError(id);
+    }
+
+    return existing;
+  }
+
+  async createRule(input: CreateAnomalyRuleInput): Promise<AnomalyRule> {
+    if (!ANOMALY_RULE_SEVERITIES.includes(input.severity)) {
+      throw unsupportedValue({
+        field: "severity",
+        value: input.severity,
+        allowed: ANOMALY_RULE_SEVERITIES,
+      });
+    }
+
+    if (!ANOMALY_RULE_SCOPES.includes(input.scope)) {
+      throw unsupportedValue({
+        field: "scope",
+        value: input.scope,
+        allowed: ANOMALY_RULE_SCOPES,
+      });
+    }
+
+    // Strict per-rule-type validation. Throws ZodError on shape failure or a
+    // `ValidationError` on an unknown ruleType — both reach the admin as
+    // `validation_error`. Spec:
+    // specs/ai-gateway/governance/anomaly-rule-threshold-schema.feature.
+    validateThresholdConfig({
+      ruleType: input.ruleType,
+      config: input.thresholdConfig ?? {},
+    });
+    // Strict destinationConfig validation (Phase 2C C3 dispatch). Empty
+    // / undefined config is allowed — that's explicit log-only opt-out.
+    if (input.destinationConfig !== undefined && Object.keys(input.destinationConfig).length > 0) {
+      validateDestinationConfig(input.destinationConfig);
+    }
+
+    return this.repository.create({
+      organizationId: input.organizationId,
+      name: input.name,
+      description: input.description ?? null,
+      severity: input.severity,
+      ruleType: input.ruleType,
+      scope: input.scope,
+      scopeId: input.scopeId,
+      thresholdConfig: input.thresholdConfig ?? {},
+      destinationConfig: input.destinationConfig ?? {},
+      status: input.status ?? "active",
+      createdById: input.actorUserId,
+    });
+  }
+
+  async updateRule(input: UpdateAnomalyRuleInput): Promise<AnomalyRule> {
+    const existing = await this.getById({ id: input.id, organizationId: input.organizationId });
+    const changes: AnomalyRuleChanges = {
+      ...this.describedChanges(input),
+      ...this.classifiedChanges(input),
+      ...this.thresholdChanges({ input, existing }),
+      ...this.destinationChanges({ input, existing }),
+    };
+
+    return this.repository.update(existing.id, changes);
+  }
+
+  /** The free-text fields, which carry no rule of their own beyond having been supplied. */
+  private describedChanges(input: UpdateAnomalyRuleInput): AnomalyRuleChanges {
+    const changes: AnomalyRuleChanges = {};
+    if (input.name !== undefined) {
+      changes.name = input.name;
+    }
+
+    if (input.description !== undefined) {
+      changes.description = input.description;
+    }
+
+    if (input.status !== undefined) {
+      changes.status = input.status;
+    }
+
+    return changes;
+  }
+
+  /** The enumerated fields, each refused by name when the value is outside its set. */
+  private classifiedChanges(input: UpdateAnomalyRuleInput): AnomalyRuleChanges {
+    const changes: AnomalyRuleChanges = {};
+    if (input.severity !== undefined) {
+      if (!ANOMALY_RULE_SEVERITIES.includes(input.severity)) {
+        throw unsupportedValue({
+          field: "severity",
+          value: input.severity,
+          allowed: ANOMALY_RULE_SEVERITIES,
+        });
+      }
+
+      changes.severity = input.severity;
+    }
+
+    if (input.ruleType !== undefined) {
+      changes.ruleType = input.ruleType;
+    }
+
+    if (input.scope !== undefined) {
+      if (!ANOMALY_RULE_SCOPES.includes(input.scope)) {
+        throw unsupportedValue({
+          field: "scope",
+          value: input.scope,
+          allowed: ANOMALY_RULE_SCOPES,
+        });
+      }
+
+      changes.scope = input.scope;
+    }
+
+    if (input.scopeId !== undefined) {
+      changes.scopeId = input.scopeId;
+    }
+
+    return changes;
+  }
+
+  /**
+   * The threshold config, re-validated against the effective rule type. Switching rule type with
+   * no matching config would leave a row whose two halves disagree, so that is refused up front
+   * and the admin supplies the right shape.
+   */
+  private thresholdChanges({
+    input,
+    existing,
+  }: {
+    input: UpdateAnomalyRuleInput;
+    existing: AnomalyRule;
+  }): AnomalyRuleChanges {
+    if (input.thresholdConfig !== undefined) {
+      validateThresholdConfig({
+        ruleType: input.ruleType ?? existing.ruleType,
+        config: input.thresholdConfig,
+      });
+
+      return { thresholdConfig: input.thresholdConfig };
+    }
+
+    if (input.ruleType !== undefined && input.ruleType !== existing.ruleType) {
+      validateThresholdConfig({ ruleType: input.ruleType, config: existing.thresholdConfig });
+    }
+
+    return {};
+  }
+
+  /**
+   * The destination config, under the same allow-empty rule as create: an empty object clears
+   * destinations, anything else must round-trip the strict schema. A reader sees a marker in place
+   * of each shared secret, so a config sent back carrying one keeps the stored secret.
+   */
+  private destinationChanges({
+    input,
+    existing,
+  }: {
+    input: UpdateAnomalyRuleInput;
+    existing: AnomalyRule;
+  }): AnomalyRuleChanges {
+    if (input.destinationConfig === undefined) {
+      return {};
+    }
+
+    const destinationConfig = restoreKeptSharedSecrets({
+      incoming: input.destinationConfig,
+      existing: existing.destinationConfig,
+    });
+    if (Object.keys(destinationConfig).length > 0) {
+      validateDestinationConfig(destinationConfig);
+    }
+
+    return { destinationConfig };
+  }
+
+  async archive({
+    id,
+    organizationId,
+  }: {
+    id: string;
+    organizationId: string;
+  }): Promise<AnomalyRule> {
+    const existing = await this.getById({ id, organizationId });
+
+    return this.repository.update(existing.id, {
+      archivedAt: toDate(this.now()),
+      status: "disabled",
+    });
+  }
+}

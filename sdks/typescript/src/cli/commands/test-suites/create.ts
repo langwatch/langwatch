@@ -1,12 +1,12 @@
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
-import { resolveCredentials } from "../../utils/apiKey";
-import { failSpinner } from "../../utils/spinnerError";
-import type { CommandResult } from "../../utils/output";
-import { parseSuiteFieldDefinitionFlags } from "../../utils/suiteFieldFlags";
-import { createCliTestSuitesService } from "./cli-test-suites-service";
-import { type EvaluatorFlagRef, readEvaluators } from "./evaluatorFlags";
-import { printEvaluators, printSuiteFields } from "./renderSuiteDetails";
+import { createSpinner } from "../../utils/spinner.ts";
+import { resolveCredentials } from "../../utils/apiKey.ts";
+import { failSpinner } from "../../utils/spinnerError.ts";
+import type { CommandResult } from "../../utils/output.ts";
+import { parseSuiteFieldDefinitionFlags } from "../../utils/suiteFieldFlags.ts";
+import { createCliTestSuitesService } from "./cli-test-suites-service.ts";
+import { type EvaluatorFlagRef, readEvaluators } from "./evaluatorFlags.ts";
+import { printEvaluators, printSuiteFields } from "./renderSuiteDetails.ts";
 
 export interface CreateTestSuiteOptions {
   /** `--field identifier:type`, one per occurrence. */
@@ -69,4 +69,3 @@ export const createTestSuiteCommand = async (
     process.exit(1);
   }
 };
-

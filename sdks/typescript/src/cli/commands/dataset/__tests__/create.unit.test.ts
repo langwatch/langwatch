@@ -28,21 +28,15 @@ describe("parseColumns()", () => {
 
   describe("when given invalid column definitions", () => {
     it("throws on missing type", () => {
-      expect(() => parseColumns("input")).toThrow(
-        'Invalid column format: "input"',
-      );
+      expect(() => parseColumns("input")).toThrow('Invalid column format: "input"');
     });
 
     it("throws on empty name", () => {
-      expect(() => parseColumns(":string")).toThrow(
-        'Invalid column format: ":string"',
-      );
+      expect(() => parseColumns(":string")).toThrow('Invalid column format: ":string"');
     });
 
     it("throws on empty type", () => {
-      expect(() => parseColumns("input:")).toThrow(
-        'Invalid column format: "input:"',
-      );
+      expect(() => parseColumns("input:")).toThrow('Invalid column format: "input:"');
     });
 
     it("throws on extra colons", () => {

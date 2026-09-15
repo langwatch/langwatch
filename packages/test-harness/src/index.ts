@@ -1,0 +1,93 @@
+/**
+ * Test harness: lane assignment, shard weighting, compiler, datastore wiring.
+ * See {@link laneForSource} for COMPONENT vs DATASTORE lane split.
+ */
+export { cleanupTestRows, requireAssigned, type CleanupEntry } from "./cleanup-test-rows.ts";
+export {
+  migrateTestClickHouseOnce,
+  nativeClickHouseBaseUrl,
+  privateRouteOrgId,
+  startTestClickHouseEndpoints,
+  TEST_CLICKHOUSE_IMAGE,
+  TEST_CLICKHOUSE_TUNING,
+  TEST_CLICKHOUSE_TUNING_LABEL,
+  type TestClickHouseEndpoint,
+} from "./clickhouse-test-endpoints.ts";
+export {
+  default as DurationManifestReporter,
+  mergeDurations,
+  type DurationManifestReporterOptions,
+} from "./duration-manifest-reporter.ts";
+export {
+  assertSerialWorkerSlot,
+  integrationFilesRunInParallel,
+  withdrawWorkerCountOverride,
+} from "./integration-file-concurrency.ts";
+export {
+  escapeGlob,
+  INTEGRATION_SEARCH_DIRS,
+  laneForSource,
+  partitionIntegrationFiles,
+  toIncludePatterns,
+  type Lane,
+  type LanePartition,
+} from "./integration-lanes.ts";
+export {
+  graphLaneForSource,
+  graphLaneSelection,
+  partitionByModuleGraph,
+  selectedGraphLane,
+  type GraphLane,
+  type GraphPartition,
+} from "./integration-module-graph.ts";
+export {
+  mightContainMockCall,
+  resolveMockSpecifier,
+  scanSourceForMockSpecifiers,
+  type MockSpecifierResolution,
+  type MockSpecifierSite,
+} from "./mock-specifier-scan.ts";
+export {
+  default as ShardFailureReporter,
+  recordShardSelection,
+  resetShardState,
+  shardModuleTally,
+  shardSawFailure,
+} from "./shard-failure-reporter.ts";
+export {
+  hardFloorReport,
+  resolveHardFloorMs,
+  setup as armUnitShardHardFloor,
+} from "./unit-shard-hard-floor.ts";
+export { createWeigher, loadDurationManifest, type DurationManifest } from "./shard-weights.ts";
+export { scanTestSourceForUnsafeDeleteMany, type TeardownViolation } from "./teardown-scan.ts";
+export {
+  frozenAt,
+  memoryCache,
+  memoryIdempotency,
+  memoryObjectStorage,
+  memoryRateLimiter,
+  recordingMail,
+  recordingTelemetry,
+  type Cache,
+  type Clock,
+  type FrozenClock,
+  type IdempotencyStore,
+  type Mail,
+  type MailMessage,
+  type ObjectStorage,
+  type RateLimiter,
+  type RecordedMetric,
+  type RecordingMail,
+  type RecordingTelemetry,
+  type StoredObject,
+  type StoredObjectAddress,
+  type Telemetry,
+} from "./member-doubles.ts";
+export { createTestAuditSink, type TestAuditRow, type TestAuditSink } from "./test-audit-sink.ts";
+export { createTestLogger, type TestLogLine, type TestLogLines } from "./test-logger.ts";
+export { allowConsole } from "./console-guard.ts";
+export { closeTsAstSession, parseSourceText, parseSourceTexts } from "./ts-ast.ts";
+export { aliasesForFile, parseVitestConfigAliases, type ModuleAlias } from "./vitest-alias-table.ts";
+export * from "./nlpgo-binary-stamp.ts";
+export * from "./nlpgo-subprocess.ts";

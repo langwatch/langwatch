@@ -41,19 +41,13 @@ export const DEFAULT_TEXT_OUTPUT: CliOutput = {
   type: "str",
 };
 
-const SCALAR_OUTPUT_TO_JSON_TYPE: Record<
-  Exclude<CliOutputType, "json_schema">,
-  string
-> = {
+const SCALAR_OUTPUT_TO_JSON_TYPE: Record<Exclude<CliOutputType, "json_schema">, string> = {
   str: "string",
   float: "number",
   bool: "boolean",
 };
 
-const JSON_TYPE_TO_SCALAR_OUTPUT: Record<
-  string,
-  Exclude<CliOutputType, "json_schema">
-> = {
+const JSON_TYPE_TO_SCALAR_OUTPUT: Record<string, Exclude<CliOutputType, "json_schema">> = {
   string: "str",
   number: "float",
   integer: "float",
@@ -69,9 +63,7 @@ const isPlainObject = (value: unknown): value is Record<string, unknown> =>
  * and normalizes to `{ name?, schema }`. Returns undefined when there is no
  * usable schema.
  */
-export const normalizeResponseFormat = (
-  raw: unknown,
-): LocalResponseFormat | undefined => {
+export const normalizeResponseFormat = (raw: unknown): LocalResponseFormat | undefined => {
   if (!isPlainObject(raw)) return undefined;
 
   // OpenAI-standard wrapper
@@ -111,18 +103,10 @@ export const asFlatFields = (
   if (schema.type !== "object") return null;
   if (!isPlainObject(schema.properties)) return null;
 
-  const allowedSchemaKeys = new Set([
-    "type",
-    "properties",
-    "required",
-    "additionalProperties",
-  ]);
+  const allowedSchemaKeys = new Set(["type", "properties", "required", "additionalProperties"]);
   if (Object.keys(schema).some((k) => !allowedSchemaKeys.has(k))) return null;
 
-  if (
-    schema.additionalProperties !== undefined &&
-    schema.additionalProperties !== false
-  ) {
+  if (schema.additionalProperties !== undefined && schema.additionalProperties !== false) {
     return null;
   }
 
@@ -150,10 +134,7 @@ export const asFlatFields = (
     if (!Array.isArray(schema.required)) return null;
     const required = [...(schema.required as unknown[])].sort();
     const names = [...propertyNames].sort();
-    if (
-      required.length !== names.length ||
-      required.some((r, i) => r !== names[i])
-    ) {
+    if (required.length !== names.length || required.some((r, i) => r !== names[i])) {
       return null;
     }
   }
@@ -172,9 +153,7 @@ export const outputsToResponseFormat = (
 ): LocalResponseFormat | undefined => {
   if (!outputs || outputs.length === 0) return undefined;
 
-  const jsonSchemaOutput = outputs.find(
-    (o) => o.type === "json_schema" && o.json_schema,
-  );
+  const jsonSchemaOutput = outputs.find((o) => o.type === "json_schema" && o.json_schema);
   if (jsonSchemaOutput?.json_schema) {
     return {
       name: jsonSchemaOutput.identifier,
@@ -218,9 +197,7 @@ export const outputsToResponseFormat = (
  * a flat object schema expands to flat fields (so the platform keeps showing
  * them individually), anything richer becomes one json_schema output.
  */
-export const responseFormatToOutputs = (
-  raw: unknown,
-): CliOutput[] | undefined => {
+export const responseFormatToOutputs = (raw: unknown): CliOutput[] | undefined => {
   const rf = normalizeResponseFormat(raw);
   if (!rf) return undefined;
 

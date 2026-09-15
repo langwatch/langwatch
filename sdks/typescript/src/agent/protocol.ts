@@ -1,12 +1,5 @@
 /**
- * The frames the SDK and the platform exchange over the agent socket.
- *
- * Every frame is one JSON text message with a `type` and the protocol
- * version. The shapes here match the contract table in ADR-128 and the
- * platform's own frame module; the validators are small and hand-written
- * because this file is part of the public `langwatch/agent` surface, where no
- * schema library may cross as a value.
- *
+ * Frames exchanged over the agent socket; shapes match ADR-128.
  * @see dev/docs/adr/128-connected-agents.md
  */
 

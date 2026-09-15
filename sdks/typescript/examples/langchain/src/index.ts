@@ -57,10 +57,7 @@ async function main() {
           });
 
           // Check for exit command
-          if (
-            userInput.toLowerCase() === "quit" ||
-            userInput.toLowerCase() === "exit"
-          ) {
+          if (userInput.toLowerCase() === "quit" || userInput.toLowerCase() === "exit") {
             console.log("👋 Goodbye!");
             finish = true;
             return;

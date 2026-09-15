@@ -1,22 +1,10 @@
 /**
- * The one shape every management command has.
- *
- * Nine families, forty-odd verbs, and each of them does exactly the same four
- * things: resolve credentials, spin while one API call runs, hand the FULL
- * response to the output port as `data`, and fail through `failSpinner` so the
- * error renders in whatever format the caller asked for. Written out per file
- * that is forty copies of the same block, and forty chances for one of them to
- * quietly return a projection of the response instead of the response.
- *
- * `runManagement` is that block, once. A command file is then what it should
- * be: the request it makes and the table it draws.
+ * Shared pattern: resolve creds, spin, hand full response to output port.
+ * See runManagement() — one centralized block instead of forty copies.
  */
 import chalk from "chalk";
 import { resolveCredentials } from "../../utils/apiKey";
-import {
-  commandValidationError,
-  reportCommandError,
-} from "../../utils/errorOutput";
+import { commandValidationError, reportCommandError } from "../../utils/errorOutput";
 import { ManagementFlagError } from "../../utils/managementFlags";
 import type { CommandResult } from "../../utils/output";
 import { createSpinner } from "../../utils/spinner";
@@ -98,13 +86,7 @@ export const printFacts = (facts: Array<[string, string]>): void => {
 };
 
 /** Shared so an empty listing always offers the command that fills it. */
-export const printEmpty = ({
-  what,
-  hint,
-}: {
-  what: string;
-  hint?: string;
-}): void => {
+export const printEmpty = ({ what, hint }: { what: string; hint?: string }): void => {
   console.log();
   console.log(chalk.gray(`No ${what} found.`));
   if (hint) console.log(chalk.cyan(`  ${hint}`));
@@ -124,9 +106,7 @@ export const counted = ({
 
 /** `—` for a value the platform has not set, so a table never shows "null". */
 export const orDash = (value: string | null | undefined): string =>
-  value === null || value === undefined || value === ""
-    ? chalk.gray("—")
-    : value;
+  value === null || value === undefined || value === "" ? chalk.gray("—") : value;
 
 /** A date the way every other CLI table renders one. */
 export const asDate = (value: string | null | undefined): string =>

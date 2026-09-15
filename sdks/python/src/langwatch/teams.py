@@ -1,7 +1,7 @@
 """
 API facade for teams, the grouping that projects and members belong to.
 
-``/api/teams`` is an organization-class route: an organization API key
+``/api/v1/teams`` is an organization-class route: an organization API key
 (``sk-lw-...``) authorizes it and there is no project to scope to, which is
 why this facade sends no project header. Uses httpx via the generated REST
 API client for HTTP transport.
@@ -18,7 +18,7 @@ from langwatch.state import get_instance
 from langwatch.utils.gateway_http import raise_for_status, walk_numbered_pages
 from langwatch.utils.initialization import ensure_setup
 
-TEAMS_PATH = "/api/teams"
+TEAMS_PATH = "/api/v1/teams"
 
 
 class TeamsFacade:

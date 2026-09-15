@@ -29,13 +29,8 @@ type ChartRunGranularitySeconds = (typeof OFFERED_GRANULARITY_STEPS)[number];
 const OFFERED_GRANULARITY_STEP_NAMES = "1 (1 second), 60 (1 minute), 3600 (1 hour)";
 
 /**
- * Runs a saved chart by id: reads the chart, then executes its own statement
- * and stored parameter values through the LangWatchQL query door — the same
- * governed execution path every other surface uses, so what this prints is
- * what the workbench would show. `--start`/`--end` fill the reserved
- * `dashboard_context_period_start`/`dashboard_context_period_end` parameters
- * for statements that declare them, and `--granularity` the reserved
- * datapoint step, in seconds.
+ * Runs a saved chart through LangWatchQL (same path as workbench). --start/--end
+ * and --granularity fill reserved dashboard context parameters.
  */
 export const runChartCommand = async (
   id: string,
@@ -49,17 +44,13 @@ export const runChartCommand = async (
   await resolveCredentials({ project: options.project });
 
   if ((options.start === undefined) !== (options.end === undefined)) {
-    console.error(
-      chalk.red("Error: --start and --end must be given together"),
-    );
+    console.error(chalk.red("Error: --start and --end must be given together"));
     process.exit(1);
   }
   let granularitySeconds: ChartRunGranularitySeconds | undefined;
   if (options.granularity !== undefined) {
     const requested = Number(options.granularity);
-    if (
-      !(OFFERED_GRANULARITY_STEPS as readonly number[]).includes(requested)
-    ) {
+    if (!(OFFERED_GRANULARITY_STEPS as readonly number[]).includes(requested)) {
       console.error(
         chalk.red(
           `Error: --granularity must be one of the offered steps: ${OFFERED_GRANULARITY_STEP_NAMES}`,
@@ -80,10 +71,7 @@ export const runChartCommand = async (
     const chart = await service.get(id);
     const result = await service.runQuery({
       sql: chart.definition.sql,
-      parameters: chart.definition.parameters as Record<
-        string,
-        ChartParameterValue
-      >,
+      parameters: chart.definition.parameters as Record<string, ChartParameterValue>,
       ...(options.start !== undefined && options.end !== undefined
         ? { timeWindow: { start: options.start, end: options.end } }
         : {}),

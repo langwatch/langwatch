@@ -1,10 +1,6 @@
 /**
  * The file tools, in Node, so the shared folder needs no host tool at all.
- *
  * Every path goes through the folder boundary here as well as in `policy.ts`.
- * The second check is not a repeat: a write resolves the real path again right
- * before it opens the file, which is what closes the window between the
- * decision and the write where a symlink can be swapped.
  */
 
 import * as fs from "node:fs";
@@ -35,13 +31,7 @@ const DEFAULT_READ_LINES = 2_000;
  * The absolute path of a target inside the folder. Refuses anything that
  * resolves outside, naming the folder that is allowed.
  */
-export function insideRoot({
-  target,
-  root,
-}: {
-  target: string;
-  root: string;
-}): string {
+export function insideRoot({ target, root }: { target: string; root: string }): string {
   const check = resolvePathInsideRoot({ target, root });
   if (!check.inside) {
     throw new LocalCallFailure({
@@ -59,13 +49,7 @@ const notFound = ({ target }: { target: string }): LocalCallFailure =>
   });
 
 /** The file as numbered lines, the way the model reads a file everywhere else. */
-export function readFile({
-  params,
-  root,
-}: {
-  params: LocalReadParams;
-  root: string;
-}): string {
+export function readFile({ params, root }: { params: LocalReadParams; root: string }): string {
   const target = insideRoot({ target: params.path, root });
   let content: string;
   try {
@@ -77,9 +61,7 @@ export function readFile({
   const from = Math.max(1, params.offset ?? 1);
   const count = params.limit ?? DEFAULT_READ_LINES;
   const slice = lines.slice(from - 1, from - 1 + count);
-  const numbered = slice
-    .map((line, index) => `${from + index}\t${line}`)
-    .join("\n");
+  const numbered = slice.map((line, index) => `${from + index}\t${line}`).join("\n");
   const rest = lines.length - (from - 1 + slice.length);
   return rest > 0
     ? `${numbered}\n[${rest} more line${rest === 1 ? "" : "s"}. Read again with offset ${from + slice.length}.]`
@@ -90,13 +72,7 @@ export function readFile({
  * Writes the file, creating the directories it needs. The boundary is checked
  * again on the resolved path right before the write.
  */
-export function writeFile({
-  params,
-  root,
-}: {
-  params: LocalWriteParams;
-  root: string;
-}): string {
+export function writeFile({ params, root }: { params: LocalWriteParams; root: string }): string {
   const target = insideRoot({ target: params.path, root });
   fs.mkdirSync(path.dirname(target), { recursive: true });
   insideRoot({ target, root });
@@ -110,13 +86,7 @@ export function writeFile({
  * so an edit is never applied to the wrong place; anything else is an error
  * the model can act on.
  */
-export function editFile({
-  params,
-  root,
-}: {
-  params: LocalEditParams;
-  root: string;
-}): string {
+export function editFile({ params, root }: { params: LocalEditParams; root: string }): string {
   const target = insideRoot({ target: params.path, root });
   let content: string;
   try {
@@ -146,13 +116,7 @@ export function editFile({
 }
 
 /** The names in one directory, directories first, marked with a trailing slash. */
-export function listDirectory({
-  params,
-  root,
-}: {
-  params: LocalLsParams;
-  root: string;
-}): string {
+export function listDirectory({ params, root }: { params: LocalLsParams; root: string }): string {
   const target = insideRoot({ target: params.path ?? ".", root });
   let entries: fs.Dirent[];
   try {
@@ -170,11 +134,7 @@ export function listDirectory({
   const shown = named.slice(0, limit);
   const rest = named.length - shown.length;
   const header = path.relative(root, target) || ".";
-  return [
-    `${header}:`,
-    ...shown,
-    ...(rest > 0 ? [`[${rest} more entries]`] : []),
-  ].join("\n");
+  return [`${header}:`, ...shown, ...(rest > 0 ? [`[${rest} more entries]`] : [])].join("\n");
 }
 
 // ---------------------------------------------------------------------------
@@ -226,9 +186,7 @@ const ruleFrom = (line: string): IgnoreRule | null => {
   const anchored = pattern.startsWith("/");
   if (anchored) pattern = pattern.slice(1);
   const body = globToRegExp(pattern).source.replace(/^\^|\$$/g, "");
-  const test = anchored
-    ? new RegExp(`^${body}(?:/|$)`)
-    : new RegExp(`(?:^|/)${body}(?:/|$)`);
+  const test = anchored ? new RegExp(`^${body}(?:/|$)`) : new RegExp(`(?:^|/)${body}(?:/|$)`);
   return { test, negated, directoryOnly };
 };
 
@@ -304,17 +262,10 @@ export function* walkFiles({
   }
 }
 
-const escapeLiteral = (value: string): string =>
-  value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const escapeLiteral = (value: string): string => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 /** Text search over the folder, with the matching lines and their numbers. */
-export function grep({
-  params,
-  root,
-}: {
-  params: LocalGrepParams;
-  root: string;
-}): string {
+export function grep({ params, root }: { params: LocalGrepParams; root: string }): string {
   const from = insideRoot({ target: params.path ?? ".", root });
   const source = params.literal ? escapeLiteral(params.pattern) : params.pattern;
   let matcher: RegExp;
@@ -366,13 +317,7 @@ export function grep({
 }
 
 /** File names under the folder that match a glob. */
-export function findFiles({
-  params,
-  root,
-}: {
-  params: LocalFindParams;
-  root: string;
-}): string {
+export function findFiles({ params, root }: { params: LocalFindParams; root: string }): string {
   const from = insideRoot({ target: params.path ?? ".", root });
   const matcher = globToRegExp(params.pattern);
   const limit = params.limit ?? DEFAULT_FIND_LIMIT;

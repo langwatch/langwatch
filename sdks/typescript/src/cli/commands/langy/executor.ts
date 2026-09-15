@@ -1,14 +1,7 @@
 /**
- * Runs one command in the shared folder.
- *
- * Every command runs under a non-login `bash -c` with the folder as its
- * working directory and its own process group, so a cancel, a timeout or a
- * Ctrl-C reaches the children too. The output the model reads is capped; the
- * whole log stays in the folder, in a directory the CLI keeps out of git.
- *
- * A background command is different in one way that matters: its output goes
- * straight to the log file descriptor rather than through a pipe, so the
- * process keeps writing after the CLI is gone.
+ * Runs one command in the shared folder, under a non-login `bash -c` with
+ * its own process group so a cancel or Ctrl-C reaches the children too. A
+ * background command's output goes straight to the log file, not a pipe.
  */
 
 import { spawn } from "node:child_process";
@@ -27,29 +20,16 @@ import { LocalCallFailure } from "./errors";
 const KILL_GRACE_MS = 2_000;
 
 /**
- * The shell one command runs in.
- *
- * A login shell reads the developer's profile files, and a broken line in one
- * of them writes to stderr of every command. That text reaches the model as
- * part of each tool result and reads as a failure of the command it did not
- * come from. A non-login shell reads no profile, and the PATH the developer
- * expects arrives anyway: the CLI was started from their own terminal, so the
- * environment it hands the command already carries it.
+ * The shell one command runs in. A login shell reads the developer's
+ * profile files, and a broken line in one writes to stderr of every
+ * command, reading as a failure of the command it did not come from.
  */
-export const SHELL_ARGS = (command: string): [string, string[]] => [
-  "bash",
-  ["-c", command],
-];
+export const SHELL_ARGS = (command: string): [string, string[]] => ["bash", ["-c", command]];
 
 /**
- * The variables a command inherits from this process, by name.
- *
- * The terminal that started the CLI carries the developer's own keys, and a
- * command Langy runs reads every one of them the moment it is handed the
- * whole environment. What a build needs from the machine is where its
- * toolchain lives, how it reaches the network and which certificates it
- * trusts. What a project needs is in the project, and the project's own
- * tools read it from there.
+ * The variables a command inherits from this process, by name. Handing over
+ * the whole environment would leak the developer's own keys; a command only
+ * needs where its toolchain lives and how it reaches the network.
  */
 export const INHERITED_ENVIRONMENT: ReadonlySet<string> = new Set([
   // The machine and the shell.
@@ -112,11 +92,8 @@ export const INHERITED_ENVIRONMENT_PREFIXES: readonly string[] = ["LC_", "XDG_"]
 export const INHERITED_ENVIRONMENT_SUFFIXES: readonly string[] = ["_HOME"];
 
 /**
- * Names that never travel, whatever else matches.
- *
- * A prefix or a suffix rule is a family, and a family has secrets in it:
- * `HOMEBREW_GITHUB_API_TOKEN` is a homebrew variable and a token at the same
- * time. The veto is read last and wins.
+ * Names that never travel, whatever else matches: a family can hold a
+ * secret too (`HOMEBREW_GITHUB_API_TOKEN` is both). Read last and wins.
  */
 export const SECRET_ENVIRONMENT_SUFFIXES: readonly string[] = [
   "_KEY",
@@ -139,9 +116,7 @@ export function inheritsVariable(name: string): boolean {
 }
 
 /** The environment one command runs with. */
-export function commandEnvironment(
-  source: NodeJS.ProcessEnv = process.env,
-): NodeJS.ProcessEnv {
+export function commandEnvironment(source: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
   const kept: NodeJS.ProcessEnv = {};
   for (const [name, value] of Object.entries(source)) {
     if (value === undefined) continue;
@@ -191,13 +166,7 @@ export function timeoutSecondsFor(seconds: number | undefined): number {
 }
 
 /** Where one call's log file lives inside the folder. */
-export function logPathFor({
-  root,
-  callId,
-}: {
-  root: string;
-  callId: string;
-}): string {
+export function logPathFor({ root, callId }: { root: string; callId: string }): string {
   return path.join(root, LOCAL_LOG_DIR, `${callId}.log`);
 }
 
@@ -237,9 +206,7 @@ export function excludeLogDirFromGit(root: string): void {
   const entry = ".langwatch/";
   try {
     fs.mkdirSync(info, { recursive: true });
-    const current = fs.existsSync(excludeFile)
-      ? fs.readFileSync(excludeFile, "utf8")
-      : "";
+    const current = fs.existsSync(excludeFile) ? fs.readFileSync(excludeFile, "utf8") : "";
     if (current.split("\n").some((line) => line.trim() === entry)) return;
     const separator = current === "" || current.endsWith("\n") ? "" : "\n";
     fs.appendFileSync(excludeFile, `${separator}${entry}\n`);
@@ -249,13 +216,9 @@ export function excludeLogDirFromGit(root: string): void {
 }
 
 /**
- * One line of captured output as a terminal would show it.
- *
- * A progress display rewrites the same line over and over, each redraw
- * separated by a carriage return. Kept as written, a two-minute test run
- * spends the whole output budget on spinner frames and the result the agent
- * actually needs is what gets cut. The last redraw of a line is what the
- * developer would see, so it is what Langy reads.
+ * One line of captured output as a terminal would show it: a progress
+ * display rewrites the same line over carriage returns, so only the last
+ * redraw is kept — the one the developer would actually see.
  */
 export function collapseProgressRedraws(text: string): string {
   if (!text.includes("\r")) return text;

@@ -70,12 +70,8 @@ export const queryAnalyticsCommand = async (options: {
   const now = Date.now();
   const sevenDaysAgo = now - 7 * 24 * 60 * 60 * 1000;
 
-  const startDate = options.startDate
-    ? new Date(options.startDate).getTime()
-    : sevenDaysAgo;
-  const endDate = options.endDate
-    ? new Date(options.endDate).getTime()
-    : now;
+  const startDate = options.startDate ? new Date(options.startDate).getTime() : sevenDaysAgo;
+  const endDate = options.endDate ? new Date(options.endDate).getTime() : now;
 
   const spinner = createSpinner(`Querying ${metric} (${aggregation})...`).start();
 
@@ -90,7 +86,12 @@ export const queryAnalyticsCommand = async (options: {
         },
       ],
       groupBy: options.groupBy as "metadata.model" | undefined,
-      timeScale: options.timeScale === "full" ? "full" : options.timeScale ? Number(options.timeScale) : undefined,
+      timeScale:
+        options.timeScale === "full"
+          ? "full"
+          : options.timeScale
+            ? Number(options.timeScale)
+            : undefined,
       timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
     });
 
@@ -119,9 +120,7 @@ export const queryAnalyticsCommand = async (options: {
           console.log(chalk.gray("  No data for the current period."));
         } else {
           for (const dataPoint of result.currentPeriod) {
-            const entries = Object.entries(dataPoint).filter(
-              ([key]) => key !== "date",
-            );
+            const entries = Object.entries(dataPoint).filter(([key]) => key !== "date");
             const dateStr = dataPoint.date
               ? new Date(dataPoint.date as number).toLocaleDateString()
               : "—";
@@ -141,9 +140,7 @@ export const queryAnalyticsCommand = async (options: {
           console.log();
           console.log(chalk.bold("Previous Period:"));
           for (const dataPoint of result.previousPeriod) {
-            const entries = Object.entries(dataPoint).filter(
-              ([key]) => key !== "date",
-            );
+            const entries = Object.entries(dataPoint).filter(([key]) => key !== "date");
             const dateStr = dataPoint.date
               ? new Date(dataPoint.date as number).toLocaleDateString()
               : "—";

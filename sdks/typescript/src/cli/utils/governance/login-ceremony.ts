@@ -185,13 +185,10 @@ export function formatLoginCeremony(input: LoginCeremonyInput): string[] {
 
   // AI tools (coding assistants). Fall back to the built-in wrappers when the
   // org published none, so the user always gets a runnable next-step.
-  const tools =
-    input.tools && input.tools.length > 0 ? input.tools : DEFAULT_TOOLS;
+  const tools = input.tools && input.tools.length > 0 ? input.tools : DEFAULT_TOOLS;
   lines.push("");
   lines.push("Your AI tools (run any of these):");
-  const cmdWidth = Math.max(
-    ...tools.map((t) => `langwatch ${t.slug}`.length),
-  );
+  const cmdWidth = Math.max(...tools.map((t) => `langwatch ${t.slug}`.length));
   for (const tool of tools) {
     const cmd = `langwatch ${tool.slug}`;
     const labelSuffix = tool.displayName ? `  # ${tool.displayName}` : "";
@@ -234,8 +231,7 @@ export function formatLoginCeremony(input: LoginCeremonyInput): string[] {
     // still better than silence, even though it cannot name its scope.
     lines.push("");
     const period =
-      input.budget.period.charAt(0).toUpperCase() +
-      input.budget.period.slice(1).toLowerCase();
+      input.budget.period.charAt(0).toUpperCase() + input.budget.period.slice(1).toLowerCase();
     lines.push(
       `${period} budget: ${formatUsd(input.budget.limitUsd)}   |   Used: ${formatUsedUsd(input.budget.usedUsd)}`,
     );

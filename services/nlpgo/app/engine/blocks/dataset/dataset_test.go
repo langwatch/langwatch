@@ -123,7 +123,7 @@ func TestSelectByEntry_StringWithoutLookup(t *testing.T) {
 }
 
 // Studio's default workflows ship with entry_selection: "first" / "last"
-// / "random" / "all" (per optimization_studio/types/dsl.ts). Pre-fix
+// / "random" / "all" (per the Workflow contract). Pre-fix
 // nlpgo (commit 392b9f743 was the cap) routed every string through the
 // byString fallback and 1ms-failed every execute_flow with the default
 // dataset because runEntry passes byString=nil. Python's

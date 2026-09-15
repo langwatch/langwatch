@@ -8,7 +8,9 @@ The job below needs only the `langwatch` CLI, `curl` and `jq`, and it exercises 
 
 Run it on a schedule so a broken credential or an expired secret shows up before a caller finds it.
 
-<Info>Runtime: typically 3 to 8 seconds wall-clock. One gateway request + two REST round-trips.</Info>
+<Info>
+  Runtime: typically 3 to 8 seconds wall-clock. One gateway request + two REST round-trips.
+</Info>
 
 ## What it checks
 
@@ -96,7 +98,7 @@ Set `SMOKE_MODEL` to a model your own providers serve. Write it as `provider/mod
 name: Gateway smoke test
 on:
   schedule:
-    - cron: '*/15 * * * *'
+    - cron: "*/15 * * * *"
   workflow_dispatch:
 
 jobs:
@@ -119,15 +121,15 @@ Wall-clock time is one provider completion plus three short API calls, so it is 
 
 ## Reading a failure
 
-| Failure | Cause | Where to look |
-|---|---|---|
-| `FAIL: no virtual key id` | The token lacks `virtualKeys:create`, or the scope id is wrong | Run `langwatch virtual-keys list` with the same token |
-| `curl` exits 7 | The gateway hostname does not resolve or does not answer | DNS and the load balancer. See [DNS and TLS](/ai-gateway/self-hosting/dns-and-tls) |
-| `401 invalid_api_key` | The gateway could not resolve the secret | [Troubleshooting](/ai-gateway/troubleshooting#401-on-every-request) |
-| `FAIL: the key can route to no models` | No provider credential is visible from `CI_SCOPE` | Add a credential at that scope under **Settings → Model Providers** |
-| `400 model_not_recognized` | `SMOKE_MODEL` is not a model any visible credential serves | [Troubleshooting](/ai-gateway/troubleshooting#400-model_not_recognized) |
-| `502 provider_error` | The gateway is healthy and the provider is not | The provider's status page, and the body `curl` printed |
-| `FAIL: empty content` | The provider answered with no message content | Read `$BODY` in the job log |
+| Failure                                | Cause                                                          | Where to look                                                                      |
+| -------------------------------------- | -------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| `FAIL: no virtual key id`              | The token lacks `virtualKeys:create`, or the scope id is wrong | Run `langwatch virtual-keys list` with the same token                              |
+| `curl` exits 7                         | The gateway hostname does not resolve or does not answer       | DNS and the load balancer. See [DNS and TLS](/ai-gateway/self-hosting/dns-and-tls) |
+| `401 invalid_api_key`                  | The gateway could not resolve the secret                       | [Troubleshooting](/ai-gateway/troubleshooting#401-on-every-request)                |
+| `FAIL: the key can route to no models` | No provider credential is visible from `CI_SCOPE`              | Add a credential at that scope under **Settings → Model Providers**                |
+| `400 model_not_recognized`             | `SMOKE_MODEL` is not a model any visible credential serves     | [Troubleshooting](/ai-gateway/troubleshooting#400-model_not_recognized)            |
+| `502 provider_error`                   | The gateway is healthy and the provider is not                 | The provider's status page, and the body `curl` printed                            |
+| `FAIL: empty content`                  | The provider answered with no message content                  | Read `$BODY` in the job log                                                        |
 
 ## Against a self-hosted install
 
@@ -144,11 +146,11 @@ The two hostnames can be the same if your load balancer routes `/api/*` to the c
 Fire your own alert from the job's failure step:
 
 ```yaml
-      - name: Alert on failure
-        if: failure()
-        run: |
-          curl -X POST https://events.pagerduty.com/v2/enqueue \
-            -d '{"routing_key":"${{ secrets.PD_KEY }}","event_action":"trigger","payload":{"summary":"Gateway smoke test failed","severity":"error","source":"github-actions"}}'
+- name: Alert on failure
+  if: failure()
+  run: |
+    curl -X POST https://events.pagerduty.com/v2/enqueue \
+      -d '{"routing_key":"${{ secrets.PD_KEY }}","event_action":"trigger","payload":{"summary":"Gateway smoke test failed","severity":"error","source":"github-actions"}}'
 ```
 
 Run this more often than you read `/readyz`. The probe reports process state only, while this exercises authentication, dispatch, the provider and the spend record.

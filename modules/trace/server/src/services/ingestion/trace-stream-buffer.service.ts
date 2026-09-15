@@ -1,0 +1,44 @@
+import type { Readable } from "node:stream";
+
+/**
+ * Raised when a stream exceeds the byte cap passed to
+ * {@link TraceStreamBufferService.streamToBuffer}. Callers reading untrusted object-store
+ * content pass a cap so a tampered or unexpectedly large object cannot OOM the worker.
+ */
+export class StreamTooLargeError extends Error {
+  constructor(maxBytes: number) {
+    super(`Stream exceeds ${maxBytes} bytes`);
+    this.name = "StreamTooLargeError";
+  }
+}
+
+export class TraceStreamBufferService {
+  static create(): TraceStreamBufferService {
+    return new TraceStreamBufferService();
+  }
+
+  /**
+   * Buffers a Readable into one Buffer. `maxBytes` bounds the total: past it the stream is
+   * destroyed and {@link StreamTooLargeError} thrown, so an oversized object cannot exhaust
+   * memory. Omit it only when the source is already size-bounded upstream.
+   */
+  static async streamToBuffer(stream: Readable, maxBytes?: number): Promise<Buffer> {
+    const chunks: Buffer[] = [];
+    let total = 0;
+    for await (const chunk of stream) {
+      const buf = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk as Buffer);
+      if (maxBytes !== undefined) {
+        total += buf.length;
+        if (total > maxBytes) {
+          stream.destroy();
+
+          throw new StreamTooLargeError(maxBytes);
+        }
+      }
+
+      chunks.push(buf);
+    }
+
+    return Buffer.concat(chunks);
+  }
+}

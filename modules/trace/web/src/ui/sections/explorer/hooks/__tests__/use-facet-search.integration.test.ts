@@ -1,0 +1,136 @@
+// useFacetSearch wires facet value search to tracesV2.facetValues; also the
+// engine for useAttributeValues (prefix="", limit 30).
+// @vitest-environment jsdom
+
+import { renderHook } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+const harness = vi.hoisted(() => ({
+  useQuery: vi.fn(),
+  projectId: { value: "proj-1" as string | undefined },
+}));
+
+vi.mock("../../../../../behavior/trace-api.ts", () => ({
+  api: { tracesV2: { facetValues: { useQuery: harness.useQuery } } },
+}));
+
+vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
+  useOrganizationTeamProject: () => ({
+    project: harness.projectId.value ? { id: harness.projectId.value } : undefined,
+  }),
+}));
+
+vi.mock("../../../../../behavior/filter.store.ts", () => ({
+  useFilterStore: (selector: (s: unknown) => unknown) =>
+    selector({ debouncedTimeRange: { from: 10, to: 20, label: undefined } }),
+}));
+
+import { useAttributeValues } from "../use-attribute-values.ts";
+import { useFacetSearch } from "../use-facet-search.ts";
+
+const lastInput = () => harness.useQuery.mock.calls.at(-1)?.[0];
+const lastOpts = () => harness.useQuery.mock.calls.at(-1)?.[1];
+const callFor = (facetKey: string) =>
+  harness.useQuery.mock.calls.find((c) => c[0]?.facetKey === facetKey);
+
+beforeEach(() => {
+  harness.useQuery.mockReset();
+  harness.useQuery.mockImplementation(() => ({
+    data: undefined,
+    isLoading: false,
+  }));
+  harness.projectId.value = "proj-1";
+});
+
+afterEach(() => vi.clearAllMocks());
+
+describe("useFacetSearch", () => {
+  describe("when enabled with a project and a facetKey", () => {
+    it("forwards the typed prefix to facetValues", () => {
+      renderHook(() => useFacetSearch({ facetKey: "service", prefix: "fin", enabled: true }));
+
+      expect(lastInput()?.facetKey).toBe("service");
+      expect(lastInput()?.prefix).toBe("fin");
+      expect(lastOpts()?.enabled).toBe(true);
+    });
+
+    it("omits an all-whitespace prefix (sends undefined, not a blank string)", () => {
+      renderHook(() => useFacetSearch({ facetKey: "service", prefix: "   ", enabled: true }));
+
+      expect(lastInput()?.prefix).toBeUndefined();
+    });
+  });
+
+  describe("when there is no project", () => {
+    it("disables the query", () => {
+      harness.projectId.value = undefined;
+      renderHook(() => useFacetSearch({ facetKey: "service", prefix: "fin", enabled: true }));
+
+      expect(lastOpts()?.enabled).toBe(false);
+    });
+  });
+
+  describe("when the facetKey is empty", () => {
+    it("disables the query", () => {
+      renderHook(() => useFacetSearch({ facetKey: "", prefix: "fin", enabled: true }));
+
+      expect(lastOpts()?.enabled).toBe(false);
+    });
+  });
+
+  // Regression: useAttributeValues must keep delegating with the same shape
+  // AttributeKeyRow has always relied on — an attribute-prefixed key, limit
+  // 30, a 5-minute staleTime, and crucially NO prefix (it lazy-loads the top
+  // values, it does not search them).
+  describe("given useAttributeValues delegates to useFacetSearch", () => {
+    it("queries facetValues with the attribute-prefixed key, limit 30, no prefix", () => {
+      renderHook(() => useAttributeValues({ attrKey: "langwatch.user_id", enabled: true }));
+
+      const call = callFor("attribute.langwatch.user_id");
+      expect(call).toBeDefined();
+      expect(call?.[0]?.limit).toBe(30);
+      expect(call?.[0]?.prefix).toBeUndefined();
+      expect(call?.[1]?.staleTime).toBe(5 * 60_000);
+    });
+
+    // The prefixed facetKey ("attribute.") is truthy even for an empty key, so
+    // useFacetSearch's own `!!facetKey` guard would not catch it —
+    // useAttributeValues must additionally gate on a non-empty attribute key.
+    it("disables the query when the attribute key is empty", () => {
+      renderHook(() => useAttributeValues({ attrKey: "", enabled: true }));
+
+      expect(lastOpts()?.enabled).toBe(false);
+    });
+
+    // Sidebar sections write filters as `${filterPrefix}.${attrKey}` — the
+    // value lookup must query the SAME facet key, or event/span attribute
+    // rows list values from trace_summaries.Attributes (i.e. none).
+    describe("when the section carries a filterPrefix", () => {
+      /** @scenario "Expanding an event-attribute key lists values observed on events" */
+      it("builds the facetKey from the section's filterPrefix", () => {
+        renderHook(() =>
+          useAttributeValues({
+            attrKey: "event.metrics.vote",
+            enabled: true,
+            filterPrefix: "event.attribute",
+          }),
+        );
+
+        expect(callFor("event.attribute.event.metrics.vote")).toBeDefined();
+      });
+
+      /** @scenario "Expanding a span-attribute key lists values observed on spans" */
+      it("supports the span-attribute prefix the same way", () => {
+        renderHook(() =>
+          useAttributeValues({
+            attrKey: "gen_ai.request.model",
+            enabled: true,
+            filterPrefix: "span.attribute",
+          }),
+        );
+
+        expect(callFor("span.attribute.gen_ai.request.model")).toBeDefined();
+      });
+    });
+  });
+});

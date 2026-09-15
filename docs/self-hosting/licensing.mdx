@@ -17,7 +17,8 @@ Members, lite members, teams, and projects. Invite your whole organization.
 </Card>
 
 <Card title="Unlimited work" icon="infinity">
-Traces, spans, prompts, evaluations, scenarios and simulations, agents, experiments, datasets, dashboards, custom graphs, and automations.
+  Traces, spans, prompts, evaluations, scenarios and simulations, agents, experiments, datasets,
+  dashboards, custom graphs, and automations.
 </Card>
 
 <Card title="Full trace content" icon="clock-rotate-left">
@@ -38,23 +39,24 @@ Seats come in two kinds, and which one a person occupies follows from what they 
 </Note>
 
 <Note>
-Volume is bounded by your own hardware, not by us. Self-hosted deployments are not metered and send no usage back to LangWatch.
+  Volume is bounded by your own hardware, not by us. Self-hosted deployments are not metered and
+  send no usage back to LangWatch.
 </Note>
 
 ## What an Enterprise license adds
 
-| Capability | Why it is licensed |
-|---|---|
-| **SSO** (Auth0, Okta, Azure AD, Google, GitHub, GitLab) | Identity federation is the surface enterprises buy. See [SSO configuration](/self-hosting/configuration/sso). |
-| **RBAC** with custom roles | Fine-grained permissions beyond the built-in roles. |
-| **SCIM** user provisioning | Directory-driven joiner/mover/leaver flows. |
-| **Audit logs** | Tamper-evident record of who did what, exportable to your SIEM. |
-| **Gateway webhooks** | Signed delivery of spend and budget events from the AI Gateway to your own systems, with retries, replay and a delivery log. This is what platforms build their own usage-based pricing and agent budget controls on. |
-| **AI Governance** | Multi-source ingestion, anomaly rules, OCSF and SIEM export, [no-spy mode](/ai-governance/no-spy-mode). |
-| **Extended retention** | Multi-class retention policies configured per category. |
-| **Support and SLA** | Named contact, response targets, upgrade guidance. |
+| Capability                                              | Why it is licensed                                                                                                                                                                                                    |
+| ------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **SSO** (Auth0, Okta, Azure AD, Google, GitHub, GitLab) | Identity federation is the surface enterprises buy. See [SSO configuration](/self-hosting/configuration/sso).                                                                                                         |
+| **RBAC** with custom roles                              | Fine-grained permissions beyond the built-in roles.                                                                                                                                                                   |
+| **SCIM** user provisioning                              | Directory-driven joiner/mover/leaver flows.                                                                                                                                                                           |
+| **Audit logs**                                          | Tamper-evident record of who did what, exportable to your SIEM.                                                                                                                                                       |
+| **Gateway webhooks**                                    | Signed delivery of spend and budget events from the AI Gateway to your own systems, with retries, replay and a delivery log. This is what platforms build their own usage-based pricing and agent budget controls on. |
+| **AI Governance**                                       | Multi-source ingestion, anomaly rules, OCSF and SIEM export, [no-spy mode](/ai-governance/no-spy-mode).                                                                                                               |
+| **Extended retention**                                  | Multi-class retention policies configured per category.                                                                                                                                                               |
+| **Support and SLA**                                     | Named contact, response targets, upgrade guidance.                                                                                                                                                                    |
 
-The Apache 2.0 floor and the Enterprise line are drawn per directory in the repository: the implementations of these capabilities live under [`platform/app/ee/`](https://github.com/langwatch/langwatch/tree/main/platform/app/ee), covered by the [Enterprise license](https://github.com/langwatch/langwatch/blob/main/platform/app/ee/LICENSE.md). See [Open-core licensing](/ai-governance/open-core-licensing) for the file-level map.
+The Apache 2.0 floor and the Enterprise line are drawn per directory in the repository: the implementations of these capabilities live under [`enterprise/`](https://github.com/langwatch/langwatch/tree/main/enterprise), covered by the [Enterprise license](https://github.com/langwatch/langwatch/blob/main/enterprise/LICENSE.md). See [Open-core licensing](/ai-governance/open-core-licensing) for the file-level map.
 
 ## SSO requires a license
 
@@ -103,6 +105,7 @@ app:
 ```
 
 Set through configuration, the license entitles the whole instance, so it does not have to be activated again for each organization the deployment hosts. It is also the recovery path for a deployment whose only administrators sign in through SSO: it needs no working login to take effect.
+
 </Step>
 
 <Step title="Restart the deployment">
@@ -126,11 +129,13 @@ No. Members, lite members, teams, and projects are all uncapped on a self-hosted
 </Accordion>
 
 <Accordion title="Do I need a license for commercial use?">
-No. The Apache 2.0 floor covers commercial use. A license is for the Enterprise capabilities listed above and for a support relationship.
+  No. The Apache 2.0 floor covers commercial use. A license is for the Enterprise capabilities
+  listed above and for a support relationship.
 </Accordion>
 
 <Accordion title="One organization has a license. What about the others?">
-The SSO gate is deployment-wide: one genuinely licensed organization enables SSO for the whole deployment. Plan entitlements stay per organization.
+  The SSO gate is deployment-wide: one genuinely licensed organization enables SSO for the whole
+  deployment. Plan entitlements stay per organization.
 </Accordion>
 
 <Accordion title="Does self-hosted send usage data to LangWatch?">

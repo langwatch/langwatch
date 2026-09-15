@@ -39,9 +39,7 @@ export const createCommand = async (
     try {
       columnTypes = parseColumns(options.columns);
     } catch (error) {
-      console.error(
-        chalk.red(error instanceof Error ? error.message : "Invalid columns format"),
-      );
+      console.error(chalk.red(error instanceof Error ? error.message : "Invalid columns format"));
       process.exit(1);
     }
   }
@@ -61,9 +59,7 @@ export const createCommand = async (
         console.log(`  ${chalk.bold("ID:")}    ${dataset.id}`);
         console.log(`  ${chalk.bold("Slug:")}  ${dataset.slug}`);
         if (dataset.columnTypes.length > 0) {
-          const colStr = dataset.columnTypes
-            .map((c) => `${c.name}:${c.type}`)
-            .join(", ");
+          const colStr = dataset.columnTypes.map((c) => `${c.name}:${c.type}`).join(", ");
           console.log(`  ${chalk.bold("Columns:")} ${colStr}`);
         }
         const viewUrl = dataset.platformUrl;

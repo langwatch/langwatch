@@ -83,15 +83,14 @@ const queryOf = (call: number): string => {
 };
 
 /** The nth fetch's RequestInit, in call order. */
-const initOf = (call: number): RequestInit =>
-  mockFetch.mock.calls[call]![1] as RequestInit;
+const initOf = (call: number): RequestInit => mockFetch.mock.calls[call]![1] as RequestInit;
 
 /** The nth fetch's request body, parsed back from the JSON that was sent. */
 const bodyOf = (call: number): Record<string, unknown> =>
   JSON.parse(initOf(call).body as string) as Record<string, unknown>;
 
 /** Reads an iterator to exhaustion and hands back every row it yielded. */
-const drain = async <T,>(rows: AsyncIterable<T>): Promise<T[]> => {
+const drain = async <T>(rows: AsyncIterable<T>): Promise<T[]> => {
   const collected: T[] = [];
   for await (const row of rows) collected.push(row);
   return collected;
@@ -177,17 +176,13 @@ describe("WebhooksApiService", () => {
 
   describe("archive()", () => {
     it("retires the endpoint with a DELETE and returns nothing", async () => {
-      mockFetch.mockResolvedValueOnce(
-        jsonResponse({ data: { archived: true } }),
-      );
+      mockFetch.mockResolvedValueOnce(jsonResponse({ data: { archived: true } }));
 
       const result = await new WebhooksApiService().archive("ep_1");
 
       expect(result).toBeUndefined();
       expect(initOf(0).method).toBe("DELETE");
-      expect(urlOf(0)).toBe(
-        "https://api.langwatch.test/api/webhooks/v1/endpoints/ep_1",
-      );
+      expect(urlOf(0)).toBe("https://api.langwatch.test/api/webhooks/v1/endpoints/ep_1");
     });
 
     it("raises when the endpoint is not the caller's to archive", async () => {
@@ -204,9 +199,7 @@ describe("WebhooksApiService", () => {
         ),
       );
 
-      await expect(
-        new WebhooksApiService().archive("ep_ghost"),
-      ).rejects.toThrow(/not found/i);
+      await expect(new WebhooksApiService().archive("ep_ghost")).rejects.toThrow(/not found/i);
     });
   });
 
@@ -215,9 +208,7 @@ describe("WebhooksApiService", () => {
 
   describe("eventsPage()", () => {
     it("takes exactly one page and hands back the cursor for the next", async () => {
-      mockFetch.mockResolvedValueOnce(
-        jsonResponse(eventsPage(["evt_a", "evt_b"], "cursor-1")),
-      );
+      mockFetch.mockResolvedValueOnce(jsonResponse(eventsPage(["evt_a", "evt_b"], "cursor-1")));
 
       const page = await new WebhooksApiService().eventsPage({
         type: "gateway.request.completed",
@@ -235,9 +226,7 @@ describe("WebhooksApiService", () => {
     });
 
     it("reads a server that sends no cursor at all as an exhausted page", async () => {
-      mockFetch.mockResolvedValueOnce(
-        jsonResponse({ data: [emittedEvent("evt_a")] }),
-      );
+      mockFetch.mockResolvedValueOnce(jsonResponse({ data: [emittedEvent("evt_a")] }));
 
       const page = await new WebhooksApiService().eventsPage(WINDOW);
 
@@ -249,9 +238,7 @@ describe("WebhooksApiService", () => {
     it("yields events across pages and stops when the cursor comes back null", async () => {
       mockFetch
         .mockResolvedValueOnce(jsonResponse(eventsPage(["evt_a"], "cursor-1")))
-        .mockResolvedValueOnce(
-          jsonResponse(eventsPage(["evt_b", "evt_c"], null)),
-        );
+        .mockResolvedValueOnce(jsonResponse(eventsPage(["evt_b", "evt_c"], null)));
 
       const events = await drain(new WebhooksApiService().iterEvents(WINDOW));
 
@@ -285,32 +272,26 @@ describe("WebhooksApiService", () => {
         Promise.resolve(jsonResponse(eventsPage(["evt_a"], "stuck"))),
       );
 
-      await expect(
-        drain(new WebhooksApiService().iterEvents(WINDOW)),
-      ).rejects.toBeInstanceOf(WebhooksApiError);
+      await expect(drain(new WebhooksApiService().iterEvents(WINDOW))).rejects.toBeInstanceOf(
+        WebhooksApiError,
+      );
     });
   });
 
   describe("getEvent()", () => {
     it("reads one envelope back by id", async () => {
-      mockFetch.mockResolvedValueOnce(
-        jsonResponse({ data: emittedEvent("evt_a") }),
-      );
+      mockFetch.mockResolvedValueOnce(jsonResponse({ data: emittedEvent("evt_a") }));
 
       const event = await new WebhooksApiService().getEvent("evt a/1");
 
       expect(event.id).toBe("evt_a");
-      expect(urlOf(0)).toBe(
-        "https://api.langwatch.test/api/webhooks/v1/events/evt%20a%2F1",
-      );
+      expect(urlOf(0)).toBe("https://api.langwatch.test/api/webhooks/v1/events/evt%20a%2F1");
     });
   });
 
   describe("deliveriesPage()", () => {
     it("carries the cursor the log serves instead of dropping it", async () => {
-      mockFetch.mockResolvedValueOnce(
-        jsonResponse(deliveriesPage(["dlv_a", "dlv_b"], "cursor-1")),
-      );
+      mockFetch.mockResolvedValueOnce(jsonResponse(deliveriesPage(["dlv_a", "dlv_b"], "cursor-1")));
 
       const page = await new WebhooksApiService().deliveriesPage("ep_1", {
         limit: 2,
@@ -322,31 +303,23 @@ describe("WebhooksApiService", () => {
     });
 
     it("passes a caller's cursor back verbatim", async () => {
-      mockFetch.mockResolvedValueOnce(
-        jsonResponse(deliveriesPage(["dlv_c"], null)),
-      );
+      mockFetch.mockResolvedValueOnce(jsonResponse(deliveriesPage(["dlv_c"], null)));
 
       await new WebhooksApiService().deliveriesPage("ep_1", {
         cursor: "1750000000000~dlv_b",
       });
 
-      expect(new URLSearchParams(queryOf(0)).get("cursor")).toBe(
-        "1750000000000~dlv_b",
-      );
+      expect(new URLSearchParams(queryOf(0)).get("cursor")).toBe("1750000000000~dlv_b");
     });
   });
 
   describe("iterDeliveries()", () => {
     it("walks the whole delivery log rather than its first page", async () => {
       mockFetch
-        .mockResolvedValueOnce(
-          jsonResponse(deliveriesPage(["dlv_a", "dlv_b"], "cursor-1")),
-        )
+        .mockResolvedValueOnce(jsonResponse(deliveriesPage(["dlv_a", "dlv_b"], "cursor-1")))
         .mockResolvedValueOnce(jsonResponse(deliveriesPage(["dlv_c"], null)));
 
-      const deliveries = await drain(
-        new WebhooksApiService().iterDeliveries("ep_1"),
-      );
+      const deliveries = await drain(new WebhooksApiService().iterDeliveries("ep_1"));
 
       expect(deliveries.map((d) => d.id)).toEqual(["dlv_a", "dlv_b", "dlv_c"]);
       expect(mockFetch).toHaveBeenCalledTimes(2);
@@ -355,9 +328,7 @@ describe("WebhooksApiService", () => {
 
     it("reads a page only when the consumer reaches it", async () => {
       mockFetch
-        .mockResolvedValueOnce(
-          jsonResponse(deliveriesPage(["dlv_a", "dlv_b"], "cursor-1")),
-        )
+        .mockResolvedValueOnce(jsonResponse(deliveriesPage(["dlv_a", "dlv_b"], "cursor-1")))
         .mockResolvedValueOnce(jsonResponse(deliveriesPage(["dlv_c"], null)));
 
       const deliveries = new WebhooksApiService().iterDeliveries("ep_1");
@@ -378,9 +349,9 @@ describe("WebhooksApiService", () => {
         Promise.resolve(jsonResponse(deliveriesPage(["dlv_a"], "stuck"))),
       );
 
-      await expect(
-        drain(new WebhooksApiService().iterDeliveries("ep_1")),
-      ).rejects.toBeInstanceOf(WebhooksApiError);
+      await expect(drain(new WebhooksApiService().iterDeliveries("ep_1"))).rejects.toBeInstanceOf(
+        WebhooksApiError,
+      );
     });
   });
 });

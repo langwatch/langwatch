@@ -22,11 +22,7 @@ import {
   archiveProject,
 } from "../langwatch-api-projects.js";
 
-import {
-  listApiKeys,
-  createApiKey,
-  revokeApiKey,
-} from "../langwatch-api-api-keys.js";
+import { listApiKeys, createApiKey, revokeApiKey } from "../langwatch-api-api-keys.js";
 
 import { handleListProjects } from "../tools/list-projects.js";
 import { handleGetProject } from "../tools/get-project.js";
@@ -298,9 +294,7 @@ describe("handleCreateApiKey()", () => {
     const result = await handleCreateApiKey({
       keyType: "personal",
       name: "My New Key",
-      bindings: [
-        { role: "ADMIN", scopeType: "ORGANIZATION", scopeId: "org_1" },
-      ],
+      bindings: [{ role: "ADMIN", scopeType: "ORGANIZATION", scopeId: "org_1" }],
     });
 
     expect(result).toContain("created successfully");
@@ -384,7 +378,9 @@ describe("handleListProjects() edge cases", () => {
   describe("when API call throws", () => {
     it("propagates the error", async () => {
       mockListProjects.mockRejectedValue(
-        new Error('LangWatch API error 403: {"error":"Forbidden","message":"Insufficient permissions"}'),
+        new Error(
+          'LangWatch API error 403: {"error":"Forbidden","message":"Insufficient permissions"}',
+        ),
       );
 
       await expect(handleListProjects()).rejects.toThrow("403");

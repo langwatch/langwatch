@@ -1,5 +1,5 @@
 {
-  "_comment": "Canonical SSRF address-classification conformance corpus. The single source of truth shared by the Go pkg/ssrf tests and the @langwatch/ssrf (TypeScript) tests. Each vector asserts the Category an egress boundary must assign to an address: 'global' (routable, allowed), 'metadata' (always refused), or 'special' (refused when local/private egress is disallowed). Prefixes and RFCs are per the IANA IPv4/IPv6 Special-Purpose Address Registries. When you add a range to address.go / address.ts, add a vector here so both languages are held to it.",
+  "_comment": "Canonical SSRF address-classification conformance corpus. The single source of truth shared by the Go pkg/ssrf tests and the TypeScript tests in packages/egress/src/ssrf. Each vector asserts the Category an egress boundary must assign to an address: 'global' (routable, allowed), 'metadata' (always refused), or 'special' (refused when local/private egress is disallowed). Prefixes and RFCs are per the IANA IPv4/IPv6 Special-Purpose Address Registries. When you add a range to address.go / address.ts, add a vector here so both languages are held to it.",
   "vectors": [
     { "addr": "8.8.8.8", "category": "global", "note": "Google Public DNS" },
     { "addr": "1.1.1.1", "category": "global", "note": "Cloudflare DNS" },

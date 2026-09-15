@@ -57,7 +57,7 @@ against that reference, the inventory of #7333 shows:
   (`composeVerificationCeremonies()` newing three repositories, plus a
   module-level mutable test seam), and `better-auth/identityDatabase.ts` (a
   lazily-constructed `IdentityCeremonies`). Four `new IdentityCeremonies({
-  prisma })` sites, none sharing anything.
+prisma })` sites, none sharing anything.
 - **A dependency cycle.** `app-layer/identity → better-auth/identityRouting`
   (for one pure function, `identifierProviderFor`) while
   `better-auth/identityDatabase → app-layer/identity`.
@@ -78,9 +78,9 @@ against that reference, the inventory of #7333 shows:
   covered only through hand-written fakes.
 
 The identity-vs-authz gap is exactly what ADR-070 says packages are for:
-*"Splitting code into packages does not, by itself, reduce runtime memory
+_"Splitting code into packages does not, by itself, reduce runtime memory
 or typecheck cost. Dependency direction does. Packages make direction
-enforceable (a forbidden import fails to resolve) and visible."*
+enforceable (a forbidden import fails to resolve) and visible."_
 
 ## Decision
 
@@ -90,7 +90,7 @@ decisions — the dispatch order, the write seam, the per-user write gate,
 `tenantId = userId`, the payload rule, erasure — move into the layer that
 owns them.
 
-This ADR originally said those decisions were *untouched* by the reshape,
+This ADR originally said those decisions were _untouched_ by the reshape,
 and for the reshape itself that was true. Two of them were then revised on
 their own merits on 2026-08-24, and this document records the result rather
 than the original: ADR-101 §2 replaced the routing facade with better-auth's
@@ -182,14 +182,14 @@ writes nothing.
 
 What moves in, and from where:
 
-| Package module | From (#7333) | Notes |
-|---|---|---|
-| `vocabulary.ts` | `pipelines/identity/schemas/events.ts` (enums), `projections/identifierIdentity.ts` (`arrivalStateForProvider`), `better-auth/identityRouting.ts` (`identifierProviderFor`) | `identifierProviderFor` moving here dissolves the app-layer ↔ better-auth cycle |
-| `identifier.ts` | `projections/identifierIdentity.ts` | `normalizeIdentifierValue`, `identifierDomain`; the crypto halves go to `identity-server/crypto` |
-| `facts.ts` | `schemas/events.ts`, `schemas/commands.ts`, `schemas/constants.ts`, `reduceIdentity.ts` (`IdentifierFact`, `IdentityLedgerState` → `IdentityHeads`) | Zod schemas for the fact **payloads** and the command inputs, with `infer`; the framework envelope (`EventSchema`, `aggregateType`, `idempotencyKey`) is NOT here — the app's pipeline composes it, as `authz-grants/schemas/events.ts` composes `GRANT_EVENT_SOURCES`. `IdentityFact = { type, data, occurredAt }` is the framework-free shape the reducer folds |
-| `reduce.ts` | `projections/reduceIdentity.ts` | Unchanged logic, framework-free input |
-| `backfill.ts` | `migration/identifier-backfill.migration.ts` (`surplusRowDiffs`, `stateSatisfies`, `isLiveState`, `BackfillDiff`, the identifier row DTO) | The proof's policy is pure; `expectedIdentifiers` derives ids (node:crypto) and so lives beside the service in `identity-server` |
-| `errors.ts` | `commands/identityCommandErrors.ts`, the two classes inside `verification-ceremony.ts` | All identity `HandledError`s in one module. Codes stay registered in `features/errors/logic/{codes,presentation}.ts` — the same arrangement as `permission_denied`, defined in `@langwatch/authz`, presented in the app |
+| Package module  | From (#7333)                                                                                                                                                                | Notes                                                                                                                                                                                                                                                                                                                                                             |
+| --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `vocabulary.ts` | `pipelines/identity/schemas/events.ts` (enums), `projections/identifierIdentity.ts` (`arrivalStateForProvider`), `better-auth/identityRouting.ts` (`identifierProviderFor`) | `identifierProviderFor` moving here dissolves the app-layer ↔ better-auth cycle                                                                                                                                                                                                                                                                                   |
+| `identifier.ts` | `projections/identifierIdentity.ts`                                                                                                                                         | `normalizeIdentifierValue`, `identifierDomain`; the crypto halves go to `identity-server/crypto`                                                                                                                                                                                                                                                                  |
+| `facts.ts`      | `schemas/events.ts`, `schemas/commands.ts`, `schemas/constants.ts`, `reduceIdentity.ts` (`IdentifierFact`, `IdentityLedgerState` → `IdentityHeads`)                         | Zod schemas for the fact **payloads** and the command inputs, with `infer`; the framework envelope (`EventSchema`, `aggregateType`, `idempotencyKey`) is NOT here — the app's pipeline composes it, as `authz-grants/schemas/events.ts` composes `GRANT_EVENT_SOURCES`. `IdentityFact = { type, data, occurredAt }` is the framework-free shape the reducer folds |
+| `reduce.ts`     | `projections/reduceIdentity.ts`                                                                                                                                             | Unchanged logic, framework-free input                                                                                                                                                                                                                                                                                                                             |
+| `backfill.ts`   | `migration/identifier-backfill.migration.ts` (`surplusRowDiffs`, `stateSatisfies`, `isLiveState`, `BackfillDiff`, the identifier row DTO)                                   | The proof's policy is pure; `expectedIdentifiers` derives ids (node:crypto) and so lives beside the service in `identity-server`                                                                                                                                                                                                                                  |
+| `errors.ts`     | `commands/identityCommandErrors.ts`, the two classes inside `verification-ceremony.ts`                                                                                      | All identity `HandledError`s in one module. Codes stay registered in `features/errors/logic/{codes,presentation}.ts` — the same arrangement as `permission_denied`, defined in `@langwatch/authz`, presented in the app                                                                                                                                           |
 
 `index.ts` opens with the same boundary statement `@langwatch/authz` carries.
 
@@ -200,7 +200,7 @@ The mirror of `@langwatch/authz-server`. Dependencies: `@langwatch/identity`,
 `@langwatch/ksuid`; `better-auth` as a **peer** for the adapter's types.
 No Prisma, no env, no `~/`, no `@langwatch/system-migrations` (the authz
 package mirrors `MigrationTenantStatus` rather than importing the runner
-— *"the authz side must not couple to the runner package"* — and identity
+— _"the authz side must not couple to the runner package"_ — and identity
 does the same: the backfill service returns its own outcome, the app's
 `SystemMigration` adapter maps it).
 
@@ -219,13 +219,16 @@ naming, an `actor` on every write that produces a fact):
 export interface IdentityHeadsRepository {
   findUserHashKey(args: { userId: string }): Promise<string | null>;
   findHeads(args: { userId: string }): Promise<IdentityHeads>;
-  findActiveIdentifierByValue(args: { normalizedValue: string }):
-    Promise<{ userId: string; identifierId: string } | null>;
+  findActiveIdentifierByValue(args: {
+    normalizedValue: string;
+  }): Promise<{ userId: string; identifierId: string } | null>;
   findIdentifier(args: { identifierId: string }): Promise<IdentifierFact | null>;
   /** The projection row an Account row is linked to — what the adapter's
    *  account-delete ceremony reads, today as raw Prisma inside better-auth. */
-  findIdentifierForAccount(args: { userId: string; accountId: string }):
-    Promise<IdentifierFact | null>;
+  findIdentifierForAccount(args: {
+    userId: string;
+    accountId: string;
+  }): Promise<IdentifierFact | null>;
 }
 
 /**
@@ -237,14 +240,24 @@ export interface IdentityHeadsRepository {
  */
 export interface IdentityLedger {
   commit(args: {
-    command: IdentityCommand;        // discriminated on type; carries commandId
-    facts: IdentityFactInput[];      // what decide* returned
+    command: IdentityCommand; // discriminated on type; carries commandId
+    facts: IdentityFactInput[]; // what decide* returned
   }): Promise<IdentityFact[]>;
 }
 
-export interface IdentityVerificationRepository { replaceForIdentifier; findByIdentifierId; consume }
-export interface IdentityBackfillRepository { findUser; findAccountRows; findIdentifierRows }
-export interface IdentityUsersRepository { storeUserHashKeyIfMissing(args: { userId; userHashKey }) }
+export interface IdentityVerificationRepository {
+  replaceForIdentifier;
+  findByIdentifierId;
+  consume;
+}
+export interface IdentityBackfillRepository {
+  findUser;
+  findAccountRows;
+  findIdentifierRows;
+}
+export interface IdentityUsersRepository {
+  storeUserHashKeyIfMissing(args: { userId; userHashKey });
+}
 ```
 
 **The guards** (`guards.ts`): `IdentityGuards` over `IdentityHeadsRepository`
@@ -380,12 +393,12 @@ reviewable on its own.
 
 ### 5. Tests and CI
 
-| Where | What | Lane |
-|---|---|---|
-| `packages/identity/src/__tests__` | `decide.*` — every refusal and every no-op ("a fact the heads carry is not stated again"); `reduce` replay determinism; `backfill` parity policy; `vocabulary` guards | package `vitest run` |
-| `packages/identity-server/src/__tests__` | `IdentityService` over in-memory ports (reads → decision → what `commit` receives); `VerificationCeremonyService` (PKCE, pinning, TTL, unlatched); `IdentityBackfillService` (adopt / detach / held / finalized); the better-auth facade's routing + gate + ceremonies over a fake `base` adapter, with `support/` stubs like `authz-read.stub.ts` | package `vitest run` |
-| `platform/app` | thin commands emit under the pipeline's declared aggregate type (`validateEventAggregateType`); `IdentityLedgerWriter` order, budgets, drops, projection-behind repair; the write gate; the routing table pinned against the **live** mounted better-auth surface (this needs the app's config, so it stays here); the RPC; the `/auth/verify-email` page | unit / component |
-| `platform/app` (**new**) | every `*.prisma.repository.ts` under `app-layer/identity/repositories/` gets a `*.integration.test.ts` against Postgres — the projection upsert + cursor commit, verification single-use consume, heads reads, backfill reads. This is the largest gap in #7333: no repository has ever run against a database in a test | integration (datastore lane) |
+| Where                                    | What                                                                                                                                                                                                                                                                                                                                                      | Lane                         |
+| ---------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------- |
+| `packages/identity/src/__tests__`        | `decide.*` — every refusal and every no-op ("a fact the heads carry is not stated again"); `reduce` replay determinism; `backfill` parity policy; `vocabulary` guards                                                                                                                                                                                     | package `vitest run`         |
+| `packages/identity-server/src/__tests__` | `IdentityService` over in-memory ports (reads → decision → what `commit` receives); `VerificationCeremonyService` (PKCE, pinning, TTL, unlatched); `IdentityBackfillService` (adopt / detach / held / finalized); the better-auth facade's routing + gate + ceremonies over a fake `base` adapter, with `support/` stubs like `authz-read.stub.ts`        | package `vitest run`         |
+| `platform/app`                           | thin commands emit under the pipeline's declared aggregate type (`validateEventAggregateType`); `IdentityLedgerWriter` order, budgets, drops, projection-behind repair; the write gate; the routing table pinned against the **live** mounted better-auth surface (this needs the app's config, so it stays here); the RPC; the `/auth/verify-email` page | unit / component             |
+| `platform/app` (**new**)                 | every `*.prisma.repository.ts` under `app-layer/identity/repositories/` gets a `*.integration.test.ts` against Postgres — the projection upsert + cursor commit, verification single-use consume, heads reads, backfill reads. This is the largest gap in #7333: no repository has ever run against a database in a test                                  | integration (datastore lane) |
 
 CI: two new shard-1 steps each in `langwatch-app-ci.yml`, next to the
 authz ones — `pnpm --filter @langwatch/identity run test` and `run
@@ -397,7 +410,7 @@ here.
 
 Specs: `specs/identity/identifier-model.feature` keeps its 22 scenarios;
 the `@scenario` bindings move with the tests. A new
-`specs/identity/identity-packages.feature` states the boundaries as
+`modules/identity/specs/package-boundary.feature` states the boundaries as
 behaviour (`@unit`, bound to a graph-walking test in the `frontend-boundary`
 style): the pure package compiles without node types; identity-server
 imports no Prisma, env, or framework module; `better-auth/` reaches
@@ -406,26 +419,26 @@ constructs an `IdentityService`.
 
 ### 6. The mapping, file by file
 
-| #7333 file | Becomes |
-|---|---|
-| `pipelines/identity/projections/identifierIdentity.ts` | split: `identity/identifier.ts` + `identity/vocabulary.ts` (pure) and `identity-server/crypto/identifier-identity.ts` (`deriveIdentifierId`, `computeIdentifierHash`) |
-| `pipelines/identity/projections/reduceIdentity.ts` | `identity/reduce.ts` + `identity/facts.ts` |
-| `pipelines/identity/schemas/*.ts` | payloads + type strings → `identity/facts.ts`; framework envelope schemas stay, re-composed from the package |
-| `pipelines/identity/commands/*.command.ts` (5) | guard bodies → `identity-server/guards.ts`; the files stay as thin handlers |
-| `pipelines/identity/commands/identityGuardReads.ts` | port → `identity-server/identity-heads.repository.ts`; `eventIdempotencyKey` → framework |
-| `pipelines/identity/commands/identityCommandErrors.ts` | `identity/errors.ts` |
-| `app-layer/identity/identity-ceremonies.ts` | `identity-server/identity.service.ts` (verbs) + `app-layer/identity/ledger.ts` (commit) — the class is deleted |
-| `app-layer/identity/verification-ceremony.ts` | `identity-server/verification-ceremony.service.ts` + `identity-server/identity-verification.repository.ts` (port) + `identity-server/crypto/pkce.ts` + errors → `identity/errors.ts` |
-| `app-layer/identity/identifier-write-gate.ts` | `app-layer/identity/write-gate.ts` + `migration-name.ts` |
-| `app-layer/identity/user-hash-key.ts` | deleted; `identity-server/crypto/user-hash-key.ts` (mint) + `identity-users.prisma.repository.ts` (store) |
-| `app-layer/identity/migration/identifier-backfill.migration.ts` | policy → `identity/backfill.ts`; orchestration → `identity-server/identity-backfill.service.ts`; a thin `SystemMigration` adapter stays in the app |
-| `app-layer/identity/repositories/identity-guard-reads.prisma.repository.ts` + `PrismaVerifiableIdentifierReads` | `identity-heads.prisma.repository.ts` |
-| `app-layer/identity/repositories/identity-backfill.prisma.repository.ts` | reads stay; the hash-key write → `identity-users.prisma.repository.ts` |
+| #7333 file                                                                                                                                               | Becomes                                                                                                                                                                                                                                                          |
+| -------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `pipelines/identity/projections/identifierIdentity.ts`                                                                                                   | split: `identity/identifier.ts` + `identity/vocabulary.ts` (pure) and `identity-server/crypto/identifier-identity.ts` (`deriveIdentifierId`, `computeIdentifierHash`)                                                                                            |
+| `pipelines/identity/projections/reduceIdentity.ts`                                                                                                       | `identity/reduce.ts` + `identity/facts.ts`                                                                                                                                                                                                                       |
+| `pipelines/identity/schemas/*.ts`                                                                                                                        | payloads + type strings → `identity/facts.ts`; framework envelope schemas stay, re-composed from the package                                                                                                                                                     |
+| `pipelines/identity/commands/*.command.ts` (5)                                                                                                           | guard bodies → `identity-server/guards.ts`; the files stay as thin handlers                                                                                                                                                                                      |
+| `pipelines/identity/commands/identityGuardReads.ts`                                                                                                      | port → `identity-server/identity-heads.repository.ts`; `eventIdempotencyKey` → framework                                                                                                                                                                         |
+| `pipelines/identity/commands/identityCommandErrors.ts`                                                                                                   | `identity/errors.ts`                                                                                                                                                                                                                                             |
+| `app-layer/identity/identity-ceremonies.ts`                                                                                                              | `identity-server/identity.service.ts` (verbs) + `app-layer/identity/ledger.ts` (commit) — the class is deleted                                                                                                                                                   |
+| `app-layer/identity/verification-ceremony.ts`                                                                                                            | `identity-server/verification-ceremony.service.ts` + `identity-server/identity-verification.repository.ts` (port) + `identity-server/crypto/pkce.ts` + errors → `identity/errors.ts`                                                                             |
+| `app-layer/identity/identifier-write-gate.ts`                                                                                                            | `app-layer/identity/write-gate.ts` + `migration-name.ts`                                                                                                                                                                                                         |
+| `app-layer/identity/user-hash-key.ts`                                                                                                                    | deleted; `identity-server/crypto/user-hash-key.ts` (mint) + `identity-users.prisma.repository.ts` (store)                                                                                                                                                        |
+| `app-layer/identity/migration/identifier-backfill.migration.ts`                                                                                          | policy → `identity/backfill.ts`; orchestration → `identity-server/identity-backfill.service.ts`; a thin `SystemMigration` adapter stays in the app                                                                                                               |
+| `app-layer/identity/repositories/identity-guard-reads.prisma.repository.ts` + `PrismaVerifiableIdentifierReads`                                          | `identity-heads.prisma.repository.ts`                                                                                                                                                                                                                            |
+| `app-layer/identity/repositories/identity-backfill.prisma.repository.ts`                                                                                 | reads stay; the hash-key write → `identity-users.prisma.repository.ts`                                                                                                                                                                                           |
 | `better-auth/identityDatabase.ts`, `identityAdapterContext.ts`, `identityRouting.ts`, `accountCeremonies.ts`, `userCeremonies.ts`, `transactionGuard.ts` | `identity-server/src/better-auth/identity-ceremonies.ts` — one class on better-auth's `databaseHooks`; the routing table, the unrouted-write error, the transaction guard, `findAllRows` and `pinnedToIds` are deleted outright (ADR-101 §2, revised 2026-08-24) |
-| `better-auth/secondaryStorageResilience.ts` | deleted (D02 withdrawn 2026-08-24) |
-| `app/api/identity/[[...route]]/app.ts` | deleted; the surface is `api/routers/identity.ts` (tRPC), and the session middleware + error class go with it (revised 2026-08-24) |
-| `app-layer/system-migrations/runtime.ts` (identity part) | `registeredUserMigrations()` moves to `app-layer/identity/runtime.ts`; the migrations runtime imports it |
-| `presets.ts` (identity repositories) | unchanged in role: the projection store and heads repository stay in the repositories bag for the pipeline registry |
+| `better-auth/secondaryStorageResilience.ts`                                                                                                              | deleted (D02 withdrawn 2026-08-24)                                                                                                                                                                                                                               |
+| `app/api/identity/[[...route]]/app.ts`                                                                                                                   | deleted; the surface is `api/routers/identity.ts` (tRPC), and the session middleware + error class go with it (revised 2026-08-24)                                                                                                                               |
+| `app-layer/system-migrations/runtime.ts` (identity part)                                                                                                 | `registeredUserMigrations()` moves to `app-layer/identity/runtime.ts`; the migrations runtime imports it                                                                                                                                                         |
+| `presets.ts` (identity repositories)                                                                                                                     | unchanged in role: the projection store and heads repository stay in the repositories bag for the pipeline registry                                                                                                                                              |
 
 ### 7. Sequencing
 
@@ -476,7 +489,7 @@ both callers — the duplication the guard exists to prevent.
 `Sender<T>` per verb?** The authz package's seam is its write repository
 taking an `actor`, with the app's implementation emitting commands. Identity
 has one more constraint: the calling path appends the facts itself and
-stages the *command* afterwards, so the port must carry both. `commit` is
+stages the _command_ afterwards, so the port must carry both. `commit` is
 that contract stated once; the package never sees a queue, a store, or a
 projection.
 
@@ -525,3 +538,60 @@ package boundary refuses at the compiler and a folder merely frowns at.
 - `dev/docs/best_practices/repository-service.md`
 - `specs/identity/identifier-model.feature`, `specs/identity/auth-path-redis-loss.feature`
 - PR #7333
+
+## Amendment: identity ships as a feature (2026-08-29)
+
+The boundaries above stand. Where the packages live does not.
+
+`packages/authz` and `packages/authz-server` — the reference shape this ADR
+copied — have since moved to `modules/authz/{contract,server}`, and
+the strict feature layout that established is what every other feature follows.
+Identity was the last vertical still beside the shared infrastructure packages,
+so the feature catalogue, the layout checks and the per-feature CI job all
+skipped it.
+
+| ADR-115 said               | Now                                   |
+| -------------------------- | ------------------------------------- |
+| `packages/identity`        | `modules/identity/contract` |
+| `packages/identity-server` | `modules/identity/server`   |
+
+`@langwatch/identity` is therefore `@langwatch/identity-contract`: the layout
+derives a package's name from its role, so a package at
+`modules/<feature>/<role>` must be `@langwatch/<feature>-<role>`.
+`@langwatch/identity-server` already matched. Everything this ADR decided about
+what each package may import, and in which direction, is unchanged — the rename
+touched 855 module specifiers and nothing else.
+
+`@langwatch/identity-eventing` did NOT move, and the reason is worth stating
+here because this ADR is where someone will look for it. The layout has three
+roles — contract, server, web — and event-sourcing code normally belongs in
+`server`; the strict layout has `projections/`, `processes/`, `intents/`,
+`stores/` and `subscribers/` for exactly that. But `identity-contract` and
+`identity-server` were on `zod@^3.25.76` while `identity-eventing` is on
+`zod@^4.4.3`, and one package cannot hold both majors: schemas built on one
+side stop satisfying `instanceof` on the other, which surfaces as a 500 rather
+than as a type error. Folding it in would also contradict this ADR's own rule
+that the server runtime never imports the event-sourcing framework — the reason
+the package was split out. So it stayed at the root until the zod versions
+aligned.
+
+**Amendment — the versions now align.** `identity-contract` and
+`identity-server` are on `zod@^4.4.3`, alongside the other 117 first-party
+packages. The migration cost almost nothing: neither package used `ZodEffects`,
+`.innerType()`, `invalid_type_error`, `required_error` or an `errorMap`, and
+the only adjustment was the four generic `commandDataSchema` helpers, where
+zod 4 widens `.extend()`'s output under a generic shape. What it removed was
+substantial — the dual-major boundary alone accounted for 37 `ZodEffects`
+type errors across `identity-eventing`.
+
+The FIRST reason above is therefore discharged; the SECOND is not. This ADR's
+rule that the server runtime never imports the event-sourcing framework still
+holds, and it is the reason the package was split out in the first place. So
+`identity-eventing` stays at the root on that ground alone, which is the
+stronger one — and now the only one.
+
+The feature's own record is
+[`modules/identity/adrs/001-identity-ships-as-a-feature.md`](../../../modules/identity/adrs/001-identity-ships-as-a-feature.md),
+and the behavioural contract moved with the packages, from
+`specs/identity/identity-packages.feature` to
+`modules/identity/specs/package-boundary.feature`.

@@ -32,8 +32,7 @@ const hungProgram = (): never =>
   ({ parseAsync: vi.fn(() => new Promise(() => undefined)) }) as never;
 
 /** A program whose command succeeds immediately. */
-const okProgram = (): never =>
-  ({ parseAsync: vi.fn(() => Promise.resolve()) }) as never;
+const okProgram = (): never => ({ parseAsync: vi.fn(() => Promise.resolve()) }) as never;
 
 /**
  * A program that hangs until the test resumes it, recording what the process
@@ -73,9 +72,7 @@ const collect = (): {
   return {
     sink: (stream, chunk) => chunks.push({ stream, data: chunk }),
     stderr: () =>
-      Buffer.concat(
-        chunks.filter((c) => c.stream === "stderr").map((c) => c.data),
-      ).toString(),
+      Buffer.concat(chunks.filter((c) => c.stream === "stderr").map((c) => c.data)).toString(),
   };
 };
 
@@ -266,7 +263,9 @@ describe("createCommandExecutor", () => {
       await vi.waitFor(() => expect(window.inflightCount).toBe(0));
 
       // ...and only now can a different-tuple caller take the window.
-      const releaseB = await window.acquire({ request: { cwd: dirB, env: {}, colorLevel: 0 } });
+      const releaseB = await window.acquire({
+        request: { cwd: dirB, env: {}, colorLevel: 0 },
+      });
       releaseB();
     });
   });
@@ -393,7 +392,9 @@ describe("createCommandExecutor", () => {
       // Once r1's work finally settles, window B is takeable again.
       hung.resume();
       await vi.waitFor(() => expect(window.inflightCount).toBe(0));
-      const releaseB = await window.acquire({ request: { cwd: dirB, env: {}, colorLevel: 0 } });
+      const releaseB = await window.acquire({
+        request: { cwd: dirB, env: {}, colorLevel: 0 },
+      });
       releaseB();
     });
   });

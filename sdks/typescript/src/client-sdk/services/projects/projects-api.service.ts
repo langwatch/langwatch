@@ -116,12 +116,7 @@ export class ProjectsApiService {
         status: response.status,
         message,
       });
-      throw new ProjectsApiError(
-        message,
-        operation,
-        parsedBody,
-        response.status,
-      );
+      throw new ProjectsApiError(message, operation, parsedBody, response.status);
     }
     return (await response.json()) as T;
   }
@@ -131,25 +126,18 @@ export class ProjectsApiService {
     if (options?.page) params.set("page", String(options.page));
     if (options?.limit) params.set("limit", String(options.limit));
     const qs = params.toString();
-    return this.request<PaginatedProjects>(
-      "list projects",
-      `/api/projects${qs ? `?${qs}` : ""}`,
-    );
+    return this.request<PaginatedProjects>("list projects", `/api/projects${qs ? `?${qs}` : ""}`);
   }
 
   async get(id: string): Promise<Project> {
-    return this.request<Project>(
-      `get project "${id}"`,
-      `/api/projects/${encodeURIComponent(id)}`,
-    );
+    return this.request<Project>(`get project "${id}"`, `/api/projects/${encodeURIComponent(id)}`);
   }
 
   async create(input: CreateProjectInput): Promise<ProjectWithServiceKey> {
-    return this.request<ProjectWithServiceKey>(
-      "create project",
-      "/api/projects",
-      { method: "POST", body: JSON.stringify(input) },
-    );
+    return this.request<ProjectWithServiceKey>("create project", "/api/projects", {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
   }
 
   async update(id: string, input: UpdateProjectInput): Promise<Project> {

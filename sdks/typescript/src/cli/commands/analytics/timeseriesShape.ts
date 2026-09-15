@@ -1,22 +1,7 @@
 /**
- * Turns an analytics result into the shape the timeseries CARD reads.
- *
- * Why here, and not in the renderer. The card wants named series of `{t, v}`
- * points; the analytics API answers with `currentPeriod` / `previousPeriod`
- * arrays of `{ date, <metricKey>: number }`. Something has to bridge those two,
- * and this command is the only place that can do it honestly — it is the one
- * that knows which metric was asked for, which aggregation, and over what
- * window. A renderer handed the raw payload would have to GUESS which numeric
- * key is the measure and what to call it, and a card that guesses its own axis
- * label is a card that will eventually mislabel someone's bill.
- *
- * Emitting the shape here also means card selection stays what ADR-079 says it
- * is: a payload is promoted because of what it demonstrably IS, not because a
- * model asserted a chart into existence.
- *
- * The raw `currentPeriod` / `previousPeriod` stay on the payload alongside this.
- * Nothing that reads them today has to change, and a consumer that wants the
- * unshaped numbers still has them.
+ * Transforms analytics API response to timeseries card shape. Lives here because
+ * only the command knows the metric, aggregation, and window being queried.
+ * @see dev/docs/adr/079-card-selection.md
  */
 
 /** A bucket as the analytics API returns it: a date plus one or more measures. */
@@ -87,12 +72,7 @@ function valueOf(bucket: AnalyticsBucket): number {
  *  with no position on the x axis cannot be drawn, only invented. */
 function dayOf(bucket: AnalyticsBucket): string | null {
   const raw = bucket.date;
-  const ms =
-    typeof raw === "number"
-      ? raw
-      : typeof raw === "string"
-        ? Date.parse(raw)
-        : NaN;
+  const ms = typeof raw === "number" ? raw : typeof raw === "string" ? Date.parse(raw) : NaN;
   if (!Number.isFinite(ms)) return null;
   return new Date(ms).toISOString().slice(0, 10);
 }

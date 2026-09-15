@@ -28,12 +28,7 @@
 import * as fs from "node:fs";
 import * as path from "node:path";
 
-import {
-  applyEdits,
-  modify,
-  parse as parseJsonc,
-  type ParseError,
-} from "jsonc-parser";
+import { applyEdits, modify, parse as parseJsonc, type ParseError } from "jsonc-parser";
 
 export type VscodePlatform = "darwin" | "linux" | "win32";
 
@@ -62,14 +57,7 @@ export function vscodeUserSettingsPath(
 ): string | null {
   switch (platform) {
     case "darwin":
-      return path.join(
-        home,
-        "Library",
-        "Application Support",
-        "Code",
-        "User",
-        "settings.json",
-      );
+      return path.join(home, "Library", "Application Support", "Code", "User", "settings.json");
     case "linux":
       return path.join(home, ".config", "Code", "User", "settings.json");
     case "win32":
@@ -154,9 +142,7 @@ function atomicWrite(filePath: string, content: string): void {
  * file does not parse as JSONC (refused rather than clobbered — the caller
  * must surface that the hardening is NOT in place).
  */
-export function clearVscodeTerminalOtelEnv(
-  args: VscodeSettingsArgs,
-): string | null {
+export function clearVscodeTerminalOtelEnv(args: VscodeSettingsArgs): string | null {
   const filePath = vscodeUserSettingsPath(args.platform, args.home, args.appData);
   const envKey = vscodeTerminalEnvKey(args.platform);
   if (!filePath || !envKey || args.keys.length === 0) return null;
@@ -205,10 +191,7 @@ export function removeVscodeTerminalOtelEnv(args: VscodeSettingsArgs): boolean {
     text = applyEdits(text, modify(text, [envKey], undefined, JSONC_FORMAT));
   } else {
     for (const k of present) {
-      text = applyEdits(
-        text,
-        modify(text, [envKey, k], undefined, JSONC_FORMAT),
-      );
+      text = applyEdits(text, modify(text, [envKey, k], undefined, JSONC_FORMAT));
     }
   }
   atomicWrite(filePath, text.endsWith("\n") ? text : `${text}\n`);

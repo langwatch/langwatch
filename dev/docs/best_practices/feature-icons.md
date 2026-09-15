@@ -2,12 +2,13 @@
 
 Every product feature / resource type (datasets, workflows, prompts,
 evaluations, traces, agents, ...) has ONE canonical icon + color in
-`src/utils/featureIcons.ts`
+`@langwatch/navigation-web`'s `model/feature-icons.ts`, re-exported from
+`@langwatch/navigation-web/command-bar`
 (`featureIcons: Record<FeatureKey, { icon, color, label }>`). Use it everywhere
 a feature is represented; do not pick an icon or color ad hoc.
 
 ```tsx
-import { featureIcons } from "~/utils/featureIcons";
+import { featureIcons } from "@langwatch/navigation-web/command-bar";
 
 const { icon: Icon, color, label } = featureIcons["datasets"];
 <Icon size={14} color={color} /> {label}

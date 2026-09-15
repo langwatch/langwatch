@@ -1,0 +1,652 @@
+# ADR-133: One feature installer, one construction path, explicit lifecycle
+
+**Date:** 2026-09-07
+
+**Status:** Accepted; implementation in progress
+
+**Behavioural contract:** [Composition specification](../../../specs/server/composition-spec.feature)
+
+**Related:** [ADR-102: runtime composition roots](./102-runtime-composition-roots.md)
+(superseded in part by this ADR),
+[ADR-101: feature package surfaces](./101-feature-package-surfaces.md),
+[ADR-111: physical application workspaces](./111-physical-application-workspaces.md),
+[ADR-112: singular feature ownership](./112-singular-feature-ownership.md),
+[ADR-128: public REST and internal tRPC](./128-public-rest-and-internal-trpc.md)
+(handler context and output validation superseded here),
+[API ADR-006](../../../packages/api/adrs/006-trpc-fluent-chain.md)
+(governed handler authoring superseded here),
+[ADR-045: domain errors at the handled boundary](./045-domain-errors-handled-boundary.md),
+[service, repository, adapter, port](../best_practices/service-repository-adapter-port.md),
+[installing a feature into an app](../best_practices/feature-installation.md).
+
+## Context
+
+Composition is the largest thing in the applications and the least designed.
+
+| Measure (2026-09-07, this branch) | Count |
+| --- | --- |
+| `*.composition.ts` under `apps/api` and `apps/worker` | 130 files |
+| Lines in those files | 36,981 |
+| `apps/api/src/app/api-production.composition.ts` | 4,804 lines |
+| `apps/worker/src/app/worker-production.composition.ts` | 2,310 lines |
+| `function refusing*` fallbacks | 53 |
+| `class *UnavailableError extends …` | 101 |
+| `class Logged*Absence` reporters | 50 |
+| `try*` method declarations in `*.{service,port,repository,store}.ts` | 678 |
+
+One class holds the API graph. `ApiProductionComposition`
+(`apps/api/src/app/api-production.composition.ts:623`) has a `compose()` at
+`:844`, thirty-odd private `compose*`/`resolve*` methods between `:1493` and
+`:4324`, and an `optionalPorts()` at `:1464` that answers five ports the
+process builds for itself. Twenty `Logged*Absence` classes follow it from
+`:4386` to `:4668`, each a hand-written way of saying the same sentence:
+this deployment did not configure that, so the surface behind it will refuse.
+`WorkerProductionComposition`
+(`apps/worker/src/app/worker-production.composition.ts:396`) is the same shape
+with static absence resolvers from `:1496`.
+
+Three defects follow from the shape, not from anyone's carelessness.
+
+1. **Optional ports production forgot.** Every field of the composition options
+   object is optional so a host may override it, and the runnable process
+   supplies none of them. An option with a fallback degrades; an option without
+   one refuses on every deployment forever and reads to a customer as an
+   outage. Five were in that second shape
+   (`specs/server/api-process-optional-collaborators.feature`).
+2. **Business reads in the wiring.** Composition modules hold Prisma queries and
+   mappers, so the composition root is also a repository.
+3. **Absence is expressed 53 + 101 + 50 ways.** A reader cannot tell from a call
+   site whether a missing collaborator is a configuration choice, a degraded
+   mode, or a wiring bug.
+
+ADR-102 designed `capabilities.ts` and `defineFeature` for exactly this and
+neither was built; its 2026-09-03 amendment records that both applications
+compose by hand instead, and that `@langwatch/runtime-composition` now holds
+only `ResourceScope` and `GracefulShutdown`. Those 130 files are 130
+hand-rolled copies of the container that was never written.
+
+This ADR records the decision Alex made on 2026-09-07. It is a specification,
+not an implementation plan.
+
+## Decision
+
+**One feature installer, one construction path, explicit lifecycle.**
+
+Each feature's server implementation declares its API token, required peer API
+tokens and static `create` factory. The installer selects that class
+with `.withApp(AnnotationApp)`. The framework supplies its declared dependencies
+and calls `create` once during boot. API and worker reuse the same factory.
+
+```ts
+// AnnotationApp here is the server implementation, not the contract class.
+export const annotationServer = defineFeature("annotation")
+  .withApp(AnnotationApp)
+  .build();
+
+const runtime = await createApp({ name: "langwatch-api" })
+  .withInfrastructure(infrastructure)
+  .withFeature(annotationServer)
+  .boot({ config, role: "api" });
+
+await runtime.start();
+```
+
+Peer installers and transport contributions are omitted from this example.
+`withFeature` declares only. `boot` validates the selected graph before calling
+any factory, then constructs it with stable peer clients. `start` begins serving.
+Imports, declarations and constructors never start background work.
+
+Factories register feature-owned subscriptions and loops with
+`resources.ownService({ name, start, stop })`. Registration is sealed when that
+feature's installation returns. The runtime starts these services before process
+hosts and drains hosts before stopping feature services. A failed start stops
+every attempted service, including the failing one, once in reverse order.
+Services that were never started receive no stop call. Allocations made during
+construction therefore use `resources.own(name, close)` separately; those
+allocations are released even if boot fails or the runtime stops before start.
+
+The API bootstrap applies the same lifecycle to services registered by existing
+composition adapters. It seals registrations after composition, awaits service
+readiness before opening the listener, and drains services before telemetry and
+infrastructure close. This bridge preserves startup order while process roots
+move to feature installers; it does not constitute installer adoption.
+
+### Accepted app factory shape
+
+The app owns public use cases and orchestration across its private entity
+services and peer APIs. Entity services own mapping, repository operations and
+entity errors. User enrichment and workflows involving multiple owners belong
+in the app, including when a feature has only one entity service. Internal
+policy helpers are private app methods, not additional public API operations.
+
+Repository interfaces and implementations remain separate files. A feature may
+register complete backend factories with
+`defineRepositories({ postgres: PostgresRepositories, memory: MemoryRepositories })`
+and select them with `.withRepositories(registry).withApp(App)`. A repository
+factory contains construction only, allowing related memory repositories to
+share one instance of their database. It does not combine their queries into
+one repository. Tests can replace one repository in the returned object.
+
+The process selects a backend once with `.withPersistence(...)`. Boot validates
+the selected factories and their declared infrastructure before construction;
+it never silently falls back to memory. Repository-aware app factories receive
+`repositories`, declared peer dependencies, config and resource ownership,
+without a raw infrastructure property. Services receive repository interfaces.
+Postgres and memory follow the same observable repository behavior and each
+installation receives fresh memory state.
+
+Contracts contain the callable app API, REST/tRPC input and output schemas,
+portable errors and values used by those public surfaces. Persistence records,
+internal commands and intermediate query structures remain server-private.
+Filenames name their actual role: public schema files use `.schemas.ts`, API
+interfaces use `.api.ts`, and concrete repositories use `.repository.ts`.
+App and service operation names use RPC verbs: `get` for a known record,
+`getMany` for known IDs, `list` for queries, and `create`, `update` and `delete`
+for the corresponding mutations. Feature naming remains unchanged.
+
+The portable contract exports a `<Feature>Api` interface from
+`contract/src/<feature>.api.ts`. It contains only callable public use cases;
+it has no service-valued properties, getters, repositories, transport objects
+or lookup methods. The contract also exports a same-named runtime token:
+`export const AnnotationApi = featureApi<AnnotationApi>("annotation")`.
+The token is the only cross-feature dependency surface.
+
+The server owns a concrete `AnnotationApp` that implements `AnnotationApi`.
+Its services and peer `*Api` dependencies use ECMAScript `#private` members. Thin forwarding
+methods are intentional at this boundary: they expose the callable API while
+keeping service ownership and construction behind the app.
+
+```ts
+const dependencies = {
+  projects: ProjectApi,
+  organizations: OrganizationApi,
+};
+
+type AnnotationSetup = FeatureSetup<
+  typeof dependencies,
+  AnnotationInfrastructure,
+  AnnotationConfig
+>;
+
+// Members and construction body omitted; FeatureSetup is the proposed helper.
+// These declarations belong on the server AnnotationApp class:
+// static readonly contract = AnnotationApi;
+// static readonly dependencies = dependencies;
+// static create(setup: AnnotationSetup): AnnotationApp;
+```
+
+`FeatureSetup` derives the dependency object from the declared tokens: projects
+is a `ProjectApi` and organizations is an `OrganizationApi`.
+Technical infrastructure and validated semantic config remain separately typed
+inputs. The setup context also supplies feature resource ownership for partial
+construction cleanup. App instances expose only callable API methods;
+factory metadata lives on the class, not on those instances.
+
+The framework calls the factory with resolved dependencies, infrastructure,
+config and resource ownership. Callers do not assemble another dependency bag
+or invoke the factory themselves. Factories may use complete peer APIs to
+construct private services, but never import another feature's service or
+repository. A root application is never a dynamic lookup API.
+
+Type checking rejects access to an undeclared dependency, incompatible factory
+inputs, and a result incompatible with the linked API. The dependency
+map is declared once, with no handwritten mirror of its resolved instance types.
+An independently declared static method still needs a parameter annotation:
+TypeScript cannot infer that parameter backwards from a later `.withApp(...)`
+call. The helper derives this annotation; it does not use reflection or code
+generation. It is framework typing machinery, not a partial service view.
+
+Boot validates missing and duplicate providers before invoking any factory.
+Reciprocal API dependencies are supported through two-phase bindings. Legacy
+constructor-token dependency cycles are rejected before construction. Type safety cannot prove that a deployment has
+installed every required feature. Imports remain subject to architecture lint;
+a typed setup parameter alone cannot prevent an undeclared global import.
+
+The interface plus explicit runtime token keeps the portable callable contract
+usable by server and future client implementations without exposing a server
+class. The installed in-process client is a dynamic proxy over that interface:
+it forwards calls to the bound App, preserving arguments, return values, promises
+and thrown errors without serialization, authentication or schema middleware.
+Methods retain the App as their receiver, including access to its private state.
+A future remote client can implement the same interface with explicit wire
+transforms, domain-error mapping, cancellation and stream semantics. Network
+trust controls belong to that transport. Inbound transports validate input
+and output and apply authorization; local calls do not repeat that middleware.
+The authenticated actor is authoritative and payload identity never overrides
+it. Separate setup/provider calls were rejected because they repeat one
+construction decision and allow the two declarations to drift.
+
+Runtime construction is two-phase: boot allocates every peer API binding,
+constructs each app once without reading or calling an incomplete peer, then
+binds completed API tokens and marks the graph ready. Early access produces a
+named boot error. A failed graph publishes nothing and cleans up acquired
+resources in reverse order. There is no per-request or network construction.
+Clients are allocated before Apps, so reciprocal dependencies do not impose an
+App construction order. This does not prevent recursive operation calls.
+Shutdown drains process hosts before closing clients and then feature resources;
+retained client methods refuse calls after closure, including failed startup.
+
+Client forwarding reads callable data descriptors only: getters are never
+invoked, and `Object.prototype` methods cannot expose the underlying App.
+The architecture lint requires the public operation set to match the API and
+rejects App inheritance, service-valued results and non-`#private` implementation
+members. `then` and prototype control names are reserved. Tokens are invariant
+in their API type, so a root cannot widen a token to supply an incomplete client.
+
+### Transport declarations and inferred namespaces
+
+A feature attaches transport declarations directly through variadic
+`withTransports`. Each declaration carries its protocol and exact native router
+factory type from its creation in `@langwatch/api`. There is no wrapper object,
+separate `restApi`/`trpcApi` call, repeated namespace or transport dependency bag.
+
+```ts
+export const annotationFeature = defineFeature("annotation")
+  .withApp(AnnotationApp)
+  .withTransports(annotationRest, annotationTrpc)
+  .build();
+```
+
+Transport means an inbound adapter: REST and tRPC now, potentially a queue or
+SQS consumer later. A future protocol supplies its own parsing, acknowledgement,
+redelivery and lifecycle implementation; this decision does not implement queue
+transports. The feature app remains independent of the arrival mechanism.
+
+Declarations remain inert. Route discovery and OpenAPI generation do not invoke
+an app factory or access services. The process mount retains native router
+factory types and checks compatibility with its host context. Attachment alone
+cannot infer a semantic app owner from an arbitrary native router context;
+architecture lint checks canonical app ownership and rejects raw protocol
+construction outside the governed API framework. Features own their declarations. Both protocols receive the same app constructed at boot.
+
+All REST and tRPC handlers use `@langwatch/api`. The framework parses input,
+applies the declared authenticated, anonymous or share-token policy and
+authorizes that exact target before invoking a
+handler with `{ input, app, actor, scope, signal }`. It constructs explicit,
+portable actor and scope snapshots; neither an outer object spread nor a narrow
+TypeScript annotation removes hidden request data. Raw request/context, session,
+headers, response mutation and authorization callbacks stay inside the protocol
+and process adapters. Feature declarations cannot construct or replace the
+trusted policy binding. Human, project-key and service identities retain their
+actual principal kind and existing credential ceilings.
+
+Handlers are inline in the fluent endpoint declaration, beside the verb, path,
+permission and input/output schemas. Types are inferred there; detached handler
+factories and repeated signature annotations obscure the boundary. Ordinary
+handlers return a JSON object, a JSON array, or `void` (including `Promise<void>`),
+or throw a concrete error. No-content is `void`, never a `NO_CONTENT` sentinel.
+The framework owns serialization, status, headers and error mapping. A handler
+cannot return `Response`, call response methods through its app, or produce text.
+Text, SSE, downloads and other special protocols require explicit framework
+integrations; they do not widen the ordinary handler interface.
+
+Middleware may declare additional output schemas. The framework parses each
+middleware result and supplies its inferred value as an additional trailing
+handler argument, in declaration order. The first argument remains
+`{ input, app, actor, scope, signal }`; middleware never merges facts into `input`
+or adds hidden properties to it. Header-dependent authentication, SCIM bearer
+credentials and webhook signatures belong in middleware. It supplies validated
+semantic facts, never raw headers, credentials, request/response objects or
+aliases of them. A handler cannot recover these through its input or app.
+Invalid middleware output prevents handler invocation; middleware facts cannot
+silently replace the framework's authenticated principal or authorized target.
+
+Input and output schemas are mandatory, including empty-input and no-content
+operations. Type checking rejects handler returns incompatible with the output
+schema, including values returned to a void declaration. Valid output is parsed
+and emitted with its declared transforms and field removal. If an unexpected
+runtime value fails output validation, the framework logs the validation error
+and endpoint/request metadata, then sends the original value with the declared
+status. Output mismatch alone never becomes a 500 or suppresses the response.
+This applies equally to REST and tRPC. Logs contain safe issue details, never the
+response content, rejected values, raw error messages, or dynamic record keys
+that disclose content. Input parsing, authentication, authorization and explicit
+security redaction remain enforced; output diagnostics are not their substitute.
+Legacy raw registration paths remain visible migration debt until all callers
+move; they are not alternative authoring APIs.
+
+Domain orchestration and collaborators belong behind app services. Conditional
+secondary permission decisions are declared policy results, preserving behavior
+such as saving a comment while declining its trace correction. The framework binds its authorization to the normalized request target. Handlers
+dispatch that target, and services verify tenant ownership of referenced resources.
+Restricted arguments alone cannot prevent a handler from inventing another ID;
+architecture checks and adversarial service/transport tests enforce that rule.
+
+The framework derives the public namespace from the singular catalogue feature
+name when attaching the transport. Authors write neither `namespace` nor
+`basePath`. REST mounts under the process API prefix `/api/v1`, so annotation
+mounts at `/api/v1/annotations`. tRPC uses the same derived `annotations`
+namespace. Routers declare relative routes and procedures only. API version
+configuration belongs to the process, once.
+
+`FeatureName` is a literal union derived from the ownership catalogue, not an
+arbitrary string or an attempt to recognise English singular nouns. The
+catalogue remains the authority for singular owners, including established
+uncountable names. `defineFeature("annotations")` fails type checking because
+that plural is not a catalogue owner.
+
+A template literal type derives `PublicNamespace<F>` from that union. Regular
+names need no per-feature namespace mapping. One small central exception table
+handles irregular and uncountable domains; both the runtime pluraliser and the
+type-level helper consume that table. The following type illustrates the rule:
+
+```ts
+type PublicNamespace<F extends FeatureName> =
+  F extends keyof NamespaceExceptions
+    ? NamespaceExceptions[F]
+    : F extends `${infer Stem}y`
+      ? F extends `${string}${"a" | "e" | "i" | "o" | "u"}y`
+        ? `${F}s`
+        : `${Stem}ies`
+      : F extends `${string}${"s" | "x" | "z" | "ch" | "sh"}`
+        ? `${F}es`
+        : `${F}s`;
+```
+
+`NamespaceExceptions` is derived from the central exception value, not maintained
+as a second table. Examples are `analytics -> analytics` and `presence -> presence`.
+Regular examples include `annotation -> annotations`, `query -> queries`,
+`gateway -> gateways` and `api-key -> api-keys`. Namespace derivation does not
+change lower-kebab spelling or singular feature ownership. Exceptional catalogue
+names must be audited explicitly; suffix rules do not understand English.
+
+The inferred namespace remains a literal type through installation, manifests
+and client generation. Runtime derivation must agree with the type-level result
+for every catalogue owner. Untyped inputs are validated against the catalogue;
+namespace collisions fail graph validation before construction or mounting.
+Lint rejects handwritten feature namespace overrides, repeated REST prefixes
+and the displaced dependency/setup/provider registration chain globally.
+
+This replaces the earlier proposed explicit namespace mapping and repeated
+`.withTransportDependencies/.withTransport/.withRest/.withTrpc` assembly. It
+keeps feature declarations short without hiding domain dependencies in routers.
+The trade-off is maintaining agreement between type and runtime pluralisation,
+plus a reviewed exception list for non-regular names.
+
+The user explicitly selected `/api/v1/annotations` as the canonical annotation
+REST root. Migration must inventory existing URLs and tRPC names across all
+features. Any differing published names require explicit compatibility aliases
+at the process migration boundary, with parity coverage; aliases do not become
+feature namespace overrides or a second domain implementation. Other endpoint
+removals or silent renames are not authorised by this naming convention.
+
+These are accepted target APIs, not claims about the current runtime builder.
+The spec marks the new declaration and inference behaviours unimplemented until
+runtime, type tests, global lint and process callers adopt them.
+
+### Amendment: one public app per feature (2026-09-07)
+
+Each installer provides one canonical `<Feature>Api` token from its contract
+package, declared alongside the callable API interface. The concrete app
+implements that interface and keeps its services private. The app has no
+service-valued public fields, getters, repositories, transport objects or
+lookup API; callable methods are the deliberate public boundary.
+This shape is the approved migration target for the annotation, project,
+organization, user and trace feature batch.
+
+The server app factory returns the app itself. `.withApp(AnnotationApp)`
+registers that exact object under its linked API token, without a selector
+and without registering its services separately.
+REST, tRPC and background contributions use that same API instance in one
+process. Dependencies between converted features name their `*Api` tokens;
+cross-feature services and repositories are forbidden. Root applications are
+never injected as service locators.
+
+Transport adaptation stays in API-only routers and mapping functions. Domain
+collaborators belong behind the app services, not in router dependency bags. A class that enriches responses or extracts actors is not the
+public feature app. Browser installation uses browser-safe contracts and the
+same feature ownership; it does not import the server graph. The server launcher
+reuses process entrypoints and tasks select the services they need without
+starting consumers or transports.
+
+This supersedes the canonical-service-only public boundary in ADR-101 and the
+strict layout ADR for every catalogue owner, core and Enterprise. Enforcement
+starts from `modules/catalogue.json`, independently of whether an
+installer or contract package already exists. Missing apps, missing required
+installers and displaced caller paths are migration failures, not exemptions.
+The global command remains red until those owners are migrated; no baseline
+hides incomplete adoption.
+
+A server owner requires feature-owned server assembly. Browser-only owners use
+browser composition and real browser service contracts, without fabricated
+server packages or empty apps. Existing portable browser services, such as
+SaasBrowserService, follow the same app grouping convention. Owners without a
+contract first establish the portable contract for their existing behaviour.
+
+Migration proceeds through lifecycle corrections, catalogue-wide enforcement,
+complete vertical ownership slices, then process-wide graph cutover. Each slice
+moves behaviour and callers together, deletes displaced construction, and
+preserves URLs, schemas, ordering, errors, principal handling and tenant checks.
+Annotation must put its queue workflows behind services and expose the canonical
+app on the actual process graph before it serves as the reference for others.
+A renamed transport facade is not a completed app migration.
+
+The shared declaration may contain API and worker contributions; boot constructs
+only the selected role's contributions, once. Boot is asynchronous so failed
+construction waits for cleanup, including resources acquired by partial setup.
+Start and stop are idempotent, partial start rolls back, and cleanup continues
+through individual failures. Transport contributions unavailable in a role fail
+explicitly when requested rather than returning an incorrectly typed value.
+
+Startup migration requirements remain in force. This app migration does not
+change authentication behaviour or replace the separately owned identity/SSO
+work; their app composition must preserve that work.
+
+### Who hosts what, and who owns what
+
+| Process | Hosts | Owns | Never |
+| --- | --- | --- | --- |
+| `apps/api` | REST, tRPC, realtime, producer-side dispatch | its own infrastructure, request context, transport security | starts a consumer or a scheduler |
+| `apps/worker` | consumers, schedulers, intent execution | the one consumer of each pipeline, drain order | serves a product transport |
+| `apps/ui` | browser feature installation, shared session and transport, page composition | the one session and the per-feature transport providers | imports a server installer |
+| `apps/server` | the launcher: starts the existing entrypoints and serves the UI artefact | process supervision only | a domain graph of its own |
+| `apps/tasks` | one-shot programs | the catalogue entry per task | a long-running listener |
+
+The UI follows the same installation and lifecycle conventions as the server
+roles, with browser-safe dependencies.
+
+### The six requirements
+
+Each requirement below names the guard that enforces it **today**, or says
+**no guard yet**, and names the guard **proposed**.
+
+**1. Feature-owned assembly.** The installer constructs its repositories,
+private collaborators and canonical API implementation. Process roots choose implementations
+and configuration and contain no domain queries, no mappers and no duplicate
+services.
+
+- Guard today: `feature-source-layout` and `feature-source-subject`
+  (`packages/oxlint-rules/src/rules/`) fix where a feature's own sources live;
+  `service-dependencies` stops a service importing a foreign repository;
+  `composed-exports` (`packages/architecture-enforcer/src/composed-exports.ts`)
+  refuses an exported service no root constructs.
+- Guard proposed: `no-domain-query-in-composition` — a Prisma delegate call, a
+  mapper, or a `create` of another feature's repository inside a
+  `*.composition.ts` or an app root fails.
+
+**2. Complete dependencies.** Callable `*Api` tokens are peer dependencies;
+named infrastructure ports remain explicit technical dependencies.
+Missing, duplicate and cyclic providers are rejected before readiness.
+There is no request-time service locator, no partial service view, and no
+automatically generated throwing proxy. A deliberately disabled feature exposes
+an explicit disabled capability state.
+
+- Guard today: `global-app-access` (`packages/architecture-enforcer/src/global-app-access.ts`)
+  bans `getApp`; `service-dependencies` bans callback bags and `Pick`/`Omit`
+  service views. Nothing validates the graph at boot: absence is discovered by
+  the first request, via one of the 53 `refusing*` fallbacks.
+- Guard proposed: boot-time validation in the container (`MissingProviderError`,
+  `DuplicateProviderError`, `DependencyCycleError`, each naming feature, key and
+  token), plus `port-is-abstract-class` — a dependency token that is a type
+  alias or a member-less class fails.
+
+**3. One registration source.** Each selected feature contributes routes, jobs
+and lifecycle hooks through its installation declaration. Runtime manifests
+derive from those declarations. `modules/catalogue.json` stays the
+ownership authority; there is no competing catalogue.
+
+- Guard today: `feature-catalogue` (`packages/architecture-enforcer/src/feature-catalogue.ts`)
+  and `manifests` hold the catalogue as the authority; the one-list convention
+  is documented in `dev/docs/best_practices/feature-installation.md` and
+  `no-raw-hono-mount` (`packages/oxlint-rules/src/rules/`) refuses a hand-rolled
+  route registration.
+- Guard proposed: `app-with-feature-only` — no `*.composition.ts` under `apps/**`
+  outside the one app root per application; manifests derived from declarations
+  rather than restated.
+
+**4. Consistent roles.** As in the table above.
+
+- Guard today: `application-boundaries` and `frontend-ui-boundaries`
+  (`packages/architecture-enforcer/src/`) keep browser packages out of server
+  entrypoints; `eventing-roles` fixes producer versus consumer;
+  `dev/scripts/check-node-resolution.mjs` proves each process's real boot graph
+  resolves under node's own resolver. `apps/api`'s producer-only Eventing is
+  pinned at `apps/api/src/platform/infrastructure/api-eventing.infrastructure.ts:104`.
+- Guard proposed: a role assertion in `boot({ role })` — a feature contributing
+  a consumer to the `api` role fails boot, rather than relying on
+  `consumersEnabled: false` being passed correctly at one call site.
+
+**5. Shared authorization semantics.** REST and tRPC preserve the same
+credential principal and authorize the actual affected scopes. Transport
+adaptation never turns a restricted key into its owner and never bypasses a
+service-level ownership check.
+
+- Guard today: `api-transport-boundaries` and `api-context-services`
+  (`packages/oxlint-rules/src/rules/api-context-services.rule.mjs`), the tRPC
+  declared-check middleware chain, and the fail-closed backstop described in
+  `feature-installation.md`. Enforcement is per transport; nothing asserts the
+  two transports reach the same policy for the same operation.
+- Guard proposed: a policy-parity test over the declared operations — every
+  operation exposed on both doors resolves to one policy and one principal.
+
+**6. Predictable shutdown.** Stop accepting work; stop fetching jobs; drain
+in-flight work while producers remain available; then close transports and
+infrastructure. Owned resources close once, in reverse dependency order. A
+failed boot cleans up everything it already acquired.
+
+- Guard today: `ResourceScope` and `GracefulShutdown`
+  (`packages/runtime-composition/src/`), proven for the worker in
+  `apps/worker/src/app/__tests__/worker.application.unit.test.ts`.
+- Guard proposed: the same lifecycle owned by the container for every role, so
+  the API and tasks get the ordering the worker already has.
+
+### Enterprise direction is unchanged
+
+Core never imports an Enterprise implementation. `manifests.ts:183` carries the
+`enterprise-direction` policy and it stays as it is; Enterprise features
+register through the same `withFeature` declaration inside a branch the
+compiler cannot see, which is why boot validation is the authority and the type
+is the early warning.
+
+## System migrations: one framework, two modes
+
+A migration is either blocking at startup or incremental in the background.
+Both run on one framework; the mode is a property of the migration.
+
+```
+  STARTUP MODE — the process does not serve until the work is finalized
+  ┌──────────────┐   ┌──────────────┐   ┌──────────────┐   ┌──────────────┐
+  │ validate     │──▶│ open         │──▶│ complete     │──▶│ construct    │──┐
+  │ config +     │   │ migration    │   │ REQUIRED     │   │ services     │  │
+  │ declarations │   │ infrastructure│  │ blocking     │   │              │  │
+  └──────────────┘   └──────────────┘   │ migrations   │   └──────────────┘  │
+                                        └──────────────┘                     │
+                     ┌──────────────┐   ┌──────────────┐                     │
+                     │ ready        │◀──│ start        │◀────────────────────┘
+                     │              │   │ transports + │
+                     └──────────────┘   │ consumers    │
+                                        └──────────────┘
+    failure, incomplete work, or operator intervention at step 3
+    ⇒ readiness never opens; the replica stays out of the load balancer
+```
+
+```
+  BACKGROUND MODE — the process serves throughout
+  ┌──────────────┐   ┌──────────────┐   ┌──────────────┐   ┌──────────────┐   ┌──────────────┐
+  │ start        │──▶│ migrate      │──▶│ verify       │──▶│ switch       │──▶│ retire       │
+  │ COMPATIBLE   │   │ incrementally│   │ convergence  │   │ reads +      │   │ old storage  │
+  │ application  │   │ + persisted  │   │              │   │ writes       │   │              │
+  └──────────────┘   │ checkpoints  │   └──────────────┘   └──────────────┘   └──────────────┘
+                     └──────────────┘
+                            ▲    │
+                            └────┘  a restart resumes from the checkpoint,
+                                    never from the beginning
+```
+
+Rules that hold across both modes:
+
+- Stored objects use **startup** mode. The move is one-way and completes before
+  traffic or consumption.
+- Replicas coordinate through the existing durable migration lease and state
+  (`packages/system-migrations/src/lease.repository.ts`,
+  `state.repository.ts`). A blocking migration therefore holds **every** replica
+  out of readiness until it is finalized, not merely the one holding the lease.
+- Failure, incomplete work, or operator intervention blocks readiness.
+- Incompatible writers are stopped or fenced before the switch.
+
+**Why awaiting the current helper is not enough.**
+`driveSystemMigrationsToConvergence`
+(`packages/system-migrations/src/convergence.ts:59`) catches every pass failure
+(`passOrNull`, `:95`, `catch` at `:106`) and returns when a pass advanced
+nothing (`converged`, `:125`). Both behaviours are correct for a background
+loop and wrong for a gate: the helper can return with tenants parked, claimed by
+another process, or merely not yet finalized, and a caller that awaits it learns
+nothing about completion. Startup mode needs an explicit completion assertion —
+every tenant in the cohort finalized — not the absence of movement.
+
+Auth's own migration keeps its separate PR and is out of scope here.
+
+## Enforceable code requirements
+
+Each maps to the tool that enforces it. Baselines are never raised for new
+violations.
+
+| Requirement | Enforced by |
+| --- | --- |
+| **One owner, no duplicate implementation.** Features own business logic; API, UI, worker and server compose surfaces. | architecture-enforcer (`feature-catalogue`, `composed-exports`, `legacy-feature-fragments`) |
+| **Construct once.** Concrete services have private constructors and `static create`. No construction in handlers, no global app access, no import-time registration. | oxlint (`service-classes`, `feature-module-classes`), architecture-enforcer (`global-app-access`) |
+| **Inject complete contracts.** No callback bags, service locators, `Pick`/`Omit` service views, mirrored signatures, or foreign repositories. | oxlint (`service-dependencies`) |
+| **Keep boundaries typed.** Zod validates transport, persistence and process inputs. No `any`, double assertions, suppression comments, or assertions standing in for validation. | oxlint (`typed-prisma-seam`, `no-inferable-twin` proposed), focused typechecks |
+| **Keep infrastructure private.** Generated Prisma stays inside repository adapters; roots parse the environment once and inject semantic configuration. | oxlint (`prisma-containment`, `environment-boundaries`), architecture-enforcer (`typed-prisma-seam`) |
+| **Keep methods predictable.** Required operations return a value or throw a concrete domain error. Normal absence belongs to explicitly named `find*` methods returning `null` or `undefined`. `try*` and `require*` are forbidden. | oxlint (`fallible-result-naming`); legacy declarations remain migration work and are not a precedent for new code |
+| **Keep composition declarative.** No SQL, authorization decision, business mapping, transaction, or request handling inside a composition module. | architecture-enforcer (`no-domain-query-in-composition`, proposed) |
+| **Keep authorization consistent.** Preserve the credential principal, check the target being accessed, share policy between transports. | oxlint (`api-context-services`), architecture-enforcer (`api-transport-boundaries`), policy-parity test (proposed) |
+| **Keep source readable.** Lower-kebab filenames with dotted roles, small cohesive collaborators, braces, named intermediate values, short comments explaining durable constraints. | oxfmt, oxlint (`feature-source-filename`, `service-member-spacing`, `comment-block-size`), architecture-enforcer (`service-ceilings`, `comment-blocks`) |
+| **Keep eventing deterministic.** Projections and process managers derive synchronously; effects run behind explicit retry and idempotency boundaries. | architecture-enforcer (`eventing-roles`, `service-projection-boundaries`) |
+| **Preserve behaviour and coverage.** Delete displaced implementations after rewiring callers; keep equivalent behavioural coverage and existing API contracts. | architecture-enforcer (`check-feature-parity`, `test-quality`), focused tests |
+
+## Done means
+
+- The old assembly paths are removed.
+- Every enabled dependency is validated before readiness.
+- All process roles follow the same installation and lifecycle rules.
+
+Existing URLs, tRPC procedure names, response shapes and process topology stay
+intact. Router renaming, removing `apps/tasks`, and runtime Prisma
+table-ownership enforcement are separate decisions and are not decided here.
+
+## Gap table
+
+| # | Requirement | Current state in code | Guard today | Guard proposed | Hours |
+| --- | --- | --- | --- | --- | --- |
+| 1 | Feature-owned assembly | `apps/api/src/app/api-production.composition.ts:844` `compose()` and 30 private `compose*`/`resolve*` methods to `:4324`; 130 `*.composition.ts` files, 36,981 lines | `feature-source-layout`, `service-dependencies`, `composed-exports` | `no-domain-query-in-composition`; container-owned construction | 120 |
+| 2 | Complete dependencies | `api-production.composition.ts:1464` `optionalPorts()`; 53 `refusing*` fallbacks, 101 `*UnavailableError`, 50 `Logged*Absence` (`:4386`–`:4668`) | `global-app-access`, `service-dependencies` — nothing validates the graph at boot | boot-time `MissingProviderError` / `DuplicateProviderError` / `DependencyCycleError`; `port-is-abstract-class`; one explicit disabled state | 60 |
+| 3 | One registration source | `apps/api/src/app-rest/app-rest.features.ts`, `apps/api/src/app-trpc/app-trpc.features.ts`, `apps/worker/src/features/worker-feature.installer.ts`, `apps/tasks/src/tasks.catalogue.ts` — four lists, one per transport | `feature-catalogue`, `manifests`, `no-raw-hono-mount` | `app-with-feature-only`; manifests derived from declarations | 40 |
+| 4 | Consistent roles | `apps/api/src/platform/infrastructure/api-eventing.infrastructure.ts:104` sets `consumersEnabled: false` at one call site; `apps/worker/src/app/worker-production.composition.ts:396` is the only consumer | `application-boundaries`, `frontend-ui-boundaries`, `eventing-roles`, `check-node-resolution.mjs` | role assertion in `boot({ role })` | 24 |
+| 5 | Shared authorization semantics | policy chain exists once per transport; no cross-transport assertion | `api-transport-boundaries`, `api-context-services`, declared-check middleware | policy-parity test over operations exposed on both doors | 24 |
+| 6 | Predictable shutdown | `packages/runtime-composition/src/resource-scope.ts`, `graceful-shutdown.ts`; ordering proven for the worker only (`apps/worker/src/app/__tests__/worker.application.unit.test.ts:232`) | `ResourceScope` + worker unit tests | container-owned lifecycle for every role, including a failed boot | 32 |
+| 7 | System migrations, startup mode | `packages/system-migrations/src/convergence.ts:59` catches failures (`:106`) and returns on no-movement (`:125`); background mode only | runner and convergence unit tests | explicit completion assertion gating readiness; startup mode for stored objects | 40 |
+
+## Deployment Impact
+
+None while the container wraps the existing graph: same features, same boot,
+same topology. Two later stages change runtime behaviour on purpose, and each
+needs its own note when it ships.
+
+- Boot validation turns a missing dependency from a first-request 500 into a
+  refused boot. A deployment that has been running on an unnoticed refusing
+  fallback will fail to start until it is configured or the feature is
+  explicitly disabled.
+- Startup-mode migrations gate readiness. A replica whose blocking migration has
+  not finalized stays out of the load balancer, which is the intent, and which
+  makes migration duration a rollout-time concern.

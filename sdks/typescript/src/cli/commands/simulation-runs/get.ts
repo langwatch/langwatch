@@ -1,10 +1,10 @@
 import { scopedApiKey } from "@/internal/credentialContext";
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
-import { resolveCredentials } from "../../utils/apiKey";
-import { readFetchFailure } from "../../utils/formatFetchError";
-import { failSpinner } from "../../utils/spinnerError";
-import type { CommandResult } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner.ts";
+import { resolveCredentials } from "../../utils/apiKey.ts";
+import { readFetchFailure } from "../../utils/formatFetchError.ts";
+import { failSpinner } from "../../utils/spinnerError.ts";
+import type { CommandResult } from "../../utils/output.ts";
 import { buildAuthHeaders } from "@/internal/api/auth";
 import type { SimulationRunEvaluation } from "@/client-sdk/services/simulation-runs";
 
@@ -48,7 +48,11 @@ function renderContent(raw: unknown): string {
         return inner ? chalk.gray(`[result] `) + inner : "";
       }
       default:
-        try { return JSON.stringify(obj); } catch { return ""; }
+        try {
+          return JSON.stringify(obj);
+        } catch {
+          return "";
+        }
     }
   }
   if (raw === null || raw === undefined) return "";
@@ -57,16 +61,14 @@ function renderContent(raw: unknown): string {
   return "";
 }
 
-const EVALUATION_STATUS_COLOR: Record<
-  SimulationRunEvaluation["status"],
-  (text: string) => string
-> = {
-  passed: chalk.green,
-  failed: chalk.red,
-  scored: chalk.cyan,
-  skipped: chalk.gray,
-  error: chalk.red,
-};
+const EVALUATION_STATUS_COLOR: Record<SimulationRunEvaluation["status"], (text: string) => string> =
+  {
+    passed: chalk.green,
+    failed: chalk.red,
+    scored: chalk.cyan,
+    skipped: chalk.gray,
+    error: chalk.red,
+  };
 
 /**
  * One line per evaluator that ran after the conversation: its status, its
@@ -74,9 +76,7 @@ const EVALUATION_STATUS_COLOR: Record<
  * it gave. A skipped one names the field the scenario left blank; a failed
  * required one is what failed the scenario.
  */
-function printEvaluations(
-  evaluations: SimulationRunEvaluation[] | undefined,
-): void {
+function printEvaluations(evaluations: SimulationRunEvaluation[] | undefined): void {
   if (!evaluations || evaluations.length === 0) return;
   console.log();
   console.log(chalk.bold("  Evaluators:"));
@@ -108,7 +108,7 @@ export const getSimulationRunCommand = async (
 
   try {
     const response = await langwatchFetch(
-      `${endpoint}/api/simulation-runs/${encodeURIComponent(runId)}`,
+      `${endpoint}/api/v1/simulation-runs/${encodeURIComponent(runId)}`,
       {
         method: "GET",
         headers: buildAuthHeaders({ apiKey }),
@@ -124,7 +124,7 @@ export const getSimulationRunCommand = async (
       process.exit(1);
     }
 
-    const run = await response.json() as {
+    const run = (await response.json()) as {
       scenarioRunId: string;
       scenarioId: string;
       batchRunId: string;
@@ -153,10 +153,14 @@ export const getSimulationRunCommand = async (
     return {
       data: run,
       table: () => {
-        const statusColor = run.status === "SUCCESS" ? chalk.green
-          : run.status === "FAILED" ? chalk.red
-          : run.status === "ERROR" ? chalk.red
-          : chalk.yellow;
+        const statusColor =
+          run.status === "SUCCESS"
+            ? chalk.green
+            : run.status === "FAILED"
+              ? chalk.red
+              : run.status === "ERROR"
+                ? chalk.red
+                : chalk.yellow;
 
         console.log();
         console.log(chalk.bold("  Simulation Run Details:"));
@@ -165,11 +169,15 @@ export const getSimulationRunCommand = async (
         console.log(`    ${chalk.gray("Batch ID:")}    ${run.batchRunId}`);
         console.log(`    ${chalk.gray("Name:")}        ${run.name ?? chalk.gray("—")}`);
         console.log(`    ${chalk.gray("Status:")}      ${statusColor(run.status)}`);
-        console.log(`    ${chalk.gray("Duration:")}    ${run.durationInMs > 0 ? `${(run.durationInMs / 1000).toFixed(1)}s` : "—"}`);
+        console.log(
+          `    ${chalk.gray("Duration:")}    ${run.durationInMs > 0 ? `${(run.durationInMs / 1000).toFixed(1)}s` : "—"}`,
+        );
         if (run.totalCost) {
           console.log(`    ${chalk.gray("Cost:")}        $${run.totalCost.toFixed(4)}`);
         }
-        console.log(`    ${chalk.gray("Started:")}     ${new Date(run.timestamp).toLocaleString()}`);
+        console.log(
+          `    ${chalk.gray("Started:")}     ${new Date(run.timestamp).toLocaleString()}`,
+        );
         // Both lines are left out when the run carries nothing: a run stored
         // before versions were recorded has no version to name, and a batch
         // started without a note has no note.
@@ -191,10 +199,14 @@ export const getSimulationRunCommand = async (
             console.log(`    ${chalk.gray("Reasoning:")}  ${run.results.reasoning}`);
           }
           if (run.results.metCriteria && run.results.metCriteria.length > 0) {
-            console.log(`    ${chalk.gray("Met:")}        ${chalk.green(run.results.metCriteria.join(", "))}`);
+            console.log(
+              `    ${chalk.gray("Met:")}        ${chalk.green(run.results.metCriteria.join(", "))}`,
+            );
           }
           if (run.results.unmetCriteria && run.results.unmetCriteria.length > 0) {
-            console.log(`    ${chalk.gray("Unmet:")}      ${chalk.red(run.results.unmetCriteria.join(", "))}`);
+            console.log(
+              `    ${chalk.gray("Unmet:")}      ${chalk.red(run.results.unmetCriteria.join(", "))}`,
+            );
           }
           if (run.results.error) {
             console.log(`    ${chalk.gray("Error:")}      ${chalk.red(run.results.error)}`);
@@ -207,9 +219,12 @@ export const getSimulationRunCommand = async (
           console.log(chalk.bold("  Conversation:"));
           const truncate = !options?.full;
           for (const msg of run.messages) {
-            const roleColor = msg.role === "user" ? chalk.blue
-              : msg.role === "assistant" ? chalk.green
-              : chalk.gray;
+            const roleColor =
+              msg.role === "user"
+                ? chalk.blue
+                : msg.role === "assistant"
+                  ? chalk.green
+                  : chalk.gray;
             let content = renderContent(msg.content);
             if (!content) continue;
             if (truncate && content.length > 400) {

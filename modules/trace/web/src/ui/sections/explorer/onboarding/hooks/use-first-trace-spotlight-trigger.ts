@@ -1,0 +1,92 @@
+import { useEffect, useRef } from "react";
+import { writeSpotlightFragment } from "../spotlights/spotlight-overlay.tsx";
+import { TRACE_EXPLORER_SPOTLIGHTS } from "../../../../../model/explorer/onboarding/spotlights/spotlights.ts";
+import { useOnboardingStore } from "../../../../../behavior/explorer/onboarding/store/onboarding-store.ts";
+import { useTraceExplorerTourPreference } from "./use-trace-explorer-tour-preference.ts";
+
+interface UseFirstTraceSpotlightTriggerArgs {
+  projectId: string | null;
+  hasAnyTraces: boolean | undefined;
+}
+
+/**
+ * One-shot automatic effect: the moment `hasAnyTraces` flips to true in any project
+ * where we have not auto-fired the spotlight tour, start the contextual walkthrough of
+ * the user's data.
+ */
+export function useFirstTraceSpotlightTrigger({
+  projectId,
+  hasAnyTraces,
+}: UseFirstTraceSpotlightTriggerArgs): void {
+  const { dismiss: persistDismissal, isDismissed, isResolved } = useTraceExplorerTourPreference();
+  const firstTraceSpotlightFired = useOnboardingStore((s) => s.firstTraceSpotlightFired);
+  const seenDrawerSpotlights = useOnboardingStore((s) => s.seenDrawerSpotlights);
+  const markFired = useOnboardingStore((s) => s.markFirstTraceSpotlightFired);
+  const spotlightsActive = useOnboardingStore((s) => s.spotlightsActive);
+  const tourActive = useOnboardingStore((s) => s.tourActive);
+  const setSpotlightsActive = useOnboardingStore((s) => s.setSpotlightsActive);
+  const setCurrentSpotlightId = useOnboardingStore((s) => s.setCurrentSpotlightId);
+  const hasLegacyTourHistoryOnMount = useRef(
+    firstTraceSpotlightFired || Object.keys(seenDrawerSpotlights).length > 0,
+  ).current;
+  const hasLegacyMigrationAttempted = useRef(false);
+
+  useEffect(() => {
+    const alreadyHandled = hasLegacyMigrationAttempted.current || isDismissed;
+    const canMigrate = isResolved && hasLegacyTourHistoryOnMount;
+    if (alreadyHandled || !canMigrate) {
+      return;
+    }
+    hasLegacyMigrationAttempted.current = true;
+    persistDismissal();
+  }, [hasLegacyTourHistoryOnMount, isDismissed, isResolved, persistDismissal]);
+
+  useEffect(() => {
+    if (!projectId) return;
+    if (hasAnyTraces !== true) return;
+    if (isDismissed) return;
+    if (firstTraceSpotlightFired) return;
+    if (spotlightsActive || tourActive) {
+      // The user is already mid-tour or mid-journey — don't yank them
+      // back to the first spotlight. Still mark fired so we don't
+      // retry on the next render once they exit.
+      markFired();
+      return;
+    }
+    // Brief breath before the spotlight pops up so the user gets to
+    // see their first real trace actually land and the page settle.
+    // Tapping someone on the shoulder the same frame as their data
+    // arrives reads as pushy. 2s is enough to register "oh, my data
+    // is here" without dragging.
+    const ARRIVAL_BREATH_MS = 2000;
+    const timer = setTimeout(() => {
+      // Re-check inside the timer because the user could have
+      // navigated away or started spotlights manually during the
+      // breath. The first-trace flag stays unset until we actually
+      // fire, so a navigation away preserves the auto-start intent
+      // for the next visit.
+      const state = useOnboardingStore.getState();
+      if (state.spotlightsActive || state.tourActive) {
+        state.markFirstTraceSpotlightFired();
+        return;
+      }
+      const first = TRACE_EXPLORER_SPOTLIGHTS[0];
+      const firstId = first?.id ?? null;
+      state.setCurrentSpotlightId(firstId);
+      state.setSpotlightsActive(true);
+      writeSpotlightFragment(firstId);
+      state.markFirstTraceSpotlightFired();
+    }, ARRIVAL_BREATH_MS);
+    return () => clearTimeout(timer);
+  }, [
+    projectId,
+    hasAnyTraces,
+    isDismissed,
+    firstTraceSpotlightFired,
+    spotlightsActive,
+    tourActive,
+    markFired,
+    setSpotlightsActive,
+    setCurrentSpotlightId,
+  ]);
+}

@@ -5,11 +5,7 @@
  * output-registration.unit.test.ts.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import {
-  AGENT_MODE_ENV_VARS,
-  applyJq,
-  printResult,
-} from "../output";
+import { AGENT_MODE_ENV_VARS, applyJq, printResult } from "../output";
 
 const DATA = [
   { name: "alpha", id: "1", nested: { score: 0.9 } },
@@ -20,9 +16,7 @@ const DATA = [
 let savedAgentEnv: Record<string, string | undefined> = {};
 
 beforeEach(() => {
-  savedAgentEnv = Object.fromEntries(
-    AGENT_MODE_ENV_VARS.map((name) => [name, process.env[name]]),
-  );
+  savedAgentEnv = Object.fromEntries(AGENT_MODE_ENV_VARS.map((name) => [name, process.env[name]]));
   for (const name of AGENT_MODE_ENV_VARS) delete process.env[name];
   vi.spyOn(console, "log").mockImplementation(() => undefined);
 });
@@ -37,7 +31,12 @@ afterEach(() => {
 });
 
 const printedJson = (): unknown =>
-  JSON.parse(vi.mocked(console.log).mock.calls.map((call) => String(call[0])).join("\n"));
+  JSON.parse(
+    vi
+      .mocked(console.log)
+      .mock.calls.map((call) => String(call[0]))
+      .join("\n"),
+  );
 
 describe("printResult", () => {
   describe("given no output flags", () => {
@@ -124,15 +123,15 @@ describe("printResult", () => {
     });
 
     it("throws on an expression that does not start with a dot", async () => {
-      await expect(
-        printResult(DATA, { jq: "items[]", table: vi.fn() }),
-      ).rejects.toThrow(/must start with/);
+      await expect(printResult(DATA, { jq: "items[]", table: vi.fn() })).rejects.toThrow(
+        /must start with/,
+      );
     });
 
     it("throws when iterating a non-array", async () => {
-      await expect(
-        printResult({ items: 42 }, { jq: ".items[]", table: vi.fn() }),
-      ).rejects.toThrow(/non-array/);
+      await expect(printResult({ items: 42 }, { jq: ".items[]", table: vi.fn() })).rejects.toThrow(
+        /non-array/,
+      );
     });
   });
 });
@@ -152,18 +151,16 @@ describe("applyJq", () => {
     expect(applyJq(". | length", { a: 1, b: 2 })).toBe(2);
     // Iteration collects first (`.items[].tags` → array of tag arrays), then
     // `| length` sizes the collected result — the subset's documented reading.
-    expect(applyJq(".items[].tags | length", {
-      items: [{ tags: ["a", "b"] }, { tags: [] }],
-    })).toBe(2);
+    expect(
+      applyJq(".items[].tags | length", {
+        items: [{ tags: ["a", "b"] }, { tags: [] }],
+      }),
+    ).toBe(2);
   });
 
   it("throws on unsupported pipes instead of silently printing null", () => {
-    expect(() => applyJq(".items | map(.name)", { items: [] })).toThrow(
-      /\| length/,
-    );
-    expect(() => applyJq(".items | length | length", { items: [] })).toThrow(
-      /\| length/,
-    );
+    expect(() => applyJq(".items | map(.name)", { items: [] })).toThrow(/\| length/);
+    expect(() => applyJq(".items | length | length", { items: [] })).toThrow(/\| length/);
     expect(() => applyJq(".items | length", { items: 42 })).toThrow(/no size/);
   });
 

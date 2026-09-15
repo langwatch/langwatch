@@ -4,19 +4,10 @@ import { readFileSync } from "fs";
 import { join } from "path";
 
 /**
- * Verifies that our declared peer dependency ranges accept the latest
- * versions of common AI frameworks that users install alongside langwatch.
- *
- * This catches the exact bug where langwatch declared @ai-sdk/openai@">=2.0.0 <3.0.0"
- * but @mastra/core pulled in @ai-sdk/openai@^3.x, causing npm ERESOLVE failures.
- *
- * The test reads our local package.json (not the published version) and checks
- * that each peer dep range satisfies the latest stable version on npm.
+ * Verifies peer dep ranges accept latest versions (catches ERESOLVE failures).
  */
 
-const sdkPackageJson = JSON.parse(
-  readFileSync(join(__dirname, "../../package.json"), "utf-8")
-);
+const sdkPackageJson = JSON.parse(readFileSync(join(__dirname, "../../package.json"), "utf-8"));
 const peerDeps: Record<string, string> = sdkPackageJson.peerDependencies;
 
 function getLatestVersion(pkg: string): string {
@@ -30,7 +21,7 @@ function semverSatisfies(version: string, range: string): boolean {
   // Use npm's own semver to check — avoids adding semver as a dependency
   const result = execSync(
     `node -e "console.log(require('semver').satisfies('${version}', '${range}'))"`,
-    { encoding: "utf-8", timeout: 10_000 }
+    { encoding: "utf-8", timeout: 10_000 },
   ).trim();
   return result === "true";
 }
@@ -65,7 +56,7 @@ describe("peer dependency compatibility", () => {
             satisfies,
             `${pkg}@${latestVersion} does not satisfy peer dep range "${range}". ` +
               `Users installing ${pkg}@latest alongside langwatch will get ERESOLVE errors. ` +
-              `Update the range in package.json peerDependencies.`
+              `Update the range in package.json peerDependencies.`,
           ).toBe(true);
         });
       }

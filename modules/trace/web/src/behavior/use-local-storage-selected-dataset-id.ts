@@ -1,0 +1,85 @@
+/**
+ * The dataset the reader last added rows to, remembered per browser.
+ */
+
+import { createLogger } from "@langwatch/observability/browser";
+import { useCallback, useState } from "react";
+
+import { api } from "./trace-api.ts";
+import { useOrganizationTeamProject } from "./use-organization-team-project.ts";
+
+const logger = createLogger("useLocalStorageSelectedDataSetId");
+
+const STORAGE_KEY = "selectedDatasetId";
+
+function readStoredDatasetId(): string {
+  if (typeof window === "undefined") return "";
+  try {
+    return window.localStorage.getItem(STORAGE_KEY) ?? "";
+  } catch {
+    // A browser with site data blocked throws on read. No memory is the same
+    // answer as an empty one, and the picker is usable either way.
+    return "";
+  }
+}
+
+function writeStoredDatasetId(datasetId: string): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(STORAGE_KEY, datasetId);
+  } catch {
+    /* see readStoredDatasetId */
+  }
+}
+
+export const useLocalStorageSelectedDataSetId = () => {
+  const { project } = useOrganizationTeamProject();
+  const trpc = api.useUtils();
+  const [selectedDataSetId, setSelectedDataSetId] = useState<string>(readStoredDatasetId);
+
+  const clear = useCallback(() => {
+    writeStoredDatasetId("");
+    setSelectedDataSetId("");
+  }, []);
+
+  const handleSetSelectedDataSetId = useCallback(
+    async (datasetId: string) => {
+      if (datasetId === "") {
+        clear();
+        return;
+      }
+
+      try {
+        const dataset = await trpc.dataset.getById.fetch({
+          projectId: project?.id ?? "",
+          datasetId,
+        });
+
+        if (dataset) {
+          writeStoredDatasetId(datasetId);
+          setSelectedDataSetId(datasetId);
+          return;
+        }
+
+        logger.warn(
+          { datasetId },
+          "Tried to set selected dataset to local storage, but it does not exist",
+        );
+        clear();
+      } catch (error) {
+        logger.error({ error }, "Error fetching dataset");
+        clear();
+      }
+    },
+    [clear, project?.id, trpc],
+  );
+
+  return {
+    /** The dataset id this browser remembers, or `""` when it remembers none. */
+    selectedDataSetId,
+    /** Remembers a dataset, having checked the project still has it. */
+    setSelectedDataSetId: handleSetSelectedDataSetId,
+    /** Forgets whatever was remembered. */
+    clear,
+  };
+};

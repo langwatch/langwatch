@@ -192,8 +192,13 @@ var removed = map[string]string{
 	"moron":         "haven git",
 }
 
-// table is the whole CLI surface, in help order.
-var table = []commandSpec{
+// table is the whole CLI surface, in help order. The viewer's own tabs are
+// appended to it: every tab of the up viewer is a command too, so a stack is
+// as readable from a pipe as it is from a keyboard.
+var table = append(baseTable, tabSpecs()...)
+
+// baseTable is the surface that is not derived from the viewer's tabs.
+var baseTable = []commandSpec{
 	{
 		name:      "up",
 		summary:   "start or reconcile this worktree's stack; +svc/-svc picks services and sticks",
@@ -251,6 +256,16 @@ var table = []commandSpec{
 		},
 	},
 	{
+		name:    "destroy",
+		summary: "stop a stack by slug and DROP its databases - the data goes with it",
+		args:    "<slug>",
+		maxArgs: 1,
+		flags: []flagSpec{
+			{long: "--yes", summary: "confirm a reset without prompting (required in agent mode)"},
+		},
+		run: runDestroy,
+	},
+	{
 		name:    "restart",
 		summary: "bounce one supervised service (or all) without tearing the stack down",
 		args:    "[service]",
@@ -285,6 +300,20 @@ var table = []commandSpec{
 		},
 	},
 	{
+		name:    "mail",
+		summary: "read this worktree's caught email: address | list | get <id> | wait | clear",
+		args:    "<address|list|get|wait|clear> [id]",
+		maxArgs: 2,
+		flags: []flagSpec{
+			{long: "--to", takesValue: true, value: "<addr>", summary: "list/wait: only messages to a matching recipient"},
+			{long: "--subject", takesValue: true, value: "<text>", summary: "list/wait: only messages with a matching subject"},
+			{long: "--timeout", takesValue: true, value: "<dur>", summary: "wait: how long to block for a match (default 30s)"},
+			{long: "--html", summary: "get: the message's raw HTML body instead of its text"},
+			{long: "--json", summary: "machine-readable"},
+		},
+		run: runMail,
+	},
+	{
 		name:    "logs",
 		summary: "captured service logs from any terminal: all interleaved, or the named ones",
 		args:    "[service…]",
@@ -294,6 +323,8 @@ var table = []commandSpec{
 			{long: "--since", takesValue: true, value: "<dur>", summary: "only lines from the last e.g. 10m"},
 			{long: "--level", takesValue: true, value: "<lvl>", summary: "only warn-or-worse (warn) / errors (error)"},
 			{long: "--stack", takesValue: true, value: "<slug>", summary: "another worktree's stack by slug"},
+			{long: "--raw", summary: "the child's own bytes, unrendered"},
+			{long: "--json", summary: "one JSON object per line, lane stamped on"},
 		},
 		run: runLogsCmd,
 	},
@@ -305,6 +336,17 @@ var table = []commandSpec{
 		},
 		run: func(_ context.Context, d deps, inv invocation) error {
 			return d.orch.Status(d.isAgent || inv.has("--json"), d.worktree)
+		},
+	},
+	{
+		name:    "env",
+		summary: "print this stack's resolved environment: eval \"$(haven env --reveal)\" to load it in a shell",
+		flags: []flagSpec{
+			{long: "--json", summary: "machine-readable"},
+			{long: "--reveal", summary: "print secret values instead of masking them"},
+		},
+		run: func(_ context.Context, d deps, inv invocation) error {
+			return d.orch.Env(d.params, inv.has("--json"), inv.has("--reveal"))
 		},
 	},
 	{
@@ -405,15 +447,16 @@ var table = []commandSpec{
 			{long: "--ttl", takesValue: true, value: "<dur>", summary: "how long the gate holds (default 30s)"},
 		},
 		run: func(ctx context.Context, d deps, inv invocation) error {
-			return d.orch.RunHMR(ctx, d.lwDir, inv.raw)
+			return d.orch.RunHMR(ctx, d.worktree, inv.raw)
 		},
 	},
 	{
 		name:    "clean",
-		summary: "one cleanup: worktree picker, then safe reclaim (artifacts, orphan processes)",
+		summary: "one cleanup: worktree picker, then job-scratch picker, then safe reclaim",
 		flags: []flagSpec{
-			{long: "--yes", summary: "no picker: build artefacts + orphan processes only — never worktrees or databases"},
+			{long: "--yes", summary: "no pickers: apply exactly the pre-tick defaults — never a database"},
 			{long: "--stale-days", takesValue: true, value: "<n>", summary: "idle age pre-ticked for deletion"},
+			{long: "--include-recent", summary: "also reclaim agent jobs that finished within the last 48h"},
 		},
 		run: runClean,
 	},
@@ -432,19 +475,39 @@ var table = []commandSpec{
 		run: runHeavy,
 	},
 	{
+		// install is about the MACHINE, setup about the CHECKOUT. Two commands
+		// rather than one because they answer to different people: everything
+		// here is something a developer installs once per laptop, and
+		// everything in setup is per worktree and gitignored.
+		name:    "install",
+		summary: "check this machine for what haven needs and offer to install it (portless, node, brew formulae, a runtime)",
+		args:    "[prerequisite…]",
+		maxArgs: -1,
+		flags: []flagSpec{
+			{long: "--list", summary: "report what is installed and what is missing; change nothing"},
+			{long: "--yes", summary: "install what haven needs without asking (leaves the optional ones alone)"},
+			{long: "--reset-skips", summary: "forget every never-ask-again, so the next run offers them all"},
+		},
+		run: runInstall,
+	},
+	{
 		name:    "setup",
 		summary: "install optional integrations into this checkout (interactive; nothing is assumed)",
 		args:    "[feature…]",
 		maxArgs: -1,
 		flags: []flagSpec{
 			{long: "--list", summary: "what can be installed, and what each one does"},
+			{long: "--off", summary: "turn a feature back off here, so haven up stops reinstalling it (e.g. gate-hook)"},
 		},
 		run: runSetup,
 	},
 	{
 		name:    "gate",
-		summary: "answer a Claude Code PreToolUse hook on stdin (install it with `haven setup gate-hook`)",
-		run:     runGate,
+		summary: "answer a coding-agent PreToolUse hook on stdin (opt in with `haven setup`)",
+		flags: []flagSpec{
+			{long: "--client", takesValue: true, value: "<client>", summary: "hook output protocol: claude (default) or codex"},
+		},
+		run: runGate,
 	},
 	{
 		name:    "slot",
@@ -470,7 +533,7 @@ var table = []commandSpec{
 		// haven flag and the command could only ever run bare.
 		minusArgs: true,
 		run: func(ctx context.Context, d deps, inv invocation) error {
-			return d.orch.Typecheck(ctx, d.lwDir, inv.raw, envInt("HAVEN_TYPECHECK_SLOTS", 0), envInt("HAVEN_TYPECHECK_MAX_RSS_MB", 0))
+			return d.orch.Typecheck(ctx, d.worktree, inv.raw, envInt("HAVEN_TYPECHECK_SLOTS", 0), envInt("HAVEN_TYPECHECK_MAX_RSS_MB", 0))
 		},
 	},
 	{

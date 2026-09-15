@@ -60,18 +60,22 @@ jobs:
             # gets analysed at all is a separate question — see the note about
             # the default code-scanning setup in the PR that added this.)
             relevant:
-              - 'platform/app/**'
+              - 'apps/**'
               - 'sdks/python/**'
               - 'sdks/typescript/**'
               - 'mcp/typescript/**'
               - 'services/langevals/**'
               - 'packages/**'
+              - 'modules/**'
+              - 'enterprise/**'
               - '.github/workflows/codeql.yml'
             codeql-javascript:
-              - 'platform/app/**'
+              - 'apps/**'
               - 'sdks/typescript/**'
               - 'mcp/typescript/**'
               - 'packages/**'
+              - 'modules/**'
+              - 'enterprise/**'
               - '.github/workflows/codeql.yml'
             codeql-python:
               - 'sdks/python/**'

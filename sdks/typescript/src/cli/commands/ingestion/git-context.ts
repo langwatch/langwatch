@@ -1,22 +1,12 @@
 /**
- * The git half of `langwatch ingest hook <tool>`: what a session's directory
- * says about the code it is working on.
- *
- * Separate from the command because it is the only part that shells out, and
- * because every branch here answers the same question the command asks once
- * ("which checkout is this?") rather than anything about hooks, telemetry or
- * state. The command injects the runner, so its tests never spawn git.
- *
+ * Git context for a session directory; command injects runner for testability.
  * Spec: specs/ai-governance/cli-wrappers/session-context-hook.feature
  */
 
 import { spawnSync } from "node:child_process";
 import * as path from "node:path";
 
-import {
-  parseGitRemoteUrl,
-  type SessionContext,
-} from "@/cli/utils/governance/session-context";
+import { parseGitRemoteUrl, type SessionContext } from "@/cli/utils/governance/session-context";
 
 /** How long a single git invocation may take. */
 const GIT_TIMEOUT_MS = 2_000;
@@ -51,13 +41,7 @@ export function readSessionContext({
 }
 
 /** Runs git in `cwd`, bounded, and reports failure as null rather than throwing. */
-export function runGitCommand({
-  args,
-  cwd,
-}: {
-  args: string[];
-  cwd: string;
-}): string | null {
+export function runGitCommand({ args, cwd }: { args: string[]; cwd: string }): string | null {
   try {
     const result = spawnSync("git", ["-C", cwd, ...args], {
       encoding: "utf8",

@@ -1,15 +1,7 @@
 // @vitest-environment node
 // @vitest-config ./vitest.e2e.config.mts
 
-import {
-  describe,
-  expect,
-  it,
-  afterEach,
-  beforeEach,
-  afterAll,
-  beforeAll,
-} from "vitest";
+import { describe, expect, it, afterEach, beforeEach, afterAll, beforeAll } from "vitest";
 import * as fs from "fs";
 import * as path from "path";
 
@@ -80,8 +72,7 @@ describe("CLI E2E", () => {
         const createResult = cli.run(`prompt create ${promptHandle}`);
         expectCliResultSuccess(createResult);
 
-        const filePath =
-          localPromptFileManagement.getPromptFilePath(promptHandle);
+        const filePath = localPromptFileManagement.getPromptFilePath(promptHandle);
         cli.run(`prompt add ${promptHandle} ${filePath}`);
 
         const pushResult = cli.run("prompt push");
@@ -112,8 +103,7 @@ describe("CLI E2E", () => {
         const createResult = cli.run(`prompt create ${promptHandle}`);
         expectCliResultSuccess(createResult);
 
-        const filePath =
-          localPromptFileManagement.getPromptFilePath(promptHandle);
+        const filePath = localPromptFileManagement.getPromptFilePath(promptHandle);
         cli.run(`prompt add ${promptHandle} ${filePath}`);
 
         // First push
@@ -154,8 +144,7 @@ describe("CLI E2E", () => {
       const createResult = cli.run(`prompt create ${promptHandle}`);
       expectCliResultSuccess(createResult);
 
-      const filePath =
-        localPromptFileManagement.getPromptFilePath(promptHandle);
+      const filePath = localPromptFileManagement.getPromptFilePath(promptHandle);
       cli.run(`prompt add ${promptHandle} ${filePath}`);
 
       // First push
@@ -194,9 +183,7 @@ describe("CLI E2E", () => {
         commitMessage: "Updated remotely",
         temperature: 0.1,
         model: "gpt-4-turbo",
-        messages: [
-          { role: "system", content: "Remotely updated message." },
-        ],
+        messages: [{ role: "system", content: "Remotely updated message." }],
       });
 
       // Push should NOT pull the remote update

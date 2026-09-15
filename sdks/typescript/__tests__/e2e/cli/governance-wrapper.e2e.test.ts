@@ -210,9 +210,9 @@ function writeToolStub(name: string, mode: string): void {
   let body = "#!/bin/bash\nset -e\n";
   if (mode === "echo-env") {
     body +=
-      'for var in ANTHROPIC_BASE_URL ANTHROPIC_AUTH_TOKEN ANTHROPIC_API_KEY OPENAI_BASE_URL OPENAI_API_KEY GOOGLE_GEMINI_BASE_URL GOOGLE_API_KEY GEMINI_API_KEY; do\n' +
+      "for var in ANTHROPIC_BASE_URL ANTHROPIC_AUTH_TOKEN ANTHROPIC_API_KEY OPENAI_BASE_URL OPENAI_API_KEY GOOGLE_GEMINI_BASE_URL GOOGLE_API_KEY GEMINI_API_KEY; do\n" +
       '  printf "%s=%s\\n" "$var" "${!var:-}"\n' +
-      'done\n';
+      "done\n";
   } else if (mode === "post-anthropic") {
     body +=
       'curl -s -X POST -H "Authorization: Bearer ${ANTHROPIC_AUTH_TOKEN}" ' +
@@ -238,11 +238,11 @@ function writeToolStub(name: string, mode: string): void {
     // One arg per line so we can split on newlines and assert exact
     // count + ordering. Exits 0.
     body +=
-      'idx=0\n' +
+      "idx=0\n" +
       'for arg in "$@"; do\n' +
       '  printf "ARG[%d]=%s\\n" "$idx" "$arg"\n' +
-      '  idx=$((idx + 1))\n' +
-      'done\n' +
+      "  idx=$((idx + 1))\n" +
+      "done\n" +
       'printf "ARGC=%d\\n" "$#"\n';
   } else {
     throw new Error(`unknown stub mode: ${mode}`);
@@ -301,9 +301,7 @@ function runCli(args: string[], opts: RunOpts = {}): Promise<RunResult> {
   //    (~/.nvm/.../bin, ~/.local/bin, /usr/local/bin) and keep only
   //    the bash/curl essentials at /usr/bin:/bin.
   const inheritedPath = process.env.PATH ?? "/usr/bin:/bin";
-  const pathValue = includeStubs
-    ? `${toolStubsDir}:${inheritedPath}`
-    : "/usr/bin:/bin";
+  const pathValue = includeStubs ? `${toolStubsDir}:${inheritedPath}` : "/usr/bin:/bin";
   // Build a minimal env: keep PATH + HOME + a small allowlist; drop
   // every VITEST_*/NODE_* variable that vitest's worker injects (some
   // of them — e.g. NODE_V8_COVERAGE — cause the spawned child to
@@ -407,10 +405,7 @@ function writeLoggedOutConfig(): void {
 }
 
 function readConfig(): Record<string, unknown> {
-  return JSON.parse(fs.readFileSync(configPath, "utf8")) as Record<
-    string,
-    unknown
-  >;
+  return JSON.parse(fs.readFileSync(configPath, "utf8")) as Record<string, unknown>;
 }
 
 // ─────────────────────────────────────────────────────────────────
@@ -513,9 +508,7 @@ describe("governance CLI wrappers — e2e", () => {
         // Config got persisted by the auto-login path
         const cfg = readConfig();
         expect(cfg.access_token).toBe(TEST_ACCESS_TOKEN);
-        expect((cfg.default_personal_vk as { secret?: string })?.secret).toBe(
-          TEST_VK,
-        );
+        expect((cfg.default_personal_vk as { secret?: string })?.secret).toBe(TEST_VK);
       });
     });
   });
@@ -585,30 +578,27 @@ describe("governance CLI wrappers — e2e", () => {
         },
         mustNotInject: ["ANTHROPIC_BASE_URL", "OPENAI_BASE_URL"],
       },
-    ])(
-      "when running `langwatch $tool`",
-      ({ tool, expected, mustNotInject }) => {
-        it(`spawns ${tool} with the documented provider env vars and no unrelated ones`, async () => {
-          writeLoggedInConfig();
-          writeToolStub(tool, "echo-env");
-          const res = await runCli([tool]);
-          expect(res.status).toBe(0);
-          const env = envFromStub(res.stdout ?? "");
-          for (const [k, want] of Object.entries(expected)) {
-            if (want === "url") {
-              expect(env[k]).toBe(gwUrl);
-            } else if (want === "url+v1") {
-              expect(env[k]).toBe(`${gwUrl}/v1`);
-            } else {
-              expect(env[k]).toBe(want);
-            }
+    ])("when running `langwatch $tool`", ({ tool, expected, mustNotInject }) => {
+      it(`spawns ${tool} with the documented provider env vars and no unrelated ones`, async () => {
+        writeLoggedInConfig();
+        writeToolStub(tool, "echo-env");
+        const res = await runCli([tool]);
+        expect(res.status).toBe(0);
+        const env = envFromStub(res.stdout ?? "");
+        for (const [k, want] of Object.entries(expected)) {
+          if (want === "url") {
+            expect(env[k]).toBe(gwUrl);
+          } else if (want === "url+v1") {
+            expect(env[k]).toBe(`${gwUrl}/v1`);
+          } else {
+            expect(env[k]).toBe(want);
           }
-          for (const k of mustNotInject) {
-            expect(env[k] ?? "").toBe("");
-          }
-        });
-      },
-    );
+        }
+        for (const k of mustNotInject) {
+          expect(env[k] ?? "").toBe("");
+        }
+      });
+    });
   });
 
   describe("routing — wrapped tool's HTTP traffic lands at the gateway with the VK", async () => {

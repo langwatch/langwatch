@@ -9,9 +9,7 @@ import { orDash, printFacts, runManagement } from "../management/_shared";
  * bindings. Personal workspaces are not listed: they are not access an
  * administrator manages.
  */
-export const getMemberCommand = async (
-  userId: string,
-): Promise<CommandResult | void> =>
+export const getMemberCommand = async (userId: string): Promise<CommandResult | void> =>
   runManagement({
     action: "fetch member",
     pending: `Fetching member "${userId}"...`,

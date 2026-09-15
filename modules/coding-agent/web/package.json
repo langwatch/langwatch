@@ -1,0 +1,93 @@
+{
+  "name": "@langwatch/coding-agent-web",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Browser-safe Coding Agent presentation helpers and UI primitives.",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "langwatch-declaration-source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    },
+    "./surfaces/activity": {
+      "langwatch-declaration-source": "./src/activity.ts",
+      "types": "./dist/activity.d.ts",
+      "default": "./src/activity.ts"
+    },
+    "./testing": {
+      "langwatch-declaration-source": "./src/testing.tsx",
+      "types": "./dist/testing.d.ts",
+      "default": "./src/testing.tsx"
+    },
+    "./surfaces/session-table": {
+      "langwatch-declaration-source": "./src/session-table.ts",
+      "types": "./dist/session-table.d.ts",
+      "default": "./src/session-table.ts"
+    },
+    "./surfaces/pull-requests": {
+      "langwatch-declaration-source": "./src/pull-requests.ts",
+      "types": "./dist/pull-requests.d.ts",
+      "default": "./src/pull-requests.ts"
+    },
+    "./surfaces/agent-identity": {
+      "langwatch-declaration-source": "./src/agent-identity.ts",
+      "types": "./dist/agent-identity.d.ts",
+      "default": "./src/agent-identity.ts"
+    },
+    "./surfaces/agent-metrics": {
+      "langwatch-declaration-source": "./src/agent-metrics.ts",
+      "types": "./dist/agent-metrics.d.ts",
+      "default": "./src/agent-metrics.ts"
+    },
+    "./surfaces/agent-traces": {
+      "langwatch-declaration-source": "./src/agent-traces.ts",
+      "types": "./dist/agent-traces.d.ts",
+      "default": "./src/agent-traces.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "pnpm -w typecheck:declarations --project . && tsc --noEmit",
+    "test": "vitest run",
+    "test:unit": "vitest run"
+  },
+  "dependencies": {
+    "@langwatch/api": "workspace:*",
+    "@langwatch/coding-agent-contract": "workspace:*",
+    "@langwatch/design-system": "workspace:*",
+    "@langwatch/time": "workspace:*",
+    "@langwatch/trace-contract": "workspace:*",
+    "@langwatch/trace-web": "workspace:*",
+    "@langwatch/ui-host": "workspace:*",
+    "lucide-react": "catalog:",
+    "numeral": "catalog:",
+    "react-icons": "catalog:"
+  },
+  "devDependencies": {
+    "@chakra-ui/react": "catalog:",
+    "@emotion/react": "catalog:",
+    "@langwatch/authz-contract": "workspace:*",
+    "@testing-library/jest-dom": "catalog:",
+    "@testing-library/react": "catalog:",
+    "@testing-library/user-event": "catalog:",
+    "@types/numeral": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "jsdom": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "peerDependencies": {
+    "@chakra-ui/react": "^3.36.0",
+    "@emotion/react": "^11.14.0",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7"
+  }
+}

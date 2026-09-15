@@ -10,12 +10,12 @@ about trace correlation and not about this.
 With the [Infinity
 datasource](https://grafana.com/docs/plugins/yesoreyeram-infinity-datasource/latest/)
 installed, PostHog's HogQL query API backs dashboard panels directly. No export
-pipeline is needed to *look* at the data.
+pipeline is needed to _look_ at the data.
 
 Infinity is a poor alert source. Alerting requires its JSONata or JQ backend
 parser to return numeric frames, evaluated against a rate-limited query API
 whose own execution cap is 10 seconds — so a rule over a wide window fails as a
-rule rather than firing. Alert *thresholds* should read a Prometheus counter
+rule rather than firing. Alert _thresholds_ should read a Prometheus counter
 instead; use PostHog for the panel a human opens after the alert fires.
 
 The fluent-bit path into Loki is documented as deliberately lossy under

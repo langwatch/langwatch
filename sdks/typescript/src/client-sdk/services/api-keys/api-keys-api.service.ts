@@ -27,11 +27,7 @@ export interface ApiKeyBindingInput {
  * from the bindings alone; `restricted` additionally requires an explicit
  * permissions list, which is what a CUSTOM binding grants.
  */
-export const API_KEY_PERMISSION_MODES = [
-  "all",
-  "readonly",
-  "restricted",
-] as const;
+export const API_KEY_PERMISSION_MODES = ["all", "readonly", "restricted"] as const;
 
 export type ApiKeyPermissionMode = (typeof API_KEY_PERMISSION_MODES)[number];
 
@@ -47,10 +43,9 @@ export interface ApiKeyInfo {
 }
 
 /**
- * One key as GET /:id and PATCH /:id report it. `roleBindings` is the shape
- * the listing publishes; `bindings` is the same set in the shape a write
- * accepts, so reading a key back after a write is a comparison rather than a
- * translation.
+ * One key as GET /:id and PATCH /:id report it. `roleBindings` is the shape the listing
+ * publishes; `bindings` is the same set in the shape a write accepts, so reading a key
+ * back after a write is a comparison rather than a translation.
  */
 export interface ApiKeyDetail extends ApiKeyInfo {
   keyType: "personal" | "service";
@@ -151,7 +146,7 @@ export class ApiKeysApiService {
   async list(): Promise<ApiKeyInfo[]> {
     const { data } = await this.request<{ data: ApiKeyInfo[] }>(
       "list API keys",
-      "/api/api-keys",
+      "/api/v1/api-keys",
     );
     return data;
   }
@@ -159,28 +154,21 @@ export class ApiKeysApiService {
   async get(id: string): Promise<ApiKeyDetail> {
     return this.request<ApiKeyDetail>(
       `fetch API key "${id}"`,
-      `/api/api-keys/${encodeURIComponent(id)}`,
+      `/api/v1/api-keys/${encodeURIComponent(id)}`,
     );
   }
 
   async create(input: CreateApiKeyInput): Promise<CreatedApiKey> {
-    return this.request<CreatedApiKey>(
-      "create API key",
-      "/api/api-keys",
-      { method: "POST", body: JSON.stringify(input) },
-    );
+    return this.request<CreatedApiKey>("create API key", "/api/v1/api-keys", {
+      method: "POST",
+      body: JSON.stringify(input),
+    });
   }
 
-  async update({
-    id,
-    input,
-  }: {
-    id: string;
-    input: UpdateApiKeyInput;
-  }): Promise<ApiKeyDetail> {
+  async update({ id, input }: { id: string; input: UpdateApiKeyInput }): Promise<ApiKeyDetail> {
     return this.request<ApiKeyDetail>(
       `update API key "${id}"`,
-      `/api/api-keys/${encodeURIComponent(id)}`,
+      `/api/v1/api-keys/${encodeURIComponent(id)}`,
       { method: "PATCH", body: JSON.stringify(input) },
     );
   }
@@ -188,7 +176,7 @@ export class ApiKeysApiService {
   async revoke(id: string): Promise<{ success: boolean }> {
     return this.request<{ success: boolean }>(
       `revoke API key "${id}"`,
-      `/api/api-keys/${encodeURIComponent(id)}`,
+      `/api/v1/api-keys/${encodeURIComponent(id)}`,
       { method: "DELETE" },
     );
   }

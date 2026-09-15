@@ -1,0 +1,75 @@
+import type { ResolvedDataPrivacy } from "@langwatch/data-privacy-contract";
+import type { ProjectWithTeam } from "@langwatch/project-contract";
+import type { PIIRedactionLevel } from "@langwatch/trace-contract";
+
+/**
+ * The project row for policy resolution: inherited down
+ * org→team→department→project chain.
+ */
+export interface DataPrivacyProject {
+  getWithTeam(id: string): Promise<ProjectWithTeam>;
+}
+
+/**
+ * The one question the ingestion paths ask of data privacy.
+ *
+ * `DataPrivacyResolutionService` answers it, and so does the wider
+ * `DataPrivacyService` that composes it. Naming it is what lets the span
+ * content-drop and PII-redaction services be composed by a process that can
+ * resolve a policy but cannot write one.
+ */
+export interface DataPrivacyResolution {
+  getResolvedForProject(input: { projectId: string }): Promise<ResolvedDataPrivacy>;
+}
+
+/** How a Presidio batch ended, as the counter labels it. */
+export type PiiAnalysisOutcome = "processed" | "skipped" | "error";
+
+/**
+ * What an operator can see about external PII analysis calls. Members interface
+ * because two processes export differently (prom-client vs OTLP) but write
+ * identical series.
+ */
+export interface PiiAnalysisMetrics {
+  /** One external analysis call was made by `method` ("presidio", "google_dlp"). */
+  analysisCalled(method: string): void;
+  /** One Presidio batch took `durationMs` end to end. */
+  analysisObserved(durationMs: number): void;
+  /** One Presidio result carried `outcome`. */
+  analysisFinished(outcome: PiiAnalysisOutcome): void;
+}
+
+/**
+ * External PII analysis capability: members interface because processes
+ * compose clients differently; close is needed for DLP's gRPC channel.
+ */
+export interface PiiAnalysis {
+  tryClearGoogleDlp(input: {
+    text: string;
+    piiRedactionLevel: PIIRedactionLevel;
+    exceptPatterns?: readonly string[];
+  }): Promise<string | null>;
+  clearPresidio(
+    texts: string[],
+    piiRedactionLevel: PIIRedactionLevel,
+    entities?: readonly string[],
+  ): Promise<(string | null)[]>;
+  close(): Promise<void>;
+}
+
+export type PIICheckOptions = {
+  piiRedactionLevel: PIIRedactionLevel;
+  enforced?: boolean;
+  mainMethod?: "google_dlp" | "presidio";
+  /**
+   * Explicit analyzer entity names (uppercase, e.g. "PERSON") to detect,
+   * overriding the level's default set. The custom PII level uses this to scan
+   * only the analysis-service identifiers a team selected.
+   */
+  entities?: readonly string[];
+  /**
+   * Do-not-redact exception patterns (raw source strings). Only google_dlp
+   * branch reads them; presidio ignores this field entirely.
+   */
+  exceptPatterns?: readonly string[];
+};

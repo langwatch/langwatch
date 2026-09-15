@@ -15,11 +15,7 @@
  *   5. `Error#message` if the input is a thrown Error
  *   6. A status-code-derived fallback, if available
  */
-import {
-  isCodeAsMessage,
-  looksLikeErrorCode,
-  sentenceForCode,
-} from "./error-code-copy";
+import { isCodeAsMessage, looksLikeErrorCode, sentenceForCode } from "./error-code-copy";
 
 const GENERIC_MESSAGES = new Set([
   "",
@@ -77,17 +73,13 @@ interface ZodIssue {
  *   → "Validation failed: a.b — msg1; c — msg2"
  */
 function formatZodIssues(body: Record<string, unknown>): string | undefined {
-  const isZod =
-    body.name === "ZodError" ||
-    (Array.isArray(body.issues) && body.issues.length > 0);
+  const isZod = body.name === "ZodError" || (Array.isArray(body.issues) && body.issues.length > 0);
   if (!isZod || !Array.isArray(body.issues)) return undefined;
 
   const rendered = (body.issues as ZodIssue[])
     .map((issue) => {
       const pathArr = Array.isArray(issue.path) ? issue.path : [];
-      const path = pathArr
-        .filter((p) => typeof p === "string" || typeof p === "number")
-        .join(".");
+      const path = pathArr.filter((p) => typeof p === "string" || typeof p === "number").join(".");
       const msg = typeof issue.message === "string" ? issue.message : "";
       if (path && msg) return `${path} — ${msg}`;
       if (msg) return msg;
@@ -139,9 +131,7 @@ export function formatApiErrorMessage({
   }
 
   if (typeof error === "string") {
-    return isGeneric(error) && options.status
-      ? `${error} (status ${options.status})`
-      : error;
+    return isGeneric(error) && options.status ? `${error} (status ${options.status})` : error;
   }
 
   if (error instanceof Error) {
@@ -154,13 +144,13 @@ export function formatApiErrorMessage({
     const causeMsg =
       cause instanceof Error
         ? cause.message
-        : cause && typeof cause === "object" &&
+        : cause &&
+            typeof cause === "object" &&
             typeof (cause as { message?: unknown }).message === "string"
           ? (cause as { message: string }).message
           : undefined;
     const causeCode =
-      cause && typeof cause === "object" &&
-      typeof (cause as { code?: unknown }).code === "string"
+      cause && typeof cause === "object" && typeof (cause as { code?: unknown }).code === "string"
         ? (cause as { code: string }).code
         : undefined;
 

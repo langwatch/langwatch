@@ -31,8 +31,7 @@ describe("the ui actions command", () => {
   describe("given the platform answers", () => {
     it("sends the read with a deadline on it", async () => {
       const fetchMock = vi.fn(
-        async (_url: string, _init?: RequestInit) =>
-          new Response('{"actions":[]}'),
+        async (_url: string, _init?: RequestInit) => new Response('{"actions":[]}'),
       );
       vi.stubGlobal("fetch", fetchMock);
 

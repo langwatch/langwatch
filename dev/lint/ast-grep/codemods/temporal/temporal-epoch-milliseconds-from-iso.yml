@@ -1,0 +1,17 @@
+# `new Date(iso).getTime()` with no binding in between. This becomes `toEpochMs`
+# and NOT `Temporal.Instant.from(iso).epochMilliseconds`, because the two do not
+# fail the same way: `Date` answers NaN for a string it cannot parse and accepts
+# a date-only `2026-01-01`, while `Temporal.Instant.from` throws on both. Where
+# the string comes off a URL or a picker that difference is a crash the caller
+# never had. `toEpochMs` is the sanctioned seam and is byte-for-byte the old
+# behaviour; narrowing the parse to `Instant.from` is a decision for hands.
+id: temporal-epoch-milliseconds-from-iso
+language: TypeScript
+severity: warning
+message: >
+  Epoch milliseconds for a string moment come from `toEpochMs`.
+rule:
+  any:
+    - pattern: new Date($ISO).getTime()
+    - pattern: new Date($ISO).valueOf()
+fix: toEpochMs($ISO)

@@ -1,8 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import {
-  InMemorySpanExporter,
-  SimpleSpanProcessor,
-} from "@opentelemetry/sdk-trace-base";
+import { InMemorySpanExporter, SimpleSpanProcessor } from "@opentelemetry/sdk-trace-base";
 import { SpanStatusCode, trace } from "@opentelemetry/api";
 import { ChatOpenAI } from "@langchain/openai";
 import { DynamicStructuredTool } from "@langchain/core/tools";
@@ -17,9 +14,7 @@ import { createIntegrationObservability } from "../../../../setup/node/__tests__
 const RUN_EXTERNAL = process.env.RUN_EXTERNAL_LLM_TESTS === "true";
 
 if (RUN_EXTERNAL && !process.env.OPENAI_API_KEY) {
-  throw new Error(
-    "RUN_EXTERNAL_LLM_TESTS is true but OPENAI_API_KEY is not set"
-  );
+  throw new Error("RUN_EXTERNAL_LLM_TESTS is true but OPENAI_API_KEY is not set");
 }
 
 /**
@@ -59,24 +54,19 @@ describe.skipIf(!RUN_EXTERNAL)("LangChain Integration Tests", () => {
   it("traces a simple LLM question/response interaction", { timeout: 30_000 }, async () => {
     const tracer = getLangWatchTracer("langchain-integration-test");
 
-    await tracer.withActiveSpan(
-      "simple question/response",
-      { root: true },
-      async () => {
-        const llm = new ChatOpenAI({
-          model: "gpt-5-mini",
-          reasoning: { effort: "low" },
-          temperature: 1,
-        });
+    await tracer.withActiveSpan("simple question/response", { root: true }, async () => {
+      const llm = new ChatOpenAI({
+        model: "gpt-5-mini",
+        reasoning: { effort: "low" },
+        temperature: 1,
+      });
 
-        const result = await llm.invoke(
-          [{ role: "user", content: "Say hello to Bob" }],
-          { callbacks: [new LangWatchCallbackHandler()] }
-        );
+      const result = await llm.invoke([{ role: "user", content: "Say hello to Bob" }], {
+        callbacks: [new LangWatchCallbackHandler()],
+      });
 
-        expect(result.content).toContain("Bob");
-      }
-    );
+      expect(result.content).toContain("Bob");
+    });
 
     await spanProcessor.forceFlush();
     const finishedSpans = spanExporter.getFinishedSpans();
@@ -85,9 +75,7 @@ describe.skipIf(!RUN_EXTERNAL)("LangChain Integration Tests", () => {
     expect(finishedSpans.length).toBeGreaterThan(0);
 
     // Find the LLM span
-    const llmSpan = finishedSpans.find(
-      (span) => span.attributes["langwatch.span.type"] === "llm"
-    );
+    const llmSpan = finishedSpans.find((span) => span.attributes["langwatch.span.type"] === "llm");
     expect(llmSpan).toBeDefined();
     expect(llmSpan?.attributes["langwatch.span.type"]).toBe("llm");
     expect(llmSpan?.attributes["gen_ai.request.model"]).toBe("gpt-5-mini");
@@ -113,46 +101,42 @@ describe.skipIf(!RUN_EXTERNAL)("LangChain Integration Tests", () => {
 
     const tracer = getLangWatchTracer("langchain-integration-test");
 
-    await tracer.withActiveSpan(
-      "tool calling test",
-      { root: true },
-      async () => {
-        const llm = new ChatOpenAI({
-          model: "gpt-5-mini",
-          reasoning: { effort: "low" },
-          temperature: 1,
-        });
+    await tracer.withActiveSpan("tool calling test", { root: true }, async () => {
+      const llm = new ChatOpenAI({
+        model: "gpt-5-mini",
+        reasoning: { effort: "low" },
+        temperature: 1,
+      });
 
-        const prompt = ChatPromptTemplate.fromMessages([
-          ["system", "You are a helpful assistant"],
-          ["placeholder", "{chat_history}"],
-          ["human", "{input}"],
-          ["placeholder", "{agent_scratchpad}"],
-        ]);
+      const prompt = ChatPromptTemplate.fromMessages([
+        ["system", "You are a helpful assistant"],
+        ["placeholder", "{chat_history}"],
+        ["human", "{input}"],
+        ["placeholder", "{agent_scratchpad}"],
+      ]);
 
-        const agent = createToolCallingAgent({
-          llm,
-          tools,
-          prompt,
-        });
+      const agent = createToolCallingAgent({
+        llm,
+        tools,
+        prompt,
+      });
 
-        const agentExecutor = new AgentExecutor({
-          agent,
-          tools,
-        });
+      const agentExecutor = new AgentExecutor({
+        agent,
+        tools,
+      });
 
-        const tracingCallback = new LangWatchCallbackHandler();
-        const result = await agentExecutor.invoke(
-          {
-            input:
-              "What is the current time? Please send me the time in the ISO8601 format, such as 2025-01-01T00:00:00Z",
-          },
-          { callbacks: [tracingCallback] }
-        );
+      const tracingCallback = new LangWatchCallbackHandler();
+      const result = await agentExecutor.invoke(
+        {
+          input:
+            "What is the current time? Please send me the time in the ISO8601 format, such as 2025-01-01T00:00:00Z",
+        },
+        { callbacks: [tracingCallback] },
+      );
 
-        expect(result.output).toContain(date.split('.')[0]); // Ignore milliseconds due to span processing
-      }
-    );
+      expect(result.output).toContain(date.split(".")[0]); // Ignore milliseconds due to span processing
+    });
 
     await spanProcessor.forceFlush();
     const finishedSpans = spanExporter.getFinishedSpans();
@@ -162,18 +146,18 @@ describe.skipIf(!RUN_EXTERNAL)("LangChain Integration Tests", () => {
 
     // Check for tool execution spans
     const toolSpans = finishedSpans.filter(
-      (span) => span.attributes["langwatch.span.type"] === "tool"
+      (span) => span.attributes["langwatch.span.type"] === "tool",
     );
     expect(toolSpans.length).toBeGreaterThan(0);
   });
 
-  it("handles multiple consecutive LLM calls with context grouping", { timeout: 30_000 }, async () => {
-    const tracer = getLangWatchTracer("langchain-integration-test");
+  it(
+    "handles multiple consecutive LLM calls with context grouping",
+    { timeout: 30_000 },
+    async () => {
+      const tracer = getLangWatchTracer("langchain-integration-test");
 
-    await tracer.withActiveSpan(
-      "context grouping test",
-      { root: true },
-      async () => {
+      await tracer.withActiveSpan("context grouping test", { root: true }, async () => {
         const llm = new ChatOpenAI({
           model: "gpt-5-mini",
           reasoning: { effort: "low" },
@@ -182,67 +166,57 @@ describe.skipIf(!RUN_EXTERNAL)("LangChain Integration Tests", () => {
 
         const tracingCallback = new LangWatchCallbackHandler();
 
-        const result1 = await llm.invoke(
-          [{ role: "user", content: "Say hello to Alice" }],
-          { callbacks: [tracingCallback] }
-        );
+        const result1 = await llm.invoke([{ role: "user", content: "Say hello to Alice" }], {
+          callbacks: [tracingCallback],
+        });
 
-        const result2 = await llm.invoke(
-          [{ role: "user", content: "Say hello to Bob" }],
-          { callbacks: [tracingCallback] }
-        );
+        const result2 = await llm.invoke([{ role: "user", content: "Say hello to Bob" }], {
+          callbacks: [tracingCallback],
+        });
 
         expect(result1.content).toContain("Alice");
         expect(result2.content).toContain("Bob");
-      }
-    );
+      });
 
-    await spanProcessor.forceFlush();
-    const finishedSpans = spanExporter.getFinishedSpans();
+      await spanProcessor.forceFlush();
+      const finishedSpans = spanExporter.getFinishedSpans();
 
-    // Verify multiple LLM spans were created
-    const llmSpans = finishedSpans.filter(
-      (span) => span.attributes["langwatch.span.type"] === "llm"
-    );
-    expect(llmSpans.length).toBe(2);
+      // Verify multiple LLM spans were created
+      const llmSpans = finishedSpans.filter(
+        (span) => span.attributes["langwatch.span.type"] === "llm",
+      );
+      expect(llmSpans.length).toBe(2);
 
-    // Verify all spans share the same trace context
-    const traceIds = new Set(
-      llmSpans.map((span) => span.spanContext().traceId)
-    );
-    expect(traceIds.size).toBe(1);
-  });
+      // Verify all spans share the same trace context
+      const traceIds = new Set(llmSpans.map((span) => span.spanContext().traceId));
+      expect(traceIds.size).toBe(1);
+    },
+  );
 
   it("properly handles LLM errors and record exceptions", async () => {
     const tracer = getLangWatchTracer("langchain-integration-test");
 
-    await tracer.withActiveSpan(
-      "error handling test",
-      { root: true },
-      async () => {
-        const llm = new ChatOpenAI({
-          model: "invalid-model",
-          temperature: 1,
-          openAIApiKey: "invalid-key", // This will cause an error
-        });
+    await tracer.withActiveSpan("error handling test", { root: true }, async () => {
+      const llm = new ChatOpenAI({
+        model: "invalid-model",
+        temperature: 1,
+        openAIApiKey: "invalid-key", // This will cause an error
+      });
 
-        const tracingCallback = new LangWatchCallbackHandler();
+      const tracingCallback = new LangWatchCallbackHandler();
 
-        await expect(
-          llm.invoke([{ role: "user", content: "This should fail" }], {
-            callbacks: [tracingCallback],
-          })
-        ).rejects.toThrow();
-      }
-    );
+      await expect(
+        llm.invoke([{ role: "user", content: "This should fail" }], {
+          callbacks: [tracingCallback],
+        }),
+      ).rejects.toThrow();
+    });
 
     await spanProcessor.forceFlush();
     const finishedSpans = spanExporter.getFinishedSpans();
 
     // Verify error span was created
-    const errorSpans = finishedSpans.filter(
-      (span) => span.status.code === SpanStatusCode.ERROR
-    );
+    const errorSpans = finishedSpans.filter((span) => span.status.code === SpanStatusCode.ERROR);
     expect(errorSpans.length).toBeGreaterThan(0);
   });
 
@@ -250,30 +224,25 @@ describe.skipIf(!RUN_EXTERNAL)("LangChain Integration Tests", () => {
     it("names LLM spans with provider and model information", async () => {
       const tracer = getLangWatchTracer("langchain-integration-test");
 
-      await tracer.withActiveSpan(
-        "LLM naming test",
-        { root: true },
-        async () => {
-          const llm = new ChatOpenAI({
-            model: "gpt-5-mini",
-            reasoning: { effort: "low" },
-            temperature: 1,
-          });
+      await tracer.withActiveSpan("LLM naming test", { root: true }, async () => {
+        const llm = new ChatOpenAI({
+          model: "gpt-5-mini",
+          reasoning: { effort: "low" },
+          temperature: 1,
+        });
 
-          const result = await llm.invoke(
-            [{ role: "user", content: "Hello" }],
-            { callbacks: [new LangWatchCallbackHandler()] }
-          );
+        const result = await llm.invoke([{ role: "user", content: "Hello" }], {
+          callbacks: [new LangWatchCallbackHandler()],
+        });
 
-          expect(result.content).toBeDefined();
-        }
-      );
+        expect(result.content).toBeDefined();
+      });
 
       await spanProcessor.forceFlush();
       const finishedSpans = spanExporter.getFinishedSpans();
 
       const llmSpan = finishedSpans.find(
-        (span) => span.attributes["langwatch.span.type"] === "llm"
+        (span) => span.attributes["langwatch.span.type"] === "llm",
       );
       expect(llmSpan).toBeDefined();
 
@@ -298,48 +267,44 @@ describe.skipIf(!RUN_EXTERNAL)("LangChain Integration Tests", () => {
 
       const tracer = getLangWatchTracer("langchain-integration-test");
 
-      await tracer.withActiveSpan(
-        "tool naming test",
-        { root: true },
-        async () => {
-          const llm = new ChatOpenAI({
-            model: "gpt-5-mini",
-            reasoning: { effort: "low" },
-            temperature: 1,
-          });
+      await tracer.withActiveSpan("tool naming test", { root: true }, async () => {
+        const llm = new ChatOpenAI({
+          model: "gpt-5-mini",
+          reasoning: { effort: "low" },
+          temperature: 1,
+        });
 
-          const prompt = ChatPromptTemplate.fromMessages([
-            ["system", "You are a helpful assistant"],
-            ["human", "{input}"],
-            ["placeholder", "{agent_scratchpad}"],
-          ]);
+        const prompt = ChatPromptTemplate.fromMessages([
+          ["system", "You are a helpful assistant"],
+          ["human", "{input}"],
+          ["placeholder", "{agent_scratchpad}"],
+        ]);
 
-          const agent = createToolCallingAgent({
-            llm,
-            tools,
-            prompt,
-          });
+        const agent = createToolCallingAgent({
+          llm,
+          tools,
+          prompt,
+        });
 
-          const agentExecutor = new AgentExecutor({
-            agent,
-            tools,
-          });
+        const agentExecutor = new AgentExecutor({
+          agent,
+          tools,
+        });
 
-          const tracingCallback = new LangWatchCallbackHandler();
-          const result = await agentExecutor.invoke(
-            { input: "What is the current time?" },
-            { callbacks: [tracingCallback] }
-          );
+        const tracingCallback = new LangWatchCallbackHandler();
+        const result = await agentExecutor.invoke(
+          { input: "What is the current time?" },
+          { callbacks: [tracingCallback] },
+        );
 
-          expect(result.output).toBeDefined();
-        }
-      );
+        expect(result.output).toBeDefined();
+      });
 
       await spanProcessor.forceFlush();
       const finishedSpans = spanExporter.getFinishedSpans();
 
       const toolSpans = finishedSpans.filter(
-        (span) => span.attributes["langwatch.span.type"] === "tool"
+        (span) => span.attributes["langwatch.span.type"] === "tool",
       );
       expect(toolSpans.length).toBeGreaterThan(0);
 
@@ -361,94 +326,79 @@ describe.skipIf(!RUN_EXTERNAL)("LangChain Integration Tests", () => {
 
       const tracer = getLangWatchTracer("langchain-integration-test");
 
-      await tracer.withActiveSpan(
-        "agent naming test",
-        { root: true },
-        async () => {
-          const llm = new ChatOpenAI({
-            model: "gpt-5-mini",
-            reasoning: { effort: "low" },
-            temperature: 1,
-          });
+      await tracer.withActiveSpan("agent naming test", { root: true }, async () => {
+        const llm = new ChatOpenAI({
+          model: "gpt-5-mini",
+          reasoning: { effort: "low" },
+          temperature: 1,
+        });
 
-          const prompt = ChatPromptTemplate.fromMessages([
-            ["system", "You are a helpful assistant"],
-            ["human", "{input}"],
-            ["placeholder", "{agent_scratchpad}"],
-          ]);
+        const prompt = ChatPromptTemplate.fromMessages([
+          ["system", "You are a helpful assistant"],
+          ["human", "{input}"],
+          ["placeholder", "{agent_scratchpad}"],
+        ]);
 
-          const agent = createToolCallingAgent({
-            llm,
-            tools,
-            prompt,
-          });
+        const agent = createToolCallingAgent({
+          llm,
+          tools,
+          prompt,
+        });
 
-          const agentExecutor = new AgentExecutor({
-            agent,
-            tools,
-          });
+        const agentExecutor = new AgentExecutor({
+          agent,
+          tools,
+        });
 
-          const tracingCallback = new LangWatchCallbackHandler();
-          const result = await agentExecutor.invoke(
-            { input: "Search for something" },
-            { callbacks: [tracingCallback] }
-          );
+        const tracingCallback = new LangWatchCallbackHandler();
+        const result = await agentExecutor.invoke(
+          { input: "Search for something" },
+          { callbacks: [tracingCallback] },
+        );
 
-          expect(result.output).toBeDefined();
-        }
-      );
+        expect(result.output).toBeDefined();
+      });
 
       await spanProcessor.forceFlush();
       const finishedSpans = spanExporter.getFinishedSpans();
 
       // Find agent-related spans - AgentExecutor can be typed as "component" or found via name
-      const agentSpan = finishedSpans.find(
-        (span) => span.name.includes("Agent")
-      );
+      const agentSpan = finishedSpans.find((span) => span.name.includes("Agent"));
       expect(agentSpan).toBeDefined();
-      
+
       // Verify the span has appropriate type (component for AgentExecutor, or chain)
-      expect(["component", "chain"]).toContain(
-        agentSpan?.attributes["langwatch.span.type"]
-      );
+      expect(["component", "chain"]).toContain(agentSpan?.attributes["langwatch.span.type"]);
     });
 
     it("names chain spans with proper fallback naming", async () => {
       const tracer = getLangWatchTracer("langchain-integration-test");
 
-      await tracer.withActiveSpan(
-        "chain naming test",
-        { root: true },
-        async () => {
-          const llm = new ChatOpenAI({
-            model: "gpt-5-mini",
-            reasoning: { effort: "low" },
-            temperature: 1,
-          });
+      await tracer.withActiveSpan("chain naming test", { root: true }, async () => {
+        const llm = new ChatOpenAI({
+          model: "gpt-5-mini",
+          reasoning: { effort: "low" },
+          temperature: 1,
+        });
 
-          // Create a simple chain
-          const prompt = ChatPromptTemplate.fromMessages([
-            ["system", "You are a helpful assistant"],
-            ["human", "{input}"],
-          ]);
+        // Create a simple chain
+        const prompt = ChatPromptTemplate.fromMessages([
+          ["system", "You are a helpful assistant"],
+          ["human", "{input}"],
+        ]);
 
-          const chain = prompt.pipe(llm);
+        const chain = prompt.pipe(llm);
 
-          const tracingCallback = new LangWatchCallbackHandler();
-          const result = await chain.invoke(
-            { input: "Hello" },
-            { callbacks: [tracingCallback] }
-          );
+        const tracingCallback = new LangWatchCallbackHandler();
+        const result = await chain.invoke({ input: "Hello" }, { callbacks: [tracingCallback] });
 
-          expect(result.content).toBeDefined();
-        }
-      );
+        expect(result.content).toBeDefined();
+      });
 
       await spanProcessor.forceFlush();
       const finishedSpans = spanExporter.getFinishedSpans();
 
       const chainSpans = finishedSpans.filter(
-        (span) => span.attributes["langwatch.span.type"] === "chain"
+        (span) => span.attributes["langwatch.span.type"] === "chain",
       );
       expect(chainSpans.length).toBeGreaterThan(0);
 
@@ -460,34 +410,27 @@ describe.skipIf(!RUN_EXTERNAL)("LangChain Integration Tests", () => {
     it("handles custom operation names from metadata", async () => {
       const tracer = getLangWatchTracer("langchain-integration-test");
 
-      await tracer.withActiveSpan(
-        "custom naming test",
-        { root: true },
-        async () => {
-          const llm = new ChatOpenAI({
-            model: "gpt-5-mini",
-            reasoning: { effort: "low" },
-            temperature: 1,
-          });
+      await tracer.withActiveSpan("custom naming test", { root: true }, async () => {
+        const llm = new ChatOpenAI({
+          model: "gpt-5-mini",
+          reasoning: { effort: "low" },
+          temperature: 1,
+        });
 
-          const tracingCallback = new LangWatchCallbackHandler();
-          const result = await llm.invoke(
-            [{ role: "user", content: "Hello" }],
-            {
-              callbacks: [tracingCallback],
-              metadata: { operation_name: "Custom LLM Call" },
-            }
-          );
+        const tracingCallback = new LangWatchCallbackHandler();
+        const result = await llm.invoke([{ role: "user", content: "Hello" }], {
+          callbacks: [tracingCallback],
+          metadata: { operation_name: "Custom LLM Call" },
+        });
 
-          expect(result.content).toBeDefined();
-        }
-      );
+        expect(result.content).toBeDefined();
+      });
 
       await spanProcessor.forceFlush();
       const finishedSpans = spanExporter.getFinishedSpans();
 
       const llmSpan = finishedSpans.find(
-        (span) => span.attributes["langwatch.span.type"] === "llm"
+        (span) => span.attributes["langwatch.span.type"] === "llm",
       );
       expect(llmSpan).toBeDefined();
 
@@ -498,30 +441,25 @@ describe.skipIf(!RUN_EXTERNAL)("LangChain Integration Tests", () => {
     it("verifies no deprecated LLM prefix in span names", async () => {
       const tracer = getLangWatchTracer("langchain-integration-test");
 
-      await tracer.withActiveSpan(
-        "deprecated prefix test",
-        { root: true },
-        async () => {
-          const llm = new ChatOpenAI({
-            model: "gpt-5-mini",
-            reasoning: { effort: "low" },
-            temperature: 1,
-          });
+      await tracer.withActiveSpan("deprecated prefix test", { root: true }, async () => {
+        const llm = new ChatOpenAI({
+          model: "gpt-5-mini",
+          reasoning: { effort: "low" },
+          temperature: 1,
+        });
 
-          const result = await llm.invoke(
-            [{ role: "user", content: "Hello" }],
-            { callbacks: [new LangWatchCallbackHandler()] }
-          );
+        const result = await llm.invoke([{ role: "user", content: "Hello" }], {
+          callbacks: [new LangWatchCallbackHandler()],
+        });
 
-          expect(result.content).toBeDefined();
-        }
-      );
+        expect(result.content).toBeDefined();
+      });
 
       await spanProcessor.forceFlush();
       const finishedSpans = spanExporter.getFinishedSpans();
 
       const llmSpans = finishedSpans.filter(
-        (span) => span.attributes["langwatch.span.type"] === "llm"
+        (span) => span.attributes["langwatch.span.type"] === "llm",
       );
 
       // Verify no LLM spans start with "LLM:" prefix
@@ -533,30 +471,25 @@ describe.skipIf(!RUN_EXTERNAL)("LangChain Integration Tests", () => {
     it("verifies GenAI attributes are set correctly", async () => {
       const tracer = getLangWatchTracer("langchain-integration-test");
 
-      await tracer.withActiveSpan(
-        "GenAI attributes test",
-        { root: true },
-        async () => {
-          const llm = new ChatOpenAI({
-            model: "gpt-5-mini",
-            reasoning: { effort: "low" },
-            temperature: 1,
-          });
+      await tracer.withActiveSpan("GenAI attributes test", { root: true }, async () => {
+        const llm = new ChatOpenAI({
+          model: "gpt-5-mini",
+          reasoning: { effort: "low" },
+          temperature: 1,
+        });
 
-          const result = await llm.invoke(
-            [{ role: "user", content: "Hello" }],
-            { callbacks: [new LangWatchCallbackHandler()] }
-          );
+        const result = await llm.invoke([{ role: "user", content: "Hello" }], {
+          callbacks: [new LangWatchCallbackHandler()],
+        });
 
-          expect(result.content).toBeDefined();
-        }
-      );
+        expect(result.content).toBeDefined();
+      });
 
       await spanProcessor.forceFlush();
       const finishedSpans = spanExporter.getFinishedSpans();
 
       const llmSpan = finishedSpans.find(
-        (span) => span.attributes["langwatch.span.type"] === "llm"
+        (span) => span.attributes["langwatch.span.type"] === "llm",
       );
       expect(llmSpan).toBeDefined();
 
@@ -574,65 +507,59 @@ describe.skipIf(!RUN_EXTERNAL)("LangChain Integration Tests", () => {
     it("verifies span hierarchy and parent-child relationships", async () => {
       const tracer = getLangWatchTracer("langchain-integration-test");
 
-      await tracer.withActiveSpan(
-        "hierarchy test",
-        { root: true },
-        async () => {
-          const llm = new ChatOpenAI({
-            model: "gpt-5-mini",
-            reasoning: { effort: "low" },
-            temperature: 1,
-          });
+      await tracer.withActiveSpan("hierarchy test", { root: true }, async () => {
+        const llm = new ChatOpenAI({
+          model: "gpt-5-mini",
+          reasoning: { effort: "low" },
+          temperature: 1,
+        });
 
-          const tools = [
-            new DynamicStructuredTool({
-              name: "test_tool",
-              description: "A test tool",
-              schema: z.object({}),
-              func: async () => "test result",
-            }),
-          ];
+        const tools = [
+          new DynamicStructuredTool({
+            name: "test_tool",
+            description: "A test tool",
+            schema: z.object({}),
+            func: async () => "test result",
+          }),
+        ];
 
-          const prompt = ChatPromptTemplate.fromMessages([
-            ["system", "You are a helpful assistant"],
-            ["human", "{input}"],
-            ["placeholder", "{agent_scratchpad}"],
-          ]);
+        const prompt = ChatPromptTemplate.fromMessages([
+          ["system", "You are a helpful assistant"],
+          ["human", "{input}"],
+          ["placeholder", "{agent_scratchpad}"],
+        ]);
 
-          const agent = createToolCallingAgent({
-            llm,
-            tools,
-            prompt,
-          });
+        const agent = createToolCallingAgent({
+          llm,
+          tools,
+          prompt,
+        });
 
-          const agentExecutor = new AgentExecutor({
-            agent,
-            tools,
-          });
+        const agentExecutor = new AgentExecutor({
+          agent,
+          tools,
+        });
 
-          const tracingCallback = new LangWatchCallbackHandler();
-          const result = await agentExecutor.invoke(
-            { input: "Use the test tool" },
-            { callbacks: [tracingCallback] }
-          );
+        const tracingCallback = new LangWatchCallbackHandler();
+        const result = await agentExecutor.invoke(
+          { input: "Use the test tool" },
+          { callbacks: [tracingCallback] },
+        );
 
-          expect(result.output).toBeDefined();
-        }
-      );
+        expect(result.output).toBeDefined();
+      });
 
       await spanProcessor.forceFlush();
       const finishedSpans = spanExporter.getFinishedSpans();
 
       // Verify we have multiple span types
       const spanTypes = new Set(
-        finishedSpans.map((span) => span.attributes["langwatch.span.type"])
+        finishedSpans.map((span) => span.attributes["langwatch.span.type"]),
       );
       expect(spanTypes.size).toBeGreaterThan(1);
 
       // Verify all spans share the same trace
-      const traceIds = new Set(
-        finishedSpans.map((span) => span.spanContext().traceId)
-      );
+      const traceIds = new Set(finishedSpans.map((span) => span.spanContext().traceId));
       expect(traceIds.size).toBe(1);
 
       // Verify proper span types are present

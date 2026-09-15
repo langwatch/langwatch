@@ -20,7 +20,7 @@ export interface ModelProviderEntry {
 
 /** Lists all model providers for the project, with masked API keys. */
 export async function listModelProviders(): Promise<Record<string, ModelProviderEntry>> {
-  return makeRequest("GET", "/api/model-providers") as Promise<
+  return makeRequest("GET", "/api/v1/model-providers") as Promise<
     Record<string, ModelProviderEntry>
   >;
 }
@@ -35,7 +35,7 @@ export async function setModelProvider(params: {
   const { provider, ...data } = params;
   return makeRequest(
     "PUT",
-    `/api/model-providers/${encodeURIComponent(provider)}`,
+    `/api/v1/model-providers/${encodeURIComponent(provider)}`,
     data,
   ) as Promise<Record<string, ModelProviderEntry>>;
 }

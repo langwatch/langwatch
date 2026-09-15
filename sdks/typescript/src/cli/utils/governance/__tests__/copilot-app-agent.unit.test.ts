@@ -58,12 +58,8 @@ describe("installCopilotAppAgent", () => {
       expect(files.get(p)).toContain("<key>RunAtLoad</key>");
       // Modern verbs only: legacy `launchctl load` exits 0 even on failure,
       // which is exactly the silent-success this module must never report.
-      expect(
-        runs.some((r) => r.cmd === "launchctl" && r.args[0] === "bootstrap"),
-      ).toBe(true);
-      expect(
-        runs.some((r) => r.cmd === "launchctl" && r.args[0] === "load"),
-      ).toBe(false);
+      expect(runs.some((r) => r.cmd === "launchctl" && r.args[0] === "bootstrap")).toBe(true);
+      expect(runs.some((r) => r.cmd === "launchctl" && r.args[0] === "load")).toBe(false);
     });
   });
 
@@ -72,25 +68,14 @@ describe("installCopilotAppAgent", () => {
     it("writes the unit and enables it with systemctl --user", () => {
       const { io, files, runs } = fakeIo();
 
-      const p = installCopilotAppAgent(
-        { ...macSpec, platform: "linux", home: "/home/dev" },
-        io,
-      );
+      const p = installCopilotAppAgent({ ...macSpec, platform: "linux", home: "/home/dev" }, io);
 
       expect(p).toContain(".config/systemd/user");
       expect(files.get(p)).toContain("ExecStart=");
-      expect(
-        runs.some(
-          (r) => r.cmd === "systemctl" && r.args.includes("enable"),
-        ),
-      ).toBe(true);
+      expect(runs.some((r) => r.cmd === "systemctl" && r.args.includes("enable"))).toBe(true);
       // restart, not `enable --now`: `--now` is a no-op on an already-active
       // unit, which would leave a running app holding the revoked prior key.
-      expect(
-        runs.some(
-          (r) => r.cmd === "systemctl" && r.args.includes("restart"),
-        ),
-      ).toBe(true);
+      expect(runs.some((r) => r.cmd === "systemctl" && r.args.includes("restart"))).toBe(true);
       expect(runs.every((r) => !r.args.includes("--now"))).toBe(true);
     });
   });
@@ -112,18 +97,12 @@ describe("installCopilotAppAgent", () => {
       const wrapperPath = [...files.keys()].find((f) => f.endsWith(".cmd"))!;
       expect(files.get(wrapperPath)).toContain('set "COPILOT_OTEL_ENABLED=true"');
       expect(xml).toContain(".cmd");
-      expect(
-        runs.some((r) => r.cmd === "schtasks" && r.args.includes("/Create")),
-      ).toBe(true);
+      expect(runs.some((r) => r.cmd === "schtasks" && r.args.includes("/Create"))).toBe(true);
       // /Create registers for the NEXT logon only; /Run starts capture now.
-      expect(
-        runs.some((r) => r.cmd === "schtasks" && r.args.includes("/Run")),
-      ).toBe(true);
+      expect(runs.some((r) => r.cmd === "schtasks" && r.args.includes("/Run"))).toBe(true);
       // Schema default DisallowStartIfOnBatteries=true would silently keep
       // laptops-on-battery from ever starting capture.
-      expect(xml).toContain(
-        "<DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries>",
-      );
+      expect(xml).toContain("<DisallowStartIfOnBatteries>false</DisallowStartIfOnBatteries>");
     });
   });
 
@@ -153,9 +132,7 @@ describe("removeCopilotAppAgent", () => {
 
       expect(removed).toBe(true);
       expect(files.has(p)).toBe(false);
-      expect(
-        runs.some((r) => r.cmd === "launchctl" && r.args[0] === "bootout"),
-      ).toBe(true);
+      expect(runs.some((r) => r.cmd === "launchctl" && r.args[0] === "bootout")).toBe(true);
     });
   });
 
@@ -182,14 +159,9 @@ describe("isCopilotAppAgentInstalled", () => {
 describe("installCopilotAppAgent registration-failure handling", () => {
   describe("when a real service-manager command fails", () => {
     it("throws instead of reporting a silent success (macOS bootstrap)", () => {
-      const { io, files } = fakeIo(
-        new Set(),
-        (_cmd, args) => args[0] === "bootstrap",
-      );
+      const { io, files } = fakeIo(new Set(), (_cmd, args) => args[0] === "bootstrap");
 
-      expect(() => installCopilotAppAgent(macSpec, io)).toThrow(
-        CopilotAppAgentError,
-      );
+      expect(() => installCopilotAppAgent(macSpec, io)).toThrow(CopilotAppAgentError);
       // The token-bearing descriptor written before the register step must
       // be unwound: a plist that failed to register is a stray credential
       // the OS could still pick up at the next login.
@@ -200,10 +172,7 @@ describe("installCopilotAppAgent registration-failure handling", () => {
       const { io } = fakeIo(new Set(), (cmd) => cmd === "schtasks");
 
       expect(() =>
-        installCopilotAppAgent(
-          { ...macSpec, platform: "win32", home: "C:\\Users\\dev" },
-          io,
-        ),
+        installCopilotAppAgent({ ...macSpec, platform: "win32", home: "C:\\Users\\dev" }, io),
       ).toThrow(CopilotAppAgentError);
     });
   });
@@ -212,10 +181,7 @@ describe("installCopilotAppAgent registration-failure handling", () => {
     it("tolerates it and still installs (bootstrap succeeds)", () => {
       // `launchctl bootout` errors on a first install (nothing loaded yet);
       // that one failure must not abort the install.
-      const { io, files } = fakeIo(
-        new Set(),
-        (_cmd, args) => args[0] === "bootout",
-      );
+      const { io, files } = fakeIo(new Set(), (_cmd, args) => args[0] === "bootout");
 
       const p = installCopilotAppAgent(macSpec, io);
 
@@ -240,9 +206,7 @@ describe("removeCopilotAppAgent unregister-failure handling", () => {
       },
     };
 
-    expect(() => removeCopilotAppAgent("darwin", "/Users/dev", io2)).toThrow(
-      CopilotAppAgentError,
-    );
+    expect(() => removeCopilotAppAgent("darwin", "/Users/dev", io2)).toThrow(CopilotAppAgentError);
     // descriptor preserved for retry — NOT deleted
     expect(files.has(p)).toBe(true);
   });
@@ -253,16 +217,11 @@ describe("removeCopilotAppAgent unregister-failure handling", () => {
     // report it and removal must delete it even though schtasks /Delete
     // fails (nothing registered).
     const { io, files } = fakeIo();
-    installCopilotAppAgent(
-      { ...macSpec, platform: "win32", home: "C:\\Users\\dev" },
-      io,
-    );
+    installCopilotAppAgent({ ...macSpec, platform: "win32", home: "C:\\Users\\dev" }, io);
     const xmlPath = [...files.keys()].find((f) => f.endsWith(".xml"))!;
     files.delete(xmlPath);
 
-    expect(isCopilotAppAgentInstalled("win32", "C:\\Users\\dev", io)).toBe(
-      true,
-    );
+    expect(isCopilotAppAgentInstalled("win32", "C:\\Users\\dev", io)).toBe(true);
 
     const io2 = {
       ...io,

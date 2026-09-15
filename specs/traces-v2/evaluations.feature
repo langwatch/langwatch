@@ -391,7 +391,7 @@ Rule: Feedback is displayed as events
   Scenario: Feedback can be filtered via the event facet
     When the user applies the filter "event:user.feedback"
     Then only traces with feedback events are shown
-    # `event` is a real facet field exposed via `query-language/metadata`
+    # `event` is a real facet field exposed by Trace query metadata
     # and the "Trace" facet group in the sidebar.
 
   @planned

@@ -1,13 +1,13 @@
 import { scopedApiKey } from "@/internal/credentialContext";
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
-import { resolveCredentials } from "../../utils/apiKey";
-import { formatFetchError } from "../../utils/formatFetchError";
-import { failSpinner } from "../../utils/spinnerError";
+import { createSpinner } from "../../utils/spinner.ts";
+import { resolveCredentials } from "../../utils/apiKey.ts";
+import { formatFetchError } from "../../utils/formatFetchError.ts";
+import { failSpinner } from "../../utils/spinnerError.ts";
 import { buildAuthHeaders } from "@/internal/api/auth";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
-import type { CommandResult } from "../../utils/output";
+import type { CommandResult } from "../../utils/output.ts";
 import { langwatchFetch } from "@/internal/http/langwatchFetch";
 
 /**
@@ -16,21 +16,28 @@ import { langwatchFetch } from "@/internal/http/langwatchFetch";
  * endpoint never returns the VALUE — that is what the human view's closing
  * note says — so the raw record is metadata only and safe as a payload.
  */
-export const getSecretCommand = async (
-  id: string,
-): Promise<CommandResult | void> => {
-  await resolveCredentials();
+export const getSecretCommand = async (id: string): Promise<CommandResult | void> => {
+  const credentials = await resolveCredentials();
+  if (!credentials.projectId) {
+    throw new Error("A project must be selected for secret operations");
+  }
 
   const apiKey = scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
-  const endpoint =
-    resolveControlPlaneUrl();
+  const endpoint = resolveControlPlaneUrl();
 
   const spinner = createSpinner(`Fetching secret "${id}"...`).start();
 
   try {
-    const response = await langwatchFetch(`${endpoint}/api/secrets/${id}`, {
-      headers: buildAuthHeaders({ apiKey }),
-    });
+    const response = await langwatchFetch(
+      `${endpoint}/api/v1/secret/${encodeURIComponent(id)}?projectId=${encodeURIComponent(credentials.projectId)}`,
+      {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          ...buildAuthHeaders({ apiKey }),
+        },
+      },
+    );
 
     if (!response.ok) {
       const message = await formatFetchError(response);
@@ -54,16 +61,10 @@ export const getSecretCommand = async (
         console.log();
         console.log(`  ${chalk.gray("ID:")}      ${chalk.green(secret.id)}`);
         console.log(`  ${chalk.gray("Name:")}    ${chalk.cyan(secret.name)}`);
-        console.log(
-          `  ${chalk.gray("Created:")} ${new Date(secret.createdAt).toLocaleString()}`
-        );
-        console.log(
-          `  ${chalk.gray("Updated:")} ${new Date(secret.updatedAt).toLocaleString()}`
-        );
+        console.log(`  ${chalk.gray("Created:")} ${new Date(secret.createdAt).toLocaleString()}`);
+        console.log(`  ${chalk.gray("Updated:")} ${new Date(secret.updatedAt).toLocaleString()}`);
         console.log();
-        console.log(
-          chalk.gray("  (Secret values are never returned for security)")
-        );
+        console.log(chalk.gray("  (Secret values are never returned for security)"));
         console.log();
       },
     };

@@ -8,9 +8,7 @@ import { escapeMarkdown } from "../utils/escape-markdown.js";
  * Used by both create-dataset and update-dataset handlers to avoid
  * duplicating the formatting logic.
  */
-export function formatDatasetMutationDetails(
-  result: DatasetMutationResponse,
-): string[] {
+export function formatDatasetMutationDetails(result: DatasetMutationResponse): string[] {
   const lines: string[] = [];
   lines.push(`**Name**: ${escapeMarkdown(result.name)}`);
   lines.push(`**Slug**: ${escapeMarkdown(result.slug)}`);

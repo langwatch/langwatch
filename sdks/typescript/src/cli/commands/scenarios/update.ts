@@ -1,17 +1,14 @@
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
+import { createSpinner } from "../../utils/spinner.ts";
 import type { UpdateScenarioBody } from "@/client-sdk/services/scenarios";
 import type { SuiteFieldDefinition } from "@/client-sdk/services/test-suites";
-import { resolveCredentials } from "../../utils/apiKey";
-import { failSpinner } from "../../utils/spinnerError";
-import type { CommandResult } from "../../utils/output";
-import { parseScenarioFieldFlags } from "../../utils/suiteFieldFlags";
-import { createCliScenariosService } from "./cli-scenarios-service";
-import { createCliTestSuitesService } from "../test-suites/cli-test-suites-service";
-import {
-  resolveSuiteReference,
-  SuiteReferenceError,
-} from "../test-suites/resolveSuite";
+import { resolveCredentials } from "../../utils/apiKey.ts";
+import { failSpinner } from "../../utils/spinnerError.ts";
+import type { CommandResult } from "../../utils/output.ts";
+import { parseScenarioFieldFlags } from "../../utils/suiteFieldFlags.ts";
+import { createCliScenariosService } from "./cli-scenarios-service.ts";
+import { createCliTestSuitesService } from "../test-suites/cli-test-suites-service.ts";
+import { resolveSuiteReference, SuiteReferenceError } from "../test-suites/resolveSuite.ts";
 
 /**
  * The field definitions of the suite a scenario is filed in, or none when
@@ -53,11 +50,7 @@ export const updateScenarioCommand = async (
   // One of the two says where the scenario goes, so a line carrying both says
   // two different things. It is refused before the scenario is touched.
   if (options.testSuite !== undefined && options.noTestSuite) {
-    console.error(
-      chalk.red(
-        "Error: --test-suite and --no-test-suite cannot be used together.",
-      ),
-    );
+    console.error(chalk.red("Error: --test-suite and --no-test-suite cannot be used together."));
     process.exit(1);
   }
 
@@ -103,8 +96,7 @@ export const updateScenarioCommand = async (
     if (options.situation !== undefined) body.situation = options.situation;
     if (options.criteria !== undefined)
       body.criteria = options.criteria.split(",").map((c) => c.trim());
-    if (options.labels !== undefined)
-      body.labels = options.labels.split(",").map((l) => l.trim());
+    if (options.labels !== undefined) body.labels = options.labels.split(",").map((l) => l.trim());
     if (testSuiteId !== undefined) body.testSuiteId = testSuiteId;
     if (fields !== undefined) body.fields = fields;
 

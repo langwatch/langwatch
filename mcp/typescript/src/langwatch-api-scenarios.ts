@@ -24,14 +24,14 @@ export interface ScenarioArchiveResponse {
 
 /** Lists all scenarios in the project. */
 export async function listScenarios(): Promise<ScenarioSummary[]> {
-  return makeRequest("GET", "/api/scenarios") as Promise<ScenarioSummary[]>;
+  return makeRequest("GET", "/api/v1/scenarios") as Promise<ScenarioSummary[]>;
 }
 
 /** Retrieves a single scenario by ID. */
 export async function getScenario(id: string): Promise<ScenarioSummary> {
   return makeRequest(
     "GET",
-    `/api/scenarios/${encodeURIComponent(id)}`
+    `/api/v1/scenarios/${encodeURIComponent(id)}`,
   ) as Promise<ScenarioSummary>;
 }
 
@@ -44,7 +44,7 @@ export async function createScenario(data: {
   testSuiteId?: string | null;
   fields?: ScenarioFieldValues;
 }): Promise<ScenarioSummary> {
-  return makeRequest("POST", "/api/scenarios", data) as Promise<ScenarioSummary>;
+  return makeRequest("POST", "/api/v1/scenarios", data) as Promise<ScenarioSummary>;
 }
 
 /** Updates an existing scenario. */
@@ -60,17 +60,15 @@ export async function updateScenario(params: {
   const { id, ...data } = params;
   return makeRequest(
     "PUT",
-    `/api/scenarios/${encodeURIComponent(id)}`,
-    data
+    `/api/v1/scenarios/${encodeURIComponent(id)}`,
+    data,
   ) as Promise<ScenarioSummary>;
 }
 
 /** Archives (soft-deletes) a scenario. */
-export async function archiveScenario(
-  id: string
-): Promise<ScenarioArchiveResponse> {
+export async function archiveScenario(id: string): Promise<ScenarioArchiveResponse> {
   return makeRequest(
     "DELETE",
-    `/api/scenarios/${encodeURIComponent(id)}`
+    `/api/v1/scenarios/${encodeURIComponent(id)}`,
   ) as Promise<ScenarioArchiveResponse>;
 }

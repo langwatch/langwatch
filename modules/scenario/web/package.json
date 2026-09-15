@@ -1,0 +1,128 @@
+{
+  "name": "@langwatch/scenario-web",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Browser-safe Scenario library and target-selection UI.",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    "./scenario-mappings": {
+      "langwatch-declaration-source": "./src/scenario-mappings.ts",
+      "types": "./dist/scenario-mappings.d.ts",
+      "default": "./src/scenario-mappings.ts"
+    },
+    "./surfaces/media-part": {
+      "langwatch-declaration-source": "./src/ui/sections/media-part.tsx",
+      "types": "./dist/ui/sections/media-part.d.ts",
+      "default": "./src/ui/sections/media-part.tsx"
+    },
+    ".": {
+      "langwatch-declaration-source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    },
+    "./surfaces/simulations-preference": {
+      "langwatch-declaration-source": "./src/simulations-preference.ts",
+      "types": "./dist/simulations-preference.d.ts",
+      "default": "./src/simulations-preference.ts"
+    },
+    "./simulations": {
+      "langwatch-declaration-source": "./src/simulations.ts",
+      "types": "./dist/simulations.d.ts",
+      "default": "./src/simulations.ts"
+    },
+    "./drawers": {
+      "langwatch-declaration-source": "./src/drawers.ts",
+      "types": "./dist/drawers.d.ts",
+      "default": "./src/drawers.ts"
+    },
+    "./surfaces/parameter-line-field": {
+      "types": "./dist/ui/sections/agent-testing/run/parameter-line-field.d.ts",
+      "default": "./src/ui/sections/agent-testing/run/parameter-line-field.tsx"
+    },
+    "./surfaces/dialog-fields": {
+      "types": "./dist/ui/elements/agent-testing/shared/dialog-fields.d.ts",
+      "default": "./src/ui/elements/agent-testing/shared/dialog-fields.tsx"
+    },
+    "./surfaces/parameter-line": {
+      "types": "./dist/model/agent-testing/run/parameter-line.d.ts",
+      "default": "./src/model/agent-testing/run/parameter-line.ts"
+    },
+    "./surfaces/parameter-suggestions": {
+      "types": "./dist/ui/sections/agent-testing/run/parameter-suggestions.d.ts",
+      "default": "./src/ui/sections/agent-testing/run/parameter-suggestions.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "pnpm -w typecheck:declarations --project . && tsc --noEmit",
+    "test": "vitest run",
+    "test:unit": "vitest run"
+  },
+  "dependencies": {
+    "@chakra-ui/react": "catalog:",
+    "@emotion/react": "catalog:",
+    "@hookform/resolvers": "catalog:",
+    "@langwatch/agent-contract": "workspace:*",
+    "@langwatch/agent-web": "workspace:*",
+    "@langwatch/analytics-web": "workspace:*",
+    "@langwatch/api": "workspace:*",
+    "@langwatch/authz-contract": "workspace:*",
+    "@langwatch/design-system": "workspace:*",
+    "@langwatch/evaluator-contract": "workspace:*",
+    "@langwatch/experiment-contract": "workspace:*",
+    "@langwatch/feature-flag-contract": "workspace:*",
+    "@langwatch/handled-error": "workspace:*",
+    "@langwatch/ksuid": "workspace:*",
+    "@langwatch/langy-web": "workspace:*",
+    "@langwatch/model-provider-contract": "workspace:*",
+    "@langwatch/model-provider-web": "workspace:*",
+    "@langwatch/observability": "workspace:*",
+    "@langwatch/prompt-web": "workspace:*",
+    "@langwatch/scenario-contract": "workspace:*",
+    "@langwatch/suite-contract": "workspace:*",
+    "@langwatch/suite-web": "workspace:*",
+    "@langwatch/time": "workspace:*",
+    "@langwatch/trace-web": "workspace:*",
+    "@langwatch/ui-drawer": "workspace:*",
+    "@langwatch/ui-host": "workspace:*",
+    "@langwatch/workflow-contract": "workspace:*",
+    "@langwatch/workflow-web": "workspace:*",
+    "@tanstack/react-table": "catalog:",
+    "@tanstack/react-virtual": "catalog:",
+    "lucide-react": "catalog:",
+    "nanoid": "catalog:",
+    "posthog-js": "catalog:",
+    "react": "catalog:",
+    "react-feather": "catalog:",
+    "react-hook-form": "catalog:",
+    "react-icons": "catalog:",
+    "usehooks-ts": "catalog:",
+    "zod": "catalog:",
+    "zustand": "catalog:"
+  },
+  "devDependencies": {
+    "@tanstack/react-query": "catalog:",
+    "@testing-library/jest-dom": "catalog:",
+    "@testing-library/react": "catalog:",
+    "@testing-library/user-event": "catalog:",
+    "@trpc/client": "catalog:",
+    "@trpc/server": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "jsdom": "catalog:",
+    "react-dom": "catalog:",
+    "react-router": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vitest": "catalog:"
+  },
+  "peerDependencies": {
+    "@chakra-ui/react": "^3.36.0",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7"
+  }
+}

@@ -1,16 +1,23 @@
 {
-	"compilerOptions": {
-		"target": "ES2022",
-		"module": "ESNext",
-		"moduleResolution": "Bundler",
-		"lib": ["ES2022", "DOM", "DOM.Iterable"],
-		"strict": true,
-		"esModuleInterop": true,
-		"skipLibCheck": true,
-		"resolveJsonModule": true,
-		"rootDir": "src",
-		"types": ["node"],
-		"noEmit": true
-	},
-	"include": ["src/**/*"]
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "noEmit": true,
+    "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
+    "module": "ESNext",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "rootDir": "src",
+    "types": ["node"],
+
+    "rewriteRelativeImportExtensions": false
+  },
+  "include": ["src/**/*"],
+
+  "references": [
+    {
+      "path": "tsconfig.build.json"
+    }
+  ]
 }

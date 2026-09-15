@@ -6,7 +6,11 @@ vi.mock("@/client-sdk/services/prompts", () => ({
 }));
 
 vi.mock("../../../utils/apiKey", () => ({
-  resolveCredentials: vi.fn(async () => ({ apiKey: "test-key", source: "env", endpoint: "https://app.langwatch.ai" })),
+  resolveCredentials: vi.fn(async () => ({
+    apiKey: "test-key",
+    source: "env",
+    endpoint: "https://app.langwatch.ai",
+  })),
 }));
 
 import { tagAssignCommand } from "../assign";
@@ -26,11 +30,12 @@ describe("tagAssignCommand", () => {
     vi.clearAllMocks();
     mockGet = vi.fn();
     mockAssignTag = vi.fn();
-    vi.mocked(PromptsApiService).mockImplementation(
-      function () { return ({
-          get: mockGet,
-          assignTag: mockAssignTag,
-        }) as unknown as InstanceType<typeof PromptsApiService>; });
+    vi.mocked(PromptsApiService).mockImplementation(function () {
+      return {
+        get: mockGet,
+        assignTag: mockAssignTag,
+      } as unknown as InstanceType<typeof PromptsApiService>;
+    });
     vi.spyOn(process, "exit").mockImplementation((code) => {
       throw new ProcessExitError(code as number);
     });

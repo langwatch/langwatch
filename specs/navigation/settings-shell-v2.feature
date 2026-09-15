@@ -40,6 +40,13 @@ Feature: Settings shell
     Then the enterprise entries carry an "ENT" pill
     And the pill is grey with a hairline border, not a coloured one
 
+  @unit
+  Scenario: A still-loading plan hides the enterprise entries
+    Given my organization's plan has not answered yet
+    When the settings menu is built
+    Then the enterprise entries are hidden
+    And they appear only once the plan answers Enterprise
+
   @integration
   Scenario: The settings groups fold, and start open
     Given I open Settings

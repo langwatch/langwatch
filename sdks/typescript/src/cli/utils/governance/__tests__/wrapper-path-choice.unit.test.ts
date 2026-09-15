@@ -47,11 +47,7 @@ describe("parseToolModeFlag", () => {
     it("forwards every arg verbatim in order with no override", () => {
       const input = ["--dangerously-skip-permissions", "-p", "say hi"];
       const out = parseToolModeFlag(input, {});
-      expect(out.args).toEqual([
-        "--dangerously-skip-permissions",
-        "-p",
-        "say hi",
-      ]);
+      expect(out.args).toEqual(["--dangerously-skip-permissions", "-p", "say hi"]);
       expect(out.override).toBeUndefined();
     });
   });
@@ -67,18 +63,9 @@ describe("parseToolModeFlag", () => {
 
     /** @scenario "--tool-mode=gateway forces the gateway path" */
     it("strips the flag from the MIDDLE without disturbing surrounding args", () => {
-      const input = [
-        "--dangerously-skip-permissions",
-        "--tool-mode=gateway",
-        "-p",
-        "hi there",
-      ];
+      const input = ["--dangerously-skip-permissions", "--tool-mode=gateway", "-p", "hi there"];
       const out = parseToolModeFlag(input, {});
-      expect(out.args).toEqual([
-        "--dangerously-skip-permissions",
-        "-p",
-        "hi there",
-      ]);
+      expect(out.args).toEqual(["--dangerously-skip-permissions", "-p", "hi there"]);
       expect(out.override).toBe("gateway");
     });
   });
@@ -201,8 +188,7 @@ describe("resolveWrapperPath", () => {
         expect(out.prompted).toBe(true);
         // The select asked how the tool should run and offered both paths,
         // subscription (OTLP) first and pre-selected as the default.
-        const promptArg = (prompt as unknown as ReturnType<typeof vi.fn>).mock
-          .calls[0]![0] as {
+        const promptArg = (prompt as unknown as ReturnType<typeof vi.fn>).mock.calls[0]![0] as {
           message: string;
           choices: Array<{ title: string; value: string; description?: string }>;
           initial: number;
@@ -397,8 +383,7 @@ describe("resolveWrapperPath", () => {
         writeImpl: vi.fn(),
         env: {},
       });
-      const promptArg = (prompt as unknown as ReturnType<typeof vi.fn>).mock
-        .calls[0]![0] as {
+      const promptArg = (prompt as unknown as ReturnType<typeof vi.fn>).mock.calls[0]![0] as {
         choices: Array<{ value: string; description: string }>;
         initial: number;
       };
@@ -423,9 +408,7 @@ describe("resolveWrapperPath", () => {
         env: {},
       });
       expect(out.mode).toBe("gateway");
-      expect(write).toHaveBeenCalledWith(
-        expect.stringContaining("Copilot seat"),
-      );
+      expect(write).toHaveBeenCalledWith(expect.stringContaining("Copilot seat"));
     });
 
     it("names the seat bypass when copilot's gateway path is chosen at the prompt", async () => {
@@ -439,17 +422,13 @@ describe("resolveWrapperPath", () => {
         isTTY: true,
         promptImpl: (async () => ({
           path: "gateway",
-        })) as unknown as Parameters<
-          typeof resolveWrapperPath
-        >[0]["promptImpl"],
+        })) as unknown as Parameters<typeof resolveWrapperPath>[0]["promptImpl"],
         saveImpl: vi.fn(),
         writeImpl: write,
         env: {},
       });
       expect(out.mode).toBe("gateway");
-      expect(write).toHaveBeenCalledWith(
-        expect.stringContaining("Copilot seat"),
-      );
+      expect(write).toHaveBeenCalledWith(expect.stringContaining("Copilot seat"));
     });
 
     it("suppresses the seat-bypass notice when policy will downgrade the pinned gateway anyway", async () => {
@@ -486,9 +465,7 @@ describe("resolveWrapperPath", () => {
       });
       expect(out.mode).toBe("gateway");
       expect(out.prompted).toBe(false);
-      expect(write).toHaveBeenCalledWith(
-        expect.stringContaining("Copilot seat"),
-      );
+      expect(write).toHaveBeenCalledWith(expect.stringContaining("Copilot seat"));
     });
 
     /** @scenario Policy-forced gateway routing for copilot names the seat bypass */
@@ -582,17 +559,11 @@ describe("resolveWrapperPath", () => {
 
   describe("prompt copy", () => {
     it("asks how the tool should run and names both paths in human terms", () => {
-      expect(pathChoiceMessage("claude")).toBe(
-        "How should `langwatch claude` run?",
-      );
+      expect(pathChoiceMessage("claude")).toBe("How should `langwatch claude` run?");
       expect(otlpChoiceTitle("claude")).toBe("Using a Claude subscription");
-      expect(otlpChoiceDescription()).toBe(
-        "keep your own plan, send only telemetry to LangWatch",
-      );
+      expect(otlpChoiceDescription()).toBe("keep your own plan, send only telemetry to LangWatch");
       expect(gatewayChoiceTitle()).toBe("Using an API key");
-      expect(gatewayChoiceDescription()).toBe(
-        "route calls through LangWatch with a virtual key",
-      );
+      expect(gatewayChoiceDescription()).toBe("route calls through LangWatch with a virtual key");
     });
 
     it("names the right subscription per tool, with a neutral fallback", () => {
@@ -653,11 +624,7 @@ describe("parseProjectScopeFlags", () => {
     });
 
     it("leaves a later wrapper flag on the args instead of consuming it", () => {
-      const out = parseProjectScopeFlags([
-        "--project",
-        "--tool-mode",
-        "gateway",
-      ]);
+      const out = parseProjectScopeFlags(["--project", "--tool-mode", "gateway"]);
       expect(out.project).toBeUndefined();
       expect(out.args).toEqual(["--tool-mode", "gateway"]);
     });

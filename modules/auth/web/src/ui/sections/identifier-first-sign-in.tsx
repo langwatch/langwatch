@@ -1,0 +1,333 @@
+import { Box, Button, HStack, Spinner, Text } from "@chakra-ui/react";
+import type { RoutingDecision, SignInMethod } from "@langwatch/identity-contract";
+import { useEffect, useRef, useState } from "react";
+import { AuthCard } from "../elements/auth-card.tsx";
+import { HandledErrorAlert } from "../elements/handled-error-alert.tsx";
+import { normalizeErrorCode, SignInError } from "./sign-in-error-screen.tsx";
+import { safeRedirectTarget, signIn, useSession } from "../../behavior/auth-client.tsx";
+import { replaceLocation } from "../../behavior/browser-navigation.ts";
+import Link from "../elements/router-link.tsx";
+import { useSearchParams } from "../../behavior/use-route.ts";
+import { usePasskeyAutofill } from "../../behavior/use-passkey-autofill.ts";
+import { useSignInRouting } from "../../behavior/use-sign-in-routing.ts";
+import { signUpHref } from "../../model/carried-email.ts";
+import type { FrontDoorDepth } from "../../model/ground-palette.ts";
+import { usePublishFrontDoorStage } from "../../model/ground-stage.ts";
+import {
+  promotePendingMethod,
+  readLastUsedMethodId,
+  rememberPendingMethod,
+} from "../../model/last-used-method.ts";
+import { signInMethodActionLabel, signInMethodLabel } from "../../model/method-labels.ts";
+import { CheckYourEmail } from "../elements/check-your-email.tsx";
+import { CredentialSignInForm } from "./credential-sign-in-form.tsx";
+import { FrontDoorFinePrint } from "./front-door-fine-print.tsx";
+import { IdentifierStepForm } from "./identifier-step-form.tsx";
+import {
+  AlternativeMethods,
+  hasAlternativeMethods,
+  useShowsAllSocialMethods,
+  SignInMethodPicker,
+} from "./sign-in-method-picker.tsx";
+
+/**
+ * The identifier-first log-in screen (D13, ADR-117 §6): ask for the address,
+ * ask the server where it signs in, render the answer. A password typed for
+ * an unheld address is a sign-up, not a refusal.
+ */
+export function IdentifierFirstSignIn() {
+  const query = useSearchParams();
+  const callbackUrl = query?.get("callbackUrl") ?? undefined;
+  const breakGlass = query?.get("local") === "1";
+  const error = normalizeErrorCode(query?.get("error"));
+
+  const { data: session } = useSession();
+  const routing = useSignInRouting();
+  const { decide } = routing;
+  const askedOnMount = useRef(false);
+  const [instanceMethods, setInstanceMethods] = useState<readonly SignInMethod[]>([]);
+  const showsAllSocial = useShowsAllSocialMethods();
+  const [lastUsedMethodId] = useState(() => readLastUsedMethodId());
+  const [signingUp, setSigningUp] = useState<string | null>(null);
+  // Every failure this card can have shows in one place, at the top. A
+  // passkey is refused from a button part-way down the rail of methods, and
+  // an alert opening there pushes the rest of the rail down the page.
+  const [passkeyError, setPasskeyError] = useState<unknown>(null);
+
+  // The recommended way in, ahead of the button in the rail below: a passkey
+  // offered from the address field's own autofill, where somebody who does not
+  // remember making one will still find it.
+  usePasskeyAutofill({
+    enabled: instanceMethods.some((method) => method.kind === "passkey"),
+    callbackUrl,
+    onError: setPasskeyError,
+  });
+
+  useEffect(() => {
+    if (!session) return;
+    // A session is the only proof a federated hand-off worked, and this is
+    // where the browser lands holding one.
+    promotePendingMethod();
+    replaceLocation(safeRedirectTarget(callbackUrl));
+  }, [session, callbackUrl]);
+
+  // Asked once, with no address: the answer is what tells this screen whether
+  // an address is even the next question, and what the instance offers beside
+  // it. A deployment that routes without one never shows the address step,
+  // which is how a single-connection install keeps behaving as it does today.
+  useEffect(() => {
+    if (askedOnMount.current || session) return;
+    askedOnMount.current = true;
+    void decide({ identifier: null, breakGlass }).then((decision) => {
+      if (decision?.outcome === "method_picker") {
+        setInstanceMethods(decision.methodSet);
+      }
+    });
+  }, [decide, breakGlass, session]);
+
+  const dialFederated = (method: SignInMethod) => {
+    rememberPendingMethod(method);
+    void signIn(method.id, { callbackUrl });
+  };
+
+  const decision = routing.decision;
+  // An address that is present but blank is the same as no address: the
+  // password step it would render cannot sign anybody in — it posts an empty
+  // username and the server answers "Invalid email", which reads as a
+  // refusal of something the person never typed. Treated as absent, so they
+  // land back on the address step and can simply type it.
+  const submittedIdentifier = routing.identifier?.trim() ? routing.identifier : null;
+  // A failed decision falls back to the address form rather than showing a
+  // picker built from the decision before it: the methods on offer are the
+  // answer to a question that just failed to be answered.
+  const showPicker = !routing.error && decision && (breakGlass || submittedIdentifier !== null);
+
+  // Told once, from the same state the returns below branch on, so the ground
+  // can never be showing a step other than the one drawn over it.
+  usePublishFrontDoorStage({
+    door: "signin",
+    depth: signInDepth({ signingUp, showPicker: Boolean(showPicker) }),
+  });
+
+  if (signingUp) {
+    return (
+      <CheckYourEmail
+        email={signingUp}
+        what="Open it to confirm the address, then choose a password."
+        onUseDifferentEmail={() => {
+          // Both, and in this order: the address step reads the router's
+          // identifier, so clearing only the sent-to state would land back on
+          // the password step for the address they came here to change.
+          setSigningUp(null);
+          routing.clear();
+        }}
+      />
+    );
+  }
+
+  if (error) return <SignInError error={error} />;
+
+  // Nothing is painted for somebody who is already logged in: the effect
+  // above is already taking them where they were going, and a card that says
+  // so would only flash on the way past.
+  if (session) return null;
+
+  if (decision?.outcome === "redirect_to_connection") {
+    return (
+      <RoutedToConnection
+        decision={decision}
+        onContinue={dialFederated}
+        callbackUrl={callbackUrl}
+      />
+    );
+  }
+
+  if (showPicker) {
+    return (
+      <AuthCard title="Log in to LangWatch">
+        <HandledErrorAlert
+          error={passkeyError}
+          fallbackTitle="Could not use a passkey"
+          className="lw-front-door-alert"
+        />
+        <SignInMethodPicker
+          methodSet={decision.methodSet}
+          reasonCode={decision.reasonCode}
+          lastUsedMethodId={lastUsedMethodId}
+          onFederatedMethodChosen={dialFederated}
+          callbackUrl={callbackUrl}
+          onPasskeyError={setPasskeyError}
+          renderLocalMethod={(method) => {
+            if (method.kind !== "password") return null;
+            return (
+              <CredentialSignInForm
+                key={method.id}
+                email={submittedIdentifier ?? ""}
+                callbackUrl={callbackUrl}
+                onUseDifferentEmail={routing.clear}
+                onSignUpStarted={setSigningUp}
+              />
+            );
+          }}
+        />
+        {/* The switch link is always here, carrying the address already
+            typed: somebody who meant to sign up gets there in one click, and
+            somebody who submits a password for an address with no account is
+            already carried into sign-up by the form above. */}
+        <SignUpLink
+          callbackUrl={callbackUrl}
+          email={submittedIdentifier}
+          label="Don't have an account? Sign up"
+        />
+      </AuthCard>
+    );
+  }
+
+  return (
+    <AuthCard title="Log in to LangWatch" finePrint={<FrontDoorFinePrint />}>
+      {/* The alert explains the form; it does not replace it. A failure to
+          reach the router is nearly always worth retrying, and the retry is
+          typing the address again — so taking the field away leaves somebody
+          holding an apology and no way to act on it. It sits above the form,
+          and the form stays live underneath. */}
+      <HandledErrorAlert
+        error={routing.error}
+        fallbackTitle="Could not start log-in"
+        className="lw-front-door-alert"
+      />
+      <HandledErrorAlert
+        error={passkeyError}
+        fallbackTitle="Could not use a passkey"
+        className="lw-front-door-alert"
+      />
+      <IdentifierStepForm
+        submitLabel="Continue"
+        isSubmitting={routing.isDeciding}
+        onSubmit={({ email }) => decide({ identifier: email, breakGlass })}
+        footer={<SignUpLink callbackUrl={callbackUrl} label="Don't have an account? Sign up" />}
+        alternatives={
+          hasAlternativeMethods({ methodSet: instanceMethods, showsAllSocial }) ? (
+            <AlternativeMethods
+              methodSet={instanceMethods}
+              lastUsedMethodId={lastUsedMethodId}
+              onFederatedMethodChosen={dialFederated}
+              callbackUrl={callbackUrl}
+              onPasskeyError={setPasskeyError}
+            />
+          ) : null
+        }
+      />
+    </AuthCard>
+  );
+}
+
+/**
+ * Which of the log-in door's steps the screen below is drawing, for the ground
+ * behind it. Read in the same order the returns are written in, so the two can
+ * only ever agree.
+ */
+function signInDepth({
+  signingUp,
+  showPicker,
+}: {
+  signingUp: string | null;
+  showPicker: boolean;
+}): FrontDoorDepth {
+  if (signingUp) return "sent";
+  if (showPicker) return "credential";
+  return "entry";
+}
+
+/**
+ * How long a hand-off is allowed to take before the screen admits to it. A
+ * redirect inside this window paints nothing — an 80ms flash isn't information.
+ */
+const HANDOFF_QUIET_MS = 400;
+
+/**
+ * The decision routed this address to an identity provider; nothing is drawn
+ * while the browser is on its way there. A slow or refused hand-off shows a
+ * card saying where it's going, with a button for the refused case.
+ */
+function RoutedToConnection({
+  decision,
+  onContinue,
+  callbackUrl,
+}: {
+  decision: RoutingDecision;
+  onContinue: (method: SignInMethod) => void;
+  callbackUrl?: string;
+}) {
+  const method: SignInMethod | undefined = decision.methodSet[0];
+  const dialed = useRef(false);
+  const [waitIsVisible, setWaitIsVisible] = useState(false);
+
+  useEffect(() => {
+    if (!method || dialed.current) return;
+    dialed.current = true;
+    void signIn(method.id, { callbackUrl });
+  }, [method, callbackUrl]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => setWaitIsVisible(true), HANDOFF_QUIET_MS);
+    return () => clearTimeout(timer);
+  }, []);
+
+  if (!method) return null;
+  if (!waitIsVisible) return null;
+
+  return (
+    <AuthCard title="Log in to LangWatch">
+      <HStack gap={3}>
+        <Spinner size="sm" color="orange.500" />
+        <Text data-testid="routed-to-connection">
+          Taking you to your organization's sign-in with {signInMethodLabel(method)}.
+        </Text>
+      </HStack>
+      <Button colorPalette="orange" onClick={() => onContinue(method)}>
+        {signInMethodActionLabel(method)}
+      </Button>
+    </AuthCard>
+  );
+}
+
+function SignUpLink({
+  callbackUrl,
+  email,
+  label,
+}: {
+  callbackUrl?: string;
+  /** Carried so nobody types their address a second time. */
+  email?: string | null;
+  label: string;
+}) {
+  // The address rides in the FRAGMENT, which is the half of a URL the browser
+  // does not send: it reaches no access log and no `Referer` on the way to the
+  // other door. See `signUpHref`.
+  const href = signUpHref({ callbackUrl, email });
+
+  // The question reads quiet and only the answer is the link, the way the
+  // board draws its footers. A label with no question is all link.
+  const splitAt = label.indexOf("? ");
+  const lead = splitAt === -1 ? "" : label.slice(0, splitAt + 2);
+  const linked = splitAt === -1 ? label : label.slice(splitAt + 2);
+
+  return (
+    <Text width="full" textAlign="center" fontSize="13px" color="fg.muted">
+      {lead}
+      <Box
+        asChild
+        color="fg"
+        fontWeight={600}
+        textDecoration="underline"
+        textUnderlineOffset="3px"
+        textDecorationColor="border"
+        _hover={{ textDecorationColor: "fg" }}
+      >
+        <Link viewTransition href={href}>
+          {linked}
+        </Link>
+      </Box>
+    </Text>
+  );
+}

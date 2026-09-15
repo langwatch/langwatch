@@ -1,8 +1,5 @@
 import { z } from "zod";
-import {
-  runAgent as apiRunAgent,
-  type AgentCallParams,
-} from "../langwatch-api-agents.js";
+import { runAgent as apiRunAgent, type AgentCallParams } from "../langwatch-api-agents.js";
 
 /**
  * A scalar and an array both parse as JSON, and either one reaches the agent
@@ -65,7 +62,8 @@ export async function handleRunAgent({
       lines.push(JSON.stringify(result, null, 2));
     }
     if (agentType === "connected") {
-      const instance = (result as { instance?: { hostname?: string; label?: string | null } }).instance;
+      const instance = (result as { instance?: { hostname?: string; label?: string | null } })
+        .instance;
       const durationMs = (result as { durationMs?: number }).durationMs;
       if (instance?.hostname) {
         const label = instance.label ? ` (${instance.label})` : "";

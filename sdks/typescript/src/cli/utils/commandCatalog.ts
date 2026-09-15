@@ -117,10 +117,7 @@ interface FeatureMeta {
 }
 
 const flattenFeatures = (features: GeneratedFeature[]): GeneratedFeature[] =>
-  features.flatMap((feature) => [
-    feature,
-    ...flattenFeatures(feature.children ?? []),
-  ]);
+  features.flatMap((feature) => [feature, ...flattenFeatures(feature.children ?? [])]);
 
 /** Command string (`trace search`) -> metadata declared by the feature map. */
 const featureMetaIndex = (): Map<string, FeatureMeta> => {
@@ -156,17 +153,11 @@ const renderedHelp = (entry: Omit<CatalogEntry, "tokenCost">): string => {
   const usage = ["langwatch", entry.path, usageArgs(entry.args)]
     .filter((part) => part.length > 0)
     .join(" ");
-  const flagLines = entry.flags.map(
-    (flag) => `\n  ${flag.name}  ${flag.description}`,
-  );
+  const flagLines = entry.flags.map((flag) => `\n  ${flag.name}  ${flag.description}`);
   return `${usage} — ${entry.description}${flagLines.join("")}`;
 };
 
-const toEntry = (
-  command: Command,
-  path: string,
-  meta: Map<string, FeatureMeta>,
-): CatalogEntry => {
+const toEntry = (command: Command, path: string, meta: Map<string, FeatureMeta>): CatalogEntry => {
   const children = command.commands
     .filter((child) => !isHidden(child))
     .map((child) => toEntry(child, `${path} ${child.name()}`, meta));
@@ -252,7 +243,5 @@ export const renderHelpTree = (entries: CatalogEntry[]): string => {
 export const renderStatusSummary = (entries: CatalogEntry[]): string[] => {
   const groups = entries.filter((entry) => !PLUMBING_COMMANDS.has(entry.path));
   const width = Math.max(...groups.map((entry) => entry.path.length));
-  return groups.map(
-    (entry) => `langwatch ${entry.path.padEnd(width)}  ${entry.description}`,
-  );
+  return groups.map((entry) => `langwatch ${entry.path.padEnd(width)}  ${entry.description}`);
 };

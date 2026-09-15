@@ -1,9 +1,14 @@
 import pino from "pino";
-import superjson from "superjson";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { runWithContext } from "../context";
-import { getLogContext } from "../context/logging";
-import { consoleIgnoreFields, createLogger } from "../logger";
+import { runWithContext } from "../context/index.ts";
+import { getLogContext } from "../context/logging.ts";
+import {
+  configureLogger,
+  consoleIgnoreFields,
+  createLogger,
+  NODE_LOG_SERIALIZERS,
+  resetLoggerCache,
+} from "../logger.ts";
 
 vi.mock("@opentelemetry/api", () => ({
   context: { active: vi.fn(() => ({})) },
@@ -25,6 +30,7 @@ function captureDest() {
 describe("createLogger", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    configureLogger({ environment: "test" });
   });
 
   it("returns a pino logger with the given name", () => {
@@ -37,24 +43,17 @@ describe("createLogger", () => {
     expect(typeof logger.debug).toBe("function");
   });
 
-  it("sets level to error in test environment", () => {
-    const pinoLogLevel = process.env.PINO_LOG_LEVEL;
-    const legacyLogLevel = process.env._LOG_LEVEL;
+  it("sets level to error for injected test configuration", () => {
+    const logger = createLogger("test-level");
 
-    delete process.env.PINO_LOG_LEVEL;
-    delete process.env._LOG_LEVEL;
+    expect(logger.level).toBe("error");
+  });
 
-    try {
-      const logger = createLogger("test-level");
+  it("uses the configured log level", () => {
+    configureLogger({ environment: "test", level: "warn" });
+    resetLoggerCache();
 
-      expect(logger.level).toBe("error");
-    } finally {
-      if (pinoLogLevel === undefined) delete process.env.PINO_LOG_LEVEL;
-      else process.env.PINO_LOG_LEVEL = pinoLogLevel;
-
-      if (legacyLogLevel === undefined) delete process.env._LOG_LEVEL;
-      else process.env._LOG_LEVEL = legacyLogLevel;
-    }
+    expect(createLogger("configured-level").level).toBe("warn");
   });
 
   describe("when disableContext is true", () => {
@@ -98,34 +97,39 @@ describe("createLogger", () => {
   });
 
   describe("when serializing errors", () => {
-    it("preserves the current superjson metadata shape for Error instances", () => {
+    it("keeps the message and type on the record, as plain JSON", () => {
       const { dest, chunks } = captureDest();
-
-      // Create a logger that mirrors createLogger's serializer setup
-      const logger = pino(
-        {
-          level: "error",
-          serializers: {
-            error: (err: unknown) => {
-              if (!(err instanceof Error))
-                return pino.stdSerializers.err(err as Error);
-              const serialized = superjson.serialize(err);
-              return {
-                ...pino.stdSerializers.err(err),
-                _superjson: serialized.meta,
-              };
-            },
-          },
-        },
-        dest,
-      );
+      // The real serializer map, not a copy of it.
+      const logger = pino({ level: "error", serializers: NODE_LOG_SERIALIZERS }, dest);
 
       logger.error({ error: new Error("boom") }, "something failed");
 
       const parsed = JSON.parse(chunks[0]!);
       expect(parsed.error.message).toBe("boom");
       expect(parsed.error.type).toBe("Error");
-      expect(parsed.error).toHaveProperty("_superjson");
+    });
+
+    it("renders a bigint hung off a custom error rather than throwing the record away", () => {
+      const { dest, chunks } = captureDest();
+      const logger = pino({ level: "error", serializers: NODE_LOG_SERIALIZERS }, dest);
+      const error = Object.assign(new Error("over budget"), { budget: 9007199254740993n });
+
+      logger.error({ error }, "something failed");
+
+      const parsed = JSON.parse(chunks[0]!);
+      expect(parsed.error.message).toBe("over budget");
+      expect(parsed.error.budget).toBe("9007199254740993");
+    });
+
+    it("renders a nested Error, which JSON alone would write as an empty object", () => {
+      const { dest, chunks } = captureDest();
+      const logger = pino({ level: "error", serializers: NODE_LOG_SERIALIZERS }, dest);
+      const error = Object.assign(new Error("outer"), { inner: new Error("inner") });
+
+      logger.error({ error }, "something failed");
+
+      const parsed = JSON.parse(chunks[0]!);
+      expect(parsed.error.inner.message).toBe("inner");
     });
 
     it("falls back to standard serializer for non-Error values", () => {
@@ -136,8 +140,7 @@ describe("createLogger", () => {
           level: "error",
           serializers: {
             error: (err: unknown) => {
-              if (!(err instanceof Error))
-                return pino.stdSerializers.err(err as Error);
+              if (!(err instanceof Error)) return pino.stdSerializers.err(err as Error);
               return pino.stdSerializers.err(err);
             },
           },
@@ -162,35 +165,27 @@ describe("createLogger", () => {
   });
 
   describe("when formatting log output", () => {
-    it("uppercases the level label", () => {
+    it("leaves pino's own numeric level alone without our formatter", () => {
       const { dest, chunks } = captureDest();
 
-      const logger = pino(
-        {
-          level: "error",
-          formatters: {
-            level: (label: string) => ({ level: label.toUpperCase() }),
-          },
-        },
-        dest,
-      );
-
+      const logger = pino({ level: "error" }, dest);
       logger.error("test");
 
+      // The shared dev log format
+      // (dev/docs/best_practices/dev-log-format.md); the exhaustive assertion
+      // over the real factory lives in sharedLogFormat.unit.test.ts.
       const parsed = JSON.parse(chunks[0]!);
-      expect(parsed.level).toBe("ERROR");
+      expect(parsed.level).toBe(50);
     });
   });
 
   describe("when a log line is emitted in production", () => {
     it("stamps the service field fluent-bit promotes to the Loki label", () => {
       const written: string[] = [];
-      const spy = vi
-        .spyOn(process.stdout, "write")
-        .mockImplementation((chunk: unknown) => {
-          written.push(String(chunk));
-          return true;
-        });
+      const spy = vi.spyOn(process.stdout, "write").mockImplementation((chunk: unknown) => {
+        written.push(String(chunk));
+        return true;
+      });
 
       try {
         const logger = createLogger("service-field-test");

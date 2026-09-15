@@ -442,6 +442,20 @@ Feature: Voice agents v1: test an ElevenLabs agent from the app
     When the caller voice config is validated
     Then a well-formed "provider/voice" string is accepted and a value of the wrong shape is rejected
 
+  # AC17
+  @unit
+  Scenario: A scenario row with the caller-voice column parses
+    Given a stored scenario row carrying its caller-voice column, set or unset
+    When the row is parsed through the module contract's scenario schema
+    Then it parses without rejecting the caller-voice column as unrecognised
+
+  # AC17
+  @unit
+  Scenario: A stored scenario keeps its caller voice through the module contract
+    Given a scenario row whose caller-voice column holds a stored config
+    When the row is parsed through the module contract's scenario schema
+    Then the parsed scenario carries that same caller-voice config
+
   # AC14
   @unit
   Scenario: The idempotency key is derived from the conversation id

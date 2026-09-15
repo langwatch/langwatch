@@ -16,24 +16,15 @@ describe("parseOriginOption()", () => {
 
   describe("when comma-separated origins are given", () => {
     it("splits into one value per origin", () => {
-      expect(parseOriginOption("application,evaluation")).toEqual([
-        "application",
-        "evaluation",
-      ]);
+      expect(parseOriginOption("application,evaluation")).toEqual(["application", "evaluation"]);
     });
 
     it("trims whitespace around each value", () => {
-      expect(parseOriginOption(" application , langy ")).toEqual([
-        "application",
-        "langy",
-      ]);
+      expect(parseOriginOption(" application , langy ")).toEqual(["application", "langy"]);
     });
 
     it("drops empty segments from stray commas", () => {
-      expect(parseOriginOption("application,,evaluation,")).toEqual([
-        "application",
-        "evaluation",
-      ]);
+      expect(parseOriginOption("application,,evaluation,")).toEqual(["application", "evaluation"]);
     });
   });
 

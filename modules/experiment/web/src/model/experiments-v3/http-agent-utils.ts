@@ -1,0 +1,88 @@
+/**
+ * HTTP Agent Utilities for Evaluations V3
+ */
+
+import type { Field, HttpComponentConfig } from "@langwatch/workflow-contract";
+import type { HttpConfig, TargetConfig } from "./types.ts";
+
+// ============================================================================
+// Body Template Variable Extraction
+// ============================================================================
+
+/**
+ * Extract variable names from an HTTP body template.
+ * @param bodyTemplate - The body template string with mustache variables
+ * @returns Array of unique variable names found in the template
+ */
+export const extractVariablesFromBodyTemplate = (bodyTemplate: string | undefined): string[] => {
+  if (!bodyTemplate) return [];
+
+  const pattern = /\{\{(\w+)\}\}/g;
+  const variables = new Set<string>();
+  for (let match = pattern.exec(bodyTemplate); match !== null; match = pattern.exec(bodyTemplate)) {
+    variables.add(match[1]!);
+  }
+
+  return Array.from(variables);
+};
+
+// ============================================================================
+// HTTP Agent Config Conversion
+// ============================================================================
+
+/**
+ * Convert HttpComponentConfig (from optimization_studio) to HttpConfig (for experiments-v3).
+ * @param config - The HTTP component config from optimization studio
+ * @returns The HttpConfig for experiments-v3
+ */
+export const convertHttpComponentConfig = (config: HttpComponentConfig): HttpConfig => {
+  return {
+    url: config.url,
+    method: config.method ?? "POST",
+    headers: config.headers,
+    auth: config.auth,
+    bodyTemplate: config.bodyTemplate,
+    outputPath: config.outputPath,
+    timeoutMs: config.timeoutMs,
+  };
+};
+
+/**
+ * Build inputs array from HTTP body template variables.
+ * @param bodyTemplate - The body template with mustache variables
+ * @returns Array of Field objects for the inputs
+ */
+export const buildInputsFromBodyTemplate = (bodyTemplate: string | undefined): Field[] => {
+  const variables = extractVariablesFromBodyTemplate(bodyTemplate);
+  return variables.map((name) => ({
+    identifier: name,
+    type: "str" as const,
+  }));
+};
+
+/**
+ * Build a TargetConfig for an HTTP agent.
+ * @param params - Parameters for creating the HTTP agent target
+ * @returns A TargetConfig ready to be added to the store
+ */
+export const buildHttpAgentTarget = (params: {
+  id: string;
+  dbAgentId?: string;
+  httpConfig: HttpConfig;
+}): TargetConfig => {
+  const { id, dbAgentId, httpConfig } = params;
+
+  // Extract inputs from body template
+  const inputs = buildInputsFromBodyTemplate(httpConfig.bodyTemplate);
+
+  return {
+    id,
+    type: "agent",
+    agentType: "http",
+    dbAgentId,
+    inputs,
+    outputs: [{ identifier: "output", type: "str" }],
+    mappings: {},
+    httpConfig,
+  };
+};

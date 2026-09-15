@@ -11,7 +11,11 @@ vi.mock("@/internal/api/client", () => ({
 }));
 
 vi.mock("../../utils/apiKey", () => ({
-  resolveCredentials: vi.fn(async () => ({ apiKey: "test-key", source: "env", endpoint: "https://app.langwatch.ai" })),
+  resolveCredentials: vi.fn(async () => ({
+    apiKey: "test-key",
+    source: "env",
+    endpoint: "https://app.langwatch.ai",
+  })),
 }));
 
 import { statusCommand } from "../status";
@@ -140,7 +144,7 @@ const mockPagedGatewayFetch = (pages: unknown[][]) =>
  * zero errored traces, no experiments, no budgets. */
 const mockAllSuccess = (): void => {
   mockGET.mockImplementation(async (path: string) => {
-    if (path.startsWith("/api/experiments")) {
+    if (path.startsWith("/api/v1/experiments")) {
       return { data: noExperiments, error: undefined, response: { status: 200 } };
     }
     return { data: [{ id: "1" }, { id: "2" }], error: undefined };
@@ -169,9 +173,7 @@ describe("statusCommand", () => {
       throw new ProcessExitError((code as number) ?? 0);
     });
     consoleLogSpy = vi.spyOn(console, "log").mockImplementation(() => undefined);
-    consoleErrorSpy = vi
-      .spyOn(console, "error")
-      .mockImplementation(() => undefined);
+    consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => undefined);
     process.env.LANGWATCH_API_KEY = "test-key";
     process.env.LANGWATCH_ENDPOINT = "http://localhost:9876";
   });
@@ -234,11 +236,7 @@ describe("statusCommand", () => {
       expect(doc.attention.runningExperiments).toBeNull();
       expect(doc.attention.budgetsAtRisk).toBeNull();
       expect(Object.keys(doc.attention.errors)).toEqual(
-        expect.arrayContaining([
-          "erroredTraces24h",
-          "runningExperiments",
-          "budgetsAtRisk",
-        ]),
+        expect.arrayContaining(["erroredTraces24h", "runningExperiments", "budgetsAtRisk"]),
       );
     });
   });
@@ -335,7 +333,7 @@ describe("statusCommand", () => {
   describe("attention sections", () => {
     it("flags errored traces, a running experiment and an at-risk budget", async () => {
       mockGET.mockImplementation(async (path: string) => {
-        if (path.startsWith("/api/experiments/runs")) {
+        if (path.startsWith("/api/v1/experiments/runs")) {
           return {
             data: {
               runs: [
@@ -344,7 +342,12 @@ describe("statusCommand", () => {
                   runId: "run_1",
                   workflowVersion: null,
                   // No finishedAt/stoppedAt → still running.
-                  timestamps: { createdAt: 1, updatedAt: 2, finishedAt: null, stoppedAt: null },
+                  timestamps: {
+                    createdAt: 1,
+                    updatedAt: 2,
+                    finishedAt: null,
+                    stoppedAt: null,
+                  },
                   progress: 5,
                   total: 10,
                   summary: { evaluations: {} },
@@ -356,7 +359,7 @@ describe("statusCommand", () => {
             response: { status: 200 },
           };
         }
-        if (path.startsWith("/api/experiments")) {
+        if (path.startsWith("/api/v1/experiments")) {
           return {
             data: {
               experiments: [
@@ -430,10 +433,10 @@ describe("statusCommand", () => {
 
     it("marks the running-experiments scan incomplete when a candidate check fails", async () => {
       mockGET.mockImplementation(async (path: string) => {
-        if (path.startsWith("/api/experiments/runs")) {
+        if (path.startsWith("/api/v1/experiments/runs")) {
           throw new Error("runs endpoint down");
         }
-        if (path.startsWith("/api/experiments")) {
+        if (path.startsWith("/api/v1/experiments")) {
           return {
             data: {
               experiments: [
@@ -553,10 +556,10 @@ describe("statusCommand", () => {
       runs?: unknown;
     }): void => {
       mockGET.mockImplementation(async (path: string) => {
-        if (path.startsWith("/api/experiments/runs")) {
+        if (path.startsWith("/api/v1/experiments/runs")) {
           return { data: runs, error: undefined, response: { status: 200 } };
         }
-        if (path.startsWith("/api/experiments")) {
+        if (path.startsWith("/api/v1/experiments")) {
           return {
             data: { experiments, pagination },
             error: undefined,
@@ -575,7 +578,7 @@ describe("statusCommand", () => {
 
     describe("when the experiment list is truncated by pagination", () => {
       it("records the unread experiments as a gap and withholds the all-clear", async () => {
-        // `GET /api/experiments` sorts by updatedAt, not lastRunAt — so a
+        // `GET /api/v1/experiments` sorts by updatedAt, not lastRunAt — so a
         // running experiment can sit past the page boundary and never be seen.
         mockExperiments({
           experiments: [experimentFixture()],
@@ -586,7 +589,12 @@ describe("statusCommand", () => {
                 experimentId: "exp_1",
                 runId: "run_1",
                 workflowVersion: null,
-                timestamps: { createdAt: 1, updatedAt: 2, finishedAt: 3, stoppedAt: null },
+                timestamps: {
+                  createdAt: 1,
+                  updatedAt: 2,
+                  finishedAt: 3,
+                  stoppedAt: null,
+                },
                 progress: 10,
                 total: 10,
                 summary: { evaluations: {} },
@@ -694,9 +702,7 @@ describe("statusCommand", () => {
         // VK budget at 92% block was structurally invisible here. Now it is
         // a row like any other and must gate the tick.
         global.fetch = mockGatewayFetch({
-          budgets: [
-            budgetFixture({ scope_type: "virtual_key", scope_id: "vk_1" }),
-          ],
+          budgets: [budgetFixture({ scope_type: "virtual_key", scope_id: "vk_1" })],
         });
 
         await statusCommand();
@@ -864,7 +870,12 @@ describe("statusCommand", () => {
                 experimentId: "exp_1",
                 runId: "run_1",
                 workflowVersion: null,
-                timestamps: { createdAt: 1, updatedAt: 2, finishedAt: 3, stoppedAt: null },
+                timestamps: {
+                  createdAt: 1,
+                  updatedAt: 2,
+                  finishedAt: 3,
+                  stoppedAt: null,
+                },
                 progress: 10,
                 total: 10,
                 summary: { evaluations: {} },

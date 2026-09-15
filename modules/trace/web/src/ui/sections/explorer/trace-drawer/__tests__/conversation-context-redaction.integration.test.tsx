@@ -1,0 +1,130 @@
+// Conversation-context strip: redacted content shows "Redacted", not
+// "(no user message)" / "(no assistant response)" placeholders.
+// @vitest-environment jsdom
+import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { cleanup, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import "@testing-library/jest-dom/vitest";
+
+vi.mock("../../../../../behavior/drawer.store.ts", () => ({
+  useDrawerStore: (selector: (s: { viewMode: string }) => unknown) =>
+    selector({ viewMode: "summary" }),
+}));
+
+vi.mock("../../hooks/use-trace-drawer-navigation.ts", () => ({
+  useTraceDrawerNavigation: () => ({ navigateToTrace: vi.fn() }),
+}));
+
+// RedactedInline looks up org permissions for the settings link.
+vi.mock("@langwatch/ui-host/use-organization-team-project", () => ({
+  useOrganizationTeamProject: () => ({
+    project: { id: "proj-1" },
+    hasPermission: () => false,
+  }),
+}));
+
+// The redacted marker itself (`RedactedInline`) still reads scope through the
+// trace-scoped host - it is only ever rendered inside a trace screen.
+vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
+  useOrganizationTeamProject: () => ({
+    project: { id: "proj-1" },
+    hasPermission: () => false,
+  }),
+}));
+
+const turnsState = {
+  conversationId: "conv_1",
+  total: 2,
+  position: 2,
+  turns: [
+    {
+      traceId: "trace_prev",
+      timestamp: 1,
+      name: "prev",
+      rootSpanType: null,
+      status: "ok",
+      // Previous turn: input hidden by a privacy rule, output present.
+      input: null,
+      output: "earlier answer",
+      inputRedacted: true,
+      outputRedacted: false,
+      inputVisibleTo: "Admins",
+      outputVisibleTo: null,
+    },
+    {
+      traceId: "trace_1",
+      timestamp: 2,
+      name: "curr",
+      rootSpanType: null,
+      status: "ok",
+      input: "current question",
+      output: "current answer",
+      inputRedacted: false,
+      outputRedacted: false,
+      inputVisibleTo: null,
+      outputVisibleTo: null,
+    },
+  ],
+  previous: {
+    traceId: "trace_prev",
+    timestamp: 1,
+    name: "prev",
+    rootSpanType: null,
+    status: "ok",
+    input: null,
+    output: "earlier answer",
+    inputRedacted: true,
+    outputRedacted: false,
+    inputVisibleTo: "Admins",
+    outputVisibleTo: null,
+  },
+  next: null,
+  isLoading: false,
+};
+
+// The panel-level translate toggle dispatches through tRPC; these tests pin
+// redaction rendering, so stub it to an identity passthrough.
+vi.mock("../../hooks/use-text-translation.ts", () => ({
+  useTextTranslation: ({ texts }: { texts: Record<string, string> }) => ({
+    displayTexts: texts,
+    isActive: false,
+    isLoading: false,
+    toggle: () => undefined,
+  }),
+}));
+
+vi.mock("../../hooks/use-conversation-context.ts", () => ({
+  useConversationContext: () => turnsState,
+}));
+
+import { ConversationContext } from "../conversation-context.tsx";
+
+function renderStrip() {
+  return render(
+    <ChakraProvider value={defaultSystem}>
+      <ConversationContext
+        conversationId="conv_1"
+        traceId="trace_1"
+        collapsed={false}
+        onToggleCollapsed={() => undefined}
+      />
+    </ChakraProvider>,
+  );
+}
+
+afterEach(cleanup);
+
+describe("Conversation context strip redaction", () => {
+  describe("given a previous turn whose input was redacted", () => {
+    it("renders the Redacted marker, not the (no user message) placeholder", () => {
+      renderStrip();
+      expect(screen.getByText("Redacted")).toBeInTheDocument();
+      expect(screen.queryByText("(no user message)")).not.toBeInTheDocument();
+    });
+
+    it("carries the audience hint so the reader knows who can see it", () => {
+      renderStrip();
+      expect(screen.getByText(/visible to Admins/i)).toBeInTheDocument();
+    });
+  });
+});

@@ -17,6 +17,8 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+
+	"github.com/langwatch/langwatch/tools/thuishaven/adapters/havenui"
 )
 
 // ServiceRow is one service of a stack, as the detail panel shows it.
@@ -191,6 +193,9 @@ type model struct {
 	outcome     Outcome
 	busy        bool
 	showMonitor bool
+	// height is the terminal's row count, from the last tea.WindowSizeMsg; zero
+	// until the first one arrives, which renders the page unclipped.
+	height int
 	// wtOverride is the user's explicit worktree-section toggle ("t"); nil means
 	// automatic — visible only while no stacks are running, so the running work
 	// owns the screen and the idle trees stay out of the way.
@@ -234,6 +239,9 @@ func tick() tea.Cmd {
 
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
+	case tea.WindowSizeMsg:
+		m.height = msg.Height
+		return m, nil
 	case tickMsg:
 		m.refresh()
 		return m, tick()
@@ -436,33 +444,67 @@ func (m model) selected() (item, bool) {
 
 // --- view --------------------------------------------------------------------
 
+// The hub's styles, drawn from haven's one palette (adapters/havenui). The
+// local names stay because the rendering below reads better for them; what
+// they must NOT be again is a second definition of the same colours.
 var (
-	accent       = lipgloss.AdaptiveColor{Light: "#ed8926", Dark: "#f59e3f"}
-	styleTitle   = lipgloss.NewStyle().Bold(true).Foreground(accent)
-	styleDim     = lipgloss.NewStyle().Faint(true)
-	styleSel     = lipgloss.NewStyle().Foreground(accent).Bold(true)
-	styleLive    = lipgloss.NewStyle().Foreground(lipgloss.Color("42"))
-	styleStale   = lipgloss.NewStyle().Foreground(lipgloss.Color("214"))
-	styleWarn    = lipgloss.NewStyle().Foreground(lipgloss.Color("203")).Bold(true)
+	accent       = havenui.Accent
+	styleTitle   = havenui.Title
+	styleDim     = havenui.Muted
+	styleSel     = havenui.Selected
+	styleLive    = havenui.Good
+	styleStale   = havenui.Aging
+	styleWarn    = havenui.Warn
 	styleSection = lipgloss.NewStyle().Bold(true).Faint(true)
-	styleBarOn   = lipgloss.NewStyle().Foreground(accent)
+	styleBarOn   = lipgloss.NewStyle().Foreground(havenui.Accent)
 	// styleBarOther colors the non-dev slice of the RAM bar: a muted violet so
 	// it reads as "occupied, not ours" next to the accent's "ours".
-	styleBarOther = lipgloss.NewStyle().Foreground(lipgloss.AdaptiveColor{Light: "#7c3aed", Dark: "#a78bfa"})
+	styleBarOther = lipgloss.NewStyle().Foreground(havenui.Other)
 )
 
 const hubWidth = 72
 
 func (m model) View() string {
-	var b strings.Builder
-	m.viewHeader(&b)
-	m.viewStacks(&b)
-	m.viewWorktrees(&b)
+	var body, footer strings.Builder
+	m.viewHeader(&body)
+	m.viewStacks(&body)
+	m.viewWorktrees(&body)
 	if m.showMonitor {
-		m.viewMonitor(&b)
+		m.viewMonitor(&body)
 	}
-	m.viewFooter(&b)
-	return b.String()
+	m.viewFooter(&footer)
+	return fitToHeight(body.String(), footer.String(), m.height)
+}
+
+// fitToHeight keeps the page inside the terminal: the footer always shows, and
+// the body scrolls so the selected row (the one carrying the ▸ marker) stays in
+// view instead of running off the bottom of a tall stack list. A zero height
+// (no size message yet) renders everything.
+func fitToHeight(body, footer string, height int) string {
+	footerLines := strings.Count(footer, "\n")
+	avail := height - footerLines
+	lines := strings.Split(strings.TrimRight(body, "\n"), "\n")
+	if height <= 0 || len(lines) <= avail {
+		return body + footer
+	}
+	if avail < 1 {
+		return footer
+	}
+	selected := 0
+	for i, l := range lines {
+		if strings.Contains(l, "▸") {
+			selected = i
+			break
+		}
+	}
+	start := 0
+	if selected >= avail {
+		start = selected - avail + 1
+	}
+	if start+avail > len(lines) {
+		start = len(lines) - avail
+	}
+	return strings.Join(lines[start:start+avail], "\n") + "\n" + footer
 }
 
 func (m model) viewHeader(b *strings.Builder) {

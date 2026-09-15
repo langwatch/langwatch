@@ -1,0 +1,12 @@
+# `new Date().toISOString()` with no binding in between. The explicit
+# `fractionalSecondDigits: 3` is load-bearing: `Instant.toString()` drops a
+# `.000` that `Date.toISOString()` always prints, so the default would change
+# the bytes a caller compares, logs or sends over the wire.
+id: temporal-now-iso-string
+language: TypeScript
+severity: warning
+message: >
+  The current moment as an ISO string comes from `nowInstant()`.
+rule:
+  pattern: new Date().toISOString()
+fix: "nowInstant().toString({ fractionalSecondDigits: 3 })"

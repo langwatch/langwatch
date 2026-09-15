@@ -5,14 +5,22 @@ import {
   type ChatMessage,
   type SpanInputOutput,
 } from "../../internal/generated/types/tracer";
-import { type SimpleChatMessage, type JsonSerializable, type InputOutputType, INPUT_OUTPUT_TYPES } from "./types";
+import {
+  type SimpleChatMessage,
+  type JsonSerializable,
+  type InputOutputType,
+  INPUT_OUTPUT_TYPES,
+} from "./types";
 
 /**
  * Zod schema for simple chat messages (less strict than the generated one)
  */
 const simpleChatMessageSchema = z.object({
   role: z.string(),
-  content: z.union([z.string(), z.array(z.any())]).nullable().optional()
+  content: z
+    .union([z.string(), z.array(z.any())])
+    .nullable()
+    .optional(),
 });
 
 const simpleChatMessageArraySchema = z.array(simpleChatMessageSchema);
@@ -21,7 +29,7 @@ const simpleChatMessageArraySchema = z.array(simpleChatMessageSchema);
  * Utility function to create a safe fallback value
  */
 function createSafeFallbackValue(value: unknown): string {
-  if (typeof value === 'object' && value !== null) {
+  if (typeof value === "object" && value !== null) {
     try {
       return JSON.stringify(value);
     } catch {
@@ -103,7 +111,10 @@ function convertToSpanInputOutput(value: unknown): SpanInputOutput {
     }
 
     // Handle chat messages (single message or array)
-    if (isChatMessage(value) || (Array.isArray(value) && value.length > 0 && isChatMessageArray(value))) {
+    if (
+      isChatMessage(value) ||
+      (Array.isArray(value) && value.length > 0 && isChatMessageArray(value))
+    ) {
       return processChatMessages(value);
     }
 
@@ -111,7 +122,7 @@ function convertToSpanInputOutput(value: unknown): SpanInputOutput {
     if (Array.isArray(value)) {
       return spanInputOutputSchema.parse({
         type: "list",
-        value: value.map(item => convertToSpanInputOutput(item))
+        value: value.map((item) => convertToSpanInputOutput(item)),
       });
     }
 
@@ -166,7 +177,9 @@ function validateValueForInputOutputType(type: InputOutputType, value: unknown):
 
     case "list": {
       const listResult = z.array(spanInputOutputSchema).safeParse(value);
-      return listResult.success ? listResult.data : [{ type: "text", value: createSafeFallbackValue(value) }];
+      return listResult.success
+        ? listResult.data
+        : [{ type: "text", value: createSafeFallbackValue(value) }];
     }
 
     case "json": {
@@ -202,18 +215,10 @@ function validateValueForInputOutputType(type: InputOutputType, value: unknown):
 }
 
 /**
- * Processes input/output values for span storage with soft Zod validation.
- * Never throws errors, always returns a valid SpanInputOutput.
- * When a type is explicitly provided, it will be preferred over auto-detection.
- *
- * @param typeOrValue - Either the explicit type string or the value to auto-detect
- * @param value - The value when explicit type is provided
- * @returns A valid SpanInputOutput object ready for span storage
+ * Processes input/output values for span storage; never throws.
+ * Prefers explicit type over auto-detection when provided.
  */
-export function processSpanInputOutput(
-  typeOrValue: unknown,
-  value?: unknown
-): SpanInputOutput {
+export function processSpanInputOutput(typeOrValue: unknown, value?: unknown): SpanInputOutput {
   try {
     // If explicit type is provided, prefer it over auto-detection
     if (typeof typeOrValue === "string" && value !== undefined) {
@@ -245,4 +250,4 @@ export type SpanInputOutputMethod<T> = {
   (type: "guardrail_result", value: unknown): T;
   (type: "evaluation_result", value: unknown): T;
   (value: unknown): T;
-}
+};

@@ -349,7 +349,7 @@ describe("createTracingProxy", () => {
 
       // Start multiple concurrent operations that will fail
       const promises = Array.from({ length: 3 }, (_, i) =>
-        proxy.delayedError(i * 10).catch(error => error.message)
+        proxy.delayedError(i * 10).catch((error) => error.message),
       );
 
       const results = await Promise.all(promises);
@@ -371,8 +371,8 @@ describe("createTracingProxy", () => {
       class PromiseChainClass {
         public async promiseChain() {
           return Promise.resolve("step1")
-            .then(_result => Promise.resolve(_result + " -> step2"))
-            .then(_result => Promise.resolve(_result + " -> step3"))
+            .then((_result) => Promise.resolve(_result + " -> step2"))
+            .then((_result) => Promise.resolve(_result + " -> step3"))
             .then(() => {
               throw new Error("Error in promise chain");
             });
@@ -597,14 +597,12 @@ describe("createTracingProxy", () => {
       const testInstance = new TestClass();
       const proxy = createTracingProxy(testInstance, langwatchTracer);
 
-      const promises = Array.from({ length: 5 }, () =>
-        proxy.publicAsyncMethod()
-      );
+      const promises = Array.from({ length: 5 }, () => proxy.publicAsyncMethod());
 
       const results = await Promise.all(promises);
 
       expect(results).toHaveLength(5);
-      results.forEach(result => {
+      results.forEach((result) => {
         expect(result).toBe("async-result");
       });
 

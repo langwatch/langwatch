@@ -1,19 +1,7 @@
 /**
- * The frames of the local control socket, as the CLI speaks them.
- *
- * `langwatch langy --share-control` opens this socket from the developer's
- * machine. Langy's local tools arrive as `call` frames the CLI runs in the
- * shared folder; the CLI answers with `result`. A call that needs the
- * developer's approval produces `permission_required`, the panel renders the
- * card, and the platform answers with `permission`.
- *
- * `platform/app/src/server/langy-local-control/protocol.ts` is the contract;
- * this file is the CLI's copy. The validators are small and hand-written for
- * the same reason `protocol.ts` next door has hand-written ones: no schema
- * library may cross into the published surface. A drift test in
- * `__tests__/local-control-protocol-drift.unit.test.ts` pins the two together.
- *
- * @see dev/docs/adr/129-langy-local-control.md
+ * The frames of the local control socket, as the CLI speaks them: a
+ * hand-written copy of the platform's own protocol.ts, pinned together by
+ * `__tests__/local-control-protocol-drift.unit.test.ts`.
  */
 
 export const LOCAL_CONTROL_PROTOCOL_VERSION = 1;
@@ -203,13 +191,9 @@ export interface LocalResultFrame {
 }
 
 /**
- * One segment of a shell command chain, as the card lists it.
- *
- * A chain that stages, commits and pushes is one call and three segments. A
- * card that offered a single pattern granted the first segment's pattern and
- * ran the rest under it, so the segments travel with the ask: the reader sees
- * every part, and an "allow this pattern" answer covers exactly the segments
- * that are not read-only.
+ * One segment of a shell command chain, as the card lists it (a chain that
+ * stages, commits and pushes is one call and three segments), so an "allow
+ * this pattern" answer covers exactly the segments that are not read-only.
  */
 export interface CommandSegment {
   /** The segment as the developer wrote it. */
@@ -295,8 +279,7 @@ export const LOCAL_CONTROL_REFUSED_CODES = [
   "replica_count_unsupported",
   "protocol_invalid",
 ] as const;
-export type LocalControlRefusedCode =
-  (typeof LOCAL_CONTROL_REFUSED_CODES)[number];
+export type LocalControlRefusedCode = (typeof LOCAL_CONTROL_REFUSED_CODES)[number];
 
 export interface LocalRefusedFrame {
   type: "refused";
@@ -326,25 +309,15 @@ export interface LocalCancelFrame {
   callId: string;
 }
 
-export const PERMISSION_DECISIONS = [
-  "allow_once",
-  "allow_pattern",
-  "deny",
-  "expired",
-] as const;
+export const PERMISSION_DECISIONS = ["allow_once", "allow_pattern", "deny", "expired"] as const;
 export type PermissionDecision = (typeof PERMISSION_DECISIONS)[number];
 
 /**
  * The answers the terminal can give. It has no "expired": a wait runs out on
  * the platform, never in the selector.
  */
-export const TERMINAL_PERMISSION_DECISIONS = [
-  "allow_once",
-  "allow_pattern",
-  "deny",
-] as const;
-export type TerminalPermissionDecision =
-  (typeof TERMINAL_PERMISSION_DECISIONS)[number];
+export const TERMINAL_PERMISSION_DECISIONS = ["allow_once", "allow_pattern", "deny"] as const;
+export type TerminalPermissionDecision = (typeof TERMINAL_PERMISSION_DECISIONS)[number];
 
 export interface LocalPermissionFrame {
   type: "permission";
@@ -395,9 +368,7 @@ const protocolOf = (frame: Record<string, unknown>): number =>
 const readString = (value: unknown, fallback: string): string =>
   isString(value) ? value : fallback;
 
-const readRegistered = (
-  frame: Record<string, unknown>,
-): LocalRegisteredFrame | null => {
+const readRegistered = (frame: Record<string, unknown>): LocalRegisteredFrame | null => {
   if (!isString(frame.instanceId)) return null;
   const conversation = isRecord(frame.conversation) ? frame.conversation : {};
   const policy = isRecord(frame.policy) ? frame.policy : {};
@@ -516,14 +487,12 @@ const readCall = (frame: Record<string, unknown>): LocalCallFrame | null => {
 };
 
 const isDecision = (value: unknown): value is PermissionDecision =>
-  isString(value) &&
-  (PERMISSION_DECISIONS as readonly string[]).includes(value);
+  isString(value) && (PERMISSION_DECISIONS as readonly string[]).includes(value);
 
 /**
- * Reads one text message from the platform into a typed frame, or null when
- * the message is not a frame this protocol version knows. Unknown types and
- * malformed frames are dropped rather than thrown, so a newer platform never
- * crashes an older CLI.
+ * Reads one text message from the platform into a typed frame, or null.
+ * Unknown types and malformed frames are dropped, not thrown, so a newer
+ * platform never crashes an older CLI.
  */
 export function parsePlatformFrame(raw: string): LocalPlatformFrame | null {
   let parsed: unknown;
@@ -541,10 +510,7 @@ export function parsePlatformFrame(raw: string): LocalPlatformFrame | null {
         type: "refused",
         protocol: protocolOf(parsed),
         code: readString(parsed.code, "protocol_invalid"),
-        message: readString(
-          parsed.message,
-          "LangWatch refused the connection.",
-        ),
+        message: readString(parsed.message, "LangWatch refused the connection."),
       };
     case "call":
       return readCall(parsed);

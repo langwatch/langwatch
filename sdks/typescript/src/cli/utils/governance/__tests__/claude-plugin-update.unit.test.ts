@@ -22,8 +22,7 @@ import { installClaudePluginHarness } from "./claude-plugin-test-helpers";
 const { spawnSyncMock } = vi.hoisted(() => ({ spawnSyncMock: vi.fn() }));
 
 vi.mock("node:child_process", async () => {
-  const actual =
-    await vi.importActual<typeof ChildProcessModule>("node:child_process");
+  const actual = await vi.importActual<typeof ChildProcessModule>("node:child_process");
   return { ...actual, spawnSync: spawnSyncMock };
 });
 
@@ -127,8 +126,7 @@ describe("updateLangwatchClaudePlugin", () => {
       const { updateLangwatchClaudePlugin } = await loadModule();
 
       updateLangwatchClaudePlugin({
-        onCheckStart: () =>
-          spawnsWhenAnnounced.push(spawnSyncMock.mock.calls.length),
+        onCheckStart: () => spawnsWhenAnnounced.push(spawnSyncMock.mock.calls.length),
       });
 
       // Announced once, and before anything reached the network. The probe is
@@ -159,9 +157,7 @@ describe("updateLangwatchClaudePlugin", () => {
         action: "up_to_date",
         from: "0.2.0",
       });
-      expect(commandsRun()).not.toContain(
-        "plugin update langwatch@langwatch --scope user",
-      );
+      expect(commandsRun()).not.toContain("plugin update langwatch@langwatch --scope user");
     });
 
     it("leaves an install ahead of the listing where it is", async () => {
@@ -271,22 +267,14 @@ describe("updateLangwatchClaudePlugin", () => {
       const result = updateLangwatchClaudePlugin();
 
       expect(result.action).toBe("unknown_version");
-      expect(commandsRun()).not.toContain(
-        "plugin update langwatch@langwatch --scope user",
-      );
+      expect(commandsRun()).not.toContain("plugin update langwatch@langwatch --scope user");
     });
 
     it("does not update against a version it cannot make sense of", async () => {
       seedInstalledPlugin({ version: "0.1.0" });
       seedMarketplace();
       writeJson({
-        segments: [
-          "plugins",
-          "marketplaces",
-          "langwatch",
-          ".claude-plugin",
-          "plugin.json",
-        ],
+        segments: ["plugins", "marketplaces", "langwatch", ".claude-plugin", "plugin.json"],
         value: { name: "langwatch", version: "main" },
       });
       const { updateLangwatchClaudePlugin } = await loadModule();

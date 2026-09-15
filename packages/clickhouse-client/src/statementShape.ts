@@ -41,8 +41,7 @@ export function extractQueryType(params: unknown): VendorQueryType {
   const p = params as Record<string, unknown>;
   if (typeof p.query !== "string") return "OTHER";
   const trimmed = p.query.trimStart().toUpperCase();
-  if (trimmed.startsWith("SELECT") || trimmed.startsWith("WITH"))
-    return "SELECT";
+  if (trimmed.startsWith("SELECT") || trimmed.startsWith("WITH")) return "SELECT";
   if (trimmed.startsWith("INSERT")) return "INSERT";
   return "OTHER";
 }

@@ -91,6 +91,12 @@ type Monitor struct {
 	// before it reports unhealthy, so a rolling deploy does not blink the
 	// public status page while the first probe is still in flight.
 	lastSuccess time.Time
+	// unreachableSince is zero while the last probe succeeded, and the time
+	// of the first consecutive failure otherwise — the transition point the
+	// log lines below key off, so a control-plane blip logs at warn once and
+	// recovery once, not one warn line per 15s probe for the life of the
+	// outage.
+	unreachableSince time.Time
 }
 
 // New builds a Monitor. It does not start probing until Start.
@@ -170,12 +176,29 @@ func (m *Monitor) probe(ctx context.Context) {
 	probeCtx, cancel := context.WithTimeout(ctx, m.probeTimeout)
 	defer cancel()
 	if err := m.pinger.Health(probeCtx); err != nil {
-		// The public detail string stays generic; the operator log gets
-		// the real cause.
-		m.logger.Warn("statusprobe_control_plane_unreachable", zap.Error(err))
+		// The public detail string stays generic; the operator log gets the
+		// real cause. Only the transition into unreachable is worth a warn —
+		// every attempt after that, until recovery, is a debug line at most,
+		// so a sustained outage does not print the same warning every 15s.
+		m.mu.Lock()
+		transitioned := m.unreachableSince.IsZero()
+		if transitioned {
+			m.unreachableSince = m.now()
+		}
+		m.mu.Unlock()
+		if transitioned {
+			m.logger.Warn("statusprobe_control_plane_unreachable", zap.Error(err))
+		} else {
+			m.logger.Debug("statusprobe_control_plane_unreachable", zap.Error(err))
+		}
 		return
 	}
 	m.mu.Lock()
+	since := m.unreachableSince
+	m.unreachableSince = time.Time{}
 	m.lastSuccess = m.now()
 	m.mu.Unlock()
+	if !since.IsZero() {
+		m.logger.Warn("statusprobe_control_plane_recovered", zap.Duration("outage", m.now().Sub(since)))
+	}
 }

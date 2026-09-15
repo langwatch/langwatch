@@ -16,7 +16,7 @@ def _get_kwargs(
 
     _kwargs: dict[str, Any] = {
         "method": "get",
-        "url": "/api/trace/{id}".format(
+        "url": "/api/v1/trace/{id}".format(
             id=quote(str(id), safe=""),
         ),
     }

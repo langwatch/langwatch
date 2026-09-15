@@ -1,0 +1,150 @@
+{
+  "name": "@langwatch/analytics-web",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Reusable LangWatchQL workbench, result and visualization browser surfaces.",
+  "files": [
+    "src",
+    "tests"
+  ],
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "langwatch-declaration-source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    },
+    "./surfaces/analytics-registry": {
+      "langwatch-declaration-source": "./src/model/analytics-registry.ts",
+      "types": "./dist/model/analytics-registry.d.ts",
+      "default": "./src/model/analytics-registry.ts"
+    },
+    "./surfaces/custom-graph": {
+      "langwatch-declaration-source": "./src/ui/sections/custom-graph.tsx",
+      "types": "./dist/ui/sections/custom-graph.d.ts",
+      "default": "./src/ui/sections/custom-graph.tsx"
+    },
+    "./surfaces/period-selector": {
+      "langwatch-declaration-source": "./src/ui/elements/period-selector.tsx",
+      "types": "./dist/ui/elements/period-selector.d.ts",
+      "default": "./src/ui/elements/period-selector.tsx"
+    },
+    "./surfaces/filter-sidebar": {
+      "langwatch-declaration-source": "./src/ui/sections/filters/filter-sidebar.tsx",
+      "types": "./dist/ui/sections/filters/filter-sidebar.d.ts",
+      "default": "./src/ui/sections/filters/filter-sidebar.tsx"
+    },
+    "./surfaces/filter-toggle": {
+      "langwatch-declaration-source": "./src/ui/sections/filters/filter-toggle.tsx",
+      "types": "./dist/ui/sections/filters/filter-toggle.d.ts",
+      "default": "./src/ui/sections/filters/filter-toggle.tsx"
+    },
+    "./surfaces/filter-params": {
+      "langwatch-declaration-source": "./src/ui/sections/use-filter-params.ts",
+      "types": "./dist/ui/sections/use-filter-params.d.ts",
+      "default": "./src/ui/sections/use-filter-params.ts"
+    },
+    "./analytics": {
+      "langwatch-declaration-source": "./src/analytics.ts",
+      "types": "./dist/analytics.d.ts",
+      "default": "./src/analytics.ts"
+    },
+    "./surfaces/analytics-host": {
+      "langwatch-declaration-source": "./src/model/analytics-host.ts",
+      "types": "./dist/model/analytics-host.d.ts",
+      "default": "./src/model/analytics-host.ts"
+    },
+    "./surfaces/precondition-matchers": {
+      "langwatch-declaration-source": "./src/model/filters/precondition-matchers.ts",
+      "types": "./dist/model/filters/precondition-matchers.d.ts",
+      "default": "./src/model/filters/precondition-matchers.ts"
+    },
+    "./surfaces/filter-registry": {
+      "langwatch-declaration-source": "./src/model/filters/registry.ts",
+      "types": "./dist/model/filters/registry.d.ts",
+      "default": "./src/model/filters/registry.ts"
+    },
+    "./surfaces/filter-types": {
+      "langwatch-declaration-source": "./src/model/filters/types.ts",
+      "types": "./dist/model/filters/types.d.ts",
+      "default": "./src/model/filters/types.ts"
+    },
+    "./testing": {
+      "langwatch-declaration-source": "./src/__tests__/lwql-fixtures.ts",
+      "types": "./dist/__tests__/lwql-fixtures.d.ts",
+      "default": "./src/__tests__/lwql-fixtures.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "pnpm -w typecheck:declarations --project . && tsc --noEmit",
+    "test": "vitest run",
+    "test:unit": "vitest run",
+    "test:browser": "vitest run -c vitest.browser.config.ts"
+  },
+  "dependencies": {
+    "@chakra-ui/react": "catalog:",
+    "@dnd-kit/core": "catalog:",
+    "@dnd-kit/sortable": "catalog:",
+    "@dnd-kit/utilities": "catalog:",
+    "@langwatch/analytics-contract": "workspace:*",
+    "@langwatch/api": "workspace:*",
+    "@langwatch/dashboard-contract": "workspace:*",
+    "@langwatch/design-system": "workspace:*",
+    "@langwatch/evaluator-contract": "workspace:*",
+    "@langwatch/evaluator-web": "workspace:*",
+    "@langwatch/handled-error": "workspace:*",
+    "@langwatch/prompt-web": "workspace:*",
+    "@langwatch/time": "workspace:*",
+    "@langwatch/trace-contract": "workspace:*",
+    "@langwatch/ui-host": "workspace:*",
+    "@langwatch/workflow-web": "workspace:*",
+    "@monaco-editor/react": "catalog:",
+    "@tanstack/react-query": "catalog:",
+    "@tanstack/react-table": "catalog:",
+    "@tanstack/react-virtual": "catalog:",
+    "@trpc/client": "catalog:",
+    "@trpc/react-query": "catalog:",
+    "chakra-react-select": "catalog:",
+    "lodash-es": "catalog:",
+    "lucide-react": "catalog:",
+    "monaco-editor": "catalog:",
+    "numeral": "catalog:",
+    "qs": "catalog:",
+    "react": "catalog:",
+    "react-error-boundary": "catalog:",
+    "react-feather": "catalog:",
+    "react-grid-layout": "catalog:",
+    "react-hook-form": "catalog:",
+    "react-icons": "catalog:",
+    "recharts": "catalog:",
+    "usehooks-ts": "catalog:",
+    "vega": "catalog:",
+    "vega-embed": "7.1.0",
+    "vega-lite": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "catalog:",
+    "@testing-library/react": "catalog:",
+    "@testing-library/user-event": "catalog:",
+    "@types/lodash-es": "catalog:",
+    "@types/node": "catalog:",
+    "@types/numeral": "catalog:",
+    "@types/qs": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "@vitest/browser-playwright": "catalog:",
+    "jsdom": "catalog:",
+    "playwright": "catalog:",
+    "react-dom": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "peerDependencies": {
+    "@chakra-ui/react": "^3.36.0",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7"
+  }
+}

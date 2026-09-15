@@ -1,11 +1,11 @@
 import { scopedApiKey } from "@/internal/credentialContext";
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
-import { resolveCredentials } from "../../utils/apiKey";
-import { formatFetchError } from "../../utils/formatFetchError";
-import { failSpinner } from "../../utils/spinnerError";
+import { createSpinner } from "../../utils/spinner.ts";
+import { resolveCredentials } from "../../utils/apiKey.ts";
+import { formatFetchError } from "../../utils/formatFetchError.ts";
+import { failSpinner } from "../../utils/spinnerError.ts";
 import { buildAuthHeaders } from "@/internal/api/auth";
-import type { CommandResult } from "../../utils/output";
+import type { CommandResult } from "../../utils/output.ts";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
 import { langwatchFetch } from "@/internal/http/langwatchFetch";
@@ -13,19 +13,16 @@ import { langwatchFetch } from "@/internal/http/langwatchFetch";
  * Returns the graph rather than printing it: the output port renders it in
  * whatever format the caller asked for (utils/output.ts).
  */
-export const getGraphCommand = async (
-  id: string
-): Promise<CommandResult | void> => {
+export const getGraphCommand = async (id: string): Promise<CommandResult | void> => {
   await resolveCredentials();
 
   const apiKey = scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
-  const endpoint =
-    resolveControlPlaneUrl();
+  const endpoint = resolveControlPlaneUrl();
 
   const spinner = createSpinner(`Fetching graph "${id}"...`).start();
 
   try {
-    const response = await langwatchFetch(`${endpoint}/api/graphs/${id}`, {
+    const response = await langwatchFetch(`${endpoint}/api/v1/graphs/${id}`, {
       headers: buildAuthHeaders({ apiKey }),
     });
 
@@ -57,20 +54,14 @@ export const getGraphCommand = async (
         console.log();
         console.log(`  ${chalk.gray("ID:")}        ${chalk.green(graph.id)}`);
         console.log(`  ${chalk.gray("Name:")}      ${chalk.cyan(graph.name)}`);
-        console.log(
-          `  ${chalk.gray("Dashboard:")} ${graph.dashboardId ?? chalk.gray("—")}`
-        );
-        console.log(
-          `  ${chalk.gray("Position:")}  (${graph.gridColumn}, ${graph.gridRow})`
-        );
+        console.log(`  ${chalk.gray("Dashboard:")} ${graph.dashboardId ?? chalk.gray("—")}`);
+        console.log(`  ${chalk.gray("Position:")}  (${graph.gridColumn}, ${graph.gridRow})`);
         console.log(`  ${chalk.gray("Size:")}      ${graph.colSpan}x${graph.rowSpan}`);
         if (graph.graph) {
           const graphType = typeof graph.graph.type === "string" ? graph.graph.type : "custom";
           console.log(`  ${chalk.gray("Type:")}      ${graphType}`);
         }
-        console.log(
-          `  ${chalk.gray("Created:")}   ${new Date(graph.createdAt).toLocaleString()}`
-        );
+        console.log(`  ${chalk.gray("Created:")}   ${new Date(graph.createdAt).toLocaleString()}`);
         console.log();
       },
     };

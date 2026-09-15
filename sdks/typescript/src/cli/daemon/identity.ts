@@ -149,9 +149,7 @@ export function daemonSocketDir(): string {
     // longer of the two — a directory that fits the shared path but not the
     // staging path is a directory no daemon can start in.
     if (
-      Buffer.byteLength(underHome, "utf8") +
-        SOCKET_FILE_BYTES +
-        MAX_STAGING_OVERHEAD_BYTES <=
+      Buffer.byteLength(underHome, "utf8") + SOCKET_FILE_BYTES + MAX_STAGING_OVERHEAD_BYTES <=
       MAX_SOCKET_PATH_BYTES
     ) {
       return underHome;
@@ -167,9 +165,7 @@ export function daemonSocketDir(): string {
  * the daemon can never disagree about what "the endpoint" is — a drift there
  * would silently key two identical invocations to two different daemons.
  */
-export function resolveIdentity(
-  env: NodeJS.ProcessEnv = process.env,
-): DaemonIdentity {
+export function resolveIdentity(env: NodeJS.ProcessEnv = process.env): DaemonIdentity {
   const endpoint = resolveControlPlaneUrl();
   const apiKey = env.LANGWATCH_API_KEY ?? "";
   const uid = typeof process.getuid === "function" ? process.getuid() : 0;
@@ -184,9 +180,7 @@ export function resolveIdentity(
   // and daemon; a password KDF would add latency without improving that model.
   const hasher = crypto.createHash("sha256");
   // lgtm[js/insufficient-password-hash]
-  const fingerprint = hasher
-    .update(`${endpoint}\0${apiKey}\0${uid}\0${configPath}`)
-    .digest("hex");
+  const fingerprint = hasher.update(`${endpoint}\0${apiKey}\0${uid}\0${configPath}`).digest("hex");
 
   const socketDir = daemonSocketDir();
   // 16 hex chars = 64 bits. A collision needs ~2^32 distinct identities on one
@@ -264,8 +258,7 @@ export function isSocketPathUsable(socketPath: string): boolean {
  */
 export function isDaemonSocketPathUsable(socketPath: string): boolean {
   return (
-    Buffer.byteLength(socketPath, "utf8") + MAX_STAGING_OVERHEAD_BYTES <=
-    MAX_SOCKET_PATH_BYTES
+    Buffer.byteLength(socketPath, "utf8") + MAX_STAGING_OVERHEAD_BYTES <= MAX_SOCKET_PATH_BYTES
   );
 }
 
@@ -325,9 +318,7 @@ function hasLooseMode(mode: number): boolean {
  * group-writable `$HOME` is a broken machine, and one this CLI degrades safely
  * on rather than pretends to fix.
  */
-export function inspectSocketTrust(
-  socketPath: string,
-): SocketTrustProblem | null {
+export function inspectSocketTrust(socketPath: string): SocketTrustProblem | null {
   // No POSIX ownership to check (and the daemon is disabled there anyway).
   if (typeof process.getuid !== "function") return null;
   const uid = process.getuid();

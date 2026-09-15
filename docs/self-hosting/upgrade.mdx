@@ -85,7 +85,7 @@ Pin image tags to a specific version instead of `latest`:
 ```yaml
 services:
   app:
-    image: langwatch/langwatch:<previous-version>  # the release you are rolling back to
+    image: langwatch/langwatch:<previous-version> # the release you are rolling back to
 ```
 
 Then restart:
@@ -116,7 +116,7 @@ If upgrading from a Helm chart version before 1.0.0, the PostgreSQL PVC naming c
 postgresql:
   primary:
     persistence:
-      existingClaim: "data-langwatch-postgresql-0"  # Your existing PVC name
+      existingClaim: "data-langwatch-postgresql-0" # Your existing PVC name
 ```
 
 Check your existing PVC name:
@@ -127,11 +127,11 @@ kubectl -n langwatch get pvc
 
 ## Version Compatibility
 
-| Chart Version | App Version | Kubernetes | Helm | Data Store |
-|--------------|-------------|------------|------|------------|
-| 3.x | 3.x | 1.28+ | 3.12+ | ClickHouse |
-| 2.x | 2.x | 1.25+ | 3.10+ | Elasticsearch, OpenSearch |
-| 1.x | 1.x | 1.25+ | 3.10+ | Elasticsearch, OpenSearch |
+| Chart Version | App Version | Kubernetes | Helm  | Data Store                |
+| ------------- | ----------- | ---------- | ----- | ------------------------- |
+| 3.x           | 3.x         | 1.28+      | 3.12+ | ClickHouse                |
+| 2.x           | 2.x         | 1.25+      | 3.10+ | Elasticsearch, OpenSearch |
+| 1.x           | 1.x         | 1.25+      | 3.10+ | Elasticsearch, OpenSearch |
 
 ## Getting Help
 

@@ -40,6 +40,22 @@ Feature: A dev stack does not outlive whoever started it
   #   LANGWATCH_DEV_SUPERVISOR=0   run the command unsupervised
   #   LANGWATCH_DEV_GRACE_MS=N     how long the stack gets to exit on its own
 
+  # --- Nothing is supervised that is not run through the supervisor ---
+
+  # The supervisor spent a release fully written and fully tested with nothing
+  # reaching it: the workspace scripts a developer actually types ran the
+  # launcher and the single lanes directly, so a Ctrl-C left concurrently and
+  # every lane running and printing, exactly as before it was written. A
+  # mechanism nobody is routed through is a mechanism that does not exist, so
+  # the routing is pinned here beside the behaviour.
+
+  @unit
+  Scenario: Every script that starts a dev process is supervised
+    Given the workspace scripts a developer starts development with
+    When each of them is read
+    Then every one runs its command through the supervisor
+    And that includes each single-lane script, not only the whole stack
+
   # --- The happy path stays invisible ---
 
   @unit
@@ -219,3 +235,11 @@ Feature: A dev stack does not outlive whoever started it
     When the ports are cleared
     Then our own stack is stopped and that process is left running
     And the ports are not reported free, because one of them is not
+
+  @unit
+  Scenario: A lane that fails takes the stack down instead of rebooting in a loop
+    Given a stack whose lanes are started the way pnpm dev starts them
+    And one lane exits with an error as soon as it starts
+    When the stack runs
+    Then the other lanes are stopped and the stack exits with a failure
+    And the failed lane is not restarted

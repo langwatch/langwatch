@@ -7,7 +7,7 @@ import (
 )
 
 // The machine-wide check queue (specs/setup/check-slots.feature). Whole-repo
-// checks — a tsgo typecheck, a biome lint — saturate the machine on purpose,
+// checks — a tsgo typecheck, a whole-tree lint — saturate the machine on purpose,
 // and several worktrees' worth at once is what makes a laptop unusable. The
 // queue used to live only in dev/scripts/check-queue.mjs; the decisions now
 // live here so `haven slot run` (and `haven typecheck`) gate against the same

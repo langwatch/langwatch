@@ -89,7 +89,7 @@ reaches back that far.
 
 **3. Money is dollars and is never converted.** `amount.value` is a JSON
 number denominated in **US dollars**. Anthropic's equivalent field is
-*cents in a decimal string* and its adapter shifts the decimal
+_cents in a decimal string_ and its adapter shifts the decimal
 (`anthropicAdmin.puller.ts:401`). Porting that here would report **100× the
 real spend**. Nothing in this adapter divides by 100, and the test suite
 pins the figure end to end.
@@ -284,17 +284,17 @@ can exist, so there is nothing to repair.
 
 ## Constants
 
-| Name | Value | Purpose |
-|---|---|---|
-| `API_BASE` | `https://api.openai.com/v1/organization` | Admin API root. Not `api.chatgpt.com`, which is the Compliance API and answers 403 to an admin key. |
-| `COST_REPORT_BUCKET_WIDTH` | `"1d"` | The only value the endpoint accepts (`1h` → 400, `Supported values are: '1d'`). Both a request parameter and a restatement dimension; the two must never diverge. |
-| `COST_GROUP_BY` | `["project_id", "line_item", "user_id", "api_key_id"]` | Decision 2. Request parameter and cursor identity. |
-| `PAGE_LIMIT` | `180` | The API's ceiling. Above it the request is **rejected**, not clamped (`Invalid limit provided: 366. Limit must be less than or equal to 180.`). One page is ~6 months of daily buckets. |
-| `RESTATEMENT_LOOKBACK_DAYS` | `3` | Decision 9. How far behind the watermark each run re-reads so a provider correction can land. A margin, not a measurement — OpenAI's restatement lag is unobserved, and the sibling adapter documents ~1 day for Anthropic. Costs three daily buckets on one request per run. |
-| `MAX_PAGES_PER_RUN` | `20` | Matches the sibling. At 180 buckets a page this bounds a run at ~10 years, so it is a runaway guard, not a throttle. |
-| `REQUEST_TIMEOUT_MS` | `30_000` | Matches the sibling. |
-| `DEFAULT_SCHEDULE` | `"0 * * * *"` | Hourly. Daily buckets do not reward finer polling. |
-| `OPENAI_ADMIN_ADAPTER_ID` | `"openai_admin"` | Registry id, persisted in `pullConfig.adapter`. |
+| Name                        | Value                                                  | Purpose                                                                                                                                                                                                                                                                       |
+| --------------------------- | ------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `API_BASE`                  | `https://api.openai.com/v1/organization`               | Admin API root. Not `api.chatgpt.com`, which is the Compliance API and answers 403 to an admin key.                                                                                                                                                                           |
+| `COST_REPORT_BUCKET_WIDTH`  | `"1d"`                                                 | The only value the endpoint accepts (`1h` → 400, `Supported values are: '1d'`). Both a request parameter and a restatement dimension; the two must never diverge.                                                                                                             |
+| `COST_GROUP_BY`             | `["project_id", "line_item", "user_id", "api_key_id"]` | Decision 2. Request parameter and cursor identity.                                                                                                                                                                                                                            |
+| `PAGE_LIMIT`                | `180`                                                  | The API's ceiling. Above it the request is **rejected**, not clamped (`Invalid limit provided: 366. Limit must be less than or equal to 180.`). One page is ~6 months of daily buckets.                                                                                       |
+| `RESTATEMENT_LOOKBACK_DAYS` | `3`                                                    | Decision 9. How far behind the watermark each run re-reads so a provider correction can land. A margin, not a measurement — OpenAI's restatement lag is unobserved, and the sibling adapter documents ~1 day for Anthropic. Costs three daily buckets on one request per run. |
+| `MAX_PAGES_PER_RUN`         | `20`                                                   | Matches the sibling. At 180 buckets a page this bounds a run at ~10 years, so it is a runaway guard, not a throttle.                                                                                                                                                          |
+| `REQUEST_TIMEOUT_MS`        | `30_000`                                               | Matches the sibling.                                                                                                                                                                                                                                                          |
+| `DEFAULT_SCHEDULE`          | `"0 * * * *"`                                          | Hourly. Daily buckets do not reward finer polling.                                                                                                                                                                                                                            |
+| `OPENAI_ADMIN_ADAPTER_ID`   | `"openai_admin"`                                       | Registry id, persisted in `pullConfig.adapter`.                                                                                                                                                                                                                               |
 
 ## Invariants
 
@@ -315,14 +315,14 @@ stored nowhere.]** |
 
 ## Assumptions
 
-| Assumption | What breaks if false |
-|---|---|
-| `user_id` identifies the **caller**, not the API key's owner | Every row is attributed to whoever minted the key rather than who spent. **Tested and unresolved:** across all captured rows every key maps to exactly one user, but the whole dataset carries a single `user_id`, so the discriminator cannot fire. Consistent with both readings; proves neither. |
-| OpenAI restates a bucket **in place**, under the same coordinates | A correction arrives as a new row beside the old instead of replacing it, and the period double-counts. Never observed. Decision 9's re-read window is what makes this load-bearing: it is the mechanism that carries a correction to the ledger, and it only works if the corrected row keeps its coordinates. |
-| The `api_key_id` floor is a property of the API, not of one organization | Nothing — Decision 8 reacts to the rejection rather than predicting it, so a per-tenant floor is handled identically. Recorded because it decides whether the retry can ever be removed. |
-| Buckets arrive in ascending order, one per day with no gaps | Nothing. Observed over 264 consecutive buckets — strictly ascending within and across pages, every gap exactly 86400s, so a quiet day still returns its bucket and the watermark keeps moving. **Deliberately not relied on:** the watermark takes `max()` rather than the last element, so ordering being unguaranteed cannot hurt. |
-| A row that disappears from a re-read bucket means *no longer billed* | Nothing breaks — Decision 5 makes the vanished row keep its last known value rather than zeroing. Stated so the behaviour is chosen, not accidental. |
-| ADR-088 Decision 13's read-time identity stack will eventually exist | Nothing in this ADR depends on it. Recorded because D13 cites **ADR-094**, which is *simulation-execution-on-process-manager-substrate*, not identity — the identity ADRs are 101 and 115 — and names `ACTOR_ID_KIND_BY_PROVIDER`, which **appears in no source file**. The stack is unbuilt and the citation is wrong. |
+| Assumption                                                               | What breaks if false                                                                                                                                                                                                                                                                                                                 |
+| ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `user_id` identifies the **caller**, not the API key's owner             | Every row is attributed to whoever minted the key rather than who spent. **Tested and unresolved:** across all captured rows every key maps to exactly one user, but the whole dataset carries a single `user_id`, so the discriminator cannot fire. Consistent with both readings; proves neither.                                  |
+| OpenAI restates a bucket **in place**, under the same coordinates        | A correction arrives as a new row beside the old instead of replacing it, and the period double-counts. Never observed. Decision 9's re-read window is what makes this load-bearing: it is the mechanism that carries a correction to the ledger, and it only works if the corrected row keeps its coordinates.                      |
+| The `api_key_id` floor is a property of the API, not of one organization | Nothing — Decision 8 reacts to the rejection rather than predicting it, so a per-tenant floor is handled identically. Recorded because it decides whether the retry can ever be removed.                                                                                                                                             |
+| Buckets arrive in ascending order, one per day with no gaps              | Nothing. Observed over 264 consecutive buckets — strictly ascending within and across pages, every gap exactly 86400s, so a quiet day still returns its bucket and the watermark keeps moving. **Deliberately not relied on:** the watermark takes `max()` rather than the last element, so ordering being unguaranteed cannot hurt. |
+| A row that disappears from a re-read bucket means _no longer billed_     | Nothing breaks — Decision 5 makes the vanished row keep its last known value rather than zeroing. Stated so the behaviour is chosen, not accidental.                                                                                                                                                                                 |
+| ADR-088 Decision 13's read-time identity stack will eventually exist     | Nothing in this ADR depends on it. Recorded because D13 cites **ADR-094**, which is _simulation-execution-on-process-manager-substrate_, not identity — the identity ADRs are 101 and 115 — and names `ACTOR_ID_KIND_BY_PROVIDER`, which **appears in no source file**. The stack is unbuilt and the citation is wrong.              |
 
 ## Gates
 

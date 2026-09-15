@@ -1,0 +1,75 @@
+{
+  "name": "@langwatch/ops-web",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Browser-safe platform operations and backoffice UI.",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    },
+    "./surfaces/impersonation": {
+      "types": "./dist/ui/sections/impersonation/index.d.ts",
+      "default": "./src/ui/sections/impersonation/index.ts"
+    },
+    "./drawers": {
+      "types": "./dist/drawers.d.ts",
+      "default": "./src/drawers.ts"
+    },
+    "./surfaces/keyboard-key": {
+      "types": "./dist/keyboard-key.d.ts",
+      "default": "./src/keyboard-key.ts"
+    },
+    "./ops": {
+      "types": "./dist/ops.d.ts",
+      "default": "./src/ops.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "pnpm -w typecheck:declarations --project . && tsc --noEmit",
+    "test": "vitest run",
+    "test:unit": "vitest run"
+  },
+  "dependencies": {
+    "@chakra-ui/react": "catalog:",
+    "@langwatch/api": "workspace:*",
+    "@langwatch/design-system": "workspace:*",
+    "@langwatch/enterprise-sso-contract": "workspace:*",
+    "@langwatch/feature-flag-contract": "workspace:*",
+    "@langwatch/feature-flag-web": "workspace:*",
+    "@langwatch/ops-contract": "workspace:*",
+    "@langwatch/prompt-contract": "workspace:*",
+    "@langwatch/time": "workspace:*",
+    "@monaco-editor/react": "catalog:",
+    "@opentelemetry/api": "catalog:",
+    "@opentelemetry/exporter-trace-otlp-proto": "^0.221.0",
+    "@opentelemetry/resources": "catalog:",
+    "@opentelemetry/sdk-trace-base": "catalog:",
+    "@opentelemetry/sdk-trace-web": "catalog:",
+    "@opentelemetry/semantic-conventions": "catalog:",
+    "@tanstack/react-query": "catalog:",
+    "@tanstack/react-virtual": "catalog:",
+    "@xyflow/react": "catalog:",
+    "langwatch": "workspace:*",
+    "lucide-react": "catalog:",
+    "react": "catalog:",
+    "recharts": "catalog:",
+    "use-debounce": "catalog:",
+    "zustand": "catalog:"
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "catalog:",
+    "@testing-library/react": "catalog:",
+    "@testing-library/user-event": "catalog:",
+    "@types/react": "catalog:",
+    "jsdom": "^29.0.1",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

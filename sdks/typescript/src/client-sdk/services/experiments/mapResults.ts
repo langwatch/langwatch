@@ -36,13 +36,12 @@ export const mapRunResultsToRows = (
   const evaluations = response.evaluations ?? [];
 
   const rows: ExperimentRowResult[] = datasetEntries.map((entry) => {
-    const entryData =
-      entry.entry && typeof entry.entry === "object" ? entry.entry : {};
+    const entryData = entry.entry && typeof entry.entry === "object" ? entry.entry : {};
 
     const predicted = entry.predicted;
     const output =
       predicted && typeof predicted === "object" && "output" in predicted
-        ? (predicted).output
+        ? predicted.output
         : predicted;
 
     const row: ExperimentRowResult = {
@@ -77,9 +76,7 @@ export const mapRunResultsToRows = (
     // (matching the python builder); the length check keeps the empty-string
     // case from being collapsed by nullish coalescing.
     const name =
-      evaluation.name && evaluation.name.length > 0
-        ? evaluation.name
-        : evaluation.evaluator;
+      evaluation.name && evaluation.name.length > 0 ? evaluation.name : evaluation.evaluator;
     if (index == null || !name) continue;
 
     for (const row of rowsByIndex.get(index) ?? []) {

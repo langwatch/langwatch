@@ -13,9 +13,7 @@ import { printEvaluators } from "../test-suites/renderSuiteDetails";
  *
  * @see specs/features/run-plan-cli.feature
  */
-export const getRunPlanCommand = async (
-  id: string,
-): Promise<CommandResult | void> => {
+export const getRunPlanCommand = async (id: string): Promise<CommandResult | void> => {
   await resolveCredentials();
 
   const service = createCliRunPlansService();
@@ -42,9 +40,7 @@ export const getRunPlanCommand = async (
         console.log(
           `    ${chalk.gray("Judge:")}     ${plan.judgeModel ?? chalk.gray("project default")}`,
         );
-        console.log(
-          `    ${chalk.gray("Archived:")}  ${plan.archivedAt ?? chalk.gray("no")}`,
-        );
+        console.log(`    ${chalk.gray("Archived:")}  ${plan.archivedAt ?? chalk.gray("no")}`);
 
         console.log();
         console.log(chalk.bold("  Targets:"));

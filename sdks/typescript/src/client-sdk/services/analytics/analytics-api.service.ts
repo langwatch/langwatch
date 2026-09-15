@@ -1,20 +1,18 @@
 import type { paths } from "@/internal/generated/openapi/api-client";
-import {
-  createLangWatchApiClient,
-  type LangwatchApiClient,
-} from "@/internal/api/client";
+import { createLangWatchApiClient, type LangwatchApiClient } from "@/internal/api/client";
 import { type InternalConfig } from "@/client-sdk/types";
 import {
   extractStatusFromResponse,
   formatApiErrorForOperation,
 } from "@/client-sdk/services/_shared/format-api-error";
+import { unwrapApiResult } from "@/client-sdk/services/_shared/unwrap-api-result";
 
 export type AnalyticsTimeseriesBody = NonNullable<
-  paths["/api/analytics/timeseries"]["post"]["requestBody"]
+  paths["/api/v1/analytics/timeseries"]["post"]["requestBody"]
 >["content"]["application/json"];
 
 export type AnalyticsTimeseriesResponse =
-  paths["/api/analytics/timeseries"]["post"]["responses"]["200"]["content"]["application/json"];
+  paths["/api/v1/analytics/timeseries"]["post"]["responses"]["200"]["content"]["application/json"];
 
 export class AnalyticsApiError extends Error {
   constructor(
@@ -34,19 +32,27 @@ export class AnalyticsApiService {
     this.apiClient = config?.langwatchApiClient ?? createLangWatchApiClient();
   }
 
-  private handleApiError(operation: string, error: unknown): never {
-    const message = formatApiErrorForOperation({ operation: operation, error: error, options: {
-      status: extractStatusFromResponse(error),
-    } });
+  private handleApiError(operation: string, error: unknown, response?: Response): never {
+    const message = formatApiErrorForOperation({
+      operation: operation,
+      error: error,
+      options: {
+        status: response?.status ?? extractStatusFromResponse(error),
+      },
+    });
     throw new AnalyticsApiError(message, operation, error);
   }
 
   async timeseries(params: AnalyticsTimeseriesBody): Promise<AnalyticsTimeseriesResponse> {
-    const { data, error } = await this.apiClient.POST(
-      "/api/analytics/timeseries",
-      { body: params },
-    );
-    if (error) this.handleApiError("query analytics", error);
-    return data;
+    const { data, error, response } = await this.apiClient.POST("/api/v1/analytics/timeseries", {
+      body: params,
+    });
+    return unwrapApiResult({
+      operation: "query analytics",
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    });
   }
 }

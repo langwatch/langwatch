@@ -1,0 +1,65 @@
+# ADR-001: Enterprise worker composition stays role-specific
+
+**Status:** Accepted
+
+**Behavioural contract:** [Enterprise worker composition](../specs/worker-composition.feature)
+
+## Context
+
+Worker feature implementations need an explicit future assembly boundary that
+cannot silently acquire API routes or browser feature dependencies.
+
+## Decision
+
+`@langwatch/enterprise-worker` exports a class with `static create` and
+Enterprise-owned worker installers. Workers receive their process-owned
+service dependencies explicitly at boot. The composition also builds the
+managed-provider capability from an explicit project/organisation read port
+and typed configuration and credential ports.
+
+## Public surfaces and transports
+
+The package exposes composition state, the portable managed-provider service,
+and worker installers. Queue consumers, jobs, and event handlers remain
+feature-owned and are started only by the physical worker application.
+
+## Dependencies
+
+The worker composition may depend on portable contracts and Enterprise server
+surfaces, but never API, web, React, or browser implementation packages. Core
+worker callers consume the managed-provider contract exposed by this
+composition and do not import the Enterprise server implementation.
+
+## Persistence
+
+Managed-provider project persistence remains behind the Enterprise server's
+private Prisma adapter. The physical worker application supplies the complete
+project/organisation read port to composition; it does not construct a
+repository or service per job.
+
+## Runtime and registration
+
+Construction is explicit through `EnterpriseWorkerComposition.create`; imports
+perform no queue subscription, feature registration, or background startup.
+
+## Environment and configuration
+
+The package reads no environment variables. Physical worker configuration is
+validated before a typed managed-provider configuration port and credentials
+port are supplied to composition.
+
+## Errors
+
+Not applicable. The shell performs no operations today, and future feature
+errors must retain their feature-owned handled error contracts.
+
+## Contracts and validation
+
+The portable catalogue provides the available feature vocabulary. Worker
+options use explicit typed feature server capabilities, and the managed
+provider is exposed as its portable contract service.
+
+## Consequences
+
+Worker composition has a legal and architectural home without pretending that
+licensing currently owns an independent worker implementation.

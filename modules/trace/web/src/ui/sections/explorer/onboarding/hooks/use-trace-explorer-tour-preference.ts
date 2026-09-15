@@ -1,0 +1,48 @@
+import { useCallback } from "react";
+import { api } from "../../../../../behavior/trace-api.ts";
+import { nowInstant } from "@langwatch/time";
+
+/**
+ * User-scoped persistence for automatic Traces Explorer tours.
+ */
+export function useTraceExplorerTourPreference() {
+  const utils = api.useUtils();
+  const preference = api.user.getTraceExplorerTourPreference.useQuery(
+    {},
+    { staleTime: Number.POSITIVE_INFINITY },
+  );
+  const dismissMutation = api.user.dismissTraceExplorerTour.useMutation({
+    onMutate: async () => {
+      await utils.user.getTraceExplorerTourPreference.cancel({});
+      const previous = utils.user.getTraceExplorerTourPreference.getData({});
+      utils.user.getTraceExplorerTourPreference.setData(
+        {},
+        {
+          dismissed: true,
+          dismissedAt: nowInstant().toString({ smallestUnit: "millisecond" }),
+        },
+      );
+      return { previous };
+    },
+    onError: (_error, _input, context) => {
+      if (context?.previous) {
+        utils.user.getTraceExplorerTourPreference.setData({}, context.previous);
+      } else {
+        void utils.user.getTraceExplorerTourPreference.invalidate({});
+      }
+    },
+  });
+  const persistDismissal = dismissMutation.mutate;
+  const isDismissalSaving = dismissMutation.isPending;
+
+  const dismiss = useCallback(() => {
+    if (preference.data?.dismissed || isDismissalSaving) return;
+    persistDismissal({});
+  }, [isDismissalSaving, persistDismissal, preference.data?.dismissed]);
+
+  return {
+    dismiss,
+    isDismissed: preference.data?.dismissed ?? true,
+    isResolved: preference.isSuccess,
+  };
+}

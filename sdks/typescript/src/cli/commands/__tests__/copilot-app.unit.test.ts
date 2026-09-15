@@ -15,8 +15,7 @@ import {
 import { type LaunchAgentSpec } from "@/cli/utils/governance/copilot-app";
 import { type GovernanceConfig } from "@/cli/utils/governance/config";
 
-const AGENT_PATH =
-  "/Users/dev/Library/LaunchAgents/ai.langwatch.copilot-app.plist";
+const AGENT_PATH = "/Users/dev/Library/LaunchAgents/ai.langwatch.copilot-app.plist";
 
 const loggedInCfg = {
   gateway_url: "https://gateway.langwatch.ai",
@@ -25,9 +24,7 @@ const loggedInCfg = {
   organization: { slug: "acme" },
 } as unknown as GovernanceConfig;
 
-function baseDeps(
-  over: Partial<ConnectCopilotAppDeps> = {},
-): ConnectCopilotAppDeps {
+function baseDeps(over: Partial<ConnectCopilotAppDeps> = {}): ConnectCopilotAppDeps {
   return {
     platform: "darwin",
     home: "/Users/dev",
@@ -68,9 +65,7 @@ describe("connectCopilotApp", () => {
 
       const spec = install.mock.calls[0]![0];
       expect(spec.execPath).toContain("GitHub Copilot.app");
-      expect(spec.env.OTEL_EXPORTER_OTLP_HEADERS).toBe(
-        "Authorization=Bearer ik-lw-abc_secret",
-      );
+      expect(spec.env.OTEL_EXPORTER_OTLP_HEADERS).toBe("Authorization=Bearer ik-lw-abc_secret");
     });
 
     /** @scenario Connect confirms where the captured traces will appear */
@@ -88,9 +83,7 @@ describe("connectCopilotApp", () => {
     it("loudly notifies that capture is tokens-only", async () => {
       const warn = vi.fn();
 
-      const result = await connectCopilotApp(
-        baseDeps({ captureContent: false, warn }),
-      );
+      const result = await connectCopilotApp(baseDeps({ captureContent: false, warn }));
 
       expect(warn).toHaveBeenCalledWith(expect.stringContaining("tokens only"));
       expect(result.captureContent).toBe(false);
@@ -116,9 +109,9 @@ describe("connectCopilotApp", () => {
       });
       const info = vi.fn();
 
-      await expect(
-        connectCopilotApp(baseDeps({ install, info })),
-      ).rejects.toMatchObject({ kind: "agent-install-failed" });
+      await expect(connectCopilotApp(baseDeps({ install, info }))).rejects.toMatchObject({
+        kind: "agent-install-failed",
+      });
       // never prints a success line when the agent didn't register
       expect(info).not.toHaveBeenCalled();
     });

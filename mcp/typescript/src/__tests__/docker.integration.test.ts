@@ -28,14 +28,11 @@ describe("Docker container", () => {
     try {
       // Build from repo root (mcp-server needs langevals/ for build)
       const repoRoot = process.cwd().replace(/\/mcp-server.*$/, "");
-      execSync(
-        `docker build -t ${IMAGE_NAME} -f mcp/typescript/Dockerfile .`,
-        {
-          cwd: repoRoot,
-          stdio: "pipe",
-          timeout: 180_000,
-        }
-      );
+      execSync(`docker build -t ${IMAGE_NAME} -f mcp/typescript/Dockerfile .`, {
+        cwd: repoRoot,
+        stdio: "pipe",
+        timeout: 180_000,
+      });
 
       // Stop any previous container
       execSync(`docker rm -f ${CONTAINER_NAME} 2>/dev/null || true`, {
@@ -43,10 +40,9 @@ describe("Docker container", () => {
       });
 
       // Start the container WITHOUT LANGWATCH_API_KEY -- clients bring their own
-      execSync(
-        `docker run -d --name ${CONTAINER_NAME} -p ${HOST_PORT}:3000 ${IMAGE_NAME}`,
-        { stdio: "pipe" }
-      );
+      execSync(`docker run -d --name ${CONTAINER_NAME} -p ${HOST_PORT}:3000 ${IMAGE_NAME}`, {
+        stdio: "pipe",
+      });
 
       // Wait for the server to be ready
       let retries = 0;
@@ -108,9 +104,7 @@ describe("Docker container", () => {
       headers: { Origin: "http://localhost:5173" },
     });
     expect(allowed.status).toBe(200);
-    expect(allowed.headers.get("access-control-allow-origin")).toBe(
-      "http://localhost:5173"
-    );
+    expect(allowed.headers.get("access-control-allow-origin")).toBe("http://localhost:5173");
 
     const rejected = await fetch(`http://localhost:${HOST_PORT}/health`, {
       headers: { Origin: "https://attacker.example" },

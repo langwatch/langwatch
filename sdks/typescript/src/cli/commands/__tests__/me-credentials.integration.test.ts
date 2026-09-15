@@ -1,25 +1,9 @@
 /**
- * The /me credentials story, end to end against the REAL built CLI and a real
- * HTTP server: a device session alone (no env vars anywhere) powers data
- * commands via the personal project's API key, the lazy exchange happens
- * exactly once and rewrites the session file, the identity notice rides
- * stderr while `-o json` stdout stays parseable, and headless project login
- * fails fast instead of blocking on a browser.
- *
- * Requires `pnpm build` (like the other CLI integration tests in this package).
- *
- * Feature: specs/ai-governance/cli-onboarding/me-credentials.feature
- * Feature: specs/ai-governance/cli-onboarding/login-unified.feature
+ * The /me credentials story, end to end against the REAL built CLI and a real HTTP server:
+ * a device session alone (no env vars anywhere) powers data commands via the personal
+ * project's API key, the lazy exchange happens exactly once and rewrites the session file,
  */
-import {
-  afterAll,
-  afterEach,
-  beforeAll,
-  beforeEach,
-  describe,
-  expect,
-  it,
-} from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { spawn } from "node:child_process";
 import * as fs from "node:fs";
 import * as http from "node:http";
@@ -68,8 +52,7 @@ const writeSession = (extra: Record<string, unknown> = {}) => {
   );
 };
 
-const readSession = () =>
-  JSON.parse(fs.readFileSync(configPath(), "utf8")) as Record<string, any>;
+const readSession = () => JSON.parse(fs.readFileSync(configPath(), "utf8")) as Record<string, any>;
 
 const run = (
   args: string[],
@@ -77,12 +60,11 @@ const run = (
   cwd: string = workDir,
 ): Promise<RunResult> =>
   new Promise((resolve) => {
-    // The runner's own shell (and the repo .env vitest loads) may carry a
-    // real LANGWATCH_API_KEY; the whole point here is a CLI with NO key in
-    // its environment, so scrub it before overlaying the test's env. The
-    // agent-mode markers (CLAUDECODE etc.) are scrubbed too: an agent
-    // running this suite would otherwise flip the CLI into agents format
-    // and change which rendering the assertions see.
+    // The runner's own shell (and the repo .env vitest loads) may carry a real
+    // LANGWATCH_API_KEY; the whole point here is a CLI with NO key in its environment, so
+    // scrub it before overlaying the test's env. The agent-mode markers (CLAUDECODE etc.) are
+    // scrubbed too: an agent running this suite would otherwise flip the CLI into agents
+    // format and change which rendering the assertions see.
     const baseEnv: Record<string, string | undefined> = { ...process.env };
     delete baseEnv.LANGWATCH_API_KEY;
     for (const marker of [
@@ -182,7 +164,7 @@ beforeAll(async () => {
         return;
       }
 
-      if (url.startsWith("/api/me/project")) {
+      if (url.startsWith("/api/v1/me/project")) {
         json(200, {
           id: "proj_x",
           name: "Env Project",
@@ -192,7 +174,7 @@ beforeAll(async () => {
         return;
       }
 
-      if (url.startsWith("/api/traces/search")) {
+      if (url.startsWith("/api/v1/traces/search")) {
         lastSearchAuth = auth;
         json(200, {
           traces: [],
@@ -201,7 +183,7 @@ beforeAll(async () => {
         return;
       }
 
-      if (url.startsWith("/api/monitors")) {
+      if (url.startsWith("/api/v1/monitors")) {
         // A command that reads process.env.LANGWATCH_API_KEY directly (not via
         // the client-factory default) — the sweep must feed it the scoped key.
         lastMonitorsAuth = auth;
@@ -212,9 +194,7 @@ beforeAll(async () => {
       json(404, { error: "not_found" });
     });
   });
-  await new Promise<void>((resolveListen) =>
-    server.listen(0, "127.0.0.1", resolveListen),
-  );
+  await new Promise<void>((resolveListen) => server.listen(0, "127.0.0.1", resolveListen));
   endpoint = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
 }, 30_000);
 
@@ -238,7 +218,10 @@ afterEach(() => {
 });
 
 describe("device session powers data commands with zero env vars", () => {
-  /** @scenario a session created before this change lazily exchanges once and rewrites the session file */
+  /**
+   * @scenario a session created before this change lazily exchanges once and
+   * rewrites the session file
+   */
   it("lazily exchanges the personal key once, rewrites config.json, then stays off the network", async () => {
     writeSession(); // no personal_project: a pre-change session
 
@@ -367,9 +350,7 @@ describe("device session powers data commands with zero env vars", () => {
     expect(result.stderr).toContain(
       "Error: you're not logged in, and LANGWATCH_API_KEY is not set.",
     );
-    expect(result.stderr).toContain(
-      "Sign in with your browser, interactively:",
-    );
+    expect(result.stderr).toContain("Sign in with your browser, interactively:");
     expect(result.stderr).toContain("  langwatch login");
   });
 });

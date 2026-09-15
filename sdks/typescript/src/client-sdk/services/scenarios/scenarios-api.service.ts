@@ -6,16 +6,14 @@ import type {
   ScenarioVersionListResponse,
   UpdateScenarioBody,
 } from "./types";
-import {
-  createLangWatchApiClient,
-  type LangwatchApiClient,
-} from "@/internal/api/client";
+import { createLangWatchApiClient, type LangwatchApiClient } from "@/internal/api/client";
 import { type InternalConfig } from "@/client-sdk/types";
 import { ScenariosApiError } from "./errors";
 import {
   extractStatusFromResponse,
   formatApiErrorForOperation,
 } from "@/client-sdk/services/_shared/format-api-error";
+import { unwrapApiResult } from "@/client-sdk/services/_shared/unwrap-api-result";
 
 export class ScenariosApiService {
   private readonly apiClient: LangwatchApiClient;
@@ -24,44 +22,66 @@ export class ScenariosApiService {
     this.apiClient = config?.langwatchApiClient ?? createLangWatchApiClient();
   }
 
-  private handleApiError(operation: string, error: unknown): never {
-    const message = formatApiErrorForOperation({ operation: operation, error: error, options: {
-      status: extractStatusFromResponse(error),
-    } });
+  private handleApiError(operation: string, error: unknown, response?: Response): never {
+    const message = formatApiErrorForOperation({
+      operation: operation,
+      error: error,
+      options: {
+        status: response?.status ?? extractStatusFromResponse(error),
+      },
+    });
     throw new ScenariosApiError(message, operation, error);
   }
 
   async getAll(): Promise<ScenarioResponse[]> {
-    const { data, error } = await this.apiClient.GET("/api/scenarios");
-    if (error) this.handleApiError("fetch all scenarios", error);
-    return data;
+    const { data, error, response } = await this.apiClient.GET("/api/v1/scenarios");
+    return unwrapApiResult({
+      operation: "fetch all scenarios",
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    });
   }
 
   async get(id: string): Promise<ScenarioResponse> {
-    const { data, error } = await this.apiClient.GET("/api/scenarios/{id}", {
+    const { data, error, response } = await this.apiClient.GET("/api/v1/scenarios/{id}", {
       params: { path: { id } },
     });
-    if (error)
-      this.handleApiError(`fetch scenario with ID "${id}"`, error);
-    return data;
+    return unwrapApiResult({
+      operation: `fetch scenario with ID "${id}"`,
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    });
   }
 
   async create(params: CreateScenarioBody): Promise<ScenarioResponse> {
-    const { data, error } = await this.apiClient.POST("/api/scenarios", {
+    const { data, error, response } = await this.apiClient.POST("/api/v1/scenarios", {
       body: params,
     });
-    if (error) this.handleApiError("create scenario", error);
-    return data;
+    return unwrapApiResult({
+      operation: "create scenario",
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    });
   }
 
   async update(id: string, params: UpdateScenarioBody): Promise<ScenarioResponse> {
-    const { data, error } = await this.apiClient.PUT("/api/scenarios/{id}", {
+    const { data, error, response } = await this.apiClient.PUT("/api/v1/scenarios/{id}", {
       params: { path: { id } },
       body: params,
     });
-    if (error)
-      this.handleApiError(`update scenario with ID "${id}"`, error);
-    return data;
+    return unwrapApiResult({
+      operation: `update scenario with ID "${id}"`,
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    });
   }
 
   /** The saved versions of a scenario, newest first. */
@@ -73,45 +93,45 @@ export class ScenariosApiService {
       ...(options?.limit !== undefined && { limit: options.limit }),
       ...(options?.cursor !== undefined && { cursor: options.cursor }),
     };
-    const { data, error } = await this.apiClient.GET(
-      "/api/scenarios/{id}/versions",
-      {
-        params: { path: { id }, query },
-      },
-    );
-    if (error)
-      this.handleApiError(`list versions of scenario "${id}"`, error);
-    return data;
+    const { data, error, response } = await this.apiClient.GET("/api/v1/scenarios/{id}/versions", {
+      params: { path: { id }, query },
+    });
+    return unwrapApiResult({
+      operation: `list versions of scenario "${id}"`,
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    });
   }
 
   /** One saved version of a scenario, with the content it saved. */
-  async getVersion(
-    id: string,
-    version: number,
-  ): Promise<ScenarioVersionDetail> {
-    const { data, error } = await this.apiClient.GET(
-      "/api/scenarios/{id}/versions/{version}",
+  async getVersion(id: string, version: number): Promise<ScenarioVersionDetail> {
+    const { data, error, response } = await this.apiClient.GET(
+      "/api/v1/scenarios/{id}/versions/{version}",
       {
         params: { path: { id, version } },
       },
     );
-    if (error)
-      this.handleApiError(
-        `get version ${version} of scenario "${id}"`,
-        error,
-      );
-    return data;
+    return unwrapApiResult({
+      operation: `get version ${version} of scenario "${id}"`,
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    });
   }
 
   async delete(id: string): Promise<DeleteScenarioResponse> {
-    const { data, error } = await this.apiClient.DELETE(
-      "/api/scenarios/{id}",
-      {
-        params: { path: { id } },
-      },
-    );
-    if (error)
-      this.handleApiError(`delete scenario with ID "${id}"`, error);
-    return data;
+    const { data, error, response } = await this.apiClient.DELETE("/api/v1/scenarios/{id}", {
+      params: { path: { id } },
+    });
+    return unwrapApiResult({
+      operation: `delete scenario with ID "${id}"`,
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    });
   }
 }

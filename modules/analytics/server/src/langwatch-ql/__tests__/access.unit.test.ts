@@ -1,0 +1,88 @@
+/** @vitest-environment node */
+
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { LWQL_FLAG, lwqlEnabled } from "../../rules/lwql-access.rules.ts";
+
+/**
+ * `lwqlEnabled` takes the project service as a parameter, so the gate can be asked in isolation. It used to be asked through
+ * `createTestApp().projects` with `vi.spyOn`, which needed a Prisma connection to build an app it then stubbed — and stopped working
+ * entirely once the composed service was wrapped for tracing, since `spyOn` cannot replace a method reached through a proxy.
+ */
+function projectsIn(organizationId: string): ProjectApi {
+  return {
+    getOrganizationId: vi.fn(async () => organizationId),
+  } as unknown as ProjectApi;
+}
+
+/** One flag, answered; every other operation refuses by name. */
+function flagsSaying(on: { value: boolean }): {
+  featureFlags: FeatureFlagApi;
+  isEnabled: ReturnType<typeof vi.fn>;
+} {
+  const isEnabled = vi.fn(async () => on.value);
+  return { featureFlags: createApiFixture<FeatureFlagApi>({ isEnabled }, "lwql flags"), isEnabled };
+}
+
+describe("LangWatchQL feature access", () => {
+  const on = { value: true };
+  let featureFlags: FeatureFlagApi;
+  let isEnabled: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    on.value = true;
+    ({ featureFlags, isEnabled } = flagsSaying(on));
+  });
+
+  describe("given a project belonging to an organization", () => {
+    describe("when the gate is asked", () => {
+      /** @scenario "The switch is decided for the project's organization, not for the project alone" */
+      it("evaluates the flag for both the project and its organization", async () => {
+        await lwqlEnabled({
+          featureFlags,
+          projectId: "project_1",
+          projects: projectsIn("organization_1"),
+        });
+
+        expect(isEnabled).toHaveBeenCalledWith(LWQL_FLAG, {
+          kind: "project",
+          projectId: "project_1",
+          organizationId: "organization_1",
+        });
+      });
+    });
+  });
+
+  describe("given the flag is off", () => {
+    describe("when the gate is asked", () => {
+      it("returns the flag service's decision", async () => {
+        on.value = false;
+
+        await expect(
+          lwqlEnabled({
+            featureFlags,
+            projectId: "project_1",
+            projects: projectsIn("organization_1"),
+          }),
+        ).resolves.toBe(false);
+      });
+    });
+  });
+
+  describe("given the flag is on", () => {
+    describe("when the gate is asked", () => {
+      it("returns the flag service's decision", async () => {
+        await expect(
+          lwqlEnabled({
+            featureFlags,
+            projectId: "project_1",
+            projects: projectsIn("organization_1"),
+          }),
+        ).resolves.toBe(true);
+      });
+    });
+  });
+});

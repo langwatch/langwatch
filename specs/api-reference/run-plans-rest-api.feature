@@ -15,7 +15,9 @@ Feature: The run plans REST API
   #   DELETE /api/v1/run-plans/{id}      archive a run plan
   #
   # The family authenticates with a project API key and publishes its routes
-  # under the dated version 2026-08-27, the bare alias, and latest.
+  # under /api/v1 only: it carries its version in its base path, so it is one
+  # of the four families the /api-and-/api/v1 twinning leaves alone — there is
+  # no bare alias and no dated segment to answer on.
 
   Scenario: Listing run plans leaves out archived plans
     Given the project holds one active run plan and one archived run plan
@@ -103,10 +105,12 @@ Feature: The run plans REST API
     Then the response reports the plan as archived
     And the run plan is no longer listed
 
-  Scenario: A dated run plans path and the bare alias both answer
+  Scenario: The run plans family answers only under /api/v1
     Given the project holds one run plan
-    When I list the run plans through the dated path 2026-08-27
-    Then the list matches the one the bare alias returns
+    When I list the run plans at /api/v1/run-plans
+    Then the list is returned
+    And the bare alias /api/run-plans answers 404
+    And the dated path /api/v1/run-plans/2026-08-27 answers 404
 
   Scenario: An unknown run plans version segment answers 404
     When I list the run plans through the version segment 2020-01-01

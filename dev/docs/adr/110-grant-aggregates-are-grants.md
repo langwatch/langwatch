@@ -50,10 +50,17 @@ of nothing.
 
 ```
               tenantId = organizationId  (both)
-  authz_grant                    authz_role
+         aggregateType = authz_grant  (both)
   id = grantId                   id = roleId
   one grant's lifecycle          one role definition's lifecycle
 ```
+
+The persisted aggregate type names the installed Eventing pipeline, not a
+second organization boundary. Grant and role events therefore retain the one
+wire value `authz_grant`; their distinct grant or role aggregate IDs are what
+give each entity its own lifecycle and ordering lane. Introducing an
+`authz_role` wire type would require a second pipeline and is not part of this
+decision.
 
 There is no organization-keyed aggregate. Roles, which an earlier draft put on
 one, are entities with their own lifecycle and their own referents
@@ -126,7 +133,7 @@ ones — keeps its enrollment pacing untouched.
 **Aggregate ids must be STABLE ACROSS RETRIES, which is not determinism.** The
 event log dedupes on `(TenantId, AggregateType, AggregateId, IdempotencyKey)`,
 so `AggregateId` is part of the dedup key and an idempotency key only dedupes
-*within* an aggregate. An id minted freshly per attempt defeats idempotency
+_within_ an aggregate. An id minted freshly per attempt defeats idempotency
 outright — the retry lands elsewhere, nothing collapses, and every pass adds
 another copy. A migrated fact therefore keeps the legacy row's own id, which is
 already a public handle (`DELETE /role-bindings/:id`); a fact the legacy schema
@@ -170,9 +177,9 @@ role resolves to the empty permission list, which grants nothing, and the deny
 sweep is a query plus compensating commands, which is what it already was.
 
 Offboarding is the exception and needs care, because the organization aggregate
-was carrying a safety property that is easy to drop by accident: *"the fold
+was carrying a safety property that is easy to drop by accident: _"the fold
 sweeps by principal, so an incomplete list cannot leave the member holding
-access."* Per-grant aggregates cannot sweep. We keep it by making enforcement
+access."_ Per-grant aggregates cannot sweep. We keep it by making enforcement
 take a **principal filter** rather than a list of ids — the shape SpiceDB uses
 for `DeleteRelationships` — so it removes what the caller could not enumerate.
 Anything less trades a security property for a performance one.

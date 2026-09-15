@@ -8,16 +8,19 @@ sidebarTitle: Azure OpenAI
 
 Open **Settings > Model Providers**, click **Add Model Provider** and select **Azure OpenAI**. Give the row a name, pick the organization, team or project it belongs to, and fill in:
 
-| Field | Value |
-|---|---|
-| `AZURE_OPENAI_API_KEY` | The key of your Azure OpenAI resource. |
-| `AZURE_OPENAI_ENDPOINT` | The resource endpoint, for example `https://acme-eu.openai.azure.com`. |
+| Field                      | Value                                                                                                                                                                     |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `AZURE_OPENAI_API_KEY`     | The key of your Azure OpenAI resource.                                                                                                                                    |
+| `AZURE_OPENAI_ENDPOINT`    | The resource endpoint, for example `https://acme-eu.openai.azure.com`.                                                                                                    |
 | `AZURE_OPENAI_API_VERSION` | The `api-version` query parameter. Set a version that serves your models, for example `2025-01-01-preview`. With an older version Azure answers `404 Resource not found`. |
 
 Save the row. Every virtual key whose scope can see the row can now dispatch to it, unless the key restricts its providers. See [Virtual keys](/ai-gateway/virtual-keys#create-a-virtual-key).
 
 <Frame caption="An Azure OpenAI row with the API version set and two deployment names under Custom Models.">
-  <img src="/images/ai-gateway/model-provider-azure-form.png" alt="The Azure OpenAI provider drawer with AZURE_OPENAI_API_KEY, AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_VERSION 2025-01-01-preview and two custom models" />
+  <img
+    src="/images/ai-gateway/model-provider-azure-form.png"
+    alt="The Azure OpenAI provider drawer with AZURE_OPENAI_API_KEY, AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_API_VERSION 2025-01-01-preview and two custom models"
+  />
 </Frame>
 
 Switch on **Use API Gateway** when your Azure OpenAI traffic goes through Azure API Management. The form then asks for `AZURE_API_GATEWAY_BASE_URL` and an optional `AZURE_API_GATEWAY_VERSION` (default `2024-05-01-preview`) instead of the endpoint.
@@ -46,14 +49,14 @@ The gateway sends the request to `<endpoint>/openai/deployments/<deployment>/cha
 
 ## Endpoints
 
-| Endpoint | Served |
-|---|---|
-| `POST /v1/chat/completions` | Yes |
-| `POST /v1/responses` | Yes |
-| `POST /v1/messages` | Yes, translated |
-| `POST /v1/embeddings` | Yes |
+| Endpoint                                               | Served                                                                                                            |
+| ------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------- |
+| `POST /v1/chat/completions`                            | Yes                                                                                                               |
+| `POST /v1/responses`                                   | Yes                                                                                                               |
+| `POST /v1/messages`                                    | Yes, translated                                                                                                   |
+| `POST /v1/embeddings`                                  | Yes                                                                                                               |
 | `POST /v1/images/generations`, `POST /v1/images/edits` | No. The gateway answers `400 provider_config_invalid` even when the deployment is on the row's Custom Models list |
-| `GET /v1/models` | Yes, the names under Custom Models |
+| `GET /v1/models`                                       | Yes, the names under Custom Models                                                                                |
 
 ## More than one resource
 

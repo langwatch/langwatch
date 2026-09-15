@@ -8,7 +8,7 @@ independent tenants** (`/t/1` … `/t/N`), each of which is:
 - a **SAML identity provider** — metadata and an SSO endpoint that signs
   assertions for any service provider's request (permissive by design)
 - a **SCIM 2.0 directory** — Users/Groups CRUD + PATCH behind a deterministic
-  bearer token, plus a control-API action that *pushes* the tenant's directory
+  bearer token, plus a control-API action that _pushes_ the tenant's directory
   at a real SCIM service provider (the Okta/Entra role, aimed at the app's
   SCIM endpoints)
 - a fake **domain owner** — `acme<n>.test` pre-seeded with a DNS TXT record
@@ -40,20 +40,20 @@ the same as JSON.
 ## Registering an application
 
 LangWatch's single sign-on setup shows you a redirect address ending in
-`{connection}` — the real id only exists *after* you register the connection,
+`{connection}` — the real id only exists _after_ you register the connection,
 which you cannot do until the identity provider is set up. Paste the address
 into the tenant page exactly as shown: a `{placeholder}` segment here matches
 whichever id turns up, so the circle breaks and you never have to come back.
 
-Registering hands back the three values the wizard's *Then tell us about it*
+Registering hands back the three values the wizard's _Then tell us about it_
 step asks for, under the same names:
 
-| Wizard field   | Where it comes from                     |
-| -------------- | --------------------------------------- |
-| Name           | whatever you called the application      |
-| Issuer address | the tenant's base address, `…/t/<n>`     |
-| Client id      | minted at registration                   |
-| Client secret  | minted at registration                   |
+| Wizard field   | Where it comes from                  |
+| -------------- | ------------------------------------ |
+| Name           | whatever you called the application  |
+| Issuer address | the tenant's base address, `…/t/<n>` |
+| Client id      | minted at registration               |
+| Client secret  | minted at registration               |
 
 For the SAML half the tenant page carries the sign-in address, entity id and a
 copyable signing certificate, plus a link to the metadata document if you would
@@ -81,12 +81,12 @@ outcome and a plain-language reason — which is usually the fastest way to find
 out whether a login even reached the identity provider, and what it objected to
 if it did.
 
-| Variable          | Default                  | Meaning                                    |
-| ----------------- | ------------------------ | ------------------------------------------ |
-| `SERVER_ADDR`     | `:5565`                  | HTTP listen address                        |
-| `IDPSIM_BASE_URL` | `http://localhost:5565`  | External base for issuer/metadata URLs     |
-| `IDPSIM_TENANTS`  | `3`                      | Tenant range size (1–100)                  |
-| `IDPSIM_DNS_ADDR` | `:15353`                 | Verification DNS UDP listener; `off` disables |
+| Variable          | Default                 | Meaning                                       |
+| ----------------- | ----------------------- | --------------------------------------------- |
+| `SERVER_ADDR`     | `:5565`                 | HTTP listen address                           |
+| `IDPSIM_BASE_URL` | `http://localhost:5565` | External base for issuer/metadata URLs        |
+| `IDPSIM_TENANTS`  | `3`                     | Tenant range size (1–100)                     |
+| `IDPSIM_DNS_ADDR` | `:15353`                | Verification DNS UDP listener; `off` disables |
 
 Under haven the lane gets `SERVER_ADDR` and `IDPSIM_BASE_URL` injected, and
 worktrees running (or falling back to) the lane see `LANGWATCH_IDPSIM_URL` in
@@ -123,7 +123,7 @@ curl -X POST localhost:5565/control/t/1/scim-push \
 ```
 
 pushes the tenant's users and groups as SCIM creates. The tenant's own SCIM
-*server* lives at `/t/<n>/scim/v2` (bearer `idpsim-scim-token-<n>`) for
+_server_ lives at `/t/<n>/scim/v2` (bearer `idpsim-scim-token-<n>`) for
 testing the client side of provisioning.
 
 ## Domain verification

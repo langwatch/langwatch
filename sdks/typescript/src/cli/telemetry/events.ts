@@ -25,13 +25,13 @@
  *
  * The wire itself is deliberately not this module's business; see `sink.ts`.
  *
- * Spec: specs/telemetry/langy-live-events.feature
+ * Spec: sdks/typescript/specs/telemetry/langy-live-events.feature
  */
 
 // The zod-free subpath, deliberately: this module is on the hot path of every
 // instrumented command, and the package root pulls in the (zod-based) card
 // schemas, which cost ~28ms an invocation to load and which nothing here needs.
-import { handledErrorFromThrown } from "@langwatch/langy/cards/handled-error";
+import { handledErrorFromThrown } from "@langwatch/langy-contract/cards/handled-error";
 import { LANGWATCH_SDK_VERSION } from "@/internal/constants";
 import { resolveLogsEndpoint } from "@/internal/endpoint";
 import {
@@ -61,12 +61,7 @@ export interface CommandEvents {
   /** A headline number is known — the stat card's value. */
   count: (args: { count: number; total?: number; message: string }) => void;
   /** The command advanced. `progress` is a 0..1 fraction; out-of-range is clamped. */
-  progress: (args: {
-    progress: number;
-    count?: number;
-    total?: number;
-    message: string;
-  }) => void;
+  progress: (args: { progress: number; count?: number; total?: number; message: string }) => void;
   /** The command succeeded. Duration is measured from `createCommandEvents`. */
   completed: (args: { count?: number; total?: number; message: string }) => void;
   /**
@@ -93,14 +88,10 @@ const NOOP_EVENTS: CommandEvents = Object.freeze({
 });
 
 const isTruthy = (value: string | undefined): boolean =>
-  value !== undefined &&
-  ["1", "true", "yes", "on"].includes(value.trim().toLowerCase());
+  value !== undefined && ["1", "true", "yes", "on"].includes(value.trim().toLowerCase());
 
 /** Which transport, if any, this environment is asking for. */
-export type Transport =
-  | { kind: "ipc"; path: string }
-  | { kind: "otlp"; endpoint: string }
-  | null;
+export type Transport = { kind: "ipc"; path: string } | { kind: "otlp"; endpoint: string } | null;
 
 /**
  * Resolve the transport. A pure env read — this is the gate that keeps a disabled
@@ -109,9 +100,7 @@ export type Transport =
  * IPC wins when both are configured: a host that handed us a socket is a host that
  * is listening, and the socket is both cheaper to load and faster to deliver.
  */
-export const resolveTransport = (
-  env: NodeJS.ProcessEnv = process.env,
-): Transport => {
+export const resolveTransport = (env: NodeJS.ProcessEnv = process.env): Transport => {
   const socket = env[LANGWATCH_EVENTS_SOCKET_ENV]?.trim();
   if (socket) return { kind: "ipc", path: socket };
 
@@ -122,14 +111,11 @@ export const resolveTransport = (
 };
 
 /** Whether anything at all will be emitted. */
-export const areEventsEnabled = (
-  env: NodeJS.ProcessEnv = process.env,
-): boolean => resolveTransport(env) !== null;
+export const areEventsEnabled = (env: NodeJS.ProcessEnv = process.env): boolean =>
+  resolveTransport(env) !== null;
 
 const truncate = (value: string): string =>
-  value.length <= MAX_MESSAGE_LENGTH
-    ? value
-    : `${value.slice(0, MAX_MESSAGE_LENGTH - 1)}…`;
+  value.length <= MAX_MESSAGE_LENGTH ? value : `${value.slice(0, MAX_MESSAGE_LENGTH - 1)}…`;
 
 /** Env vars whose *values* must never appear in an outbound message. */
 const SECRET_ENV_VARS = [
@@ -152,10 +138,7 @@ const SECRET_PATTERNS: RegExp[] = [
  * an API key echoed back by a server is caught by value whatever shape it has —
  * then anything that merely LOOKS like a credential.
  */
-export const redactSecrets = (
-  message: string,
-  env: NodeJS.ProcessEnv = process.env,
-): string => {
+export const redactSecrets = (message: string, env: NodeJS.ProcessEnv = process.env): string => {
   let scrubbed = message;
 
   for (const name of SECRET_ENV_VARS) {
@@ -222,7 +205,10 @@ const createOtlpSink = async (endpoint: string): Promise<EventSink> => {
     resource,
     processors: [
       new SimpleLogRecordProcessor({
-        exporter: new OTLPLogExporter({ url: endpoint, timeoutMillis: EXPORT_TIMEOUT_MS }),
+        exporter: new OTLPLogExporter({
+          url: endpoint,
+          timeoutMillis: EXPORT_TIMEOUT_MS,
+        }),
       }),
     ],
   });
@@ -371,9 +357,7 @@ export const createCommandEvents = ({
           [ATTR.error]: reason,
           [ATTR.errorKind]: handled.kind,
           [ATTR.errorIsHandled]: handled.isHandled,
-          ...(handled.httpStatus > 0
-            ? { [ATTR.errorStatus]: handled.httpStatus }
-            : {}),
+          ...(handled.httpStatus > 0 ? { [ATTR.errorStatus]: handled.httpStatus } : {}),
           [ATTR.message]: line,
           [ATTR.durationMs]: Date.now() - startedAt,
         },

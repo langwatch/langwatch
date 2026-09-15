@@ -35,11 +35,11 @@ function copySkillToWorkDir(tempFolder: string) {
  * instead of in the entry file.
  */
 function expectTracingInSource({
-	tempFolder,
-	extension,
+  tempFolder,
+  extension,
 }: {
-	tempFolder: string;
-	extension: string;
+  tempFolder: string;
+  extension: string;
 }) {
   const sources = fs
     .readdirSync(tempFolder, { recursive: true, withFileTypes: true })
@@ -66,9 +66,7 @@ describe("Level-up Skill", () => {
   it.skipIf(isCI)(
     "orchestrates all sub-skills for a Python OpenAI bot",
     async () => {
-      const tempFolder = fs.mkdtempSync(
-        path.join(os.tmpdir(), "langwatch-skill-level-up-py-")
-      );
+      const tempFolder = fs.mkdtempSync(path.join(os.tmpdir(), "langwatch-skill-level-up-py-"));
 
       copyFixtureToWorkDir({
         fixtureSubpath: "python-openai",
@@ -95,7 +93,7 @@ describe("Level-up Skill", () => {
         ],
         script: [
           scenario.user(
-            "take my agent to the next level with langwatch — add tracing, set up evaluations, and add scenario tests"
+            "take my agent to the next level with langwatch — add tracing, set up evaluations, and add scenario tests",
           ),
           scenario.agent(),
           (state) => {
@@ -109,15 +107,13 @@ describe("Level-up Skill", () => {
 
       expect(result.success).toBe(true);
     },
-    1_800_000 // 30 min: the meta-skill runs every sub-skill in one turn
+    1_800_000, // 30 min: the meta-skill runs every sub-skill in one turn
   );
 
   it.skipIf(isCI)(
     "orchestrates all sub-skills for a TypeScript Vercel AI bot",
     async () => {
-      const tempFolder = fs.mkdtempSync(
-        path.join(os.tmpdir(), "langwatch-skill-level-up-ts-")
-      );
+      const tempFolder = fs.mkdtempSync(path.join(os.tmpdir(), "langwatch-skill-level-up-ts-"));
       copyFixtureToWorkDir({
         fixtureSubpath: "typescript-vercel",
         workingDirectory: tempFolder,
@@ -143,7 +139,7 @@ describe("Level-up Skill", () => {
         ],
         script: [
           scenario.user(
-            "take my agent to the next level with langwatch — add tracing, set up evaluations, and add scenario tests"
+            "take my agent to the next level with langwatch — add tracing, set up evaluations, and add scenario tests",
           ),
           scenario.agent(),
           (state) => {
@@ -155,14 +151,14 @@ describe("Level-up Skill", () => {
       });
       expect(result.success).toBe(true);
     },
-    1_800_000
+    1_800_000,
   );
 
   it.skipIf(isCI)(
     "orchestrates all sub-skills for a Python LangGraph agent",
     async () => {
       const tempFolder = fs.mkdtempSync(
-        path.join(os.tmpdir(), "langwatch-skill-level-up-langgraph-")
+        path.join(os.tmpdir(), "langwatch-skill-level-up-langgraph-"),
       );
       copyFixtureToWorkDir({
         fixtureSubpath: "python-langgraph",
@@ -188,7 +184,7 @@ describe("Level-up Skill", () => {
         ],
         script: [
           scenario.user(
-            "take my agent to the next level with langwatch — add tracing, set up evaluations, and add scenario tests"
+            "take my agent to the next level with langwatch — add tracing, set up evaluations, and add scenario tests",
           ),
           scenario.agent(),
           (state) => {
@@ -200,15 +196,13 @@ describe("Level-up Skill", () => {
       });
       expect(result.success).toBe(true);
     },
-    1_800_000
+    1_800_000,
   );
 
   it.skipIf(isCI)(
     "orchestrates all sub-skills for a TypeScript Mastra agent",
     async () => {
-      const tempFolder = fs.mkdtempSync(
-        path.join(os.tmpdir(), "langwatch-skill-level-up-mastra-")
-      );
+      const tempFolder = fs.mkdtempSync(path.join(os.tmpdir(), "langwatch-skill-level-up-mastra-"));
       copyFixtureToWorkDir({
         fixtureSubpath: "typescript-mastra",
         workingDirectory: tempFolder,
@@ -233,7 +227,7 @@ describe("Level-up Skill", () => {
         ],
         script: [
           scenario.user(
-            "take my agent to the next level with langwatch — add tracing, set up evaluations, and add scenario tests"
+            "take my agent to the next level with langwatch — add tracing, set up evaluations, and add scenario tests",
           ),
           scenario.agent(),
           (state) => {
@@ -245,6 +239,6 @@ describe("Level-up Skill", () => {
       });
       expect(result.success).toBe(true);
     },
-    1_800_000
+    1_800_000,
   );
 });

@@ -18,7 +18,7 @@ on:
 #
 # "creates-or-updates ... per package" above is also a CI cost. Every merge to
 # main force-pushes each affected release branch, and a release PR's diff is a
-# changelog plus version fields in `package.json`, `platform/app/package.json`
+# changelog plus version fields in `package.json`, the application manifests
 # and three `Chart.yaml`s. Nine workflows path-filter on `package.json` —
 # correctly, since a dependency bump touches exactly those files — and a path
 # filter cannot tell a version bump from a dependency bump. So a nine-file

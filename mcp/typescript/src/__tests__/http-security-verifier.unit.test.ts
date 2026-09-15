@@ -85,11 +85,11 @@ describe("createApiKeyVerifier", () => {
     await expect(verifier.verify("sk-real")).resolves.toBe(true);
 
     expect(fetchImpl).toHaveBeenCalledWith(
-      "https://app.langwatch.ai/api/me/project",
+      "https://app.langwatch.ai/api/v1/me/project",
       expect.objectContaining({
         method: "GET",
         headers: { "X-Auth-Token": "sk-real" },
-      })
+      }),
     );
   });
 
@@ -171,9 +171,7 @@ describe("createApiKeyVerifier", () => {
       fetchImpl: fetchImpl as unknown as typeof fetch,
     });
 
-    const results = await Promise.all(
-      Array.from({ length: 25 }, () => verifier.verify("sk-real"))
-    );
+    const results = await Promise.all(Array.from({ length: 25 }, () => verifier.verify("sk-real")));
 
     expect(results.every((result) => result === true)).toBe(true);
     expect(fetchImpl).toHaveBeenCalledTimes(1);
@@ -202,9 +200,7 @@ describe("createApiKeyVerifier", () => {
       requestTimeoutMs: 20,
       fetchImpl: ((_url: string, init?: RequestInit) =>
         new Promise((_resolve, reject) => {
-          init?.signal?.addEventListener("abort", () =>
-            reject(new Error("aborted"))
-          );
+          init?.signal?.addEventListener("abort", () => reject(new Error("aborted")));
         })) as unknown as typeof fetch,
     });
 

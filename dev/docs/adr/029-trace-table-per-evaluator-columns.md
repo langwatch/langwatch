@@ -39,7 +39,7 @@ The static column model is the crux this decision has to break:
 
 The data is already there: `TraceListItem.evaluations: TraceEvalResult[]` ships
 on every row, each carrying `{evaluatorId, evaluatorName, status, score,
-passed, label}` (`types/trace.ts`). The evaluator *list* for the picker is
+passed, label}` (`types/trace.ts`). The evaluator _list_ for the picker is
 already discoverable via the `tracesV2.discover` "evaluator" facet
 (`useTraceFacets`), scoped to evaluators with runs in the active time range.
 
@@ -50,7 +50,7 @@ Behavioural contract: see
 User decisions taken before drafting (the four design forks):
 
 1. **Explicit picker**, not auto-derive from visible rows.
-2. **Per-field columns** — a column targets one evaluator *and* one field
+2. **Per-field columns** — a column targets one evaluator _and_ one field
    (Score / Verdict / Label); one evaluator can back several columns.
 3. **Time-range evaluators plus free-text** — the picker is a typeahead over
    discovered evaluators but accepts an arbitrary typed evaluator key.
@@ -75,7 +75,7 @@ rest`. The `eval:` prefix is the discriminator every consumer keys off.
 - **`makeEvalCellDef({ evaluatorKey, field, label })`** returns a
   `CellDef<TraceListItem>` (alongside `EvaluationsCell`). The cell resolves the
   trace's **latest** run for `evaluatorKey` — matching against `evaluatorId`
-  first, then `evaluatorName` (so a free-text *name* still matches), reusing
+  first, then `evaluatorName` (so a free-text _name_ still matches), reusing
   the latest-wins dedup already in `EvaluationsCell` — then renders the chosen
   field:
   - **score** → formatted `score` + a status-coloured dot (`evalChipColor`);
@@ -89,7 +89,7 @@ rest`. The `eval:` prefix is the discriminator every consumer keys off.
   `{columns, registry, minWidth}` bundle. It parses `eval:` ids out of the
   logical column list, builds a `ColumnDef` per id (accessor returns the field
   value — wired for future sort — header = resolved label, `enableSorting:
-  false`), and **merges** the matching `CellDef`s into the registry it hands
+false`), and **merges** the matching `CellDef`s into the registry it hands
   down (`{...registry, cells: {...registry.cells, ...evalCells}}`). `columns.ts`
   and the static registry stay untouched and fully static.
 
@@ -104,7 +104,7 @@ Note the cell synthesis in §B keys off `columnOrder` **directly**, not off the
 reconciled set — so eval columns still render on the legacy custom-lens loader
 path that bypasses `reconcileColumns`
 ([specs/traces-v2/view-system.feature](../../../specs/traces-v2/view-system.feature)
-records that an unknown *static* id renders nothing there; an `eval:` id instead
+records that an unknown _static_ id renders nothing there; an `eval:` id instead
 resolves to its synthesised cell).
 
 ### D. The Columns dropdown "Evaluations" section gains an add-form

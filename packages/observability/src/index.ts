@@ -12,28 +12,40 @@ export {
   OTEL_ATTR,
   REQUEST_CAUSE_FIELD,
   TRACER_NAMES,
-} from "./constants";
-export type {
-  JobContextMetadata,
-  JobDataWithContext,
-  RequestContext,
-} from "./context/core";
+} from "./constants.ts";
+export type { JobContextMetadata, JobDataWithContext, RequestContext } from "./context/core.ts";
 export {
+  configureLogger,
+  createLoggerFactory,
   type CreateLoggerOptions,
   consoleIgnoreFields,
   createLogger,
+  type LoggerConfiguration,
+  type LoggerFactory,
+  type LoggerFormat,
+  loggerConfigurationFrom,
   type Logger,
-} from "./logger";
+  type ProcessLoggerInputs,
+  type ResolvedLoggerConfiguration,
+} from "./logger.ts";
 export {
   getLogLevelFromStatusCode,
   getStatusCodeFromError,
   hasAuthorizationToken,
   logHttpRequest,
   type RequestLogData,
-} from "./request/requestLogging";
+} from "./request/requestLogging.ts";
 export {
   MAX_VALIDATION_ISSUES,
   validationMeta,
   type ValidationIssueMeta,
   type ValidationMeta,
-} from "./validation/validationMeta";
+} from "./validation/validationMeta.ts";
+export {
+  processFailureLine,
+  runScript,
+  scriptFailureRecord,
+  writeScriptWarning,
+} from "./run-script.ts";
+export { bootNodeExecutable, installBootGuard } from "./boot-guard.ts";
+export { createWarnThrottle, type WarnThrottle } from "./warn-throttle.ts";

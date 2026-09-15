@@ -1,14 +1,7 @@
 /**
- * The socket that carries Langy's local calls to this machine.
- *
- * One outbound connection to `/api/v1/langy/control/connect`, authorised with
- * the Langy session key the approval minted. It is the same transport the
- * connected-agents SDK uses (a WebSocket, falling back to HTTP long polling
- * when a proxy refuses the upgrade) and the same reconnect loop, both taken
- * from `src/agent/` rather than copied.
- *
- * The client owns the connection and nothing else: what a call does is
- * `session.ts`, what may run is `policy.ts`.
+ * The socket that carries Langy's local calls to this machine, using the
+ * same transport and reconnect loop as the connected-agents SDK
+ * (`src/agent/`). Owns the connection and nothing else.
  */
 
 import * as os from "node:os";
@@ -125,20 +118,15 @@ export class RelayClient {
   /** Calls this process is working on, re-sent on every register. */
   private readonly inFlight = new Set<string>();
   /**
-   * Results no open connection carried, kept until one does.
-   *
-   * A result written while the socket is down is dropped by the socket, and
-   * the platform then has a call with no answer and replays it on the next
-   * connection. The answer this machine already has is sent again instead.
+   * Results no open connection carried, kept until one does — a result
+   * written while the socket is down is dropped, and the platform replays
+   * the call on the next connection.
    */
   private readonly unsentResults = new Map<string, LocalResultFrame>();
   /**
-   * The answers this session already gave, newest last.
-   *
-   * A result can be sent on a socket that dies before the platform reads it.
-   * The platform then has a call with no answer and replays it, and a CLI
-   * that only skips a call it has already run leaves that call waiting for
-   * ever. The answer is sent again instead.
+   * The answers this session already gave, newest last, so a replayed call
+   * (the platform never saw the result before the socket died) is answered
+   * again instead of left waiting forever.
    */
   private readonly completedResults = new Map<string, LocalResultFrame>();
 
@@ -218,10 +206,8 @@ export class RelayClient {
   }
 
   /**
-   * Sends the answer to a call again, and says whether there was one.
-   *
-   * False means the call is still being worked on here, which the register
-   * frame already says with its in-flight call ids.
+   * Sends the answer to a call again, and says whether there was one. False
+   * means the call is still in flight, which the register frame already says.
    */
   resendResult(callId: string): boolean {
     const frame = this.completedResults.get(callId);

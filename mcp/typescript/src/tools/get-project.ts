@@ -1,8 +1,6 @@
 import { getProject as apiGetProject } from "../langwatch-api-projects.js";
 
-export async function handleGetProject(params: {
-  id: string;
-}): Promise<string> {
+export async function handleGetProject(params: { id: string }): Promise<string> {
   const project = await apiGetProject(params.id);
 
   const lines: string[] = [];

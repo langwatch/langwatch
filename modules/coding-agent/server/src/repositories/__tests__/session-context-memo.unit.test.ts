@@ -1,0 +1,87 @@
+/**
+ * @vitest-environment node
+ * @unit
+ * Memory memo housekeeping: no-Redis memo must handle its own expiry to avoid
+ * accumulating entries on long-running processes.
+ * @see specs/coding-agent/session-git-context.feature
+ */
+import { describe, expect, it } from "vitest";
+import type { SessionWorkingContext } from "@langwatch/coding-agent-contract";
+import { MemorySessionContextMemoRepository } from "../memory/memory.session-context-memo.repository.ts";
+
+const DAY = 24 * 60 * 60 * 1000;
+
+const context: SessionWorkingContext = {
+  repositoryHost: "github.com",
+  repositoryOwner: "acme",
+  repositoryName: "widgets",
+  branch: "feat/split",
+};
+
+describe("MemorySessionContextMemoRepository", () => {
+  describe("given a context written to the memo", () => {
+    describe("when it is read back inside its lifetime", () => {
+      it("answers the declared context", async () => {
+        const memo = new MemorySessionContextMemoRepository(() => 0);
+        await memo.set({ tenantId: "p1", sessionId: "s1", context });
+
+        expect(await memo.find({ tenantId: "p1", sessionId: "s1" })).toEqual(context);
+      });
+    });
+
+    describe("when its lifetime has passed", () => {
+      /** @scenario "A memo entry is forgotten once its lifetime passes" */
+      it("answers nothing for that session", async () => {
+        let now = 0;
+        const memo = new MemorySessionContextMemoRepository(() => now);
+        await memo.set({ tenantId: "p1", sessionId: "s1", context });
+
+        now = 181 * DAY;
+
+        expect(await memo.find({ tenantId: "p1", sessionId: "s1" })).toBeNull();
+      });
+    });
+  });
+
+  describe("given more sessions than the memo holds", () => {
+    describe("when the oldest session's context is read", () => {
+      /** @scenario "The no-Redis memo stops growing at its bound" */
+      it("evicts the oldest and keeps the newest", async () => {
+        const memo = new MemorySessionContextMemoRepository(() => 0);
+        // One past the bound, so exactly the first write is evicted.
+        for (let index = 0; index <= 10_000; index++) {
+          await memo.set({
+            tenantId: "p1",
+            sessionId: `s${index}`,
+            context,
+          });
+        }
+
+        expect(await memo.find({ tenantId: "p1", sessionId: "s0" })).toBeNull();
+        expect(await memo.find({ tenantId: "p1", sessionId: "s1" })).toEqual(context);
+        expect(await memo.find({ tenantId: "p1", sessionId: "s10000" })).toEqual(context);
+      });
+    });
+  });
+
+  describe("given two tenants that share a session id", () => {
+    describe("when each tenant's context is read", () => {
+      it("keeps their contexts apart", async () => {
+        const memo = new MemorySessionContextMemoRepository(() => 0);
+        await memo.set({ tenantId: "p1", sessionId: "shared", context });
+        await memo.set({
+          tenantId: "p2",
+          sessionId: "shared",
+          context: { ...context, branch: "feat/other" },
+        });
+
+        expect((await memo.find({ tenantId: "p1", sessionId: "shared" }))?.branch).toBe(
+          "feat/split",
+        );
+        expect((await memo.find({ tenantId: "p2", sessionId: "shared" }))?.branch).toBe(
+          "feat/other",
+        );
+      });
+    });
+  });
+});

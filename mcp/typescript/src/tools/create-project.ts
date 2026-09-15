@@ -38,7 +38,7 @@ export async function handleCreateProject(params: {
   lines.push("");
   lines.push(
     "> ⚠️ Save the service API key now — it will not be shown again. " +
-    "Use it as `LANGWATCH_API_KEY` to authenticate project-scoped operations.",
+      "Use it as `LANGWATCH_API_KEY` to authenticate project-scoped operations.",
   );
 
   return lines.join("\n");

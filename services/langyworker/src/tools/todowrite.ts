@@ -8,7 +8,11 @@
  */
 
 import { Type } from "typebox";
-import type { ExtensionAPI, ExtensionContext, InlineExtension } from "@earendil-works/pi-coding-agent";
+import type {
+  ExtensionAPI,
+  ExtensionContext,
+  InlineExtension,
+} from "@earendil-works/pi-coding-agent";
 
 export const TODOWRITE_TOOL_NAME = "todowrite";
 
@@ -78,8 +82,10 @@ export function normalizeTodoStatus(status: unknown): TodoStatus {
 export function normalizeTodos(params: unknown): TodoItem[] {
   const rows: unknown[] = Array.isArray(params)
     ? params
-    : typeof params === "object" && params !== null && Array.isArray((params as { todos?: unknown }).todos)
-      ? ((params as { todos: unknown[] }).todos)
+    : typeof params === "object" &&
+        params !== null &&
+        Array.isArray((params as { todos?: unknown }).todos)
+      ? (params as { todos: unknown[] }).todos
       : [];
   const items: TodoItem[] = [];
   for (const row of rows) {
@@ -136,7 +142,7 @@ export function createTodowriteExtension(): InlineExtension {
         name: TODOWRITE_TOOL_NAME,
         label: "Todo",
         description:
-          "Maintain the live todo list the user sees. Pass the FULL list on every call ({\"todos\": [{\"content\", \"status\"}]}); each call replaces the previous list. Statuses: pending, in_progress, completed, cancelled. Keep exactly one item in_progress at a time.",
+          'Maintain the live todo list the user sees. Pass the FULL list on every call ({"todos": [{"content", "status"}]}); each call replaces the previous list. Statuses: pending, in_progress, completed, cancelled. Keep exactly one item in_progress at a time.',
         parameters: todowriteParams,
         async execute(_toolCallId, params) {
           todos = normalizeTodos(params);

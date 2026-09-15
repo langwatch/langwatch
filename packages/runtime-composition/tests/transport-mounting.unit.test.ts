@@ -1,0 +1,298 @@
+import { describe, expect, it } from "vitest";
+
+import { createApp } from "../src/application.ts";
+import { memberSourceOf } from "./member-source.ts";
+import { moduleApi } from "../src/module-api-token.ts";
+import { defineServerModule, type FeatureSetup } from "../src/feature-installer.ts";
+import {
+  DuplicateTransportNamespaceError,
+  MissingTransportHostError,
+  type FeatureRestHost,
+  type FeatureTrpcHost,
+} from "../src/transport-mounting.ts";
+
+interface CatalogueApi {
+  read(): string;
+}
+const CatalogueApi = moduleApi<CatalogueApi>("dataset");
+
+class CatalogueApp implements CatalogueApi {
+  static readonly contract = CatalogueApi;
+  static readonly dependencies = {};
+
+  static create(_setup: FeatureSetup<Record<never, never>, object, undefined>): CatalogueApi {
+    return new CatalogueApp();
+  }
+
+  read(): string {
+    return "one dataset";
+  }
+}
+
+/** One declared family, standing in for a REST declaration builder's output. */
+const catalogueRest = {
+  protocol: "rest",
+  namespace: "dataset",
+  router: () => ({ family: "dataset" }),
+} as const;
+
+/** One declared namespace, standing in for a tRPC declaration. */
+const catalogueTrpc = {
+  protocol: "trpc",
+  namespace: "dataset",
+  router: () => ({ procedures: ["getAll"] }),
+} as const;
+
+type MountedRest = Readonly<{
+  declaration: object;
+  app: unknown;
+  options: Readonly<{ onError?: unknown; facts?: readonly unknown[] }> | undefined;
+}>;
+
+/** A process's REST door, recording every mount it was asked for. */
+function recordingRestHost(): FeatureRestHost<MountedRest> & { mounted: MountedRest[] } {
+  const mounted: MountedRest[] = [];
+
+  return {
+    mounted,
+    mount: (declaration, app, options) => {
+      const record = { declaration, app: app(), options };
+      mounted.push(record);
+
+      return record;
+    },
+  };
+}
+
+type MountedTrpc = Readonly<{
+  app: unknown;
+  options: Readonly<{ facts?: readonly object[] }> | undefined;
+}>;
+
+/** A process's tRPC root, answering the namespace it was handed. */
+function recordingTrpcHost(): FeatureTrpcHost<MountedTrpc> & { mounted: MountedTrpc[] } {
+  const mounted: MountedTrpc[] = [];
+
+  return {
+    mounted,
+    mount: (_declaration, app, options) => {
+      const record = { app: app(), options };
+      mounted.push(record);
+
+      return record;
+    },
+  };
+}
+
+/**
+ * One binding in the shape `bindRestMiddleware` answers with: the middleware a
+ * route declared, and how this process resolves it. The REST door reads a
+ * binding by its `middleware`, which is what tells the two doors apart.
+ */
+function restBinding(read: () => string) {
+  return { middleware: { name: "catalogueSize" }, resolve: () => read() };
+}
+
+/** One binding in the shape `bindTrpcFact` answers with, keyed by its `fact`. */
+function trpcBinding(read: () => string) {
+  return { fact: { name: "catalogueSize" }, resolve: () => read() };
+}
+
+describe("given a feature whose server declares transports", () => {
+  describe("when the application was handed the process's own doors", () => {
+    it("mounts every declared family on the REST door", async () => {
+      const server = defineServerModule("dataset")
+        .withApp(CatalogueApp)
+        .withTransports(catalogueRest);
+      const rest = recordingRestHost();
+
+      const runtime = await createApp({ role: "api", members: memberSourceOf({}) })
+        .withTransports({ rest })
+        .withModules([server])
+        .boot();
+
+      expect(runtime.transports.rest).toHaveLength(1);
+      expect(rest.mounted[0]?.declaration).toEqual({ family: "dataset" });
+    });
+
+    it("binds the handler's application to the feature's own app", async () => {
+      const server = defineServerModule("dataset")
+        .withApp(CatalogueApp)
+        .withTransports(catalogueTrpc);
+
+      const runtime = await createApp({ role: "api", members: memberSourceOf({}) })
+        .withTransports({ trpc: recordingTrpcHost() })
+        .withModules([server])
+        .boot();
+
+      const mounted = runtime.transports.trpc.dataset;
+
+      expect((mounted?.app as CatalogueApi).read()).toBe("one dataset");
+    });
+
+    it("keys each mounted namespace by the name its declaration carries", async () => {
+      const server = defineServerModule("dataset")
+        .withApp(CatalogueApp)
+        .withTransports(catalogueTrpc);
+
+      const runtime = await createApp({ role: "api", members: memberSourceOf({}) })
+        .withTransports({ trpc: recordingTrpcHost() })
+        .withModules([server])
+        .boot();
+
+      expect(Object.keys(runtime.transports.trpc)).toEqual(["dataset"]);
+    });
+
+    it("mounts with no install-side options", async () => {
+      const rest = recordingRestHost();
+      const server = defineServerModule("dataset")
+        .withApp(CatalogueApp)
+        .withTransports(catalogueRest);
+
+      await createApp({ role: "api", members: memberSourceOf({}) })
+        .withTransports({ rest })
+        .withModules([server])
+        .boot();
+
+      expect(rest.mounted[0]?.options).toEqual({});
+    });
+  });
+
+  describe("when the module binds the facts its own declarations name", () => {
+    it("mounts the family with what the module bound", async () => {
+      const rest = recordingRestHost();
+      const server = defineServerModule("dataset")
+        .withApp(CatalogueApp)
+        .withTransports(catalogueRest)
+        .withTransportFacts(({ app }) => [restBinding(() => app.read())]);
+
+      await createApp({ role: "api", members: memberSourceOf({}) })
+        .withTransports({ rest })
+        .withModules([server])
+        .boot();
+
+      const bound = rest.mounted[0]?.options?.facts ?? [];
+
+      expect(bound).toHaveLength(1);
+    });
+
+    it("reads the value off the module's own App, not off the process", async () => {
+      const rest = recordingRestHost();
+      const server = defineServerModule("dataset")
+        .withApp(CatalogueApp)
+        .withTransports(catalogueRest)
+        .withTransportFacts(({ app }) => [restBinding(() => app.read())]);
+
+      await createApp({ role: "api", members: memberSourceOf({}) })
+        .withTransports({ rest })
+        .withModules([server])
+        .boot();
+
+      const [binding] = (rest.mounted[0]?.options?.facts ?? []) as readonly {
+        resolve(): string;
+      }[];
+
+      expect(binding?.resolve()).toBe("one dataset");
+    });
+
+    it("hands each door only the bindings of its own protocol", async () => {
+      const rest = recordingRestHost();
+      const trpc = recordingTrpcHost();
+      const server = defineServerModule("dataset")
+        .withApp(CatalogueApp)
+        .withTransports(catalogueRest, catalogueTrpc)
+        .withTransportFacts(({ app }) => [
+          restBinding(() => app.read()),
+          trpcBinding(() => app.read()),
+        ]);
+
+      await createApp({ role: "api", members: memberSourceOf({}) })
+        .withTransports({ rest, trpc })
+        .withModules([server])
+        .boot();
+
+      const bound = (rest.mounted[0]?.options?.facts ?? []) as readonly object[];
+
+      expect(bound).toHaveLength(1);
+      expect(bound[0]).toHaveProperty("middleware");
+      expect(trpc.mounted[0]?.options?.facts).toHaveLength(1);
+      expect(trpc.mounted[0]?.options?.facts?.[0]).toHaveProperty("fact");
+    });
+
+    it("binds nothing in a role that serves no doors", async () => {
+      let bound = 0;
+      const server = defineServerModule("dataset")
+        .withApp(CatalogueApp)
+        .withTransports(catalogueRest)
+        .withTransportFacts(() => {
+          bound += 1;
+
+          return [];
+        });
+
+      await createApp({ role: "worker", members: memberSourceOf({}) })
+        .withModules([server])
+        .boot();
+
+      expect(bound).toBe(0);
+    });
+  });
+
+  describe("when the process opened no door for a declared protocol", () => {
+    it("refuses at boot, naming the feature and the protocol", async () => {
+      const server = defineServerModule("dataset")
+        .withApp(CatalogueApp)
+        .withTransports(catalogueTrpc);
+
+      await expect(
+        createApp({ role: "api", members: memberSourceOf({}) })
+          .withTransports({ rest: recordingRestHost() })
+          .withModules([server])
+          .boot(),
+      ).rejects.toThrow(MissingTransportHostError);
+    });
+  });
+
+  describe("when two installed features claim one namespace", () => {
+    it("refuses at boot, naming both", async () => {
+      const dataset = defineServerModule("dataset")
+        .withApp(CatalogueApp)
+        .withTransports(catalogueTrpc);
+      const monitor = defineServerModule("monitor")
+        .withApp(
+          class MonitorApp {
+            static readonly contract = moduleApi<CatalogueApi>("monitor");
+            static readonly dependencies = {};
+            static create(): CatalogueApi {
+              return { read: () => "one monitor" };
+            }
+          },
+        )
+        .withTransports(catalogueTrpc);
+
+      await expect(
+        createApp({ role: "api", members: memberSourceOf({}) })
+          .withTransports({ trpc: recordingTrpcHost() })
+          .withModules([dataset, monitor])
+          .boot(),
+      ).rejects.toThrow(DuplicateTransportNamespaceError);
+    });
+  });
+
+  describe("when the same feature is installed on a worker", () => {
+    it("mounts nothing, because a worker serves no door", async () => {
+      const server = defineServerModule("dataset")
+        .withApp(CatalogueApp)
+        .withTransports(catalogueRest, catalogueTrpc);
+      const rest = recordingRestHost();
+
+      const runtime = await createApp({ role: "worker", members: memberSourceOf({}) })
+        .withTransports({ rest })
+        .withModules([server])
+        .boot();
+
+      expect(runtime.transports).toEqual({ rest: [], trpc: {} });
+      expect(rest.mounted).toHaveLength(0);
+    });
+  });
+});

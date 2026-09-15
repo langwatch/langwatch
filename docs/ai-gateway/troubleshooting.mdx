@@ -13,7 +13,14 @@ Every gateway response carries `X-LangWatch-Gateway-Request-Id`. Read it from yo
 Error responses share one body shape:
 
 ```json
-{"error":{"type":"rate_limited","code":"rate_limited","message":"rate_limited","fault":"customer"}}
+{
+  "error": {
+    "type": "rate_limited",
+    "code": "rate_limited",
+    "message": "rate_limited",
+    "fault": "customer"
+  }
+}
 ```
 
 The `code` field is the stable identifier. Match your client code on `code`; the `message` is copy and it changes.
@@ -33,12 +40,12 @@ A `401` with an empty `Authorization` value in your own shell means the variable
 
 **Causes and fixes:**
 
-| Cause | Fix |
-|---|---|
-| The environment variable is empty in the client process | Print the variable from inside the running container |
-| The client holds a secret that was rotated more than 24 hours ago | Copy the new secret from the rotate response into your secret store |
-| The value is the display prefix, not the secret | A secret is `vk-lw-` plus 26 characters, 32 in total. The 13-character prefix shown in the UI is not a key |
-| The virtual key was deleted or belongs to another organization | Create a key in the organization you are calling |
+| Cause                                                             | Fix                                                                                                        |
+| ----------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| The environment variable is empty in the client process           | Print the variable from inside the running container                                                       |
+| The client holds a secret that was rotated more than 24 hours ago | Copy the new secret from the rotate response into your secret store                                        |
+| The value is the display prefix, not the secret                   | A secret is `vk-lw-` plus 26 characters, 32 in total. The 13-character prefix shown in the UI is not a key |
+| The virtual key was deleted or belongs to another organization    | Create a key in the organization you are calling                                                           |
 
 A revoked or disabled key answers `403`, not `401`. See the next section.
 
@@ -46,11 +53,11 @@ A revoked or disabled key answers `403`, not `401`. See the next section.
 
 Both are deliberate stops on the key, and they are different states.
 
-| Code | Status | Meaning |
-|---|---|---|
-| `virtual_key_revoked` | 403 | The key is dead. Revocation is terminal |
-| `virtual_key_disabled` | 403 | The key is stopped and an administrator can turn it back on |
-| `virtual_key_expired` | 403 | The key passed its expiration date |
+| Code                   | Status | Meaning                                                     |
+| ---------------------- | ------ | ----------------------------------------------------------- |
+| `virtual_key_revoked`  | 403    | The key is dead. Revocation is terminal                     |
+| `virtual_key_disabled` | 403    | The key is stopped and an administrator can turn it back on |
+| `virtual_key_expired`  | 403    | The key passed its expiration date                          |
 
 **Fix:** re-enable a disabled key in **AI Gateway → Virtual Keys**, or with `langwatch virtual-keys enable <id>`. A revoked key cannot come back. Create a new key and move the callers to it.
 
@@ -91,11 +98,11 @@ curl -sS https://gateway.acme.com/v1/models \
 
 **Causes and fixes:**
 
-| Cause | Fix |
-|---|---|
-| The model has no provider prefix and no prefix rule matches it | Write `provider/model`, for example `openai/gpt-5-mini` or `anthropic/claude-sonnet-4-5` |
-| The first segment is not a provider the key can reach | Use a provider id from the list above, or a routing handle defined on the key's provider row |
-| An Azure deployment name is not in the deployment map | Add the deployment name on the provider credential, or send `azure/<deployment name>` |
+| Cause                                                          | Fix                                                                                          |
+| -------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| The model has no provider prefix and no prefix rule matches it | Write `provider/model`, for example `openai/gpt-5-mini` or `anthropic/claude-sonnet-4-5`     |
+| The first segment is not a provider the key can reach          | Use a provider id from the list above, or a routing handle defined on the key's provider row |
+| An Azure deployment name is not in the deployment map          | Add the deployment name on the provider credential, or send `azure/<deployment name>`        |
 
 Two neighbouring codes mean something else. `400 model_not_allowed` means the model is real but the key's allowlist refuses it. `400 model_provider_not_bound` means no credential in the key's scope serves that provider. See [Model naming](/ai-gateway/providers/overview).
 
@@ -162,11 +169,11 @@ You changed a limit, an allowlist or a credential, and requests still behave the
 
 **How a change reaches a pod.** Each pod holds the resolved key in memory and refreshes it three ways:
 
-| Path | Timing |
-|---|---|
-| The change feed, a long poll against the control plane | About 10 seconds |
+| Path                                                       | Timing                                                 |
+| ---------------------------------------------------------- | ------------------------------------------------------ |
+| The change feed, a long poll against the control plane     | About 10 seconds                                       |
 | The configuration re-fetch, for changes that emit no event | `LW_GATEWAY_AUTH_CACHE_CONFIG_TTL_SECONDS`, default 60 |
-| The key's own token expiring | 15 minutes |
+| The key's own token expiring                               | 15 minutes                                             |
 
 Rotations, revocations, budget edits, routing changes and cache-rule edits all travel on the change feed, so 10 seconds is the normal case.
 
@@ -182,11 +189,11 @@ Traffic is flowing, and the key's spend and its budgets stay flat.
 
 **Confirm it, in order:**
 
-| Check | Query | If it fails |
-|---|---|---|
-| Records are written | `gateway_spend_spool_appended_total` is climbing | Spend emission is off. Set `spend.enabled: true` |
-| No records are lost | `gateway_spend_spool_dropped_total` is flat | `reason="intake"` means the pod outran the spool; `reason="overflow"` means the drainer is behind and the oldest segments were deleted |
-| The control plane is answering | `gateway_control_plane_requests_total{status="error"}` is flat | The drainer cannot reach the control plane |
+| Check                          | Query                                                          | If it fails                                                                                                                            |
+| ------------------------------ | -------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| Records are written            | `gateway_spend_spool_appended_total` is climbing               | Spend emission is off. Set `spend.enabled: true`                                                                                       |
+| No records are lost            | `gateway_spend_spool_dropped_total` is flat                    | `reason="intake"` means the pod outran the spool; `reason="overflow"` means the drainer is behind and the oldest segments were deleted |
+| The control plane is answering | `gateway_control_plane_requests_total{status="error"}` is flat | The drainer cannot reach the control plane                                                                                             |
 
 Every dropped record is spend that is never billed and never enforced against, so alert on the drop counter.
 
@@ -204,11 +211,11 @@ A `401`, `403` or `404` from the control plane about the key itself is not an ou
 
 **Read the ladder in the pod log:**
 
-| Line | Level | Meaning |
-|---|---|---|
-| `auth_cache_serve_stale` | info | The grace window is active and keys are still being served |
-| `auth_cache_refresh_transport_failure` | warn | Each refresh is failing. This is the outage signal, and cached keys are still serving |
-| `auth_cache_hard_evict` with `reason=hard_cap_exceeded` | error | The grace window is spent and requests are now refused |
+| Line                                                    | Level | Meaning                                                                               |
+| ------------------------------------------------------- | ----- | ------------------------------------------------------------------------------------- |
+| `auth_cache_serve_stale`                                | info  | The grace window is active and keys are still being served                            |
+| `auth_cache_refresh_transport_failure`                  | warn  | Each refresh is failing. This is the outage signal, and cached keys are still serving |
+| `auth_cache_hard_evict` with `reason=hard_cap_exceeded` | error | The grace window is spent and requests are now refused                                |
 
 **Fix:** restore the control plane. Raise `LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS` while an outage is still running if you would rather extend than refuse. Set it to a negative value to switch stale serving off entirely, which is what a strict revocation policy wants.
 
@@ -228,12 +235,12 @@ The audio upload routes have their own fixed cap of 26 MB.
 
 ## The gateway refuses to start
 
-| Message | Cause | Fix |
-|---|---|---|
-| `LW_GATEWAY_AUTH_CACHE_... is no longer read` | A retired duration-string variable is still set | Set the `_SECONDS` variable the message names, as a plain number of seconds |
-| `hosted gateway requires BLOCK_LOCAL_HTTP_CALLS=true` | `ENVIRONMENT` is set to anything but `local` | Set `BLOCK_LOCAL_HTTP_CALLS` and `REQUIRE_HTTPS_CUSTOM_ENDPOINTS` to `true` |
-| A validation error naming `LW_GATEWAY_BASE_URL`, `LW_GATEWAY_INTERNAL_SECRET` or `LW_GATEWAY_JWT_SECRET` | One of the three required variables is empty | Set all three. See [Config](/ai-gateway/self-hosting/config) |
-| `... is outside the supported range` | A seconds field holds a millisecond or nanosecond count | Write the value in seconds |
+| Message                                                                                                  | Cause                                                   | Fix                                                                         |
+| -------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- | --------------------------------------------------------------------------- |
+| `LW_GATEWAY_AUTH_CACHE_... is no longer read`                                                            | A retired duration-string variable is still set         | Set the `_SECONDS` variable the message names, as a plain number of seconds |
+| `hosted gateway requires BLOCK_LOCAL_HTTP_CALLS=true`                                                    | `ENVIRONMENT` is set to anything but `local`            | Set `BLOCK_LOCAL_HTTP_CALLS` and `REQUIRE_HTTPS_CUSTOM_ENDPOINTS` to `true` |
+| A validation error naming `LW_GATEWAY_BASE_URL`, `LW_GATEWAY_INTERNAL_SECRET` or `LW_GATEWAY_JWT_SECRET` | One of the three required variables is empty            | Set all three. See [Config](/ai-gateway/self-hosting/config)                |
+| `... is outside the supported range`                                                                     | A seconds field holds a millisecond or nanosecond count | Write the value in seconds                                                  |
 
 ## See also
 

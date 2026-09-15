@@ -3,10 +3,7 @@ import {
   CURSOR_WALK_PAGE_SIZE,
   walkCursorPages,
 } from "@/client-sdk/services/_shared/collect-cursor-pages";
-import {
-  mutationInit,
-  type MutationOptions,
-} from "@/client-sdk/services/_shared/mutation-options";
+import { mutationInit, type MutationOptions } from "@/client-sdk/services/_shared/mutation-options";
 import { formatApiErrorForOperation } from "@/client-sdk/services/_shared/format-api-error";
 import { throwIfHandledError } from "@/client-sdk/services/_shared/throw-handled-error";
 import { resolveEndpoint } from "@/internal/endpoint";
@@ -118,12 +115,7 @@ export interface SpendSummaryRow {
   cost: { total_usd: string; nano_usd: number };
 }
 
-/**
- * The states a request can be filtered by, which is more than the two a
- * caller usually thinks in: a request is `admitted` when it starts,
- * `confirmed` or `failed` when it ends, and `settled` once its cost is final.
- * `success` and `error` are the coarse outcome pair over those.
- */
+/** Request states: admitted at start, confirmed/failed/settled at end. */
 export type SpendEventStatus =
   | "success"
   | "error"
@@ -132,12 +124,7 @@ export type SpendEventStatus =
   | "failed"
   | "settled";
 
-/**
- * The states a ROLLUP can be filtered by. A rollup sums the cost of requests
- * past admission, so `admitted` is refused there rather than answered with a
- * zero; list the events to see those. Derived by exclusion so the two stay one
- * vocabulary.
- */
+/** Rollup states: excludes admitted (no cost yet). Use events for those. */
 export type SpendSummaryStatus = Exclude<SpendEventStatus, "admitted">;
 
 /** A dimension a rollup can be grouped by. */
@@ -151,13 +138,8 @@ export type SpendGroupBy =
   | "request_type";
 
 /**
- * The filters BOTH spend reads accept. A reconciliation checksums the rollups
- * and diffs the events when a checksum disagrees, so the two take the same
- * vocabulary and a divergence can be walked on exactly the narrowing that
- * produced it.
- *
- * Every field takes one value or many; many means "any of these". Naming two
- * different fields narrows.
+ * Shared filters for spend reads. Every field takes one value or many.
+ * Multiple values widen; multiple fields narrow.
  */
 export interface SpendFilterOptions {
   projectId?: string | string[];
@@ -226,25 +208,12 @@ function appendSpendFilters({
 }
 
 /**
- * What a rollup is grouped by, and over what window.
- *
- * Grouping by `model` or `provider`, or into time buckets, is REFUSED with
- * `gateway_spend_group_by_unstable` over a window recent enough that outcomes
- * can still arrive: until a request settles, the model and provider recorded
- * against it are the ones that were asked for, and they are replaced by the
- * ones that actually served it. A page walk over a group that can move counts
- * some requests twice and misses others.
- *
- * Reconcile closed periods and this never fires. For a live view where an
- * approximate shape is enough, send `allowUnstable`.
+ * Grouping by model/provider/time is unstable: outcomes may arrive and change
+ * the recorded values. Use allowUnstable for approximate live views; reconcile
+ * closed periods to avoid this.
  */
-export interface SpendSummariesOptions
-  extends Omit<SpendFilterOptions, "status"> {
-  /**
-   * One lifecycle status, minus `admitted`: a rollup sums the cost of requests
-   * past admission, and an admitted request has none yet. List the events for
-   * those.
-   */
+export interface SpendSummariesOptions extends Omit<SpendFilterOptions, "status"> {
+  /** Lifecycle status; excludes admitted (no cost yet). */
   status?: SpendSummaryStatus;
   /** One or two dimensions. Two rows can share `key`; read `group`. */
   groupBy: SpendGroupBy | SpendGroupBy[];
@@ -318,29 +287,8 @@ export class SpendEventsApiError extends Error {
 }
 
 /**
- * Client for the gateway spend reconciliation surface (/api/gateway/v1).
- * Authenticates with an ORGANIZATION API key (sk-lw-*).
- *
- * Entity types mirror the wire verbatim, so their fields are lowercase
- * snake_case. Call options this SDK invents (query filters, per-call
- * behaviour, action arguments) are camelCase like the rest of the SDK.
- *
- * There is no project id here: `/spend-summaries` takes `project_id` as a
- * query filter rather than scoping on a header, so the project belongs to the
- * call, not to the client.
- *
- * The key MUST be an organization API key (`sk-lw-{id}_{secret}`, from
- * Settings > API Keys). A project API key is refused before any permission is
- * consulted, with `credential_class_mismatch`, and no header makes it work:
- * these are organization-scoped routes and a project key names one project.
- * The same organization key also reaches the project-scoped surfaces when
- * given `X-Project-Id`, so one key covers both families and a project key
- * covers only one.
- *
- * Neither collection on this service offers an eager whole-set read. The
- * ledger is unbounded, and materialising a window of it is the very
- * under-counting and out-of-memory footgun the page docstrings warn about:
- * take pages, or stream with `iterate()` / `iterSummaries()`.
+ * Spend reconciliation service (/api/gateway/v1). Requires ORGANIZATION API
+ * key (sk-lw-*). Use iterate/iterSummaries for large windows (no eager read).
  */
 export class SpendEventsApiService {
   private readonly endpoint: string;
@@ -351,11 +299,7 @@ export class SpendEventsApiService {
     this.apiKey = config?.apiKey ?? scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
   }
 
-  private async request<T>(
-    operation: string,
-    path: string,
-    init?: RequestInit,
-  ): Promise<T> {
+  private async request<T>(operation: string, path: string, init?: RequestInit): Promise<T> {
     const response = await langwatchFetch(`${this.endpoint}${path}`, {
       ...init,
       // A hung control plane must fail the command, not freeze it.
@@ -389,15 +333,7 @@ export class SpendEventsApiService {
     return (await response.json()) as T;
   }
 
-  /**
-   * ONE page of the per-request spend ledger for a window. Pass `next_cursor`
-   * back as `cursor` for the next page, verbatim.
-   *
-   * A full page does NOT mean there is more and a short page does NOT mean
-   * there is no more: only a null cursor ends the walk. A reconciler that
-   * stops on the first page silently under-counts the window, so read every
-   * page or stream them with `iterate()`.
-   */
+  /** One page of events. Follow next_cursor or use iterate() for the full window. */
   async listPage(
     options: SpendFilterOptions & {
       /** Required: the pull is a ranged read by contract. */
@@ -433,15 +369,7 @@ export class SpendEventsApiService {
     };
   }
 
-  /**
-   * Every spend event in the window, one row at a time, fetching each page
-   * only when the consumer reaches it.
-   *
-   * This is how a reconciler reads a whole window without holding it: the
-   * ledger is unbounded, so there is deliberately no eager `list()` to
-   * collect it into an array. Raises rather than looping forever on a cursor
-   * chain that never ends.
-   */
+  /** Stream events without holding the whole window in memory. */
   async *iterate(
     options: SpendFilterOptions & {
       /** Required: the pull is a ranged read by contract. */
@@ -455,10 +383,7 @@ export class SpendEventsApiService {
       startCursor: options.cursor,
       nextCursorOf: (page) => page.next_cursor,
       onEndlessWalk: (reason) =>
-        new SpendEventsApiError(
-          `Failed to list spend events: ${reason}.`,
-          "list spend events",
-        ),
+        new SpendEventsApiError(`Failed to list spend events: ${reason}.`, "list spend events"),
       fetchPage: (cursor) =>
         this.listPage({
           ...options,
@@ -471,22 +396,12 @@ export class SpendEventsApiService {
     }
   }
 
-  /**
-   * ONE page of per-key spend rollups for a window, paged by group key
-   * ascending.
-   *
-   * The page is a step of a walk, not a whole answer: follow `next_cursor`
-   * until it comes back null, or stream the walk with `iterSummaries()`. A
-   * reconciler that reads only the first page silently under-counts every
-   * tenant past the limit.
-   */
+  /** One page of rollups by group key. Use iterSummaries for the full walk. */
   async summariesPage(
     options: SpendSummariesOptions & { cursor?: string; limit?: number },
   ): Promise<SpendSummariesPage> {
     const params = new URLSearchParams();
-    const groupBy = Array.isArray(options.groupBy)
-      ? options.groupBy
-      : [options.groupBy];
+    const groupBy = Array.isArray(options.groupBy) ? options.groupBy : [options.groupBy];
     params.set("group_by", groupBy.join(","));
     params.set("from", String(options.from));
     params.set("to", String(options.to));
@@ -509,14 +424,7 @@ export class SpendEventsApiService {
     };
   }
 
-  /**
-   * Every rollup row for the window, one at a time, fetching each page only
-   * when the consumer reaches it.
-   *
-   * The rollup has one row per tenant seen in the window, which no bound
-   * covers, so there is deliberately no eager whole-set read here either: a
-   * checksum that quietly covers part of the window is worse than none.
-   */
+  /** Stream rollup rows without holding the whole window in memory. */
   async *iterSummaries(
     options: SpendSummariesOptions & { cursor?: string; limit?: number },
   ): AsyncGenerator<SpendSummaryRow> {
@@ -540,13 +448,7 @@ export class SpendEventsApiService {
     }
   }
 
-  /**
-   * Re-deliver a window's spend envelopes to ONE endpoint through the
-   * normal delivery path. Envelope ids are unchanged (your consumer's
-   * dedup key); mind your downstream billing system's finite dedup
-   * window before replaying old ranges. The window is capped server-side
-   * at 7 days per call.
-   */
+  /** Re-deliver spend envelopes to an endpoint (max 7 days). */
   async replay(
     options: {
       from: number;

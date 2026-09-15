@@ -26,7 +26,7 @@ def _get_kwargs() -> dict[str, Any]:
 
     _kwargs: dict[str, Any] = {
         "method": "post",
-        "url": "/api/governance/ingestion-templates",
+        "url": "/api/v1/governance/ingestion-templates",
     }
 
     return _kwargs

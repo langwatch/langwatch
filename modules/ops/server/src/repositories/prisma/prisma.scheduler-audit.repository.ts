@@ -1,0 +1,113 @@
+import type { AuditLogApi } from "@langwatch/audit-log-contract";
+import type { SchedulerAuditEntryView, SchedulerControlAction } from "@langwatch/ops-contract";
+import { SchedulerAuditRepository } from "../process/ops-audit.repository.ts";
+
+/** The rows the scheduler history reads back, and the people it names. */
+export type SchedulerAuditDatabase = {
+  auditLog: {
+    findMany(input: {
+      where: { targetKind: string };
+      orderBy: { createdAt: "desc" };
+      take: number;
+      select: {
+        id: true;
+        createdAt: true;
+        action: true;
+        targetId: true;
+        projectId: true;
+        userId: true;
+      };
+    }): Promise<
+      Array<{
+        id: string;
+        createdAt: Date;
+        action: string;
+        targetId: string | null;
+        projectId: string | null;
+        userId: string | null;
+      }>
+    >;
+  };
+  user: {
+    findMany(input: {
+      where: { id: { in: string[] } };
+      select: { id: true; name: true; email: true };
+    }): Promise<Array<{ id: string; name: string | null; email: string | null }>>;
+  };
+};
+
+export class PrismaSchedulerAuditRepository extends SchedulerAuditRepository {
+  private constructor(
+    private readonly database: SchedulerAuditDatabase,
+    private readonly auditLog: AuditLogApi,
+  ) {
+    super();
+  }
+
+  static create({
+    database,
+    auditLog,
+  }: {
+    database: SchedulerAuditDatabase;
+    auditLog: AuditLogApi;
+  }): PrismaSchedulerAuditRepository {
+    return new PrismaSchedulerAuditRepository(database, auditLog);
+  }
+
+  async append(entry: {
+    actorUserId: string;
+    action: SchedulerControlAction;
+    scheduleId: string;
+    projectId: string;
+    slot: Date | null;
+  }): Promise<void> {
+    await this.auditLog.record({
+      userId: entry.actorUserId,
+      projectId: entry.projectId,
+      action: entry.action,
+      targetKind: "scheduled_job",
+      targetId: entry.scheduleId,
+      metadata: { slot: entry.slot?.toISOString() ?? null },
+    });
+  }
+
+  async listRecent({ limit }: { limit: number }): Promise<SchedulerAuditEntryView[]> {
+    const rows = await this.database.auditLog.findMany({
+      where: { targetKind: "scheduled_job" },
+      orderBy: { createdAt: "desc" },
+      take: limit,
+      select: {
+        id: true,
+        createdAt: true,
+        action: true,
+        targetId: true,
+        projectId: true,
+        userId: true,
+      },
+    });
+
+    const userIds = [
+      ...new Set(rows.map((row) => row.userId).filter((id): id is string => id !== null)),
+    ];
+    const actors = new Map<string, string>();
+    if (userIds.length > 0) {
+      const users = await this.database.user.findMany({
+        where: { id: { in: userIds } },
+        select: { id: true, name: true, email: true },
+      });
+      for (const user of users) {
+        const label = user.name ?? user.email;
+        if (label) actors.set(user.id, label);
+      }
+    }
+
+    return rows.map((row) => ({
+      id: row.id,
+      at: row.createdAt.toISOString(),
+      action: row.action,
+      scheduleId: row.targetId ?? "",
+      projectId: row.projectId,
+      actor: row.userId ? (actors.get(row.userId) ?? null) : null,
+    }));
+  }
+}

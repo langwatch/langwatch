@@ -89,8 +89,7 @@ const REAL_DEPS: HealDeps = {
 /**
  * How long the healer waits for the platform to say what became of the key.
  * The hook runs on the session's critical path and fetch has no timeout of
- * its own, so a connection that opens and never answers would hold the
- * session open. Matches the deadline the hook posts its own record with.
+ * its own.
  */
 const DESCRIBE_TIMEOUT_MS = 3_000;
 
@@ -228,14 +227,8 @@ async function revocationBlocksHeal({
 
 /**
  * Put a freshly minted key into the cache and the tool's wiring, or leave
- * both naming the key that was there before.
- *
- * The cache and the wiring must never name different keys. The next 401 is
- * repaired only when the rejected bearer is the key the cache holds, so a
- * pair that disagrees declines a repair this device could have made. The
- * cache is written first and put back when the wiring lands no target, and a
- * cache that cannot be written at all is a failed heal rather than a healed
- * one whose key this device would not recognise next time.
+ * both naming the key that was there before — they must never disagree.
+ * The cache is written first and put back when the wiring lands no target.
  */
 function adoptMintedKey({
   agent,

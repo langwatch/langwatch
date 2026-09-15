@@ -25,10 +25,7 @@
 
 export { Experiment } from "./experiment";
 export { ExperimentsFacade } from "./experiments.facade";
-export {
-  ExperimentsApiService,
-  ExperimentsApiServiceError,
-} from "./experiments-api.service";
+export { ExperimentsApiService, ExperimentsApiServiceError } from "./experiments-api.service";
 export type {
   ExperimentRunStartResponse,
   ExperimentRunStartRequest,
@@ -91,11 +88,7 @@ export type {
 } from "./platformTypes";
 
 // Run polling
-export {
-  pollExperimentRun,
-  DEFAULT_POLL_INTERVAL,
-  DEFAULT_POLL_TIMEOUT,
-} from "./run-status";
+export { pollExperimentRun, DEFAULT_POLL_INTERVAL, DEFAULT_POLL_TIMEOUT } from "./run-status";
 export type { PollRunStatus, PollExperimentRunResult } from "./run-status";
 
 export {

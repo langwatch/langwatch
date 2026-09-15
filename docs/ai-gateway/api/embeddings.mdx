@@ -32,28 +32,28 @@ curl https://gateway.langwatch.ai/v1/embeddings \
 {
   "object": "list",
   "data": [
-    {"object": "embedding", "index": 0, "embedding": [0.012, -0.033]},
-    {"object": "embedding", "index": 1, "embedding": [0.089, 0.041]}
+    { "object": "embedding", "index": 0, "embedding": [0.012, -0.033] },
+    { "object": "embedding", "index": 1, "embedding": [0.089, 0.041] }
   ],
   "model": "text-embedding-3-small",
-  "usage": {"prompt_tokens": 2, "total_tokens": 2}
+  "usage": { "prompt_tokens": 2, "total_tokens": 2 }
 }
 ```
 
 ## Which providers serve it
 
-| Model resolves to | What the gateway does |
-|---|---|
-| OpenAI, Azure OpenAI, Gemini, Vertex, Bedrock, a custom OpenAI-compatible endpoint | Translates the request into the provider's embeddings call. |
-| Voyage (`voyage/` prefix) | Forwards the OpenAI-shaped body to Voyage as written, with the bare model name. Voyage credentials serve embeddings only; any other route on them answers `400 bad_request`. |
-| Anthropic | Has no embeddings API. The provider's own rejection is forwarded. |
+| Model resolves to                                                                  | What the gateway does                                                                                                                                                        |
+| ---------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| OpenAI, Azure OpenAI, Gemini, Vertex, Bedrock, a custom OpenAI-compatible endpoint | Translates the request into the provider's embeddings call.                                                                                                                  |
+| Voyage (`voyage/` prefix)                                                          | Forwards the OpenAI-shaped body to Voyage as written, with the bare model name. Voyage credentials serve embeddings only; any other route on them answers `400 bad_request`. |
+| Anthropic                                                                          | Has no embeddings API. The provider's own rejection is forwarded.                                                                                                            |
 
 ## Parameters the gateway changes or refuses
 
-| Parameter | What the gateway does |
-|---|---|
-| `model` | Resolved through the key's aliases, allowlist and routing policy, then rewritten to the provider's model id. Missing: `400 missing_model`. Outside the allowlist: `400 model_not_allowed`. |
-| `input` | Read and passed to the provider as one text or a list of texts. A body that does not parse as an embeddings request answers `400 bad_request`. |
+| Parameter | What the gateway does                                                                                                                                                                      |
+| --------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `model`   | Resolved through the key's aliases, allowlist and routing policy, then rewritten to the provider's model id. Missing: `400 missing_model`. Outside the allowlist: `400 model_not_allowed`. |
+| `input`   | Read and passed to the provider as one text or a list of texts. A body that does not parse as an embeddings request answers `400 bad_request`.                                             |
 
 The `X-LangWatch-End-User-Id`, `X-LangWatch-Metadata` and `Traceparent` request headers work as on [Chat Completions](/ai-gateway/api/chat-completions#request-headers-the-gateway-reads).
 

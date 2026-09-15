@@ -1,0 +1,115 @@
+/**
+ * Host component providing context for the Data Retention screen. Reads full graph for filtering.
+ */
+
+import {
+  dataRetentionApi,
+  DataRetentionHostProvider,
+  type DataRetentionHostApi,
+  type RetentionAvailableScopes,
+} from "@langwatch/data-retention-web/data-retention";
+import { useMemo, type ReactNode } from "react";
+import { useUiCapabilities } from "@langwatch/ui-host/capabilities";
+import {
+  useUiOrganizationFacts,
+  useUiPlatformAdmin,
+} from "../../../../behavior/ui-organization-facts";
+import { useUiShellFailure } from "../../../../behavior/ui-shell-failure";
+import { UiPageFailure, UiPageLoading } from "../../../../ui/sections/ui-page-fallbacks";
+
+type OrganizationGraphEntry = {
+  id: string;
+  name: string;
+  teams: Array<{
+    id: string;
+    name: string;
+    projects: Array<{ id: string; name: string }>;
+  }>;
+};
+
+export function DataRetentionHost({ children }: { children: ReactNode }) {
+  const { session, route, feedback } = useUiCapabilities();
+  const activeScope = session.activeScope();
+  const { isEnterprise } = useUiOrganizationFacts();
+  const isPlatformAdmin = useUiPlatformAdmin();
+
+  const organizations = dataRetentionApi.organization.getAll.useQuery({ isDemo: false });
+
+  // A refused graph is a state, not an empty one: `organization` below is
+  // read off this query, so a refusal left the data retention screen empty forever.
+  const failure = useUiShellFailure({
+    error: organizations.error,
+    fallbackTitle: "Couldn't load your data retention settings",
+  });
+
+  const organization = useMemo(
+    () =>
+      (organizations.data ?? []).find(
+        (candidate: OrganizationGraphEntry) => candidate.id === activeScope.organizationId,
+      ),
+    [organizations.data, activeScope.organizationId],
+  );
+
+  const teamId = useMemo(() => {
+    if (!activeScope.projectId) return void 0;
+    for (const team of organization?.teams ?? []) {
+      if (team.projects.some((project) => project.id === activeScope.projectId)) {
+        return team.id;
+      }
+    }
+    return void 0;
+  }, [organization, activeScope.projectId]);
+
+  // The scope filter's options: everything the reader can SEE, derived from the
+  // one graph read. `useAvailableScopes` did exactly this in `platform/app`.
+  const availableScopes = useMemo<RetentionAvailableScopes>(() => {
+    const teams = organization?.teams ?? [];
+    return {
+      organization: organization ? { id: organization.id, name: organization.name } : null,
+      teams: teams.map((team) => ({ id: team.id, name: team.name })),
+      projects: teams.flatMap((team) =>
+        team.projects.map((project) => ({
+          id: project.id,
+          name: project.name,
+          teamId: team.id,
+        })),
+      ),
+    };
+  }, [organization]);
+
+  const reading = route.reading();
+  const host = useMemo<DataRetentionHostApi>(
+    () => ({
+      scope: () => ({
+        organizationId: activeScope.organizationId ?? void 0,
+        teamId,
+        projectId: activeScope.projectId ?? void 0,
+      }),
+      hasPermission: (permission) => session.hasPermission(permission),
+      availableScopes: () => availableScopes,
+      isPlatformAdmin: () => isPlatformAdmin,
+      isEnterprise: () => isEnterprise,
+      route: () => reading,
+      setQuery: (next, options) => route.setQuery(next, options),
+      succeeded: (notice) => feedback.succeeded(notice),
+      failed: (failure) => feedback.failed(failure),
+    }),
+    [
+      activeScope.organizationId,
+      activeScope.projectId,
+      teamId,
+      availableScopes,
+      isPlatformAdmin,
+      isEnterprise,
+      reading,
+      route,
+      session,
+      feedback,
+    ],
+  );
+
+  if (failure.departing) return <UiPageLoading />;
+  if (failure.copy) return <UiPageFailure copy={failure.copy} />;
+
+  return <DataRetentionHostProvider value={host}>{children}</DataRetentionHostProvider>;
+}

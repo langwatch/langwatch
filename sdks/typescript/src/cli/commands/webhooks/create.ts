@@ -41,9 +41,7 @@ export function sqsSecretFromEnv(): string | undefined {
  * kind flag to keep in agreement with the address, so the two can never
  * disagree.
  */
-export function destinationFromOptions(
-  options: CreateWebhookOptions,
-): WebhookDestinationInput {
+export function destinationFromOptions(options: CreateWebhookOptions): WebhookDestinationInput {
   if (options.queueUrl) {
     if (options.url) {
       throw new Error(
@@ -90,7 +88,10 @@ export const createWebhookCommand = async (
   try {
     const endpoint = await service.create({
       ...destinationFromOptions(options),
-      enabled_events: options.events.split(",").map((e) => e.trim()).filter(Boolean),
+      enabled_events: options.events
+        .split(",")
+        .map((e) => e.trim())
+        .filter(Boolean),
     });
     spinner.succeed(`Created endpoint ${endpoint.id}`);
     return {
@@ -110,10 +111,18 @@ export const createWebhookCommand = async (
           );
           console.log();
         }
-        console.log(chalk.gray("Verify deliveries with the X-LangWatch-Signature header (t=,v1= HMAC-SHA256, 5-minute tolerance)."));
+        console.log(
+          chalk.gray(
+            "Verify deliveries with the X-LangWatch-Signature header (t=,v1= HMAC-SHA256, 5-minute tolerance).",
+          ),
+        );
         if (endpoint.destination_kind === "sqs") {
           // The one thing every queue consumer gets wrong on its first run.
-          console.log(chalk.gray("On a queue, that signature is a MESSAGE ATTRIBUTE: pass MessageAttributeNames: [\"All\"] to ReceiveMessage or you will not see it."));
+          console.log(
+            chalk.gray(
+              'On a queue, that signature is a MESSAGE ATTRIBUTE: pass MessageAttributeNames: ["All"] to ReceiveMessage or you will not see it.',
+            ),
+          );
         }
         console.log();
       },

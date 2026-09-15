@@ -44,11 +44,7 @@ const budget = (id: string, overrides: Partial<GatewayBudget> = {}): GatewayBudg
   ...overrides,
 });
 
-const page = (
-  ids: string[],
-  next_cursor: string | null,
-  spend_available = true,
-): unknown => ({
+const page = (ids: string[], next_cursor: string | null, spend_available = true): unknown => ({
   data: ids.map((id) =>
     budget(
       id,
@@ -68,7 +64,7 @@ const queryOf = (call: number): string => {
 };
 
 /** Reads an iterator to exhaustion and hands back every row it yielded. */
-const drain = async <T,>(rows: AsyncIterable<T>): Promise<T[]> => {
+const drain = async <T>(rows: AsyncIterable<T>): Promise<T[]> => {
   const collected: T[] = [];
   for await (const row of rows) collected.push(row);
   return collected;
@@ -116,9 +112,7 @@ describe("GatewayBudgetsApiService cursor paging", () => {
       await new GatewayBudgetsApiService().list();
 
       expect(queryOf(0)).toBe("limit=200");
-      expect(new URLSearchParams(queryOf(1)).get("cursor")).toBe(
-        "op aq ue/+cursor",
-      );
+      expect(new URLSearchParams(queryOf(1)).get("cursor")).toBe("op aq ue/+cursor");
     });
 
     it("keeps the scope filter on every page of the walk", async () => {
@@ -131,9 +125,7 @@ describe("GatewayBudgetsApiService cursor paging", () => {
       });
 
       for (const call of [0, 1]) {
-        expect(new URLSearchParams(queryOf(call)).get("scope_type")).toBe(
-          "project,group",
-        );
+        expect(new URLSearchParams(queryOf(call)).get("scope_type")).toBe("project,group");
       }
     });
 
@@ -151,9 +143,7 @@ describe("GatewayBudgetsApiService cursor paging", () => {
     });
 
     it("stops after one request against a server that sends no cursor at all", async () => {
-      mockFetch.mockResolvedValueOnce(
-        jsonResponse({ data: [budget("a")], spend_available: true }),
-      );
+      mockFetch.mockResolvedValueOnce(jsonResponse({ data: [budget("a")], spend_available: true }));
 
       const result = await new GatewayBudgetsApiService().list();
 
@@ -163,9 +153,7 @@ describe("GatewayBudgetsApiService cursor paging", () => {
 
     it("raises rather than truncating when the cursor chain never ends", async () => {
       // A fresh Response per call: a body can only be read once.
-      mockFetch.mockImplementation(() =>
-        Promise.resolve(jsonResponse(page(["a"], "stuck"))),
-      );
+      mockFetch.mockImplementation(() => Promise.resolve(jsonResponse(page(["a"], "stuck"))));
 
       await expect(new GatewayBudgetsApiService().list()).rejects.toBeInstanceOf(
         GatewayBudgetsApiError,
@@ -233,22 +221,18 @@ describe("GatewayBudgetsApiService cursor paging", () => {
       );
 
       for (const call of [0, 1]) {
-        expect(new URLSearchParams(queryOf(call)).get("scope_type")).toBe(
-          "project,group",
-        );
+        expect(new URLSearchParams(queryOf(call)).get("scope_type")).toBe("project,group");
       }
     });
 
     it("raises rather than looping forever when the cursor chain never ends", async () => {
       // A fresh Response per call: a body can only be read once.
-      mockFetch.mockImplementation(() =>
-        Promise.resolve(jsonResponse(page(["a"], "stuck"))),
-      );
+      mockFetch.mockImplementation(() => Promise.resolve(jsonResponse(page(["a"], "stuck"))));
 
       // The guard fires on the second page, long before this drains.
-      await expect(
-        drain(new GatewayBudgetsApiService().iterate()),
-      ).rejects.toBeInstanceOf(GatewayBudgetsApiError);
+      await expect(drain(new GatewayBudgetsApiService().iterate())).rejects.toBeInstanceOf(
+        GatewayBudgetsApiError,
+      );
     });
   });
 
@@ -278,9 +262,9 @@ describe("GatewayBudgetsApiService cursor paging", () => {
         ),
       );
 
-      await expect(
-        new GatewayBudgetsApiService().listPage({ cursor: "made-up" }),
-      ).rejects.toThrow(/cursor/i);
+      await expect(new GatewayBudgetsApiService().listPage({ cursor: "made-up" })).rejects.toThrow(
+        /cursor/i,
+      );
     });
   });
   describe("get()", () => {
@@ -292,9 +276,7 @@ describe("GatewayBudgetsApiService cursor paging", () => {
       const result = await new GatewayBudgetsApiService().get("b1");
 
       expect(result.id).toBe("b1");
-      expect(String(mockFetch.mock.calls[0]![0])).toContain(
-        "/api/gateway/v1/budgets/b1",
-      );
+      expect(String(mockFetch.mock.calls[0]![0])).toContain("/api/gateway/v1/budgets/b1");
     });
 
     it("percent-encodes an id so it stays one path segment", async () => {
@@ -326,9 +308,7 @@ describe("GatewayBudgetsApiService cursor paging", () => {
 
       // A filter dropped after page one silently widens the answer.
       for (const call of [0, 1]) {
-        expect(new URLSearchParams(queryOf(call)).get("external_id")).toBe(
-          "acct-42",
-        );
+        expect(new URLSearchParams(queryOf(call)).get("external_id")).toBe("acct-42");
       }
     });
 
@@ -340,9 +320,7 @@ describe("GatewayBudgetsApiService cursor paging", () => {
       await drain(new GatewayBudgetsApiService().iterate({ externalId: "acct-42" }));
 
       for (const call of [0, 1]) {
-        expect(new URLSearchParams(queryOf(call)).get("external_id")).toBe(
-          "acct-42",
-        );
+        expect(new URLSearchParams(queryOf(call)).get("external_id")).toBe("acct-42");
       }
     });
   });

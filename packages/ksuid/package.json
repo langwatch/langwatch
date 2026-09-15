@@ -1,0 +1,66 @@
+{
+  "name": "@langwatch/ksuid",
+  "version": "2.0.2",
+  "description": "Generate prefixed, k-sorted globally unique identifiers with TypeScript support",
+  "keywords": [
+    "id",
+    "identifier",
+    "ksuid",
+    "sortable",
+    "typescript",
+    "unique",
+    "zero-dependency"
+  ],
+  "homepage": "https://github.com/langwatch/langwatch/tree/main/packages/ksuid",
+  "bugs": "https://github.com/langwatch/langwatch/issues",
+  "license": "MIT",
+  "author": "LangWatch (https://langwatch.ai)",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/langwatch/langwatch.git",
+    "directory": "packages/ksuid"
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    },
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "main": "./dist/index.cjs",
+    "module": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+      ".": {
+        "types": "./dist/index.d.ts",
+        "import": "./dist/index.js",
+        "require": "./dist/index.cjs"
+      },
+      "./package.json": "./package.json"
+    }
+  },
+  "scripts": {
+    "build": "tsup && tsc -p tsconfig.publish.json",
+    "typecheck": "pnpm -w typecheck:declarations --project . && tsc --noEmit",
+    "test": "vitest run",
+    "test:unit": "vitest run",
+    "prepublishOnly": "pnpm build"
+  },
+  "devDependencies": {
+    "tsup": "catalog:",
+    "typescript": "catalog:sdk-toolchain",
+    "vitest": "catalog:"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

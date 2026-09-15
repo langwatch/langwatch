@@ -82,16 +82,7 @@ function generateAccessToken(): string {
   return createHash("sha256").update(randomUUID()).digest("hex");
 }
 
-/**
- * Client address used for rate limiting.
- *
- * Forwarded headers only mean something when a trusted proxy sets them, so this
- * reads the socket peer unless proxy trust is turned on explicitly. Defaulting
- * to the socket keeps the limits countable: a caller that reaches the port
- * directly cannot rotate `X-Forwarded-For` to reset its own counter. Where that
- * default is wrong, it is wrong in the strict direction, counting a whole proxy
- * as one client rather than not counting at all.
- */
+// Rate limit key: socket peer unless LANGWATCH_MCP_TRUST_PROXY=true checks X-Forwarded-For.
 function rateLimitKey(req: Request): string {
   if (process.env.LANGWATCH_MCP_TRUST_PROXY === "true") {
     return req.ip ?? req.socket.remoteAddress ?? "unknown";
@@ -121,13 +112,7 @@ function resolveApiKey({
   return null;
 }
 
-function sendUnauthorized({
-  res,
-  error,
-}: {
-  res: Response;
-  error: string;
-}): void {
+function sendUnauthorized({ res, error }: { res: Response; error: string }): void {
   res.status(401).json({ error });
 }
 
@@ -136,23 +121,13 @@ function sendUnauthorized({
  * tool calls (which read config via `getConfig()`/`requireApiKey()`) see the
  * per-session API key instead of the global one.
  */
-async function handleWithSessionConfig<T>(
-  apiKey: string,
-  fn: () => Promise<T>
-): Promise<T> {
+async function handleWithSessionConfig<T>(apiKey: string, fn: () => Promise<T>): Promise<T> {
   const baseConfig = getConfig();
   return runWithConfig({ ...baseConfig, apiKey }, fn);
 }
 
-/**
- * Origin validation and CORS.
- *
- * The MCP transport specification requires servers to validate Origin on every
- * incoming connection, because a page on an attacker's domain can point DNS at
- * loopback and reach a server that only checks the token. Requests with no
- * Origin header are not browser requests, so they pass: browsers always send
- * Origin on the cross-origin requests this guards.
- */
+// MCP requires origin validation to prevent DNS-rebinding attacks. Requests without
+// Origin header pass since they're not browser requests and can't be compromised this way.
 function createOriginMiddleware({
   allowedOrigins,
 }: {
@@ -171,16 +146,13 @@ function createOriginMiddleware({
       // A cross-origin client cannot read a response header unless it is
       // exposed, and the Streamable HTTP transport reads the session id off
       // the initialize response.
-      res.header(
-        "Access-Control-Expose-Headers",
-        "Mcp-Session-Id, MCP-Protocol-Version"
-      );
+      res.header("Access-Control-Expose-Headers", "Mcp-Session-Id, MCP-Protocol-Version");
     }
 
     res.header("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS");
     res.header(
       "Access-Control-Allow-Headers",
-      "Content-Type, Authorization, mcp-session-id, MCP-Protocol-Version"
+      "Content-Type, Authorization, mcp-session-id, MCP-Protocol-Version",
     );
     res.header("X-Content-Type-Options", "nosniff");
     res.header("X-Frame-Options", "DENY");
@@ -205,7 +177,10 @@ function createAuthenticator(runtime: ServerRuntime): Authenticate {
 
     const token = readBearerToken(req);
     if (!token) {
-      sendUnauthorized({ res, error: "Authorization: Bearer <LANGWATCH_API_KEY> header required" });
+      sendUnauthorized({
+        res,
+        error: "Authorization: Bearer <LANGWATCH_API_KEY> header required",
+      });
       return null;
     }
 
@@ -247,10 +222,7 @@ function overSessionLimit({
   sessions: SessionStore<StreamableHTTPServerTransport>;
   sseSessions: SessionStore<SSEServerTransport>;
 }): boolean {
-  return (
-    sessions.countForKey(apiKey) + sseSessions.countForKey(apiKey) >=
-    MAX_SESSIONS_PER_KEY
-  );
+  return sessions.countForKey(apiKey) + sseSessions.countForKey(apiKey) >= MAX_SESSIONS_PER_KEY;
 }
 
 function sendSessionLimitReached(res: Response): void {
@@ -269,20 +241,17 @@ function registerOAuthRoutes({
 }): void {
   const { verifier, oauthTokens, oauthRateLimiter } = runtime;
 
-  app.get(
-    "/.well-known/oauth-authorization-server",
-    (req: Request, res: Response) => {
-      const baseUrl = `${req.protocol}://${req.get("host")}`;
-      res.json({
-        issuer: baseUrl,
-        token_endpoint: `${baseUrl}/oauth/token`,
-        token_endpoint_auth_methods_supported: ["client_secret_post"],
-        grant_types_supported: ["client_credentials"],
-        response_types_supported: [],
-        scopes_supported: ["mcp:tools"],
-      });
-    }
-  );
+  app.get("/.well-known/oauth-authorization-server", (req: Request, res: Response) => {
+    const baseUrl = `${req.protocol}://${req.get("host")}`;
+    res.json({
+      issuer: baseUrl,
+      token_endpoint: `${baseUrl}/oauth/token`,
+      token_endpoint_auth_methods_supported: ["client_secret_post"],
+      grant_types_supported: ["client_credentials"],
+      response_types_supported: [],
+      scopes_supported: ["mcp:tools"],
+    });
+  });
 
   // RFC 6749 requires application/x-www-form-urlencoded on the token endpoint.
   app.post(
@@ -310,8 +279,7 @@ function registerOAuthRoutes({
       if (!clientSecret || typeof clientSecret !== "string") {
         res.status(400).json({
           error: "invalid_request",
-          error_description:
-            "client_secret is required (use your LangWatch API key)",
+          error_description: "client_secret is required (use your LangWatch API key)",
         });
         return;
       }
@@ -343,7 +311,7 @@ function registerOAuthRoutes({
         expires_in: OAUTH_TOKEN_TTL_SECONDS,
         scope: "mcp:tools",
       });
-    }
+    },
   );
 }
 
@@ -376,7 +344,7 @@ function registerStreamableHttpRoutes({
 
       sessions.touch(sessionId);
       await handleWithSessionConfig(session.apiKey, () =>
-        session.transport.handleRequest(req, res, req.body)
+        session.transport.handleRequest(req, res, req.body),
       );
       return;
     }
@@ -406,12 +374,8 @@ function registerStreamableHttpRoutes({
 
       const sessionServer = createMcpServer();
       try {
-        await handleWithSessionConfig(apiKey, () =>
-          sessionServer.connect(transport)
-        );
-        await handleWithSessionConfig(apiKey, () =>
-          transport.handleRequest(req, res, req.body)
-        );
+        await handleWithSessionConfig(apiKey, () => sessionServer.connect(transport));
+        await handleWithSessionConfig(apiKey, () => transport.handleRequest(req, res, req.body));
       } catch (error) {
         if (transport.sessionId) sessions.remove(transport.sessionId);
         await transport.close().catch(() => undefined);
@@ -450,7 +414,7 @@ function registerStreamableHttpRoutes({
 
       sessions.touch(sessionId);
       await handleWithSessionConfig(session.apiKey, () =>
-        session.transport.handleRequest(req, res)
+        session.transport.handleRequest(req, res),
       );
       return;
     }
@@ -472,8 +436,7 @@ function registerStreamableHttpRoutes({
     const sessionId = sessionIdOf(req);
     const session = sessionId ? sessions.get(sessionId) : undefined;
     const owned =
-      session !== undefined &&
-      apiKeysMatch({ presentedKey: apiKey, expectedKey: session.apiKey });
+      session !== undefined && apiKeysMatch({ presentedKey: apiKey, expectedKey: session.apiKey });
 
     if (!sessionId || !session || !owned) {
       res.status(404).json({ error: "Session not found" });
@@ -517,9 +480,7 @@ function registerSseRoutes({
     });
 
     try {
-      await handleWithSessionConfig(apiKey, () =>
-        sessionServer.connect(transport)
-      );
+      await handleWithSessionConfig(apiKey, () => sessionServer.connect(transport));
     } catch (error) {
       // Without this the entry holds one of the per-key slots until the reaper
       // sweeps it, because res "close" may never fire if the stream never
@@ -546,8 +507,7 @@ function registerSseRoutes({
     const sessionId = req.query["sessionId"] as string | undefined;
     const session = sessionId ? sseSessions.get(sessionId) : undefined;
     const owned =
-      session !== undefined &&
-      apiKeysMatch({ presentedKey: apiKey, expectedKey: session.apiKey });
+      session !== undefined && apiKeysMatch({ presentedKey: apiKey, expectedKey: session.apiKey });
 
     if (!sessionId || !session || !owned) {
       res.status(400).json({ error: "Invalid or missing session ID" });
@@ -556,7 +516,7 @@ function registerSseRoutes({
 
     sseSessions.touch(sessionId);
     await handleWithSessionConfig(session.apiKey, () =>
-      session.transport.handlePostMessage(req, res, req.body)
+      session.transport.handlePostMessage(req, res, req.body),
     );
   };
 
@@ -566,14 +526,8 @@ function registerSseRoutes({
 
 /** Sweeps idle sessions, expired tokens, and stale rate limiter entries. */
 function startReaper(runtime: ServerRuntime): NodeJS.Timeout {
-  const {
-    sessions,
-    sseSessions,
-    oauthTokens,
-    verifier,
-    authFailRateLimiter,
-    oauthRateLimiter,
-  } = runtime;
+  const { sessions, sseSessions, oauthTokens, verifier, authFailRateLimiter, oauthRateLimiter } =
+    runtime;
 
   const reaper = setInterval(() => {
     sessions.sweep();
@@ -647,32 +601,17 @@ export interface StartedHttpServer {
   allowedOrigins: string[];
 }
 
-/**
- * Starts an Express HTTP server with Streamable HTTP and legacy SSE transports
- * for the LangWatch MCP server.
- *
- * Every request carries `Authorization: Bearer <key>`. The key is verified
- * against the LangWatch API before any per-session state is allocated, and
- * re-checked on every subsequent request against the key the session was
- * created with, so a session id on its own authorizes nothing.
- *
- * Endpoints:
- * - GET /health - Health check for Kubernetes probes (no auth)
- * - POST/GET/DELETE /mcp - Streamable HTTP transport (modern)
- * - GET /sse - Legacy SSE transport (backwards compatibility)
- * - POST /messages - Legacy SSE message endpoint
- */
+// HTTP server with Streamable HTTP and legacy SSE transports; every request
+// re-verifies the bearer token against the LangWatch API.
 export async function startHttpServer({
   port,
   host,
   allowedOrigins,
   apiKeyVerifier,
 }: StartHttpServerOptions): Promise<StartedHttpServer> {
-  const bindHost =
-    host ?? process.env.LANGWATCH_MCP_HTTP_HOST ?? DEFAULT_BIND_HOST;
+  const bindHost = host ?? process.env.LANGWATCH_MCP_HTTP_HOST ?? DEFAULT_BIND_HOST;
   const originAllowlist =
-    allowedOrigins ??
-    parseAllowedOrigins(process.env.LANGWATCH_MCP_ALLOWED_ORIGINS);
+    allowedOrigins ?? parseAllowedOrigins(process.env.LANGWATCH_MCP_ALLOWED_ORIGINS);
 
   const runtime = createRuntime({
     endpoint: getConfig().endpoint,

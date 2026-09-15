@@ -192,7 +192,7 @@ Feature: Shared ops snapshot with a single elected writer
 
   # The pending-counter reconcile is NOT governed here. It already has its own
   # cross-instance single-flight marker, specified end to end in
-  # specs/ops/pending-counter-reconcile.feature — every pod attempts it, one
+  # modules/ops/specs/pending-counter-reconcile.feature — every pod attempts it, one
   # runs. The snapshot lease does not gate it, and no scenario in this file
   # should imply that it does.
 
@@ -262,3 +262,19 @@ Feature: Shared ops snapshot with a single elected writer
     When the dashboard totals what is in flight
     Then the total includes the parked groups
     And work moving from pending into parked leaves the total unchanged
+
+  # ── The API process's own composition ──────────────────────────────────
+
+  @unit
+  Scenario: The operator dashboard reads the snapshot the writer publishes
+    Given the API process composed a connection to the snapshot store
+    When its operator back office is composed
+    Then it reads the live and detail artifacts the writer publishes
+    And it never claims the writer's lease
+
+  @unit
+  Scenario: A process with no snapshot store says so rather than reporting an all-clear
+    Given the API process composed no connection to the snapshot store
+    When the operator badge is read
+    Then the counts carry no computed time
+    And the process names the absence at composition

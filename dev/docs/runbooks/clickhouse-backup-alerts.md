@@ -13,12 +13,12 @@ a Prometheus that scrapes it.
 
 ## The four alerts
 
-| Alert | Severity | Means |
-|---|---|---|
-| `ClickHouseBackupStale` | critical | No successful run inside the backup's window, or no successful run ever |
-| `ClickHouseBackupJobFailed` | warning | A Job created inside the window ended with a `Failed` condition |
-| `ClickHouseBackupCronJobSuspended` | warning | `spec.suspend` is set, so nothing is being scheduled |
-| `ClickHouseBackupCronJobMissing` | critical | No `kube_cronjob_info` series: the CronJob is gone, or kube-state-metrics is |
+| Alert                              | Severity | Means                                                                        |
+| ---------------------------------- | -------- | ---------------------------------------------------------------------------- |
+| `ClickHouseBackupStale`            | critical | No successful run inside the backup's window, or no successful run ever      |
+| `ClickHouseBackupJobFailed`        | warning  | A Job created inside the window ended with a `Failed` condition              |
+| `ClickHouseBackupCronJobSuspended` | warning  | `spec.suspend` is set, so nothing is being scheduled                         |
+| `ClickHouseBackupCronJobMissing`   | critical | No `kube_cronjob_info` series: the CronJob is gone, or kube-state-metrics is |
 
 `ClickHouseBackupStale` is the one that matters. The other three are there to
 name a cause faster than the staleness window elapses, or, in the case of

@@ -1,7 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 vi.mock("../../../utils/apiKey", () => ({
-  resolveCredentials: vi.fn(async () => ({ apiKey: "test-key", source: "env", endpoint: "https://app.langwatch.ai" })),
+  resolveCredentials: vi.fn(async () => ({
+    apiKey: "test-key",
+    source: "env",
+    endpoint: "https://app.langwatch.ai",
+  })),
 }));
 
 vi.mock("ora", () => ({
@@ -72,7 +76,7 @@ describe("listTriggersCommand()", () => {
       await listTriggersCommand();
 
       expect(mockFetch).toHaveBeenCalledWith(
-        expect.stringContaining("/api/triggers"),
+        expect.stringContaining("/api/v1/triggers"),
         expect.objectContaining({
           headers: expect.objectContaining({
             authorization: "Bearer test-key",
@@ -125,7 +129,7 @@ describe("getTriggerCommand()", () => {
       await getTriggerCommand("trigger_abc");
 
       expect(mockFetch).toHaveBeenCalledWith(
-        "http://localhost:5560/api/triggers/trigger_abc",
+        "http://localhost:5560/api/v1/triggers/trigger_abc",
         expect.anything(),
       );
     });
@@ -164,7 +168,7 @@ describe("createTriggerCommand()", () => {
       await createTriggerCommand("Error Alert", { action: "SEND_EMAIL" });
 
       expect(mockFetch).toHaveBeenCalledWith(
-        "http://localhost:5560/api/triggers",
+        "http://localhost:5560/api/v1/triggers",
         expect.objectContaining({
           method: "POST",
           body: expect.stringContaining("SEND_EMAIL"),
@@ -175,9 +179,9 @@ describe("createTriggerCommand()", () => {
 
   describe("when invalid action is provided", () => {
     it("exits with code 1", async () => {
-      await expect(
-        createTriggerCommand("Bad", { action: "INVALID" }),
-      ).rejects.toThrow(ProcessExitError);
+      await expect(createTriggerCommand("Bad", { action: "INVALID" })).rejects.toThrow(
+        ProcessExitError,
+      );
     });
   });
 });
@@ -206,7 +210,7 @@ describe("updateTriggerCommand()", () => {
       await updateTriggerCommand("trigger_abc", { active: "false" });
 
       expect(mockFetch).toHaveBeenCalledWith(
-        "http://localhost:5560/api/triggers/trigger_abc",
+        "http://localhost:5560/api/v1/triggers/trigger_abc",
         expect.objectContaining({
           method: "PATCH",
           body: expect.stringContaining("false"),
@@ -240,7 +244,7 @@ describe("deleteTriggerCommand()", () => {
       await deleteTriggerCommand("trigger_abc");
 
       expect(mockFetch).toHaveBeenCalledWith(
-        "http://localhost:5560/api/triggers/trigger_abc",
+        "http://localhost:5560/api/v1/triggers/trigger_abc",
         expect.objectContaining({ method: "DELETE" }),
       );
     });

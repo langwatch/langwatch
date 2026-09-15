@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
@@ -23,8 +24,13 @@ type SessionServiceStatus struct {
 // proxy, the daemon, and the managed database servers. These are machine-wide,
 // not stack children, so the dashboard reports them but never offers a bounce.
 type SessionServer struct {
-	Name   string `json:"name"`
-	Up     bool   `json:"up"`
+	Name string `json:"name"`
+	Up   bool   `json:"up"`
+	// Port is the loopback port the server answers on, 0 for a server with no
+	// port of its own (the proxy is named by scheme, the daemon by pid). The
+	// dashboard prints the detail line; a reader that has to probe the server
+	// itself - the viewer's stores tab - needs the number, not the prose.
+	Port   int    `json:"port,omitempty"`
 	Detail string `json:"detail,omitempty"`
 }
 
@@ -73,7 +79,7 @@ func (o *Orchestrator) SessionSnapshot(slug string) SessionReport {
 		restartable[t.Name] = true
 	}
 	for _, svc := range st.Services {
-		cli := domain.CLIServiceName(svc.Name)
+		cli := domain.CLIServiceNameForLayout(svc.Name, st.Layout)
 		r.Services = append(r.Services, SessionServiceStatus{
 			Name:        cli,
 			Role:        svc.Role,
@@ -83,34 +89,50 @@ func (o *Orchestrator) SessionSnapshot(slug string) SessionReport {
 			Fallback:    svc.IsFallback,
 			Restartable: restartable[cli] && !svc.IsFallback,
 		})
+		// The backend lane shares the app's hostname under /api, so the routed
+		// list has no row of its own for it. It is the process that decides
+		// whether the stack works at all, so it gets one right under the ui.
+		// A monolith checkout serves the API from the same lane as the browser
+		// application, so its app row already IS this one.
+		if svc.Name == "app" && st.APIPort != 0 && !st.Layout.IsMonolith() {
+			r.Services = append(r.Services, SessionServiceStatus{
+				Name:        BackendLane,
+				Role:        svc.Role,
+				URL:         strings.TrimSuffix(svc.URL, "/") + "/api",
+				Port:        st.APIPort,
+				Up:          o.sys.PortInUse(st.APIPort),
+				Restartable: restartable[BackendLane],
+			})
+		}
 	}
 
 	info, daemonUp := o.store.Daemon()
 	r.Servers = append(r.Servers,
-		SessionServer{Name: "proxy", Up: o.proxy.Running(), Detail: fmt.Sprintf("%s :%d", scheme, port)},
+		SessionServer{Name: "proxy", Up: o.proxy.Running(), Port: port, Detail: fmt.Sprintf("%s :%d", scheme, port)},
 		SessionServer{Name: "daemon", Up: daemonUp && o.sys.ProcessAlive(info.PID), Detail: fmt.Sprintf("pid %d", info.PID)},
 	)
 	if st.ClickHouseHTTPPort != 0 {
 		r.Servers = append(r.Servers, SessionServer{
-			Name: "clickhouse", Up: o.sys.PortInUse(st.ClickHouseHTTPPort),
+			Name: "clickhouse", Up: o.sys.PortInUse(st.ClickHouseHTTPPort), Port: st.ClickHouseHTTPPort,
 			Detail: fmt.Sprintf(":%d %s", st.ClickHouseHTTPPort, st.ClickHouseDatabase),
 		})
 	}
 	if st.PostgresPort != 0 {
 		r.Servers = append(r.Servers, SessionServer{
-			Name: "postgres", Up: o.sys.PortInUse(st.PostgresPort),
+			Name: "postgres", Up: o.sys.PortInUse(st.PostgresPort), Port: st.PostgresPort,
 			Detail: fmt.Sprintf(":%d %s", st.PostgresPort, st.PostgresDatabase),
 		})
 	}
 	if st.RedisPort != 0 {
 		r.Servers = append(r.Servers, SessionServer{
-			Name: "redis", Up: o.sys.PortInUse(st.RedisPort),
+			Name: "redis", Up: o.sys.PortInUse(st.RedisPort), Port: st.RedisPort,
 			Detail: fmt.Sprintf(":%d db%d", st.RedisPort, st.RedisDB),
 		})
 	}
 	if st.ObservabilityGrafanaPort != 0 {
 		r.Servers = append(r.Servers, SessionServer{
-			Name: "observability", Up: o.sys.PortInUse(st.ObservabilityGrafanaPort), Detail: "grafana",
+			Name: "observability", Up: o.sys.PortInUse(st.ObservabilityGrafanaPort),
+			Port: st.ObservabilityGrafanaPort, Detail: "grafana",
 		})
 	}
 	return r

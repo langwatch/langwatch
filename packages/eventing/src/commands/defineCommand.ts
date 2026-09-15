@@ -1,0 +1,108 @@
+import type { z } from "zod";
+import type { AggregateType } from "../domain/aggregateType.ts";
+import type { CommandType } from "../domain/commandType.ts";
+import type { EventType } from "../domain/eventType.ts";
+import { createTenantId } from "../domain/tenantId.ts";
+import type { Event } from "../domain/types.ts";
+import { EventUtils } from "../utils/event.utils.ts";
+import type { Command, CommandHandler, CommandHandlerResult } from "./command.ts";
+import type { CommandEnvelope } from "./commandEnvelope.ts";
+import { stripEnvelope, withCommandEnvelope } from "./commandEnvelope.ts";
+import type { CommandHandlerClass } from "./commandHandlerClass.ts";
+import { defineCommandSchema } from "./commandSchema.ts";
+
+/**
+ * Return type of defineCommand() — extends CommandHandlerClass with optional makeJobId.
+ * Uses Event (base) for the event type parameter so commands are compatible with
+ * any pipeline event union (covariant event type).
+ */
+export type DefinedCommandClass<TCommandData, TCmdType extends CommandType> = CommandHandlerClass<
+  TCommandData,
+  TCmdType,
+  Event
+> & {
+  makeJobId?: (data: TCommandData) => string;
+};
+
+/**
+ * Defines a command handler class from a Zod event data schema.
+ * Envelope fields (tenantId, occurredAt, idempotencyKey) are auto-merged.
+ */
+export function defineCommand<
+  TEventDataSchema extends z.ZodObject<z.ZodRawShape>,
+  TCmdType extends CommandType,
+  TEvtType extends EventType,
+>({
+  commandType,
+  eventType,
+  eventVersion,
+  aggregateType,
+  schema,
+  aggregateId,
+  idempotencyKey,
+  groupKey,
+  spanAttributes,
+  makeJobId,
+}: {
+  commandType: TCmdType;
+  eventType: TEvtType;
+  eventVersion: string;
+  aggregateType: AggregateType;
+  schema: TEventDataSchema;
+  aggregateId: (data: z.infer<TEventDataSchema> & CommandEnvelope) => string;
+  idempotencyKey: (data: z.infer<TEventDataSchema> & CommandEnvelope) => string;
+  groupKey?: (data: z.infer<TEventDataSchema> & CommandEnvelope) => string;
+  spanAttributes?: (
+    data: z.infer<TEventDataSchema> & CommandEnvelope,
+  ) => Record<string, string | number | boolean>;
+  makeJobId?: (data: z.infer<TEventDataSchema> & CommandEnvelope) => string;
+}): DefinedCommandClass<z.infer<TEventDataSchema> & CommandEnvelope, TCmdType> {
+  type CommandData = z.infer<TEventDataSchema> & CommandEnvelope;
+
+  const commandDataSchema = withCommandEnvelope(schema);
+
+  const cmdSchema = defineCommandSchema(commandType, commandDataSchema);
+
+  class DefinedCommand implements CommandHandler<Command<CommandData>, Event> {
+    static readonly schema = cmdSchema;
+
+    static getAggregateId(payload: CommandData): string {
+      return aggregateId(payload);
+    }
+
+    static getGroupKey: ((payload: CommandData) => string) | undefined = groupKey;
+
+    static getSpanAttributes:
+      | ((payload: CommandData) => Record<string, string | number | boolean>)
+      | undefined = spanAttributes;
+
+    static makeJobId: ((payload: CommandData) => string) | undefined = makeJobId;
+
+    handle(command: Command<CommandData>): CommandHandlerResult<Event> {
+      const { tenantId: tenantIdStr, data: commandData } = command;
+      const tenantId = createTenantId(tenantIdStr);
+
+      const eventData = stripEnvelope(commandData);
+
+      const event = EventUtils.createEvent({
+        aggregateType,
+        aggregateId: aggregateId(commandData),
+        tenantId,
+        type: eventType,
+        version: eventVersion,
+        data: eventData,
+        occurredAt: commandData.occurredAt,
+        idempotencyKey: idempotencyKey(commandData),
+      });
+
+      return [event];
+    }
+  }
+
+  // Cast required: TypeScript cannot unify a class expression's constructor signature
+  // with the intersection type `CommandHandlerClassStatic & (new () => CommandHandler)`.
+  // The inner class structurally satisfies DefinedCommandClass but TS needs the
+  // intermediate `unknown` to bridge the nominal gap between class literals and
+  // intersection constructor types.
+  return DefinedCommand as unknown as DefinedCommandClass<CommandData, TCmdType>;
+}

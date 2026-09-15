@@ -1,14 +1,7 @@
 import { z } from "zod";
 
-/**
- * Typed inputs for the fields a test suite declares, the evaluators attached
- * to a suite or a run plan, and the values a scenario carries per field.
- *
- * Each one mirrors the zod the platform validates the REST body with
- * (`suiteFieldDefinitionsSchema`, `evaluatorAttachmentsSchema` and
- * `scenarioFieldValuesSchema` on the server side), so an agent is told what
- * is accepted before the request goes out rather than after.
- */
+// Typed inputs for suite fields, evaluators, and scenario values that mirror the
+// server-side validation schemas so agents know what's accepted before sending.
 
 /** The value types a field can hold. */
 export const SUITE_FIELD_TYPES = ["text", "number", "boolean"] as const;

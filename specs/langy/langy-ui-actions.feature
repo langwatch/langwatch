@@ -58,6 +58,13 @@ Feature: Langy drives the open page through typed UI actions
     And the agent is still told what I am looking at
 
   @unit
+  Scenario: A flag-store blip must not stop the turn, and must not advertise a surface it could not confirm
+    Given the feature-flag store throws while resolving whether ui actions are offered
+    When a turn starts, or the ui-action surface is resolved directly
+    Then the surface resolves to false rather than throwing
+    And the turn starts with the ui-action channel closed
+
+  @unit
   Scenario: An action outside a running turn is refused
     Given the conversation has no turn in flight
     When the agent dispatches an action
@@ -306,7 +313,7 @@ Feature: Langy drives the open page through typed UI actions
     browser store and an execution pipeline.
 
     A headless stand-in for the page closes that gap
-    (platform/app/e2e/langy/fake-workbench-tab.ts). It listens to the same turn
+    (the fake workbench tab, deleted with the platform application). It listens to the same turn
     stream the panel listens to, claims through the same mutation, applies the
     same transforms to the same store, saves the same document, and starts runs
     through the same route. What it stands in for is the rendering, not the

@@ -30,23 +30,28 @@ Pick **LLM as Judge**, then **LLM-as-a-Judge Boolean Evaluator**.
 Name the evaluator, pick the judge model and write the criteria in **Prompt**, for example: the reply passes only when it answers the customer's question and stays on the topic of the customer's order. A built-in evaluator such as PII Detection shows its own options here instead, for example the entity types to flag.
 
 Under **Variables**, map the evaluator's fields to the trace. `input` maps to the trace input and `output` to the trace output by default. Click **Create Evaluator**.
+
 </Step>
 
 <Step title="Set the level, the filter and the sampling">
 Back in the **New Online Evaluation** drawer, the evaluator is selected.
 
 <Frame>
-<img src="/images/evaluations/online-evaluation-drawer.png" alt="The New Online Evaluation drawer with the evaluation level, the evaluator, the name, a precondition and the sampling rate" />
+  <img
+    src="/images/evaluations/online-evaluation-drawer.png"
+    alt="The New Online Evaluation drawer with the evaluation level, the evaluator, the name, a precondition and the sampling rate"
+  />
 </Frame>
 
-| Field | What it does |
-|-------|--------------|
-| **Evaluation Level** | **Trace Level** scores each trace on its own as it arrives. **Thread Level** scores all traces of a thread together. See [Evaluate whole threads](#evaluate-whole-threads). |
-| **Name** | The name shown in the list, on the trace and in analytics. |
-| **Preconditions** | Optional. Click **Add Precondition** to run the monitor only on traces that match. Each rule reads a field from the trace, its metadata, its spans, its topics, earlier evaluations, events or annotations, and applies **contains**, **does not contain**, **matches regex** or **is**. With no precondition, the monitor runs on every trace. |
-| **Sampling** | Optional. The share of matching traces to score, from `0.01` (1%) to `1.0` (100%). Lower it on expensive evaluators. |
+| Field                | What it does                                                                                                                                                                                                                                                                                                                                    |
+| -------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Evaluation Level** | **Trace Level** scores each trace on its own as it arrives. **Thread Level** scores all traces of a thread together. See [Evaluate whole threads](#evaluate-whole-threads).                                                                                                                                                                     |
+| **Name**             | The name shown in the list, on the trace and in analytics.                                                                                                                                                                                                                                                                                      |
+| **Preconditions**    | Optional. Click **Add Precondition** to run the monitor only on traces that match. Each rule reads a field from the trace, its metadata, its spans, its topics, earlier evaluations, events or annotations, and applies **contains**, **does not contain**, **matches regex** or **is**. With no precondition, the monitor runs on every trace. |
+| **Sampling**         | Optional. The share of matching traces to score, from `0.01` (1%) to `1.0` (100%). Lower it on expensive evaluators.                                                                                                                                                                                                                            |
 
 Click **Create Online Evaluation**. The monitor is active as soon as it is created.
+
 </Step>
 </Steps>
 
@@ -57,7 +62,10 @@ A trace is one request and response. A thread is the whole conversation, grouped
 Pick **Thread Level** in the drawer. The evaluator's variables now map to the **Current Thread** source, whose `traces` field holds every trace in the thread with its input and output.
 
 <Frame>
-<img src="/images/evaluations/online-evaluation-thread-level.png" alt="The drawer with Thread Level selected and the Thread Idle Time select" />
+  <img
+    src="/images/evaluations/online-evaluation-thread-level.png"
+    alt="The drawer with Thread Level selected and the Thread Idle Time select"
+  />
 </Frame>
 
 **Thread Idle Time** sets how long the monitor waits after the last message before it scores the thread, from 1 to 30 minutes, 5 minutes by default. Without it the thread would be scored again on every new message. Pick **Disabled - evaluate on every trace** to score after each message anyway.
@@ -67,19 +75,28 @@ Pick **Thread Level** in the drawer. The evaluator's variables now map to the **
 On a trace, the **Evals** section of the trace drawer lists each monitor that ran with its verdict, score and the reason it returned, and the header shows an **Eval** chip per monitor. The trace table has an **Evals** column too, so you can filter and sort the [Trace Explorer](https://app.langwatch.ai/@project/traces) by the monitor's result.
 
 <Frame>
-<img src="/images/evaluations/trace-evals.png" alt="The Evals section of a trace drawer with the Off-topic reply verdict" />
+  <img
+    src="/images/evaluations/trace-evals.png"
+    alt="The Evals section of a trace drawer with the Off-topic reply verdict"
+  />
 </Frame>
 
 The [Online Evaluations](https://app.langwatch.ai/@project/online-evaluations) list shows every monitor with its mode, its status and **Performance, last 7 days**: the pass rate or the average score with a trend against the previous week.
 
 <Frame>
-<img src="/images/evaluations/online-evaluations-list.png" alt="The Online Evaluations list with the active Off-topic reply monitor and its 7 day pass rate" />
+  <img
+    src="/images/evaluations/online-evaluations-list.png"
+    alt="The Online Evaluations list with the active Off-topic reply monitor and its 7 day pass rate"
+  />
 </Frame>
 
 **View analytics** in the row menu opens the evaluations analytics page. At the top, **Overall Health** counts the evaluation runs and **Pass / Fail Trend** plots them over time across every monitor. Below, each monitor has a pass and fail share, a bar chart of passed and failed evaluations per day and a **Pass Rate Trend** line. A score evaluator shows its average score instead of a pass rate.
 
 <Frame>
-<img src="/images/evaluations/online-evaluation-analytics.png" alt="The evaluations analytics page with the Off-topic reply monitor: the pass and fail share, the passed and failed evaluations per day and the Pass Rate Trend" />
+  <img
+    src="/images/evaluations/online-evaluation-analytics.png"
+    alt="The evaluations analytics page with the Off-topic reply monitor: the pass and fail share, the passed and failed evaluations per day and the Pass Rate Trend"
+  />
 </Frame>
 
 ## Pause, edit and remove a monitor

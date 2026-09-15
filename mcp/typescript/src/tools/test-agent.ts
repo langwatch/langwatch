@@ -8,7 +8,7 @@ import { testAgent as apiTestAgent } from "../langwatch-api-agents.js";
 export async function handleTestAgent(params: { id: string }): Promise<string> {
   const run = await apiTestAgent(params.id);
   return [
-    "Test run scheduled. The user sends \"ping\"; the run succeeds when the agent answers.",
+    'Test run scheduled. The user sends "ping"; the run succeeds when the agent answers.',
     "",
     `**Scenario run ID:** ${run.scenarioRunId}`,
     `**Batch run ID:** ${run.batchRunId}`,

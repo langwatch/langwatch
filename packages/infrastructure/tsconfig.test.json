@@ -1,0 +1,15 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "types": ["node"],
+    "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo/infrastructure.test.tsbuildinfo"
+  },
+  "include": ["src/**/*.ts", "tests/**/*.ts"],
+  "exclude": [],
+
+  "references": [
+    {
+      "path": "tsconfig.build.json"
+    }
+  ]
+}

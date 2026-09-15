@@ -1,14 +1,14 @@
 import { scopedApiKey } from "@/internal/credentialContext";
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
-import { resolveCredentials } from "../../utils/apiKey";
-import { formatFetchError } from "../../utils/formatFetchError";
-import { formatTable } from "../../utils/formatting";
-import { failSpinner } from "../../utils/spinnerError";
+import { createSpinner } from "../../utils/spinner.ts";
+import { resolveCredentials } from "../../utils/apiKey.ts";
+import { formatFetchError } from "../../utils/formatFetchError.ts";
+import { formatTable } from "../../utils/formatting.ts";
+import { failSpinner } from "../../utils/spinnerError.ts";
 import { buildAuthHeaders } from "@/internal/api/auth";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
-import type { CommandResult } from "../../utils/output";
+import type { CommandResult } from "../../utils/output.ts";
 import { langwatchFetch } from "@/internal/http/langwatchFetch";
 
 /**
@@ -17,18 +17,27 @@ import { langwatchFetch } from "@/internal/http/langwatchFetch";
  * metadata only — never a secret VALUE — so the raw list is safe as a payload.
  */
 export const listSecretsCommand = async (): Promise<CommandResult | void> => {
-  await resolveCredentials();
+  const credentials = await resolveCredentials();
+  if (!credentials.projectId) {
+    throw new Error("A project must be selected for secret operations");
+  }
 
   const apiKey = scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
-  const endpoint =
-    resolveControlPlaneUrl();
+  const endpoint = resolveControlPlaneUrl();
 
   const spinner = createSpinner("Fetching secrets...").start();
 
   try {
-    const response = await langwatchFetch(`${endpoint}/api/secrets`, {
-      headers: buildAuthHeaders({ apiKey }),
-    });
+    const response = await langwatchFetch(
+      `${endpoint}/api/v1/secret?projectId=${encodeURIComponent(credentials.projectId)}`,
+      {
+        method: "GET",
+        headers: {
+          "Content-Type": "application/json",
+          ...buildAuthHeaders({ apiKey }),
+        },
+      },
+    );
 
     if (!response.ok) {
       const message = await formatFetchError(response);
@@ -43,9 +52,7 @@ export const listSecretsCommand = async (): Promise<CommandResult | void> => {
       updatedAt: string;
     }>;
 
-    spinner.succeed(
-      `Found ${secrets.length} secret${secrets.length !== 1 ? "s" : ""}`
-    );
+    spinner.succeed(`Found ${secrets.length} secret${secrets.length !== 1 ? "s" : ""}`);
 
     return {
       data: secrets,
@@ -54,9 +61,7 @@ export const listSecretsCommand = async (): Promise<CommandResult | void> => {
           console.log();
           console.log(chalk.gray("No secrets found."));
           console.log(chalk.gray("Create one with:"));
-          console.log(
-            chalk.cyan('  langwatch secret create MY_API_KEY --value "sk-..."')
-          );
+          console.log(chalk.cyan('  langwatch secret create MY_API_KEY --value "sk-..."'));
           return;
         }
 

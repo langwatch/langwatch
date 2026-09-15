@@ -1,0 +1,7 @@
+{
+  "version": 0,
+  "budgets": {
+    "apps/api/src/app/api-production.composition.ts": 4787,
+    "apps/worker/src/app/worker-production.composition.ts": 2421
+  }
+}

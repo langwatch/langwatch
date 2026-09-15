@@ -2,13 +2,31 @@ package app
 
 import (
 	"fmt"
+	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
 
+// resolvedDevEnv is the environment the app process will actually see in this
+// worktree: the operator's .env, overridden by whatever the shell that ran
+// `haven up` already exports — the same precedence a dotenv loader gives a
+// real env var. It exists to answer one question honestly (did the developer
+// already configure an email provider?) without haven reading or writing
+// anything to disk itself.
+func resolvedDevEnv(repoDir string) map[string]string {
+	resolved := domain.LoadDotenv(repoDir)
+	for _, kv := range os.Environ() {
+		if key, val, ok := strings.Cut(kv, "="); ok && val != "" {
+			resolved[key] = val
+		}
+	}
+	return resolved
+}
+
 // palette gives each supervised child a distinct prefix color.
-var palette = []string{"32", "34", "33", "35", "36", "31", "92", "94"}
+var palette = []string{"32", "34", "33", "35", "36", "31", "92", "94", "96", "95"}
 
 // goServiceShell picks `make service` (go run) or `make service-watch` (air) for
 // a Go service — the "run vs watch" decision the orchestrator owns.
@@ -20,10 +38,26 @@ func goServiceShell(repoRoot, svc string, shouldWatch bool) string {
 	return fmt.Sprintf("make -C %q %s svc=%s", repoRoot, target, svc)
 }
 
+// goCombinedShell runs the data-plane services in ONE Go process — the local
+// topology (ADR-004, amendment 2026-09-07). `services` names which of them this
+// stack selected, so a worktree that turned one off gets a process hosting only
+// the other rather than a second lane it has to reason about.
+//
+// Watching is air: it rebuilds the one binary on a Go change, restarts only
+// when the build succeeded, and waits out the same quiet window the Node lane
+// debounces on (LANGWATCH_DEV_WATCH_DEBOUNCE_MS).
+func goCombinedShell(repoRoot string, services []string, shouldWatch bool) string {
+	target := "service"
+	if shouldWatch {
+		target = "service-watch"
+	}
+	return fmt.Sprintf("make -C %q %s svc=combined args=%q", repoRoot, target, strings.Join(services, " "))
+}
+
 // planChildren turns a resolved stack into the supervised process set, layering
 // the overlay env (hostname URLs + ports) onto each child and giving each Go
 // service its SERVER_ADDR.
-func (o *Orchestrator) planChildren(st domain.Stack, opts PlanOptions, lwDir, langyDockerHost string) []Child {
+func (o *Orchestrator) planChildren(st domain.Stack, opts PlanOptions, repoDir, langyDockerHost string) []Child {
 	base := st.OverlayEnv()
 	logPath := func(name string) string {
 		return filepath.Join(o.cfg.Home, "logs", st.Slug, name+".log")
@@ -37,6 +71,18 @@ func (o *Orchestrator) planChildren(st domain.Stack, opts PlanOptions, lwDir, la
 	// the CA is absent, so this appends nothing outside a portless stack.
 	if ca := o.proxy.CACertPath(); ca != "" {
 		base = append(base, "NODE_EXTRA_CA_CERTS="+ca)
+	}
+	// The app's own outgoing mail, routed at the sink for both Node lanes — but
+	// never over a provider the developer configured explicitly (see
+	// domain.MailSMTPEnv): haven must not silently rewire mail they deliberately
+	// routed elsewhere. Computed before `base` feeds the ui/backend lanes (and
+	// mono's own copy) below, so a monolith checkout's one lane gets it too.
+	if opts.Selection.Mail {
+		for _, svc := range st.Services {
+			if svc.Name == domain.MailService && svc.SMTPPort != 0 {
+				base = append(base, domain.MailSMTPEnv(resolvedDevEnv(repoDir), svc.SMTPPort)...)
+			}
+		}
 	}
 	port := func(name string) int {
 		for _, s := range st.Services {
@@ -52,50 +98,58 @@ func (o *Orchestrator) planChildren(st domain.Stack, opts PlanOptions, lwDir, la
 	// `import "dotenv/config"`. Together with the `quiet: true` passed in
 	// server.mts / vite.config.ts, this keeps every Node lane starting on real
 	// logs — matching the Go services' clean startup.
-	nodeEnv := func() []string {
+	nodeEnv := func(lane string) []string {
 		return append(append([]string{}, base...),
-			"NODE_ENV=development", "DOTENV_CONFIG_QUIET=true")
+			"NODE_ENV=development", "DOTENV_CONFIG_QUIET=true", domain.LaneEnv(lane))
 	}
-	out = append(out, Child{
-		Name: "app", Dir: lwDir, Color: palette[1], LogPath: logPath("app"),
-		Shell: "pnpm -s run dev:vite",
-		Env:   nodeEnv(),
-		// Hold the web (vite) until the API answers /api/health. The app proxies
-		// /api to the API (start:app), which is a bigger process and boots slower;
-		// a browser that loads the web before the API is up gets stuck in an auth
-		// redirect loop. Gating the lane means the hostname simply isn't served
-		// until the stack can actually handle a request.
-		ReadyProbeURL: fmt.Sprintf("http://127.0.0.1:%d/api/health", st.APIPort),
-	})
-	// In-process worker mode (the default): the app process (start:app ->
-	// start.ts) hosts the worker stack itself, so there is no separate
-	// `workers` lane below — one Node process instead of two, saving its RAM.
-	// `haven up +workers` selects the standalone lane instead.
-	apiEnv := nodeEnv()
-	if !opts.Selection.Workers {
-		apiEnv = append(apiEnv, "WORKERS_IN_PROCESS=1")
+	// A monolith checkout has neither Node package: one process serves the
+	// browser application and its API, so the ui lane below and the backend
+	// lane at the end are replaced by the single app lane. See plan_monolith.go.
+	mono := monolithPlan{
+		Stack: st, Opts: opts, RepoDir: repoDir, Base: base,
+		NodeEnv: nodeEnv, LogPath: logPath, Port: port,
 	}
-	out = append(out, Child{
-		Name: "api", Dir: lwDir, Color: palette[3], LogPath: logPath("api"),
-		Shell: "pnpm -s run start:app",
-		Env:   apiEnv,
-	})
-	if opts.Selection.Gateway {
+	if st.Layout.IsMonolith() {
+		out = append(out, mono.appChild())
+	} else {
 		out = append(out, Child{
-			Name: "gateway", Dir: opts.RepoRoot, Color: palette[2], LogPath: logPath("gateway"),
-			Shell: goServiceShell(opts.RepoRoot, "aigateway", opts.ShouldGoWatch),
-			Env:   append(append([]string{}, base...), fmt.Sprintf("SERVER_ADDR=:%d", port("gateway"))),
+			Name: "ui", Dir: repoDir, Color: palette[1], LogPath: logPath("ui"),
+			Shell: "pnpm -s --filter " + UIPackage + " dev",
+			Env:   nodeEnv("ui"),
+			// Hold the browser application (vite) until the API answers /api/health.
+			// It proxies /api to the API lane, which is a much bigger process and
+			// boots slower; a browser that loads the SPA before the API is up gets
+			// stuck in an auth redirect loop. Gating the lane means the hostname
+			// simply isn't served until the stack can actually handle a request.
+			ReadyProbeURL: st.HealthProbeURL(),
 		})
 	}
+	// One Go lane, hosting whichever data-plane services this stack selected.
+	// Each still binds the port haven allocated for its hostname: SERVER_ADDR
+	// cannot answer for two listeners in one process, so each has its own
+	// address variable.
+	var goServices []string
+	goEnv := append(append([]string{}, base...), domain.LaneEnv(GoLane))
+	if opts.Selection.Gateway {
+		goServices = append(goServices, "aigateway")
+		goEnv = append(goEnv, fmt.Sprintf("%s=:%d", GatewayAddrEnv, port("gateway")))
+	}
 	if opts.Selection.NLP {
+		goServices = append(goServices, "nlpgo")
+		goEnv = append(goEnv, fmt.Sprintf("%s=:%d", NLPAddrEnv, port("nlp")))
+	}
+	if st.Layout.IsMonolith() {
+		out = append(out, mono.goChildren()...)
+	} else if len(goServices) > 0 {
 		out = append(out, Child{
-			Name: "nlp", Dir: opts.RepoRoot, Color: palette[4], LogPath: logPath("nlp"),
-			Shell: goServiceShell(opts.RepoRoot, "nlpgo", opts.ShouldGoWatch),
-			Env:   append(append([]string{}, base...), fmt.Sprintf("SERVER_ADDR=:%d", port("nlp"))),
+			Name: GoLane, Dir: opts.RepoRoot, Color: palette[2], LogPath: logPath(GoLane),
+			Shell: goCombinedShell(opts.RepoRoot, goServices, opts.ShouldGoWatch),
+			Env:   goEnv,
 		})
 	}
 	if opts.Selection.IDP {
-		idpEnv := append(append([]string{}, base...), fmt.Sprintf("SERVER_ADDR=:%d", port("idp")))
+		idpEnv := append(append([]string{}, base...),
+			fmt.Sprintf("SERVER_ADDR=:%d", port("idp")), domain.LaneEnv("idp"))
 		// The issuer/metadata URLs the simulator publishes must be the routed
 		// hostname, not loopback — the browser follows them during a login.
 		for _, svc := range st.Services {
@@ -118,21 +172,141 @@ func (o *Orchestrator) planChildren(st domain.Stack, opts PlanOptions, lwDir, la
 			Env:   idpEnv,
 		})
 	}
+	if opts.Selection.Mail {
+		var httpPort, smtpPort int
+		var mailURL string
+		for _, svc := range st.Services {
+			if svc.Name == domain.MailService {
+				httpPort, smtpPort, mailURL = svc.Port, svc.SMTPPort, svc.URL
+			}
+		}
+		// Messages survive a restart (MAILSIM_DATA_DIR persists them as files) and
+		// are pruned only when the worktree's own state is — never shared across
+		// worktrees, mirroring langyagent's per-slug state dir below.
+		mailDataDir := filepath.Join(o.cfg.Home, "mail", st.Slug)
+		_ = os.MkdirAll(mailDataDir, 0o755)
+		mailEnv := append(append([]string{}, base...),
+			domain.LaneEnv("mail"),
+			fmt.Sprintf("MAILSIM_HTTP_ADDR=:%d", httpPort),
+			fmt.Sprintf("MAILSIM_SMTP_ADDR=:%d", smtpPort),
+			"MAILSIM_DATA_DIR="+mailDataDir,
+		)
+		if mailURL != "" {
+			mailEnv = append(mailEnv, "MAILSIM_BASE_URL="+mailURL)
+		}
+		out = append(out, Child{
+			Name: "mail", Dir: opts.RepoRoot, Color: palette[7], LogPath: logPath("mail"),
+			Shell: goServiceShell(opts.RepoRoot, "mailsim", opts.ShouldGoWatch),
+			Env:   mailEnv,
+		})
+	}
+	// The two developer tools. Neither is a Node LANE — nothing in the product
+	// degrades without them — so they are planned like the Go services: only
+	// when the worktree has selected them, and never counted among the three.
+	// Each is handed the port haven allocated for its hostname, on the command
+	// line, because both tools otherwise bind a fixed default that a second
+	// worktree would find busy.
+	if opts.Selection.DesignSystem {
+		out = append(out, Child{
+			Name: domain.DesignSystemService, Dir: repoDir, Color: palette[8], LogPath: logPath(domain.DesignSystemService),
+			Shell: fmt.Sprintf("pnpm -s --filter %s storybook --port %d --ci",
+				DesignSystemPackage, port(domain.DesignSystemService)),
+			Env: nodeEnv(domain.DesignSystemService),
+		})
+	}
+	if opts.Selection.MailRoom {
+		out = append(out, Child{
+			Name: domain.MailRoomService, Dir: repoDir, Color: palette[9], LogPath: logPath(domain.MailRoomService),
+			// --strictPort: vite silently moves to the next free port otherwise,
+			// which would leave mail-room.<slug> routed to nothing at all.
+			// --host 127.0.0.1: vite's default "localhost" binds only ::1 on
+			// this machine, and the proxy and the port probe both dial IPv4.
+			Shell: fmt.Sprintf("pnpm -s --filter %s dev --host 127.0.0.1 --port %d --strictPort",
+				MailPackage, port(domain.MailRoomService)),
+			Env: nodeEnv(domain.MailRoomService),
+		})
+	}
 	if opts.Selection.Langy {
 		langy := o.langyChild(st, opts, base, port("langyagent"), langyDockerHost)
 		langy.LogPath = logPath("langyagent")
 		out = append(out, langy)
 	}
-	if opts.Selection.Workers {
-		out = append(out, Child{
-			// green, not red: workers are a healthy background lane, and a red
-			// prefix reads as an error even on ordinary info logs. Red (palette[5])
-			// is reserved for genuine failures, so no lane label uses it —
-			// TestNoLaneIsRed pins that.
-			Name: "workers", Dir: lwDir, Color: palette[0], LogPath: logPath("workers"),
-			Shell: "pnpm -s run start:workers",
-			Env:   append(nodeEnv(), "START_WORKERS=true"),
-		})
+	if st.Layout.IsMonolith() {
+		return out
 	}
+	out = append(out, Child{
+		// green, not red: the backend is a healthy lane, and a red prefix reads
+		// as an error even on ordinary info logs. Red (palette[5]) is reserved
+		// for genuine failures, so no lane label uses it — TestNoLaneIsRed pins
+		// that.
+		//
+		// Unconditional, and one lane: locally the API application and the
+		// worker application share a process (ADR-004, amendment 2026-09-07).
+		// It is a launcher, not a process role — each application still parses
+		// its own configuration and composes its own graph, and nothing reads
+		// WORKERS_IN_PROCESS or START_WORKERS. Production still deploys them
+		// separately.
+		Name: BackendLane, Dir: repoDir, Color: palette[0], LogPath: logPath(BackendLane),
+		Shell: "pnpm -s --filter " + BackendPackage + " dev",
+		Env:   nodeEnv(BackendLane),
+	})
 	return out
 }
+
+// The Node lanes a stack supervises, by workspace package name. planChildren
+// runs each with `pnpm --filter <pkg> dev` from the workspace root, so the lane
+// never depends on a path staying where it is.
+const (
+	// UIPackage is the browser application — Vite, which serves the routed
+	// app.<slug> hostname and proxies /api to the backend lane.
+	UIPackage = "@langwatch/ui"
+	// BackendPackage is the contributor-only launcher that hosts the API
+	// application and the worker application in one local process. Both
+	// applications keep their own entry points; this only starts them together.
+	BackendPackage = "@langwatch/dev-runtime"
+	// APIPackage and WorkerPackage are the two applications the backend lane
+	// hosts. Locally they share one process; in production each is its own
+	// deployment, started from its own entry point. Named here because that is
+	// what the lane is made of, and because `pnpm --filter <pkg> dev` still runs
+	// either one on its own.
+	APIPackage    = "@langwatch/platform-api"
+	WorkerPackage = "@langwatch/worker"
+)
+
+// The lane names haven supervises, logs and restarts by.
+const (
+	// BackendLane is the API + worker Node process.
+	BackendLane = "backend"
+	// GoLane is the process hosting the Go data-plane services.
+	GoLane = "go"
+)
+
+// The address variable each service in the combined Go process binds. One per
+// service, because SERVER_ADDR cannot name two listeners in one process. They
+// are the same names cmd/service reads.
+const (
+	GatewayAddrEnv = "LANGWATCH_GO_AIGATEWAY_ADDR"
+	NLPAddrEnv     = "LANGWATCH_GO_NLPGO_ADDR"
+)
+
+// The two developer tools a stack can optionally supervise, by workspace
+// package name. They are tools rather than parts of the product — nothing the
+// application does depends on either — so they stay in their own packages and
+// haven only runs them for a worktree that asked (`haven up +design-system
+// +mail-room`).
+const (
+	// DesignSystemPackage owns the component workshop (Storybook), routed at
+	// design-system.<slug>.
+	DesignSystemPackage = "@langwatch/design-system"
+	// MailPackage owns the studio that previews every transactional message,
+	// routed at mail-room.<slug>. Its `dev` script is the studio's Vite server.
+	MailPackage = "@langwatch/mail"
+)
+
+// UIDirRel is where the browser application lives inside the workspace. Only
+// the Vite lane's own working directory needs it — the HMR-gate marker is
+// resolved by the plugin against that directory, not the workspace root.
+const UIDirRel = "apps/ui"
+
+// UIDir is the Vite lane's working directory inside a checkout.
+func UIDir(repoDir string) string { return filepath.Join(repoDir, UIDirRel) }

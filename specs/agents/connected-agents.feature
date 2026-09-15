@@ -439,7 +439,7 @@ Feature: Connected agents
     Given an instance that registered agent A only
     When a call for agent B is routed at that instance
     Then the call is not sent to it
-    And the call fails for that instance with "agent_disconnected"
+    And the unauthorized session leaves the call and its delivery result unchanged
 
   @unit
   Scenario: A call envelope carries only the contract fields
@@ -706,8 +706,15 @@ Feature: Connected agents
     Scenario: The HTTP transport refuses the same credentials as the socket
       Given a personal key that holds only "scenarios:view"
       When it posts a register frame to the register route
-      Then the answer is a refused frame with "permission_denied"
-      And an ingestion key is refused with "key_type_not_allowed"
+      Then the answer is a refused frame with "permission_denied" and status 403
+      And an ingestion key is refused with "key_type_not_allowed" and status 403
+
+    @integration
+    Scenario: A register refusal answers at the HTTP status of its reason
+      Given an SDK process whose network blocks WebSockets
+      When it registers with no bearer token
+      Then the answer is a refused frame with "api_key_invalid" and status 401
+      And a key that reaches several projects with none named is refused with "project_required" and status 400
 
     @integration
     Scenario: A poll delivers a parked call once
@@ -765,13 +772,13 @@ Feature: Connected agents
     Scenario: An HTTP register is refused without Redis on a deployment with several replicas
       Given no Redis and LANGWATCH_APP_REPLICAS set to 3
       When a process posts a register frame
-      Then the answer is a refused frame with "replica_count_unsupported"
+      Then the answer is a refused frame with "replica_count_unsupported" and status 503
 
     @integration
     Scenario: A frames body the endpoint does not take is refused as a protocol frame
       Given an instance registered over HTTP
       When it posts a body that carries no ack, result or deregister frame
-      Then the answer is a refused frame with "protocol_invalid"
+      Then the answer is a refused frame with "protocol_invalid" and status 422
 
     @integration
     Scenario: A frames body above the cap names the limit alone
@@ -779,3 +786,64 @@ Feature: Connected agents
       When it posts a body above the frame cap
       Then it is refused with "agent_payload_too_large"
       And the message names the limit and no measured size
+
+  # ---------------------------------------------------------------------------
+  # Project isolation
+  # ---------------------------------------------------------------------------
+
+  Rule: An instance only ever reaches the calls of its own project
+
+    # The instance id travels in the register frame, so it is chosen by the
+    # connecting process and is not unique across projects. Every key of an
+    # instance, a call and a session therefore carries the project id, and a
+    # frame that names a call of another project is refused rather than taken.
+
+    @unit
+    Scenario: A call key of one project never names another project's call
+      Given the same call id in two projects
+      When the key of each call is built
+      Then the two keys differ
+      And each key carries its own project id
+
+    @unit
+    Scenario: An ack for a call of another project is refused
+      Given an instance registered in one project with the instance id of another project's instance
+      When it acknowledges a call that belongs to the other project
+      Then the frame is refused with "agent_call_foreign_project"
+      And the call is not marked as started
+
+    @unit
+    Scenario: An ack for a call of the instance's own project is taken
+      Given an instance with a call of its own project waiting for it
+      When it acknowledges that call
+      Then the call is marked as started
+
+    @unit
+    Scenario: A poll from another project leaves the calls of an instance untouched
+      Given a call parked for an instance of one project
+      When a process of another project polls with the same instance id
+      Then the poll answers with no frame
+      And the parked call is still waiting and carries no result
+
+  Rule: Connected session protocols do not expose raw HTTP capabilities
+
+    @unit
+    Scenario: A connected protocol forwards only its declared credential facts
+      Given a connected frame request with an additional secret header
+      When the framework invokes the connected protocol
+      Then the App receives parsed frame input and the declared credential facts separately
+      And the additional header and raw request and response are absent
+
+    @unit
+    Scenario: A malformed protocol output preserves the response without logging its content
+      Given the App returns an invalid accepted count containing a secret marker
+      When the protocol serializes the response
+      Then the caller receives the original response with its declared protocol status
+      And an error log names the endpoint and validation failure
+      And no serialized log argument contains the secret marker
+
+    @unit
+    Scenario: Application instances do not share presence write throttle state
+      Given two independently composed Agent applications
+      When both refresh the same agent at the same time
+      Then each application records its own first presence write

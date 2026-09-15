@@ -1,0 +1,47 @@
+import { describe, expect, it } from "vitest";
+import { PLAN_LIMITS } from "../index.ts";
+import { PlanTypes } from "../index.ts";
+
+describe("PLAN_LIMITS", () => {
+  describe("when checking critical plan-specific fields", () => {
+    it("sets PRO maxMembers to 5", () => {
+      expect(PLAN_LIMITS[PlanTypes.PRO].maxMembers).toBe(5);
+    });
+
+    it("sets ENTERPRISE maxMembers to 1000", () => {
+      expect(PLAN_LIMITS[PlanTypes.ENTERPRISE].maxMembers).toBe(1000);
+    });
+
+    it("sets FREE maxMembers to 2", () => {
+      expect(PLAN_LIMITS[PlanTypes.FREE].maxMembers).toBe(2);
+    });
+  });
+
+  describe("when checking the webhook endpoints entitlement", () => {
+    /** @scenario An enterprise subscription with no license is entitled */
+    it("states it on ENTERPRISE rather than leaving it to be inferred", () => {
+      expect(PLAN_LIMITS[PlanTypes.ENTERPRISE].webhookEndpointsEnabled).toBe(true);
+    });
+
+    /** @scenario A plan below enterprise is not entitled */
+    it("does not grant it to the plans sold below enterprise", () => {
+      expect(PLAN_LIMITS[PlanTypes.GROWTH].webhookEndpointsEnabled).toBeUndefined();
+      expect(PLAN_LIMITS[PlanTypes.FREE].webhookEndpointsEnabled).toBeUndefined();
+      expect(PLAN_LIMITS[PlanTypes.PRO].webhookEndpointsEnabled).toBeUndefined();
+    });
+  });
+
+  describe("when checking the automation daily dispatch ceiling", () => {
+    /** @scenario "The automation ceiling rises with each self-serve rung" */
+    it("rises strictly from Free through Launch, Accelerate and Growth", () => {
+      const ladder = [PlanTypes.FREE, PlanTypes.LAUNCH, PlanTypes.ACCELERATE, PlanTypes.GROWTH].map(
+        (type) => PLAN_LIMITS[type].automationDailyDispatchCeiling,
+      );
+
+      expect(ladder).toEqual([50, 150, 300, 500]);
+      for (let index = 1; index < ladder.length; index++) {
+        expect(ladder[index]!).toBeGreaterThan(ladder[index - 1]!);
+      }
+    });
+  });
+});

@@ -41,7 +41,7 @@ describe("ExperimentsApiService list endpoints", () => {
   describe("listExperiments", () => {
     describe("given the API returns a valid payload", () => {
       describe("when called without arguments", () => {
-        it("hits /api/experiments with no query string", async () => {
+        it("hits /api/v1/experiments with no query string", async () => {
           const payload: ExperimentListResponse = {
             experiments: [],
             pagination: {
@@ -57,17 +57,13 @@ describe("ExperimentsApiService list endpoints", () => {
           const result = await service.listExperiments();
 
           expect(result).toEqual(payload);
-          expect(fetchedUrl()).toBe(
-            "https://api.langwatch.test/api/experiments",
-          );
+          expect(fetchedUrl()).toBe("https://api.langwatch.test/api/v1/experiments");
         });
       });
 
       describe("when called with pageSize and page", () => {
         it("includes them in the query string", async () => {
-          mockFetch.mockResolvedValueOnce(
-            jsonResponse({ experiments: [], pagination: {} }),
-          );
+          mockFetch.mockResolvedValueOnce(jsonResponse({ experiments: [], pagination: {} }));
 
           const service = new ExperimentsApiService();
           await service.listExperiments({ pageSize: 10, page: 2 });
@@ -82,19 +78,14 @@ describe("ExperimentsApiService list endpoints", () => {
       describe("when called", () => {
         it("throws ExperimentsApiServiceError with 'list experiments' operation", async () => {
           mockFetch.mockResolvedValueOnce(
-            jsonResponse(
-              { error: "Missing credentials" },
-              { status: 401 },
-            ),
+            jsonResponse({ error: "Missing credentials" }, { status: 401 }),
           );
 
           const service = new ExperimentsApiService();
           const err = await service.listExperiments().catch((e) => e);
 
           expect(err).toBeInstanceOf(ExperimentsApiServiceError);
-          expect((err as ExperimentsApiServiceError).operation).toBe(
-            "list experiments",
-          );
+          expect((err as ExperimentsApiServiceError).operation).toBe("list experiments");
         });
       });
     });
@@ -123,9 +114,7 @@ describe("ExperimentsApiService list endpoints", () => {
           });
 
           expect(result).toEqual(payload);
-          expect(fetchedUrl()).toContain(
-            "/api/experiments/runs?experimentSlug=checkout-flow",
-          );
+          expect(fetchedUrl()).toContain("/api/v1/experiments/runs?experimentSlug=checkout-flow");
         });
       });
     });
@@ -134,16 +123,11 @@ describe("ExperimentsApiService list endpoints", () => {
       describe("when the API returns 404", () => {
         it("throws ExperimentsApiServiceError mentioning the slug", async () => {
           mockFetch.mockResolvedValueOnce(
-            jsonResponse(
-              { error: "Experiment not found" },
-              { status: 404 },
-            ),
+            jsonResponse({ error: "Experiment not found" }, { status: 404 }),
           );
 
           const service = new ExperimentsApiService();
-          const err = await service
-            .listRuns({ experimentSlug: "missing" })
-            .catch((e) => e);
+          const err = await service.listRuns({ experimentSlug: "missing" }).catch((e) => e);
 
           expect(err).toBeInstanceOf(ExperimentsApiServiceError);
           expect((err as ExperimentsApiServiceError).operation).toContain("missing");
@@ -156,9 +140,7 @@ describe("ExperimentsApiService list endpoints", () => {
         it("wraps the error as ExperimentsApiServiceError", async () => {
           mockFetch.mockRejectedValueOnce(new Error("ECONNRESET"));
           const service = new ExperimentsApiService();
-          const err = await service
-            .listRuns({ experimentSlug: "checkout-flow" })
-            .catch((e) => e);
+          const err = await service.listRuns({ experimentSlug: "checkout-flow" }).catch((e) => e);
           expect(err).toBeInstanceOf(ExperimentsApiServiceError);
         });
       });

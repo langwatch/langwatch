@@ -28,7 +28,7 @@ func runHeavy(ctx context.Context, d deps, inv invocation) error {
 	}
 	return d.orch.RunHeavy(ctx, app.HeavyRun{
 		Shell:   shell,
-		Dir:     d.lwDir,
+		Dir:     d.worktree,
 		AgentID: inv.value("--agent-id"),
 		// The gate decided the width; this only applies it. A count that will not
 		// parse is treated as absent rather than fatal, because refusing to run
@@ -51,18 +51,23 @@ func positiveInt(s string) int {
 	return n
 }
 
-// runGate is `haven gate` — answer one Claude Code PreToolUse hook.
+// runGate answers one PreToolUse hook in the selected client protocol.
 //
-// There is no install flag: `haven setup gate-hook` registers this in the
-// worktree's own .claude/settings.local.json, and it is opt-in — `haven up`
-// installs nothing that changes how another tool behaves. A command whose job
-// is answering hooks should not also be the thing that installs them.
+// `haven setup gate-hook` registers the hook by hand, and `haven up` now
+// registers it automatically for the worktree it starts - a per-worktree hook
+// only guards the checkout it was installed in, and remembering to run setup in
+// every one of them is exactly what stopped happening. `haven setup gate-hook
+// --off` opts a worktree back out of both.
 //
 // It always exits 0. Exit code 2 BLOCKS the tool call, and an unrecovered Go
 // panic exits with exactly 2, so returning an error from here would risk
 // converting a haven bug into a machine-wide tool-call blocker. Every failure
-// inside Gate already resolves to "defer".
-func runGate(_ context.Context, d deps, _ invocation) error {
+// inside Gate already resolves to a neutral answer with no permission decision.
+func runGate(_ context.Context, d deps, inv invocation) error {
+	if inv.value("--client") == "codex" {
+		d.orch.GateCodex(os.Stdin, os.Stdout)
+		return nil
+	}
 	d.orch.Gate(os.Stdin, os.Stdout)
 	return nil
 }

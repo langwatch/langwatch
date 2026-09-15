@@ -22,7 +22,7 @@ def _get_kwargs(
 
     _kwargs: dict[str, Any] = {
         "method": "put",
-        "url": "/api/model-defaults/{id}".format(
+        "url": "/api/v1/model-defaults/{id}".format(
             id=quote(str(id), safe=""),
         ),
     }

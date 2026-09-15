@@ -17,7 +17,11 @@ type StdoutWrite = typeof process.stdout.write;
 
 export const rawStdoutWrite: StdoutWrite = process.stdout.write.bind(process.stdout);
 
-process.stdout.write = ((chunk: Parameters<StdoutWrite>[0], encodingOrCb?: unknown, cb?: unknown) => {
+process.stdout.write = ((
+  chunk: Parameters<StdoutWrite>[0],
+  encodingOrCb?: unknown,
+  cb?: unknown,
+) => {
   return (process.stderr.write as (...args: unknown[]) => boolean)(chunk, encodingOrCb, cb);
 }) as StdoutWrite;
 

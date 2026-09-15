@@ -18,10 +18,10 @@
 // The directive below performs two steps:
 //
 //  1. Down-convert the canonical OpenAPI 3.1 document
-//     (platform/app/src/app/api/openapiLangWatch.json) to a 3.0.3-compatible
+//     (docs/api-reference/openapiLangWatch.json) to a 3.0.3-compatible
 //     temporary file via downconvert.py, because oapi-codegen (kin-openapi)
 //     does not parse 3.1. The canonical spec is never modified.
 //  2. Run oapi-codegen with oapi-codegen.yaml to emit zz_generated.gen.go.
 package openapi
 
-//go:generate sh -c "python3 downconvert.py ../../../../../platform/app/src/app/api/openapiLangWatch.json ./openapi-3.0.json && go run github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@v2.7.1 -config oapi-codegen.yaml ./openapi-3.0.json && rm -f ./openapi-3.0.json"
+//go:generate sh -c "python3 downconvert.py ../../../../../docs/api-reference/openapiLangWatch.json ./openapi-3.0.json && go run github.com/oapi-codegen/oapi-codegen/v2/cmd/oapi-codegen@v2.7.1 -config oapi-codegen.yaml ./openapi-3.0.json && rm -f ./openapi-3.0.json"

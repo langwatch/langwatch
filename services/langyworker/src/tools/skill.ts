@@ -26,7 +26,10 @@ export type SkillEntry = {
 };
 
 /** Minimal SKILL.md frontmatter reader: `name:` and `description:` between --- fences. */
-export function parseSkillFrontmatter(markdown: string): { name?: string; description?: string } {
+export function parseSkillFrontmatter(markdown: string): {
+  name?: string;
+  description?: string;
+} {
   if (!markdown.startsWith("---")) return {};
   const end = markdown.indexOf("\n---", 3);
   if (end === -1) return {};
@@ -81,7 +84,9 @@ export function renderSkillInventory(skills: SkillEntry[]): string {
 
 const skillParams = Type.Object({
   name: Type.Optional(
-    Type.String({ description: "Skill name to load. Omit to list every installed skill." }),
+    Type.String({
+      description: "Skill name to load. Omit to list every installed skill.",
+    }),
   ),
 });
 

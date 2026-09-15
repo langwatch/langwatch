@@ -10,10 +10,7 @@ import {
   type AgentResponse,
   type AgentsApiService,
 } from "@/client-sdk/services/agents/agents-api.service";
-import {
-  commandValidationError,
-  reportCommandError,
-} from "../../../utils/errorOutput";
+import { commandValidationError, reportCommandError } from "../../../utils/errorOutput";
 import { loadConfig, saveConfig } from "../../../utils/governance/config";
 
 export function fail(message: string): never {
@@ -22,10 +19,7 @@ export function fail(message: string): never {
 }
 
 /** The local URL the flags point at, after mutual-exclusion validation. */
-export function resolveLocalUrl(options: {
-  port?: string;
-  url?: string;
-}): string {
+export function resolveLocalUrl(options: { port?: string; url?: string }): string {
   if (options.port && options.url) {
     fail("--port and --url are mutually exclusive. Pass one of them.");
   }
@@ -49,9 +43,7 @@ export function resolveLocalUrl(options: {
     // The URL is stored in the agent's platform config and printed by the
     // session, so credentials embedded in it would leak both ways.
     if (parsed.username || parsed.password) {
-      fail(
-        "--url must not carry a username or password. Pass the URL without credentials.",
-      );
+      fail("--url must not carry a username or password. Pass the URL without credentials.");
     }
     return options.url;
   }
@@ -83,12 +75,9 @@ function rememberedAgentForDirectory(): string | undefined {
 }
 
 /**
- * Resolve which registered HTTP agent this session repoints:
- *
- *   1. `--agent <id|name>`: an exact id, else a name match over HTTP agents.
- *   2. The agent remembered for this directory from a previous run.
- *   3. An interactive picker over the project's HTTP agents (TTY only), which
- *      offers to create one when the project has none yet.
+ * Resolve which registered HTTP agent this session repoints: `--agent
+ * <id|name>`, else the agent remembered for this directory, else an
+ * interactive picker (TTY only) offering to create one.
  */
 export async function resolveTargetAgent({
   service,
@@ -123,9 +112,7 @@ function agentFromFlag({
   httpAgents: AgentResponse[];
 }): AgentResponse {
   const byId = all.find((agent) => agent.id === agentFlag);
-  const byName = httpAgents.filter(
-    (agent) => agent.name.toLowerCase() === agentFlag.toLowerCase(),
-  );
+  const byName = httpAgents.filter((agent) => agent.name.toLowerCase() === agentFlag.toLowerCase());
   const match = byId ?? byName[0];
   if (!match) {
     fail(
@@ -166,13 +153,11 @@ function agentFromMemory(httpAgents: AgentResponse[]): AgentResponse | undefined
 }
 
 const CREATE_INSTRUCTIONS =
-  "This project has no HTTP agents. Create one first: langwatch agent create \"My Agent\" --type http --config '{\"url\":\"https://...\"}'";
+  'This project has no HTTP agents. Create one first: langwatch agent create "My Agent" --type http --config \'{"url":"https://..."}\'';
 
 /**
  * The project has no HTTP agents yet: offer to create one on the spot (TTY
- * only). The created agent points at the local server, so after the session
- * restores it, its URL states what it targeted; edit it in the UI when the
- * agent gets a deployed address.
+ * only), pointed at the local server for now.
  */
 async function createHttpAgentInteractively({
   service,
@@ -231,8 +216,7 @@ async function pickHttpAgent({
     message: "Which agent should point at your machine?",
     choices: httpAgents.map((agent) => ({
       title: agent.name,
-      description:
-        typeof agent.config?.url === "string" ? agent.config.url : undefined,
+      description: typeof agent.config?.url === "string" ? agent.config.url : undefined,
       value: agent.id,
     })),
     initial: 0,

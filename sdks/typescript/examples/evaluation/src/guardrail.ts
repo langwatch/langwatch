@@ -75,17 +75,14 @@ const processMessage = async (userInput: string): Promise<string> => {
 
   // Run guardrail to check for PII - this creates a span attached to the current trace
   try {
-    const guardrail = await langwatch.evaluations.evaluate(
-      "presidio/pii_detection",
-      {
-        data: {
-          input: userInput,
-          output: generatedResponse,
-        },
-        name: "PII Detection Guardrail",
-        asGuardrail: true,
-      }
-    );
+    const guardrail = await langwatch.evaluations.evaluate("presidio/pii_detection", {
+      data: {
+        input: userInput,
+        output: generatedResponse,
+      },
+      name: "PII Detection Guardrail",
+      asGuardrail: true,
+    });
 
     console.log(`🔍 Guardrail Result:`);
     console.log(`   - Status: ${guardrail.status}`);
@@ -132,7 +129,7 @@ const main = async () => {
         } finally {
           span.end();
         }
-      }
+      },
     );
   }
 

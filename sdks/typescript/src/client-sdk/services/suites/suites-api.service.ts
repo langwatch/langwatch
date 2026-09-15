@@ -1,38 +1,36 @@
 import type { paths } from "@/internal/generated/openapi/api-client";
-import {
-  createLangWatchApiClient,
-  type LangwatchApiClient,
-} from "@/internal/api/client";
+import { createLangWatchApiClient, type LangwatchApiClient } from "@/internal/api/client";
 import type { InternalConfig } from "@/client-sdk/types";
 import {
   extractStatusFromResponse,
   formatApiErrorForOperation,
 } from "@/client-sdk/services/_shared/format-api-error";
+import { unwrapApiResult } from "@/client-sdk/services/_shared/unwrap-api-result";
 
 export type SuiteResponse = NonNullable<
-  paths["/api/suites"]["get"]["responses"]["200"]["content"]["application/json"]
+  paths["/api/v1/suites"]["get"]["responses"]["200"]["content"]["application/json"]
 >[number] & {
   /** URL to view this suite on the LangWatch platform */
   platformUrl?: string;
 };
 
 export type CreateSuiteBody = NonNullable<
-  paths["/api/suites"]["post"]["requestBody"]
+  paths["/api/v1/suites"]["post"]["requestBody"]
 >["content"]["application/json"];
 
 export type UpdateSuiteBody = NonNullable<
-  paths["/api/suites/{id}"]["patch"]["requestBody"]
+  paths["/api/v1/suites/{id}"]["patch"]["requestBody"]
 >["content"]["application/json"];
 
 export type SuiteRunResult =
-  paths["/api/suites/{id}/run"]["post"]["responses"]["200"]["content"]["application/json"];
+  paths["/api/v1/suites/{id}/run"]["post"]["responses"]["200"]["content"]["application/json"];
 
 export interface SuiteTarget {
   type: "prompt" | "http" | "code" | "workflow";
   referenceId: string;
 }
 
-/** Options for `POST /api/suites/{id}/run`. */
+/** Options for `POST /api/v1/suites/{id}/run`. */
 export interface SuiteRunOptions {
   /**
    * Key that makes the request safe to retry. Generated per call when omitted,
@@ -69,7 +67,7 @@ export class SuitesApiError extends Error {
 }
 
 /**
- * @deprecated Use runPlans and testSuites; /api/suites is a frozen alias.
+ * @deprecated Use runPlans and testSuites; /api/v1/suites is a frozen alias.
  */
 export class SuitesApiService {
   private readonly apiClient: LangwatchApiClient;
@@ -78,54 +76,83 @@ export class SuitesApiService {
     this.apiClient = config?.langwatchApiClient ?? createLangWatchApiClient();
   }
 
-  private handleApiError(operation: string, error: unknown): never {
-    const message = formatApiErrorForOperation({ operation: operation, error: error, options: {
-      status: extractStatusFromResponse(error),
-    } });
+  private handleApiError(operation: string, error: unknown, response?: Response): never {
+    const message = formatApiErrorForOperation({
+      operation: operation,
+      error: error,
+      options: {
+        status: response?.status ?? extractStatusFromResponse(error),
+      },
+    });
     throw new SuitesApiError(message, operation, error);
   }
 
   async getAll(options?: { kind?: SuiteKind }): Promise<SuiteResponse[]> {
-    const { data, error } = await this.apiClient.GET("/api/suites", {
+    const { data, error, response } = await this.apiClient.GET("/api/v1/suites", {
       ...(options?.kind !== undefined && {
         params: { query: { kind: options.kind } },
       }),
     });
-    if (error) this.handleApiError("list suites", error);
-    return data;
+    return unwrapApiResult({
+      operation: "list suites",
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    });
   }
 
   async get(id: string): Promise<SuiteResponse> {
-    const { data, error } = await this.apiClient.GET("/api/suites/{id}", {
+    const { data, error, response } = await this.apiClient.GET("/api/v1/suites/{id}", {
       params: { path: { id } },
     });
-    if (error) this.handleApiError(`get suite "${id}"`, error);
-    return data;
+    return unwrapApiResult({
+      operation: `get suite "${id}"`,
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    });
   }
 
   async create(params: CreateSuiteBody): Promise<SuiteResponse> {
-    const { data, error } = await this.apiClient.POST("/api/suites", {
+    const { data, error, response } = await this.apiClient.POST("/api/v1/suites", {
       body: params,
     });
-    if (error) this.handleApiError("create suite", error);
-    return data;
+    return unwrapApiResult({
+      operation: "create suite",
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    });
   }
 
   async update(id: string, params: UpdateSuiteBody): Promise<SuiteResponse> {
-    const { data, error } = await this.apiClient.PATCH("/api/suites/{id}", {
+    const { data, error, response } = await this.apiClient.PATCH("/api/v1/suites/{id}", {
       params: { path: { id } },
       body: params,
     });
-    if (error) this.handleApiError(`update suite "${id}"`, error);
-    return data;
+    return unwrapApiResult({
+      operation: `update suite "${id}"`,
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    });
   }
 
   async duplicate(id: string): Promise<SuiteResponse> {
-    const { data, error } = await this.apiClient.POST("/api/suites/{id}/duplicate", {
+    const { data, error, response } = await this.apiClient.POST("/api/v1/suites/{id}/duplicate", {
       params: { path: { id } },
     });
-    if (error) this.handleApiError(`duplicate suite "${id}"`, error);
-    return data;
+    return unwrapApiResult({
+      operation: `duplicate suite "${id}"`,
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    });
   }
 
   async run(id: string, options?: SuiteRunOptions): Promise<SuiteRunResult>;
@@ -141,7 +168,7 @@ export class SuitesApiService {
     const options: SuiteRunOptions =
       typeof optionsOrIdempotencyKey === "string"
         ? { idempotencyKey: optionsOrIdempotencyKey }
-        : optionsOrIdempotencyKey ?? {};
+        : (optionsOrIdempotencyKey ?? {});
 
     const body: {
       idempotencyKey: string;
@@ -149,8 +176,7 @@ export class SuitesApiService {
       note?: string;
     } = {
       idempotencyKey:
-        options.idempotencyKey ??
-        `cli-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        options.idempotencyKey ?? `cli-${Date.now()}-${Math.random().toString(36).slice(2)}`,
     };
     if (options.parameters !== undefined) body.parameters = options.parameters;
     // A note of only spaces is no note: sending "" would store an empty string
@@ -158,19 +184,29 @@ export class SuitesApiService {
     const note = options.note?.trim();
     if (note) body.note = note;
 
-    const { data, error } = await this.apiClient.POST("/api/suites/{id}/run", {
+    const { data, error, response } = await this.apiClient.POST("/api/v1/suites/{id}/run", {
       params: { path: { id } },
       body,
     });
-    if (error) this.handleApiError(`run suite "${id}"`, error);
-    return data;
+    return unwrapApiResult({
+      operation: `run suite "${id}"`,
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    });
   }
 
   async delete(id: string): Promise<{ id: string; archived: boolean }> {
-    const { data, error } = await this.apiClient.DELETE("/api/suites/{id}", {
+    const { data, error, response } = await this.apiClient.DELETE("/api/v1/suites/{id}", {
       params: { path: { id } },
     });
-    if (error) this.handleApiError(`delete suite "${id}"`, error);
-    return data as unknown as { id: string; archived: boolean };
+    return unwrapApiResult({
+      operation: `delete suite "${id}"`,
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    }) as unknown as { id: string; archived: boolean };
   }
 }

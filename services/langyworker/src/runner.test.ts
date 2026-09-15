@@ -77,7 +77,8 @@ function makeRunner({
   const runner = new TurnRunner({
     session,
     writer,
-    composeSystem: (turnSystem?: string) => `PERSONA\n\nAGENTS${turnSystem ? `\n\n${turnSystem}` : ""}`,
+    composeSystem: (turnSystem?: string) =>
+      `PERSONA\n\nAGENTS${turnSystem ? `\n\n${turnSystem}` : ""}`,
     applySystemPrompt: (composed) => appliedSystemPrompts.push(composed),
     warn: () => undefined,
     ...options,
@@ -110,8 +111,16 @@ describe("TurnRunner", () => {
   describe("when a turn completes cleanly", () => {
     it("emits turn_started then turn_done ok, with the recomposed system prompt applied", async () => {
       const fake = makeFakeSession();
-      const { runner, events } = makeRunner({ session: fake.session, appliedSystemPrompts: fake.appliedSystemPrompts });
-      const done = runner.submitTurn({ type: "turn", turnId: "t1", prompt: "hi", system: "SYS" });
+      const { runner, events } = makeRunner({
+        session: fake.session,
+        appliedSystemPrompts: fake.appliedSystemPrompts,
+      });
+      const done = runner.submitTurn({
+        type: "turn",
+        turnId: "t1",
+        prompt: "hi",
+        system: "SYS",
+      });
       await until(() => fake.promptCalls.length === 1);
       fake.finish();
       await done;
@@ -147,7 +156,10 @@ describe("TurnRunner", () => {
     /** @scenario A resumed session ignores the handoff digest it no longer needs */
     it("does not prepend the resumeToken seed", async () => {
       const fake = makeFakeSession();
-      const { runner } = makeRunner({ session: fake.session, options: { sessionResumed: true } });
+      const { runner } = makeRunner({
+        session: fake.session,
+        options: { sessionResumed: true },
+      });
       const done = runner.submitTurn({
         type: "turn",
         turnId: "t1",
@@ -210,7 +222,11 @@ describe("TurnRunner", () => {
       runner.abortTurn("t1");
       await done;
       expect(fake.abortCount()).toBe(1);
-      expect(events.at(-1)).toEqual({ type: "turn_done", turnId: "t1", outcome: "aborted" });
+      expect(events.at(-1)).toEqual({
+        type: "turn_done",
+        turnId: "t1",
+        outcome: "aborted",
+      });
     });
   });
 

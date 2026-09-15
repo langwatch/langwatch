@@ -1,0 +1,155 @@
+// eslint-disable-next-line no-restricted-imports
+import { Dialog as ChakraDialog, Portal } from "@chakra-ui/react";
+import * as React from "react";
+import { useUiDeployment } from "@langwatch/ui-host/capabilities";
+import { CloseButton } from "../elements/close-button.tsx";
+import { IsolatedErrorBoundary } from "./isolated-error-boundary.tsx";
+
+interface DialogContentProps extends ChakraDialog.ContentProps {
+  portalled?: boolean;
+  portalRef?: React.RefObject<HTMLElement>;
+  backdrop?: boolean;
+  /**
+   * Props merged onto the default backdrop (e.g. stronger blur).
+   */
+  backdropProps?: Omit<ChakraDialog.BackdropProps, "bg" | "background" | "backgroundColor">;
+  /** Props passed to the positioner (e.g. style for --layer-index). */
+  positionerProps?: ChakraDialog.PositionerProps;
+  /**
+   * Set to `false` to disable the inline error boundary that wraps children. By
+   * default, a render-time crash inside a dialog body shows an inline error panel — it
+   * does NOT close the dialog or take down the page.
+   */
+  withErrorBoundary?: boolean;
+  /** Optional scope label shown by the error fallback. */
+  errorScope?: string;
+}
+
+export const DialogContent = React.forwardRef<HTMLDivElement, DialogContentProps>(
+  function DialogContent(props, ref) {
+    const {
+      children,
+      portalled = true,
+      portalRef,
+      backdrop = true,
+      backdropProps,
+      positionerProps,
+      withErrorBoundary = true,
+      errorScope,
+      ...rest
+    } = props;
+
+    const { isDevelopment } = useUiDeployment();
+
+    // Crash inside the dialog body should NOT close the dialog. Wrap the
+    // children so a render error renders an inline error panel within the
+    // dialog frame instead.
+    const safeChildren = withErrorBoundary ? (
+      <IsolatedErrorBoundary scope={errorScope}>{children}</IsolatedErrorBoundary>
+    ) : (
+      children
+    );
+
+    // Strip background overrides defensively at runtime in addition to the
+    // type-level Omit, in case a caller widens the type with `as any`.
+    const safeBackdropProps = stripBackdropBg({ props: backdropProps, isDevelopment });
+
+    return (
+      <Portal disabled={!portalled} container={portalRef}>
+        {backdrop && (
+          <ChakraDialog.Backdrop
+            backdropFilter="var(--lw-backdrop-blur, blur(8px))"
+            {...safeBackdropProps}
+            bg="transparent"
+            // Stable DOM signal that the wrapper's transparency contract is active.
+            data-lw-transparent-backdrop="true"
+          />
+        )}
+        <ChakraDialog.Positioner {...positionerProps}>
+          <ChakraDialog.Content ref={ref} {...rest} asChild={false}>
+            {safeChildren}
+          </ChakraDialog.Content>
+        </ChakraDialog.Positioner>
+      </Portal>
+    );
+  },
+);
+
+export const DialogCloseTrigger = React.forwardRef<
+  HTMLButtonElement,
+  ChakraDialog.CloseTriggerProps
+>(function DialogCloseTrigger(props, ref) {
+  return (
+    <ChakraDialog.CloseTrigger position="absolute" top="2" insetEnd="2" {...props} asChild>
+      <CloseButton size="sm" ref={ref}>
+        {props.children}
+      </CloseButton>
+    </ChakraDialog.CloseTrigger>
+  );
+});
+
+export type DialogRootProps = Omit<ChakraDialog.RootProps, "size"> & {
+  size?: "xs" | "sm" | "md" | "lg" | "xl" | "5xl" | "6xl" | "cover" | "full";
+};
+
+export const DialogRoot = function DialogRoot(props: DialogRootProps) {
+  return (
+    <ChakraDialog.Root
+      {...(props as ChakraDialog.RootProps)}
+      trapFocus={false}
+      preventScroll={false}
+    />
+  );
+};
+
+function stripBackdropBg({
+  props,
+  isDevelopment,
+}: {
+  props: DialogContentProps["backdropProps"] | undefined;
+  isDevelopment: boolean;
+}): DialogContentProps["backdropProps"] | undefined {
+  if (!props) return props;
+  const { bg, background, backgroundColor, style, ...rest } = props as ChakraDialog.BackdropProps;
+  const safeStyle = style
+    ? { ...style, background: "transparent", backgroundColor: "transparent" }
+    : undefined;
+  const setsPropBackground =
+    bg !== undefined || background !== undefined || backgroundColor !== undefined;
+  const setsStyleBackground =
+    style?.background !== undefined || style?.backgroundColor !== undefined;
+  if (isDevelopment && (setsPropBackground || setsStyleBackground)) {
+    console.warn(
+      "[Dialog] backdropProps.bg/background/backgroundColor is ignored — the backdrop is always transparent so the page behind stays visible. Adjust Dialog.Content surface instead.",
+    );
+  }
+  return {
+    ...rest,
+    ...(safeStyle ? { style: safeStyle } : {}),
+  } as DialogContentProps["backdropProps"];
+}
+
+export const DialogFooter = ChakraDialog.Footer;
+export const DialogHeader = ChakraDialog.Header;
+export const DialogBody = ChakraDialog.Body;
+export const DialogTitle = ChakraDialog.Title;
+export const DialogDescription = ChakraDialog.Description;
+export const DialogTrigger = ChakraDialog.Trigger;
+export const DialogActionTrigger = ChakraDialog.ActionTrigger;
+
+export const Dialog = {
+  Root: DialogRoot,
+  Content: DialogContent,
+  CloseTrigger: DialogCloseTrigger,
+  Footer: DialogFooter,
+  Header: DialogHeader,
+  Body: DialogBody,
+  // `Backdrop` is intentionally NOT exported. `Dialog.Content` already
+  // renders the one allowed backdrop (transparent + blur). Mounting a
+  // second one stacks two overlays and reintroduces the dark grey fill
+  // we explicitly do not want.
+  Title: DialogTitle,
+  Description: DialogDescription,
+  Trigger: DialogTrigger,
+  ActionTrigger: DialogActionTrigger,
+};

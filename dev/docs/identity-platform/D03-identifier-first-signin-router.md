@@ -1,6 +1,12 @@
 # D03 — Identifier-first sign-in router + cutover
 
-Epic: `../identity-platform-redesign.md` · Plan: `delivery-plan.md` · Wave 2 · Depends on: D01 · SHIPPED: the router decides every sign-in; the flag it flipped on is removed · **Highest-risk deliverable**
+Epic: `../plans/identity-platform-redesign.md` · Plan: `delivery-plan.md` · Wave 2 · Depends on: D01 · Flag: `IDENTITY_ROUTER_V2` (shadow → enforce) · **Highest-risk deliverable**
+
+> **Amendment 2026-09-03:** `platform/app` is deleted. BetterAuth wiring now
+> lives in `modules/auth/server/src/transport/better-auth/`
+> (`better-auth.api.ts`, `better-auth-hooks.ts`, `sign-in-router-shadow.ts`)
+> and `modules/identity/server/src/better-auth/`. Verify current
+> shape against that tree before treating paths below as live.
 
 # Overview
 

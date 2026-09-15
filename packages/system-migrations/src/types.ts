@@ -19,11 +19,7 @@
  * both returns the tenant to its legacy path (no consumer reads it as
  * finalized) and pins it there until a human moves it again.
  */
-export type TenantMigrationStatus =
-  | "migrated"
-  | "finalized"
-  | "parked"
-  | "rolled_back";
+export type TenantMigrationStatus = "migrated" | "finalized" | "parked" | "rolled_back";
 
 /**
  * The two terminal states the runner never re-runs: `finalized` is the
@@ -31,9 +27,7 @@ export type TenantMigrationStatus =
  * the runner and any harness composing a pass around the same state table
  * can never drift onto different skip rules.
  */
-export function isTerminalTenantStatus(
-  status: TenantMigrationStatus | undefined,
-): boolean {
+export function isTerminalTenantStatus(status: TenantMigrationStatus | undefined): boolean {
   return status === "finalized" || status === "rolled_back";
 }
 

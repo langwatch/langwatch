@@ -15,9 +15,7 @@ import type { CommandResult } from "../../utils/output";
  * prints it in full. A rotate that withheld the new secret from a scripted
  * caller would break the very deployment it was rotating.
  */
-export const rotateVirtualKeyCommand = async (
-  id: string,
-): Promise<CommandResult | void> => {
+export const rotateVirtualKeyCommand = async (id: string): Promise<CommandResult | void> => {
   await resolveCredentials();
 
   const service = new VirtualKeysApiService();
@@ -32,7 +30,11 @@ export const rotateVirtualKeyCommand = async (
       data: { virtual_key, secret },
       table: () => {
         console.log();
-        console.log(chalk.bold.yellow("⚠  New secret, save it NOW. The old secret keeps working for 24 hours."));
+        console.log(
+          chalk.bold.yellow(
+            "⚠  New secret, save it NOW. The old secret keeps working for 24 hours.",
+          ),
+        );
         console.log();
         console.log(`  ${chalk.green(secret)}`);
         console.log();

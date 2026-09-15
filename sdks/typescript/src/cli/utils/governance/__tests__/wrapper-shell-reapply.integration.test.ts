@@ -53,11 +53,9 @@ describe("buildShellReapply real-shell execution", () => {
   function writeRealBinary(tool: string) {
     const bin = path.join(binDir, tool);
     // Proves IT ran (not the function) AND that the reapplied env reached it.
-    fs.writeFileSync(
-      bin,
-      `#!/bin/sh\necho REAL_BINARY_RAN OTEL=$OTEL_EXPORTER_OTLP_ENDPOINT\n`,
-      { mode: 0o755 },
-    );
+    fs.writeFileSync(bin, `#!/bin/sh\necho REAL_BINARY_RAN OTEL=$OTEL_EXPORTER_OTLP_ENDPOINT\n`, {
+      mode: 0o755,
+    });
   }
 
   function writeShadowFunction(shell: string, tool: string) {

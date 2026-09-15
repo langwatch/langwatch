@@ -145,7 +145,9 @@ describe("given a filter shape this guard cannot decompose", () => {
         "  work:",
         "  example-complete:",
       ].join("\n");
-      const rules = inspect("example.yml", source).map((i) => i.rule).sort();
+      const rules = inspect("example.yml", source)
+        .map((i) => i.rule)
+        .sort();
       assert.deepEqual(rules, ["R2", "R3"]);
     });
   });
@@ -200,9 +202,12 @@ describe("stripComment", () => {
 
 describe("pullRequestFilter", () => {
   describe("when the trigger key is quoted", () => {
-    it("still finds the filter, because YAML 1.1 makes \"on\" a common spelling", () => {
+    it('still finds the filter, because YAML 1.1 makes "on" a common spelling', () => {
       const source = ['"on":', "  pull_request:", "    paths:", '      - "pkg/**"'].join("\n");
-      assert.deepEqual(pullRequestFilter(source), { kind: "filtered", entries: ["pkg/**"] });
+      assert.deepEqual(pullRequestFilter(source), {
+        kind: "filtered",
+        entries: ["pkg/**"],
+      });
     });
   });
 
@@ -219,7 +224,10 @@ describe("pullRequestFilter", () => {
   describe("when the workflow uses pull_request_target", () => {
     it("is filtered just the same", () => {
       const source = ["on:", "  pull_request_target:", "    paths:", "      - a/**"].join("\n");
-      assert.deepEqual(pullRequestFilter(source), { kind: "filtered", entries: ["a/**"] });
+      assert.deepEqual(pullRequestFilter(source), {
+        kind: "filtered",
+        entries: ["a/**"],
+      });
     });
   });
 
@@ -300,7 +308,10 @@ describe("gateFilters", () => {
       "            relevant:",
       "              - 'real/path.go'",
     ].join("\n");
-    assert.deepEqual(gateFilters(source), { kind: "filtered", entries: ["real/path.go"] });
+    assert.deepEqual(gateFilters(source), {
+      kind: "filtered",
+      entries: ["real/path.go"],
+    });
   });
 
   it("reports none when the workflow has no gate", () => {

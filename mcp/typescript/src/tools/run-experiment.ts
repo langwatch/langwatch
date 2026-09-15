@@ -24,12 +24,10 @@ interface EvaluationStatusResponse {
   };
 }
 
-export async function handleRunExperiment(params: {
-  slug: string;
-}): Promise<string> {
+export async function handleRunExperiment(params: { slug: string }): Promise<string> {
   const result = (await makeRequest(
     "POST",
-    `/api/experiments/${encodeURIComponent(params.slug)}/run`,
+    `/api/v1/experiments/${encodeURIComponent(params.slug)}/run`,
   )) as EvaluationRunResponse;
 
   const lines: string[] = [];
@@ -75,7 +73,7 @@ async function statusFromResults(params: {
   try {
     results = (await makeRequest(
       "GET",
-      `/api/experiments/runs/${encodeURIComponent(params.runId)}/results${qs}`,
+      `/api/v1/experiments/runs/${encodeURIComponent(params.runId)}/results${qs}`,
     )) as ResultsForStatus;
   } catch (error) {
     // Only a genuine "no such run" is a fallback miss (-> guidance). Real
@@ -97,19 +95,13 @@ async function statusFromResults(params: {
   lines.push(`**Status**: ${status}`);
   lines.push(`**Progress**: ${progress}/${total} cells`);
   if (results.timestamps.createdAt) {
-    lines.push(
-      `**Started**: ${new Date(results.timestamps.createdAt).toISOString()}`,
-    );
+    lines.push(`**Started**: ${new Date(results.timestamps.createdAt).toISOString()}`);
   }
   if (results.timestamps.finishedAt) {
-    lines.push(
-      `**Finished**: ${new Date(results.timestamps.finishedAt).toISOString()}`,
-    );
+    lines.push(`**Finished**: ${new Date(results.timestamps.finishedAt).toISOString()}`);
   }
   if (results.timestamps.stoppedAt) {
-    lines.push(
-      `**Stopped**: ${new Date(results.timestamps.stoppedAt).toISOString()}`,
-    );
+    lines.push(`**Stopped**: ${new Date(results.timestamps.stoppedAt).toISOString()}`);
   }
   lines.push("");
   lines.push(
@@ -126,11 +118,10 @@ export async function handleExperimentStatus(params: {
   try {
     status = (await makeRequest(
       "GET",
-      `/api/experiments/runs/${encodeURIComponent(params.runId)}`,
+      `/api/v1/experiments/runs/${encodeURIComponent(params.runId)}`,
     )) as EvaluationStatusResponse;
   } catch (error) {
-    const code =
-      error instanceof LangWatchApiError ? error.status : undefined;
+    const code = error instanceof LangWatchApiError ? error.status : undefined;
     const message = error instanceof Error ? error.message : String(error);
     if (code === 404 || /404|not found/i.test(message)) {
       const fallback = await statusFromResults(params);
@@ -169,9 +160,7 @@ export async function handleExperimentStatus(params: {
       lines.push(`**Failed**: ${status.summary.failedCells}`);
     }
     if (status.summary.duration) {
-      lines.push(
-        `**Duration**: ${(status.summary.duration / 1000).toFixed(1)}s`,
-      );
+      lines.push(`**Duration**: ${(status.summary.duration / 1000).toFixed(1)}s`);
     }
     if (status.summary.runUrl) {
       lines.push(`**View results**: ${status.summary.runUrl}`);

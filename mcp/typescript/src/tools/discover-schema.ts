@@ -2,12 +2,7 @@ import { filterFields } from "../schemas/filter-fields.js";
 import { analyticsMetrics } from "../schemas/analytics-metrics.js";
 import { analyticsGroups } from "../schemas/analytics-groups.js";
 
-export type Category =
-  | "filters"
-  | "metrics"
-  | "aggregations"
-  | "groups"
-  | "all";
+export type Category = "filters" | "metrics" | "aggregations" | "groups" | "all";
 
 /**
  * Formats the LangWatch analytics schema into human-readable markdown.
@@ -36,24 +31,18 @@ export function formatSchema(category: Category): string {
 
 function formatFilters(): string {
   const lines = ["## Available Filter Fields", ""];
-  lines.push(
-    "Use these in the `filters` parameter of `search_traces` and `get_analytics`."
-  );
+  lines.push("Use these in the `filters` parameter of `search_traces` and `get_analytics`.");
   lines.push('Format: `{ "field_name": ["value1", "value2"] }`');
   lines.push("");
   for (const f of filterFields) {
-    lines.push(
-      `- **${f.field}**: ${f.description}${f.example ? ` (e.g., \`${f.example}\`)` : ""}`
-    );
+    lines.push(`- **${f.field}**: ${f.description}${f.example ? ` (e.g., \`${f.example}\`)` : ""}`);
   }
   return lines.join("\n");
 }
 
 function formatMetrics(): string {
   const lines = ["## Available Metrics", ""];
-  lines.push(
-    "Use these in `get_analytics` as `metric` parameter in `category.name` format."
-  );
+  lines.push("Use these in `get_analytics` as `metric` parameter in `category.name` format.");
   lines.push("");
 
   const byCategory = new Map<string, typeof analyticsMetrics>();
@@ -95,9 +84,7 @@ function formatAggregations(): string {
 
 function formatGroups(): string {
   const lines = ["## Available Group-By Options", ""];
-  lines.push(
-    "Use these in the `groupBy` parameter of `get_analytics`."
-  );
+  lines.push("Use these in the `groupBy` parameter of `get_analytics`.");
   lines.push("");
   for (const g of analyticsGroups) {
     lines.push(`- **${g.name}** (${g.label}): ${g.description}`);

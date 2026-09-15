@@ -58,9 +58,12 @@ describe("Target Trace Isolation", () => {
     }> = [];
 
     globalThis.fetch = vi.fn(async (input: RequestInfo | URL, options?: RequestInit) => {
-      const urlStr = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+      const urlStr =
+        typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
       if (urlStr.includes("experiment/init")) {
-        return new Response(JSON.stringify({ slug: "test", path: "/test" }), { status: 200 });
+        return new Response(JSON.stringify({ slug: "test", path: "/test" }), {
+          status: 200,
+        });
       }
       if (urlStr.includes("log_results")) {
         capturedBodies.push(JSON.parse(options?.body as string));
@@ -92,7 +95,7 @@ describe("Target Trace Isolation", () => {
           }),
         ]);
       },
-      { concurrency: 1 }
+      { concurrency: 1 },
     );
 
     // Wait for flush
@@ -137,9 +140,12 @@ describe("Target Trace Isolation", () => {
     }> = [];
 
     globalThis.fetch = vi.fn(async (input: RequestInfo | URL, options?: RequestInit) => {
-      const urlStr = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+      const urlStr =
+        typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
       if (urlStr.includes("experiment/init")) {
-        return new Response(JSON.stringify({ slug: "test", path: "/test" }), { status: 200 });
+        return new Response(JSON.stringify({ slug: "test", path: "/test" }), {
+          status: 200,
+        });
       }
       if (urlStr.includes("log_results")) {
         capturedBodies.push(JSON.parse(options?.body as string));
@@ -169,7 +175,7 @@ describe("Target Trace Isolation", () => {
           }),
         ]);
       },
-      { concurrency: 3 }
+      { concurrency: 3 },
     );
 
     // Wait for flush
@@ -182,7 +188,9 @@ describe("Target Trace Isolation", () => {
     expect(allEntries.length).toBe(6);
 
     // ALL trace_ids should be unique
-    const traceIds = allEntries.map((e) => e.trace_id).filter((t): t is string => t !== null && t !== "");
+    const traceIds = allEntries
+      .map((e) => e.trace_id)
+      .filter((t): t is string => t !== null && t !== "");
 
     expect(traceIds.length).toBe(6); // All should have valid trace IDs
     expect(new Set(traceIds).size).toBe(6); // All should be unique
@@ -194,9 +202,12 @@ describe("Target Trace Isolation", () => {
     }> = [];
 
     globalThis.fetch = vi.fn(async (input: RequestInfo | URL, options?: RequestInit) => {
-      const urlStr = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+      const urlStr =
+        typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
       if (urlStr.includes("experiment/init")) {
-        return new Response(JSON.stringify({ slug: "test", path: "/test" }), { status: 200 });
+        return new Response(JSON.stringify({ slug: "test", path: "/test" }), {
+          status: 200,
+        });
       }
       if (urlStr.includes("log_results")) {
         capturedBodies.push(JSON.parse(options?.body as string));
@@ -212,12 +223,9 @@ describe("Target Trace Isolation", () => {
 
     const evaluation = await langwatch.experiments.init("test-noop-tracer");
 
-    await evaluation.run(
-      [{ q: "test" }],
-      async () => {
-        await evaluation.withTarget("model", async () => "response");
-      }
-    );
+    await evaluation.run([{ q: "test" }], async () => {
+      await evaluation.withTarget("model", async () => "response");
+    });
 
     // Wait for flush
     await new Promise((r) => setTimeout(r, 200));
@@ -237,9 +245,12 @@ describe("Target Trace Isolation", () => {
 
   it("sets evaluationUsesTargets flag on first withTarget call", async () => {
     globalThis.fetch = vi.fn(async (input: RequestInfo | URL) => {
-      const urlStr = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+      const urlStr =
+        typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
       if (urlStr.includes("experiment/init")) {
-        return new Response(JSON.stringify({ slug: "test", path: "/test" }), { status: 200 });
+        return new Response(JSON.stringify({ slug: "test", path: "/test" }), {
+          status: 200,
+        });
       }
       return new Response(JSON.stringify({}), { status: 200 });
     }) as typeof fetch;
@@ -271,7 +282,7 @@ describe("Target Trace Isolation", () => {
           // We verify this by checking that only target entries exist, not iteration entries
         }
       },
-      { concurrency: 1 }
+      { concurrency: 1 },
     );
 
     expect(firstCallComplete).toBe(true);
@@ -283,9 +294,12 @@ describe("Target Trace Isolation", () => {
     }> = [];
 
     globalThis.fetch = vi.fn(async (input: RequestInfo | URL, options?: RequestInit) => {
-      const urlStr = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+      const urlStr =
+        typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
       if (urlStr.includes("experiment/init")) {
-        return new Response(JSON.stringify({ slug: "test", path: "/test" }), { status: 200 });
+        return new Response(JSON.stringify({ slug: "test", path: "/test" }), {
+          status: 200,
+        });
       }
       if (urlStr.includes("log_results")) {
         capturedBodies.push(JSON.parse(options?.body as string));
@@ -307,7 +321,7 @@ describe("Target Trace Isolation", () => {
         // Always use withTarget
         await evaluation.withTarget("model", async () => "response");
       },
-      { concurrency: 2 }
+      { concurrency: 2 },
     );
 
     // Wait for flush

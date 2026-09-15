@@ -1,0 +1,14 @@
+# The current moment read as a millisecond count. `Date.now()`, and the two
+# chained spellings that mean the same thing, all produce a number, so the
+# rewrite is unconditional: nothing downstream can tell which clock minted it.
+id: temporal-now-epoch-milliseconds
+language: TypeScript
+severity: warning
+message: >
+  The current moment as epoch milliseconds comes from `nowInstant()`.
+rule:
+  any:
+    - pattern: Date.now()
+    - pattern: new Date().getTime()
+    - pattern: new Date().valueOf()
+fix: nowInstant().epochMilliseconds

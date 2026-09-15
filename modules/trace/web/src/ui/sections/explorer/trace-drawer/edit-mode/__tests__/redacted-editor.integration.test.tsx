@@ -1,0 +1,76 @@
+// Redacted field shows redaction marker, not editor (nothing to correct).
+// @vitest-environment jsdom
+import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { cleanup, render, screen } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import "@testing-library/jest-dom/vitest";
+
+vi.mock("@langwatch/ui-host/use-organization-team-project", () => ({
+  useOrganizationTeamProject: () => ({
+    project: { id: "project-1", slug: "acme" },
+    hasPermission: () => true,
+  }),
+}));
+
+// The redacted marker itself (`RedactedInline`) still reads scope through the
+// trace-scoped host - it is only ever rendered inside a trace screen.
+vi.mock("../../../../../../behavior/use-organization-team-project.ts", () => ({
+  useOrganizationTeamProject: () => ({
+    project: { id: "project-1", slug: "acme" },
+    hasPermission: () => true,
+  }),
+}));
+
+vi.mock("../../../../use-field-redaction.ts", () => ({
+  useFieldRedaction: () => ({ isRedacted: false, isLoading: false }),
+}));
+
+const { RedactedField } = await import("../../../../redacted-field.tsx");
+const { useTraceEditStore } = await import("../../../../../../index.ts");
+const { SpanEditableIO } = await import("../span-editable-io.tsx");
+
+function renderInput({ redacted }: { redacted: boolean }) {
+  return render(
+    <ChakraProvider value={defaultSystem}>
+      <RedactedField field="input" redacted={redacted} visibleTo="no one">
+        <SpanEditableIO
+          spanId="span-1"
+          field="input"
+          label="Input"
+          capturedText="what is the weather"
+        />
+      </RedactedField>
+    </ChakraProvider>,
+  );
+}
+
+beforeEach(() => {
+  useTraceEditStore.getState().discard();
+  useTraceEditStore.getState().startEditing({ traceId: "trace-1" });
+});
+
+afterEach(cleanup);
+
+describe("given a span whose input is hidden from the reviewer", () => {
+  describe("when the span is open in edit mode", () => {
+    /** @scenario "A redacted field carries no editor" */
+    it("offers no editor for it", () => {
+      renderInput({ redacted: true });
+
+      expect(screen.queryByLabelText("Edit input")).not.toBeInTheDocument();
+      expect(screen.getByText("Redacted")).toBeInTheDocument();
+    });
+  });
+});
+
+// The control for the case above: without it, a redaction test would pass just
+// as well against a component that never renders an editor at all.
+describe("given a span whose input the reviewer can read", () => {
+  describe("when the span is open in edit mode", () => {
+    it("offers the editor", () => {
+      renderInput({ redacted: false });
+
+      expect(screen.getByLabelText("Edit input")).toBeInTheDocument();
+    });
+  });
+});

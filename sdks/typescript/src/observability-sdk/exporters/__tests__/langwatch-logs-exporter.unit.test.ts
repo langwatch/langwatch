@@ -1,5 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { LangWatchLogsExporter, type LangWatchLogsExporterOptions } from "../langwatch-logs-exporter";
+import {
+  LangWatchLogsExporter,
+  type LangWatchLogsExporterOptions,
+} from "../langwatch-logs-exporter";
 import {
   LANGWATCH_SDK_NAME_OBSERVABILITY as LANGWATCH_SDK_NAME,
   LANGWATCH_SDK_LANGUAGE,
@@ -216,7 +219,7 @@ describe("LangWatchLogsExporter", () => {
             "x-langwatch-sdk-runtime": LANGWATCH_SDK_RUNTIME(),
           }),
           url: expect.stringContaining(LOGS_PATH),
-        })
+        }),
       );
     });
   });

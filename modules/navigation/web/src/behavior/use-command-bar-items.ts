@@ -1,0 +1,212 @@
+import { BookOpen, Search, Sparkles } from "lucide-react";
+import { useMemo } from "react";
+import {
+  MIN_SEARCH_QUERY_LENGTH,
+  RECENT_ITEMS_DISPLAY_LIMIT,
+} from "../model/command-bar-constants.ts";
+import { findEasterEgg } from "../model/command-easter-eggs.ts";
+import type { ListItem } from "../model/command-icon-info.ts";
+import type { Command, RecentItem, SearchResult } from "../model/command-bar-types.ts";
+import type { GroupedRecentItems } from "./use-recent-items.ts";
+import { useTopLevelNavigationCommands } from "./use-command-feature-flags.ts";
+import type { FilteredCommands } from "./use-filtered-commands.ts";
+import type { FilteredProject } from "./use-filtered-projects.ts";
+
+/**
+ * Hook that builds the flat list of all items for keyboard navigation and display.
+ */
+export function useCommandBarItems(
+  query: string,
+  filteredCommands: FilteredCommands,
+  filteredProjects: FilteredProject[],
+  searchResults: SearchResult[],
+  idResult: SearchResult | null,
+  groupedItems: GroupedRecentItems,
+  projectSlug: string | undefined,
+  langyEnabled: boolean,
+): {
+  allItems: ListItem[];
+  recentItemsLimited: RecentItem[];
+  searchInTracesItem: ListItem | null;
+  searchInDocsItem: ListItem | null;
+  easterEggItem: ListItem | null;
+  askLangyItem: ListItem | null;
+} {
+  const availableTopLevelNav = useTopLevelNavigationCommands();
+
+  // The "Ask Langy" activation — the command bar's door into Langy. Synthesized (not a static
+  // registry command) so it can carry the live query and only appears where Langy can actually
+  // open: a real project, and the user in the rollout (langyEnabled mirrors useShowLangy).
+  const askLangyItem = useMemo<ListItem | null>(() => {
+    if (!langyEnabled || !projectSlug) return null;
+    const trimmed = query.trim();
+    return {
+      type: "command",
+      data: {
+        id: "action-ask-langy",
+        label: trimmed ? `Ask Langy: "${trimmed}"` : "Ask Langy",
+        description: trimmed
+          ? "Hand this question to Langy"
+          : "Ask about the project in plain language",
+        icon: Sparkles,
+        category: "actions",
+        keywords: ["langy", "ask", "ai", "assistant", "chat", "help"],
+      } as Command,
+    };
+  }, [langyEnabled, projectSlug, query]);
+
+  // Get top recent items across all time groups
+  const recentItemsLimited = useMemo(() => {
+    const allRecent = [
+      ...groupedItems.today,
+      ...groupedItems.yesterday,
+      ...groupedItems.pastWeek,
+      ...groupedItems.past30Days,
+    ];
+    return allRecent.slice(0, RECENT_ITEMS_DISPLAY_LIMIT);
+  }, [groupedItems]);
+
+  // Create "Search in traces" item when query is long enough
+  const searchInTracesItem = useMemo<ListItem | null>(() => {
+    const trimmedQuery = query.trim();
+    if (!trimmedQuery || trimmedQuery.length < MIN_SEARCH_QUERY_LENGTH) {
+      return null;
+    }
+    // Don't create invalid path when projectSlug is missing
+    if (!projectSlug) {
+      return null;
+    }
+    return {
+      type: "command",
+      data: {
+        id: "action-search-traces",
+        label: `Search "${query.trim()}" in traces`,
+        icon: Search,
+        category: "navigation",
+        path: `/${projectSlug}/traces#all-traces?q=${encodeURIComponent(query.trim())}`,
+      } as Command,
+    };
+  }, [query, projectSlug]);
+
+  // Create "Search in docs" item when query is long enough
+  const searchInDocsItem = useMemo<ListItem | null>(() => {
+    const trimmedQuery = query.trim();
+    if (!trimmedQuery || trimmedQuery.length < MIN_SEARCH_QUERY_LENGTH) {
+      return null;
+    }
+    return {
+      type: "command",
+      data: {
+        id: "action-search-docs",
+        label: `Search "${query.trim()}" in docs`,
+        icon: BookOpen,
+        category: "navigation",
+        externalUrl: `https://langwatch.ai/docs/introduction?search=${encodeURIComponent(query.trim())}`,
+      } as Command,
+    };
+  }, [query]);
+
+  // Easter egg item
+  const easterEggItem = useMemo<ListItem | null>(() => {
+    const egg = findEasterEgg(query);
+    if (!egg) return null;
+    return {
+      type: "command",
+      data: {
+        id: egg.id,
+        label: egg.label,
+        icon: egg.icon,
+        category: "actions",
+      } as Command,
+    };
+  }, [query]);
+
+  // Build flat list of all items for keyboard navigation
+  const allItems = useMemo<ListItem[]>(() => {
+    const items: ListItem[] = [];
+
+    if (query === "") {
+      // On an empty bar Ask Langy LEADS — nothing competes for index 0, so
+      // "Cmd+K, Enter" is the fast path into the assistant.
+      if (askLangyItem) {
+        items.push(askLangyItem);
+      }
+
+      // Add up to 5 recent items first
+      for (const item of recentItemsLimited) {
+        items.push({ type: "recent", data: item });
+      }
+
+      // Show only top-level navigation commands by default
+      for (const cmd of availableTopLevelNav) {
+        items.push({ type: "command", data: cmd });
+      }
+    } else {
+      // Add easter egg item first if found
+      if (easterEggItem) {
+        items.push(easterEggItem);
+      }
+      // Add ID result if detected
+      if (idResult) {
+        items.push({ type: "search", data: idResult });
+      }
+      for (const cmd of filteredCommands.navigation) {
+        items.push({ type: "command", data: cmd });
+      }
+      for (const cmd of filteredCommands.actions) {
+        items.push({ type: "command", data: cmd });
+      }
+      for (const cmd of filteredCommands.support) {
+        items.push({ type: "command", data: cmd });
+      }
+      for (const cmd of filteredCommands.theme) {
+        items.push({ type: "command", data: cmd });
+      }
+      for (const cmd of filteredCommands.page) {
+        items.push({ type: "command", data: cmd });
+      }
+      for (const result of searchResults) {
+        items.push({ type: "search", data: result });
+      }
+      for (const proj of filteredProjects) {
+        items.push({ type: "project", data: proj });
+      }
+      // Ask Langy sits under the real MATCHES and above the FALLBACKS. It used to trail
+      // everything, which sounds like the same rule but is not: "Search for X in traces" and
+      // "in docs" are offered for literally any string, so they are not matches at all — they
+      // are the two things we can always say.
+      if (askLangyItem) {
+        items.push(askLangyItem);
+      }
+      if (searchInTracesItem) {
+        items.push(searchInTracesItem);
+      }
+      if (searchInDocsItem) {
+        items.push(searchInDocsItem);
+      }
+    }
+
+    return items;
+  }, [
+    query,
+    recentItemsLimited,
+    availableTopLevelNav,
+    askLangyItem,
+    easterEggItem,
+    idResult,
+    filteredCommands,
+    searchResults,
+    filteredProjects,
+    searchInTracesItem,
+    searchInDocsItem,
+  ]);
+
+  return {
+    allItems,
+    recentItemsLimited,
+    searchInTracesItem,
+    searchInDocsItem,
+    easterEggItem,
+    askLangyItem,
+  };
+}

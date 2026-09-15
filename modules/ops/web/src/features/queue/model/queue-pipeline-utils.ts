@@ -1,0 +1,168 @@
+import { nowInstant } from "@langwatch/time";
+import { formatTimeAgo } from "../../../model/ops-formatters.ts";
+import type { OpsPipelineNode, OpsQueueGroup } from "./queue-presentation.ts";
+import type { StatusFilter } from "./queue-types.ts";
+
+export function isNodePaused(
+  node: OpsPipelineNode,
+  parentPath: string,
+  pausedKeys: Set<string>,
+): boolean {
+  const path = parentPath ? `${parentPath}/${node.name}` : node.name;
+  if (pausedKeys.has(path)) return true;
+  if (parentPath) {
+    const segments = parentPath.split("/");
+    for (let i = 1; i <= segments.length; i++) {
+      const ancestor = segments.slice(0, i).join("/");
+      if (pausedKeys.has(ancestor)) return true;
+    }
+  }
+  return false;
+}
+
+export function isNodeDirectlyPaused(nodePath: string, pausedKeys: Set<string>): boolean {
+  return pausedKeys.has(nodePath);
+}
+
+export function filterTree(nodes: OpsPipelineNode[], query: string): OpsPipelineNode[] | null {
+  if (!query.trim()) return nodes;
+  const lower = query.toLowerCase();
+
+  function prune(node: OpsPipelineNode): OpsPipelineNode | null {
+    const name = node.name.toLowerCase();
+    if (name.includes(lower)) return node;
+    const filtered = node.children.map(prune).filter((c): c is OpsPipelineNode => c !== null);
+    if (filtered.length > 0) return { ...node, children: filtered };
+    return null;
+  }
+
+  const result = nodes.map(prune).filter((node): node is OpsPipelineNode => node !== null);
+  return result.length > 0 ? result : null;
+}
+
+export function isOverdue(ms: number | null): boolean {
+  if (ms === null) return false;
+  // Consider a group overdue if its oldest job is more than 5 minutes old
+  return nowInstant().epochMilliseconds - ms > 5 * 60 * 1000;
+}
+
+export type GroupState = "blocked" | "stale" | "retrying" | "active" | "due" | "scheduled" | "idle";
+
+export interface GroupClassification {
+  state: GroupState;
+  /** Dispatch-eligibility instant, when it is in the future; null otherwise. */
+  nextEligibleMs: number | null;
+  /** The last attempt recorded an error a success has not yet cleared. */
+  isFailing: boolean;
+  /** Retries so far; 0 on a group that has never failed. */
+  attempt: number;
+}
+
+/** Error hash persists until SUCCESS; reads as "failing now" only mid-retry or
+ * recent enough. */
+const FAILING_ERROR_MAX_AGE_MS = 15 * 60 * 1000;
+
+/** Group status from scan fields. Ready score is re-stage time (now+backoff); future
+ * score on retry IS countdown. Retry check outranks active key. */
+function hasUnclearedError(g: OpsQueueGroup, attempt: number, now: number): boolean {
+  if (g.errorMessage === null) return false;
+  if (attempt > 0) return true;
+  return g.errorTimestamp !== null && now - g.errorTimestamp < FAILING_ERROR_MAX_AGE_MS;
+}
+
+export function classifyGroup(
+  g: OpsQueueGroup,
+  now = nowInstant().epochMilliseconds,
+): GroupClassification {
+  const attempt = g.retryCount ?? 0;
+  const isFailing = hasUnclearedError(g, attempt, now);
+  const deferredUntilMs = g.score > now ? g.score : null;
+
+  const classified = (
+    state: GroupState,
+    nextEligibleMs: number | null = null,
+  ): GroupClassification => ({ state, nextEligibleMs, isFailing, attempt });
+
+  if (g.isStaleBlock) return classified("stale");
+  if (g.isBlocked) return classified("blocked");
+  if (attempt > 0 && deferredUntilMs !== null) return classified("retrying", deferredUntilMs);
+  if (g.hasActiveJob) return classified("active");
+  if (g.pendingJobs > 0)
+    return deferredUntilMs !== null ? classified("scheduled", deferredUntilMs) : classified("due");
+  return classified("idle");
+}
+
+/** Lower = more wrong = higher in the table. */
+const STATE_SEVERITY: Record<GroupState, number> = {
+  blocked: 0,
+  stale: 1,
+  retrying: 2,
+  due: 3,
+  active: 4,
+  scheduled: 5,
+  idle: 6,
+};
+
+/**
+ * Trouble first, then depth. The server orders by pending count alone, which
+ * buries one blocked group under two hundred healthy fan-out rows.
+ */
+export function sortGroupsBySeverity<T extends OpsQueueGroup>(
+  groups: T[],
+  now = nowInstant().epochMilliseconds,
+): T[] {
+  return [...groups].sort((a, b) => {
+    const severityDelta =
+      STATE_SEVERITY[classifyGroup(a, now).state] - STATE_SEVERITY[classifyGroup(b, now).state];
+    if (severityDelta !== 0) return severityDelta;
+    if (b.pendingJobs !== a.pendingJobs) return b.pendingJobs - a.pendingJobs;
+    return a.groupId.localeCompare(b.groupId);
+  });
+}
+
+/** The "Next run" cell: when the dispatcher will next touch this group. */
+export function describeNextRun(
+  c: GroupClassification,
+  now = nowInstant().epochMilliseconds,
+): string {
+  switch (c.state) {
+    case "active":
+      return "running";
+    case "due":
+      return "now";
+    case "retrying":
+    case "scheduled":
+      // The eligibility instant can slip into the past between refreshes;
+      // "in -3s" would read as a bug rather than as an imminent dispatch.
+      return c.nextEligibleMs !== null && c.nextEligibleMs > now
+        ? formatTimeAgo(c.nextEligibleMs, now)
+        : "now";
+    case "blocked":
+    case "stale":
+    case "idle":
+      return "—";
+  }
+}
+
+export function matchesStatusFilter(
+  g: OpsQueueGroup,
+  filter: StatusFilter,
+  now = nowInstant().epochMilliseconds,
+): boolean {
+  if (filter === "all") return true;
+  const { state, isFailing } = classifyGroup(g, now);
+  switch (filter) {
+    case "ok":
+      return !isFailing && state !== "blocked" && state !== "stale" && state !== "retrying";
+    case "blocked":
+      return state === "blocked";
+    case "stale":
+      return state === "stale";
+    // "Retrying" as the operator means it: anything failing that has not yet
+    // been given up on, whether it is waiting out backoff or mid-reattempt.
+    case "retrying":
+      return state === "retrying" || (isFailing && state !== "blocked" && state !== "stale");
+    case "active":
+      return state === "active";
+  }
+}

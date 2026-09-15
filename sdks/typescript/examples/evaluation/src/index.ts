@@ -97,7 +97,7 @@ const main = async () => {
         score: isCorrect ? 1.0 : 0.0,
       });
     },
-    { concurrency: 2 }
+    { concurrency: 2 },
   );
 
   console.log("\n✅ Evaluation complete! Check the LangWatch UI for results.");

@@ -10,15 +10,11 @@ import { z } from "zod";
 
 /** What a run plan covers. */
 export const runPlanScopeSchema = z.discriminatedUnion("mode", [
-  z
-    .object({ mode: z.literal("all") })
-    .describe("Every non-archived scenario of the project"),
+  z.object({ mode: z.literal("all") }).describe("Every non-archived scenario of the project"),
   z
     .object({
       mode: z.literal("test_suites"),
-      testSuiteIds: z
-        .array(z.string())
-        .describe("The test suite IDs whose scenarios to run"),
+      testSuiteIds: z.array(z.string()).describe("The test suite IDs whose scenarios to run"),
     })
     .describe("The non-archived scenarios filed in the given test suites"),
   z
@@ -26,9 +22,7 @@ export const runPlanScopeSchema = z.discriminatedUnion("mode", [
       mode: z.literal("labels"),
       labels: z.array(z.string()).describe("The labels to select scenarios by"),
     })
-    .describe(
-      "The non-archived scenarios carrying at least one of the given labels",
-    ),
+    .describe("The non-archived scenarios carrying at least one of the given labels"),
   z
     .object({ mode: z.literal("scenarios") })
     .describe("The scenarios named in scenarioIds, picked by hand"),
@@ -81,9 +75,7 @@ export interface RunPlanTargetWire {
 }
 
 /** The targets of a tool call, as the REST body carries them. */
-export function toWireTargets(
-  targets: z.infer<typeof runPlanTargetSchema>[],
-): RunPlanTargetWire[] {
+export function toWireTargets(targets: z.infer<typeof runPlanTargetSchema>[]): RunPlanTargetWire[] {
   return targets.map((target) => ({
     type: target.type,
     referenceId: target.referenceId,

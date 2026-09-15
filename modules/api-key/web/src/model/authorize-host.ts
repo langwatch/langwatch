@@ -1,0 +1,127 @@
+// Handoff screen port (/authorize + /mcp/authorize). Switcher is consent control; key asked via
+// port; MCP exchange is app's REST call; redirect-scheme check stays on screen.
+
+import { createContext, useContext, type ReactNode } from "react";
+
+/** The project a grant is about. */
+export type AuthorizeScope = {
+  readonly projectId: string | undefined;
+  readonly projectName: string | undefined;
+};
+
+export type AuthorizeSessionStatus = "loading" | "authenticated" | "unauthenticated";
+
+export type AuthorizeRouteReading = {
+  readonly pathname: string;
+  readonly query: Readonly<Record<string, string | undefined>>;
+};
+
+/** What our own authorize endpoint answered, in RFC 6749 §4.1.2.1 terms. */
+export type McpAuthorizeAnswer = {
+  readonly ok: boolean;
+  /** Where to send the reader. Verified against the client registry server-side. */
+  readonly redirect?: string;
+  readonly error?: string;
+  readonly error_description?: string;
+};
+
+export type McpAuthorizeRequest = {
+  readonly projectId: string;
+  readonly redirect_uri: string;
+  readonly state: string;
+  readonly code_challenge: string;
+  readonly code_challenge_method: string;
+  readonly client_id: string;
+};
+
+export type AuthorizeFailureNotice = {
+  /**
+   * The failure itself, which the composition's presentation registry turns
+   * into the sentence a customer reads. Required rather than optional, and the
+   * shape `UiFeedback` takes: a notice with no error degrades to the generic
+   * line for a failure we could have named.
+   */
+  readonly error: unknown;
+  /** What the reader was doing, for a code the registry does not list. */
+  readonly fallbackTitle: string;
+  /** A sentence for a refusal the SCREEN made rather than the server. */
+  readonly description?: string;
+};
+
+export type AuthorizeSuccessNotice = {
+  readonly title: string;
+  readonly description?: string;
+};
+
+export abstract class AuthorizeHostApi {
+  abstract scope(): AuthorizeScope;
+
+  abstract sessionStatus(): AuthorizeSessionStatus;
+
+  abstract route(): AuthorizeRouteReading;
+
+  /** A client transition inside this application. */
+  abstract navigate(to: string): void;
+
+  abstract replace(to: string): void;
+
+  /**
+   * Leaves for an address this application does not own.
+   *
+   * Separate from `navigate` on purpose: the MCP flow ends by handing the reader
+   * to the client's own callback, which is a third-party address and never a
+   * route. The screen checks the scheme before calling this; the host performs
+   * the navigation because a feature may not touch `window.location`.
+   */
+  abstract handOffTo(url: string): void;
+
+  /**
+   * The project's legacy base key, or `undefined` when the reader may not hold
+   * it. See the module docblock: this is a question, not a scope field.
+   */
+  abstract revealProjectApiKey(): string | undefined;
+
+  /**
+   * The control that chooses what is being authorized.
+   *
+   * `null` only if a composition has no workspace graph to switch within, which
+   * for these two addresses would be a composition fault rather than a state.
+   */
+  abstract projectSwitcher(): ReactNode;
+
+  /** Exchanges the OAuth parameters for a redirect, or for a stated failure. */
+  abstract authorizeMcpClient(request: McpAuthorizeRequest): Promise<McpAuthorizeAnswer>;
+
+  abstract succeeded(notice: AuthorizeSuccessNotice): void;
+
+  abstract failed(failure: AuthorizeFailureNotice): void;
+
+  /** Writes to the clipboard and says the right thing either way. */
+  abstract copyToClipboard(input: {
+    text: string;
+    succeeded: AuthorizeSuccessNotice;
+  }): Promise<boolean>;
+}
+
+const AuthorizeHostContext = createContext<AuthorizeHostApi | undefined>(void 0);
+
+/** Publishes the host to the two handoff screens. */
+export const AuthorizeHostProvider = AuthorizeHostContext.Provider;
+
+/**
+ * The host these screens are mounted in.
+ *
+ * Missing means a screen was rendered outside the frontend feature that owns it,
+ * which is a composition fault rather than something a consent screen can
+ * degrade around — and degrading around it would mean granting access without
+ * being able to name what is being granted.
+ */
+export function useAuthorizeHost(): AuthorizeHostApi {
+  const host = useContext(AuthorizeHostContext);
+  if (!host) {
+    throw new Error(
+      "No authorize host is mounted above this screen; render it inside the authorize frontend feature.",
+    );
+  }
+  return host;
+}

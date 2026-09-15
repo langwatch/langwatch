@@ -1,0 +1,209 @@
+/**
+ * What the personal-workspace screens are mounted inside: the tRPC Provider
+ * their hooks run on, and the host port for session, org graph, deployment,
+ * address and feedback — including the caller's own membership `role`.
+ */
+
+import {
+  personalWorkspaceApi,
+  PersonalWorkspaceHostProvider,
+  type PersonalOrganization,
+  type PersonalTeam,
+  type PersonalWorkspaceHostPort,
+} from "@langwatch/user-web/personal-workspace";
+import { useLangyStore } from "@langwatch/langy-web/surfaces/langy-store";
+import { useMemo, type ReactNode } from "react";
+import { isLangyDemoProject } from "../../../../behavior/langy-demo-project";
+import { readPublicAppConfig } from "../../../../behavior/public-config";
+import { useUiCapabilities } from "@langwatch/ui-host/capabilities";
+import {
+  linkUiSignInMethod,
+  listUiPasskeys,
+  registerUiPasskey,
+  removeUiPasskey,
+  renameUiPasskey,
+} from "../../../../behavior/ui-passkeys";
+import { useRefreshUiSession } from "../../../../behavior/ui-session-refresh";
+import { useUiShellFailure } from "../../../../behavior/ui-shell-failure";
+import { UiPageFailure, UiPageLoading } from "../../../../ui/sections/ui-page-fallbacks";
+import {
+  resolvePersonalWorkspaceOrganization,
+  resolvePersonalWorkspaceProject,
+} from "../../behavior/personal-workspace-scope-lookup";
+
+/**
+ * The deployment shape; missing config means self-hosted, not broken.
+ */
+/** The grant and the release the assistant hand-off is behind, as the shell reads them. */
+const LANGY_CREATE_PERMISSION = "langy:create";
+const LANGY_RELEASE_FLAG = "release_langy_enabled";
+
+function readDeployment(): {
+  isSaas: boolean;
+  appBaseUrl: string;
+  passkeysEnabled: boolean;
+  authProvider: string | undefined;
+  demoProjectSlug?: string;
+} {
+  try {
+    const config = readPublicAppConfig();
+    return {
+      isSaas: config.deployment === "saas",
+      appBaseUrl: config.appBaseUrl,
+      passkeysEnabled: config.passkeys,
+      authProvider: config.authProvider,
+      ...(config.demoProjectSlug ? { demoProjectSlug: config.demoProjectSlug } : {}),
+    };
+  } catch {
+    // A shell with no configuration is a self-hosted one with no stated
+    // address rather than a broken one. Passkeys read OFF there for the same
+    // reason the section gates on the flag at all: offering a ceremony a
+    // deployment never mounted an endpoint for is an offer we cannot honour.
+    return {
+      isSaas: false,
+      appBaseUrl: "https://app.langwatch.ai",
+      passkeysEnabled: false,
+      authProvider: undefined,
+    };
+  }
+}
+
+/** Map teams to personal-workspace shape, stamping each project with team id. */
+function toPersonalWorkspaceTeams(
+  teams: {
+    id: string;
+    name: string;
+    projects: Array<{ id: string; name: string; slug: string }>;
+  }[],
+): readonly PersonalTeam[] {
+  return teams.map((team) => ({
+    id: team.id,
+    name: team.name,
+    projects: team.projects.map((project) => ({ ...project, teamId: team.id })),
+  }));
+}
+
+export function PersonalWorkspaceHost({ children }: { children: ReactNode }) {
+  const { session, navigation, route, feedback } = useUiCapabilities();
+  const refreshSession = useRefreshUiSession();
+  const scope = session.activeScope();
+  const actor = session.currentUser();
+
+  const organizations = personalWorkspaceApi.organization.getAll.useQuery({ isDemo: false });
+
+  // A refused graph is a state, not an empty one: `organization` and
+  // `project` below are read off this query, so a refusal left the
+  // personal-workspace screens empty forever.
+  const failure = useUiShellFailure({
+    error: organizations.error,
+    fallbackTitle: "Couldn't load your personal workspace",
+  });
+
+  /** The graph with each project stamped with its team id. */
+  const organizationsWithTeamIds: readonly PersonalOrganization[] = useMemo(
+    () =>
+      (organizations.data ?? []).map((organization) => ({
+        id: organization.id,
+        name: organization.name,
+        slug: organization.slug,
+        // The one field Settings > Authentication reads off the graph that no
+        // other personal-workspace screen does: an organization pinned to a
+        // single sign-on provider may not link additional methods.
+        ssoProvider: organization.ssoProvider ?? null,
+        teams: toPersonalWorkspaceTeams(organization.teams),
+      })),
+    [organizations.data],
+  );
+
+  /** The caller's own role; undefined means still arriving. */
+  const organizationRole = useMemo(() => {
+    const organizationId = scope.organizationId;
+    if (!organizationId) return void 0;
+    const organization = (organizations.data ?? []).find(
+      (candidate) => candidate.id === organizationId,
+    );
+    return organization?.members[0]?.role;
+  }, [organizations.data, scope.organizationId]);
+
+  const reading = route.reading();
+
+  /**
+   * The assistant, as a screen's hand-off needs it. The gate is the shell's own:
+   * the grant, the release flag, and never the shared demo project — the same
+   * three the command bar reads before offering the same hand-off.
+   */
+  const askLangy = useLangyStore((store) => store.askLangy);
+  const canAskLangy =
+    session.hasPermission(LANGY_CREATE_PERMISSION) &&
+    session.featureFlag(LANGY_RELEASE_FLAG) === true &&
+    !isLangyDemoProject({
+      projectSlug: resolvePersonalWorkspaceProject({
+        projectId: scope.projectId,
+        organizations: organizationsWithTeamIds,
+      })?.slug,
+      demoProjectSlug: readDeployment().demoProjectSlug,
+    });
+
+  const host = useMemo<PersonalWorkspaceHostPort>(
+    () => ({
+      scope: () => scope,
+      organization: () =>
+        resolvePersonalWorkspaceOrganization({
+          organizationId: scope.organizationId,
+          organizations: organizationsWithTeamIds,
+        }),
+      project: () =>
+        resolvePersonalWorkspaceProject({
+          projectId: scope.projectId,
+          organizations: organizationsWithTeamIds,
+        }),
+      // "We have not looked yet" and "there is no project" are the same
+      // absent project, and the two project-scoped screens must not report
+      // the first as the second.
+      isScopeResolved: () => organizations.isSuccess,
+      currentUser: () =>
+        actor ? { id: actor.id, name: actor.name, email: actor.email, image: actor.image } : null,
+      organizationRole: () => organizationRole,
+      hasPermission: (permission) => session.hasPermission(permission),
+      isFeatureEnabled: (flag) => session.isFeatureEnabled(flag),
+      deployment: () => readDeployment(),
+      route: () => reading,
+      setQuery: (next, options) => route.setQuery(next, options),
+      navigate: (to) => navigation.navigate(to),
+      refreshSession: () => refreshSession(),
+      listPasskeys: () => listUiPasskeys(),
+      registerPasskey: () => registerUiPasskey(),
+      renamePasskey: (input) => renameUiPasskey(input),
+      removePasskey: (input) => removeUiPasskey(input),
+      // Back to the page the reader is standing on, so a linked method
+      // lands them where they asked for it rather than at the product's
+      // front door.
+      linkSignInMethod: (provider) =>
+        linkUiSignInMethod(provider, { callbackUrl: "/settings/authentication" }),
+      canAskAssistant: () => canAskLangy,
+      askAssistant: (prompt) => askLangy(prompt),
+      succeeded: (notice) => feedback.succeeded(notice),
+      failed: (failure) => feedback.failed(failure),
+    }),
+    [
+      askLangy,
+      canAskLangy,
+      scope,
+      actor,
+      organizationsWithTeamIds,
+      organizationRole,
+      organizations.isSuccess,
+      reading,
+      refreshSession,
+      session,
+      route,
+      navigation,
+      feedback,
+    ],
+  );
+
+  if (failure.departing) return <UiPageLoading />;
+  if (failure.copy) return <UiPageFailure copy={failure.copy} />;
+
+  return <PersonalWorkspaceHostProvider value={host}>{children}</PersonalWorkspaceHostProvider>;
+}

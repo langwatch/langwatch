@@ -1,0 +1,323 @@
+import { Accordion, Box, Field, HStack, Input, Text, Textarea, VStack } from "@chakra-ui/react";
+import { LuChevronDown } from "react-icons/lu";
+
+import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
+import { parseSkipListInput, skipListToInput } from "@langwatch/model-provider-contract";
+
+import { SmallLabel } from "../elements/small-label.tsx";
+import { toEpochMs, type TimeInput } from "@langwatch/time";
+import { readableDate } from "../../model/display-formatters.ts";
+
+/**
+ * The accordion item the Advanced section renders into. Exported so the parent
+ * form can expand the section to show an error it has to put on a field
+ * inside it.
+ */
+export const ADVANCED_ACCORDION_VALUE = "advanced";
+
+/**
+ * Owned by the parent form so Save persists basic + advanced in one `update` mutation. Numeric
+ * inputs stay as raw strings until submit so half-typed values don't coerce to NaN mid-keystroke.
+ */
+export interface ModelProviderAdvancedDraft {
+  rateLimitRpm: string;
+  rateLimitTpm: string;
+  rateLimitRpd: string;
+  fallbackPriorityGlobal: string;
+  providerConfigJson: string;
+  /** One pattern per line, exactly as the operator typed it. */
+  skipPermissionsModels: string;
+}
+
+export const EMPTY_ADVANCED_DRAFT: ModelProviderAdvancedDraft = {
+  rateLimitRpm: "",
+  rateLimitTpm: "",
+  rateLimitRpd: "",
+  fallbackPriorityGlobal: "",
+  providerConfigJson: "",
+  skipPermissionsModels: "",
+};
+
+export function intToInput(value: number | null | undefined): string {
+  return value === null || value === undefined ? "" : String(value);
+}
+
+export function inputToInt(value: string): number | null {
+  if (value.trim() === "") return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? Math.trunc(n) : null;
+}
+
+export function jsonToInput(value: unknown): string {
+  if (value === null || value === undefined) return "";
+  try {
+    return JSON.stringify(value, null, 2);
+  } catch {
+    return "";
+  }
+}
+
+export function draftFromProvider(initial: {
+  rateLimitRpm: number | null;
+  rateLimitTpm: number | null;
+  rateLimitRpd: number | null;
+  fallbackPriorityGlobal: number | null;
+  providerConfig: unknown;
+  langySkipPermissionsModels: string[] | null;
+}): ModelProviderAdvancedDraft {
+  return {
+    rateLimitRpm: intToInput(initial.rateLimitRpm),
+    rateLimitTpm: intToInput(initial.rateLimitTpm),
+    rateLimitRpd: intToInput(initial.rateLimitRpd),
+    fallbackPriorityGlobal: intToInput(initial.fallbackPriorityGlobal),
+    providerConfigJson: jsonToInput(initial.providerConfig),
+    skipPermissionsModels: skipListToInput(initial.langySkipPermissionsModels),
+  };
+}
+
+/**
+ * Parsed advanced draft for the update payload. `providerConfig` of
+ * `undefined` means "not parsed yet"; the caller treats that as "skip".
+ * A throw means malformed JSON the form should refuse to submit.
+ */
+export interface ParsedAdvancedPayload {
+  rateLimitRpm: number | null;
+  rateLimitTpm: number | null;
+  rateLimitRpd: number | null;
+  fallbackPriorityGlobal: number | null;
+  providerConfig: Record<string, unknown> | null;
+}
+
+/**
+ * The skip-permissions list the payload carries: one entry per non-empty
+ * line. An empty result clears the stored list, which returns the provider to
+ * its default.
+ */
+export function parseSkipPermissionsDraft(draft: ModelProviderAdvancedDraft): string[] {
+  return parseSkipListInput(draft.skipPermissionsModels);
+}
+
+export function parseAdvancedDraft(draft: ModelProviderAdvancedDraft): ParsedAdvancedPayload {
+  let providerConfig: Record<string, unknown> | null = null;
+  if (draft.providerConfigJson.trim()) {
+    const parsed: unknown = JSON.parse(draft.providerConfigJson);
+    // Reject valid-but-non-object JSON ([1,2], 42, "x", null) up front
+    // so the user gets a clean inline error instead of the gateway zod
+    // rejecting it with a cryptic "Expected object, received array".
+    if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+      throw new Error("Provider config must be a JSON object");
+    }
+    providerConfig = parsed as Record<string, unknown>;
+  }
+  return {
+    rateLimitRpm: inputToInt(draft.rateLimitRpm),
+    rateLimitTpm: inputToInt(draft.rateLimitTpm),
+    rateLimitRpd: inputToInt(draft.rateLimitRpd),
+    fallbackPriorityGlobal: inputToInt(draft.fallbackPriorityGlobal),
+    providerConfig,
+  };
+}
+
+/**
+ * Collapsed by default so first-setup knobs stay out of sight. `showGatewayFields` and
+ * `showSkipPermissionsField` gate two independent audiences; either alone renders the section.
+ * Pure UI — state and the persisting Save button both live in the parent form.
+ */
+export function ModelProviderAdvancedSection({
+  modelProviderId,
+  draft,
+  onDraftChange,
+  jsonError,
+  skipPermissionsError,
+  skipPermissionsPlaceholder,
+  showGatewayFields,
+  showSkipPermissionsField,
+  initial,
+  accordionValue,
+  onAccordionValueChange,
+}: {
+  modelProviderId: string | undefined;
+  draft: ModelProviderAdvancedDraft;
+  onDraftChange: (next: ModelProviderAdvancedDraft) => void;
+  jsonError: string | null;
+  /** Field-level refusal for the skip-permissions list, from the server. */
+  skipPermissionsError: string | null;
+  /** The provider's own default list, shown when the field is empty. */
+  skipPermissionsPlaceholder: string;
+  showGatewayFields: boolean;
+  showSkipPermissionsField: boolean;
+  initial: {
+    healthStatus?: string | null;
+    circuitOpenedAt?: TimeInput | null;
+    lastHealthCheckAt?: TimeInput | null;
+    disabledAt?: TimeInput | null;
+  };
+  /**
+   * Controlled accordion expansion. Lifted so the parent form can
+   * auto-expand on malformed JSON at Save time — otherwise the inline
+   * `jsonError` renders inside collapsed content and the user gets no
+   * feedback. `[]` = collapsed, `[ADVANCED_ACCORDION_VALUE]` = expanded.
+   */
+  accordionValue: string[];
+  onAccordionValueChange: (value: string[]) => void;
+}) {
+  const setField =
+    <K extends keyof ModelProviderAdvancedDraft>(key: K) =>
+    (value: ModelProviderAdvancedDraft[K]) =>
+      onDraftChange({ ...draft, [key]: value });
+
+  const formatDate = (d: TimeInput | null | undefined): string => {
+    if (!d) return "—";
+    const epochMs = toEpochMs(d);
+    if (!Number.isFinite(epochMs)) return String(d);
+
+    return readableDate(epochMs).toLocaleString();
+  };
+
+  return (
+    <Accordion.Root
+      collapsible
+      width="full"
+      value={accordionValue}
+      onValueChange={(details) => onAccordionValueChange(details.value)}
+    >
+      <Accordion.Item value={ADVANCED_ACCORDION_VALUE} width="full">
+        <Accordion.ItemTrigger paddingY={2}>
+          <HStack width="full" justify="space-between">
+            <SmallLabel>Advanced</SmallLabel>
+            <Accordion.ItemIndicator>
+              <LuChevronDown />
+            </Accordion.ItemIndicator>
+          </HStack>
+        </Accordion.ItemTrigger>
+        <Accordion.ItemContent>
+          <VStack align="start" width="full" gap={3} paddingTop={2}>
+            {showSkipPermissionsField && (
+              <Field.Root>
+                <HStack gap={0}>
+                  <SmallLabel>Models allowed to skip Langy permission checks</SmallLabel>
+                  <FieldInfoTooltip
+                    testId="skip-permissions-models-info"
+                    description="Langy can run commands on a developer's machine without asking when the conversation runs on one of these models. Leave the field empty to use the models this provider trusts by default."
+                  />
+                </HStack>
+                <Textarea
+                  rows={4}
+                  aria-label="Models allowed to skip Langy permission checks"
+                  placeholder={skipPermissionsPlaceholder}
+                  fontFamily="mono"
+                  fontSize="xs"
+                  value={draft.skipPermissionsModels}
+                  onChange={(e) => setField("skipPermissionsModels")(e.target.value)}
+                />
+                {skipPermissionsError ? (
+                  <Text fontSize="xs" color="red.500">
+                    {skipPermissionsError}
+                  </Text>
+                ) : (
+                  <Field.HelperText>One pattern per line.</Field.HelperText>
+                )}
+              </Field.Root>
+            )}
+            {showGatewayFields &&
+              (!modelProviderId ? (
+                <Box width="full" paddingY={2}>
+                  <Text fontSize="xs" color="gray.500">
+                    Save the provider first to configure rate limits and routing hints.
+                  </Text>
+                </Box>
+              ) : (
+                <>
+                  <HStack width="full" align="start" gap={3}>
+                    <Field.Root>
+                      <SmallLabel>RPM</SmallLabel>
+                      <Input
+                        type="number"
+                        min={0}
+                        placeholder="No cap"
+                        value={draft.rateLimitRpm}
+                        onChange={(e) => setField("rateLimitRpm")(e.target.value)}
+                      />
+                      <Field.HelperText>Requests per minute.</Field.HelperText>
+                    </Field.Root>
+
+                    <Field.Root>
+                      <SmallLabel>TPM</SmallLabel>
+                      <Input
+                        type="number"
+                        min={0}
+                        placeholder="No cap"
+                        value={draft.rateLimitTpm}
+                        onChange={(e) => setField("rateLimitTpm")(e.target.value)}
+                      />
+                      <Field.HelperText>Tokens per minute.</Field.HelperText>
+                    </Field.Root>
+
+                    <Field.Root>
+                      <SmallLabel>RPD</SmallLabel>
+                      <Input
+                        type="number"
+                        min={0}
+                        placeholder="No cap"
+                        value={draft.rateLimitRpd}
+                        onChange={(e) => setField("rateLimitRpd")(e.target.value)}
+                      />
+                      <Field.HelperText>Requests per day.</Field.HelperText>
+                    </Field.Root>
+                  </HStack>
+
+                  <Field.Root>
+                    <SmallLabel>Fallback priority</SmallLabel>
+                    <Input
+                      type="number"
+                      placeholder="Auto"
+                      value={draft.fallbackPriorityGlobal}
+                      onChange={(e) => setField("fallbackPriorityGlobal")(e.target.value)}
+                    />
+                    <Field.HelperText>
+                      Order used when a Virtual Key has no Routing Policy. Lower tries first.
+                      Tiebreak by creation order.
+                    </Field.HelperText>
+                  </Field.Root>
+
+                  <Field.Root>
+                    <SmallLabel>Provider config (JSON)</SmallLabel>
+                    <Textarea
+                      rows={4}
+                      placeholder={`{\n  "region": "us-east-1"\n}`}
+                      fontFamily="mono"
+                      fontSize="xs"
+                      value={draft.providerConfigJson}
+                      onChange={(e) => setField("providerConfigJson")(e.target.value)}
+                    />
+                    {jsonError ? (
+                      <Text fontSize="xs" color="red.500">
+                        {jsonError}
+                      </Text>
+                    ) : (
+                      <Field.HelperText>
+                        Provider-specific routing hints. Bedrock region, Azure deployment override,
+                        etc.
+                      </Field.HelperText>
+                    )}
+                  </Field.Root>
+
+                  <Box width="full" borderTop="1px solid" borderColor="border.muted" paddingTop={2}>
+                    <SmallLabel>Health (read-only)</SmallLabel>
+                    <VStack align="start" gap={1} fontSize="xs" color="fg.muted">
+                      <Text>Status: {initial.healthStatus ?? "UNKNOWN"}</Text>
+                      <Text>Last checked: {formatDate(initial.lastHealthCheckAt)}</Text>
+                      <Text>Circuit opened: {formatDate(initial.circuitOpenedAt)}</Text>
+                      {initial.disabledAt && (
+                        <Text color="red.500">Disabled at: {formatDate(initial.disabledAt)}</Text>
+                      )}
+                    </VStack>
+                  </Box>
+                </>
+              ))}
+          </VStack>
+        </Accordion.ItemContent>
+      </Accordion.Item>
+    </Accordion.Root>
+  );
+}

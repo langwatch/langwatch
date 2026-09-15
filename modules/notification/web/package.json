@@ -1,0 +1,48 @@
+{
+  "name": "@langwatch/notification-web",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Browser-safe notification screens: who has unsubscribed from a project's notifications, and undoing it.",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "exports": {
+    "./email-suppressions": {
+      "langwatch-declaration-source": "./src/email-suppressions.ts",
+      "types": "./dist/email-suppressions.d.ts",
+      "default": "./src/email-suppressions.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "pnpm -w typecheck:declarations --project . && tsc --noEmit",
+    "test": "vitest run",
+    "test:unit": "vitest run"
+  },
+  "dependencies": {
+    "@langwatch/api": "workspace:*",
+    "@langwatch/design-system": "workspace:*",
+    "@langwatch/time": "workspace:*",
+    "lucide-react": "catalog:"
+  },
+  "devDependencies": {
+    "@chakra-ui/react": "catalog:",
+    "@emotion/react": "catalog:",
+    "@testing-library/jest-dom": "catalog:",
+    "@testing-library/react": "catalog:",
+    "@testing-library/user-event": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "jsdom": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "peerDependencies": {
+    "@chakra-ui/react": "^3.36.0",
+    "@emotion/react": "^11.14.0",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7"
+  }
+}

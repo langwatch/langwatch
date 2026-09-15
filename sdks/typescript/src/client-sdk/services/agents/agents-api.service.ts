@@ -1,13 +1,11 @@
-import {
-  createLangWatchApiClient,
-  type LangwatchApiClient,
-} from "@/internal/api/client";
+import { createLangWatchApiClient, type LangwatchApiClient } from "@/internal/api/client";
 import type { paths } from "@/internal/generated/openapi/api-client";
 import { type InternalConfig } from "@/client-sdk/types";
 import {
   extractStatusFromResponse,
   formatApiErrorForOperation,
 } from "@/client-sdk/services/_shared/format-api-error";
+import { unwrapApiResult } from "@/client-sdk/services/_shared/unwrap-api-result";
 
 /** One run parameter an agent declares, as the platform lists it. */
 export interface AgentParameterSpec {
@@ -101,27 +99,41 @@ export class AgentsApiService {
     this.apiClient = config?.langwatchApiClient ?? createLangWatchApiClient();
   }
 
-  private handleApiError(operation: string, error: unknown): never {
-    const message = formatApiErrorForOperation({ operation: operation, error: error, options: {
-      status: extractStatusFromResponse(error),
-    } });
+  private handleApiError(operation: string, error: unknown, response?: Response): never {
+    const message = formatApiErrorForOperation({
+      operation: operation,
+      error: error,
+      options: {
+        status: response?.status ?? extractStatusFromResponse(error),
+      },
+    });
     throw new AgentsApiError(message, operation, error);
   }
 
   async list(params?: { page?: number; limit?: number }): Promise<AgentListResponse> {
-    const { data, error } = await this.apiClient.GET("/api/v1/agents", {
+    const { data, error, response } = await this.apiClient.GET("/api/v1/agents", {
       params: { query: params },
     });
-    if (error) this.handleApiError("list agents", error);
-    return data as unknown as AgentListResponse;
+    return unwrapApiResult({
+      operation: "list agents",
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    }) as unknown as AgentListResponse;
   }
 
   async get(id: string): Promise<AgentResponse> {
-    const { data, error } = await this.apiClient.GET("/api/v1/agents/{id}", {
+    const { data, error, response } = await this.apiClient.GET("/api/v1/agents/{id}", {
       params: { path: { id } },
     });
-    if (error) this.handleApiError(`get agent "${id}"`, error);
-    return data as unknown as AgentResponse;
+    return unwrapApiResult({
+      operation: `get agent "${id}"`,
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    }) as unknown as AgentResponse;
   }
 
   async create(params: {
@@ -130,32 +142,50 @@ export class AgentsApiService {
     config: Record<string, unknown>;
     workflowId?: string;
   }): Promise<AgentResponse> {
-    const { data, error } = await this.apiClient.POST("/api/v1/agents", {
+    const { data, error, response } = await this.apiClient.POST("/api/v1/agents", {
       body: params as never,
     });
-    if (error) this.handleApiError("create agent", error);
-    return data as unknown as AgentResponse;
+    return unwrapApiResult({
+      operation: "create agent",
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    }) as unknown as AgentResponse;
   }
 
-  async update(id: string, params: {
-    name?: string;
-    type?: string;
-    config?: Record<string, unknown>;
-  }): Promise<AgentResponse> {
-    const { data, error } = await this.apiClient.PATCH("/api/v1/agents/{id}", {
+  async update(
+    id: string,
+    params: {
+      name?: string;
+      type?: string;
+      config?: Record<string, unknown>;
+    },
+  ): Promise<AgentResponse> {
+    const { data, error, response } = await this.apiClient.PATCH("/api/v1/agents/{id}", {
       params: { path: { id } },
       body: params as never,
     });
-    if (error) this.handleApiError(`update agent "${id}"`, error);
-    return data as unknown as AgentResponse;
+    return unwrapApiResult({
+      operation: `update agent "${id}"`,
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    }) as unknown as AgentResponse;
   }
 
   async delete(id: string): Promise<{ id: string; name: string }> {
-    const { data, error } = await this.apiClient.DELETE("/api/v1/agents/{id}", {
+    const { data, error, response } = await this.apiClient.DELETE("/api/v1/agents/{id}", {
       params: { path: { id } },
     });
-    if (error) this.handleApiError(`delete agent "${id}"`, error);
-    return data as unknown as { id: string; name: string };
+    return unwrapApiResult({
+      operation: `delete agent "${id}"`,
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    }) as unknown as { id: string; name: string };
   }
 
   /**
@@ -163,25 +193,34 @@ export class AgentsApiService {
    * dispatches it to a live instance and answers with the function's output.
    */
   async call(id: string, body: AgentCallBody): Promise<AgentCallResponse> {
-    const { data, error } = await this.apiClient.POST("/api/v1/agents/{id}/call", {
+    const { data, error, response } = await this.apiClient.POST("/api/v1/agents/{id}/call", {
       params: { path: { id } },
       body,
     });
-    if (error) this.handleApiError(`call agent "${id}"`, error);
-    return data as AgentCallResponse;
+    return unwrapApiResult({
+      operation: `call agent "${id}"`,
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    }) as AgentCallResponse;
   }
 
   /**
-   * Runs one scripted scenario against an agent: the user sends "ping", the
-   * agent answers, and the run succeeds when the answer arrives. The project
-   * gains no scenario, run plan or test suite, and the answer carries the run
-   * ids to follow.
+   * Runs one scripted scenario against an agent: the user sends "ping", the agent answers,
+   * and the run succeeds when the answer arrives. The project gains no scenario, run plan or
+   * test suite, and the answer carries the run ids to follow.
    */
   async test(id: string): Promise<AgentTestRunResponse> {
-    const { data, error } = await this.apiClient.POST("/api/v1/agents/{id}/test", {
+    const { data, error, response } = await this.apiClient.POST("/api/v1/agents/{id}/test", {
       params: { path: { id } },
     });
-    if (error) this.handleApiError(`test agent "${id}"`, error);
-    return data as AgentTestRunResponse;
+    return unwrapApiResult({
+      operation: `test agent "${id}"`,
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    }) as AgentTestRunResponse;
   }
 }

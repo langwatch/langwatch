@@ -12,23 +12,24 @@ You are the **orchestrator**. You do NOT drive the browser yourself. You spawn a
 ## Step 1: Prepare
 
 Parse `$ARGUMENTS` for:
+
 - **Port** (optional): a number (e.g. `5570`) or `:<port>` format
 - **Feature** (optional): a description of what to verify, or a path to a `specs/*.feature` file
 
 If a feature file path is given, **read it now** and extract the scenarios into a concrete checklist. If a plain description is given, use it directly. If neither is provided, use the **default smoke test**: app loads, sign in works, dashboard renders after auth.
 
-### Resolve the port
+### Resolve the base URL
 
-1. Explicit port in `$ARGUMENTS` → use it
-2. Read `.dev-port` file in the repo root → source it for `APP_PORT`
-3. **No port and no `.dev-port`?** → run `dev/scripts/dev-up.sh` and then read the `.dev-port` it creates
+1. Explicit port in `$ARGUMENTS` → `http://localhost:<port>`
+2. A haven stack (the recommended path): `make haven status` names the slug, and the URL
+   is `https://app.<slug>.langwatch.localhost:<port>` with the port from
+   `~/.portless/proxy.port`. See the `haven-setup` skill.
+3. A plain `pnpm dev` stack: the browser application binds `PORT` (default 5560).
+4. A per-worktree isolated compose stack: `dev/scripts/dev-up.sh` writes `.dev-port` at
+   the repo root with `APP_PORT` and `BASE_URL`; source it.
 
-```bash
-# .dev-port format (written by dev-up.sh):
-APP_PORT=5560
-BASE_URL=http://localhost:5560
-COMPOSE_PROJECT_NAME=langwatch-abcd1234
-```
+Never start a stack the user did not ask for, and never leave one running that you
+started without saying so.
 
 ### Resolve the feature
 
@@ -92,18 +93,20 @@ Only create what is listed above. Do not add extra data beyond what is needed.
 - Browser: Chromium (headless) — use Playwright MCP tools
 - Save screenshots to: <absolute artifact path>/screenshots/
 
-## Auth (NextAuth credentials form, NOT Auth0)
+## Auth (email + password credentials form, not a third-party IdP)
 - Navigate to the app → redirects to /auth/signin (Email + Password form)
 - Email: browser-test@langwatch.ai
 - Password: BrowserTest123!
 - If "Register new account" needed, register first with same credentials
 - Org name if onboarding: Browser Test Org
 - After auth: dashboard shows "Hello, Browser" + "Browser Test Org" header
+- Sign-in only works from the origin the app is configured with; a raw 127.0.0.1
+  origin 403s the sign-in even though anonymous pages load
 
 ## How to interact
 - Use browser_snapshot (accessibility tree) for finding elements — it's faster than screenshots
 - Use browser_take_screenshot to capture evidence at each key step
-- Use browser_wait_for with generous timeouts (60-120s for first page loads, dev mode is slow)
+- Use browser_wait_for with generous timeouts (30-60s for the first load in dev)
 - Number screenshots sequentially: 01-sign-in.png, 02-dashboard.png, etc.
 
 ## Guardrails — READ THESE
@@ -118,11 +121,13 @@ Only create what is listed above. Do not add extra data beyond what is needed.
 ## Step 4: Collect results
 
 When the sub-agent returns:
+
 1. Parse its summary table
 2. Write the report to `browser-tests/<feature-name>/<YYYY-MM-DD>/report.md`:
 
 ```markdown
 # Browser Test: <feature-name>
+
 **Date:** YYYY-MM-DD
 **App:** http://localhost:<port>
 **Browser:** Chromium (headless)
@@ -131,39 +136,47 @@ When the sub-agent returns:
 
 ## Results
 
-| # | Scenario | Result | Screenshot |
-|---|----------|--------|------------|
-| 1 | <name>   | PASS   | screenshots/01-xxx.png |
+| #   | Scenario | Result | Screenshot             |
+| --- | -------- | ------ | ---------------------- |
+| 1   | <name>   | PASS   | screenshots/01-xxx.png |
 
 ## Failures (if any)
+
 - **Scenario 2:** Expected X but saw Y.
 
 ## Notes
+
 <any observations>
 ```
 
-3. If you started the app (no `.dev-port` existed before), tear it down: `dev/scripts/dev-down.sh`
+3. If you started a compose stack yourself, tear it down: `dev/scripts/dev-down.sh`. Leave
+   a stack the user already had running alone.
 
 ## Step 5: Upload screenshots and update the PR
 
-Screenshots are uploaded to **img402.dev** (free, no auth) instead of committed to git. This avoids binary bloat in the repo.
+Screenshots go to an external host rather than into git, so the repo carries no binaries.
+The host below is not maintained by us — check it still answers before relying on it, and
+say so in the report if it does not.
 
 1. **Upload each screenshot** to img402.dev:
+
    ```bash
    curl -s -F "image=@browser-tests/<feature>/<date>/screenshots/01-xxx.jpeg" https://img402.dev/api/free
    # Returns: {"url":"https://i.img402.dev/abc123.jpg", ...}
    ```
+
    Collect the returned URLs for each screenshot.
 
 2. **Update the PR description** with the results table using img402 URLs so images render inline:
 
    Read the current PR body first (`gh pr view --json body`), then append a new section:
+
    ```markdown
    ## Browser Test: <feature-name>
 
-   | # | Scenario | Result | Screenshot |
-   |---|----------|--------|------------|
-   | 1 | <name> | PASS | ![01](https://i.img402.dev/abc123.jpg) |
+   | #   | Scenario | Result | Screenshot                             |
+   | --- | -------- | ------ | -------------------------------------- |
+   | 1   | <name>   | PASS   | ![01](https://i.img402.dev/abc123.jpg) |
    ```
 
    Use `gh api repos/langwatch/langwatch/pulls/<number> -X PATCH -f body="..."` to update (not `gh pr edit`).
@@ -173,6 +186,7 @@ Screenshots are uploaded to **img402.dev** (free, no auth) instead of committed 
 ## Step 6: Report
 
 Return the summary to the user/orchestrator. Include:
+
 - The results table
 - Link to the PR where screenshots are now visible
 - Note: img402.dev free tier has 7-day retention; screenshots expire but remain in the PR body as broken images after that

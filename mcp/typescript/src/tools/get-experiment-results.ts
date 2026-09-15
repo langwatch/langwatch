@@ -43,8 +43,7 @@ interface EvaluationRunResults {
 
 const DEFAULT_ROW_CAP = 50;
 
-const rowKey = (index: number, targetId?: string | null): string =>
-  `${index}:${targetId ?? ""}`;
+const rowKey = (index: number, targetId?: string | null): string => `${index}:${targetId ?? ""}`;
 
 const summarizeEntry = (entry: Record<string, unknown>): string => {
   const candidates = ["input", "question", "query", "prompt", "user"];
@@ -90,22 +89,20 @@ export async function handleExperimentResults(params: {
   try {
     results = (await makeRequest(
       "GET",
-      `/api/experiments/runs/${encodeURIComponent(params.runId)}/results${qs}`,
+      `/api/v1/experiments/runs/${encodeURIComponent(params.runId)}/results${qs}`,
     )) as EvaluationRunResults;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     const status =
       error instanceof LangWatchApiError
         ? error.status
-        : error && typeof error === "object" &&
+        : error &&
+            typeof error === "object" &&
             "status" in error &&
             typeof (error as { status?: unknown }).status === "number"
           ? (error as { status: number }).status
           : undefined;
-    if (
-      status === 404 ||
-      (status === undefined && /404|not found/i.test(message))
-    ) {
+    if (status === 404 || (status === undefined && /404|not found/i.test(message))) {
       return [
         `# Evaluation Results: ${params.runId}`,
         "",
@@ -164,9 +161,7 @@ export async function handleExperimentResults(params: {
   }));
 
   if (filter === "failed") {
-    rows = rows.filter((r) =>
-      isFailedRow({ entry: r.entry, evaluations: r.evaluations }),
-    );
+    rows = rows.filter((r) => isFailedRow({ entry: r.entry, evaluations: r.evaluations }));
   }
 
   const totalMatching = rows.length;
@@ -182,14 +177,13 @@ export async function handleExperimentResults(params: {
   >();
   for (const r of rowsForSummary) {
     for (const e of r.evaluations) {
-      const stats =
-        evaluatorAverages.get(e.evaluator) ?? {
-          sum: 0,
-          count: 0,
-          passed: 0,
-          failed: 0,
-          errored: 0,
-        };
+      const stats = evaluatorAverages.get(e.evaluator) ?? {
+        sum: 0,
+        count: 0,
+        passed: 0,
+        failed: 0,
+        errored: 0,
+      };
       if (typeof e.score === "number") {
         stats.sum += e.score;
         stats.count += 1;
@@ -207,9 +201,7 @@ export async function handleExperimentResults(params: {
   lines.push(`**Experiment**: ${results.experimentId}`);
   lines.push(`**Status**: ${runStatus}`);
   if (typeof results.total === "number" && results.total > 0) {
-    lines.push(
-      `**Progress**: ${results.progress ?? results.dataset.length}/${results.total} rows`,
-    );
+    lines.push(`**Progress**: ${results.progress ?? results.dataset.length}/${results.total} rows`);
   }
   lines.push(`**Total rows**: ${results.dataset.length}`);
   lines.push(`**Total evaluations**: ${results.evaluations.length}`);
@@ -235,11 +227,8 @@ export async function handleExperimentResults(params: {
     lines.push("| Evaluator | Avg Score | Passed | Failed | Errored |");
     lines.push("| --- | --- | --- | --- | --- |");
     for (const [name, stats] of evaluatorAverages) {
-      const avg =
-        stats.count > 0 ? (stats.sum / stats.count).toFixed(3) : "—";
-      lines.push(
-        `| ${name} | ${avg} | ${stats.passed} | ${stats.failed} | ${stats.errored} |`,
-      );
+      const avg = stats.count > 0 ? (stats.sum / stats.count).toFixed(3) : "—";
+      lines.push(`| ${name} | ${avg} | ${stats.passed} | ${stats.failed} | ${stats.errored} |`);
     }
     lines.push("");
   }
@@ -248,9 +237,7 @@ export async function handleExperimentResults(params: {
     if (filter === "failed") {
       lines.push("_No rows matched the filter._");
     } else if (runStatus === "running") {
-      lines.push(
-        "_No rows recorded yet. The run is still in progress; call again shortly._",
-      );
+      lines.push("_No rows recorded yet. The run is still in progress; call again shortly._");
     } else if (runStatus === "interrupted") {
       lines.push("_No rows were recorded before the run was interrupted._");
     } else {
@@ -259,9 +246,7 @@ export async function handleExperimentResults(params: {
     return lines.join("\n");
   }
 
-  lines.push(
-    `## Rows (${rows.length}${truncated ? ` of ${totalMatching}` : ""})`,
-  );
+  lines.push(`## Rows (${rows.length}${truncated ? ` of ${totalMatching}` : ""})`);
   lines.push("");
 
   for (const { entry, evaluations } of rows) {

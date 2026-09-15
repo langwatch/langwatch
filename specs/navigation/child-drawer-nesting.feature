@@ -1,136 +1,74 @@
-Feature: Child drawers open as nested overlays instead of navigating
-  As a LangWatch user
-  I want drawers opened from within another drawer to appear as nested overlays
-  So that I maintain context in the parent drawer and can return to it by closing the child
+Feature: A drawer that needs another drawer
+  As someone editing in a drawer who has to go and make something first
+  I want the second drawer to take me there and bring me back
+  So that the work I had already done is still there when I return
 
-  # Implementation approach: Child drawers are rendered via local React state
-  # within the parent drawer component, NOT via URL navigation.
-  # This preserves parent state but sacrifices deep-linking to the child.
-  #
-  # Scope: SuiteFormDrawer child drawers only (scenarioEditor, agentHttpEditor).
-  # ScenarioRunDetailDrawer already works correctly via local state.
-  # Evaluations-v3 picker flows are out of scope (separate architecture).
+  Drawers are URL-routed singletons: `?drawer.open=<name>` plus one
+  `drawer.<key>` per parameter, resolved through the application's registry, and
+  ONE drawer is mounted at a time (dev/docs/best_practices/drawers.md). A step
+  that needs another drawer therefore NAVIGATES to it and returns — `openDrawer`
+  pushes onto the drawer stack, and `goBack` restores the caller with its
+  address. It is not a second `Drawer.Root` mounted from `useState` inside the
+  first: that stacks an overlay the hook's history knows nothing about, so the
+  browser's back button, a pasted link and the caller's own return all disagree
+  about what is on screen.
 
-  Background:
-    Given I am logged into project "my-project"
+  This file said the opposite until it was rewritten. Its premise was "child
+  drawers are rendered via local React state within the parent drawer
+  component, NOT via URL navigation" — the exact shape the drawers doc names as
+  the thing never to do — and every scenario in it was `@unimplemented`, so it
+  enforced nothing while reading as a decision somebody had taken.
 
-  # ---------------------------------------------------------------------------
-  # Case 1: Suite editor -> Create new scenario
-  # ---------------------------------------------------------------------------
+  Rule: The sub-flow is a navigation, and the caller is what it returns to
 
-  @integration @unimplemented
-  Scenario: Creating a new scenario from suite editor opens as a child drawer
-    Given the suite editor drawer is open
-    When I click "Create New" in the scenario picker
-    Then the scenario editor opens as a child drawer on top of the suite editor
-    And the suite editor remains mounted underneath
+    `openDrawer` pushes; `goBack` pops back to the caller with the parameters
+    its address carried. The push UNMOUNTS the caller exactly as closing it
+    does, which is why a draft belongs in a store that outlives the component
+    rather than in its own state.
 
-  @integration @unimplemented
-  Scenario: Closing the scenario editor child drawer returns to the suite editor
-    Given the suite editor drawer is open
-    And I opened the scenario editor as a child drawer
-    When I close the scenario editor
-    Then the suite editor drawer is visible with my previous form state intact
+    @integration
+    Scenario: Going back from a sub-flow returns to the drawer that opened it
+      Given a reader who walked from one drawer into another
+      When they go back
+      Then the first drawer is on screen again with the parameters it was opened with
 
-  @e2e @unimplemented
-  Scenario: New scenario created in child drawer appears in suite editor's picker
-    Given the suite editor drawer is open with 2 scenarios selected
-    When I open the scenario editor as a child drawer
-    And I create a new scenario named "Fresh Scenario"
-    And I close the scenario editor
-    Then the suite editor's scenario picker includes "Fresh Scenario"
+    @integration @unimplemented
+    Scenario: A sub-flow is a navigation rather than a second overlay
+      Given a drawer with a step that needs another drawer
+      When the reader takes that step
+      Then the address names the second drawer
+      And only one drawer is mounted
 
-  # ---------------------------------------------------------------------------
-  # Case 2: Suite editor -> Create new agent (HTTP editor)
-  # ---------------------------------------------------------------------------
+    @integration @unimplemented
+    Scenario: The caller's unsaved work survives the walk into a sub-flow and back
+      Given a reader has filled in part of a drawer
+      When they open a sub-flow from it and come back without saving
+      Then what they had already entered is still there
 
-  @integration @unimplemented
-  Scenario: Creating a new agent from suite editor opens as a child drawer
-    Given the suite editor drawer is open
-    When I click "New Agent" in the target picker
-    Then the agent HTTP editor opens as a child drawer on top of the suite editor
-    And the suite editor remains mounted underneath
+  Rule: The caller decides how the sub-flow ends
 
-  @integration @unimplemented
-  Scenario: Closing the agent editor child drawer returns to the suite editor
-    Given the suite editor drawer is open
-    And I opened the agent HTTP editor as a child drawer
-    When I close the agent HTTP editor
-    Then the suite editor drawer is visible with my previous form state intact
+    A target that calls `closeDrawer` clears the whole navigation stack, and
+    takes the caller down with it. So a caller passes `onClose: goBack`, and a
+    target reaches for `closeDrawer` only when it was handed no ending at all —
+    which is the case where there is no caller to return to.
 
-  # ---------------------------------------------------------------------------
-  # Case 3: Scenario run detail -> View Trace (regression guard)
-  # Already works via local state - these verify no regression.
-  # ---------------------------------------------------------------------------
-  #
-  # The two scenarios below describe the trace-details child drawer
-  # opened from inside the scenario run detail drawer. That drawer
-  # renders `TraceDetails` inside a Drawer.Root of its own, which is
-  # why it outlived the removal of the legacy trace drawer: what was
-  # removed there was the drawer shell, not the detail view. The
-  # component composition is exercised by `ScenarioRunDetailDrawer
-  # .integration.test.tsx`, but no single test asserts the "Open
-  # Thread → child drawer mounts → close → parent visible" flow
-  # end-to-end. Cheap follow-up.
+    @integration
+    Scenario: A drawer the framework cannot let close itself is handed the close to call
+      Given a drawer registered in the application's own registry
+      When the address opens it
+      Then it is given the close to call rather than left to close the stack
 
-  @integration @unimplemented
-  Scenario: Viewing a trace from scenario run detail opens as a child drawer
-    Given the scenario run detail drawer is open for a completed run with a trace
-    When I click "Open Thread"
-    Then the trace details drawer opens as a child drawer
-    And the scenario run detail drawer remains mounted underneath
+    # The other half of the same rule, from the link-follower's side, is
+    # specs/navigation/drawer-opened-with-no-caller.feature: that file is about
+    # the WORK still finishing, and this scenario is about which ending runs.
+    @integration
+    Scenario: A sub-flow target with no caller closes the drawer itself
+      Given a drawer opened from an address that named no caller
+      When it finishes its work
+      Then it closes the drawer rather than returning to a caller that is not there
 
-  @integration @unimplemented
-  Scenario: Closing the trace child drawer returns to the scenario run detail
-    Given the scenario run detail drawer is open
-    And I opened the trace details as a child drawer
-    When I close the trace details drawer
-    Then the scenario run detail drawer is visible with its original content
-
-  # ---------------------------------------------------------------------------
-  # Non-drawer contexts remain unaffected
-  # ---------------------------------------------------------------------------
-  #
-  # Root-level drawer behaviour is implicit in every drawer test
-  # that runs without a parent (e.g. `SuiteFormDrawer` standalone
-  # tests). No dedicated assertion exists for the "no parent
-  # drawer" branch.
-
-  @integration @unimplemented
-  Scenario: Opening a drawer from a page (non-drawer context) works normally
-    Given I am on the suites list page with no drawer open
-    When I click to open the suite editor
-    Then the suite editor drawer opens as a root-level drawer
-    And no parent drawer is underneath
-
-  # ---------------------------------------------------------------------------
-  # Parent state preservation
-  # ---------------------------------------------------------------------------
-
-  @integration @unimplemented
-  Scenario: Suite editor form state survives a child drawer round-trip
-    Given the suite editor drawer is open
-    And I have entered "My Suite" as the suite name
-    And I have selected 3 scenarios
-    When I open the scenario editor as a child drawer
-    And I close the scenario editor without saving
-    Then the suite editor still shows "My Suite" as the suite name
-    And 3 scenarios remain selected
-
-  # ---------------------------------------------------------------------------
-  # Keyboard interaction with stacked drawers
-  # ---------------------------------------------------------------------------
-  #
-  # `NestedDrawerTyping.integration.test.tsx` covers keyboard input
-  # in nested drawers but does not specifically assert Escape-only-
-  # closes-topmost behaviour. The semantics are baked into the
-  # underlying Chakra Drawer overlay stack — adding an explicit
-  # assertion is cheap follow-up.
-
-  @integration @unimplemented
-  Scenario: Pressing Escape closes only the topmost child drawer
-    Given the suite editor drawer is open
-    And I opened the scenario editor as a child drawer
-    When I press Escape
-    Then the scenario editor closes
-    And the suite editor remains open
+    @integration @unimplemented
+    Scenario: Pressing Escape in a sub-flow returns to the caller
+      Given a reader is in a sub-flow opened from another drawer
+      When they press Escape
+      Then they are back in the drawer that opened it, not on the page behind it

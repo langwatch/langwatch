@@ -116,34 +116,28 @@ export class ModelDefaultsApiService {
   }
 
   async getSnapshot(): Promise<ModelDefaultsSnapshot> {
-    return this.request<ModelDefaultsSnapshot>("/api/model-defaults");
+    return this.request<ModelDefaultsSnapshot>("/api/v1/model-defaults");
   }
 
   async createConfig(body: CreateConfigBody): Promise<{ id: string }> {
-    return this.request<{ id: string }>("/api/model-defaults", {
+    return this.request<{ id: string }>("/api/v1/model-defaults", {
       method: "POST",
       body: JSON.stringify(body),
     });
   }
 
   async updateConfig(id: string, body: UpdateConfigBody): Promise<void> {
-    await this.request<void>(
-      `/api/model-defaults/${encodeURIComponent(id)}`,
-      {
-        method: "PUT",
-        body: JSON.stringify(body),
-        allowNoContent: true,
-      },
-    );
+    await this.request<void>(`/api/v1/model-defaults/${encodeURIComponent(id)}`, {
+      method: "PUT",
+      body: JSON.stringify(body),
+      allowNoContent: true,
+    });
   }
 
   async deleteConfig(id: string): Promise<void> {
-    await this.request<void>(
-      `/api/model-defaults/${encodeURIComponent(id)}`,
-      {
-        method: "DELETE",
-        allowNoContent: true,
-      },
-    );
+    await this.request<void>(`/api/v1/model-defaults/${encodeURIComponent(id)}`, {
+      method: "DELETE",
+      allowNoContent: true,
+    });
   }
 }

@@ -21,12 +21,12 @@ describe("PromptsApiService.renameTag", () => {
     } as InternalConfig);
   });
 
-  /** @scenario renameTag calls PUT /api/prompts/tags/{tag} with new name */
-  it("calls PUT /api/prompts/tags/{tag} with new name", async () => {
+  /** @scenario renameTag calls PUT /api/v1/prompts/tags/{tag} with new name */
+  it("calls PUT /api/v1/prompts/tags/{tag} with new name", async () => {
     mockPut.mockResolvedValue({ data: undefined, error: undefined });
     await service.renameTag({ tag: "old-name", name: "new-name" });
     expect(mockPut).toHaveBeenCalledWith(
-      "/api/prompts/tags/{tag}",
+      "/api/v1/prompts/tags/{tag}",
       expect.objectContaining({
         params: expect.objectContaining({ path: { tag: "old-name" } }),
         body: { name: "new-name" },
@@ -37,7 +37,9 @@ describe("PromptsApiService.renameTag", () => {
   describe("when the API returns an error", () => {
     it("throws PromptsApiError", async () => {
       mockPut.mockResolvedValue({ data: undefined, error: "tag not found" });
-      await expect(service.renameTag({ tag: "old-name", name: "new-name" })).rejects.toThrow(PromptsApiError);
+      await expect(service.renameTag({ tag: "old-name", name: "new-name" })).rejects.toThrow(
+        PromptsApiError,
+      );
     });
   });
 });
@@ -66,7 +68,7 @@ describe("PromptsApiService.get", () => {
       await service.get("pizza-prompt", { tag: "production" });
 
       expect(mockGet).toHaveBeenCalledWith(
-        "/api/prompts/{id}",
+        "/api/v1/prompts/{id}",
         expect.objectContaining({
           params: expect.objectContaining({
             path: { id: "pizza-prompt" },
@@ -83,7 +85,7 @@ describe("PromptsApiService.get", () => {
       await service.get("pizza-prompt", { tag: "production", version: "3" });
 
       expect(mockGet).toHaveBeenCalledWith(
-        "/api/prompts/{id}",
+        "/api/v1/prompts/{id}",
         expect.objectContaining({
           params: expect.objectContaining({
             path: { id: "pizza-prompt" },
@@ -138,9 +140,7 @@ describe("PromptsApiService.sync", () => {
       });
 
       await expect(service.sync(syncArgs)).rejects.toThrow(PromptsApiError);
-      await expect(service.sync(syncArgs)).rejects.toThrow(
-        /invalid response body/,
-      );
+      await expect(service.sync(syncArgs)).rejects.toThrow(/invalid response body/);
     });
 
     it("throws PromptsApiError when data is missing entirely", async () => {
@@ -162,7 +162,7 @@ describe("PromptsApiService.sync", () => {
 
 describe("PromptsApiService.handleApiError", () => {
   let service: PromptsApiService;
-  let handleApiError: typeof PromptsApiService.prototype["handleApiError"];
+  let handleApiError: (typeof PromptsApiService.prototype)["handleApiError"];
 
   beforeEach(() => {
     service = new PromptsApiService({
@@ -174,9 +174,7 @@ describe("PromptsApiService.handleApiError", () => {
   });
 
   it("extracts string error", () => {
-    expect(() =>
-      handleApiError("test operation", "simple error")
-    ).toThrow(PromptsApiError);
+    expect(() => handleApiError("test operation", "simple error")).toThrow(PromptsApiError);
 
     try {
       handleApiError("test operation", "simple error");
@@ -239,7 +237,9 @@ describe("PromptsApiService.handleApiError", () => {
       handleApiError("test operation", error);
     } catch (e) {
       expect(e).toBeInstanceOf(PromptsApiError);
-      expect((e as PromptsApiError).message).toBe("Failed to test operation: Unknown error occurred");
+      expect((e as PromptsApiError).message).toBe(
+        "Failed to test operation: Unknown error occurred",
+      );
     }
   });
 
@@ -295,4 +295,3 @@ describe("PromptsApiService.handleApiError", () => {
     }
   });
 });
-

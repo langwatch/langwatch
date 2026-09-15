@@ -9,9 +9,7 @@ import type { CommandResult } from "../../utils/output";
  * Returns the revoked key rather than printing it: the output port renders it
  * in whatever format the caller asked for (utils/output.ts).
  */
-export const revokeVirtualKeyCommand = async (
-  id: string,
-): Promise<CommandResult | void> => {
+export const revokeVirtualKeyCommand = async (id: string): Promise<CommandResult | void> => {
   await resolveCredentials();
 
   const service = new VirtualKeysApiService();

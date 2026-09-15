@@ -1,0 +1,49 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "types": ["node"],
+    "tsBuildInfoFile": "dist/tsconfig.test.tsbuildinfo"
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": [],
+
+  "references": [
+    {
+      "path": "tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/actor/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/api/tsconfig.build.json"
+    },
+    {
+      "path": "../contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/eventing/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/handled-error/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/observability/tsconfig.build.json"
+    },
+    {
+      "path": "../../organization/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/prisma-client/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/system-migrations/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/time/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/test-harness/tsconfig.build.json"
+    }
+  ]
+}

@@ -1,12 +1,9 @@
 {
+  "extends": "../tsconfig.base.json",
   "compilerOptions": {
-    "target": "ES2022",
+    "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo/skills.tsbuildinfo",
     "module": "ESNext",
-    "moduleResolution": "bundler",
-    "strict": true,
     "esModuleInterop": true,
-    "skipLibCheck": true,
-    "forceConsistentCasingInFileNames": true,
     "isolatedModules": true,
     "noUncheckedIndexedAccess": true
   },

@@ -15,7 +15,11 @@ vi.mock("@/client-sdk/services/experiments/experiments-api.service", async (impo
 });
 
 vi.mock("../../../utils/apiKey", () => ({
-  resolveCredentials: vi.fn(async () => ({ apiKey: "test-key", source: "env", endpoint: "https://app.langwatch.ai" })),
+  resolveCredentials: vi.fn(async () => ({
+    apiKey: "test-key",
+    source: "env",
+    endpoint: "https://app.langwatch.ai",
+  })),
 }));
 
 vi.mock("ora", () => ({
@@ -60,20 +64,22 @@ const sampleResults = {
   ],
   evaluations: [
     { evaluator: "quality", index: 0, status: "processed", score: 0.9, passed: true },
-    { evaluator: "quality", index: 2, status: "processed", score: 0.2, passed: false, details: "low score" },
+    {
+      evaluator: "quality",
+      index: 2,
+      status: "processed",
+      score: 0.2,
+      passed: false,
+      details: "low score",
+    },
     { evaluator: "safety", index: 0, status: "processed", score: 1.0, passed: true },
   ],
   timestamps: { createdAt: 0, updatedAt: 0 },
 };
 
 /**
- * A run with a Comparison evaluator.
- *
- * The shape is the point: dataset entries are per (row, target), and the
- * comparison's verdict is per row only — recorded against its own id, which
- * is not one of the targets. Anything keyed that way has no dataset entry to
- * hang off, which is exactly how 60 real verdicts went missing on a live run
- * while the run summary still advertised the comparison.
+ * Comparison evaluator verdicts are keyed to row only, not (row, target).
+ * They have no dataset entry to attach to. Test ensures they don't vanish.
  */
 const comparisonResults = {
   experimentId: "exp_2",
@@ -88,11 +94,41 @@ const comparisonResults = {
     { index: 1, targetId: "target_b", entry: { input: "q2" } },
   ],
   evaluations: [
-    { evaluator: "quality", targetId: "target_a", index: 0, status: "processed", score: 0.9, passed: true },
-    { evaluator: "quality", targetId: "target_b", index: 0, status: "processed", score: 0.4, passed: true },
+    {
+      evaluator: "quality",
+      targetId: "target_a",
+      index: 0,
+      status: "processed",
+      score: 0.9,
+      passed: true,
+    },
+    {
+      evaluator: "quality",
+      targetId: "target_b",
+      index: 0,
+      status: "processed",
+      score: 0.4,
+      passed: true,
+    },
     // Keyed to the comparison, not to a target — no dataset row matches this.
-    { evaluator: "target_comparison", targetId: "target_comparison", index: 0, status: "processed", score: 1, label: "target_a", details: "A was clearer." },
-    { evaluator: "target_comparison", targetId: "target_comparison", index: 1, status: "processed", score: 1, label: "target_b", details: "B was more accurate." },
+    {
+      evaluator: "target_comparison",
+      targetId: "target_comparison",
+      index: 0,
+      status: "processed",
+      score: 1,
+      label: "target_a",
+      details: "A was clearer.",
+    },
+    {
+      evaluator: "target_comparison",
+      targetId: "target_comparison",
+      index: 1,
+      status: "processed",
+      score: 1,
+      label: "target_b",
+      details: "B was more accurate.",
+    },
   ],
   timestamps: { createdAt: 0, updatedAt: 0 },
 };
@@ -109,12 +145,14 @@ describe("experimentResultsCommand()", () => {
     mockListRuns = vi.fn().mockResolvedValue({
       runs: [{ runId: "run_1" }, { runId: "older_run" }],
     });
-    vi.mocked(ExperimentsApiService).mockImplementation(function () { return ({
-      startRun: vi.fn(),
-      getRunStatus: vi.fn(),
-      getRunResults: mockGetRunResults,
-      listRuns: mockListRuns,
-    }) as unknown as ExperimentsApiService; });
+    vi.mocked(ExperimentsApiService).mockImplementation(function () {
+      return {
+        startRun: vi.fn(),
+        getRunStatus: vi.fn(),
+        getRunResults: mockGetRunResults,
+        listRuns: mockListRuns,
+      } as unknown as ExperimentsApiService;
+    });
     logSpy = vi.spyOn(console, "log").mockImplementation(noop);
     vi.spyOn(console, "error").mockImplementation(noop);
     mockProcessExit();
@@ -161,9 +199,9 @@ describe("experimentResultsCommand()", () => {
       /** @scenario "User requests an experiment with no runs" */
       it("exits with code 1", async () => {
         mockListRuns.mockResolvedValue({ runs: [] });
-        await expect(
-          experimentResultsCommand({ experimentSlug: "doc-qa" }),
-        ).rejects.toMatchObject({ code: 1 });
+        await expect(experimentResultsCommand({ experimentSlug: "doc-qa" })).rejects.toMatchObject({
+          code: 1,
+        });
         expect(mockGetRunResults).not.toHaveBeenCalled();
       });
     });
@@ -227,9 +265,7 @@ describe("experimentResultsCommand()", () => {
         });
 
         result?.table();
-        const printed = logSpy.mock.calls
-          .map((c: unknown[]) => String(c[0]))
-          .join("\n");
+        const printed = logSpy.mock.calls.map((c: unknown[]) => String(c[0])).join("\n");
         expect(printed).toContain("Showing 5 of 50");
       });
     });
@@ -268,9 +304,10 @@ describe("experimentResultsCommand()", () => {
         result?.table();
         const printed = logSpy.mock.calls.map((c: unknown[]) => String(c[0])).join("\n");
         expect(printed).toContain("quality");
-        const headerLine = logSpy.mock.calls
-          .map((c: unknown[]) => String(c[0]))
-          .find((line: string) => line.includes("Target")) ?? "";
+        const headerLine =
+          logSpy.mock.calls
+            .map((c: unknown[]) => String(c[0]))
+            .find((line: string) => line.includes("Target")) ?? "";
         expect(headerLine).not.toContain("safety");
       });
     });
@@ -366,7 +403,7 @@ describe("experimentResultsCommand()", () => {
 
   describe("given a run with a Comparison evaluator", () => {
     describe("when the results are returned", () => {
-      /** @scenario "A comparison verdict reaches the CLI even though it belongs to no single target" */
+      /** @scenario "Comparison verdict reaches CLI despite no single target" */
       it("keeps the verdicts that belong to no single target", async () => {
         mockGetRunResults.mockResolvedValue(comparisonResults);
 
@@ -375,14 +412,9 @@ describe("experimentResultsCommand()", () => {
         });
 
         const evaluations = (result as any).data.evaluations;
-        const verdicts = evaluations.filter(
-          (e: any) => e.evaluator === "target_comparison",
-        );
+        const verdicts = evaluations.filter((e: any) => e.evaluator === "target_comparison");
         expect(verdicts).toHaveLength(2);
-        expect(verdicts.map((v: any) => v.label)).toEqual([
-          "target_a",
-          "target_b",
-        ]);
+        expect(verdicts.map((v: any) => v.label)).toEqual(["target_a", "target_b"]);
         // The judge's reasoning is the reason to reach for this at all.
         expect(verdicts[0].details).toBe("A was clearer.");
       });
@@ -397,9 +429,7 @@ describe("experimentResultsCommand()", () => {
         });
 
         const evaluations = (result as any).data.evaluations;
-        expect(
-          evaluations.filter((e: any) => e.evaluator === "quality"),
-        ).toHaveLength(2);
+        expect(evaluations.filter((e: any) => e.evaluator === "quality")).toHaveLength(2);
       });
     });
 
@@ -429,9 +459,7 @@ describe("experimentResultsCommand()", () => {
         });
 
         const evaluations = (result as any).data.evaluations;
-        const verdicts = evaluations.filter(
-          (e: any) => e.evaluator === "target_comparison",
-        );
+        const verdicts = evaluations.filter((e: any) => e.evaluator === "target_comparison");
         expect(verdicts.map((v: any) => v.index)).toEqual([1]);
       });
     });
@@ -447,9 +475,7 @@ describe("experimentResultsCommand()", () => {
         });
 
         const evaluations = (result as any).data.evaluations;
-        const verdicts = evaluations.filter(
-          (e: any) => e.evaluator === "target_comparison",
-        );
+        const verdicts = evaluations.filter((e: any) => e.evaluator === "target_comparison");
         // Both judged rows are in the answer, not only the two rows the table
         // would have printed.
         expect(verdicts.map((v: any) => v.index).sort()).toEqual([0, 1]);
@@ -467,9 +493,7 @@ describe("experimentResultsCommand()", () => {
         });
 
         const evaluations = (result as any).data.evaluations;
-        expect(
-          evaluations.some((e: any) => e.evaluator === "target_comparison"),
-        ).toBe(false);
+        expect(evaluations.some((e: any) => e.evaluator === "target_comparison")).toBe(false);
       });
     });
   });
@@ -486,9 +510,7 @@ describe("experimentResultsCommand()", () => {
             options: { runId: "missing" },
           }),
         ).rejects.toMatchObject({ code: 1 });
-        expect(oraMocks.fail).toHaveBeenCalledWith(
-          expect.stringContaining("Run not found"),
-        );
+        expect(oraMocks.fail).toHaveBeenCalledWith(expect.stringContaining("Run not found"));
       });
     });
   });
@@ -510,10 +532,30 @@ const comparisonFailedResults = {
     { index: 0, targetId: "target_b", entry: { input: "q1" } },
   ],
   evaluations: [
-    { evaluator: "quality", targetId: "target_a", index: 0, status: "processed", score: 0.9, passed: true },
-    { evaluator: "quality", targetId: "target_b", index: 0, status: "processed", score: 0.8, passed: true },
+    {
+      evaluator: "quality",
+      targetId: "target_a",
+      index: 0,
+      status: "processed",
+      score: 0.9,
+      passed: true,
+    },
+    {
+      evaluator: "quality",
+      targetId: "target_b",
+      index: 0,
+      status: "processed",
+      score: 0.8,
+      passed: true,
+    },
     // Row-independent, and the only thing that went wrong.
-    { evaluator: "target_comparison", targetId: "target_comparison", index: 0, status: "error", details: "judge timed out" },
+    {
+      evaluator: "target_comparison",
+      targetId: "target_comparison",
+      index: 0,
+      status: "error",
+      details: "judge timed out",
+    },
   ],
   timestamps: { createdAt: 0, updatedAt: 0 },
 };
@@ -550,9 +592,7 @@ describe("experimentResultsCommand() — failures the row join cannot see", () =
       })) as { data: { dataset: unknown[]; evaluations: { evaluator: string }[] } };
 
       expect(result.data.dataset.length).toBeGreaterThan(0);
-      expect(
-        result.data.evaluations.some((e) => e.evaluator === "target_comparison"),
-      ).toBe(true);
+      expect(result.data.evaluations.some((e) => e.evaluator === "target_comparison")).toBe(true);
     });
   });
 
@@ -561,9 +601,7 @@ describe("experimentResultsCommand() — failures the row join cannot see", () =
       mockGetRunResults2.mockResolvedValue({
         ...comparisonFailedResults,
         evaluations: comparisonFailedResults.evaluations.map((e) =>
-          e.status === "error"
-            ? { ...e, status: "processed", score: 1, label: "target_a" }
-            : e,
+          e.status === "error" ? { ...e, status: "processed", score: 1, label: "target_a" } : e,
         ),
       });
 

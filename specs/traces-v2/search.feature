@@ -1923,12 +1923,14 @@ Rule: Attribute sections list values from their own attribute store
     Given the user is authenticated with "traces:view" permission
     And the project has traces with trace, span, and event attributes
 
+  @unit
   Scenario: Expanding an event-attribute key lists values observed on events
     Given events carry the attribute "event.metrics.vote" with values "1" and "-1"
     And no trace-level attribute named "event.metrics.vote" exists
     When the user expands the "event.metrics.vote" key in the Event attributes section
     Then the value list shows "1" and "-1"
 
+  @unit
   Scenario: Expanding a span-attribute key lists values observed on spans
     Given spans carry the attribute "gen_ai.request.model" with value "gpt-5-mini"
     And no trace-level attribute named "gen_ai.request.model" exists
@@ -1952,11 +1954,13 @@ Rule: Event filtering is reachable on the default sidebar
     And the user has never changed density
     And the project has traces with events carrying attributes
 
+  @unit
   Scenario: Event name and Event attributes sections show on the comfortable default
     Given the user has never changed facet visibility
     Then the sidebar shows the "Event name" section
     And the sidebar shows the "Event attributes" section
 
+  @unit
   Scenario: Span attributes stays behind the facet picker on comfortable density
     Given the user has never changed facet visibility
     And the project has traces with span attributes
@@ -1979,6 +1983,7 @@ Rule: Event rows drill down into their metric values
     Given the user is authenticated with "traces:view" permission
     And the project has traces with "thumbs_up_down" events carrying "event.metrics.vote" values "1" and "-1"
 
+  @unit @integration
   Scenario: Expanding the thumbs_up_down row shows its vote values with counts
     When the user expands the "thumbs_up_down" row in the Event name section
     Then the drilldown lists "vote" values "thumbs up" and "thumbs down" with their counts
@@ -1990,11 +1995,13 @@ Rule: Event rows drill down into their metric values
   # named by whoever sent it, has no such mapping and shows as stored.
   # (Metric values are numbers everywhere — see `eventSchema.metrics`, a
   # record of string to number — so "as stored" always means a decimal.)
+  @integration
   Scenario: A metric with no human name shows its stored value
     Given "checkout_survey" events carry "event.metrics.stars" with value "4"
     When the user expands the "checkout_survey" row in the Event name section
     Then the drilldown lists that value as "4"
 
+  @integration
   Scenario: Clicking a vote value on an already-active event row applies a single event-attribute filter
     Given "event:thumbs_up_down" is already an active filter
     When the user clicks the vote value shown as "thumbs down" in the thumbs_up_down drilldown
@@ -2006,6 +2013,7 @@ Rule: Event rows drill down into their metric values
   # event type — a metric that never happened on "thumbs_up_down" would still
   # pass. Adding the anchor keeps the picked value scoped to the row the user
   # actually expanded.
+  @integration
   Scenario: Clicking a vote value on an inactive event row scopes the filter to that event first
     Given the "thumbs_up_down" row is not yet an active filter
     When the user expands the row and clicks the vote value shown as "thumbs down"
@@ -2047,6 +2055,7 @@ Rule: Event rows drill down into their metric values
     When the user clicks the vote value "-1" in the thumbs_up_down drilldown
     Then that trace still matches the resulting query
 
+  @integration
   Scenario: An event type with no metrics shows no drilldown affordance
     Given the project has "custom_marker" events carrying no event.metrics attributes
     Then the "custom_marker" row shows no expand affordance

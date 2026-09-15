@@ -3,7 +3,7 @@
 .PHONY: dev-up dev-down dev-logs setup-hooks service service-watch test-scripts
 .PHONY: dogfood-langy-local
 .PHONY: herrgen herrgen-check
-.PHONY: lint-rules lint-rules-changed lint-rules-test go-lint go-lint-changed
+.PHONY: lint-rules lint-rules-changed lint-rules-test go-lint go-lint-slot go-lint-changed
 .PHONY: _dev-up-deprecation-warning
 
 # Surface every target — boxd-* are pulled in via include below.
@@ -24,7 +24,7 @@ help:
 	@echo "    make service svc=<name>             run a Go service (e.g. aigateway)"
 	@echo ""
 	@echo "  Local dev by hostname (thuishaven):"
-	@echo "    make haven install                  go install the haven binary (then run 'haven ...' directly)"
+	@echo "    make haven install                  go install the haven binary, then check this machine has what haven needs"
 	@echo "    make haven up                       start this worktree's stack (bootstraps itself)"
 	@echo "    make haven status                   every stack + shared-server health, one shot"
 	@echo "    make haven <cmd>                    any haven subcommand (see 'haven help')"
@@ -70,7 +70,7 @@ help:
 	@echo "    make dev-down                          stop isolated containers"
 	@echo "    make dev-logs                          tail isolated logs"
 	@echo ""
-	@echo "  See: dev/docs/adr/004-docker-dev-environment.md, dev/docs/boxd-makefile.md"
+	@echo "  See: dev/docs/adr/004-docker-dev-environment.md, dev/docs/runbooks/boxd-makefile.md"
 
 # The demo applications keep their own Makefile; this only forwards `lang`.
 dogfood-langy-local:
@@ -104,7 +104,7 @@ setup-hooks:
 # Run a Go service via the mono-binary.
 # Usage: make service svc=aigateway
 #
-# Sources every var from platform/app/.env into the Go process's environment.
+# Sources every var from .env into the Go process's environment.
 # The gateway + control-plane intentionally share secrets (LW_GATEWAY_*,
 # LW_VIRTUAL_KEY_PEPPER etc.) — one flat .env is simpler than namespace
 # prefixes. Vars the Go service doesn't need are ignored.
@@ -128,7 +128,7 @@ setup-hooks:
 # the default port, and wrong everywhere else with no error anywhere: the
 # gateway still proxies LLM traffic and returns 200, it just ships spend,
 # budget and auth traffic to whichever control plane that port belongs to.
-DEV_ENV_FILE ?= platform/app/.env
+DEV_ENV_FILE ?= .env
 service:
 	@test -n "$(svc)" || (echo "usage: make service svc=<name>" && exit 1)
 	@_snap=$$(export -p) && \
@@ -137,36 +137,43 @@ service:
 			|| echo "$(DEV_ENV_FILE) not found — using process environment"; } && \
 		eval "$$_snap" && \
 		. dev/scripts/lib/derive-gateway-base-url.sh && derive_gateway_base_url && \
-		export LOG_FORMAT=pretty && \
-		exec go run ./cmd/service $(svc)
+		export LOG_FORMAT=$${LOG_FORMAT:-json} && \
+		if [ -n "$$LANGWATCH_LANE" ]; then exec go run ./cmd/service $(svc) $(args); else \
+			set -o pipefail; go run ./cmd/service $(svc) $(args) 2>&1 \
+				| node dev/scripts/log-render.mjs $(svc) --color; fi
 
-# Run a Go service with live reload on file changes.
+# Run a Go service with live reload on file changes. A rebuild that fails
+# leaves the running process alone and prints the compile error; only a
+# successful build restarts. The quiet window before a rebuild is
+# LANGWATCH_DEV_WATCH_DEBOUNCE_MS, the same knob the Node lane debounces on.
 # Usage: make service-watch svc=aigateway
+#        make service-watch svc=combined args="aigateway nlpgo"
 service-watch:
 	@test -n "$(svc)" || (echo "usage: make watch svc=<name>" && exit 1)
-	@test -f $(DEV_ENV_FILE) || (echo "$(DEV_ENV_FILE) not found — seed platform/app/.env first" && exit 1)
+	@test -f $(DEV_ENV_FILE) || (echo "$(DEV_ENV_FILE) not found — seed .env first" && exit 1)
 	@which air > /dev/null 2>&1 || (echo "Installing air..." && go install github.com/air-verse/air@latest)
 	@_snap=$$(export -p) && \
 		set -a && . $(DEV_ENV_FILE) && set +a && \
 		eval "$$_snap" && \
 		. dev/scripts/lib/derive-gateway-base-url.sh && derive_gateway_base_url && \
-		export LOG_FORMAT=pretty && \
-		air --build.cmd "go build -o ./tmp/$(svc) ./cmd/service" \
-			--build.bin "./tmp/$(svc) $(svc)" \
+		export LOG_FORMAT=$${LOG_FORMAT:-json} && \
+		air --build.cmd "mkdir -p .bin/$(svc) && go build -o .bin/$(svc)/$(svc) ./cmd/service" \
+			--build.bin ".bin/$(svc)/$(svc) $(svc) $(args)" \
 			--build.include_ext "go" \
-			--build.exclude_dir "tmp,vendor,node_modules"
+			--build.delay $${LANGWATCH_DEV_WATCH_DEBOUNCE_MS:-750} \
+			--build.exclude_dir ".bin,tmp,vendor,node_modules"
 
 # The dev* shim targets were removed in #4053. Use `make quickstart`
 # (interactive) or `./dev/scripts/dev.sh <preset>` directly. Preset list:
 # all-local, all-local-nlp, dev-storage, dev-infra, frontend-only,
 # migration, full-local.
 
-# Refresh AWS SSO credentials in platform/app/.env so `make quickstart
+# Refresh AWS SSO credentials in .env so `make quickstart
 # dev-storage` can talk to runtime-storage-dev. SSO temporary tokens
 # expire ~hourly; this rotates the three S3_*_KEY/TOKEN lines in
-# platform/app/.env, leaving S3_BUCKET_NAME/S3_ENDPOINT/S3_REGION alone.
+# .env, leaving S3_BUCKET_NAME/S3_ENDPOINT/S3_REGION alone.
 refresh-dev-s3:
-	@bash platform/app/scripts/refresh-dev-s3-env.sh
+	@bash dev/scripts/refresh-dev-s3-env.sh
 
 # Run all *.unit.bats tests under dev/scripts/__tests__/. Dev-only — these
 # tests cover shell behavior of `dev.sh` / `write-dev-overrides.sh` /
@@ -213,7 +220,7 @@ herrgen-check:
 # uses — rule-matching behaviour is version-sensitive. Bump both together.
 AST_GREP_VERSION := 0.42.3
 SEMGREP_VERSION  := 1.164.0
-GOLANGCI_VERSION := v2.11.4
+GOLANGCI_VERSION := v2.13.2
 
 # Resolve the pinned tools without caring how the developer installs Python
 # tools. `uv` is preferred (isolated, no venv juggling); an already-correct
@@ -259,15 +266,29 @@ lint-rules-test:
 # which is why "run the Go checks before pushing" quietly stopped happening.
 # Always resolve the pinned version rather than trusting PATH.
 GOLANGCI := $(shell if command -v golangci-lint >/dev/null 2>&1 && golangci-lint --version 2>/dev/null | grep -q "$(patsubst v%,%,$(GOLANGCI_VERSION))"; then echo golangci-lint; else echo "go run github.com/golangci/golangci-lint/v2/cmd/golangci-lint@$(GOLANGCI_VERSION)"; fi)
-GO_LINT_PKGS := ./services/aigateway/... ./services/langyagent/... ./services/nlpgo/... ./pkg/... ./cmd/... ./tools/...
+GO_LINT_PKGS := ./services/aigateway/... ./services/langyagent/... ./services/mailsim/... ./services/nlpgo/... ./pkg/... ./cmd/... ./tools/...
 
-go-lint:
-	@echo "==> golangci-lint $(GOLANGCI_VERSION)"
-	@$(GOLANGCI) run $(GO_LINT_PKGS)
+# golangci-lint reads package export data through whatever `go` it finds, and
+# the pinned linter (built with Go 1.25, upstream ships "latest-1") cannot
+# read the format a Go newer than go.mod's emits. CI never sees this because
+# it installs from go-version-file: go.mod; a laptop ahead of the repo does.
+# Pinning GOTOOLCHAIN to go.mod's version makes both environments identical.
+GO_MOD_TOOLCHAIN := go$(shell awk '$$1 == "go" {print $$2; exit}' go.mod)
+
+# golangci-lint saturates cores the same way a whole-tree typecheck does, so it
+# takes a slot from the same machine-wide counter (`haven slot run`) before it
+# runs, and queues behind a typecheck already running rather than piling onto
+# it. go-lint-changed stays direct: it scans only the diff against
+# origin/main, not the whole tree, and is not the cost this queue exists for.
+go-lint-slot:
+	@echo "==> golangci-lint $(GOLANGCI_VERSION) (queued through haven slot run)"
+	@$(HAVEN) slot run --label golangci-lint -- env GOTOOLCHAIN=$(GO_MOD_TOOLCHAIN) $(GOLANGCI) run $(GO_LINT_PKGS)
+
+go-lint: go-lint-slot
 
 go-lint-changed:
 	@echo "==> golangci-lint $(GOLANGCI_VERSION) (new/changed lines only)"
-	@$(GOLANGCI) run --new-from-merge-base=origin/main $(GO_LINT_PKGS)
+	@env GOTOOLCHAIN=$(GO_MOD_TOOLCHAIN) $(GOLANGCI) run --new-from-merge-base=origin/main $(GO_LINT_PKGS)
 
 # Stop all services
 down:
@@ -303,24 +324,24 @@ else
 	@:
 endif
 
-# Run the app (pnpm dev, which also auto-starts the Go aigateway) alongside
-# the Go nlpgo engine. nlpgo is the `nlpgo` subcommand of the cmd/service
-# monobinary, run the same way as aigateway (`make service svc=nlpgo`). We pin
-# SERVER_ADDR=:5561 so it binds the port the app expects (LANGWATCH_NLP_SERVICE
-# → http://localhost:5561) and doesn't collide with langevals on :5562.
-# LANGWATCH_ENDPOINT points nlpgo's evaluator/agent-workflow callbacks back at
-# the local app.
+# The whole local stack in one terminal: the three applications (ui, api,
+# workers) plus the Go aigateway and nlpgo engines. `pnpm dev` starts all five
+# itself now — dev/scripts/dev-stack.sh derives every port and skips a Go lane
+# that is already listening — so this target is one line pointing at it, kept
+# because `make start` is in the README and in muscle memory.
 start:
-	cd platform/app && pnpm concurrently --kill-others \
-		'pnpm dev' \
-		'SERVER_ADDR=:5561 LANGWATCH_ENDPOINT=http://localhost:5560 make -C .. service svc=nlpgo'
+	pnpm dev
 
 start/postgres:
 	@echo "Starting Postgres..."
 	@docker compose -f infra/compose.yml --project-directory . up -d postgres
 
+# A watching typecheck of one application (default apps/api):
+#   make tsc-watch app=apps/ui
+# It never takes a check-queue slot — a `--watch` run would hold one for the
+# whole session, which is exactly what the queue exists to prevent.
 tsc-watch:
-	cd platform/app && pnpm tsc-watch
+	pnpm exec tsc --noEmit --watch --preserveWatchOutput -p $(or $(app),apps/api)/tsconfig.json
 
 # Single entry point — interactive launcher or non-interactive mode runner.
 # (#3860 AC#1, AC#2). Positional usage via MAKECMDGOALS:
@@ -383,15 +404,29 @@ endif
 worktree:
 	@./dev/scripts/worktree.sh $(WORKTREE_ARG)
 
+# Describe the REST surface the API process actually mounts, and say how it
+# differs from the frozen document.
+#
+# The DOCUMENT IS FROZEN. `apps/api/src/features/discovery/openapi-document.json`
+# is served by three routes and both SDKs generate clients from it, so nothing
+# here writes it — not this target, not the task it runs. What the generator
+# produces goes to a scratch file, and the check prints what a person would
+# have to look at before replacing the artifact by hand.
+#
+# All THREE clients are generated and committed. Go is named explicitly because
+# it was once missing from this target and drifted eight spec commits behind
+# while TypeScript and Python stayed current. GOWORK=off because sdks/go/client
+# is its own module and is deliberately absent from the repo-root go.work.
+#
+# To regenerate the CLIENTS from the document as it stands, run the three
+# commands the output names.
 sync-all-openapi:
-	cd platform/app && pnpm run task generateOpenAPISpec
-	cd sdks/typescript && pnpm run generate:openapi-types
-	cd sdks/python && make generate/api-client
-	# The Go client is generated and committed like the other two, and was
-	# missing here — which is why it drifted eight spec commits behind while
-	# TypeScript and Python stayed current. GOWORK=off because sdks/go/client
-	# is its own module and is deliberately absent from the repo-root go.work.
-	cd sdks/go/client && GOWORK=off go generate ./...
+	@pnpm --filter @langwatch/platform-api task openapi-check
+	@echo ""
+	@echo "The frozen document was NOT written. To refresh the clients from it as it stands:"
+	@echo "    cd sdks/typescript && pnpm run generate:openapi-types"
+	@echo "    cd sdks/python && make generate/api-client"
+	@echo "    cd sdks/go/client && GOWORK=off go generate ./..."
 
 # Included last on purpose (see the note next to `include dev/boxd.mk`): the
 # `make haven <sub>` passthrough must define its no-op goals after the real

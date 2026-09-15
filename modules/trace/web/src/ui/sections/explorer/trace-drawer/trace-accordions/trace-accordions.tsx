@@ -1,0 +1,65 @@
+import { Box, Skeleton, VStack } from "@chakra-ui/react";
+import { memo } from "react";
+import type { SpanTreeNode, TraceHeader } from "@langwatch/trace-contract";
+import { SpanAccordions } from "./span-accordions.tsx";
+import { useSyncSectionPresence } from "../../../../../behavior/explorer/trace-drawer/trace-accordions/section-presence.ts";
+import { TraceSummaryAccordions } from "./trace-summary-accordions.tsx";
+
+interface TraceAccordionsProps {
+  trace: TraceHeader;
+  spans: SpanTreeNode[];
+  selectedSpan: SpanTreeNode | null;
+  activeTab: "summary" | "span";
+  /**
+   * Set on the span-detail mount when the user has asked for a span (via the row's
+   * drawer, the error popover's "Open span", the URL, etc.) but the span tree hasn't
+   * resolved yet.
+   */
+  selectedSpanId?: string | null;
+  isSpansLoading?: boolean;
+  onSelectSpan?: (spanId: string) => void;
+}
+
+export const TraceAccordions = memo(function TraceAccordions({
+  trace,
+  spans,
+  selectedSpan,
+  activeTab,
+  selectedSpanId,
+  isSpansLoading,
+  onSelectSpan,
+}: TraceAccordionsProps) {
+  useSyncSectionPresence({ traceId: trace.traceId, tab: activeTab });
+
+  if (activeTab === "span" && selectedSpan) {
+    return (
+      // Key on spanId so React fully unmounts the old span's accordion
+      // state when the user switches spans — otherwise the previous
+      // span's open/closed sections and stale detail flicker through
+      // during the transition.
+      <SpanAccordions
+        key={selectedSpan.spanId}
+        traceId={trace.traceId}
+        span={selectedSpan}
+        onSelectSpan={onSelectSpan}
+      />
+    );
+  }
+  // Span tab + an id we haven't resolved yet + tree is still loading → render a
+  // skeleton instead of falling through to the trace summary.
+  if (activeTab === "span" && selectedSpanId && isSpansLoading) {
+    return (
+      <Box padding={4}>
+        <VStack align="stretch" gap={2}>
+          <Skeleton height="20px" width="40%" borderRadius="sm" />
+          <Skeleton height="14px" width="65%" borderRadius="sm" />
+          <Skeleton height="14px" width="55%" borderRadius="sm" />
+          <Skeleton height="120px" borderRadius="md" />
+          <Skeleton height="36px" borderRadius="md" />
+          <Skeleton height="36px" borderRadius="md" />
+        </VStack>
+      </Box>
+    );
+  }
+  return <TraceSummaryAccordions trace={trace} spans={spans} onSelectSpan={onSelectSpan} />;
+});

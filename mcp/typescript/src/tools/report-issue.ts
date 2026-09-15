@@ -68,14 +68,11 @@ function redactReport(params: ReportIssueParams): RedactedReport {
   };
 }
 
-async function deliverReport(
-  report: RedactedReport,
-  params: ReportIssueParams,
-): Promise<string> {
+async function deliverReport(report: RedactedReport, params: ReportIssueParams): Promise<string> {
   const config = getConfig();
   const endpoint = config.endpoint.replace(/\/+$/, "");
 
-  const response = await fetch(`${endpoint}/api/bug-reports`, {
+  const response = await fetch(`${endpoint}/api/v1/bug-reports`, {
     method: "POST",
     headers: {
       "content-type": "application/json",
@@ -117,9 +114,7 @@ async function deliverReport(
  * an API key: the reporter may be struggling precisely because setup failed.
  * When a key is configured it only links the report to the project.
  */
-export async function handleReportIssue(
-  params: ReportIssueParams,
-): Promise<string> {
+export async function handleReportIssue(params: ReportIssueParams): Promise<string> {
   if (!params.user_approved) {
     throw new Error(
       "This sends a report to the LangWatch team, so the user must approve it first. " +

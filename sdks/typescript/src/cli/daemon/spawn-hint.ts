@@ -30,10 +30,7 @@ const WINDOW_MS = 60_000;
 const MISSES_BEFORE_SPAWN = 2;
 
 function hintPath(identity: DaemonIdentity): string {
-  return path.join(
-    identity.socketDir,
-    `${identity.fingerprint.slice(0, 16)}.hint`,
-  );
+  return path.join(identity.socketDir, `${identity.fingerprint.slice(0, 16)}.hint`);
 }
 
 /**
@@ -61,8 +58,7 @@ export function recordMissAndDecideToSpawn(identity: DaemonIdentity): boolean {
       const parsed: unknown = JSON.parse(fs.readFileSync(file, "utf8"));
       if (Array.isArray(parsed)) {
         recent = parsed.filter(
-          (entry): entry is number =>
-            typeof entry === "number" && now - entry < WINDOW_MS,
+          (entry): entry is number => typeof entry === "number" && now - entry < WINDOW_MS,
         );
       }
     } catch {

@@ -6,8 +6,8 @@ import {
   type RequestContext,
   runWithContext,
   updateCurrentContext,
-} from "../context/core";
-import { getLogContext } from "../context/logging";
+} from "../context/core.ts";
+import { getLogContext } from "../context/logging.ts";
 
 vi.mock("@opentelemetry/api", () => ({
   context: {
@@ -95,9 +95,7 @@ describe("context/core", () => {
 
     describe("when no context is set", () => {
       it("does not throw", () => {
-        expect(() =>
-          updateCurrentContext({ organizationId: "no-context" }),
-        ).not.toThrow();
+        expect(() => updateCurrentContext({ organizationId: "no-context" })).not.toThrow();
       });
     });
   });
@@ -130,9 +128,7 @@ describe("context/core", () => {
 
     describe("when the span context is invalid", () => {
       it("returns undefined", async () => {
-        const { trace, isSpanContextValid } = await import(
-          "@opentelemetry/api"
-        );
+        const { trace, isSpanContextValid } = await import("@opentelemetry/api");
         vi.mocked(trace.getSpan).mockReturnValueOnce({
           spanContext: () => ({
             traceId: "00000000000000000000000000000000",

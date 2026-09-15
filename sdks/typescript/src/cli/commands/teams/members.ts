@@ -3,13 +3,7 @@ import { TeamsApiService } from "@/client-sdk/services/teams/teams-api.service";
 import { formatTable } from "../../utils/formatting";
 import { parseRole } from "../../utils/managementFlags";
 import type { CommandResult } from "../../utils/output";
-import {
-  counted,
-  orDash,
-  printEmpty,
-  runManagement,
-  withParsedFlags,
-} from "../management/_shared";
+import { counted, orDash, printEmpty, runManagement, withParsedFlags } from "../management/_shared";
 
 type TeamMemberRow = {
   userId: string | null;
@@ -26,9 +20,7 @@ type TeamMemberRow = {
  * them. Printed straight through, that reads as the same person joining the
  * team twice, and a count of people that is not a count of people.
  */
-const membersByPerson = (
-  rows: TeamMemberRow[],
-): Array<TeamMemberRow & { roles: string[] }> => {
+const membersByPerson = (rows: TeamMemberRow[]): Array<TeamMemberRow & { roles: string[] }> => {
   const byUser = new Map<string, TeamMemberRow & { roles: string[] }>();
   for (const row of rows) {
     const key = row.userId ?? `${row.email ?? ""}|${row.name ?? ""}`;
@@ -46,9 +38,7 @@ const membersByPerson = (
  * Team membership is a team-scoped role binding, which is why adding a member
  * takes the role they get on the team rather than just their id.
  */
-export const listTeamMembersCommand = async (
-  teamId: string,
-): Promise<CommandResult | void> =>
+export const listTeamMembersCommand = async (teamId: string): Promise<CommandResult | void> =>
   runManagement({
     action: "list team members",
     pending: `Fetching members of team "${teamId}"...`,

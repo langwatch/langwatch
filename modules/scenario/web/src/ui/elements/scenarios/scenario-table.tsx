@@ -1,0 +1,60 @@
+import { type ScenarioListItem } from "../../../model/scenario-list.types.ts";
+import { ScenarioTable as ScenarioTableView } from "../scenario-table.tsx";
+import type { ColumnFiltersState, RowSelectionState } from "@tanstack/react-table";
+import {
+  LangyContextTarget,
+  scenarioContextChip,
+} from "@langwatch/langy-web/surfaces/langy-context";
+import type { Scenario } from "../../../model/prisma-types.ts";
+import { formatTimeAgo } from "@langwatch/ui-host/format-time-ago";
+import { TagList } from "../tag-list.tsx";
+
+export type ScenarioTableProps = {
+  scenarios: Scenario[];
+  columnFilters: ColumnFiltersState;
+  onColumnFiltersChange(filters: ColumnFiltersState): void;
+  onRowClick(scenarioId: string): void;
+  rowSelection: RowSelectionState;
+  onRowSelectionChange(selection: RowSelectionState): void;
+  onArchive(scenario: Scenario): void;
+};
+
+function toScenarioListItem(scenario: Scenario): ScenarioListItem {
+  return {
+    id: scenario.id,
+    name: scenario.name,
+    labels: scenario.labels,
+    updatedAt: scenario.updatedAt,
+  };
+}
+
+export function ScenarioTable({ scenarios, onArchive, ...props }: ScenarioTableProps) {
+  const scenarioItems = scenarios.map(toScenarioListItem);
+
+  return (
+    <ScenarioTableView
+      {...props}
+      scenarios={scenarioItems}
+      formatUpdatedAt={(updatedAt) => formatTimeAgo(updatedAt.getTime()) ?? ""}
+      renderLabels={(labels) => <TagList labels={labels} />}
+      renderRow={(scenario, row) => (
+        <LangyContextTarget
+          key={scenario.id}
+          target={scenarioContextChip({
+            scenarioId: scenario.id,
+            name: scenario.name,
+            noun: "scenario",
+          })}
+        >
+          {row}
+        </LangyContextTarget>
+      )}
+      onArchive={(scenario) => {
+        const sourceScenario = scenarios.find(({ id }) => id === scenario.id);
+        if (sourceScenario) {
+          onArchive(sourceScenario);
+        }
+      }}
+    />
+  );
+}

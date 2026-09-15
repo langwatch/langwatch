@@ -14,9 +14,7 @@ export async function handleDeleteDatasetRecords(params: {
 
   const lines: string[] = [];
   lines.push(`${result.deletedCount} record(s) deleted successfully!\n`);
-  lines.push(
-    "> Use `platform_get_dataset` to see the updated dataset.",
-  );
+  lines.push("> Use `platform_get_dataset` to see the updated dataset.");
 
   return lines.join("\n");
 }

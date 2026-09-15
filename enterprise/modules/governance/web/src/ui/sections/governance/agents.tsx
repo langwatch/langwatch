@@ -1,0 +1,565 @@
+import { Box, Heading, HStack, Spinner, VStack } from "@chakra-ui/react";
+import type {
+  AgentsListingOutcome,
+  AgentsListingRefusalCause,
+} from "@ee/governance/services/pullers/agentsListingOutcome";
+import { Plus } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { useSearchParams } from "react-router";
+
+import {
+  AGENTS_EMPTY_COPY,
+  AgentFilterBar,
+  type AgentFilters,
+  AgentFleetSummaryStrip,
+  type AgentsLayout,
+  AgentsLayoutControl,
+  AgentsList,
+  agentsListedEmptyCopy,
+  agentsRefusedCopy,
+  agentsUnlistedCopy,
+  applyAgentFilters,
+  DEFAULT_AGENTS_LAYOUT,
+  type GovernanceAgentRow,
+  type GovernanceEmptyStateCopy,
+  isAgentsLayout,
+  NO_MATCHING_AGENTS_COPY,
+  SAMPLE_AGENT_ROWS,
+  sourcesPresentIn,
+  summarizeAgentFleet,
+  useAgentFilters,
+} from "~/components/governance/agents";
+import {
+  GovernanceEmptyState,
+  GovernanceEmptyStateAction,
+} from "~/components/governance/empty";
+import GovernanceLayout from "~/components/governance/GovernanceLayout";
+import {
+  SampleDataBanner,
+  SampleDataToggle,
+  useSampleMode,
+} from "~/components/governance/sample";
+import {
+  GovernanceSyncButton,
+  governanceSyncStatus,
+} from "~/components/governance/sync";
+import { PageLayout } from "~/components/ui/layouts/PageLayout";
+import { toaster } from "~/components/ui/toaster";
+import { withFeatureFlagGuard } from "~/components/WithFeatureFlagGuard";
+import { withPermissionGuard } from "~/components/WithPermissionGuard";
+import { HandledErrorAlert, showErrorToast } from "~/features/errors";
+import { useDrawer } from "~/hooks/useDrawer";
+import { useOrganizationTeamProject } from "~/hooks/useOrganizationTeamProject";
+import { api } from "~/utils/api";
+
+// Agents page: organization-wide list with real rows. Sample mode either-or. List/cards layout.
+// Register via snippet (ADR-128). Summary folds from rows.
+
+// Layout part of address (?view=); default hidden, unknown degrades to it. Other controls in
+// address so this must be too.
+function useAgentsLayout() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const requested = searchParams.get("view");
+  const layout = isAgentsLayout(requested) ? requested : DEFAULT_AGENTS_LAYOUT;
+  const selectLayout = (next: AgentsLayout) =>
+    setSearchParams(
+      (prev) => {
+        const params = new URLSearchParams(prev);
+        if (next === DEFAULT_AGENTS_LAYOUT) params.delete("view");
+        else params.set("view", next);
+        return params;
+      },
+      { replace: true },
+    );
+  return { layout, selectLayout };
+}
+
+/** The address that opens the register-agent drawer on arrival. */
+const ADD_AGENT_PARAM = "add";
+
+// Deep link ?add=1 opens register drawer, honored once then cleared. Same pattern as
+// people page's useAddDepartmentDeepLink; no permission gate needed.
+function useAddAgentDeepLink() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { openDrawer } = useDrawer();
+
+  const requested = searchParams.get(ADD_AGENT_PARAM) === "1";
+  const drawerOpen = searchParams.get("drawer.open");
+  const opened = useRef(false);
+
+  useEffect(() => {
+    if (!requested) {
+      opened.current = false;
+      return;
+    }
+
+    if (drawerOpen === "addAgent") {
+      setSearchParams(
+        (previous) => {
+          const params = new URLSearchParams(previous);
+          params.delete(ADD_AGENT_PARAM);
+          return params;
+        },
+        { replace: true },
+      );
+      return;
+    }
+    if (opened.current) return;
+    opened.current = true;
+    openDrawer("addAgent");
+  }, [requested, drawerOpen, openDrawer, setSearchParams]);
+}
+
+/**
+ * One empty state, given the page's own words.
+ *
+ * Every one of these carries an action, because the dashed box it replaces
+ * left the reader exactly where they were. The copy lives in `emptyStates.ts`
+ * and the shape is shared with the inventory; see
+ * `~/components/governance/empty`.
+ */
+function AgentsEmptyState({
+  copy,
+  onAct,
+  actionDisabled = false,
+  testId,
+}: {
+  copy: GovernanceEmptyStateCopy;
+  onAct: () => void;
+  /**
+   * The pane's action is a second doorway to a control in the header, so it
+   * has to be shut whenever that control is. An empty state offering a press
+   * the header has already disabled is the same defect as a live button that
+   * silently does nothing, moved down the page.
+   */
+  actionDisabled?: boolean;
+  testId: string;
+}) {
+  return (
+    <GovernanceEmptyState
+      icon={copy.icon}
+      headline={copy.headline}
+      description={copy.description}
+      testId={testId}
+      action={
+        // Weight comes from the descriptor, never from this call site: every
+        // state passing through here would otherwise take the component's
+        // default and draw "Clear filters" as loudly as "Register agent".
+        <GovernanceEmptyStateAction
+          emphasis={copy.emphasis}
+          onClick={onAct}
+          disabled={actionDisabled}
+        >
+          {copy.actionLabel}
+        </GovernanceEmptyStateAction>
+      }
+    />
+  );
+}
+
+// Reads query and displays based on sample choice. Sample mode substitutes wholesale, never
+// fallback for empty/failed reads.
+function useAgentsScreen() {
+  const { organization } = useOrganizationTeamProject({
+    redirectToOnboarding: false,
+  });
+  const orgId = organization?.id ?? "";
+  const sample = useSampleMode();
+
+  const agents = api.governanceAgents.list.useQuery(
+    { organizationId: orgId },
+    { enabled: !!orgId, refetchOnWindowFocus: false },
+  );
+
+  return {
+    sample,
+    rows: sample.active ? SAMPLE_AGENT_ROWS : (agents.data ?? []),
+    // Suppress loading/error under sample mode. Use `!orgId` not `!!orgId` to avoid false
+    // "no agents registered" before org resolves.
+    isLoading: !sample.active && (!orgId || agents.isLoading),
+    error: sample.active ? null : agents.error,
+  };
+}
+
+// Asynchronous: mutation returns when request recorded, answer through next read. hasAsked
+// per mount; second request dropped if first in flight.
+function useAgentSync({
+  orgId,
+  canManage,
+}: {
+  orgId: string;
+  canManage: boolean;
+}) {
+  const [hasAsked, setAsked] = useState(false);
+  const sources = api.governanceAgents.syncSources.useQuery(
+    { organizationId: orgId },
+    { enabled: !!orgId, refetchOnWindowFocus: false },
+  );
+  const mutation = api.governanceAgents.requestListing.useMutation({
+    onSuccess: (result) => {
+      // Zero is not an ask. The service only asks the sources the scheduler
+      // will pull, so a provider can be connected and still leave this at
+      // zero — and then nothing was recorded, nothing will answer, and there
+      // is nothing for a reload to show. Latching `hasAsked` here would put
+      // the control into "already asked, reload to see" over a press that
+      // asked nobody, and "Asked 0 providers" reads as the page miscounting.
+      if (result.requested === 0) {
+        toaster.create({
+          title: "Nothing to ask",
+          description:
+            "No connected provider is scheduled to be asked right now.",
+          type: "info",
+        });
+        return;
+      }
+      setAsked(true);
+      toaster.create({
+        title: "Sync requested",
+        // What was asked, not what was found. The providers have not answered
+        // yet and this page will not notice when they do.
+        description: `Asked ${result.requested} ${
+          result.requested === 1 ? "provider" : "providers"
+        } to list their agents. Reload this page in a moment to see what came back.`,
+        type: "success",
+      });
+    },
+    onError: (error) =>
+      showErrorToast({ error, fallbackTitle: "Couldn't request a sync" }),
+  });
+
+  const connected = sources.data ?? [];
+  const status = governanceSyncStatus({
+    canManage,
+    // Same window as the agents read above: until the organization resolves
+    // this query is disabled and reports `isLoading: false`, so `connected`
+    // is empty and the control would say "no provider can list agents" about
+    // an organization it has not identified yet.
+    isLoadingSources: !orgId || sources.isLoading,
+    sourceCount: connected.length,
+    isAsking: mutation.isPending,
+    hasAsked,
+  });
+
+  return {
+    connected,
+    state: status.state,
+    // Every unpressable state carries its own sentence, in this page's words.
+    // A disabled control with no reason is indistinguishable from a broken
+    // one, so the cause and the sentence are decided together here rather
+    // than left to whichever call site draws the button.
+    reason:
+      status.state === "asked"
+        ? "Already asked. Reload the page to see what the providers reported."
+        : status.state !== "unavailable"
+          ? null
+          : AGENT_SYNC_UNAVAILABLE_REASONS[status.because],
+    press: () => {
+      if (status.state !== "ready") return;
+      mutation.mutate({ organizationId: orgId });
+    },
+  };
+}
+
+/** One sentence per way of not being pressable. See `governanceSyncStatus`. */
+const AGENT_SYNC_UNAVAILABLE_REASONS = {
+  no_grant: "Only an administrator can ask a provider to list its agents.",
+  checking: "Checking which providers can list agents.",
+  no_provider: "No connected provider can list agents.",
+} as const;
+
+// Filter row in header, not here (same as api keys page).
+function AgentsPane({
+  rows,
+  filters,
+  layout,
+  sample,
+  isLoading,
+  noAgents,
+  onClearFilters,
+}: {
+  rows: readonly GovernanceAgentRow[];
+  filters: AgentFilters;
+  layout: AgentsLayout;
+  sample: boolean;
+  isLoading: boolean;
+  /**
+   * What to show when the organization holds no agents at all, decided by the
+   * page rather than here. Which nothing this is depends on whether a provider
+   * that can list agents is connected, which is a read this pane does not
+   * make; the words and the press travel together so a state cannot arrive
+   * with the other page's action attached to it.
+   */
+  noAgents: {
+    copy: GovernanceEmptyStateCopy;
+    onAct: () => void;
+    actionDisabled: boolean;
+    testId: string;
+  };
+  onClearFilters: () => void;
+}) {
+  const visible = applyAgentFilters(rows, filters);
+
+  // Ahead of both empty states, because "no agent has registered yet" is a
+  // claim about the organization and a read still in flight has not earned it.
+  if (isLoading) {
+    return (
+      <Box padding={6}>
+        {/*
+         * Named, so a screen reader announces a wait rather than nothing at
+         * all — and so a test can assert the wait is what rendered. Without a
+         * name this branch is indistinguishable from an empty pane to both.
+         */}
+        <Spinner aria-label="Loading agents" />
+      </Box>
+    );
+  }
+
+  if (visible.length > 0) {
+    return <AgentsList agents={visible} layout={layout} sample={sample} />;
+  }
+
+  // Two different nothings, and they must never borrow each other's words.
+  // Telling a reader who has ten agents and a narrow filter to go register one
+  // is the page failing to understand its own state, so the branch is on why
+  // the list is empty rather than on the fact that it is.
+  return rows.length === 0 ? (
+    <AgentsEmptyState
+      copy={noAgents.copy}
+      onAct={noAgents.onAct}
+      actionDisabled={noAgents.actionDisabled}
+      testId={noAgents.testId}
+    />
+  ) : (
+    <AgentsEmptyState
+      copy={NO_MATCHING_AGENTS_COPY}
+      onAct={onClearFilters}
+      testId="agents-no-match"
+    />
+  );
+}
+
+// Reads page state to decide empty pane: no provider, nothing asked, every answered (only
+// "org has none"), or refusal (beats other readings). Copy in emptyStates.ts.
+// Higher rank = more actionable refusal cause (access > unreachable > incomplete).
+const REFUSAL_CAUSE_RANK: Record<AgentsListingRefusalCause, number> = {
+  // Somebody has to fix something; asking again changes nothing until then.
+  access: 3,
+  // Asking again later is the whole remedy.
+  unreachable: 2,
+  // Nothing is wrong and asking again walks the same pages to the same bound.
+  incomplete: 1,
+};
+
+/** `causes` is never empty here: the caller only asks once a refusal exists. */
+function mostActionableCause(
+  causes: readonly AgentsListingRefusalCause[],
+): AgentsListingRefusalCause {
+  return causes.reduce((best, cause) =>
+    REFUSAL_CAUSE_RANK[cause] > REFUSAL_CAUSE_RANK[best] ? cause : best,
+  );
+}
+
+function chooseNoAgentsState({
+  connected,
+  canAsk,
+  onRegister,
+  onSync,
+  syncDisabled,
+}: {
+  connected: readonly {
+    name: string;
+    lastListing: AgentsListingOutcome | null;
+  }[];
+  canAsk: boolean;
+  onRegister: () => void;
+  onSync: () => void;
+  syncDisabled: boolean;
+}) {
+  if (connected.length === 0) {
+    return {
+      copy: AGENTS_EMPTY_COPY,
+      onAct: onRegister,
+      actionDisabled: false,
+      testId: "agents-empty",
+    };
+  }
+
+  const refused = connected.filter(
+    (source) => source.lastListing?.outcome === "refused",
+  );
+  if (refused.length > 0) {
+    return {
+      copy: agentsRefusedCopy({
+        // Only the ones that refused. Naming a provider that answered would
+        // blame it for a fault it does not have, and send its owner to audit a
+        // credential that is working.
+        providerNames: refused.map((source) => source.name),
+        cause: mostActionableCause(
+          refused.flatMap((source) =>
+            source.lastListing?.outcome === "refused"
+              ? [source.lastListing.cause]
+              : [],
+          ),
+        ),
+        canAsk,
+      }),
+      onAct: onSync,
+      actionDisabled: syncDisabled,
+      testId: "agents-empty-refused",
+    };
+  }
+
+  if (connected.every((source) => source.lastListing?.outcome === "listed")) {
+    return {
+      copy: agentsListedEmptyCopy({
+        providerNames: connected.map((source) => source.name),
+      }),
+      onAct: onRegister,
+      actionDisabled: false,
+      testId: "agents-empty-listed",
+    };
+  }
+
+  return {
+    copy: agentsUnlistedCopy({
+      providerNames: connected.map((source) => source.name),
+      canAsk,
+    }),
+    onAct: onSync,
+    actionDisabled: syncDisabled,
+    testId: "agents-empty-unlisted",
+  };
+}
+
+function AgentsPage() {
+  const { layout, selectLayout } = useAgentsLayout();
+  const { openDrawer } = useDrawer();
+  const openRegister = () => openDrawer("addAgent");
+  useAddAgentDeepLink();
+  const { organization, hasAnyPermission } = useOrganizationTeamProject({
+    redirectToOnboarding: false,
+  });
+  const canManage = hasAnyPermission("governance:manage");
+  const sync = useAgentSync({
+    orgId: organization?.id ?? "",
+    canManage,
+  });
+  const { sample, rows, isLoading, error } = useAgentsScreen();
+  const { filters, setFilter, clearFilters } = useAgentFilters();
+  // Gated on the unfiltered set, never the visible one: a reader who filters
+  // down to nothing must still have the chip that gets them back. The layout
+  // switch takes the same gate, because there is nothing to lay out either
+  // way until a row exists.
+  const showControls = rows.length > 0;
+  // Over the whole fleet, not the filtered view — see `summarizeAgentFleet`.
+  const summary = rows.length > 0 ? summarizeAgentFleet({ rows }) : null;
+  const noAgents = chooseNoAgentsState({
+    connected: sync.connected,
+    // The sentence follows the grant, not the momentary state of the button:
+    // "asking" and "asked" are both readers who may ask.
+    canAsk: canManage,
+    onRegister: openRegister,
+    onSync: sync.press,
+    syncDisabled: sync.state !== "ready",
+  });
+
+  return (
+    <GovernanceLayout pageTitle="Agents · AI Governance · LangWatch">
+      <VStack align="stretch" gap={5} width="full" maxW="container.xl">
+        <HStack justify="space-between" align="center">
+          <Heading size="md">Agents</Heading>
+          <HStack gap={2}>
+            {/* Same corner and same order as the inventory's header: how the
+                content is drawn, then whether it is invented, then the one
+                thing this page is for adding. */}
+            {showControls && (
+              <AgentsLayoutControl layout={layout} onChange={selectLayout} />
+            )}
+            {/* Ghost, so the one outlined control in this row stays the action
+                that creates something of the organization's own — the same
+                arrangement the people header uses for `Run match pass`.
+                It is rendered for every reader rather than gated on the manage
+                grant, which is where this departs from that header: a reader
+                who cannot press it is the one least able to work out why the
+                page will not refresh, and a disabled control that says so
+                tells them, where an absent one does not. */}
+            <GovernanceSyncButton
+              label="Sync agents"
+              state={sync.state}
+              reason={sync.reason}
+              onPress={sync.press}
+            />
+            <SampleDataToggle
+              active={sample.active}
+              onToggle={sample.toggle}
+              size="sm"
+            />
+            {/* The action that creates this page's own thing, drawn as the
+                house header button — outline, small, leading plus glyph, the
+                same control /settings/model-providers uses for "Add Model
+                Provider". It was a solid orange button until the section-wide
+                pass that took solid orange off these pages; the brand accent
+                now marks only the sample affordances, which is the one thing
+                on the screen it needs to distinguish.
+                Rule: specs/ai-governance/dashboard/governance-ui-controls.feature */}
+            <PageLayout.HeaderButton onClick={openRegister}>
+              <Plus size={14} />
+              Register agent
+            </PageLayout.HeaderButton>
+          </HStack>
+        </HStack>
+        {sample.active && (
+          <SampleDataBanner>
+            These agents are an illustration of what this page will hold —
+            nothing here is real.
+          </SampleDataBanner>
+        )}
+        {/* Above the content rather than in place of it. A failed read leaves
+            the page with no rows, and the pane below already has a sentence
+            for that; what it cannot say is that the emptiness is a failure
+            rather than an answer. `useAgentsScreen` has already decided this
+            is null under sample mode. */}
+        <HandledErrorAlert error={error} fallbackTitle="Couldn't load agents" />
+        {/* Under the banner, above the chips. Under the banner because every
+            figure on it is invented while sample mode is on, and the banner is
+            the page's one claim about the whole screen; above the chips
+            because the strip summarizes the fleet rather than whatever the
+            chips have left of it. */}
+        {summary && <AgentFleetSummaryStrip summary={summary} />}
+        {/* Out of the content and into the header. Controls that narrow what
+            is below should not live inside the thing they narrow — the api
+            keys page pairs its scope filter with its create action above a
+            table for the same reason. */}
+        {showControls && (
+          <AgentFilterBar
+            filters={filters}
+            sources={sourcesPresentIn(rows)}
+            onSourceChange={(value) => setFilter("source", value)}
+            onOwnershipChange={(value) => setFilter("ownership", value)}
+            onSortChange={(value) => setFilter("sort", value)}
+          />
+        )}
+        <AgentsPane
+          rows={rows}
+          filters={filters}
+          layout={layout}
+          sample={sample.active}
+          isLoading={isLoading}
+          noAgents={noAgents}
+          onClearFilters={clearFilters}
+        />
+      </VStack>
+      {/* No drawer is mounted here. `CurrentDrawer` at the app root owns the
+          mount and the address owns which one is open, so this page only ever
+          asks. */}
+    </GovernanceLayout>
+  );
+}
+
+export default withFeatureFlagGuard("release_ui_ai_governance_enabled", {
+  bypassOnboardingRedirect: true,
+})(
+  withPermissionGuard("governance:view", {
+    bypassOnboardingRedirect: true,
+  })(AgentsPage),
+);

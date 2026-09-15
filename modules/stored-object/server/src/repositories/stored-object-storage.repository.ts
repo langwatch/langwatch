@@ -1,0 +1,11 @@
+/**
+ * Byte I/O for stored objects, addressed by storage URI.
+ */
+import type { Readable } from "node:stream";
+
+export abstract class StoredObjectStorageRepository {
+  abstract get(uri: string): Promise<Readable>;
+  abstract put(uri: string, bytes: Buffer, mediaType: string): Promise<void>;
+  abstract delete(uri: string): Promise<void>;
+  abstract exists(uri: string): Promise<boolean>;
+}

@@ -1,0 +1,14 @@
+/** The organization drawers; both need fromDrawerAddress's open coercion. */
+
+import {
+  CreateTeamDrawer as CreateTeam,
+  InviteMemberDrawer as InviteMember,
+} from "@langwatch/organization-web/drawers";
+
+import { fromDrawerAddress } from "../../../../model/ui-drawer-address";
+import { withHost } from "../../../../ui/sections/ui-page";
+import { OrganizationHost } from "./organization-host";
+
+export const InviteMemberDrawer = withHost(OrganizationHost, fromDrawerAddress(InviteMember));
+
+export const CreateTeamDrawer = withHost(OrganizationHost, fromDrawerAddress(CreateTeam));

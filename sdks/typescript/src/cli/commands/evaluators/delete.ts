@@ -9,9 +9,7 @@ import type { CommandResult } from "../../utils/output";
  * Returns the archival outcome rather than printing it: the output port renders
  * it in whatever format the caller asked for (utils/output.ts).
  */
-export const deleteEvaluatorCommand = async (
-  idOrSlug: string,
-): Promise<CommandResult | void> => {
+export const deleteEvaluatorCommand = async (idOrSlug: string): Promise<CommandResult | void> => {
   await resolveCredentials();
 
   const service = new EvaluatorsApiService();
@@ -38,9 +36,7 @@ export const deleteEvaluatorCommand = async (
 
   try {
     await service.delete(evaluatorId);
-    deleteSpinner.succeed(
-      `Archived evaluator "${chalk.cyan(evaluatorName)}"`,
-    );
+    deleteSpinner.succeed(`Archived evaluator "${chalk.cyan(evaluatorName)}"`);
   } catch (error) {
     failSpinner({
       spinner: deleteSpinner,

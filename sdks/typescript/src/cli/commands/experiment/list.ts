@@ -50,9 +50,7 @@ export const experimentListCommand = async (
         const tableData = result.experiments.map((exp: ExperimentSummary) => ({
           Name: exp.name ?? exp.slug,
           Slug: exp.slug,
-          "Last Run": exp.lastRunAt
-            ? formatRelativeTime(exp.lastRunAt)
-            : chalk.gray("—"),
+          "Last Run": exp.lastRunAt ? formatRelativeTime(exp.lastRunAt) : chalk.gray("—"),
           Runs: String(exp.runsCount),
         }));
 

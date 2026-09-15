@@ -27,7 +27,7 @@ Langy frontend — the durable event stream these cards must live in), ADR-078
 
 ADR-079 (card determinism) settled who decides presentation: a pure function
 at the command boundary, never the model. It also named what the model was
-left without — any legitimate channel to contribute *data* to a card — and
+left without — any legitimate channel to contribute _data_ to a card — and
 sketched one (`langwatch present`) that was never built, with the amendment
 correcting the record.
 

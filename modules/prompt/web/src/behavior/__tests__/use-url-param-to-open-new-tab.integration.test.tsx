@@ -1,0 +1,102 @@
+/**
+ * @vitest-environment jsdom
+ */
+
+import { act, render } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { PromptBrowserStorage } from "../../model/browser-capabilities.ts";
+import { clearStoreInstances, getStoreForTesting } from "../../model/prompt-tabs-store.ts";
+import { useUrlParamToOpenNewTab } from "../use-url-param-to-open-new-tab.ts";
+
+vi.mock("../use-prompt-project.ts", () => ({
+  usePromptProject: () => ({ project: { id: "project_1" }, projectId: "project_1" }),
+}));
+
+vi.mock("../use-prompt-id-query-param.ts", () => ({
+  usePromptIdQueryParam: () => ({
+    selectedPromptId: null,
+    setSelectedPromptId: vi.fn(),
+    clearSelection: vi.fn(),
+  }),
+}));
+
+const { mockGetResolvedDefault } = vi.hoisted(() => ({
+  mockGetResolvedDefault: vi.fn(),
+}));
+
+vi.mock("../prompt-api.ts", () => ({
+  promptApi: {
+    modelProvider: {
+      getResolvedDefault: { useQuery: mockGetResolvedDefault },
+    },
+    useUtils: () => ({
+      prompts: { getByIdOrHandle: { fetch: vi.fn() } },
+    }),
+  },
+}));
+
+function memoryStorage(): PromptBrowserStorage {
+  const entries = new Map<string, string>();
+  return {
+    get length() {
+      return entries.size;
+    },
+    key: (index) => [...entries.keys()][index] ?? null,
+    getItem: (key) => entries.get(key) ?? null,
+    setItem: (key, value) => {
+      entries.set(key, value);
+    },
+    removeItem: (key) => {
+      entries.delete(key);
+    },
+  };
+}
+
+const capabilities = {
+  storage: memoryStorage(),
+  logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+};
+
+vi.mock("../../model/prompt-host.ts", () => ({
+  usePromptHost: () => ({ tabCapabilities: () => capabilities }),
+}));
+
+const { renderCount } = vi.hoisted(() => ({ renderCount: { value: 0 } }));
+
+function TestComponent() {
+  useUrlParamToOpenNewTab();
+  renderCount.value += 1;
+  return null;
+}
+
+describe("useUrlParamToOpenNewTab", () => {
+  beforeEach(() => {
+    renderCount.value = 0;
+    clearStoreInstances();
+    mockGetResolvedDefault.mockReturnValue({ data: { model: "openai/gpt-5-mini" } });
+  });
+
+  describe("when the hook reads the tab store", () => {
+    /** @scenario "Opening a prompt from the URL does not put the studio in a render loop" */
+    it("renders once and stays put when an unrelated tab opens", () => {
+      render(<TestComponent />);
+
+      expect(renderCount.value).toBe(1);
+
+      act(() => {
+        getStoreForTesting({ projectId: "project_1", capabilities })
+          .getState()
+          .addTab({
+            data: {
+              chat: { initialMessagesFromSpanData: [] },
+              form: { currentValues: {} },
+              meta: { title: null },
+              variableValues: {},
+            },
+          });
+      });
+
+      expect(renderCount.value).toBe(1);
+    });
+  });
+});

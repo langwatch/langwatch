@@ -3,10 +3,7 @@ import {
   ApiKeysApiService,
   type UpdateApiKeyInput,
 } from "@/client-sdk/services/api-keys/api-keys-api.service";
-import {
-  commandValidationError,
-  reportCommandError,
-} from "../../utils/errorOutput";
+import { commandValidationError, reportCommandError } from "../../utils/errorOutput";
 import {
   parseBindingFlags,
   parsePermissionFlags,
@@ -46,9 +43,7 @@ export const updateApiKeyCommand = async ({
     // key's reach with a smaller set is the reason these flags exist.
     return {
       ...(options.name !== undefined ? { name: options.name } : {}),
-      ...(options.description !== undefined
-        ? { description: options.description }
-        : {}),
+      ...(options.description !== undefined ? { description: options.description } : {}),
       ...(options.permissionMode !== undefined
         ? { permissionMode: parsePermissionMode(options.permissionMode) }
         : {}),

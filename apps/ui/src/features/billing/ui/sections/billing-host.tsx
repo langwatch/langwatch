@@ -1,0 +1,82 @@
+/** Billing screen host: tRPC provider and scope. Team from active project (not scope). */
+
+import {
+  billingApi,
+  BillingHostProvider,
+  type BillingHostOrganization,
+  type BillingHostPort,
+} from "@langwatch/enterprise-billing-web/billing";
+import { useMemo, type ReactNode } from "react";
+
+import { readPublicAppConfig } from "../../../../behavior/public-config";
+import { useUiCapabilities } from "@langwatch/ui-host/capabilities";
+import { uiLeaveTo } from "../../../../behavior/ui-departure";
+import { useUiShellFailure } from "../../../../behavior/ui-shell-failure";
+import { UiPageFailure, UiPageLoading } from "../../../../ui/sections/ui-page-fallbacks";
+
+function readDeployment(): { isSaaS: boolean; isSettled: boolean } {
+  try {
+    return { isSaaS: readPublicAppConfig().deployment === "saas", isSettled: true };
+  } catch {
+    return { isSaaS: false, isSettled: false };
+  }
+}
+
+/** Where a Stripe checkout returns the reader to. */
+function applicationOrigin(): string {
+  return typeof window === "undefined" ? "" : window.location.origin;
+}
+
+export function BillingHost({ children }: { children: ReactNode }) {
+  const { session, route, feedback, navigation } = useUiCapabilities();
+  const scope = session.activeScope();
+
+  const organizations = billingApi.organization.getAll.useQuery({ isDemo: false });
+
+  // A refused graph is a state, not an empty one: `organization` below is
+  // read off this query, so a refusal left the billing screens empty forever.
+  const failure = useUiShellFailure({
+    error: organizations.error,
+    fallbackTitle: "Couldn't load your billing",
+  });
+
+  const organization: BillingHostOrganization | undefined = useMemo(() => {
+    const found = (organizations.data ?? []).find(
+      (candidate) => candidate.id === scope.organizationId,
+    );
+    if (!found) return void 0;
+    return { id: found.id, name: found.name, pricingModel: found.pricingModel };
+  }, [organizations.data, scope.organizationId]);
+
+  const activeTeamId = useMemo(() => {
+    if (!scope.projectId) return void 0;
+    for (const candidate of organizations.data ?? []) {
+      for (const team of candidate.teams) {
+        if (team.projects.some((project) => project.id === scope.projectId)) return team.id;
+      }
+    }
+    return void 0;
+  }, [organizations.data, scope.projectId]);
+
+  const reading = route.reading();
+  const host = useMemo<BillingHostPort>(() => {
+    const deployment = readDeployment();
+    return {
+      organization: () => organization,
+      activeTeamId: () => activeTeamId,
+      isSaaS: () => deployment.isSaaS,
+      isDeploymentSettled: () => deployment.isSettled,
+      routeQuery: () => reading.query,
+      applicationOrigin: () => applicationOrigin(),
+      navigate: (to) => navigation.navigate(to),
+      leaveTo: (url) => uiLeaveTo(url),
+      succeeded: (notice) => feedback.succeeded(notice),
+      failed: (failure) => feedback.failed(failure),
+    };
+  }, [organization, activeTeamId, reading, navigation, feedback]);
+
+  if (failure.departing) return <UiPageLoading />;
+  if (failure.copy) return <UiPageFailure copy={failure.copy} />;
+
+  return <BillingHostProvider value={host}>{children}</BillingHostProvider>;
+}

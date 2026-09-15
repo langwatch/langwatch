@@ -4,11 +4,7 @@ import { ChartsApiService } from "@/client-sdk/services/charts/charts-api.servic
 import { resolveCredentials } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
-import {
-  ChartInputError,
-  type DefinitionFlags,
-  resolveDefinitionInput,
-} from "./definitionInput";
+import { ChartInputError, type DefinitionFlags, resolveDefinitionInput } from "./definitionInput";
 
 /**
  * Returns the updated chart rather than printing it: the output port renders
@@ -35,9 +31,7 @@ export const updateChartCommand = async (
 
   if (options.name === undefined && definition === undefined) {
     console.error(
-      chalk.red(
-        "Error: nothing to update — pass --name, or a definition via --sql / --sql-file",
-      ),
+      chalk.red("Error: nothing to update — pass --name, or a definition via --sql / --sql-file"),
     );
     process.exit(1);
   }

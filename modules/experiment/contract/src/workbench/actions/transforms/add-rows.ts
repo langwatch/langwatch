@@ -1,0 +1,63 @@
+import { type AddRowsPayload, addRowsPayloadSchema } from "../schemas.ts";
+import { inlineRowCount, replaceDataset, requireInlineDataset } from "./helpers.ts";
+import type { Transform } from "./types.ts";
+
+const paddedTo = ({ values, length }: { values: string[]; length: number }): string[] => {
+  const padded = [...values];
+  while (padded.length < length) {
+    padded.push("");
+  }
+  return padded;
+};
+
+/**
+ * Append rows to an inline dataset.
+ */
+export const addRows: Transform<
+  AddRowsPayload,
+  { datasetId: string; addedRows: number; rowCount: number }
+> = ({ state, payload }) => {
+  const { datasetId, rows } = addRowsPayloadSchema.parse(payload);
+  const dataset = requireInlineDataset({ state, datasetId });
+
+  const startRowCount = inlineRowCount(dataset.inline);
+  const records: Record<string, string[]> = {};
+
+  for (const column of dataset.inline.columns) {
+    const values = paddedTo({
+      values: dataset.inline.records[column.id] ?? [],
+      length: startRowCount,
+    });
+    for (const row of rows) {
+      values.push(row[column.id] ?? row[column.name] ?? "");
+    }
+    records[column.id] = values;
+  }
+
+  // Keep any column that only exists in the records (never surfaced by the
+  // table, but dropping it here would lose data). It grows with the rest: a
+  // caller cannot address it, so its new cells are empty, and leaving it short
+  // would write ragged records.
+  for (const [columnId, values] of Object.entries(dataset.inline.records)) {
+    if (records[columnId]) continue;
+    records[columnId] = paddedTo({
+      values,
+      length: startRowCount + rows.length,
+    });
+  }
+
+  return {
+    state: replaceDataset({
+      state,
+      dataset: {
+        ...dataset,
+        inline: { ...dataset.inline, records },
+      },
+    }),
+    result: {
+      datasetId,
+      addedRows: rows.length,
+      rowCount: startRowCount + rows.length,
+    },
+  };
+};

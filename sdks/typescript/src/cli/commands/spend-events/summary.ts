@@ -66,15 +66,7 @@ const GROUP_LABELS: Record<string, string> = {
   request_type: "request types",
 };
 
-/**
- * What the row count after the walk is a count OF.
- *
- * A dimension's own noun is only true when the walk has one dimension and no
- * time bucket. Add a second dimension or an hour column and each row is a
- * combination, so calling twelve model-by-hour rows "12 models" states
- * something the data does not say, on a surface whose whole job is being
- * exactly right about counts.
- */
+// Determine correct noun for row count; single dimension yields its own noun.
 export function summaryCountNoun({
   groupBy,
   bucket,
@@ -82,8 +74,7 @@ export function summaryCountNoun({
   groupBy: string[];
   bucket?: string;
 }): string {
-  const countsOneDimension =
-    groupBy.length === 1 && (bucket === undefined || bucket === "none");
+  const countsOneDimension = groupBy.length === 1 && (bucket === undefined || bucket === "none");
   if (!countsOneDimension) return "rows";
   return GROUP_LABELS[groupBy[0] ?? "virtual_key"] ?? "groups";
 }
@@ -104,15 +95,12 @@ function oneOf<T extends string>({
 }): T {
   if (!allowed.includes(value as T)) {
     console.error(
-      chalk.red(
-        `Invalid ${flag} value: ${value} (expected one of ${allowed.join(", ")})`,
-      ),
+      chalk.red(`Invalid ${flag} value: ${value} (expected one of ${allowed.join(", ")})`),
     );
     process.exit(1);
   }
   return value as T;
 }
-
 
 export const spendSummaryCommand = async (options: {
   groupBy?: string;
@@ -147,11 +135,8 @@ export const spendSummaryCommand = async (options: {
         });
   const now = Date.now();
   const fromMs =
-    options.from !== undefined
-      ? parseInstant(options.from, "--from")
-      : now - 24 * 60 * 60 * 1000;
-  const toMs =
-    options.to !== undefined ? parseInstant(options.to, "--to") : now;
+    options.from !== undefined ? parseInstant(options.from, "--from") : now - 24 * 60 * 60 * 1000;
+  const toMs = options.to !== undefined ? parseInstant(options.to, "--to") : now;
   const service = new SpendEventsApiService({ apiKey });
   const spinner = createSpinner("Reading spend summaries...").start();
   try {
@@ -176,10 +161,7 @@ export const spendSummaryCommand = async (options: {
         pairs: options.metadata,
         flag: "--metadata",
       }),
-      limit:
-        options.limit !== undefined
-          ? parsePositiveInt(options.limit, "--limit")
-          : undefined,
+      limit: options.limit !== undefined ? parsePositiveInt(options.limit, "--limit") : undefined,
     })) {
       data.push(row);
     }
@@ -202,9 +184,7 @@ export const spendSummaryCommand = async (options: {
               ? `  img ${row.usage.input_image_tokens} / ${row.usage.output_image_tokens} tok, ${row.usage.image_count} image${row.usage.image_count !== 1 ? "s" : ""}`
               : "";
           const settledNote =
-            row.settled_count > 0
-              ? chalk.yellow(` (+${row.settled_count} settled, unpriced)`)
-              : "";
+            row.settled_count > 0 ? chalk.yellow(` (+${row.settled_count} settled, unpriced)`) : "";
           console.log(
             `${chalk.cyan(rowLabel(row))}  $${Number(row.cost.total_usd).toFixed(6)}  ${row.event_count} events${settledNote}  in ${row.usage.input_tokens} / out ${row.usage.output_tokens}${imageNote}`,
           );

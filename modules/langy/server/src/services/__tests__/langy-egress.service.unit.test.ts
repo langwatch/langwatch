@@ -1,0 +1,87 @@
+/**
+ * The egress allow-list door, through the composition production uses.
+ * @vitest-environment node
+ */
+import { describe, expect, it, vi } from "vitest";
+import type { LangyConversationService } from "../langy-conversation.service.ts";
+import { LangyCredentialService } from "../langy-credential.service.ts";
+import type { LangyMessageService } from "../langy-message.service.ts";
+import type { LangyTurnService } from "../langy-turn.service.ts";
+import { LangyService } from "../langy.service.ts";
+
+/** Only the one collaborator the egress verbs reach. */
+function credentialService(stored: string[] | null) {
+  const saveEgressAllowlist = vi.fn(async () => undefined);
+  const repository = {
+    tryFindEgressAllowlist: vi.fn(async () => stored),
+    saveEgressAllowlist,
+  };
+  const service = LangyCredentialService.create({
+    repository: repository as never,
+    sessionKeys: {} as never,
+    virtualKeys: {} as never,
+    github: {} as never,
+    runtime: {} as never,
+  });
+  return { service, repository, saveEgressAllowlist };
+}
+
+function composed(credentials: LangyCredentialService) {
+  return LangyService.create({
+    conversations: {} as unknown as LangyConversationService,
+    turns: {} as unknown as LangyTurnService,
+    messages: {} as unknown as LangyMessageService,
+    credentials,
+    feedbackPrompt: { shouldPrompt: () => false } as never,
+  });
+}
+
+describe("LangyService egress allow-list, composed the way production composes it", () => {
+  describe("when an allow-list is stored", () => {
+    it("reads it back rather than throwing on the absent repositories", async () => {
+      const { service } = credentialService(["api.example.com"]);
+
+      await expect(
+        composed(service).findEgressAllowlist({ projectId: "project-1" }),
+      ).resolves.toEqual(["api.example.com"]);
+    });
+  });
+
+  describe("when nothing is stored", () => {
+    it("answers null, which the app reads as monitor-only", async () => {
+      const { service } = credentialService(null);
+
+      await expect(
+        composed(service).findEgressAllowlist({ projectId: "project-1" }),
+      ).resolves.toBeNull();
+    });
+  });
+
+  describe("when the allow-list is replaced", () => {
+    it("normalises the hosts and saves them", async () => {
+      const { service, saveEgressAllowlist } = credentialService(null);
+
+      await expect(
+        composed(service).trySetEgressAllowlist({
+          projectId: "project-1",
+          allowlist: ["API.Example.com.", " other.example.com "],
+        }),
+      ).resolves.toEqual(["api.example.com", "other.example.com"]);
+
+      expect(saveEgressAllowlist).toHaveBeenCalledWith("project-1", [
+        "api.example.com",
+        "other.example.com",
+      ]);
+    });
+
+    it("clears back to monitor-only when the list is empty", async () => {
+      const { service, saveEgressAllowlist } = credentialService(["api.example.com"]);
+
+      await expect(
+        composed(service).trySetEgressAllowlist({ projectId: "project-1", allowlist: [] }),
+      ).resolves.toBeNull();
+
+      expect(saveEgressAllowlist).toHaveBeenCalledWith("project-1", null);
+    });
+  });
+});

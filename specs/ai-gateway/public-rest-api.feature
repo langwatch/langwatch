@@ -3,7 +3,7 @@ Feature: Public REST API — /api/gateway/v1/*
   # The public REST surface for the AI Gateway control plane: virtual key
   # CRUD + spend, budget CRUD across every scope dimension, cache rules.
   # Bound scenarios run in
-  # platform/app/src/app/api/gateway-platform/__tests__/ against the real
+  # [gone] src/app/api/gateway-platform/__tests__/ against the real
   # Hono app, real Postgres, and real ClickHouse.
 
   As a LangWatch customer integrating with the AI Gateway programmatically

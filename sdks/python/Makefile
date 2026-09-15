@@ -100,15 +100,24 @@ OPENAPI_PYTHON_CLIENT_VERSION := 0.28.4
 ensure-openapi-python-client:
 	@uv pip install --quiet "openapi-python-client==$(OPENAPI_PYTHON_CLIENT_VERSION)"
 
+# The OpenAPI document is a CHECKED-IN artifact owned by the API process. It
+# used to be regenerated here first (`pnpm run task generateOpenAPISpec`); that
+# generator was deleted with the monolith's task lane and has no replacement,
+# so this target reads the document as it stands and fails loudly if it is
+# missing rather than generating a client from nothing.
+API_SPEC = ../../apps/api/src/features/discovery/openapi-document.json
+
 generate/api-client: ensure-openapi-python-client
-	@echo "Generating OpenAPI spec..."
-	@cd ../../platform/app && pnpm run task generateOpenAPISpec
+	@test -f $(API_SPEC) || { \
+		echo "$(API_SPEC) is missing — the Python client is generated from it" >&2; \
+		exit 1; \
+	}
 	@echo "Deleting old API client..."
 	@rm -rf src/langwatch/generated/langwatch_rest_api_client
 	@echo "Building API client..."
 	@mkdir -p .tmp/api-client
 	@python3 scripts/spec-for-python-generator.py \
-		../../platform/app/src/app/api/openapiLangWatch.json \
+		$(API_SPEC) \
 		.tmp/openapiLangWatch.python.json
 	uv run openapi-python-client generate \
 		--path .tmp/openapiLangWatch.python.json \

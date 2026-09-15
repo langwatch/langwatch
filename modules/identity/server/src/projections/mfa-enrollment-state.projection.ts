@@ -1,0 +1,201 @@
+import {
+  BACKUP_CODE_CONSUMED_EVENT_TYPE,
+  BACKUP_CODES_REGENERATED_EVENT_TYPE,
+  backupCodeConsumedPayloadSchema,
+  backupCodesRegeneratedPayloadSchema,
+  emptyMfaEnrollment,
+  MFA_CONFIRMED_EVENT_TYPE,
+  MFA_DISABLED_EVENT_TYPE,
+  MFA_ENROLLED_EVENT_TYPE,
+  MFA_ENROLLMENT_EXPIRED_EVENT_TYPE,
+  MFA_VERIFICATION_FAILED_EVENT_TYPE,
+  mfaConfirmedPayloadSchema,
+  mfaDisabledPayloadSchema,
+  type MfaEnrollmentState,
+  mfaEnrolledPayloadSchema,
+  mfaEnrollmentExpiredPayloadSchema,
+  mfaVerificationFailedPayloadSchema,
+  reduceMfaEnrollment,
+} from "@langwatch/identity-contract";
+import {
+  AbstractFoldProjection,
+  EventSchema,
+  type FoldEventHandlers,
+  type StateProjectionStore,
+} from "@langwatch/eventing";
+import { z } from "zod";
+
+/**
+ * The two-step verification pipeline's wire schemas: the framework envelope (id, aggregate, tenant,
+ * cursor time) over the MFA payloads `@langwatch/identity-contract` declares. Nothing here can
+ * carry a secret or a backup code, because none of the payloads it extends has a field for one.
+ */
+
+export const mfaEnrolledEventSchema = EventSchema.extend({
+  type: z.literal(MFA_ENROLLED_EVENT_TYPE),
+  data: mfaEnrolledPayloadSchema,
+});
+export type MfaEnrolledEvent = z.infer<typeof mfaEnrolledEventSchema>;
+
+export const mfaConfirmedEventSchema = EventSchema.extend({
+  type: z.literal(MFA_CONFIRMED_EVENT_TYPE),
+  data: mfaConfirmedPayloadSchema,
+});
+export type MfaConfirmedEvent = z.infer<typeof mfaConfirmedEventSchema>;
+
+export const mfaEnrollmentExpiredEventSchema = EventSchema.extend({
+  type: z.literal(MFA_ENROLLMENT_EXPIRED_EVENT_TYPE),
+  data: mfaEnrollmentExpiredPayloadSchema,
+});
+export type MfaEnrollmentExpiredEvent = z.infer<typeof mfaEnrollmentExpiredEventSchema>;
+
+export const mfaDisabledEventSchema = EventSchema.extend({
+  type: z.literal(MFA_DISABLED_EVENT_TYPE),
+  data: mfaDisabledPayloadSchema,
+});
+export type MfaDisabledEvent = z.infer<typeof mfaDisabledEventSchema>;
+
+export const backupCodeConsumedEventSchema = EventSchema.extend({
+  type: z.literal(BACKUP_CODE_CONSUMED_EVENT_TYPE),
+  data: backupCodeConsumedPayloadSchema,
+});
+export type BackupCodeConsumedEvent = z.infer<typeof backupCodeConsumedEventSchema>;
+
+export const backupCodesRegeneratedEventSchema = EventSchema.extend({
+  type: z.literal(BACKUP_CODES_REGENERATED_EVENT_TYPE),
+  data: backupCodesRegeneratedPayloadSchema,
+});
+export type BackupCodesRegeneratedEvent = z.infer<typeof backupCodesRegeneratedEventSchema>;
+
+export const mfaVerificationFailedEventSchema = EventSchema.extend({
+  type: z.literal(MFA_VERIFICATION_FAILED_EVENT_TYPE),
+  data: mfaVerificationFailedPayloadSchema,
+});
+export type MfaVerificationFailedEvent = z.infer<typeof mfaVerificationFailedEventSchema>;
+
+export const mfaEventSchema = z.discriminatedUnion("type", [
+  mfaEnrolledEventSchema,
+  mfaConfirmedEventSchema,
+  mfaEnrollmentExpiredEventSchema,
+  mfaDisabledEventSchema,
+  backupCodeConsumedEventSchema,
+  backupCodesRegeneratedEventSchema,
+  mfaVerificationFailedEventSchema,
+]);
+export type MfaEvent = z.infer<typeof mfaEventSchema>;
+
+const MFA_PROJECTION_VERSION = "2026-08-24";
+
+const mfaEvents = [
+  mfaEnrolledEventSchema,
+  mfaConfirmedEventSchema,
+  mfaEnrollmentExpiredEventSchema,
+  mfaDisabledEventSchema,
+  backupCodeConsumedEventSchema,
+  backupCodesRegeneratedEventSchema,
+  mfaVerificationFailedEventSchema,
+] as const;
+
+/** The reducer's state plus the base class's bookkeeping stamps — server
+ *  rig, deliberately outside the replay-proof reducer surface. */
+export type MfaFoldState = MfaEnrollmentState & {
+  CreatedAt: number;
+  UpdatedAt: number;
+  LastEventOccurredAt: number;
+};
+
+/**
+ * The two-step verification pipeline's operational projection (D06): one Postgres row per person,
+ * applied through `.withProjection()`'s direct load/apply/store cycle under the queue's per-user
+ * lock.
+ */
+export class MfaEnrollmentStateFoldProjection
+  extends AbstractFoldProjection<
+    MfaFoldState,
+    typeof mfaEvents,
+    "CreatedAt",
+    "UpdatedAt",
+    "LastEventOccurredAt",
+    StateProjectionStore<MfaFoldState>
+  >
+  implements FoldEventHandlers<typeof mfaEvents, MfaFoldState>
+{
+  readonly name = "mfaEnrollmentState";
+  readonly version = MFA_PROJECTION_VERSION;
+  readonly store: StateProjectionStore<MfaFoldState>;
+
+  protected readonly events = mfaEvents;
+
+  static create(deps: {
+    store: StateProjectionStore<MfaFoldState>;
+  }): MfaEnrollmentStateFoldProjection {
+    return new MfaEnrollmentStateFoldProjection(deps);
+  }
+
+  constructor(deps: { store: StateProjectionStore<MfaFoldState> }) {
+    super();
+    this.store = deps.store;
+  }
+
+  protected initState() {
+    return emptyMfaEnrollment({ userId: "" });
+  }
+
+  private fold(event: MfaEvent, state: MfaFoldState): MfaFoldState {
+    const parsed = mfaEventSchema.parse(event);
+    const next = reduceMfaEnrollment({
+      state,
+      fact: {
+        type: parsed.type,
+        data: parsed.data,
+        occurredAt: parsed.occurredAt,
+      } as never,
+    });
+    return {
+      ...state,
+      ...next,
+      // init() cannot know the person; the first applied event does.
+      userId: next.userId === "" ? parsed.aggregateId : next.userId,
+    };
+  }
+
+  handleIdentityMfaEnrolled(event: MfaEnrolledEvent, state: MfaFoldState): MfaFoldState {
+    return this.fold(event, state);
+  }
+
+  handleIdentityMfaConfirmed(event: MfaConfirmedEvent, state: MfaFoldState): MfaFoldState {
+    return this.fold(event, state);
+  }
+
+  handleIdentityMfaEnrollmentExpired(
+    event: MfaEnrollmentExpiredEvent,
+    state: MfaFoldState,
+  ): MfaFoldState {
+    return this.fold(event, state);
+  }
+
+  handleIdentityMfaDisabled(event: MfaDisabledEvent, state: MfaFoldState): MfaFoldState {
+    return this.fold(event, state);
+  }
+
+  handleIdentityBackupCodeConsumed(
+    event: BackupCodeConsumedEvent,
+    state: MfaFoldState,
+  ): MfaFoldState {
+    return this.fold(event, state);
+  }
+
+  handleIdentityBackupCodesRegenerated(
+    event: BackupCodesRegeneratedEvent,
+    state: MfaFoldState,
+  ): MfaFoldState {
+    return this.fold(event, state);
+  }
+
+  handleIdentityMfaVerificationFailed(
+    event: MfaVerificationFailedEvent,
+    state: MfaFoldState,
+  ): MfaFoldState {
+    return this.fold(event, state);
+  }
+}

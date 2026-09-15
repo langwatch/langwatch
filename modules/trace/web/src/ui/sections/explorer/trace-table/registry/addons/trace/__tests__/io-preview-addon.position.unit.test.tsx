@@ -1,0 +1,85 @@
+// IO preview cell must NOT inherit sticky-first-column rule (horizontal
+// scroll fix).
+// @vitest-environment jsdom
+import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import type { Row } from "@tanstack/react-table";
+import { render } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
+import type { TraceListItem } from "../../../../../types/trace.ts";
+import { ROW_STYLES } from "../../../../status-row.tsx";
+import { IOPreviewAddon } from "../io-preview-addon.tsx";
+
+// Force the compact path — that's the density the IO preview row renders in.
+vi.mock("../../../../../../../../behavior/density.store.ts", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  useDensityStore: (selector: (state: { density: string }) => unknown) =>
+    selector({ density: "compact" }),
+}));
+
+vi.mock("../../../../../hooks/use-density-tokens.ts", () => ({
+  useDensityTokens: () => ({ ioFontSize: "11px" }),
+}));
+
+const COLUMNS = ["select", "trace", "model", "labels", "evaluations", "events"];
+
+function fakeRow(): Row<TraceListItem> {
+  return {
+    original: { input: "ping", output: "pong" } as TraceListItem,
+    getVisibleCells: () =>
+      COLUMNS.map((id) => ({ column: { id } })) as ReturnType<
+        Row<TraceListItem>["getVisibleCells"]
+      >,
+  } as Row<TraceListItem>;
+}
+
+function renderAddonRow() {
+  const tanstackRow = fakeRow();
+  return render(
+    <ChakraProvider value={defaultSystem}>
+      <table>
+        <tbody>
+          {IOPreviewAddon.render({
+            row: tanstackRow.original,
+            density: {
+              ioFontSize: "11px",
+              ioPaddingTop: "6px",
+              ioPaddingBottom: "6px",
+            } as never,
+            densityMode: "compact",
+            colSpan: COLUMNS.length,
+            style: ROW_STYLES.default,
+            isExpanded: false,
+            isSelected: false,
+            tanstackRow,
+            actions: {},
+            // evals (index 4) rowSpans into this addon row.
+            rowSpanClaimedIndices: [4],
+          })}
+        </tbody>
+      </table>
+    </ChakraProvider>,
+  );
+}
+
+describe("IOPreviewAddon row positioning", () => {
+  describe("given the addon row renders with labels/evals to its right", () => {
+    describe("when the preview content cell paints", () => {
+      it("does not let the content cell go sticky, so it can't slide over the reserved columns on scroll", () => {
+        const { container } = renderAddonRow();
+        const firstCell = container.querySelector("td");
+        expect(firstCell).not.toBeNull();
+        // Inline override beats the shell's `td:first-child { sticky }` rule.
+        expect(firstCell!.style.position).toBe("static");
+      });
+
+      it("renders the preview text inside that leading content cell", () => {
+        const { container } = renderAddonRow();
+        const firstCell = container.querySelector("td");
+        expect(firstCell).not.toBeNull();
+        // The first cell is the bounded preview content, not a filler.
+        expect(firstCell?.textContent).toContain("ping");
+        expect(firstCell?.textContent).toContain("pong");
+      });
+    });
+  });
+});

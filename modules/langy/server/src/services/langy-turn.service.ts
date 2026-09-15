@@ -1,0 +1,61 @@
+import { LangyFinalPartsService } from "./langy-final-parts.service.ts";
+import { LangyTurnStartService } from "./langy-turn-start.service.ts";
+import { LangyTurnStopService } from "./langy-turn-stop.service.ts";
+import {
+  type LangyTurnServiceDeps,
+  type StartConversationTurnInput,
+} from "./langy-turn-shared.service.ts";
+import { LangyTurnWarmService } from "./langy-turn-warm.service.ts";
+
+export type {
+  LangyChatMessageInput,
+  LangyTurnServiceDeps,
+  LangyTurnTechnicalMembers,
+  StartConversationTurnInput,
+} from "./langy-turn-shared.service.ts";
+export { LANGY_USER_MESSAGE_LABEL, LangyTurnSharedService } from "./langy-turn-shared.service.ts";
+
+/** The one public Langy turn facade; all workflow collaborators remain private. */
+export class LangyTurnService {
+  private readonly start: LangyTurnStartService;
+  private readonly stop: LangyTurnStopService;
+  private readonly warm: LangyTurnWarmService;
+
+  private constructor(deps: LangyTurnServiceDeps) {
+    const resolved = {
+      ...deps,
+      finalParts: deps.finalParts ?? LangyFinalPartsService.create(),
+    };
+    this.start = LangyTurnStartService.create(resolved);
+    this.stop = LangyTurnStopService.create(resolved);
+    this.warm = LangyTurnWarmService.create(resolved);
+  }
+
+  static create(deps: LangyTurnServiceDeps): LangyTurnService {
+    return new LangyTurnService(deps);
+  }
+
+  startConversationTurn(
+    input: StartConversationTurnInput,
+  ): Promise<{ conversationId: string; turnId: string }> {
+    return this.start.startConversationTurn(input);
+  }
+
+  stopTurn(input: {
+    projectId: string;
+    conversationId: string;
+    turnId: string;
+    userId: string;
+  }): Promise<void> {
+    return this.stop.stopTurn(input);
+  }
+
+  warmConversationWorker(input: {
+    projectId: string;
+    session: StartConversationTurnInput["session"];
+    requestedConversationId: string | null;
+    modelOverride?: string;
+  }): Promise<{ conversationId: string | null; warmed: boolean }> {
+    return this.warm.warmConversationWorker(input);
+  }
+}

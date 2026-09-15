@@ -2,15 +2,8 @@ import { describe, expect, it } from "vitest";
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
-import {
-  listNativeSkills,
-  listPublishedSkills,
-  renderSkill,
-} from "../_compiler/native.js";
-import {
-  FEATURE_SKILLS,
-  NATIVE_ONLY_SKILLS,
-} from "../_lib/feature-skills.js";
+import { listNativeSkills, listPublishedSkills, renderSkill } from "../_compiler/native.js";
+import { FEATURE_SKILLS, NATIVE_ONLY_SKILLS } from "../_lib/feature-skills.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const skillsRoot = path.resolve(__dirname, "..");
@@ -30,10 +23,16 @@ describe("native skill generation", () => {
     it("includes every recipe on disk — what we publish, Langy has", () => {
       const recipeDirs = fs
         .readdirSync(path.join(skillsRoot, "recipes"), { withFileTypes: true })
-        .filter((e) => e.isDirectory() && fs.existsSync(path.join(skillsRoot, "recipes", e.name, "SKILL.mdx")))
+        .filter(
+          (e) =>
+            e.isDirectory() && fs.existsSync(path.join(skillsRoot, "recipes", e.name, "SKILL.mdx")),
+        )
         .map((e) => e.name)
         .sort();
-      const recipeSlugs = skills.filter((s) => s.isRecipe).map((s) => s.slug).sort();
+      const recipeSlugs = skills
+        .filter((s) => s.isRecipe)
+        .map((s) => s.slug)
+        .sort();
       expect(recipeSlugs).toEqual(recipeDirs);
       expect(recipeSlugs.length, "expected recipes to be included").toBeGreaterThan(0);
     });
@@ -62,14 +61,20 @@ describe("native skill generation", () => {
         const m = renderSkill(skill).match(/^---\n([\s\S]*?)\n---\n/);
         expect(m, `${skill.slug}: no frontmatter block`).not.toBeNull();
         expect(m![1], `${skill.slug}: frontmatter missing name`).toMatch(/^name:\s*\S/m);
-        expect(m![1], `${skill.slug}: frontmatter missing description`).toMatch(/^description:\s*\S/m);
+        expect(m![1], `${skill.slug}: frontmatter missing description`).toMatch(
+          /^description:\s*\S/m,
+        );
       }
     });
 
     it("inlines shared partials — no leftover MDX import or unrendered component", () => {
       for (const skill of skills) {
-        const noCode = renderSkill(skill).replace(/```[\s\S]*?```/g, "").replace(/`[^`\n]*`/g, "");
-        expect(noCode, `${skill.slug}: leftover import`).not.toMatch(/^import\s+\w+\s+from\s+['"][^'"]+\.mdx?['"]/m);
+        const noCode = renderSkill(skill)
+          .replace(/```[\s\S]*?```/g, "")
+          .replace(/`[^`\n]*`/g, "");
+        expect(noCode, `${skill.slug}: leftover import`).not.toMatch(
+          /^import\s+\w+\s+from\s+['"][^'"]+\.mdx?['"]/m,
+        );
         expect(noCode, `${skill.slug}: unrendered component`).not.toMatch(/^<[A-Z]\w*\s*\/>\s*$/m);
         expect(noCode, `${skill.slug}: leftover _shared ref`).not.toContain("_shared/");
       }
@@ -101,7 +106,9 @@ describe("native skill generation", () => {
     it("matches the sources — regenerate with `bash skills/_compiled/generate.sh`", () => {
       for (const skill of skills) {
         const committed = fs.readFileSync(path.join(nativeDir, skill.slug, "SKILL.md"), "utf8");
-        expect(committed, `${skill.slug}: committed native output is stale`).toBe(renderSkill(skill));
+        expect(committed, `${skill.slug}: committed native output is stale`).toBe(
+          renderSkill(skill),
+        );
       }
     });
 
@@ -123,10 +130,7 @@ describe("native skill generation", () => {
         .sort();
       expect(embeddedDirs).toEqual(skills.map((s) => s.slug).sort());
       for (const slug of embeddedDirs) {
-        const embedded = fs.readFileSync(
-          path.join(embedRoot, slug, "SKILL.md"),
-          "utf8",
-        );
+        const embedded = fs.readFileSync(path.join(embedRoot, slug, "SKILL.md"), "utf8");
         expect(embedded, `${slug}: Go embed copy is stale`).toBe(
           fs.readFileSync(path.join(nativeDir, slug, "SKILL.md"), "utf8"),
         );
@@ -239,7 +243,9 @@ describe("native skill generation", () => {
 
       const shipped = new Set(skills.map((s) => s.slug));
       for (const name of routed) {
-        expect(shipped.has(name), `AGENTS.md routes to a skill that does not ship: ${name}`).toBe(true);
+        expect(shipped.has(name), `AGENTS.md routes to a skill that does not ship: ${name}`).toBe(
+          true,
+        );
       }
     });
 
@@ -262,10 +268,9 @@ describe("native skill generation", () => {
         ).toEqual([...EVALUATION_SKILLS].sort());
 
         for (const row of rows) {
-          expect(
-            row.commands,
-            `${row.skill} does not name the evaluator type catalog`,
-          ).toContain("langwatch evaluator types");
+          expect(row.commands, `${row.skill} does not name the evaluator type catalog`).toContain(
+            "langwatch evaluator types",
+          );
         }
       });
 

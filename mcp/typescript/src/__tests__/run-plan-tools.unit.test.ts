@@ -85,9 +85,7 @@ describe("handleRunPlan()", () => {
 
     /** @scenario "Agent runs a name that no plan carries yet" */
     it("says the plan was created and started", () => {
-      expect(result).toContain(
-        'Run plan "Regression Plan" created and started.',
-      );
+      expect(result).toContain('Run plan "Regression Plan" created and started.');
     });
 
     /** @scenario "Agent reads the batch a run started" */
@@ -275,9 +273,7 @@ describe("handleListRunPlans()", () => {
 
   describe("when includeArchived is set", () => {
     it("marks an archived plan as archived", async () => {
-      mockListRunPlans.mockResolvedValue([
-        { ...samplePlan, archivedAt: "2024-02-01T00:00:00Z" },
-      ]);
+      mockListRunPlans.mockResolvedValue([{ ...samplePlan, archivedAt: "2024-02-01T00:00:00Z" }]);
 
       const result = await handleListRunPlans({ includeArchived: true });
 

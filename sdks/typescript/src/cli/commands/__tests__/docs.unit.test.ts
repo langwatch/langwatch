@@ -1,25 +1,15 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import {
-  normalizeDocsUrl,
-  docsCommand,
-  scenarioDocsCommand,
-} from "../docs";
+import { normalizeDocsUrl, docsCommand, scenarioDocsCommand } from "../docs";
 
 describe("normalizeDocsUrl()", () => {
   describe("for langwatch docs", () => {
     it("returns the llms.txt index when no input is provided", () => {
-      expect(normalizeDocsUrl(undefined, "langwatch")).toBe(
-        "https://langwatch.ai/docs/llms.txt",
-      );
+      expect(normalizeDocsUrl(undefined, "langwatch")).toBe("https://langwatch.ai/docs/llms.txt");
     });
 
     it("returns the llms.txt index for empty input", () => {
-      expect(normalizeDocsUrl("", "langwatch")).toBe(
-        "https://langwatch.ai/docs/llms.txt",
-      );
-      expect(normalizeDocsUrl("   ", "langwatch")).toBe(
-        "https://langwatch.ai/docs/llms.txt",
-      );
+      expect(normalizeDocsUrl("", "langwatch")).toBe("https://langwatch.ai/docs/llms.txt");
+      expect(normalizeDocsUrl("   ", "langwatch")).toBe("https://langwatch.ai/docs/llms.txt");
     });
 
     /** @scenario docs with a relative path appends .md and resolves under /docs */
@@ -49,28 +39,22 @@ describe("normalizeDocsUrl()", () => {
     /** @scenario docs accepts a full URL ending in .md unchanged */
     it("preserves an absolute URL unchanged when it ends in .md", () => {
       expect(
-        normalizeDocsUrl(
-          "https://langwatch.ai/docs/integration/python/guide.md",
-          "langwatch",
-        ),
+        normalizeDocsUrl("https://langwatch.ai/docs/integration/python/guide.md", "langwatch"),
       ).toBe("https://langwatch.ai/docs/integration/python/guide.md");
     });
 
     /** @scenario docs accepts a full URL without an extension and appends .md */
     it("appends .md to an absolute URL without an extension", () => {
       expect(
-        normalizeDocsUrl(
-          "https://langwatch.ai/docs/integration/python/guide",
-          "langwatch",
-        ),
+        normalizeDocsUrl("https://langwatch.ai/docs/integration/python/guide", "langwatch"),
       ).toBe("https://langwatch.ai/docs/integration/python/guide.md");
     });
 
     /** @scenario docs preserves an absolute URL ending in .txt (e.g. llms.txt) */
     it("preserves an absolute URL ending in .txt (e.g., llms.txt)", () => {
-      expect(
-        normalizeDocsUrl("https://langwatch.ai/docs/llms.txt", "langwatch"),
-      ).toBe("https://langwatch.ai/docs/llms.txt");
+      expect(normalizeDocsUrl("https://langwatch.ai/docs/llms.txt", "langwatch")).toBe(
+        "https://langwatch.ai/docs/llms.txt",
+      );
     });
 
     /** @scenario docs strips wrapping quotes that agents sometimes paste */
@@ -112,17 +96,14 @@ describe("normalizeDocsUrl()", () => {
 
     /** @scenario scenario-docs is forgiving about a redundant scenario/ prefix */
     it("does not duplicate the scenario/ prefix when included", () => {
-      expect(
-        normalizeDocsUrl("scenario/advanced/red-teaming", "scenario"),
-      ).toBe("https://langwatch.ai/scenario/advanced/red-teaming.md");
+      expect(normalizeDocsUrl("scenario/advanced/red-teaming", "scenario")).toBe(
+        "https://langwatch.ai/scenario/advanced/red-teaming.md",
+      );
     });
 
     it("preserves an absolute URL", () => {
       expect(
-        normalizeDocsUrl(
-          "https://langwatch.ai/scenario/advanced/red-teaming.md",
-          "scenario",
-        ),
+        normalizeDocsUrl("https://langwatch.ai/scenario/advanced/red-teaming.md", "scenario"),
       ).toBe("https://langwatch.ai/scenario/advanced/red-teaming.md");
     });
   });
@@ -133,9 +114,7 @@ describe("docsCommand()", () => {
   let fetchSpy: any;
 
   beforeEach(() => {
-    stdoutSpy = vi
-      .spyOn(process.stdout, "write")
-      .mockImplementation((() => true) as any);
+    stdoutSpy = vi.spyOn(process.stdout, "write").mockImplementation((() => true) as any);
     fetchSpy = vi.spyOn(global, "fetch").mockResolvedValue(
       new Response("# Hello\nbody\n", {
         status: 200,
@@ -152,10 +131,7 @@ describe("docsCommand()", () => {
   /** @scenario docs with no argument fetches the LangWatch llms.txt index */
   it("fetches the langwatch index when called with no url", async () => {
     await docsCommand();
-    expect(fetchSpy).toHaveBeenCalledWith(
-      "https://langwatch.ai/docs/llms.txt",
-      expect.any(Object),
-    );
+    expect(fetchSpy).toHaveBeenCalledWith("https://langwatch.ai/docs/llms.txt", expect.any(Object));
     expect(stdoutSpy).toHaveBeenCalledWith("# Hello\nbody\n");
   });
 

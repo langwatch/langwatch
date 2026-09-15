@@ -13,15 +13,10 @@ import { normalizeEndpoint } from "@/internal/endpoint";
  * who live in terminal. Same multi-tenant guard as the web UI
  * (org-scoped via the device-flow Bearer token).
  */
-export async function ingestListCommand(options: {
-  all?: boolean;
-  json?: boolean;
-}): Promise<void> {
+export async function ingestListCommand(options: { all?: boolean; json?: boolean }): Promise<void> {
   const cfg = loadConfig();
   if (!isLoggedIn(cfg)) {
-    process.stderr.write(
-      "Not logged in. Run `langwatch login --device` first.\n",
-    );
+    process.stderr.write("Not logged in. Run `langwatch login --device` first.\n");
     process.exit(1);
   }
 
@@ -60,16 +55,9 @@ export async function ingestListCommand(options: {
   const rows: string[][] = [headerRow];
   for (const s of sources) {
     const lastEvent =
-      s.lastEventAt === null
-        ? chalk.gray("—")
-        : humanRelative(new Date(s.lastEventAt));
+      s.lastEventAt === null ? chalk.gray("—") : humanRelative(new Date(s.lastEventAt));
     const archivedTag = s.archivedAt ? chalk.gray(" [archived]") : "";
-    rows.push([
-      s.name + archivedTag,
-      s.sourceType,
-      colorStatus(s.status),
-      lastEvent,
-    ]);
+    rows.push([s.name + archivedTag, s.sourceType, colorStatus(s.status), lastEvent]);
   }
   printTable(rows);
 
@@ -110,14 +98,8 @@ export function humanRelative(d: Date, now: number = Date.now()): string {
 }
 
 /**
- * Build a fixed-width table from rows including a leading header row.
- * Returns the formatted string (one row per \n-separated line) instead
- * of console.log-ing directly, so callers control output and tests can
- * assert column alignment without spying on stdout.
- *
- * Each cell's visible width is computed by stripping ANSI escape codes
- * (chalk wraps colors as `\x1b[Nm...\x1b[0m`); without this, coloured
- * cells appear longer than they actually are and break alignment.
+ * Build fixed-width table, stripping ANSI codes for accurate column widths.
+ * Returns formatted string, not stdout (testable, controlled output).
  */
 export function buildTable(rows: string[][]): string {
   if (rows.length === 0) return "";
@@ -141,6 +123,7 @@ function printTable(rows: string[][]): void {
 }
 
 function stripAnsi(s: string): string {
-  // eslint-disable-next-line no-control-regex -- intentional: stripping ANSI escape codes from chalk output for column-width math
+  // eslint-disable-next-line no-control-regex -- intentional: strip ANSI codes
+  // from chalk output for column-width math
   return s.replace(/\x1b\[[0-9;]*m/g, "");
 }

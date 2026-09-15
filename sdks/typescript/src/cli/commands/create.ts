@@ -3,17 +3,12 @@ import * as path from "path";
 import chalk from "chalk";
 import { FileManager } from "../utils/fileManager";
 import { resolveCredentials } from "../utils/apiKey";
-import {
-  commandValidationError,
-  reportCommandError,
-} from "../utils/errorOutput";
+import { commandValidationError, reportCommandError } from "../utils/errorOutput";
 import { ensureProjectInitialized } from "../utils/init";
 import { DEFAULT_PROMPT_MODEL } from "../constants";
 import type { CommandResult } from "../utils/output";
 
-export const createCommand = async (
-  name: string,
-): Promise<CommandResult | void> => {
+export const createCommand = async (name: string): Promise<CommandResult | void> => {
   try {
     // Validate prompt name
     if (!name || name.trim() === "") {
@@ -30,17 +25,11 @@ export const createCommand = async (
     await ensureProjectInitialized();
 
     // Check if file already exists
-    const promptPath = path.join(
-      process.cwd(),
-      "prompts",
-      `${name}.prompt.yaml`,
-    );
+    const promptPath = path.join(process.cwd(), "prompts", `${name}.prompt.yaml`);
 
     if (fs.existsSync(promptPath)) {
       reportCommandError({
-        error: commandValidationError(
-          `Prompt file already exists at ${promptPath}`,
-        ),
+        error: commandValidationError(`Prompt file already exists at ${promptPath}`),
       });
       process.exit(1);
     }
@@ -88,9 +77,7 @@ messages:
     return {
       data: { name, path: relativePath, dependency: `file:${relativePath}` },
       table: () => {
-        console.log(
-          chalk.green(`✓ Created prompt file: ${chalk.cyan(displayPath)}`),
-        );
+        console.log(chalk.green(`✓ Created prompt file: ${chalk.cyan(displayPath)}`));
         console.log(chalk.gray(`  Edit this file and then run:`));
         console.log(chalk.cyan(`  langwatch prompt sync`));
       },

@@ -45,11 +45,7 @@ function spyFetch(response: Response): {
   const seen: SeenCall[] = [];
   const fetchImpl: typeof fetch = async (input, init) => {
     const url =
-      typeof input === "string"
-        ? input
-        : input instanceof URL
-          ? input.toString()
-          : input.url;
+      typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
     const headers = (init?.headers ?? {}) as Record<string, string>;
     seen.push({
       url,
@@ -69,9 +65,7 @@ describe("cli-api — auth contract", () => {
         ...baseCfg(),
         access_token: undefined,
       };
-      await expect(
-        listIngestionSources(cfgNoToken, { fetchImpl }),
-      ).rejects.toMatchObject({
+      await expect(listIngestionSources(cfgNoToken, { fetchImpl })).rejects.toMatchObject({
         name: "GovernanceCliError",
         status: 401,
         code: "not_logged_in",
@@ -88,9 +82,7 @@ describe("cli-api — auth contract", () => {
       // `status` control-flow surface is unchanged; the CLI's composed
       // re-login message is reused verbatim.
       const { fetchImpl } = spyFetch(status(401, { error: "unauthorized" }));
-      await expect(
-        getGovernanceStatus(baseCfg(), { fetchImpl }),
-      ).rejects.toMatchObject({
+      await expect(getGovernanceStatus(baseCfg(), { fetchImpl })).rejects.toMatchObject({
         name: "LangWatchHandledError",
         status: 401,
         code: "unauthorized",
@@ -129,15 +121,10 @@ describe("cli-api — auth contract", () => {
 
     it("refreshes and retries once, so the caller never sees the 401", async () => {
       const cfg = { ...baseCfg("at_old"), refresh_token: "rt_old" };
-      const responses = [
-        status(401, { error: "unauthorized" }),
-        ok({ hasPersonalVKs: true }),
-      ];
+      const responses = [status(401, { error: "unauthorized" }), ok({ hasPersonalVKs: true })];
       const authHeaders: (string | undefined)[] = [];
       const fetchImpl = vi.fn(async (_url: string, init?: RequestInit) => {
-        authHeaders.push(
-          (init?.headers as Record<string, string> | undefined)?.Authorization,
-        );
+        authHeaders.push((init?.headers as Record<string, string> | undefined)?.Authorization);
         return responses.shift()!;
       }) as unknown as typeof fetch;
 
@@ -203,9 +190,7 @@ describe("cli-api — auth contract", () => {
           error_description: "IngestionSource not found",
         }),
       );
-      await expect(
-        getSourceHealth(baseCfg(), "missing-id", { fetchImpl }),
-      ).rejects.toMatchObject({
+      await expect(getSourceHealth(baseCfg(), "missing-id", { fetchImpl })).rejects.toMatchObject({
         name: "LangWatchHandledError",
         status: 404,
         code: "not_found",
@@ -218,9 +203,7 @@ describe("cli-api — auth contract", () => {
       // own generic GovernanceCliError — still handled-error-shaped for the
       // render pipeline, but the CLI's fallback rather than a server-named one.
       const { fetchImpl } = spyFetch(status(404));
-      await expect(
-        getSourceHealth(baseCfg(), "missing-id", { fetchImpl }),
-      ).rejects.toMatchObject({
+      await expect(getSourceHealth(baseCfg(), "missing-id", { fetchImpl })).rejects.toMatchObject({
         name: "GovernanceCliError",
         status: 404,
         code: "not_found",
@@ -232,9 +215,7 @@ describe("cli-api — auth contract", () => {
   describe("when the server returns 5xx", () => {
     it("throws with the status code in the message", async () => {
       const { fetchImpl } = spyFetch(status(503, "service unavailable"));
-      const err = await getGovernanceStatus(baseCfg(), { fetchImpl }).catch(
-        (e: unknown) => e,
-      );
+      const err = await getGovernanceStatus(baseCfg(), { fetchImpl }).catch((e: unknown) => e);
       expect(err).toBeInstanceOf(GovernanceCliError);
       expect((err as GovernanceCliError).status).toBe(503);
       expect((err as GovernanceCliError).message).toContain("503");
@@ -248,9 +229,7 @@ describe("cli-api — request shape", () => {
       const { fetchImpl, seen } = spyFetch(ok({ sources: [] }));
       await listIngestionSources(baseCfg(), { fetchImpl });
       expect(seen).toHaveLength(1);
-      expect(seen[0]!.url).toBe(
-        "http://app.example/api/auth/cli/governance/ingest/sources",
-      );
+      expect(seen[0]!.url).toBe("http://app.example/api/auth/cli/governance/ingest/sources");
     });
 
     it("appends ?include_archived=1 when includeArchived is set", async () => {
@@ -295,9 +274,7 @@ describe("cli-api — request shape", () => {
         { ...baseCfg(), control_plane_url: "http://app.example/" },
         { fetchImpl },
       );
-      expect(seen[0]!.url).toBe(
-        "http://app.example/api/auth/cli/governance/ingest/sources",
-      );
+      expect(seen[0]!.url).toBe("http://app.example/api/auth/cli/governance/ingest/sources");
     });
   });
 
@@ -387,9 +364,7 @@ describe("cli-api — request shape", () => {
       };
       const { fetchImpl, seen } = spyFetch(ok(fixture));
       const out = await getGovernanceStatus(baseCfg(), { fetchImpl });
-      expect(seen[0]!.url).toBe(
-        "http://app.example/api/auth/cli/governance/status",
-      );
+      expect(seen[0]!.url).toBe("http://app.example/api/auth/cli/governance/status");
       expect(out).toEqual(fixture);
     });
   });
@@ -419,25 +394,19 @@ describe("cli-api — request shape", () => {
     });
 
     it("returns null on 404 — graceful degrade for older self-hosters without the REST adapter", async () => {
-      const { fetchImpl } = spyFetch(
-        status(404, { error_description: "Not found" }),
-      );
+      const { fetchImpl } = spyFetch(status(404, { error_description: "Not found" }));
       const out = await getCliBootstrap(baseCfg(), { fetchImpl });
       expect(out).toBeNull();
     });
 
     it("propagates 401 unauthorized errors so the caller can surface a re-login hint", async () => {
       const { fetchImpl } = spyFetch(status(401));
-      await expect(getCliBootstrap(baseCfg(), { fetchImpl })).rejects.toThrow(
-        GovernanceCliError,
-      );
+      await expect(getCliBootstrap(baseCfg(), { fetchImpl })).rejects.toThrow(GovernanceCliError);
     });
 
     it("propagates 5xx errors with the status in the message", async () => {
       const { fetchImpl } = spyFetch(status(500, { msg: "boom" }));
-      await expect(getCliBootstrap(baseCfg(), { fetchImpl })).rejects.toThrow(
-        /500/,
-      );
+      await expect(getCliBootstrap(baseCfg(), { fetchImpl })).rejects.toThrow(/500/);
     });
   });
   describe("when the caller sets a request timeout", () => {
@@ -452,9 +421,9 @@ describe("cli-api — request shape", () => {
           );
         });
 
-      await expect(
-        getBudgetOverview(baseCfg(), { fetchImpl, timeoutMs: 20 }),
-      ).rejects.toThrow(/abort/i);
+      await expect(getBudgetOverview(baseCfg(), { fetchImpl, timeoutMs: 20 })).rejects.toThrow(
+        /abort/i,
+      );
     });
 
     it("passes no signal when the caller sets no timeout", async () => {
@@ -470,17 +439,14 @@ describe("cli-api — request shape", () => {
   });
   describe("ingestion-templates clone-from-platform", () => {
     /**
-     * The command posted to `/ingestion-templates/clone-from-platform`. The
-     * route is `/ingestion-templates/clone`, which is also what the spec and
-     * the governance guide document, so the command 404'd every time it ran.
-     *
-     * The stub answers 404 for any path the app does not register, so a caller
-     * reaching for one fails here the way it failed in production.
+     * The command posted to `/ingestion-templates/clone-from-platform`. The route is
+     * `/ingestion-templates/clone`, which is also what the spec and the governance guide
+     * document, so the command 404'd every time it ran.
      */
     const REGISTERED_TEMPLATE_PATHS = new Set([
-      "/api/governance/ingestion-templates",
-      "/api/governance/ingestion-templates/admin",
-      "/api/governance/ingestion-templates/clone",
+      "/api/v1/governance/ingestion-templates",
+      "/api/v1/governance/ingestion-templates/admin",
+      "/api/v1/governance/ingestion-templates/clone",
     ]);
 
     const onlyRealRoutes = (): {
@@ -490,11 +456,7 @@ describe("cli-api — request shape", () => {
       const seen: SeenCall[] = [];
       const fetchImpl: typeof fetch = async (input, init) => {
         const url =
-          typeof input === "string"
-            ? input
-            : input instanceof URL
-              ? input.toString()
-              : input.url;
+          typeof input === "string" ? input : input instanceof URL ? input.toString() : input.url;
         const headers = (init?.headers ?? {}) as Record<string, string>;
         seen.push({
           url,
@@ -513,15 +475,11 @@ describe("cli-api — request shape", () => {
     it("posts to the route the app actually serves", async () => {
       const { fetchImpl, seen } = onlyRealRoutes();
 
-      const out = await cloneIngestionTemplateFromPlatform(
-        baseCfg(),
-        "tpl_platform",
-        { fetchImpl },
-      );
+      const out = await cloneIngestionTemplateFromPlatform(baseCfg(), "tpl_platform", {
+        fetchImpl,
+      });
 
-      expect(seen[0]!.url).toBe(
-        "http://app.example/api/governance/ingestion-templates/clone",
-      );
+      expect(seen[0]!.url).toBe("http://app.example/api/v1/governance/ingestion-templates/clone");
       expect(out).toEqual({ id: "tpl_new" });
     });
   });

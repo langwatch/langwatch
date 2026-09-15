@@ -30,7 +30,7 @@ def _get_kwargs(
 
     _kwargs: dict[str, Any] = {
         "method": "post",
-        "url": "/api/experiments/{slug}/versions/{version}/restore".format(
+        "url": "/api/v1/experiments/{slug}/versions/{version}/restore".format(
             slug=quote(str(slug), safe=""),
             version=quote(str(version), safe=""),
         ),

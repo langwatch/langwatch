@@ -54,15 +54,10 @@ export type FilterResult =
 
 const indentOf = (line: string): number => line.length - line.trimStart().length;
 
-const isBlank = (line: string): boolean =>
-  line.trim() === "" || line.trim().startsWith("#");
+const isBlank = (line: string): boolean => line.trim() === "" || line.trim().startsWith("#");
 
 /** Lines of the block introduced at `startIndex`, excluding the key line. */
-export const blockUnder = (
-  lines: string[],
-  startIndex: number,
-  indent: number,
-): string[] => {
+export const blockUnder = (lines: string[], startIndex: number, indent: number): string[] => {
   const out: string[] = [];
   for (let i = startIndex + 1; i < lines.length; i++) {
     const line = lines[i]!;
@@ -117,11 +112,7 @@ const findKeyIndex = (lines: string[], key: string, indent: number): number =>
   });
 
 /** Index of a key at ANY indent greater than `minIndent`. */
-const findKeyAnyIndent = (
-  lines: string[],
-  keys: string[],
-  minIndent: number,
-): number =>
+const findKeyAnyIndent = (lines: string[], keys: string[], minIndent: number): number =>
   lines.findIndex((line) => {
     if (isBlank(line) || indentOf(line) <= minIndent) return false;
     const trimmed = line.trim();
@@ -186,11 +177,7 @@ export const pullRequestFilter = (source: string): FilterResult => {
   if (onIndex === -1) return { kind: "none" };
 
   const onBlock = blockUnder(lines, onIndex, 0);
-  const prIndex = findKeyAnyIndent(
-    onBlock,
-    ["pull_request", "pull_request_target"],
-    -1,
-  );
+  const prIndex = findKeyAnyIndent(onBlock, ["pull_request", "pull_request_target"], -1);
   if (prIndex === -1) return { kind: "none" };
 
   const prLine = onBlock[prIndex]!;
@@ -428,8 +415,7 @@ export const main = (dir = ".github/workflows"): number => {
 };
 
 const isEntrypoint = (): boolean =>
-  process.argv[1] !== undefined &&
-  import.meta.url === pathToFileURL(resolve(process.argv[1])).href;
+  process.argv[1] !== undefined && import.meta.url === pathToFileURL(resolve(process.argv[1])).href;
 
 if (isEntrypoint()) {
   // The workflows directory is an argument so CI can point a trusted copy of

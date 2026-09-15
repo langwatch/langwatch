@@ -68,10 +68,7 @@ describe("recordMissAndDecideToSpawn", () => {
     describe("when a miss is recorded", () => {
       it("recovers instead of breaking the command", () => {
         fs.mkdirSync(identity.socketDir, { recursive: true, mode: 0o700 });
-        fs.writeFileSync(
-          path.join(identity.socketDir, "aaaaaaaaaaaaaaaa.hint"),
-          "not json at all",
-        );
+        fs.writeFileSync(path.join(identity.socketDir, "aaaaaaaaaaaaaaaa.hint"), "not json at all");
 
         expect(() => recordMissAndDecideToSpawn(identity)).not.toThrow();
       });
@@ -98,9 +95,7 @@ describe("recordMissAndDecideToSpawn", () => {
       it("refuses to spawn, because that daemon's socket could never be private", () => {
         fs.mkdirSync(identity.socketDir, { recursive: true, mode: 0o777 });
         // chown needs root; moving OUR uid makes the same comparison fail.
-        vi.spyOn(process, "getuid").mockReturnValue(
-          (process.getuid?.() ?? 0) + 1,
-        );
+        vi.spyOn(process, "getuid").mockReturnValue((process.getuid?.() ?? 0) + 1);
 
         expect(recordMissAndDecideToSpawn(identity)).toBe(false);
         expect(recordMissAndDecideToSpawn(identity)).toBe(false);

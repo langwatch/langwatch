@@ -35,8 +35,7 @@ export const createOrganizationCommand = async (
           ? { adminApiKeyName: options.adminApiKeyName }
           : {}),
       }),
-    succeed: (created) =>
-      `Created organization "${chalk.cyan(created.organization.name)}"`,
+    succeed: (created) => `Created organization "${chalk.cyan(created.organization.name)}"`,
     table: (created) => {
       console.log();
       console.log(chalk.gray("Organization id:   ") + created.organization.id);
@@ -44,9 +43,7 @@ export const createOrganizationCommand = async (
       console.log(chalk.gray("Default team:      ") + created.team.name);
       console.log();
       console.log(
-        chalk.bold.yellow(
-          "⚠  Save the admin API key below NOW. It will not be shown again.",
-        ),
+        chalk.bold.yellow("⚠  Save the admin API key below NOW. It will not be shown again."),
       );
       console.log();
       console.log(`  ${chalk.green(created.adminApiKey.token)}`);

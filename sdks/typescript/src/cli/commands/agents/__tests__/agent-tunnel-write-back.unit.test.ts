@@ -63,9 +63,9 @@ describe("applyDevTunnel()", () => {
       });
 
       expect(config.url).toBe(`${TUNNEL_URL}/agent`);
-      expect(
-        (config.devTunnel as { previousUrl?: string }).previousUrl,
-      ).toBe("https://staging.example.com/agent");
+      expect((config.devTunnel as { previousUrl?: string }).previousUrl).toBe(
+        "https://staging.example.com/agent",
+      );
     });
   });
 
@@ -86,9 +86,7 @@ describe("applyDevTunnel()", () => {
 
       const headers = config.headers as { key: string; value: string }[];
       const secretRows = headers.filter((h) => h.key === DEV_SECRET_HEADER);
-      expect(secretRows).toEqual([
-        { key: DEV_SECRET_HEADER, value: "fresh-secret" },
-      ]);
+      expect(secretRows).toEqual([{ key: DEV_SECRET_HEADER, value: "fresh-secret" }]);
       expect(headers).toContainEqual({
         key: "Authorization",
         value: "Bearer customer-token",
@@ -132,9 +130,7 @@ describe("restoreDevTunnel()", () => {
       expect(restored).not.toBeNull();
       expect(restored?.url).toBe("https://staging.example.com/agent");
       expect(restored?.devTunnel).toBeUndefined();
-      expect(restored?.headers).toEqual([
-        { key: "Authorization", value: "Bearer customer-token" },
-      ]);
+      expect(restored?.headers).toEqual([{ key: "Authorization", value: "Bearer customer-token" }]);
     });
   });
 

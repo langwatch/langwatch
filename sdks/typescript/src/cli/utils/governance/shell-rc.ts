@@ -32,24 +32,14 @@ import * as readline from "node:readline";
 import chalk from "chalk";
 
 import {
-	type CodexNotifyWriteResult,
-	codexNotifyCommandIsEphemeral,
-	defaultCodexNotifyCommand,
-	writeCodexNotifyBlock,
+  type CodexNotifyWriteResult,
+  codexNotifyCommandIsEphemeral,
+  defaultCodexNotifyCommand,
+  writeCodexNotifyBlock,
 } from "../codex-config-toml";
-import {
-	appEnvHasAllVars,
-	appSettingsTargetFor,
-	installAppEnv,
-} from "./app-settings";
-import {
-	ensureLangwatchClaudePlugin,
-	readClaudePluginState,
-} from "./claude-plugin";
-import {
-	installSessionContextHooks,
-	removeSessionContextHooks,
-} from "./session-context-hooks";
+import { appEnvHasAllVars, appSettingsTargetFor, installAppEnv } from "./app-settings";
+import { ensureLangwatchClaudePlugin, readClaudePluginState } from "./claude-plugin";
+import { installSessionContextHooks, removeSessionContextHooks } from "./session-context-hooks";
 import { type GovernanceConfig, saveConfig } from "./config";
 import { assertCodexAgentGuidance } from "./codex-agents-md";
 
@@ -90,10 +80,10 @@ export const GATEWAY_RC_MARKERS = { begin: BLOCK_BEGIN, end: BLOCK_END };
  * pair so multiple wrappers coexist in one rc file.
  */
 export function toolMarkers(tool: string): { begin: string; end: string } {
-	return {
-		begin: `# >>> langwatch ${tool} begin >>>`,
-		end: `# <<< langwatch ${tool} end <<<`,
-	};
+  return {
+    begin: `# >>> langwatch ${tool} begin >>>`,
+    end: `# <<< langwatch ${tool} end <<<`,
+  };
 }
 
 export type DetectedShell = "zsh" | "bash" | "fish";
@@ -105,32 +95,32 @@ export type DetectedShell = "zsh" | "bash" | "fish";
  * - the persist flow skips entirely in that case.
  */
 export function detectShell(): DetectedShell | null {
-	const raw = (process.env.SHELL ?? "").toLowerCase();
-	if (raw.includes("fish")) return "fish";
-	if (raw.includes("zsh")) return "zsh";
-	if (raw.includes("bash")) return "bash";
-	if (process.platform === "darwin") return "zsh";
-	if (process.platform === "linux") return "bash";
-	return null;
+  const raw = (process.env.SHELL ?? "").toLowerCase();
+  if (raw.includes("fish")) return "fish";
+  if (raw.includes("zsh")) return "zsh";
+  if (raw.includes("bash")) return "bash";
+  if (process.platform === "darwin") return "zsh";
+  if (process.platform === "linux") return "bash";
+  return null;
 }
 
 /** Render an absolute path with the home dir collapsed to `~`. */
 export function tildify(p: string): string {
-	const home = os.homedir();
-	return p.startsWith(home) ? `~${p.slice(home.length)}` : p;
+  const home = os.homedir();
+  return p.startsWith(home) ? `~${p.slice(home.length)}` : p;
 }
 
 /** Returns the absolute path of the shell rc file. */
 export function rcPath(shell: DetectedShell): string {
-	const home = os.homedir();
-	switch (shell) {
-		case "zsh":
-			return path.join(home, ".zshrc");
-		case "bash":
-			return path.join(home, ".bashrc");
-		case "fish":
-			return path.join(home, ".config", "fish", "config.fish");
-	}
+  const home = os.homedir();
+  switch (shell) {
+    case "zsh":
+      return path.join(home, ".zshrc");
+    case "bash":
+      return path.join(home, ".bashrc");
+    case "fish":
+      return path.join(home, ".config", "fish", "config.fish");
+  }
 }
 
 /**
@@ -138,7 +128,7 @@ export function rcPath(shell: DetectedShell): string {
  * exported. If true the persist prompt stays quiet (per 1.3).
  */
 export function isShellAlreadyConfigured(): boolean {
-	return !!process.env.ANTHROPIC_BASE_URL && !!process.env.ANTHROPIC_AUTH_TOKEN;
+  return !!process.env.ANTHROPIC_BASE_URL && !!process.env.ANTHROPIC_AUTH_TOKEN;
 }
 
 /**
@@ -155,30 +145,30 @@ export function isShellAlreadyConfigured(): boolean {
  * for the presence of a well-formed block.
  */
 export function rcHasLangwatchBlock({
-	shell,
-	requiredKeys,
-	markers = { begin: BLOCK_BEGIN, end: BLOCK_END },
+  shell,
+  requiredKeys,
+  markers = { begin: BLOCK_BEGIN, end: BLOCK_END },
 }: {
-	shell: DetectedShell;
-	requiredKeys?: string[];
-	markers?: { begin: string; end: string };
+  shell: DetectedShell;
+  requiredKeys?: string[];
+  markers?: { begin: string; end: string };
 }): boolean {
-	try {
-		const content = fs.readFileSync(rcPath(shell), "utf8");
-		const begin = content.indexOf(markers.begin);
-		const end = content.indexOf(markers.end);
-		if (begin === -1 || end === -1 || end < begin) return false;
-		if (!requiredKeys || requiredKeys.length === 0) return true;
-		const block = content.slice(begin, end);
-		return requiredKeys.every((k) => block.includes(k));
-	} catch {
-		return false;
-	}
+  try {
+    const content = fs.readFileSync(rcPath(shell), "utf8");
+    const begin = content.indexOf(markers.begin);
+    const end = content.indexOf(markers.end);
+    if (begin === -1 || end === -1 || end < begin) return false;
+    if (!requiredKeys || requiredKeys.length === 0) return true;
+    const block = content.slice(begin, end);
+    return requiredKeys.every((k) => block.includes(k));
+  } catch {
+    return false;
+  }
 }
 
 function quote(s: string): string {
-	if (!/[ \t\n'"$\\]/.test(s)) return s;
-	return "'" + s.replace(/'/g, "'\\''") + "'";
+  if (!/[ \t\n'"$\\]/.test(s)) return s;
+  return "'" + s.replace(/'/g, "'\\''") + "'";
 }
 
 /**
@@ -193,21 +183,17 @@ function quote(s: string): string {
  * for `persistBlockToRc` to bracket with the tool's markers.
  */
 export function buildScopedToolFunction(
-	tool: string,
-	vars: Record<string, string>,
-	shell: DetectedShell,
+  tool: string,
+  vars: Record<string, string>,
+  shell: DetectedShell,
 ): string {
-	const entries = Object.entries(vars);
-	if (shell === "fish") {
-		const sets = entries
-			.map(([k, v]) => `    set -lx ${k} ${quote(v)}`)
-			.join("\n");
-		return [`function ${tool}`, sets, `    command ${tool} $argv`, "end"].join(
-			"\n",
-		);
-	}
-	const assigns = entries.map(([k, v]) => `    ${k}=${quote(v)} \\`).join("\n");
-	return [`${tool}() {`, assigns, `    command ${tool} "$@"`, "}"].join("\n");
+  const entries = Object.entries(vars);
+  if (shell === "fish") {
+    const sets = entries.map(([k, v]) => `    set -lx ${k} ${quote(v)}`).join("\n");
+    return [`function ${tool}`, sets, `    command ${tool} $argv`, "end"].join("\n");
+  }
+  const assigns = entries.map(([k, v]) => `    ${k}=${quote(v)} \\`).join("\n");
+  return [`${tool}() {`, assigns, `    command ${tool} "$@"`, "}"].join("\n");
 }
 
 /**
@@ -219,42 +205,42 @@ export function buildScopedToolFunction(
  * Returns the path that was written for the caller to surface.
  */
 export function persistBlockToRc(
-	shell: DetectedShell,
-	block: string,
-	markers: { begin: string; end: string } = {
-		begin: BLOCK_BEGIN,
-		end: BLOCK_END,
-	},
+  shell: DetectedShell,
+  block: string,
+  markers: { begin: string; end: string } = {
+    begin: BLOCK_BEGIN,
+    end: BLOCK_END,
+  },
 ): string {
-	const file = rcPath(shell);
-	const dir = path.dirname(file);
-	fs.mkdirSync(dir, { recursive: true });
-	const wrapped = `${markers.begin}\n${block}\n${markers.end}\n`;
+  const file = rcPath(shell);
+  const dir = path.dirname(file);
+  fs.mkdirSync(dir, { recursive: true });
+  const wrapped = `${markers.begin}\n${block}\n${markers.end}\n`;
 
-	let existing = "";
-	try {
-		existing = fs.readFileSync(file, "utf8");
-	} catch {
-		// ENOENT - fresh file
-	}
+  let existing = "";
+  try {
+    existing = fs.readFileSync(file, "utf8");
+  } catch {
+    // ENOENT - fresh file
+  }
 
-	const marker = new RegExp(
-		`${escapeRegex(markers.begin)}[\\s\\S]*?${escapeRegex(markers.end)}\\n?`,
-		"m",
-	);
-	let next: string;
-	if (marker.test(existing)) {
-		next = existing.replace(marker, wrapped);
-	} else {
-		const needsNewline = existing.length > 0 && !existing.endsWith("\n");
-		next = existing + (needsNewline ? "\n" : "") + "\n" + wrapped;
-	}
-	fs.writeFileSync(file, next);
-	return file;
+  const marker = new RegExp(
+    `${escapeRegex(markers.begin)}[\\s\\S]*?${escapeRegex(markers.end)}\\n?`,
+    "m",
+  );
+  let next: string;
+  if (marker.test(existing)) {
+    next = existing.replace(marker, wrapped);
+  } else {
+    const needsNewline = existing.length > 0 && !existing.endsWith("\n");
+    next = existing + (needsNewline ? "\n" : "") + "\n" + wrapped;
+  }
+  fs.writeFileSync(file, next);
+  return file;
 }
 
 function escapeRegex(s: string): string {
-	return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
 /**
@@ -265,26 +251,26 @@ function escapeRegex(s: string): string {
  * was removed (idempotent — false when the file or the block was absent).
  */
 export function removeBlockFromRc(
-	shell: DetectedShell,
-	markers: { begin: string; end: string } = {
-		begin: BLOCK_BEGIN,
-		end: BLOCK_END,
-	},
+  shell: DetectedShell,
+  markers: { begin: string; end: string } = {
+    begin: BLOCK_BEGIN,
+    end: BLOCK_END,
+  },
 ): boolean {
-	const file = rcPath(shell);
-	let content: string;
-	try {
-		content = fs.readFileSync(file, "utf8");
-	} catch {
-		return false; // ENOENT
-	}
-	const re = new RegExp(
-		`\\n?${escapeRegex(markers.begin)}[\\s\\S]*?${escapeRegex(markers.end)}\\n?`,
-		"m",
-	);
-	if (!re.test(content)) return false;
-	fs.writeFileSync(file, content.replace(re, ""));
-	return true;
+  const file = rcPath(shell);
+  let content: string;
+  try {
+    content = fs.readFileSync(file, "utf8");
+  } catch {
+    return false; // ENOENT
+  }
+  const re = new RegExp(
+    `\\n?${escapeRegex(markers.begin)}[\\s\\S]*?${escapeRegex(markers.end)}\\n?`,
+    "m",
+  );
+  if (!re.test(content)) return false;
+  fs.writeFileSync(file, content.replace(re, ""));
+  return true;
 }
 
 /**
@@ -303,30 +289,30 @@ export type PersistChoice = "yes" | "no" | "never" | "skip";
  * around it.
  */
 export async function askPersistChoice({
-	target,
-	tool,
-	question,
+  target,
+  tool,
+  question,
 }: {
-	target: string;
-	tool: string;
-	question?: string;
+  target: string;
+  tool: string;
+  question?: string;
 }): Promise<PersistChoice> {
-	if (!process.stdin.isTTY) return "skip";
+  if (!process.stdin.isTTY) return "skip";
 
-	const rl = readline.createInterface({
-		input: process.stdin,
-		output: process.stdout,
-	});
-	const asked = question ?? persistQuestion({ tool, targetHint: target });
-	const ans = await new Promise<string>((resolve) => {
-		rl.question(`${asked} [Y/n/never] `, (a) => resolve(a));
-	});
-	rl.close();
+  const rl = readline.createInterface({
+    input: process.stdin,
+    output: process.stdout,
+  });
+  const asked = question ?? persistQuestion({ tool, targetHint: target });
+  const ans = await new Promise<string>((resolve) => {
+    rl.question(`${asked} [Y/n/never] `, (a) => resolve(a));
+  });
+  rl.close();
 
-	const norm = ans.trim().toLowerCase();
-	if (norm === "" || norm === "y" || norm === "yes") return "yes";
-	if (norm === "never") return "never";
-	return "no";
+  const norm = ans.trim().toLowerCase();
+  if (norm === "" || norm === "y" || norm === "yes") return "yes";
+  if (norm === "never") return "never";
+  return "no";
 }
 
 /**
@@ -336,21 +322,15 @@ export async function askPersistChoice({
  * the plugin's hooks record, or the user is agreeing to something they were
  * never told about.
  */
-function persistQuestion({
-	tool,
-	targetHint,
-}: {
-	tool: string;
-	targetHint: string;
-}): string {
-	if (tool === "claude") {
-		return (
-			`Set up LangWatch capture for ${tool}? This saves the telemetry env vars to ` +
-			`${targetHint} and installs the LangWatch Claude Code plugin, whose session ` +
-			`hooks record the repository and branch each session works on.`
-		);
-	}
-	return `Install env vars to ${targetHint} so that next time the plain \`${tool}\` command keeps capturing telemetry data?`;
+function persistQuestion({ tool, targetHint }: { tool: string; targetHint: string }): string {
+  if (tool === "claude") {
+    return (
+      `Set up LangWatch capture for ${tool}? This saves the telemetry env vars to ` +
+      `${targetHint} and installs the LangWatch Claude Code plugin, whose session ` +
+      `hooks record the repository and branch each session works on.`
+    );
+  }
+  return `Install env vars to ${targetHint} so that next time the plain \`${tool}\` command keeps capturing telemetry data?`;
 }
 
 /**
@@ -376,121 +356,103 @@ function persistQuestion({
  * already carries the current export set.
  */
 export async function maybeOfferIngestionShellRcPersist({
-	cfg,
-	tool,
-	vars,
+  cfg,
+  tool,
+  vars,
 }: {
-	cfg: GovernanceConfig;
-	tool: string;
-	vars: Record<string, string>;
+  cfg: GovernanceConfig;
+  tool: string;
+  vars: Record<string, string>;
 }): Promise<void> {
-	if (cfg.shell_rc_preference === "skip") return;
-	// Already wired up - the OTLP exporter env is present in this shell.
-	if (process.env.OTEL_EXPORTER_OTLP_ENDPOINT) return;
-	if (Object.keys(vars).length === 0) return;
+  if (cfg.shell_rc_preference === "skip") return;
+  // Already wired up - the OTLP exporter env is present in this shell.
+  if (process.env.OTEL_EXPORTER_OTLP_ENDPOINT) return;
+  if (Object.keys(vars).length === 0) return;
 
-	const appTarget = appSettingsTargetFor(tool);
-	if (appTarget) {
-		if (appEnvHasAllVars(appTarget, vars)) {
-			// The exports are current, but the session context seam may not be: it
-			// arrived after the env block, so a device that persisted earlier
-			// carries the block and none of it. Same file, same grant, so assert it
-			// here rather than leaving repository identity off every session that
-			// already said yes.
-			reassertClaudeSessionContext(tool);
-			return;
-		}
-		console.log();
-		const choice = await askPersistChoice({
-			target: appTarget.displayPath,
-			tool,
-		});
-		if (choice === "skip" || choice === "no") return;
-		if (choice === "never") {
-			recordNeverChoice(cfg);
-			return;
-		}
-		try {
-			installAppEnv(appTarget, vars);
-			console.log(
-				chalk.green(
-					`  ✓ Installed langwatch telemetry exports to ${appTarget.displayPath}`,
-				),
-			);
-			installClaudeSessionContext(tool);
-		} catch (err) {
-			console.log(
-				chalk.yellow(
-					`  ! Couldn't write to ${appTarget.displayPath}: ${(err as Error).message}`,
-				),
-			);
-		}
-		return;
-	}
+  const appTarget = appSettingsTargetFor(tool);
+  if (appTarget) {
+    if (appEnvHasAllVars(appTarget, vars)) {
+      // The exports are current, but the session context seam may not be: it
+      // arrived after the env block, so a device that persisted earlier
+      // carries the block and none of it. Same file, same grant, so assert it
+      // here rather than leaving repository identity off every session that
+      // already said yes.
+      reassertClaudeSessionContext(tool);
+      return;
+    }
+    console.log();
+    const choice = await askPersistChoice({
+      target: appTarget.displayPath,
+      tool,
+    });
+    if (choice === "skip" || choice === "no") return;
+    if (choice === "never") {
+      recordNeverChoice(cfg);
+      return;
+    }
+    try {
+      installAppEnv(appTarget, vars);
+      console.log(
+        chalk.green(`  ✓ Installed langwatch telemetry exports to ${appTarget.displayPath}`),
+      );
+      installClaudeSessionContext(tool);
+    } catch (err) {
+      console.log(
+        chalk.yellow(`  ! Couldn't write to ${appTarget.displayPath}: ${(err as Error).message}`),
+      );
+    }
+    return;
+  }
 
-	// codex needs no prompt here: the wrapper's per-run [otel] write
-	// persists the Authorization header inline in ~/.codex/config.toml
-	// (0600, marker-managed, removed by `langwatch logout`), so a plain
-	// `codex` already captures. What can still be missing on an older
-	// install is the turn harvest, the notify hook that recovers the
-	// conversation content those exports carry none of. Assert it under
-	// the same grant.
-	if (tool === "codex") {
-		assertCodexTurnHarvest();
-		assertCodexAgentGuidance();
-		return;
-	}
+  // codex needs no prompt here: the wrapper's per-run [otel] write
+  // persists the Authorization header inline in ~/.codex/config.toml
+  // (0600, marker-managed, removed by `langwatch logout`), so a plain
+  // `codex` already captures. What can still be missing on an older
+  // install is the turn harvest, the notify hook that recovers the
+  // conversation content those exports carry none of. Assert it under
+  // the same grant.
+  if (tool === "codex") {
+    assertCodexTurnHarvest();
+    assertCodexAgentGuidance();
+    return;
+  }
 
-	const shell = detectShell();
-	if (!shell) return;
+  const shell = detectShell();
+  if (!shell) return;
 
-	// Every remaining tool (gemini, opencode, …) has no config-file env target
-	// and rides on generic OTEL_* names, so a global `export` would leak into
-	// every shell child. Install a scoped wrapper function that sets the
-	// telemetry env only for `<tool>` runs, under the tool's own marker pair so
-	// multiple wrappers coexist. (cursor never reaches here — it's gateway-only
-	// via allow_otel_direct=false, so Path B ingestion never resolves for it.)
-	const markers = toolMarkers(tool);
-	// Already installed for this endpoint, even if this shell hasn't sourced the
-	// rc yet (so the OTEL env isn't in process.env). Keyed on the endpoint so a
-	// stale wrapper for a different endpoint doesn't suppress installing this one.
-	if (
-		rcHasLangwatchBlock({
-			shell,
-			requiredKeys: [vars.OTEL_EXPORTER_OTLP_ENDPOINT].filter(
-				Boolean,
-			) as string[],
-			markers,
-		})
-	) {
-		return;
-	}
-	const target = rcPath(shell);
-	console.log();
-	const choice = await askPersistChoice({ target, tool });
-	if (choice === "skip" || choice === "no") return;
-	if (choice === "never") {
-		recordNeverChoice(cfg);
-		return;
-	}
-	try {
-		const wrote = persistBlockToRc(
-			shell,
-			buildScopedToolFunction(tool, vars, shell),
-			markers,
-		);
-		console.log(
-			chalk.green(
-				`  ✓ Installed a scoped \`${tool}\` telemetry wrapper in ${wrote}`,
-			),
-		);
-	} catch (err) {
-		console.log(
-			chalk.yellow(
-				`  ! Couldn't write to ${target}: ${(err as Error).message}`,
-			),
-		);
-	}
+  // Every remaining tool (gemini, opencode, …) has no config-file env target
+  // and rides on generic OTEL_* names, so a global `export` would leak into
+  // every shell child. Install a scoped wrapper function that sets the
+  // telemetry env only for `<tool>` runs, under the tool's own marker pair so
+  // multiple wrappers coexist. (cursor never reaches here — it's gateway-only
+  // via allow_otel_direct=false, so Path B ingestion never resolves for it.)
+  const markers = toolMarkers(tool);
+  // Already installed for this endpoint, even if this shell hasn't sourced the
+  // rc yet (so the OTEL env isn't in process.env). Keyed on the endpoint so a
+  // stale wrapper for a different endpoint doesn't suppress installing this one.
+  if (
+    rcHasLangwatchBlock({
+      shell,
+      requiredKeys: [vars.OTEL_EXPORTER_OTLP_ENDPOINT].filter(Boolean) as string[],
+      markers,
+    })
+  ) {
+    return;
+  }
+  const target = rcPath(shell);
+  console.log();
+  const choice = await askPersistChoice({ target, tool });
+  if (choice === "skip" || choice === "no") return;
+  if (choice === "never") {
+    recordNeverChoice(cfg);
+    return;
+  }
+  try {
+    const wrote = persistBlockToRc(shell, buildScopedToolFunction(tool, vars, shell), markers);
+    console.log(chalk.green(`  ✓ Installed a scoped \`${tool}\` telemetry wrapper in ${wrote}`));
+  } catch (err) {
+    console.log(chalk.yellow(`  ! Couldn't write to ${target}: ${(err as Error).message}`));
+  }
 }
 
 /**
@@ -501,14 +463,14 @@ export async function maybeOfferIngestionShellRcPersist({
  * rather than abandon an install that otherwise worked.
  */
 export type CodexTurnHarvestOutcome =
-	| { status: "installed"; chained: string[] | null; ephemeral: boolean }
-	| { status: "unchanged" }
-	| { status: "skipped" }
-	| { status: "blocked" };
+  | { status: "installed"; chained: string[] | null; ephemeral: boolean }
+  | { status: "unchanged" }
+  | { status: "skipped" }
+  | { status: "blocked" };
 
 /** What every caller says when the merge was refused. */
 export const CODEX_TURN_HARVEST_BLOCKED_MESSAGE =
-	"Your codex configuration already runs a program of its own after every turn, and it cannot be moved safely, so the conversation will not be recorded. Remove that setting and run this again.";
+  "Your codex configuration already runs a program of its own after every turn, and it cannot be moved safely, so the conversation will not be recorded. Remove that setting and run this again.";
 
 /**
  * The merge refuses rather than leave two top-level `notify` keys behind, which
@@ -516,7 +478,7 @@ export const CODEX_TURN_HARVEST_BLOCKED_MESSAGE =
  * raised where the TOML is read, one module below this one.
  */
 function isNotifyMergeRefusal(err: unknown): boolean {
-	return err instanceof Error && err.message.startsWith("refusing to write ");
+  return err instanceof Error && err.message.startsWith("refusing to write ");
 }
 
 /**
@@ -529,23 +491,23 @@ function isNotifyMergeRefusal(err: unknown): boolean {
  * `codex` into traces with something to read.
  */
 export function installCodexTurnHarvest(
-	options: { filePath?: string } = {},
+  options: { filePath?: string } = {},
 ): CodexTurnHarvestOutcome {
-	const command = defaultCodexNotifyCommand();
-	if (!command) return { status: "skipped" };
-	let result: CodexNotifyWriteResult;
-	try {
-		result = writeCodexNotifyBlock({ command }, options);
-	} catch (err) {
-		if (isNotifyMergeRefusal(err)) return { status: "blocked" };
-		throw err;
-	}
-	if (result.action === "unchanged") return { status: "unchanged" };
-	return {
-		status: "installed",
-		chained: result.chained,
-		ephemeral: codexNotifyCommandIsEphemeral(command),
-	};
+  const command = defaultCodexNotifyCommand();
+  if (!command) return { status: "skipped" };
+  let result: CodexNotifyWriteResult;
+  try {
+    result = writeCodexNotifyBlock({ command }, options);
+  } catch (err) {
+    if (isNotifyMergeRefusal(err)) return { status: "blocked" };
+    throw err;
+  }
+  if (result.action === "unchanged") return { status: "unchanged" };
+  return {
+    status: "installed",
+    chained: result.chained,
+    ephemeral: codexNotifyCommandIsEphemeral(command),
+  };
 }
 
 /**
@@ -559,59 +521,49 @@ export function installCodexTurnHarvest(
  * never hear about.
  */
 export function assertCodexTurnHarvest(): void {
-	let outcome: CodexTurnHarvestOutcome;
-	try {
-		outcome = installCodexTurnHarvest();
-	} catch (err) {
-		// Never silent: with the exporters in and the harvest out, plain codex
-		// reports tokens but no conversation, and the user has no way to know.
-		console.log(
-			chalk.yellow(
-				`  ! Could not wire the codex turn harvest: ${(err as Error).message}\n` +
-					"    Plain codex runs will report tokens but no conversation until it is wired.",
-			),
-		);
-		return;
-	}
-	if (outcome.status === "blocked") {
-		console.log(chalk.yellow(`  ! ${CODEX_TURN_HARVEST_BLOCKED_MESSAGE}`));
-		return;
-	}
-	if (outcome.status === "skipped") {
-		console.log(
-			chalk.yellow(
-				"  ! Could not determine the langwatch entry to run the codex turn harvest.\n" +
-					"    Reinstall the CLI (npm i -g langwatch), then run `langwatch instrument codex` again.",
-			),
-		);
-		return;
-	}
-	if (outcome.status !== "installed") return;
-	console.log(
-		chalk.green(
-			"  ✓ Codex will record each turn's conversation as it completes",
-		),
-	);
-	console.log(
-		chalk.dim(
-			"    Sessions from before this install: `langwatch ingest codex` recovers them.",
-		),
-	);
-	if (outcome.chained) {
-		console.log(
-			chalk.dim(
-				`    Your existing notify program still runs: ${outcome.chained[0]}`,
-			),
-		);
-	}
-	if (outcome.ephemeral) {
-		console.log(
-			chalk.yellow(
-				"    Heads up: this points at an npx cache that npm may clean up.\n" +
-					"    Install the CLI (npm i -g langwatch) so it keeps working.",
-			),
-		);
-	}
+  let outcome: CodexTurnHarvestOutcome;
+  try {
+    outcome = installCodexTurnHarvest();
+  } catch (err) {
+    // Never silent: with the exporters in and the harvest out, plain codex
+    // reports tokens but no conversation, and the user has no way to know.
+    console.log(
+      chalk.yellow(
+        `  ! Could not wire the codex turn harvest: ${(err as Error).message}\n` +
+          "    Plain codex runs will report tokens but no conversation until it is wired.",
+      ),
+    );
+    return;
+  }
+  if (outcome.status === "blocked") {
+    console.log(chalk.yellow(`  ! ${CODEX_TURN_HARVEST_BLOCKED_MESSAGE}`));
+    return;
+  }
+  if (outcome.status === "skipped") {
+    console.log(
+      chalk.yellow(
+        "  ! Could not determine the langwatch entry to run the codex turn harvest.\n" +
+          "    Reinstall the CLI (npm i -g langwatch), then run `langwatch instrument codex` again.",
+      ),
+    );
+    return;
+  }
+  if (outcome.status !== "installed") return;
+  console.log(chalk.green("  ✓ Codex will record each turn's conversation as it completes"));
+  console.log(
+    chalk.dim("    Sessions from before this install: `langwatch ingest codex` recovers them."),
+  );
+  if (outcome.chained) {
+    console.log(chalk.dim(`    Your existing notify program still runs: ${outcome.chained[0]}`));
+  }
+  if (outcome.ephemeral) {
+    console.log(
+      chalk.yellow(
+        "    Heads up: this points at an npx cache that npm may clean up.\n" +
+          "    Install the CLI (npm i -g langwatch) so it keeps working.",
+      ),
+    );
+  }
 }
 
 /**
@@ -628,20 +580,20 @@ export function assertCodexTurnHarvest(): void {
  * what this always did.
  */
 function installClaudeSessionContext(tool: string): void {
-	if (tool !== "claude") return;
+  if (tool !== "claude") return;
 
-	const plugin = ensureLangwatchClaudePlugin({ interactive: true });
-	if (plugin.action === "installed") {
-		console.log(
-			chalk.green(
-				`  ✓ Installed the LangWatch Claude Code plugin, whose hooks report each session's repository and branch`,
-			),
-		);
-		return;
-	}
-	if (plugin.action === "already_installed") return;
+  const plugin = ensureLangwatchClaudePlugin({ interactive: true });
+  if (plugin.action === "installed") {
+    console.log(
+      chalk.green(
+        `  ✓ Installed the LangWatch Claude Code plugin, whose hooks report each session's repository and branch`,
+      ),
+    );
+    return;
+  }
+  if (plugin.action === "already_installed") return;
 
-	installRawSessionContextHooks();
+  installRawSessionContextHooks();
 }
 
 /**
@@ -654,18 +606,18 @@ function installClaudeSessionContext(tool: string): void {
  * leaving both wired runs the same two hooks twice per session.
  */
 function reassertClaudeSessionContext(tool: string): void {
-	if (tool !== "claude") return;
+  if (tool !== "claude") return;
 
-	if (readClaudePluginState().pluginInstalled) {
-		try {
-			removeSessionContextHooks({ tool: "claude_code" });
-		} catch {
-			// Best-effort: a duplicate hook is worse than tidy, not broken.
-		}
-		return;
-	}
+  if (readClaudePluginState().pluginInstalled) {
+    try {
+      removeSessionContextHooks({ tool: "claude_code" });
+    } catch {
+      // Best-effort: a duplicate hook is worse than tidy, not broken.
+    }
+    return;
+  }
 
-	installRawSessionContextHooks();
+  installRawSessionContextHooks();
 }
 
 /**
@@ -674,25 +626,22 @@ function reassertClaudeSessionContext(tool: string): void {
  * over: the exports it rides beside are already installed.
  */
 function installRawSessionContextHooks(): void {
-	try {
-		const hooks = installSessionContextHooks({ tool: "claude_code" });
-		if (hooks.action === "unchanged") return;
-		console.log(
-			chalk.green(
-				`  ✓ Installed the hooks that report each session's repository and branch`,
-			),
-		);
-	} catch {
-		// Best-effort, the same way the telemetry refresh treats them.
-	}
+  try {
+    const hooks = installSessionContextHooks({ tool: "claude_code" });
+    if (hooks.action === "unchanged") return;
+    console.log(
+      chalk.green(`  ✓ Installed the hooks that report each session's repository and branch`),
+    );
+  } catch {
+    // Best-effort, the same way the telemetry refresh treats them.
+  }
 }
 
 function recordNeverChoice(cfg: GovernanceConfig): void {
-	cfg.shell_rc_preference = "skip";
-	try {
-		saveConfig(cfg);
-	} catch {
-		// best effort — a config write failure just means the next run re-asks.
-	}
+  cfg.shell_rc_preference = "skip";
+  try {
+    saveConfig(cfg);
+  } catch {
+    // best effort — a config write failure just means the next run re-asks.
+  }
 }
-

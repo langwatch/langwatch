@@ -1,0 +1,151 @@
+/**
+ * Handled errors for licensing with stable codes the client renders copy from.
+ * Each error is a named cause the caller can act on (pick org, paste key, renew).
+ */
+
+import { HandledError, ValidationError } from "@langwatch/handled-error";
+
+import { LICENSE_ERRORS, type LicenseError } from "./license-constants.ts";
+
+/**
+ * The organization a license action names does not exist.
+ *
+ * Previously a bare `Error` matched by `instanceof` in three router handlers,
+ * each re-wrapping it as a `TRPCError`. `instanceof` is same-process only and
+ * breaks the moment a bundler loads two copies of this module, so the code is
+ * the discriminant now and those handlers are gone.
+ */
+export class OrganizationNotFoundError extends HandledError {
+  declare readonly code: "organization_not_found";
+
+  constructor() {
+    super("organization_not_found", "Organization not found", {
+      httpStatus: 404,
+      fault: "customer",
+    });
+    this.name = "OrganizationNotFoundError";
+  }
+}
+
+/**
+ * The key isn't a license we can read — wrong format, or a signature that
+ * doesn't verify.
+ *
+ * Both collapse to one code deliberately: a customer cannot act differently on
+ * "malformed" than on "not signed by us", and telling them which one it is
+ * only tells whoever is probing that they got the shape right.
+ */
+export class LicenseKeyInvalidError extends HandledError {
+  declare readonly code: "license_key_invalid";
+
+  constructor() {
+    super("license_key_invalid", "This license key is not valid", {
+      httpStatus: 400,
+      fault: "customer",
+    });
+    this.name = "LicenseKeyInvalidError";
+  }
+}
+
+/** The license verifies, but its expiry date has passed. */
+export class LicenseExpiredError extends HandledError {
+  declare readonly code: "license_expired";
+
+  constructor() {
+    super("license_expired", "This license has expired", {
+      httpStatus: 400,
+      fault: "customer",
+    });
+    this.name = "LicenseExpiredError";
+  }
+}
+
+/**
+ * The signing key isn't a PEM private key — usually a public key, or a
+ * fragment that lost its delimiters on the way through a chat window.
+ *
+ * Separate from the two codes above because this is the *issuer's* key, not
+ * the customer's licence: the person seeing it is generating a licence, and
+ * what they have to fix is the thing they pasted.
+ */
+export class LicenseSigningKeyNotPemError extends HandledError {
+  declare readonly code: "license_signing_key_not_pem";
+
+  constructor() {
+    super(
+      "license_signing_key_not_pem",
+      "The provided license signing key is not a PEM private key",
+      {
+        httpStatus: 400,
+        fault: "customer",
+        tips: [
+          "Provide the whole private key, including its BEGIN and END lines",
+          "A public key cannot sign; provide the private half of the key pair",
+        ],
+      },
+    );
+    this.name = "LicenseSigningKeyNotPemError";
+  }
+}
+
+/** The signing key is passphrase-protected, so signing cannot use it as-is. */
+export class LicenseSigningKeyEncryptedError extends HandledError {
+  declare readonly code: "license_signing_key_encrypted";
+
+  constructor() {
+    super(
+      "license_signing_key_encrypted",
+      "The provided license signing key is passphrase-protected",
+      {
+        httpStatus: 400,
+        fault: "customer",
+        tips: ["Provide an unencrypted private key; signing cannot use a passphrase-protected key"],
+      },
+    );
+    this.name = "LicenseSigningKeyEncryptedError";
+  }
+}
+
+/**
+ * A well-formed PEM OpenSSL refused to sign with. OpenSSL's error is masked
+ * (names internals/key material) so only this error's code reaches the client.
+ */
+export class LicenseSigningFailedError extends HandledError {
+  declare readonly code: "license_signing_failed";
+
+  constructor(options: { reasons?: readonly Error[] } = {}) {
+    super("license_signing_failed", "The provided license signing key could not be used to sign", {
+      httpStatus: 400,
+      fault: "customer",
+      tips: ["Check that this is the license signing key and that it was copied in full"],
+      ...options,
+    });
+    this.name = "LicenseSigningFailedError";
+  }
+}
+
+/**
+ * The term an operator typed for a key they are minting has already elapsed.
+ * A FIELD refusal: the generator form has the control on screen, so the
+ * rejection appears where the operator is looking rather than in a toast.
+ */
+export class LicenseExpiryNotInFutureError extends ValidationError {
+  constructor() {
+    super("A license term must end in the future", {
+      meta: { fieldErrors: { expiresAt: ["Expiration date must be in the future"] } },
+      fault: "customer",
+    });
+    this.name = "LicenseExpiryNotInFutureError";
+  }
+}
+
+/**
+ * Converts ValidationResult failure verdicts to handled errors. The verdict is
+ * a server discriminant (not copy), and unrecognized verdicts fail closed to
+ * "invalid".
+ */
+export function licenseValidationError(verdict: LicenseError | string | undefined): HandledError {
+  return verdict === LICENSE_ERRORS.EXPIRED
+    ? new LicenseExpiredError()
+    : new LicenseKeyInvalidError();
+}

@@ -24,11 +24,9 @@ quickwit-*
 /store/
 /data/
 /metadata/
-/platform/app/store/
-/platform/app/data/
-/platform/app/metadata/
 __pycache__
 dist/
+/dev/.cache/
 
 langwatch_server/
 .DS_Store
@@ -54,6 +52,7 @@ prompts/**
 # Claude Code personal settings (the wildcard also catches editor/tool backup
 # copies like settings.local.json.bak-*, which carry the same secrets)
 **/.claude/settings.local.json*
+**/.codex/hooks.json
 **/.claude/agent-memory/
 **/.claude/projects/
 .claude/scheduled_tasks.lock
@@ -98,12 +97,12 @@ browser-tests/
 # those rules, or `git add -f` it.
 
 # Playwright E2E tests
-tests/agentic-e2e/test-results/
-tests/agentic-e2e/playwright-report/
-tests/agentic-e2e/.auth/
-tests/agentic-e2e/debug-*.png
-tests/agentic-e2e/tests/seed.spec.ts
-tests/agentic-e2e/node_modules/
+dev/tests/agentic-e2e/test-results/
+dev/tests/agentic-e2e/playwright-report/
+dev/tests/agentic-e2e/.auth/
+dev/tests/agentic-e2e/debug-*.png
+dev/tests/agentic-e2e/tests/seed.spec.ts
+dev/tests/agentic-e2e/node_modules/
 seed.spec.ts
 .playwright-mcp/
 .mcp.local.json
@@ -138,10 +137,10 @@ uuid
 **/.pr-screenshots/
 
 # Per-scenario LLM conversation transcripts (langy.scenario.test.ts)
-platform/app/e2e/langy/scenario-logs/
+apps/ui/e2e/langy/scenario-logs/
 
 # Per-run red-team crescendo reports (langy-redteam.scenario.test.ts)
-platform/app/e2e/langy/redteam-reports/
+apps/ui/e2e/langy/redteam-reports/
 
 # Agent scratch + dogfood evidence (never track)
 **/.claude/dogfood-evidence/
@@ -153,11 +152,47 @@ server.log
 # thuishaven (portless local dev)
 .langwatch-slug
 .haven.json
-/bin/haven
-platform/app/dev.log
+**/dev.log
 .claude/tmp/
 
-# Biome gate artifacts (.github/workflows/langwatch-app-ci.yml lint job)
-/biome.raw.json
-/biome.rdjson
-/biome.posted.json
+# The nlpgo integration harness compiles the Go engine once and caches the
+# binary here (packages/test-harness/src/nlpgo-subprocess.ts). It used to sit
+# inside the application package, whose own ignore file covered it.
+/.vitest-tmp/
+
+# Every binary this repository builds locally, one directory per binary:
+# .bin/<name>/<name> (haven, the Go services under `make service-watch`, the
+# bun-compiled langy-worker and langwatch CLIs). Release pipelines still pass
+# their own --outfile; this is the default so a stray build can never be
+# committed the way a 9.8 MB `apidiff` once was.
+/.bin/
+
+# apidiff scratch: worktrees, instance logs, generated compose overrides
+.apidiff/
+
+# visualdiff run directories: worktrees, screenshots, reports
+.visualdiff/
+
+# Prisma client output: prepare regenerates it (pnpm start:prepare:files), never commit it
+packages/prisma-client/src/generated/
+.claims.tsv
+.claims.tsv.lock/
+
+# Multi-agent workflow runtime state. The protocol itself lives in
+# .claude/coordinator/ and IS tracked; what it produces is not. A manifest is
+# one task's contract and a handoff is a snapshot between two agents - both are
+# stale the moment the drive moves on, and a stale handoff in git history is
+# something a future agent reads and believes. Anything worth keeping graduates
+# to dev/docs/adr/, dev/docs/plans/ or .claude/skills/core/.
+#
+# The contents are ignored rather than the directories, because git cannot
+# re-include a file whose parent directory is excluded - the README negations
+# below only work this way round.
+.claude/handoffs/*
+!.claude/handoffs/README.md
+.claude/manifests/*
+!.claude/manifests/README.md
+.claude/coordinator/LANES.md
+
+# The Python uv workspace's shared virtual environment (ADR-145).
+.venv/

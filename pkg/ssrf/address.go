@@ -11,7 +11,7 @@
 // given service left open, so the rule set must be one thing, expressed once.
 //
 // The Go implementation lives here; the byte-for-byte equivalent TypeScript
-// implementation lives in the @langwatch/ssrf workspace package. Both are held
+// implementation lives in packages/egress/src/ssrf/address.ts. Both are held
 // to the same behavior by the shared conformance corpus in
 // testdata/address_vectors.json — if the two languages ever disagree about any
 // vector, one of the two test suites fails.

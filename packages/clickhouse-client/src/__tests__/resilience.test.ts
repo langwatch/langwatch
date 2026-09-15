@@ -1,25 +1,11 @@
 import { describe, expect, it } from "vitest";
-import {
-  isTransientClickHouseError,
-  jitteredBackoffMs,
-  retryNoticeLevel,
-} from "../resilience";
+import { isTransientClickHouseError, jitteredBackoffMs, retryNoticeLevel } from "../resilience.ts";
 
-const withCode = ({
-  message,
-  code,
-}: {
-  message: string;
-  code: string;
-}): Error => Object.assign(new Error(message), { code });
+const withCode = ({ message, code }: { message: string; code: string }): Error =>
+  Object.assign(new Error(message), { code });
 
-const withStatus = ({
-  message,
-  status,
-}: {
-  message: string;
-  status: number;
-}): Error => Object.assign(new Error(message), { statusCode: status });
+const withStatus = ({ message, status }: { message: string; status: number }): Error =>
+  Object.assign(new Error(message), { statusCode: status });
 
 describe("isTransientClickHouseError", () => {
   describe("given something that is not an error", () => {
@@ -37,12 +23,7 @@ describe("isTransientClickHouseError", () => {
 
   describe("given a socket-level failure", () => {
     describe("when the code is a known transient one", () => {
-      it.each([
-        "ECONNRESET",
-        "EPIPE",
-        "ETIMEDOUT",
-        "EAI_AGAIN",
-      ])("retries %s", (code) => {
+      it.each(["ECONNRESET", "EPIPE", "ETIMEDOUT", "EAI_AGAIN"])("retries %s", (code) => {
         expect(
           isTransientClickHouseError({
             error: withCode({ message: "socket", code }),
@@ -87,15 +68,11 @@ describe("isTransientClickHouseError", () => {
   describe("given a timeout", () => {
     describe("when only the message says so", () => {
       it("retries on the message alone", () => {
-        expect(
-          isTransientClickHouseError({ error: new Error("Timeout error.") }),
-        ).toBe(true);
+        expect(isTransientClickHouseError({ error: new Error("Timeout error.") })).toBe(true);
       });
 
       it("tolerates the message without its trailing stop", () => {
-        expect(
-          isTransientClickHouseError({ error: new Error("Timeout error") }),
-        ).toBe(true);
+        expect(isTransientClickHouseError({ error: new Error("Timeout error") })).toBe(true);
       });
     });
 
@@ -219,9 +196,7 @@ describe("jitteredBackoffMs", () => {
   describe("given full jitter", () => {
     describe("when the random source always returns 1", () => {
       it("adds at most one base delay", () => {
-        expect(
-          jitteredBackoffMs({ ...base, attempt: 0, random: () => 1 }),
-        ).toBe(1000);
+        expect(jitteredBackoffMs({ ...base, attempt: 0, random: () => 1 })).toBe(1000);
       });
     });
   });
@@ -259,9 +234,7 @@ describe("retryNoticeLevel", () => {
     describe("when the level is chosen", () => {
       it("stays quiet so one failure is not counted many times", () => {
         // A 25-attempt budget previously produced 25 warn records per failure.
-        const levels = Array.from({ length: 25 }, (_, i) =>
-          retryNoticeLevel(i),
-        );
+        const levels = Array.from({ length: 25 }, (_, i) => retryNoticeLevel(i));
 
         expect(levels.filter((l) => l === "warn")).toHaveLength(1);
       });

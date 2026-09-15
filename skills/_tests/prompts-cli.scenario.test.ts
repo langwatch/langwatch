@@ -20,13 +20,9 @@ dotenv.config({ path: path.resolve(__dirname, "../.env") });
 const isCI = !!process.env.CI;
 const judgeModel = openai("gpt-5-mini");
 
-function assertNoInteractiveWorkarounds(
-  state: ScenarioExecutionStateLike
-): void {
+function assertNoInteractiveWorkarounds(state: ScenarioExecutionStateLike): void {
   const allText = state.messages
-    .map((m) =>
-      typeof m.content === "string" ? m.content : JSON.stringify(m.content)
-    )
+    .map((m) => (typeof m.content === "string" ? m.content : JSON.stringify(m.content)))
     .join("\n");
 
   // Agent should not need to pipe yes, use expect, or hack around interactive prompts
@@ -40,9 +36,7 @@ describe("LangWatch Prompts CLI — Agent Usability", () => {
   it.skipIf(isCI)(
     "agent discovers and uses CLI to version prompts from scratch",
     async () => {
-      const tempFolder = fs.mkdtempSync(
-        path.join(os.tmpdir(), "langwatch-cli-prompts-version-")
-      );
+      const tempFolder = fs.mkdtempSync(path.join(os.tmpdir(), "langwatch-cli-prompts-version-"));
 
       copyFixtureToWorkDir({
         fixtureSubpath: "cli-prompts/python-with-prompts",
@@ -51,7 +45,7 @@ describe("LangWatch Prompts CLI — Agent Usability", () => {
 
       fs.writeFileSync(
         path.join(tempFolder, ".env"),
-        `LANGWATCH_API_KEY=${process.env.LANGWATCH_API_KEY}\n`
+        `LANGWATCH_API_KEY=${process.env.LANGWATCH_API_KEY}\n`,
       );
 
       const result = await scenario.run({
@@ -72,14 +66,13 @@ describe("LangWatch Prompts CLI — Agent Usability", () => {
         ],
         script: [
           scenario.user(
-            "use the langwatch prompt cli to version my prompts. The langwatch cli is already installed globally via npm. Check the docs with `langwatch docs prompt-management/cli` if needed."
+            "use the langwatch prompt cli to version my prompts. The langwatch cli is already installed globally via npm. Check the docs with `langwatch docs prompt-management/cli` if needed.",
           ),
           scenario.agent(),
           (state) => {
-
             expect(
               fs.existsSync(path.join(tempFolder, "prompts.json")),
-              "Expected prompts.json to exist after langwatch prompt init"
+              "Expected prompts.json to exist after langwatch prompt init",
             ).toBe(true);
 
             const promptsDir = path.join(tempFolder, "prompts");
@@ -87,14 +80,8 @@ describe("LangWatch Prompts CLI — Agent Usability", () => {
               fs.existsSync(promptsDir) &&
               fs
                 .readdirSync(promptsDir)
-                .some(
-                  (f) =>
-                    f.endsWith(".prompt.yaml") || f.endsWith(".prompt.yml")
-                );
-            expect(
-              hasYaml,
-              "Expected at least one .prompt.yaml file in prompts/"
-            ).toBe(true);
+                .some((f) => f.endsWith(".prompt.yaml") || f.endsWith(".prompt.yml"));
+            expect(hasYaml, "Expected at least one .prompt.yaml file in prompts/").toBe(true);
 
             assertNoInteractiveWorkarounds(state);
           },
@@ -104,27 +91,22 @@ describe("LangWatch Prompts CLI — Agent Usability", () => {
 
       expect(result.success).toBe(true);
     },
-    900_000
+    900_000,
   );
 
   it.skipIf(isCI)(
     "agent creates a specific named prompt via CLI",
     async () => {
-      const tempFolder = fs.mkdtempSync(
-        path.join(os.tmpdir(), "langwatch-cli-prompts-create-")
-      );
+      const tempFolder = fs.mkdtempSync(path.join(os.tmpdir(), "langwatch-cli-prompts-create-"));
 
       fs.writeFileSync(
         path.join(tempFolder, ".env"),
-        `LANGWATCH_API_KEY=${process.env.LANGWATCH_API_KEY}\n`
+        `LANGWATCH_API_KEY=${process.env.LANGWATCH_API_KEY}\n`,
       );
-      fs.writeFileSync(
-        path.join(tempFolder, "prompts.json"),
-        JSON.stringify({ prompts: {} })
-      );
+      fs.writeFileSync(path.join(tempFolder, "prompts.json"), JSON.stringify({ prompts: {} }));
       fs.writeFileSync(
         path.join(tempFolder, "prompts-lock.json"),
-        JSON.stringify({ lockfileVersion: 1, prompts: {} })
+        JSON.stringify({ lockfileVersion: 1, prompts: {} }),
       );
       fs.mkdirSync(path.join(tempFolder, "prompts"), { recursive: true });
 
@@ -146,26 +128,20 @@ describe("LangWatch Prompts CLI — Agent Usability", () => {
         ],
         script: [
           scenario.user(
-            "create a new prompt called refund-handler for handling customer refund requests using the langwatch prompt cli. Edit the YAML to have a good system prompt for it. The cli is already installed globally."
+            "create a new prompt called refund-handler for handling customer refund requests using the langwatch prompt cli. Edit the YAML to have a good system prompt for it. The cli is already installed globally.",
           ),
           scenario.agent(),
           (state) => {
-
             const promptsDir = path.join(tempFolder, "prompts");
             const yamlFiles = fs.existsSync(promptsDir)
               ? fs
                   .readdirSync(promptsDir)
-                  .filter(
-                    (f) =>
-                      f.endsWith(".prompt.yaml") || f.endsWith(".prompt.yml")
-                  )
+                  .filter((f) => f.endsWith(".prompt.yaml") || f.endsWith(".prompt.yml"))
               : [];
             expect(yamlFiles.length).toBeGreaterThan(0);
 
             const content = yamlFiles
-              .map((f) =>
-                fs.readFileSync(path.join(promptsDir, f), "utf8")
-              )
+              .map((f) => fs.readFileSync(path.join(promptsDir, f), "utf8"))
               .join("\n");
             expect(content.toLowerCase()).toMatch(/refund/);
 
@@ -177,28 +153,23 @@ describe("LangWatch Prompts CLI — Agent Usability", () => {
 
       expect(result.success).toBe(true);
     },
-    900_000
+    900_000,
   );
 
   it.skipIf(isCI)(
     "agent uses push --force-local to resolve conflicts non-interactively",
     async () => {
-      const tempFolder = fs.mkdtempSync(
-        path.join(os.tmpdir(), "langwatch-cli-prompts-push-")
-      );
+      const tempFolder = fs.mkdtempSync(path.join(os.tmpdir(), "langwatch-cli-prompts-push-"));
 
       // Set up a project with a prompt that exists both locally and remotely (simulate conflict scenario)
       fs.writeFileSync(
         path.join(tempFolder, ".env"),
-        `LANGWATCH_API_KEY=${process.env.LANGWATCH_API_KEY}\n`
+        `LANGWATCH_API_KEY=${process.env.LANGWATCH_API_KEY}\n`,
       );
-      fs.writeFileSync(
-        path.join(tempFolder, "prompts.json"),
-        JSON.stringify({ prompts: {} })
-      );
+      fs.writeFileSync(path.join(tempFolder, "prompts.json"), JSON.stringify({ prompts: {} }));
       fs.writeFileSync(
         path.join(tempFolder, "prompts-lock.json"),
-        JSON.stringify({ lockfileVersion: 1, prompts: {} })
+        JSON.stringify({ lockfileVersion: 1, prompts: {} }),
       );
       fs.mkdirSync(path.join(tempFolder, "prompts"), { recursive: true });
 
@@ -221,17 +192,14 @@ describe("LangWatch Prompts CLI — Agent Usability", () => {
         ],
         script: [
           scenario.user(
-            "create a new prompt called greeting-bot using the langwatch prompt cli, then push it to the platform. If there are any conflicts during push, use the --force-local flag. The cli is already installed globally."
+            "create a new prompt called greeting-bot using the langwatch prompt cli, then push it to the platform. If there are any conflicts during push, use the --force-local flag. The cli is already installed globally.",
           ),
           scenario.agent(),
           (state) => {
-
             // Verify prompt was created
             const promptsDir = path.join(tempFolder, "prompts");
             const yamlFiles = fs.existsSync(promptsDir)
-              ? fs
-                  .readdirSync(promptsDir)
-                  .filter((f) => f.endsWith(".prompt.yaml"))
+              ? fs.readdirSync(promptsDir).filter((f) => f.endsWith(".prompt.yaml"))
               : [];
             expect(yamlFiles.length).toBeGreaterThan(0);
 
@@ -243,27 +211,24 @@ describe("LangWatch Prompts CLI — Agent Usability", () => {
       });
       expect(result.success).toBe(true);
     },
-    900_000
+    900_000,
   );
 
   it.skipIf(isCI)(
     "agent adds a structured-output prompt with a modern model",
     async () => {
       const tempFolder = fs.mkdtempSync(
-        path.join(os.tmpdir(), "langwatch-cli-prompts-structured-")
+        path.join(os.tmpdir(), "langwatch-cli-prompts-structured-"),
       );
 
       fs.writeFileSync(
         path.join(tempFolder, ".env"),
-        `LANGWATCH_API_KEY=${process.env.LANGWATCH_API_KEY}\n`
+        `LANGWATCH_API_KEY=${process.env.LANGWATCH_API_KEY}\n`,
       );
-      fs.writeFileSync(
-        path.join(tempFolder, "prompts.json"),
-        JSON.stringify({ prompts: {} })
-      );
+      fs.writeFileSync(path.join(tempFolder, "prompts.json"), JSON.stringify({ prompts: {} }));
       fs.writeFileSync(
         path.join(tempFolder, "prompts-lock.json"),
-        JSON.stringify({ lockfileVersion: 1, prompts: {} })
+        JSON.stringify({ lockfileVersion: 1, prompts: {} }),
       );
       fs.mkdirSync(path.join(tempFolder, "prompts"), { recursive: true });
 
@@ -286,16 +251,13 @@ describe("LangWatch Prompts CLI — Agent Usability", () => {
         ],
         script: [
           scenario.user(
-            "use the langwatch prompt cli to version a new prompt called product-classifier. It classifies a product into a category and must always return strict JSON with two fields: category (string) and reasoning (string). The cli is already installed globally. Check `langwatch docs prompt-management/cli` if needed."
+            "use the langwatch prompt cli to version a new prompt called product-classifier. It classifies a product into a category and must always return strict JSON with two fields: category (string) and reasoning (string). The cli is already installed globally. Check `langwatch docs prompt-management/cli` if needed.",
           ),
           scenario.agent(),
           (state) => {
-
             const promptsDir = path.join(tempFolder, "prompts");
             const yamlFiles = fs.existsSync(promptsDir)
-              ? fs
-                  .readdirSync(promptsDir)
-                  .filter((f) => f.endsWith(".prompt.yaml"))
+              ? fs.readdirSync(promptsDir).filter((f) => f.endsWith(".prompt.yaml"))
               : [];
             expect(yamlFiles.length).toBeGreaterThan(0);
 
@@ -308,9 +270,7 @@ describe("LangWatch Prompts CLI — Agent Usability", () => {
             // Modern model — never a legacy gpt-4 / gpt-3.x generation
             const modelMatch = /^model:\s*(\S+)/m.exec(content);
             expect(modelMatch).toBeTruthy();
-            expect(modelMatch![1]!).not.toMatch(
-              /^openai\/gpt-[0-4]([.-]|$)/
-            );
+            expect(modelMatch![1]!).not.toMatch(/^openai\/gpt-[0-4]([.-]|$)/);
 
             assertNoInteractiveWorkarounds(state);
           },
@@ -320,6 +280,6 @@ describe("LangWatch Prompts CLI — Agent Usability", () => {
 
       expect(result.success).toBe(true);
     },
-    900_000
+    900_000,
   );
 });

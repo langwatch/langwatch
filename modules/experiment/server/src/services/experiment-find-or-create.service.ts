@@ -1,0 +1,99 @@
+/**
+ * The rule that turns an SDK's `experiment_slug` into an experiment row.
+ */
+import type { Experiment, ExperimentType } from "@langwatch/experiment-contract";
+import type { ExperimentService } from "./experiment.service.ts";
+import { nanoid } from "nanoid";
+import originalSlugify from "slugify";
+
+/** What an SDK names an experiment by. Either identifier, or both. */
+export type ExperimentFindOrCreateInput = Readonly<{
+  /**
+   * Only the id is read. The API boundary carries a project IDENTITY rather
+   * than a project row, so naming the row here would ask three call sites for
+   * a read none of them makes.
+   */
+  projectId: string;
+  experimentId?: string | null | undefined;
+  experimentSlug?: string | null | undefined;
+  experimentType: ExperimentType;
+  experimentName?: string | undefined;
+  workflowId?: string | undefined;
+}>;
+
+export class ExperimentFindOrCreateService {
+  static create(experiments: ExperimentService): ExperimentFindOrCreateService {
+    return new ExperimentFindOrCreateService(experiments);
+  }
+
+  private constructor(private readonly experiments: ExperimentService) {}
+
+  /**
+   * The experiment the slug names, created if it is free.
+   */
+  async resolve(input: ExperimentFindOrCreateInput): Promise<Experiment> {
+    const projectId = input.projectId;
+    let experiment: Experiment | null = null;
+
+    if (input.experimentId) {
+      experiment = await this.experiments.getById({ projectId, id: input.experimentId });
+    }
+
+    let slug: string | null = null;
+    if (input.experimentSlug) {
+      slug = ExperimentFindOrCreateService.slugify(input.experimentSlug);
+      // `findBySlug` filters `archivedAt` at the service layer. An archived
+      // row also carries a `-archived-<nanoid>` slug, so it would not collide
+      // even on a raw read — the lookup still goes through the service so the
+      // archive rule stays one source of truth.
+      experiment = await this.experiments.findBySlug({ projectId, slug });
+    }
+
+    if (!experiment && !slug) {
+      throw new Error("Either experiment_id or experiment_slug is required");
+    }
+
+    if (!experiment && slug) {
+      return await this.experiments.save({
+        id: `experiment_${nanoid()}`,
+        name: input.experimentName ?? input.experimentSlug ?? slug,
+        requestedSlug: slug,
+        slugMode: "deduplicate",
+        projectId,
+        type: input.experimentType,
+        workflowId: input.workflowId ?? null,
+        workbenchState: null,
+      });
+    }
+
+    if (!experiment) {
+      throw new Error("Experiment not found");
+    }
+
+    // A name or a workflow sent with an EXISTING experiment updates it; the
+    // slug is preserved, because it is already in the customer's URLs.
+    if (input.experimentName ?? input.workflowId) {
+      return await this.experiments.save({
+        id: experiment.id,
+        name: input.experimentName ?? experiment.name,
+        requestedSlug: experiment.slug,
+        slugMode: "preserve-existing",
+        projectId,
+        type: experiment.type,
+        workflowId: input.workflowId ?? experiment.workflowId,
+        workbenchState: experiment.workbenchState,
+      });
+    }
+
+    return experiment;
+  }
+
+  /** The deployment's slug rule. See the four characters above. */
+  private static slugify(value: string): string {
+    return originalSlugify(value.replaceAll(/[:?&_]/g, "-"), {
+      lower: true,
+      strict: true,
+      replacement: "-",
+    });
+  }
+}

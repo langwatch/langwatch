@@ -1,10 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { DEFAULT_ENDPOINT } from "../constants";
-import {
-  normalizeEndpoint,
-  resolveEndpoint,
-  resolveLogsEndpoint,
-} from "../endpoint";
+import { normalizeEndpoint, resolveEndpoint, resolveLogsEndpoint } from "../endpoint";
 
 describe("resolveEndpoint", () => {
   const previousEndpoint = process.env.LANGWATCH_ENDPOINT;
@@ -21,17 +17,13 @@ describe("resolveEndpoint", () => {
   describe("given an explicit endpoint", () => {
     describe("when it carries a trailing slash", () => {
       it("strips the slash", () => {
-        expect(resolveEndpoint("https://app.langwatch.ai/")).toBe(
-          "https://app.langwatch.ai",
-        );
+        expect(resolveEndpoint("https://app.langwatch.ai/")).toBe("https://app.langwatch.ai");
       });
     });
 
     describe("when it carries repeated trailing slashes", () => {
       it("strips all of them", () => {
-        expect(resolveEndpoint("http://localhost:5560///")).toBe(
-          "http://localhost:5560",
-        );
+        expect(resolveEndpoint("http://localhost:5560///")).toBe("http://localhost:5560");
       });
     });
 
@@ -113,17 +105,13 @@ describe("resolveLogsEndpoint", () => {
 describe("normalizeEndpoint", () => {
   describe("when the value has surrounding whitespace", () => {
     it("trims it", () => {
-      expect(normalizeEndpoint("  https://app.langwatch.ai/  ")).toBe(
-        "https://app.langwatch.ai",
-      );
+      expect(normalizeEndpoint("  https://app.langwatch.ai/  ")).toBe("https://app.langwatch.ai");
     });
   });
 
   describe("when the value has no trailing slash", () => {
     it("leaves it untouched", () => {
-      expect(normalizeEndpoint("https://app.langwatch.ai")).toBe(
-        "https://app.langwatch.ai",
-      );
+      expect(normalizeEndpoint("https://app.langwatch.ai")).toBe("https://app.langwatch.ai");
     });
   });
 });

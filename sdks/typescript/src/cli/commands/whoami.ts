@@ -1,9 +1,5 @@
 import chalk from "chalk";
-import {
-  loadConfig,
-  isLoggedIn,
-  type GovernanceConfig,
-} from "@/cli/utils/governance/config";
+import { loadConfig, isLoggedIn, type GovernanceConfig } from "@/cli/utils/governance/config";
 
 /**
  * One line for what the login key reaches. The key is minted from the scope
@@ -44,7 +40,9 @@ export const whoamiCommand = async (): Promise<void> => {
   const cfg = loadConfig();
   if (!isLoggedIn(cfg)) {
     console.error(
-      chalk.yellow("Not logged in. Run `langwatch login --device` to sign in via your company SSO."),
+      chalk.yellow(
+        "Not logged in. Run `langwatch login --device` to sign in via your company SSO.",
+      ),
     );
     process.exit(1);
   }

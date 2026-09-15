@@ -1,0 +1,238 @@
+import { createLogger } from "@langwatch/observability";
+import { z } from "zod";
+import { sendEmail } from "../email-sender.ts";
+import type { EmailDelivery } from "../providers/types.ts";
+import {
+  ActionRow,
+  DataTable,
+  EmailLayout,
+  InlineLink,
+  Muted,
+  Paragraph,
+} from "./email-layout.tsx";
+import {
+  accountTeamStepSchema,
+  meteredNoun,
+  priceLine,
+  selfServeStepFields,
+  usageUnitSchema,
+} from "./next-step.ts";
+import { defineTemplate, renderMailTemplate } from "./registry.ts";
+
+const logger = createLogger("langwatch:mailer:automationLimitEmail");
+
+export const automationLimitKinds = ["ceiling_reached", "paused"] as const;
+
+export type AutomationLimitKind = (typeof automationLimitKinds)[number];
+
+export const automationLimitEmailProps = z.object({
+  kind: z.enum(automationLimitKinds),
+  automationName: z.string().min(1),
+  projectName: z.string().min(1),
+  /** Confirmed matches allowed per day; zero is valid (some plans allow no dispatches). */
+  dailyCeiling: z.number().int().nonnegative(),
+  /** Confirmed matches it dropped today, at the moment the mail was queued. */
+  skippedToday: z.number().int().nonnegative(),
+  actionUrl: z.url(),
+  /** What the project's organization is metered in, as its own meter reports it. */
+  usageUnit: usageUnitSchema.optional(),
+  /**
+   * Where the organization can get a higher ceiling (resolved for them). Shown only when
+   * reached. Enterprise orgs see people who change their own ceiling, not tier numbers.
+   */
+  nextStep: z
+    .discriminatedUnion("kind", [
+      z.object({
+        ...selfServeStepFields,
+        /** Confirmed matches a day one automation may act on, on that tier. */
+        dailyCeiling: z.number().int().positive(),
+      }),
+      accountTeamStepSchema,
+    ])
+    .optional(),
+});
+
+export type AutomationLimitEmailProps = z.infer<typeof automationLimitEmailProps>;
+
+export const automationLimitEmailSubject = ({
+  kind,
+  automationName,
+}: Pick<AutomationLimitEmailProps, "kind" | "automationName">): string =>
+  kind === "paused"
+    ? `Automation paused: ${automationName}`
+    : `Automation reached its daily limit: ${automationName}`;
+
+export const AutomationLimitEmail = ({
+  kind,
+  automationName,
+  projectName,
+  dailyCeiling,
+  skippedToday,
+  actionUrl,
+  usageUnit,
+  nextStep,
+}: AutomationLimitEmailProps) => {
+  const paused = kind === "paused";
+  const noun = meteredNoun(usageUnit);
+  // A paused automation is a mistake in the customer's own condition, so the
+  // offer is gated on the kind rather than on whether the data arrived.
+  const offer = !paused && nextStep?.kind === "self_serve" ? nextStep : undefined;
+  return (
+    <EmailLayout
+      eyebrow="AUTOMATIONS"
+      preview={
+        paused ? `"${automationName}" was paused` : `"${automationName}" reached its daily limit`
+      }
+      heading={
+        paused ? `We paused "${automationName}"` : `"${automationName}" reached its daily limit`
+      }
+    >
+      <Paragraph>
+        {paused
+          ? `This automation in ${projectName} matched almost every one of your ${noun}, well past its limit of ${dailyCeiling.toLocaleString()} matches a day. We have paused it so it stops creating records you did not intend.`
+          : `This automation in ${projectName} matched more ${noun} today than its limit of ${dailyCeiling.toLocaleString()} a day allows, so we stopped acting on the rest for today. It is still switched on, and it starts again tomorrow.`}
+      </Paragraph>
+      <DataTable
+        columns={[
+          { key: "ceiling", label: "Daily limit", align: "right" },
+          { key: "skipped", label: "Skipped today", align: "right" },
+        ]}
+        rows={[
+          {
+            key: automationName,
+            cells: {
+              ceiling: dailyCeiling.toLocaleString(),
+              skipped: skippedToday.toLocaleString(),
+            },
+          },
+        ]}
+      />
+      <Paragraph>
+        {paused
+          ? `Narrow its condition so it selects the ${noun} you actually want, then switch it back on.`
+          : `If this is the volume you expect, narrow the condition so it selects fewer ${noun}, or ask for a higher limit.`}
+      </Paragraph>
+      <ActionRow
+        primary={{ href: actionUrl, label: "Open the automation" }}
+        {...(offer
+          ? {
+              secondary: { href: offer.url, label: `Upgrade to ${offer.name}` },
+              note: `Raises this automation's daily limit to ${offer.dailyCeiling.toLocaleString()} matches, from ${priceLine(offer)}.`,
+            }
+          : {})}
+      />
+      {!paused && nextStep?.kind === "account_team" && (
+        <Muted>
+          Your ceiling is set by your agreement with us.{" "}
+          <InlineLink href={nextStep.contactUrl}>Talk to your account team</InlineLink> to raise it.
+        </Muted>
+      )}
+    </EmailLayout>
+  );
+};
+
+export const automationLimitEmailTemplate = defineTemplate({
+  id: "automation-limit",
+  title: "Automation daily limit",
+  sentWhen: "An automation matches past its daily ceiling, or runs away and is paused.",
+  schema: automationLimitEmailProps,
+  subject: automationLimitEmailSubject,
+  Component: AutomationLimitEmail,
+  fixtures: {
+    "ceiling reached": {
+      kind: "ceiling_reached",
+      automationName: "Escalate low satisfaction",
+      projectName: "Support agent",
+      dailyCeiling: 500,
+      skippedToday: 1_284,
+      actionUrl: "https://app.langwatch.ai/support-agent/automations/auto_7Kd2ppQ4",
+      nextStep: {
+        kind: "self_serve",
+        name: "Accelerate",
+        dailyCeiling: 5_000,
+        price: 199,
+        currency: "USD",
+        billingPeriod: "monthly",
+        url: "https://app.langwatch.ai/settings/subscription/checkout/accelerate",
+      },
+    },
+    "ceiling reached on negotiated terms": {
+      kind: "ceiling_reached",
+      automationName: "Escalate low satisfaction",
+      projectName: "Claims triage",
+      dailyCeiling: 25_000,
+      skippedToday: 3_140,
+      actionUrl: "https://app.langwatch.ai/claims-triage/automations/auto_7Kd2ppQ4",
+      usageUnit: "events",
+      nextStep: { kind: "account_team", contactUrl: "https://langwatch.ai/contact" },
+    },
+    "ceiling reached, nothing higher to move to": {
+      kind: "ceiling_reached",
+      automationName: "Escalate low satisfaction",
+      projectName: "Support agent",
+      dailyCeiling: 50_000,
+      skippedToday: 402,
+      actionUrl: "https://app.langwatch.ai/support-agent/automations/auto_7Kd2ppQ4",
+    },
+    paused: {
+      kind: "paused",
+      automationName: "Tag every conversation",
+      projectName: "Support agent",
+      dailyCeiling: 500,
+      skippedToday: 91_402,
+      actionUrl: "https://app.langwatch.ai/support-agent/automations/auto_3Bn8xxL1",
+    },
+  },
+});
+
+export const renderAutomationLimitEmail = async (
+  props: AutomationLimitEmailProps,
+): Promise<string> => (await renderMailTemplate(automationLimitEmailTemplate, props)).html;
+
+export const sendAutomationLimitEmail = async ({
+  mailer,
+  to,
+  ...props
+}: AutomationLimitEmailProps & { to: string[]; mailer: EmailDelivery }) => {
+  const { subject, html } = await renderMailTemplate(automationLimitEmailTemplate, props);
+  const results = await Promise.allSettled(
+    to.map((recipient) => sendEmail({ mailer, content: { to: recipient, subject, html } })),
+  );
+
+  const failures = results.filter((result) => result.status === "rejected");
+  if (failures.length === 0) return;
+
+  // The sends are independent, so one unroutable admin address must not decide
+  // that the rest of the organization hears nothing. Only a batch where nothing
+  // landed is a failure worth reporting upward, because the caller answers that
+  // by trying again, and trying again would mail the admins who did receive it
+  // a second time.
+  const kinds = [...new Set(failures.map((failure) => failureKind(failure.reason)))].sort();
+  if (failures.length === to.length) {
+    throw new Error(
+      `Could not send the automation limit email to any of its ${to.length} ` +
+        `recipients (${kinds.join(", ")})`,
+    );
+  }
+
+  logger.warn(
+    { failed: failures.length, recipients: to.length, kinds },
+    "Some automation limit emails could not be sent",
+  );
+};
+
+/**
+ * Extract the error code or SMTP status from provider rejections to avoid logging
+ * recipient addresses.
+ */
+function failureKind(reason: unknown): string {
+  if (typeof reason === "object" && reason !== null) {
+    const { code, responseCode } = reason as {
+      code?: unknown;
+      responseCode?: unknown;
+    };
+    if (typeof code === "string" && code !== "") return code;
+    if (typeof responseCode === "number") return `smtp_${responseCode}`;
+  }
+  return reason instanceof Error ? reason.name : "unknown";
+}

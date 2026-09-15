@@ -89,7 +89,7 @@ class DashboardsFacade:
         Returns:
             Dictionary with dashboard data.
         """
-        response = self._http().get("/api/dashboards")
+        response = self._http().get("/api/v1/dashboards")
         _raise_for_status(response, operation="list")
         return response.json()
 
@@ -103,7 +103,7 @@ class DashboardsFacade:
         Returns:
             Dictionary containing the dashboard data.
         """
-        response = self._http().get(f"/api/dashboards/{_quote(dashboard_id)}")
+        response = self._http().get(f"/api/v1/dashboards/{_quote(dashboard_id)}")
         _raise_for_status(response, operation="get")
         return response.json()
 
@@ -122,7 +122,7 @@ class DashboardsFacade:
             Dictionary containing the created dashboard data.
         """
         body: Dict[str, Any] = {"name": name}
-        response = self._http().post("/api/dashboards", json=body)
+        response = self._http().post("/api/v1/dashboards", json=body)
         _raise_for_status(response, operation="create")
         return response.json()
 
@@ -144,7 +144,7 @@ class DashboardsFacade:
         """
         body: Dict[str, Any] = {"name": name}
         response = self._http().patch(
-            f"/api/dashboards/{_quote(dashboard_id)}", json=body
+            f"/api/v1/dashboards/{_quote(dashboard_id)}", json=body
         )
         _raise_for_status(response, operation="rename")
         return response.json()
@@ -159,6 +159,6 @@ class DashboardsFacade:
         Returns:
             Dictionary with deletion result.
         """
-        response = self._http().delete(f"/api/dashboards/{_quote(dashboard_id)}")
+        response = self._http().delete(f"/api/v1/dashboards/{_quote(dashboard_id)}")
         _raise_for_status(response, operation="delete")
         return response.json()

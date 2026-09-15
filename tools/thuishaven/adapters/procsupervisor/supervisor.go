@@ -7,6 +7,7 @@ package procsupervisor
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -19,12 +20,15 @@ import (
 	"time"
 
 	"github.com/langwatch/langwatch/tools/thuishaven/app"
+	"github.com/langwatch/langwatch/tools/thuishaven/domain/logfmt"
 )
 
 // Supervisor is the real process-backed implementation of app.Supervisor.
 type Supervisor struct {
 	isPlain bool
 	recent  *recentLogs
+	// startedAt is when this up began; captures older than it are rotated out.
+	startedAt time.Time
 }
 
 type recentLogs struct {
@@ -34,7 +38,7 @@ type recentLogs struct {
 
 // New returns a Supervisor. isAgent=true suppresses color for token-free output.
 func New(isAgent bool) Supervisor {
-	return Supervisor{isPlain: isAgent, recent: &recentLogs{}}
+	return Supervisor{isPlain: isAgent, recent: &recentLogs{}, startedAt: time.Now()}
 }
 
 // RunOnce runs a command to completion, streaming its output.
@@ -241,7 +245,10 @@ func containsAny(value string, needles []string) bool {
 // superviseChild runs one child, restarting it (1s backoff) on exit until ctx
 // is cancelled, then SIGTERMs the process group and SIGKILLs after 5s.
 func (s Supervisor) superviseChild(ctx context.Context, ac app.Child) {
-	c := proc{name: ac.Name, dir: ac.Dir, shell: ac.Shell, env: ac.Env, color: ac.Color, isPlain: s.isPlain, preview: s.recent, sink: newLogSink(ac.LogPath)}
+	c := proc{
+		name: ac.Name, dir: ac.Dir, shell: ac.Shell, env: ac.Env, color: ac.Color, isPlain: s.isPlain,
+		preview: s.recent, sink: newLogSinkSince(ac.LogPath, s.startedAt), crash: &crashDedup{},
+	}
 	// Gate the start on a dependency being ready (e.g. the web lane on the API),
 	// so this process — and the hostname routed to it — never comes up before what
 	// it needs is serving.
@@ -276,7 +283,7 @@ func (s Supervisor) superviseChild(ctx context.Context, ac app.Child) {
 			if ctx.Err() != nil {
 				return
 			}
-			c.logln("exited — restarting in 1s")
+			c.logln(levelRecordLine("warn", "exited — restarting in 1s", time.Time{}))
 			select {
 			case <-ctx.Done():
 			case <-time.After(time.Second):
@@ -323,8 +330,79 @@ type proc struct {
 	isPlain                 bool
 	preview                 *recentLogs
 	// sink captures every line (timestamped) to the per-service log file the
-	// `haven logs` command reads — nil for one-shot lanes.
+	// `haven logs` command reads — nil for one-shot lanes. Capture always
+	// gets the full line, dedup or not: only the live echo below is folded.
 	sink *logSink
+	// crash collapses a fatal line repeated across consecutive restarts into
+	// a short counter instead of the same failure once per restart — nil for
+	// a proc that never restarts (RunOnce, RunOnceBounded, WaitReady).
+	crash *crashDedup
+}
+
+// crashDedup tracks the last fatal message a proc rendered, across restarts:
+// superviseChild's loop reuses the same proc value for the life of the lane,
+// so this state survives from one crash to the next.
+type crashDedup struct {
+	mu      sync.Mutex
+	lastMsg string
+	repeat  int
+}
+
+// observe records one fatal record's message and reports what to render: the
+// message itself the first time a failure is seen (or once it changes), or a
+// short "same failure, restart N" line — still worth a line, never worth
+// repeating the location — for every consecutive repeat of the same one.
+func (d *crashDedup) observe(msg string) (renderMsg string, isRepeat bool) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	if d.repeat > 0 && msg == d.lastMsg {
+		d.repeat++
+		return fmt.Sprintf("same failure, restart %d", d.repeat), true
+	}
+	d.lastMsg = msg
+	d.repeat = 1
+	return msg, false
+}
+
+// dedupeFatal rewrites a line that is a repeat of the previous fatal message
+// into the short counter form; anything else — a first occurrence, a
+// different failure, or a line that is not a fatal record at all — passes
+// through unchanged.
+func (c proc) dedupeFatal(line string) string {
+	if c.crash == nil {
+		return line
+	}
+	rec, ok := logfmt.Parse(line)
+	if !ok || rec.Level != logfmt.LevelFatal {
+		return line
+	}
+	renderMsg, isRepeat := c.crash.observe(rec.Message)
+	if !isRepeat {
+		return line
+	}
+	return levelRecordLine("fatal", renderMsg, rec.Time)
+}
+
+// levelRecordLine builds the minimal structured line logfmt.Parse reads back
+// — level, message, a timestamp (now, for a zero one) — for a line this
+// supervisor decided to print itself, so it renders with the same one-line,
+// correctly-leveled discipline as everything a supervised child writes.
+func levelRecordLine(level, msg string, at time.Time) string {
+	if at.IsZero() {
+		at = time.Now()
+	}
+	encoded, err := json.Marshal(map[string]string{
+		"time":  at.UTC().Format(logfmt.TimeFormat),
+		"level": level,
+		"msg":   msg,
+	})
+	if err != nil {
+		// Only ever a plain string map; Marshal cannot fail on one. Kept as a
+		// safety net rather than asserted away, same as this file's other
+		// "cannot actually happen" branches.
+		return msg
+	}
+	return string(encoded)
 }
 
 func (c proc) command(ctx context.Context) *exec.Cmd {
@@ -380,28 +458,34 @@ const streamReadBuffer = 64 << 10
 // stream captures one output stream line by line for the life of the pipe. It
 // returns only at EOF, or when the pipe cannot be read at all, never on a
 // single bad line.
+//
+// A raw window is local to this call: stdout and stderr are read by separate
+// goroutines, each with its own window, so a structured line on one stream
+// can never cut short a raw run still building on the other.
 func (c proc) stream(r io.Reader) {
 	br := bufio.NewReaderSize(r, streamReadBuffer)
 	var line []byte
+	var w rawWindow
 	for {
 		chunk, err := br.ReadSlice('\n')
 		line = append(line, chunk...)
 		switch {
 		case err == nil:
-			c.logln(string(line))
+			c.captureLine(&w, string(line))
 			line = line[:0]
 		case errors.Is(err, bufio.ErrBufferFull):
 			// No newline yet. Emit a segment once the line is over the cap and
 			// keep reading the rest of it, so memory stays bounded and the pipe
 			// stays drained.
 			if len(line) >= streamMaxLine {
-				c.logln(string(line))
+				c.captureLine(&w, string(line))
 				line = line[:0]
 			}
 		default:
 			if len(line) > 0 {
-				c.logln(string(line))
+				c.captureLine(&w, string(line))
 			}
+			c.flushRaw(&w)
 			if !errors.Is(err, io.EOF) {
 				c.logln(fmt.Sprintf("log capture read error: %v", err))
 				// Keep draining: if the error was transient the child stays
@@ -413,23 +497,91 @@ func (c proc) stream(r io.Reader) {
 	}
 }
 
+// rawWindow batches consecutive lines that are not the shared structured
+// format, so a Node ESM link failure — the whole stack dumped straight to
+// stderr, before any handler exists to catch and log it — renders as one
+// line rather than one per frame.
+type rawWindow struct {
+	lines []string
+}
+
+// captureLine keeps full fidelity in the sink, then either renders a
+// structured line at once (flushing any raw run ahead of it) or adds a raw
+// line to the window instead of rendering it immediately.
+func (c proc) captureLine(w *rawWindow, line string) {
+	line = strings.TrimRight(line, "\r\n")
+	c.sink.writeLine(line)
+	if logfmt.Muted(c.name, line) {
+		return
+	}
+	if _, ok := logfmt.Parse(line); !ok {
+		w.lines = append(w.lines, line)
+		return
+	}
+	c.flushRaw(w)
+	c.render(c.dedupeFatal(line))
+}
+
+// flushRaw renders whatever the window collected: the line unchanged when it
+// never grew past one, otherwise one collapsed line naming the first line and
+// how many more followed, with the raw run still readable in full through
+// `haven logs <lane> --raw` (the sink already has every one of them).
+func (c proc) flushRaw(w *rawWindow) {
+	switch len(w.lines) {
+	case 0:
+		return
+	case 1:
+		c.render(w.lines[0])
+	default:
+		msg := fmt.Sprintf(
+			"%s (+%d lines, stack in haven logs %s --raw)",
+			w.lines[0], len(w.lines)-1, c.name,
+		)
+		c.render(levelRecordLine("error", msg, time.Time{}))
+	}
+	w.lines = nil
+}
+
+// logln captures one line and echoes it live. Used for the supervisor's own
+// synthetic lines (a restart notice, a start failure) — never for a child's
+// raw stream, which goes through captureLine/flushRaw instead so a burst of
+// unstructured output collapses to one line rather than one per frame.
 func (c proc) logln(line string) {
 	line = strings.TrimRight(line, "\r\n")
 	c.sink.writeLine(line)
+	// Captured first, echoed second: a tool banner — or a fatal line about to
+	// be folded into a repeat counter below — is still in the log file
+	// `haven logs --raw` replays in full, it just does not reach the terminal
+	// a second (or fifth) time.
+	if logfmt.Muted(c.name, line) {
+		return
+	}
+	c.render(c.dedupeFatal(line))
+}
+
+// render is the one place a line reaches the terminal (or the `up` preview
+// buffer), through the same domain/logfmt every other viewer uses. The
+// capture into the sink has already happened by the time anything calls this.
+func (c proc) render(line string) {
+	rendered := logfmt.Render(line, logfmt.Options{
+		Lane:      c.name,
+		LaneColor: c.color,
+		Time:      time.Now(),
+		Color:     !c.isPlain,
+	})
+	if rendered == "" {
+		return
+	}
 	if c.preview != nil {
 		c.preview.Lock()
-		c.preview.lines = append(c.preview.lines, fmt.Sprintf("%-8s │ %s", c.name, line))
+		c.preview.lines = append(c.preview.lines, rendered)
 		if len(c.preview.lines) > 12 {
 			c.preview.lines = c.preview.lines[len(c.preview.lines)-12:]
 		}
 		c.preview.Unlock()
 		return
 	}
-	if c.isPlain {
-		fmt.Printf("%-8s | %s\n", c.name, line)
-		return
-	}
-	fmt.Printf("\x1b[%sm%-8s\x1b[0m │ %s\n", c.color, c.name, line)
+	fmt.Println(rendered)
 }
 
 func renderUp(ctx context.Context, logs *recentLogs, children []app.Child) {

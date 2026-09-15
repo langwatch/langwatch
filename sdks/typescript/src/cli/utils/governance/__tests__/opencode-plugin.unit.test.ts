@@ -134,13 +134,7 @@ beforeEach(() => {
   process.env.HOME = tmpHome;
   process.env.USERPROFILE = tmpHome;
   delete process.env.XDG_CONFIG_HOME;
-  pluginPath = path.join(
-    tmpHome,
-    ".config",
-    "opencode",
-    "plugins",
-    OPENCODE_PLUGIN_FILE_NAME,
-  );
+  pluginPath = path.join(tmpHome, ".config", "opencode", "plugins", OPENCODE_PLUGIN_FILE_NAME);
 });
 
 afterEach(() => {
@@ -162,25 +156,15 @@ describe("installOpencodeSessionContextPlugin", () => {
 
       expect(result.action).toBe("created");
       expect(result.path).toBe(pluginPath);
-      expect(result.displayPath).toBe(
-        `~/.config/opencode/plugins/${OPENCODE_PLUGIN_FILE_NAME}`,
-      );
-      expect(fs.readFileSync(pluginPath, "utf8")).toContain(
-        OPENCODE_HOOK_COMMAND.split(" ")[0],
-      );
+      expect(result.displayPath).toBe(`~/.config/opencode/plugins/${OPENCODE_PLUGIN_FILE_NAME}`);
+      expect(fs.readFileSync(pluginPath, "utf8")).toContain(OPENCODE_HOOK_COMMAND.split(" ")[0]);
     });
 
     it("follows XDG_CONFIG_HOME when the user relocated the config directory", () => {
       process.env.XDG_CONFIG_HOME = path.join(tmpHome, "elsewhere");
 
       expect(opencodePluginTarget().path).toBe(
-        path.join(
-          tmpHome,
-          "elsewhere",
-          "opencode",
-          "plugins",
-          OPENCODE_PLUGIN_FILE_NAME,
-        ),
+        path.join(tmpHome, "elsewhere", "opencode", "plugins", OPENCODE_PLUGIN_FILE_NAME),
       );
     });
   });
@@ -192,9 +176,7 @@ describe("installOpencodeSessionContextPlugin", () => {
 
       expect(installOpencodeSessionContextPlugin().action).toBe("unchanged");
       expect(fs.readFileSync(pluginPath, "utf8")).toBe(before);
-      expect(fs.readdirSync(path.dirname(pluginPath))).toEqual([
-        OPENCODE_PLUGIN_FILE_NAME,
-      ]);
+      expect(fs.readdirSync(path.dirname(pluginPath))).toEqual([OPENCODE_PLUGIN_FILE_NAME]);
     });
   });
 
@@ -204,9 +186,7 @@ describe("installOpencodeSessionContextPlugin", () => {
       fs.writeFileSync(pluginPath, "export const Mine = async () => ({});\n");
 
       expect(installOpencodeSessionContextPlugin().action).toBe("unchanged");
-      expect(fs.readFileSync(pluginPath, "utf8")).toBe(
-        "export const Mine = async () => ({});\n",
-      );
+      expect(fs.readFileSync(pluginPath, "utf8")).toBe("export const Mine = async () => ({});\n");
     });
   });
 });
@@ -225,9 +205,7 @@ describe("hasOpencodeSessionContextPlugin", () => {
     it("reports it present, by its marker", () => {
       installOpencodeSessionContextPlugin();
 
-      expect(fs.readFileSync(pluginPath, "utf8").startsWith(
-        OPENCODE_PLUGIN_MARKER,
-      )).toBe(true);
+      expect(fs.readFileSync(pluginPath, "utf8").startsWith(OPENCODE_PLUGIN_MARKER)).toBe(true);
       expect(hasOpencodeSessionContextPlugin()).toBe(true);
     });
   });
@@ -280,9 +258,7 @@ describe("the generated plugin module", () => {
       });
 
       expect(invocation).not.toBeNull();
-      expect(["langwatch", ...invocation!.argv].join(" ")).toBe(
-        OPENCODE_HOOK_COMMAND,
-      );
+      expect(["langwatch", ...invocation!.argv].join(" ")).toBe(OPENCODE_HOOK_COMMAND);
       expect(JSON.parse(invocation!.stdin)).toEqual({
         session_id: "ses_abc",
         cwd: "/repo/worktrees/review",
@@ -312,9 +288,7 @@ describe("the generated plugin module", () => {
       ["an event of another kind", { type: "message.updated" }],
       ["an event with no type at all", {}],
     ])("runs nothing for %s", (_label, event) => {
-      expect(
-        runPluginEvent({ directory: "/repo", event, expectInvocation: false }),
-      ).toBeNull();
+      expect(runPluginEvent({ directory: "/repo", event, expectInvocation: false })).toBeNull();
     });
   });
 

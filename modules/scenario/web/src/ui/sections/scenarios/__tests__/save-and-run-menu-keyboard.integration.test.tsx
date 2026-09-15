@@ -1,0 +1,92 @@
+/**
+ * The agent rows of the save-and-run menu read to the keyboard: the focus reaches a row and Enter runs the scenario against it.
+ * @vitest-environment jsdom
+ * @see specs/features/agents/connected-agents-ui.feature
+ */
+import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+
+vi.mock("../../../../behavior/use-organization-team-project.ts", () => ({
+  useOrganizationTeamProject: () => ({ project: { id: "project-1" } }),
+}));
+
+vi.mock("../../../../behavior/prompts/use-all-prompts-for-project.ts", () => ({
+  useAllPromptsForProject: () => ({ data: [] }),
+}));
+
+vi.mock("../../../../behavior/scenario-api.ts", () => ({
+  api: {
+    agents: { getAll: { useQuery: () => ({ data: [] }) } },
+  },
+}));
+
+vi.mock("@langwatch/agent-contract", () => ({
+  ownerOnlyCopy: () => "Only the owner of this agent can run it.",
+}));
+
+vi.mock("../../../../behavior/scenarios/use-filtered-scenario-targets.ts", () => ({
+  isAgentTarget: () => false,
+  notRunnableCopy: () => "Only the owner of this agent can run it.",
+  useFilteredAgents: () => [
+    {
+      id: "agent-1",
+      name: "Support Agent",
+      type: "http",
+      label: "Support Agent",
+      updatedAt: new Date("2025-01-01"),
+      isTeammateOwned: false,
+      isRunnable: true,
+    },
+  ],
+}));
+
+import { SaveAndRunMenu } from "../save-and-run-menu.tsx";
+
+beforeAll(() => {
+  Element.prototype.scrollTo = vi.fn();
+});
+
+describe("<SaveAndRunMenu/>", () => {
+  afterEach(cleanup);
+
+  describe("when the reader drives the open menu with the keyboard", () => {
+    it("gives the agent row the focus and runs it when activated", async () => {
+      const user = userEvent.setup();
+      const onSaveAndRun = vi.fn();
+      render(
+        <ChakraProvider value={defaultSystem}>
+          <SaveAndRunMenu
+            selectedTarget={{ type: "prompt", id: "p1" } as never}
+            onTargetChange={vi.fn()}
+            onSaveAndRun={onSaveAndRun}
+            onSaveWithoutRunning={vi.fn()}
+            onCreateAgent={vi.fn()}
+          />
+        </ChakraProvider>,
+      );
+
+      await user.click(screen.getByRole("button", { name: /save and run/i }));
+
+      const row = await screen.findByTestId("save-and-run-agent-agent-1");
+
+      // The bug here was a bare `HStack` carrying only `onClick`: nothing the keyboard
+      // could reach.
+      expect(row.tagName).toBe("BUTTON");
+      expect(row).not.toBeDisabled();
+      expect(row).not.toHaveAttribute("tabindex", "-1");
+
+      row.focus();
+      expect(row).toHaveFocus();
+
+      await user.click(row);
+      await waitFor(() =>
+        expect(onSaveAndRun).toHaveBeenCalledWith({
+          type: "http",
+          id: "agent-1",
+        }),
+      );
+    });
+  });
+});

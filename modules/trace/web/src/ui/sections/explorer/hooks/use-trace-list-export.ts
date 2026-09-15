@@ -1,0 +1,21 @@
+import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
+import { useFilterStore } from "../../../../behavior/filter.store.ts";
+import { useExportTraces } from "./use-export-traces.ts";
+
+/**
+ * Adapter around `useExportTraces` that pulls filter/time/query state out of the
+ * traces-v2 zustand stores instead of the legacy `useFilterParams`.
+ */
+export function useTraceListExport() {
+  const { project } = useOrganizationTeamProject();
+  const queryText = useFilterStore((s) => s.debouncedQueryText);
+  const timeRange = useFilterStore((s) => s.debouncedTimeRange);
+
+  return useExportTraces({
+    projectId: project?.id,
+    filters: {},
+    startDate: timeRange.from,
+    endDate: timeRange.to,
+    query: queryText || undefined,
+  });
+}

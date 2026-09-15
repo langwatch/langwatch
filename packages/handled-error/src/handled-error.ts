@@ -1,81 +1,13 @@
 import { trace } from "@opentelemetry/api";
+import type {
+  HandledErrorFault,
+  SerializedHandledError,
+  SerializedReason,
+} from "./serialized-handled-error.ts";
 
 /**
- * Who is responsible for a handled error — the axis that drives log level and
- * alerting (handled-ness itself only decides what the *client* sees):
- *
- * - `customer`: the caller can fix it (bad filter, not found, permission).
- *   Expected; logged at warn, watched for spikes.
- * - `platform`: our infrastructure failed (ClickHouse down, worker spawn).
- *   Logged at error — an incident, not noise.
- * - `provider`: a third party failed (LLM provider outage, upstream 5xx).
- *   Logged at error, but never a bug in our code.
- *
- * Mirrors the fault classification in `services/aigateway/adapters/httpapi/faults.go`.
- */
-export type HandledErrorFault = "customer" | "platform" | "provider";
-
-export interface SerializedReason {
-  code: string;
-  /**
-   * @deprecated Back-compat alias of `code`, emitted during the
-   * `DomainError` → `HandledError` transition so clients still reading the old
-   * `kind` discriminant keep working. Read `code` in new code; this alias is
-   * removed once no consumer reads `kind`.
-   */
-  kind: string;
-  fault?: HandledErrorFault;
-  traceId?: string;
-  spanId?: string;
-  meta?: Record<string, unknown>;
-  tips?: readonly string[];
-  docsUrl?: string;
-  reasons?: SerializedReason[];
-}
-
-/**
- * Serialised, client-safe shape of a {@link HandledError}. Mirrors the Go
- * `herr.E` (`pkg/herr`): `code`/`meta`/`traceId`/`spanId`/`reasons` line up
- * field-for-field with `Code`/`Meta`/`TraceID`/`SpanID`/`Reasons`. `httpStatus`
- * and `traceUrl` are TypeScript-side conveniences with no `herr.E` equivalent
- * (Go maps code→status via a registry and builds the trace link elsewhere).
- *
- * `fault`, `tips` and `docsUrl` are the remediation channel: they let API,
- * CLI and MCP consumers (agents!) self-diagnose without a human interpreting
- * the error. All three are additive — older clients ignore them.
- */
-export interface SerializedHandledError {
-  code: string;
-  /**
-   * @deprecated Back-compat alias of `code`, emitted during the
-   * `DomainError` → `HandledError` transition so clients still reading the old
-   * `kind` discriminant keep working. Read `code` in new code; this alias is
-   * removed once no consumer reads `kind`.
-   */
-  kind: string;
-  meta: Record<string, unknown>;
-  traceId: string | undefined;
-  spanId: string | undefined;
-  /**
-   * A clickable Grafana link straight to this trace, present whenever a Grafana
-   * is configured (GRAFANA_BASE_URL — set automatically by haven locally).
-   * Included in production too: Grafana is access-controlled, so the URL leaks
-   * nothing to a client that can't reach it.
-   */
-  traceUrl?: string;
-  httpStatus: number;
-  fault: HandledErrorFault;
-  tips?: readonly string[];
-  docsUrl?: string;
-  reasons: SerializedReason[];
-}
-
-/**
- * The Go pkg/herr wire envelope — herr and HandledError are the SAME model
- * (type ⇄ code, meta, trace ids, recursive reasons), so a typed error crosses
- * any Go→TS wire losslessly. herr guarantees the envelope only ever carries
- * known handled codes with vetted copy; genuinely unknown causes arrive
- * pre-collapsed to type "unknown".
+ * The Go pkg/herr wire envelope — herr and HandledError are the SAME model (type ⇄ code, meta,
+ * trace ids, recursive reasons), so a typed error crosses any Go→TS wire losslessly.
  */
 export interface HerrEnvelope {
   /**
@@ -91,81 +23,40 @@ export interface HerrEnvelope {
   trace_id?: string;
   span_id?: string;
   fault?: HandledErrorFault;
+  retryable?: boolean;
   tips?: string[];
   docs_url?: string;
   reasons?: HerrEnvelope[];
 }
 
 /**
- * Pluggable trace-URL source for {@link HandledError.serialize}. The package
- * is env-agnostic so it can be shared by the app, MCP server and CLI; the app
- * wires its Grafana link builder in via {@link setTraceUrlProvider} at module
- * load. Defaults to no trace URLs.
+ * Pluggable trace-URL source for {@link HandledError.serialize}. The package is env-agnostic so
+ * it can be shared by the app, MCP server and CLI; the app wires its Grafana link builder in
+ * via {@link setTraceUrlProvider} at module load. Defaults to no trace URLs.
  */
-export type TraceUrlProvider = (
-  traceId: string | undefined,
-) => string | undefined;
-
-let traceUrlProvider: TraceUrlProvider = () => undefined;
+export type TraceUrlProvider = (traceId: string | undefined) => string | undefined;
 
 export function setTraceUrlProvider(provider: TraceUrlProvider): void {
-  traceUrlProvider = provider;
+  HandledError.configureTraceUrlProvider(provider);
 }
 
+/** One runtime constructor shared by every copy of this package in a realm. */
+const HANDLED_ERROR_RUNTIME = Symbol.for("@langwatch/handled-error/runtime/v1");
+
 /**
- * Base class for all handled errors — the TypeScript counterpart of Go's
- * `herr.E` (`pkg/herr`). Its shape matches `herr.E` field-for-field:
- * `code`↔`Code`, `meta`↔`Meta`, `traceId`↔`TraceID`, `spanId`↔`SpanID`,
- * `reasons`↔`Reasons`. (`httpStatus` is TS-only; Go maps code→status via a
- * registry. Stack traces stay on the native `Error.stack` and never serialise.)
- *
- * `code` is a serialisable string discriminant — safe across process/worker
- * boundaries and serialisation (use instead of `instanceof` in those cases):
- *
- * ```ts
- * if (err.code === "evaluation_not_found") { ... }   // cross-process safe
- * if (err instanceof EvaluationNotFoundError) { ...}  // same-process only
- * ```
- *
- * For the broader "is this handled at all?" question, call
- * {@link HandledError.isHandled} rather than `instanceof HandledError`: it also
- * matches instances whose class identity a bundler duplicated, which bare
- * `instanceof` misses (see {@link hasHandledErrorBrand}).
- *
- * `meta` carries domain-specific context (e.g. `{ spanId }`) included in the
- * serialised shape. `httpStatus` is the suggested HTTP response code (defaults
- * to 500; subclasses set appropriate defaults). `traceId` / `spanId` are
- * captured automatically from the active OTel span. `reasons` serialises nested
- * HandledErrors by code and masks everything else as `{ code: "unknown" }`.
- *
- * `fault` says who's responsible (defaults to `"customer"` — annotate 5xx-ish
- * subclasses as `"platform"`/`"provider"` so incidents keep logging at error).
- * `tips` and `docsUrl` are the self-diagnosis channel for agents hitting the
- * API/CLI/MCP: short, actionable remediation steps and a link to the relevant
- * (markdown) doc. They serialise verbatim and are safe to show any client.
- *
- * Serialised shape:
- * ```json
- * {
- *   "code": "span_not_found",
- *   "meta": { "spanId": "abc" },
- *   "traceId": "...",
- *   "spanId": "...",
- *   "httpStatus": 404,
- *   "fault": "customer",
- *   "tips": ["Check the span id — spans expire after the retention window"],
- *   "docsUrl": "https://docs.langwatch.ai/...",
- *   "reasons": [{ "code": "invalid_span_id" }, { "code": "unknown" }]
- * }
- * ```
+ * TypeScript counterpart of Go's `herr.E`. Use the serialisable `code`, not `instanceof`,
+ * across process boundaries.
  */
-export abstract class HandledError extends Error {
+abstract class HandledErrorRuntime extends Error {
+  static #traceUrlProvider: TraceUrlProvider = () => undefined;
+  readonly #issuedByHandledError = true;
   readonly isHandled = true as const;
   readonly meta: Record<string, unknown>;
   readonly traceId: string | undefined;
   readonly spanId: string | undefined;
   readonly httpStatus: number;
   readonly fault: HandledErrorFault;
+  readonly retryable: boolean;
   readonly tips: readonly string[];
   readonly docsUrl: string | undefined;
   readonly reasons: readonly Error[];
@@ -177,6 +68,7 @@ export abstract class HandledError extends Error {
       meta?: Record<string, unknown>;
       httpStatus?: number;
       fault?: HandledErrorFault;
+      retryable?: boolean;
       tips?: readonly string[];
       docsUrl?: string;
       reasons?: readonly Error[];
@@ -196,6 +88,7 @@ export abstract class HandledError extends Error {
     this.meta = options.meta ?? {};
     this.httpStatus = options.httpStatus ?? 500;
     this.fault = options.fault ?? "customer";
+    this.retryable = options.retryable ?? false;
     this.tips = options.tips ?? [];
     this.docsUrl = options.docsUrl;
     this.reasons = options.reasons ?? [];
@@ -205,7 +98,7 @@ export abstract class HandledError extends Error {
   serialize(): SerializedHandledError {
     // traceId is the real trace id for handled errors, so it links straight to
     // the trace when a trace URL provider is wired (the app uses Grafana).
-    const traceUrl = traceUrlProvider(this.traceId);
+    const traceUrl = HandledErrorRuntime.#traceUrlProvider(this.traceId);
     return {
       code: this.code,
       // Deprecated back-compat alias — see SerializedHandledError.kind.
@@ -216,6 +109,7 @@ export abstract class HandledError extends Error {
       ...(traceUrl ? { traceUrl } : {}),
       httpStatus: this.httpStatus,
       fault: this.fault,
+      retryable: this.retryable,
       ...(this.tips.length > 0 ? { tips: this.tips } : {}),
       ...(this.docsUrl ? { docsUrl: this.docsUrl } : {}),
       reasons: this.reasons.map(serializeReason),
@@ -223,32 +117,40 @@ export abstract class HandledError extends Error {
   }
 
   /**
-   * Narrows `error` to the concrete subclass this is called on:
-   *
-   *   EvaluationNotFoundError.is(err)   // error is EvaluationNotFoundError
-   *   NotFoundError.is(err)             // error is NotFoundError
-   *
-   * This is a plain `instanceof`, so it only holds within one module graph.
-   * At a boundary, ask {@link HandledError.isHandled} instead ("is this
-   * handled at all?"), or compare `err.code` to pick out one subclass.
+   * Serialize through the package-owned implementation rather than a possibly
+   * overridden method on the thrown object.
    */
-  static is<T extends HandledError>(
-    this: abstract new (
-      ...args: never
-    ) => T,
+  static serializeTrusted(error: HandledErrorRuntime): SerializedHandledError {
+    if (!HandledErrorRuntime.hasProvenance(error)) {
+      throw new TypeError("Only a registry-issued HandledError can be serialized");
+    }
+
+    return HandledErrorRuntime.prototype.serialize.call(error);
+  }
+
+  /** @internal Realm-wide configuration behind {@link setTraceUrlProvider}. */
+  static configureTraceUrlProvider(provider: TraceUrlProvider): void {
+    HandledErrorRuntime.#traceUrlProvider = provider;
+  }
+
+  /**
+   * Narrows `error` to the concrete subclass this is called on: EvaluationNotFoundError.is(err)
+   * // error is EvaluationNotFoundError NotFoundError.is(err) // error is NotFoundError This is
+   * a subclass-specific `instanceof`.
+   */
+  static is<T extends HandledErrorRuntime>(
+    this: abstract new (...args: never) => T,
     error: unknown,
   ): error is T {
     return error instanceof this;
   }
 
   /**
-   * True when `error` is a handled error, including one whose class identity a
-   * bundler duplicated — see {@link hasHandledErrorBrand}. Prefer this over
-   * `instanceof HandledError` anywhere an error may have crossed a module
-   * boundary (route handlers, tRPC middleware, error formatters).
+   * True only for an error issued by this package's realm-wide runtime
+   * constructor. Prefer this over `instanceof` at route/error boundaries.
    */
-  static isHandled(error: unknown): error is HandledError {
-    return error instanceof HandledError || hasHandledErrorBrand(error);
+  static isHandled(error: unknown): error is HandledErrorRuntime {
+    return HandledErrorRuntime.hasProvenance(error);
   }
 
   /** True when `error` is an unhandled infrastructure Error. */
@@ -257,58 +159,49 @@ export abstract class HandledError extends Error {
   }
 
   /**
-   * Returns a safe user-facing message for any error:
-   * - HandledErrors → their own message (safe to show users)
-   * - Everything else → a generic "unknown error" string, and the original
-   *   error is passed to the optional `log` callback for server-side logging.
-   *
-   * ```ts
-   * } catch (e) {
-   *   const msg = HandledError.toUserMessage(e, (err) => logger.error(err));
-   *   throw new TRPCError({ code: "NOT_FOUND", message: msg });
-   * }
-   * ```
+   * Returns a safe user-facing message for any error: - HandledErrors → their own message (safe
+   * to show users) - Everything else → a generic "unknown error" string, and the original error
+   * is passed to the optional `log` callback for server-side logging.
    */
   static toUserMessage(error: unknown, log?: (error: unknown) => void): string {
     if (HandledError.isHandled(error)) return error.message;
     log?.(error);
     return "An unknown error occurred";
   }
+
+  private static hasProvenance(error: unknown): error is HandledErrorRuntime {
+    return typeof error === "object" && error !== null && #issuedByHandledError in error;
+  }
 }
 
 /**
- * Structural test for the `isHandled` brand.
- *
- * `instanceof` compares class identity, which breaks when a bundler includes
- * this module twice — Next.js/turbopack does this across route and server
- * boundaries, so an error can be a genuine HandledError raised from a *second*
- * copy of this class and still fail `instanceof`. Every instance carries the
- * `isHandled` brand as an own property, so matching on that recognises those
- * duplicates while still rejecting unrelated objects.
- *
- * The `instanceof Error` requirement is load-bearing, not belt-and-braces: the
- * brand is an own *enumerable* field, so `JSON.parse(JSON.stringify(err))` — or
- * a worker `postMessage` structured clone — produces a plain object that still
- * carries `isHandled: true` but has no prototype, and therefore none of the
- * methods this guard promises (`serialize`). Requiring a real `Error` rejects
- * those while still admitting bundler duplicates, since `Error` is the realm's
- * shared global. Wire payloads go through the boundary schema instead —
- * `handledErrorFromHerr` here, or `isHandledErrorLike` in `packages/api`.
+ * Reuse the first runtime constructor installed in this JavaScript realm. Turbopack may
+ * evaluate this module more than once, but every copy still exports and subclasses this one
+ * constructor.
  */
-function hasHandledErrorBrand(error: unknown): error is HandledError {
-  return (
-    error instanceof Error &&
-    (error as { isHandled?: unknown }).isHandled === true
-  );
+function handledErrorConstructor(): typeof HandledErrorRuntime {
+  const scope = globalThis as typeof globalThis & {
+    [HANDLED_ERROR_RUNTIME]?: typeof HandledErrorRuntime;
+  };
+  const existing = scope[HANDLED_ERROR_RUNTIME];
+  if (existing) return existing;
+
+  Object.defineProperty(scope, HANDLED_ERROR_RUNTIME, {
+    configurable: false,
+    enumerable: false,
+    value: HandledErrorRuntime,
+    writable: false,
+  });
+  return HandledErrorRuntime;
 }
 
+export type HandledError = HandledErrorRuntime;
+export const HandledError: typeof HandledErrorRuntime = handledErrorConstructor();
+
 /**
- * Deserialize a herr wire envelope into a HandledError chain. A `tree_zebra`
- * herr from service A IS a `tree_zebra` HandledError here — same code, same
- * meta, same reasons; nothing marks it as having crossed a wire. Cross-process
- * identity is the `code` discriminant (see the class doc), exactly as if it
- * had been raised locally. Belongs in boundary middleware (wire schemas):
- * downstream code only ever receives the HandledError.
+ * Deserialize a herr wire envelope into a HandledError chain. A `tree_zebra` herr from service
+ * A IS a `tree_zebra` HandledError here — same code, same meta, same reasons; nothing marks it
+ * as having crossed a wire.
  */
 export function handledErrorFromHerr(
   body: HerrEnvelope,
@@ -323,6 +216,7 @@ export function handledErrorFromHerr(
         meta: body.meta,
         httpStatus: options.httpStatus,
         fault: body.fault,
+        retryable: body.retryable,
         tips: body.tips,
         docsUrl: body.docs_url,
         traceId: body.trace_id,
@@ -336,13 +230,11 @@ export function handledErrorFromHerr(
 
 function serializeReason(error: Error): SerializedReason {
   if (HandledError.isHandled(error)) {
-    // A HandledError's message is safe to show by the class contract, and for
-    // a reason it is often the only prose there is (a herr-deserialized cause
-    // carries its message on `.message`, not in meta — FromBody/toErrorBody
-    // promote between the two on the Go side). Fold it into `meta.message` —
+    // A HandledError's message is safe to show by the class contract, and for a reason it is
+    // often the only prose there is (a herr-deserialized cause carries its message on
+    // `.message`, not in meta — FromBody/toErrorBody promote between the two on the Go side).
+    // Fold it into `meta.message` —
     // the ADR-045 prose channel consumers already read — so the reason chain
-    // keeps naming the real failure across this serialization too. An explicit
-    // meta.message wins; a message that merely repeats the code adds nothing.
     const meta =
       error.message && error.message !== error.code && !error.meta.message
         ? { ...error.meta, message: error.message }
@@ -352,8 +244,10 @@ function serializeReason(error: Error): SerializedReason {
       // Deprecated back-compat alias — see SerializedReason.kind.
       kind: error.code,
       fault: error.fault,
-      ...(error.traceId ? { traceId: error.traceId } : {}),
-      ...(error.spanId ? { spanId: error.spanId } : {}),
+      retryable: error.retryable === true,
+      // No trace ids here. Every reason in one response was raised inside the
+      // same request, so each would repeat the pair the envelope already
+      // carries — one body, one correlation handle.
       ...(Object.keys(meta).length > 0 && { meta }),
       ...(error.tips.length > 0 && { tips: error.tips }),
       ...(error.docsUrl ? { docsUrl: error.docsUrl } : {}),
@@ -362,50 +256,29 @@ function serializeReason(error: Error): SerializedReason {
       }),
     };
   }
-  return { code: "unknown", kind: "unknown" };
+  return { code: "unknown", kind: "unknown", retryable: false };
 }
 
 /** Options shared by the convenience subclasses below. */
 export interface HandledErrorOptions {
   meta?: Record<string, unknown>;
   fault?: HandledErrorFault;
+  retryable?: boolean;
   tips?: readonly string[];
   docsUrl?: string;
   reasons?: readonly Error[];
 }
 
 /**
- * Thrown when a requested resource does not exist (HTTP 404).
- *
- * Domain-specific subclasses narrow `code` via `declare` and populate `meta`
- * with identifying fields (e.g. `{ spanId }`).
+ * Thrown when a requested resource does not exist (HTTP 404). Domain-specific subclasses narrow
+ * `code` via `declare` and populate `meta` with identifying fields (e.g. `{ spanId }`).
  */
 export class NotFoundError extends HandledError {
   /**
-   * `code` is a bare `string` on purpose, and that is NOT the same as saying
-   * any string is acceptable.
-   *
-   * This package sits UPSTREAM of every tree that enumerates codes: the app
-   * (`platform/app/src/features/errors/logic/codes.ts`), the MCP server and
-   * `packages/api` all depend on it, and none of them can be
-   * depended on from here without inverting that edge into a cycle. There is
-   * also no single union to narrow to — each consumer owns its own code list,
-   * and a union of one of them would reject the others' perfectly valid codes.
-   *
-   * So the enumeration is enforced downstream instead, where the codes live:
-   * `platform/app/src/features/errors/logic/__tests__/codes.unit.test.ts` scans
-   * the app's trees for every code a handled error declares — including the
-   * `new NotFoundError("…", …)` shape specifically — and fails when a raised
-   * code is missing from `APP_ERROR_CODES`, which is the key set the client
-   * presentation registry must satisfy exhaustively. A code passed here
-   * without copy fails that guard, not the type checker.
+   * `code` is a bare `string` on purpose, and that is NOT the same as saying any string is
+   * acceptable.
    */
-  constructor(
-    code: string,
-    resource: string,
-    id: string,
-    options: HandledErrorOptions = {},
-  ) {
+  constructor(code: string, resource: string, id: string, options: HandledErrorOptions = {}) {
     super(code, `${resource} not found: ${id}`, {
       ...options,
       meta: { id, ...options.meta },
@@ -415,7 +288,7 @@ export class NotFoundError extends HandledError {
   }
 }
 
-/** One zod issue, in the shape both v3 and v4 agree on. */
+/** The part of a Zod 4 issue consumed at this portable boundary. */
 export interface ZodLikeIssue {
   code: string;
   path: PropertyKey[];
@@ -423,10 +296,9 @@ export interface ZodLikeIssue {
 }
 
 /**
- * Structural stand-in for zod's `ZodError`. The package is consumed by the app
- * (zod 3.x classic), mcp-server (zod 4) and SDKs — importing `ZodError` from
- * any single zod version makes the other versions' errors unassignable. Any
- * error with zod's `flatten()` shape qualifies.
+ * Structural stand-in for Zod's `ZodError`. Keeping this package independent
+ * of the concrete schema runtime prevents a validation library from leaking
+ * through the handled-error contract.
  */
 export interface ZodLikeError {
   name: string;
@@ -439,26 +311,8 @@ export interface ZodLikeError {
 }
 
 /**
- * Is this a zod error, whichever zod threw it?
- *
- * `err instanceof ZodError` answers "did the zod *I* imported throw this",
- * which is a different question the moment a repo runs two zod entrypoints —
- * and this one does: most schemas are authored against the default (v3)
- * export, a growing set against `zod/v4`. The two ship separate `ZodError`
- * classes, so a v4 error fails `instanceof` a v3 `ZodError` and vice versa.
- *
- * That is not a cosmetic mismatch. Every validation boundary is an
- * `instanceof` gate deciding whether a failure is the *caller's* fault, so a
- * missed gate does not merely lose formatting: the error stops being a 422
- * `validation_error` the customer can act on and becomes an unnamed 500,
- * logged against the platform's error budget. Moving one leaf schema to
- * `zod/v4` is enough to do it, with nothing at the seam to say so — the
- * schema and the gate that catches it are usually different files, and
- * typecheck sees no disagreement between them.
- *
- * So the gates ask about shape instead of identity. `name` plus `issues`
- * plus `flatten` is the intersection both versions satisfy and the whole of
- * what the consumers here read.
+ * Is this a Zod error without coupling the boundary to one runtime instance?
+ * `name`, `issues`, and `flatten` are the complete shape consumers read.
  */
 export function isZodLikeError(err: unknown): err is ZodLikeError {
   if (typeof err !== "object" || err === null) return false;
@@ -488,4 +342,15 @@ export class ValidationError extends HandledError {
       },
     });
   }
+}
+
+/**
+ * The active span's ids, for a failure shape that is not itself a `HandledError` and so cannot
+ * pick them up from its own constructor. An unclassified failure still has to be correlatable,
+ * and this is the one place that reads the ambient span.
+ */
+export function activeTraceContext(): { traceId?: string; spanId?: string } {
+  const ctx = trace.getActiveSpan()?.spanContext();
+
+  return { traceId: ctx?.traceId, spanId: ctx?.spanId };
 }

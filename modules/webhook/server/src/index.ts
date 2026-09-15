@@ -1,0 +1,166 @@
+export {
+  WEBHOOK_ENDPOINTS_ENTITLEMENT_MESSAGE,
+  WEBHOOK_EVENT_TYPES,
+  WebhookEndpointNotFoundError,
+  WebhookEndpointValidationError,
+  WebhookEndpointsNotEntitledError,
+  WebhookEventNotFoundError,
+  eventMatches,
+  isValidEventSelector,
+  type SqsCredentialMode,
+  type SqsDestinationInput,
+  type SqsDestinationView,
+  type WebhookDeliveryControls,
+  type WebhookDeliveryOutcome,
+  type WebhookDestinationKind,
+  type WebhookEndpointHealth,
+  type WebhookEndpointView,
+  type WebhookEnvelope,
+  type WebhookEventType,
+  type WebhookEventTypeName,
+} from "@langwatch/webhook-contract";
+export {
+  PrismaWebhookEndpointRepository,
+  type WebhookEndpointDeps,
+} from "./repositories/prisma/prisma.webhook-endpoint.repository.ts";
+export {
+  type WebhookEndpointRuntime,
+  type WebhookEndpointServiceOptions,
+  type WebhookEndpointStatusSnapshot,
+} from "./repositories/webhook-endpoint.repository.ts";
+export type { WebhookId, WebhookSecret } from "./app/webhook.app.ts";
+// Webhook event reads are composed through the repository and held as the
+// port. Its cursor codec is private to the feature: nothing outside it
+// names that any more.
+export {
+  WebhookEventsClickHouseRepository,
+  type WebhookClickHouseClientResolver,
+} from "./repositories/clickhouse/clickhouse.webhook-events.repository.ts";
+export { WebhookEventsRepository } from "./repositories/webhook-events.repository.ts";
+export { webhookRepositories } from "./repositories/webhook-repositories.registry.ts";
+export type { WebhookRepositories } from "./repositories/webhook.repositories.ts";
+export {
+  WebhookEndpointConfiguration,
+  WebhookEndpointPolicyService,
+  WEBHOOK_AUTO_DISABLE_AFTER_MS,
+  WEBHOOK_BATCH_DELAY_BOUNDS_MS,
+  WEBHOOK_DISABLED_REASON_AUTO,
+  WEBHOOK_DISABLED_REASON_MANUAL,
+  WEBHOOK_IN_FLIGHT_BOUNDS,
+  WEBHOOK_MAX_BATCH_SIZE_BOUNDS,
+  type WebhookEndpointConfigurationInput,
+} from "./services/webhook-endpoint-policy.service.ts";
+export {
+  WebhookDestinationService,
+  type ParsedSqsQueueUrl,
+  type WebhookDestinationConfig,
+  type WebhookUrlProblemCode,
+} from "./services/webhook-destination.service.ts";
+export {
+  WebhookDeliveryService,
+  type WebhookDeliveryProcessDeps,
+} from "./services/webhook-delivery.service.ts";
+export {
+  deliverSchema,
+  flushEndpointSchema,
+  sendBatchSchema,
+  GATEWAY_SPEND_ADMITTED_EVENT_TYPE,
+  GATEWAY_SPEND_CONFIRMED_EVENT_TYPE,
+  GATEWAY_SPEND_FAILED_EVENT_TYPE,
+  GATEWAY_SPEND_SETTLED_EVENT_TYPE,
+  INITIAL_WEBHOOK_DELIVERY_STATE,
+  WEBHOOK_DELIVERY_PROCESS_NAME,
+  WEBHOOK_RETRY_LADDER_MS,
+  WEBHOOK_SEND_MAX_ATTEMPTS,
+  type AdmitSpendCommandData,
+  type ConfirmSpendCommandData,
+  type DeliverPayload,
+  type EndpointStreamState,
+  type FailSpendCommandData,
+  type FlushEndpointPayload,
+  type GatewaySpendProcessingEvent,
+  type SendBatchPayload,
+  type SettleSpendCommandData,
+  type SpendAttribution,
+  type SpendUsage,
+  type WebhookDeliveryEndpointService,
+  type WebhookDeliveryState,
+} from "./rules/webhook-delivery-contract.rules.ts";
+export {
+  WebhookBatchPlannerService,
+  WEBHOOK_FLUSH_RECHECK_MS,
+  type PendingEnvelope,
+} from "./services/webhook-batch-planner.service.ts";
+export {
+  WebhookEnvelopeService,
+  type WebhookSpendEventRow,
+  type WebhookSpendEventStatus,
+} from "./services/webhook-envelope.service.ts";
+export { WebhookAccessService } from "./services/webhook-access.service.ts";
+export {
+  WebhookEventsService,
+  type LegacyWebhookEventsServiceOptions,
+  type WebhookProjectReader,
+  type WebhookEventsServiceOptions,
+} from "./services/webhook-events.service.ts";
+export {
+  WebhookHealthService,
+  type WebhookEndpointHealthSource,
+  type WebhookHealthDeps,
+} from "./services/webhook-health.service.ts";
+
+/**
+ * The feature's application: the one object both of its doors call. The process composes it
+ * from the endpoint store, the health report, the emitted-events log, the entitlement check,
+ * the delivery hop a test fire uses, and the `Idempotency-Key` ledger.
+ */
+export {
+  WebhookApp,
+  type WebhookAppDependencies,
+  type WebhookTestDispatch,
+} from "./app/webhook.app.ts";
+export { webhookServer } from "./webhook.server.ts";
+
+/**
+ * The session-authenticated tRPC namespace this feature owns, `webhookEndpoints`.
+ */
+export { webhookEndpointTrpcTransport } from "./transport/webhook-endpoint.trpc.ts";
+
+/**
+ * The organization-key REST family this feature owns, `/api/webhooks/v1`.
+ */
+export { webhookRest } from "./transport/webhook.rest.ts";
+
+// --------------------------------------------------------------------------- An endpoint's
+// LAST HOP Everything above the destination interface is one machinery no matter where an
+// endpoint delivers — the same coalescing buffer, the same retry ladder, the same delivery log,
+// the same signature over the same bytes. Only the hop differs, and it differs behind
+// `WebhookDestination`.
+export {
+  type WebhookDestination,
+  type WebhookDispatchRequest,
+  type WebhookDispatchResult,
+  type WebhookDispatchVerdict,
+} from "./app/webhook.app.ts";
+export {
+  WebhookDestinationAdapter,
+  type WebhookDestinationDeps,
+} from "./services/webhook-destination-dispatch.service.ts";
+export { HttpWebhookDestinationAdapter } from "./services/http.webhook-destination.service.ts";
+export {
+  SQS_MAX_MESSAGE_BYTES,
+  SqsWebhookDestinationAdapter,
+  type AwsClientConfigResolver,
+  type SqsDestinationConfig,
+} from "./services/sqs.webhook-destination.service.ts";
+export {
+  inspectSqsQueueUrl,
+  parseSqsQueueUrl,
+  sqsHostFor,
+  type SqsQueueUrlInspection,
+  type SqsQueueUrlProblem,
+} from "./rules/sqs-queue-url.rules.ts";
+export {
+  PrismaWebhookRetentionRepository,
+  WEBHOOK_DELIVERY_RETENTION_MS,
+} from "./repositories/prisma/prisma.webhook-retention.repository.ts";

@@ -1,5 +1,5 @@
 import { context as otelContext, trace } from "@opentelemetry/api";
-import { getCurrentContext } from "./core";
+import { getCurrentContext } from "./core.ts";
 
 /**
  * Gets context fields suitable for logging.

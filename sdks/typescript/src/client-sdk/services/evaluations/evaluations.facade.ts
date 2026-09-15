@@ -1,39 +1,13 @@
 /**
- * EvaluationsFacade - Entry point for the Evaluations API (Online Evaluations / Guardrails)
- *
- * Provides an API for running evaluators and guardrails in real-time against LLM inputs/outputs.
- *
+ * EvaluationsFacade - Entry point for the Evaluations API (Online Evaluations /
+ * Guardrails)
  * @example
- * ```typescript
- * const langwatch = new LangWatch({ apiKey: "your-api-key" });
- *
- * // Run a guardrail
- * const guardrail = await langwatch.evaluations.evaluate("presidio/pii_detection", {
- *   data: { input: userInput, output: generatedResponse },
- *   name: "PII Detection",
- *   asGuardrail: true,
- *   settings: {},
- * });
- *
- * if (!guardrail.passed) {
- *   return "I'm sorry, I can't do that.";
- * }
- * ```
  */
 
 import { trace, SpanStatusCode, context as otelContext } from "@opentelemetry/api";
 import { createLangWatchSpan } from "@/observability-sdk/span/implementation";
-import type {
-  EvaluationResult,
-  EvaluateOptions,
-  EvaluateRequest,
-  EvaluateResponse,
-} from "./types";
-import {
-  EvaluatorCallError,
-  EvaluatorNotFoundError,
-  EvaluationsApiError,
-} from "./errors";
+import type { EvaluationResult, EvaluateOptions, EvaluateRequest, EvaluateResponse } from "./types";
+import { EvaluatorCallError, EvaluatorNotFoundError, EvaluationsApiError } from "./errors";
 import type { Logger } from "@/logger";
 import { buildAuthHeaders } from "@/internal/api/auth";
 import { langwatchFetch } from "@/internal/http/langwatchFetch";
@@ -56,47 +30,11 @@ export class EvaluationsFacade {
   }
 
   /**
-   * Run an evaluator or guardrail against provided data
-   *
-   * Creates an OpenTelemetry span attached to the current trace context,
-   * calls the LangWatch evaluation API, and returns the result.
-   *
+   * Run an evaluator or guardrail against provided data.
    * @param slug - The evaluator slug (e.g., "presidio/pii_detection", "langevals/llm_boolean")
    * @param options - Evaluation options including data, name, settings, and asGuardrail flag
-   * @returns The evaluation result with status, passed, score, details, label, and cost
-   *
-   * @example
-   * ```typescript
-   * // Run as a guardrail (synchronous evaluation that can block responses)
-   * const guardrail = await langwatch.evaluations.evaluate("presidio/pii_detection", {
-   *   data: { input: userInput, output: generatedResponse },
-   *   name: "PII Detection Guardrail",
-   *   asGuardrail: true,
-   * });
-   *
-   * if (!guardrail.passed) {
-   *   console.log("PII detected:", guardrail.details);
-   *   return "Sorry, I cannot process that request.";
-   * }
-   * ```
-   *
-   * @example
-   * ```typescript
-   * // Run as an online evaluation (async scoring for monitoring)
-   * const result = await langwatch.evaluations.evaluate("langevals/llm_boolean", {
-   *   data: { input: question, output: response },
-   *   name: "Quality Check",
-   *   settings: { prompt: "Check if the response answers the question." },
-   * });
-   *
-   * console.log("Score:", result.score);
-   * console.log("Details:", result.details);
-   * ```
    */
-  evaluate = async (
-    slug: string,
-    options: EvaluateOptions
-  ): Promise<EvaluationResult> => {
+  evaluate = async (slug: string, options: EvaluateOptions): Promise<EvaluationResult> => {
     const { data, name, settings, asGuardrail } = options;
     const spanName = name ?? slug;
     const spanType = asGuardrail ? "guardrail" : "evaluation";
@@ -106,12 +44,8 @@ export class EvaluationsFacade {
 
     // Get current trace/span IDs from active context
     const activeSpan = trace.getActiveSpan();
-    const traceId = activeSpan
-      ? activeSpan.spanContext().traceId
-      : undefined;
-    const parentSpanId = activeSpan
-      ? activeSpan.spanContext().spanId
-      : undefined;
+    const traceId = activeSpan ? activeSpan.spanContext().traceId : undefined;
+    const parentSpanId = activeSpan ? activeSpan.spanContext().spanId : undefined;
 
     // Start the evaluation span
     const otelSpan = tracer.startSpan(
@@ -121,7 +55,7 @@ export class EvaluationsFacade {
           "langwatch.span.type": spanType,
         },
       },
-      otelContext.active()
+      otelContext.active(),
     );
 
     const langwatchSpan = createLangWatchSpan(otelSpan);
@@ -145,7 +79,7 @@ export class EvaluationsFacade {
       };
 
       // Call the evaluation API
-      const url = `${this.#endpoint}/api/evaluations/${slug}/evaluate`;
+      const url = `${this.#endpoint}/api/v1/evaluations/${slug}/evaluate`;
 
       this.#logger.debug(`Calling evaluation API: ${url}`);
 
@@ -167,7 +101,7 @@ export class EvaluationsFacade {
 
         throw new EvaluationsApiError(
           `Evaluation API returned ${response.status}: ${errorText}`,
-          response.status
+          response.status,
         );
       }
 
@@ -176,11 +110,16 @@ export class EvaluationsFacade {
       // Map response to result
       const result: EvaluationResult = {
         status: responseData.status,
-        ...(responseData.passed !== null && responseData.passed !== undefined && { passed: responseData.passed }),
-        ...(responseData.score !== null && responseData.score !== undefined && { score: responseData.score }),
-        ...(responseData.details !== null && responseData.details !== undefined && { details: responseData.details }),
-        ...(responseData.label !== null && responseData.label !== undefined && { label: responseData.label }),
-        ...(responseData.cost !== null && responseData.cost !== undefined && { cost: responseData.cost }),
+        ...(responseData.passed !== null &&
+          responseData.passed !== undefined && { passed: responseData.passed }),
+        ...(responseData.score !== null &&
+          responseData.score !== undefined && { score: responseData.score }),
+        ...(responseData.details !== null &&
+          responseData.details !== undefined && { details: responseData.details }),
+        ...(responseData.label !== null &&
+          responseData.label !== undefined && { label: responseData.label }),
+        ...(responseData.cost !== null &&
+          responseData.cost !== undefined && { cost: responseData.cost }),
       };
 
       // Update span with output
@@ -237,10 +176,7 @@ export class EvaluationsFacade {
       }
 
       // Wrap unknown errors
-      throw new EvaluatorCallError(
-        slug,
-        error instanceof Error ? error.message : String(error)
-      );
+      throw new EvaluatorCallError(slug, error instanceof Error ? error.message : String(error));
     } finally {
       // Always end the span
       otelSpan.end();

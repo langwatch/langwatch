@@ -2,7 +2,7 @@
 // writeup, given the files it changed and who opened it.
 //
 // The deployment-impact workflow triggers on `charts/**`, `services/**`,
-// `dev/docs/adr/**`, `dev/docs/best_practices/**`, `platform/app/.env.example`
+// `dev/docs/adr/**`, `dev/docs/best_practices/**`, `.env.example`
 // and `docs/self-hosting/**`. Those globs match every dependency bump in
 // services/langevals, services/aigateway and services/nlpgo, and every chart's
 // Chart.lock — so a routine version bump is asked for a writeup about operator
@@ -37,10 +37,7 @@ import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
 /** Logins whose pull requests get the hand-edited-manifest exemption. */
-export const DEPENDENCY_BOTS: readonly string[] = [
-  "dependabot[bot]",
-  "renovate[bot]",
-];
+export const DEPENDENCY_BOTS: readonly string[] = ["dependabot[bot]", "renovate[bot]"];
 
 /** Auto-generated resolution snapshots: no deployment surface by construction. */
 const LOCKFILES: readonly string[] = [
@@ -54,12 +51,7 @@ const LOCKFILES: readonly string[] = [
 ];
 
 /** Hand-edited dependency manifests: a version bump, or something more. */
-const MANIFESTS: readonly string[] = [
-  "pyproject.toml",
-  "package.json",
-  "go.mod",
-  "Cargo.toml",
-];
+const MANIFESTS: readonly string[] = ["pyproject.toml", "package.json", "go.mod", "Cargo.toml"];
 
 const basename = (path: string): string => path.split("/").pop() ?? path;
 
@@ -127,16 +119,13 @@ export const parseChangedFiles = (json: string): string[] => {
   return entries.map((entry) => {
     const filename = (entry as { filename?: unknown } | null)?.filename;
     if (typeof filename !== "string" || filename === "") {
-      throw new Error(
-        `changed-files entry has no usable filename: ${JSON.stringify(entry)}`,
-      );
+      throw new Error(`changed-files entry has no usable filename: ${JSON.stringify(entry)}`);
     }
     return filename;
   });
 };
 
-export const isDependencyBot = (author: string): boolean =>
-  DEPENDENCY_BOTS.includes(author);
+export const isDependencyBot = (author: string): boolean => DEPENDENCY_BOTS.includes(author);
 
 /** Whether this pull request must carry a `## Deployment Impact` section. */
 export const requiresWriteup = ({
@@ -152,13 +141,7 @@ export const requiresWriteup = ({
   return true;
 };
 
-export const main = ({
-  files,
-  author,
-}: {
-  files: readonly string[];
-  author: string;
-}): string[] => {
+export const main = ({ files, author }: { files: readonly string[]; author: string }): string[] => {
   const { onlyLockfiles, onlyManifests } = classify(files);
   return [
     `only_lockfiles=${onlyLockfiles}`,
@@ -168,15 +151,12 @@ export const main = ({
 };
 
 const isEntrypoint = (): boolean =>
-  process.argv[1] !== undefined &&
-  import.meta.url === pathToFileURL(resolve(process.argv[1])).href;
+  process.argv[1] !== undefined && import.meta.url === pathToFileURL(resolve(process.argv[1])).href;
 
 if (isEntrypoint()) {
   const path = process.argv[2];
   if (path === undefined) {
-    throw new Error(
-      "usage: guard-deployment-impact.ts <changed-files.json>  (PR_AUTHOR in env)",
-    );
+    throw new Error("usage: guard-deployment-impact.ts <changed-files.json>  (PR_AUTHOR in env)");
   }
   const files = parseChangedFiles(readFileSync(path, "utf8"));
   const outputs = main({ files, author: process.env.PR_AUTHOR ?? "" });

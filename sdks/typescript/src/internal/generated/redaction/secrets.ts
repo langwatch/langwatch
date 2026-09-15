@@ -30,7 +30,7 @@
  * `sessionReport.ts`) so issue reports are scrubbed with the exact same rules
  * before leaving the user's machine.
  */
-import { SECRET_MARKER } from "./markers.js";
+import { SECRET_MARKER } from "./markers.ts";
 
 /** The placeholder a redacted secret is replaced with. */
 export const SECRETS_REDACTION_MARKER = SECRET_MARKER;
@@ -82,9 +82,7 @@ const ENTROPY_SAMPLE_LENGTH = 256;
 /** Shannon entropy of `value` in bits per character, over a bounded sample. */
 function shannonEntropyBits(value: string): number {
   const sample =
-    value.length > ENTROPY_SAMPLE_LENGTH
-      ? value.slice(0, ENTROPY_SAMPLE_LENGTH)
-      : value;
+    value.length > ENTROPY_SAMPLE_LENGTH ? value.slice(0, ENTROPY_SAMPLE_LENGTH) : value;
   const counts = new Map<string, number>();
   for (const char of sample) {
     counts.set(char, (counts.get(char) ?? 0) + 1);
@@ -136,7 +134,7 @@ const TOKEN_END = String.raw`(?![A-Za-z0-9_-])`;
 const VENDOR_KEY_PATTERNS = [
   // LangWatch's own API, ingest and legacy personal-access tokens, minted as
   // `{prefix}{lookupId}_{secret}` by
-  // platform/app/src/server/api-key/api-key-token.utils.ts. Matched on the
+  // modules/api-key/contract/src/api-key.tokens.ts. Matched on the
   // prefix plus three body characters, like every other known vendor, so a
   // truncated or short-bodied one still redacts: `sk-lw-` would otherwise reach
   // only the generic `sk-` rule and its 20-character floor, and `ik-lw-`
@@ -222,10 +220,7 @@ const SHAPED_TOKEN_MIN_ENTROPY = 3.9;
  * new false positives, and it needs no vendor to be named.
  */
 function isKeyShapedBody(body: string): boolean {
-  if (
-    body.length < SHAPED_TOKEN_MIN_BODY ||
-    body.length > SHAPED_TOKEN_MAX_BODY
-  ) {
+  if (body.length < SHAPED_TOKEN_MIN_BODY || body.length > SHAPED_TOKEN_MAX_BODY) {
     return false;
   }
   const { lower, upper, digit } = countCharClasses(body);
@@ -408,8 +403,7 @@ const PLACEHOLDER_VALUE_REGEX =
  * or a SCREAMING_SNAKE name. The underscore is required on the bare form so an
  * all-uppercase secret (a base32 TOTP seed, say) is not mistaken for a name.
  */
-const ENV_REFERENCE_REGEX =
-  /^(?:\$[A-Za-z_][A-Za-z0-9_]*|[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+)$/;
+const ENV_REFERENCE_REGEX = /^(?:\$[A-Za-z_][A-Za-z0-9_]*|[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+)$/;
 
 /** `process.env.OPENAI_API_KEY`, `config.auth.token`: code, not key material. */
 const CODE_EXPRESSION_REGEX = /^[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)+$/;
@@ -643,8 +637,7 @@ const VALUE_RULES: ValueRule[] = [
     // in prose is a sentence, not a header, and matching it redacted one.
     id: "authorization_scheme_token",
     description: "Non-Bearer authorization scheme token",
-    regex:
-      /\b(Authorization:\s*(?:Token|SSWS|GenieKey|Splunk|OAuth)\s+)[A-Za-z0-9._~+/-]{10,}=*/gi,
+    regex: /\b(Authorization:\s*(?:Token|SSWS|GenieKey|Splunk|OAuth)\s+)[A-Za-z0-9._~+/-]{10,}=*/gi,
     render: (_m, prefix) => `${prefix}${REPLACEMENT}`,
   },
   {
@@ -667,8 +660,7 @@ const VALUE_RULES: ValueRule[] = [
         `([0-9a-f]{${HEX_BODY_MIN},${HEX_BODY_MAX}})${TOKEN_END}`,
       "gi",
     ),
-    accept: (groups) =>
-      !IDENTIFIER_PREFIXES.has((groups[1] ?? "").toLowerCase()),
+    accept: (groups) => !IDENTIFIER_PREFIXES.has((groups[1] ?? "").toLowerCase()),
     precondition: (text) => text.includes("_"),
   },
   {
@@ -696,9 +688,7 @@ const VALUE_RULES: ValueRule[] = [
       `${TOKEN_START}([A-Za-z][A-Za-z0-9]{1,11})[_-]([A-Za-z0-9_+/-]{${SHAPED_TOKEN_MIN_BODY},})${TOKEN_END}`,
       "g",
     ),
-    accept: (groups) =>
-      !isNonCredentialPrefix(groups[1] ?? "") &&
-      isKeyShapedBody(groups[2] ?? ""),
+    accept: (groups) => !isNonCredentialPrefix(groups[1] ?? "") && isKeyShapedBody(groups[2] ?? ""),
     precondition: (text) => text.includes("_") || text.includes("-"),
   },
   {
@@ -875,7 +865,7 @@ function guardCustomPattern(pattern: string): string {
 const ORDINARY_TEXT_PROBES = [
   "the user asked the agent to summarise the meeting notes",
   "<task-notification>",
-  "platform/app/src/server/traces/trace.service.ts",
+  "modules/trace/server/src/services/trace-legacy-read.service.ts",
   "2026-08-10T14:32:11.482Z",
   "claude-opus-5",
   // The identifiers a tracing product is made of. Without these a pattern like
@@ -1039,10 +1029,7 @@ function sliceEndAfter(text: string, start: number): number {
     // which is the unbounded scan the budget exists to prevent.
     const lookahead = text.slice(target, target + SAFE_CUT_LOOKAHEAD);
     const next = lookahead.search(/\s/);
-    end =
-      next === -1
-        ? Math.min(target + SAFE_CUT_LOOKAHEAD, text.length)
-        : target + next;
+    end = next === -1 ? Math.min(target + SAFE_CUT_LOOKAHEAD, text.length) : target + next;
   }
 
   const begin = text.lastIndexOf(PEM_BEGIN, end);
@@ -1107,9 +1094,7 @@ export function redactSecretsInText({
  * absent or empty list becomes `null`, which the rule loop reads as "run
  * everything" without a lookup per rule.
  */
-function toSkipSet(
-  skipRuleIds: readonly string[] | undefined,
-): ReadonlySet<string> | null {
+function toSkipSet(skipRuleIds: readonly string[] | undefined): ReadonlySet<string> | null {
   if (!skipRuleIds || skipRuleIds.length === 0) return null;
   return new Set(skipRuleIds);
 }
@@ -1177,11 +1162,7 @@ export function detectSecretsInText({
   customPatterns?: readonly RegExp[];
   skipRuleIds?: readonly string[];
 }): SecretMatch[] {
-  if (
-    typeof text !== "string" ||
-    text.length === 0 ||
-    text.length > MAX_SCAN_LENGTH
-  ) {
+  if (typeof text !== "string" || text.length === 0 || text.length > MAX_SCAN_LENGTH) {
     return [];
   }
 
@@ -1235,9 +1216,7 @@ function lengthPrecedingMatch({
 
 /** Whether a rule's second-stage test rejects this candidate. */
 function ruleDeclines(rule: ValueRule, match: RegExpMatchArray): boolean {
-  return (
-    rule.accept !== undefined && !rule.accept(match as unknown as string[])
-  );
+  return rule.accept !== undefined && !rule.accept(match as unknown as string[]);
 }
 
 /** How much of a match the rule claims: all of it, or up to the value boundary. */
@@ -1273,9 +1252,7 @@ function matchesOfCustomPattern(pattern: RegExp, text: string): SecretMatch[] {
 function withoutOverlaps(matches: SecretMatch[]): SecretMatch[] {
   const kept: SecretMatch[] = [];
   for (const match of matches) {
-    const overlaps = kept.some(
-      (other) => match.start < other.end && other.start < match.end,
-    );
+    const overlaps = kept.some((other) => match.start < other.end && other.start < match.end);
     if (!overlaps) kept.push(match);
   }
   return kept.sort((a, b) => a.start - b.start);

@@ -11,8 +11,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { failSpinnerFromResponse } from "../failFromResponse";
 
-const spinner = () =>
-  ({ fail: vi.fn(), succeed: vi.fn(), stop: vi.fn() }) as unknown as Ora;
+const spinner = () => ({ fail: vi.fn(), succeed: vi.fn(), stop: vi.fn() }) as unknown as Ora;
 
 const responseOf = (status: number, body: unknown, contentType = "application/json") =>
   new Response(typeof body === "string" ? body : JSON.stringify(body), {
@@ -94,11 +93,7 @@ describe("failSpinnerFromResponse", () => {
     it("keeps the sentence and does not invent a domain code", async () => {
       await failSpinnerFromResponse({
         spinner: spinner(),
-        response: responseOf(
-          502,
-          "<html><body>Bad Gateway</body></html>",
-          "text/html",
-        ),
+        response: responseOf(502, "<html><body>Bad Gateway</body></html>", "text/html"),
         action: "create trigger",
         format: "json",
       });

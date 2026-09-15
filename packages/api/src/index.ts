@@ -1,46 +1,47 @@
-// ---------------------------------------------------------------------------
-// @langwatch/api -- Public API
-// ---------------------------------------------------------------------------
+// @langwatch/api — transport-agnostic half of the API; shared error vocabulary, access policies,
+// capability ports, Standard Schema boundary. The Hono service framework is `@langwatch/api/rest`;
+// tRPC root and policy middleware are `@langwatch/api/trpc`. Neither is re-exported here: a
+// consumer that wants a transport names it.
 
-export { createService, ServiceBuilder, VersionBuilder } from "./builder.js";
-export { isRpcPath } from "./version-builder.js";
-export type { RpcConfig, RpcPath } from "./version-builder.js";
-export { createErrorHandler, formatError } from "./errors.js";
-export { loggerMiddleware, tracerMiddleware } from "./middleware.js";
+export {
+  AuthenticatedActorRequiredError,
+  ApiVersionConflictError,
+  createErrorHandler,
+  EnterprisePlanRequiredError,
+  formatError,
+  ProjectInputMismatchError,
+  InvalidApiVersionError,
+  PayloadTooLargeError,
+  ScopeInputMismatchError,
+} from "./errors.ts";
 
-import type { Hono } from "hono";
-import { handle } from "hono/vercel";
+export type { RateLimiter, ResponseCache, UpgradeHandler } from "./ports.ts";
+export { ConnectUpgradeRouter } from "./ports.ts";
+export { WebSocketProtocol, type ProtocolConnection } from "./websocket.ts";
 
-export function routeHandlers(app: Hono) {
-  const h = handle(app);
-  return { GET: h, POST: h, PUT: h, DELETE: h, PATCH: h } as const;
-}
+export type { ApiSchema, ApiSchemaOutput } from "./schema.ts";
+
+// The access-policy vocabulary: what credential an operation accepts, and what
+// that credential can reach. Read by the REST route registry, the OpenAPI
+// security generator and the authorization audit alike, so it belongs to no
+// one transport.
+
 export {
-  createSSEResponse,
-  type SSEConfig,
-  type SSEHandler,
-  type TypedSSEStream,
-} from "./sse.js";
-export {
-  type BaseApp,
-  type DateVersion,
-  type EndpointConfig,
-  type EndpointDocs,
-  type EndpointRegistration,
-  type Handler,
-  type HttpMethod,
-  httpStatusText,
-  isDateVersion,
-  type MountedRoute,
-  type ServiceConfig,
-  VERSION_LATEST,
-  VERSION_PREVIEW,
-  type VersionStatus,
-} from "./types.js";
-export {
-  type ResolvedEndpoint,
-  type ResolvedVersion,
-  resolveRequestVersion,
-  resolveVersions,
-  type VersionDefinition,
-} from "./versioning.js";
+  type AccessPolicy,
+  anyAuthenticated,
+  apiKeyPermission,
+  type CredentialClass,
+  credentialClassFor,
+  describeAccessPolicy,
+  type HandlerCredential,
+  handlerManagedAuth,
+  internalSecret,
+  isApiKeyReachable,
+  policyPermissions,
+  publicEndpoint,
+  requires,
+  requiresOnProject,
+  requiresOnTeam,
+} from "./access-policy.ts";
+
+export { isInternalSecretValid } from "./rest/security.ts";

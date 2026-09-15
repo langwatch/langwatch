@@ -1,0 +1,41 @@
+{
+  "name": "@langwatch/automation-contract",
+  "version": "0.1.0",
+  "private": true,
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc --project tsconfig.build.json",
+    "typecheck": "pnpm -w typecheck:declarations --project . && tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@langwatch/api": "workspace:*",
+    "@langwatch/runtime-composition": "workspace:*",
+    "@langwatch/config": "workspace:*",
+    "@langwatch/handled-error": "workspace:*",
+    "@langwatch/monitor-contract": "workspace:*",
+    "@langwatch/time": "workspace:*",
+    "croner": "catalog:",
+    "liquidjs": "catalog:",
+    "marked": "^18.0.5",
+    "sanitize-html": "^2.17.7",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "@types/sanitize-html": "^2.16.0",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

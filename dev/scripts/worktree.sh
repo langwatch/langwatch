@@ -121,10 +121,10 @@ main() {
     git worktree add -b "$branch" "$dir" origin/main
   fi
 
-  # Copy .env files from subdirectories that need them.
+  # Copy the repository-root contributor env and service-local env files.
   # Warns when a required .env is missing so the developer knows to create one.
   local env_warnings=0
-  for src_dir in "platform/app" "services/langevals" "sdks/python" "sdks/typescript" "mcp/typescript"; do
+  for src_dir in "." "services/langevals" "sdks/python" "sdks/typescript" "mcp/typescript"; do
     local dest="${dir}/${src_dir}"
 
     # Skip directories that don't exist in the worktree

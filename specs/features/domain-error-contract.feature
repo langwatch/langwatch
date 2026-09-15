@@ -76,6 +76,28 @@ Feature: Handled errors — the handled-error boundary
     And no stack trace or internal detail is present
 
   @unit @bdd @domain-errors
+  Scenario: A framework refusal keeps the status it was raised with
+    Given a route raises the HTTP framework's own refusal with status 404
+    When the client calls that route
+    Then the HTTP status is 404
+    And the body carries the refusal's own sentence
+
+  @unit @bdd @domain-errors
+  Scenario: A framework refusal raised through a second copy of the framework is still a refusal
+    Given a route raises a refusal carrying status 404 from a second copy of the HTTP framework
+    When the client calls that route
+    Then the HTTP status is 404
+    And the body carries the refusal's own sentence
+    So a refusal never becomes a 500 because two packages resolved the framework differently
+
+  @unit @bdd @domain-errors
+  Scenario: A framework refusal at 5xx still collapses to the generic body
+    Given a route raises the HTTP framework's own refusal with status 503
+    When the client calls that route
+    Then the HTTP status is 503
+    And the body says only that an unknown error occurred
+
+  @unit @bdd @domain-errors
   Scenario: Validation failures travel the one handled-error channel
     Given a request fails input validation
     When the error is serialised for any transport
@@ -250,7 +272,9 @@ Feature: Handled errors — the handled-error boundary
   # ==========================================================================
 
   # @unimplemented: no SSE subscription is exercised end-to-end anywhere that
-  # would observe the error frame's payload.
+  # would observe the error frame's payload. When registerSse (packages/api)
+  # becomes the transport for these streams, this payload is the contract it
+  # adopts — packages/api/specs/sse-streaming.feature pins the framework side.
   @integration @unimplemented @bdd @domain-errors
   Scenario: A streamed response carries the serialised handled error on its error event
     Given an SSE subscription hits a known failure mid-stream

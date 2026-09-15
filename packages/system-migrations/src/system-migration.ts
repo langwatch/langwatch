@@ -1,4 +1,4 @@
-import type { TenantMigrationOutcome, TenantMigrationRecord } from "./types";
+import type { TenantMigrationOutcome, TenantMigrationRecord } from "./types.ts";
 
 /**
  * One in-place migration, written against the tenant it is given and nothing
@@ -7,6 +7,8 @@ import type { TenantMigrationOutcome, TenantMigrationRecord } from "./types";
  * drives them.
  */
 export interface SystemMigration {
+  /** Boot execution policy; omitted migrations retain the background default. */
+  readonly executionMode?: "background" | "startup";
   /** Whether a held outcome must prevent startup. Defaults to finite. */
   readonly startupSettlement?: "finite" | "recurring";
   /**

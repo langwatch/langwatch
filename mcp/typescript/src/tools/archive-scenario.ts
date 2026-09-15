@@ -5,9 +5,7 @@ import { archiveScenario as apiArchiveScenario } from "../langwatch-api-scenario
  *
  * Archives (soft-deletes) a scenario and returns confirmation.
  */
-export async function handleArchiveScenario(params: {
-  scenarioId: string;
-}): Promise<string> {
+export async function handleArchiveScenario(params: { scenarioId: string }): Promise<string> {
   const result = await apiArchiveScenario(params.scenarioId);
 
   const lines: string[] = [];

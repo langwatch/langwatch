@@ -1,0 +1,173 @@
+import {
+  emptyJoinRequest,
+  JOIN_APPROVED_EVENT_TYPE,
+  joinApprovedPayloadSchema,
+  JOIN_EXPIRED_EVENT_TYPE,
+  joinExpiredPayloadSchema,
+  JOIN_REJECTED_EVENT_TYPE,
+  joinRejectedPayloadSchema,
+  JOIN_REQUESTED_EVENT_TYPE,
+  type JoinRequestAggregateState,
+  joinRequestedPayloadSchema,
+  JOIN_WITHDRAWN_EVENT_TYPE,
+  joinWithdrawnPayloadSchema,
+  reduceJoinRequest,
+} from "@langwatch/identity-contract";
+import {
+  AbstractFoldProjection,
+  EventSchema,
+  type FoldEventHandlers,
+  type StateProjectionStore,
+} from "@langwatch/eventing";
+import { z } from "zod";
+
+/**
+ * The join-request pipeline's wire schemas: the framework envelope (id, aggregate, tenant, cursor
+ * time) over the payloads `@langwatch/identity-contract` declares.
+ */
+
+export const joinRequestedEventSchema = EventSchema.extend({
+  type: z.literal(JOIN_REQUESTED_EVENT_TYPE),
+  data: joinRequestedPayloadSchema,
+});
+export type JoinRequestedEvent = z.infer<typeof joinRequestedEventSchema>;
+
+export const joinApprovedEventSchema = EventSchema.extend({
+  type: z.literal(JOIN_APPROVED_EVENT_TYPE),
+  data: joinApprovedPayloadSchema,
+});
+export type JoinApprovedEvent = z.infer<typeof joinApprovedEventSchema>;
+
+export const joinRejectedEventSchema = EventSchema.extend({
+  type: z.literal(JOIN_REJECTED_EVENT_TYPE),
+  data: joinRejectedPayloadSchema,
+});
+export type JoinRejectedEvent = z.infer<typeof joinRejectedEventSchema>;
+
+export const joinExpiredEventSchema = EventSchema.extend({
+  type: z.literal(JOIN_EXPIRED_EVENT_TYPE),
+  data: joinExpiredPayloadSchema,
+});
+export type JoinExpiredEvent = z.infer<typeof joinExpiredEventSchema>;
+
+export const joinWithdrawnEventSchema = EventSchema.extend({
+  type: z.literal(JOIN_WITHDRAWN_EVENT_TYPE),
+  data: joinWithdrawnPayloadSchema,
+});
+export type JoinWithdrawnEvent = z.infer<typeof joinWithdrawnEventSchema>;
+
+export const joinRequestEventSchema = z.discriminatedUnion("type", [
+  joinRequestedEventSchema,
+  joinApprovedEventSchema,
+  joinRejectedEventSchema,
+  joinExpiredEventSchema,
+  joinWithdrawnEventSchema,
+]);
+export type JoinRequestEvent = z.infer<typeof joinRequestEventSchema>;
+
+const JOIN_REQUEST_PROJECTION_VERSION = "2026-08-24";
+
+export const JOIN_REQUEST_PROJECTION_NAME = "joinRequestState" as const;
+
+const joinRequestEvents = [
+  joinRequestedEventSchema,
+  joinApprovedEventSchema,
+  joinRejectedEventSchema,
+  joinExpiredEventSchema,
+  joinWithdrawnEventSchema,
+] as const;
+
+/** The reducer's state plus the base class's bookkeeping stamps — server
+ *  rig, deliberately outside the replay-proof reducer surface. */
+export type JoinRequestFoldState = JoinRequestAggregateState & {
+  CreatedAt: number;
+  UpdatedAt: number;
+  LastEventOccurredAt: number;
+};
+
+/**
+ * Postgres `JoinRequest` row per request, applied through `.withProjection()`'s direct
+ * load/apply/store cycle under the queue's per-request lock.
+ * The join-request pipeline's operational projection (D12, ADR-117): one
+ */
+export class JoinRequestStateFoldProjection
+  extends AbstractFoldProjection<
+    JoinRequestFoldState,
+    typeof joinRequestEvents,
+    "CreatedAt",
+    "UpdatedAt",
+    "LastEventOccurredAt",
+    StateProjectionStore<JoinRequestFoldState>
+  >
+  implements FoldEventHandlers<typeof joinRequestEvents, JoinRequestFoldState>
+{
+  readonly name = JOIN_REQUEST_PROJECTION_NAME;
+  readonly version = JOIN_REQUEST_PROJECTION_VERSION;
+  readonly store: StateProjectionStore<JoinRequestFoldState>;
+
+  protected readonly events = joinRequestEvents;
+
+  static create(deps: {
+    store: StateProjectionStore<JoinRequestFoldState>;
+  }): JoinRequestStateFoldProjection {
+    return new JoinRequestStateFoldProjection(deps);
+  }
+
+  constructor(deps: { store: StateProjectionStore<JoinRequestFoldState> }) {
+    super();
+    this.store = deps.store;
+  }
+
+  protected initState() {
+    return emptyJoinRequest({ joinRequestId: "" });
+  }
+
+  private fold(event: JoinRequestEvent, state: JoinRequestFoldState): JoinRequestFoldState {
+    const parsed = joinRequestEventSchema.parse(event);
+    const next = reduceJoinRequest({
+      state,
+      fact: { ...parsed, occurredAt: parsed.occurredAt } as never,
+    });
+    return {
+      ...state,
+      ...next,
+      // init() cannot know the request; the first applied event does.
+      joinRequestId: next.joinRequestId === "" ? parsed.aggregateId : next.joinRequestId,
+    };
+  }
+
+  handleIdentityJoinRequested(
+    event: JoinRequestedEvent,
+    state: JoinRequestFoldState,
+  ): JoinRequestFoldState {
+    return this.fold(event, state);
+  }
+
+  handleIdentityJoinApproved(
+    event: JoinApprovedEvent,
+    state: JoinRequestFoldState,
+  ): JoinRequestFoldState {
+    return this.fold(event, state);
+  }
+
+  handleIdentityJoinRejected(
+    event: JoinRejectedEvent,
+    state: JoinRequestFoldState,
+  ): JoinRequestFoldState {
+    return this.fold(event, state);
+  }
+
+  handleIdentityJoinExpired(
+    event: JoinExpiredEvent,
+    state: JoinRequestFoldState,
+  ): JoinRequestFoldState {
+    return this.fold(event, state);
+  }
+
+  handleIdentityJoinWithdrawn(
+    event: JoinWithdrawnEvent,
+    state: JoinRequestFoldState,
+  ): JoinRequestFoldState {
+    return this.fold(event, state);
+  }
+}

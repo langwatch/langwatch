@@ -6,11 +6,7 @@ import {
   type ClaudePluginEnsureAction,
   ensureLangwatchClaudePlugin,
 } from "@/cli/utils/governance/claude-plugin";
-import {
-  isLoggedIn,
-  loadConfig,
-  saveConfig,
-} from "@/cli/utils/governance/config";
+import { isLoggedIn, loadConfig, saveConfig } from "@/cli/utils/governance/config";
 import { installOpencodeSessionContextPlugin } from "@/cli/utils/governance/opencode-plugin";
 import { installSessionContextHooks } from "@/cli/utils/governance/session-context-hooks";
 import {
@@ -22,34 +18,11 @@ import { writeCodexOtelBlock } from "@/cli/utils/codex-config-toml";
 import { reportCommandError } from "@/cli/utils/errorOutput";
 
 /**
- * `langwatch ingest install <tool>` — Path B activation flow.
- *
- * Distinct from the gateway-only `langwatch <tool>` wrapper (Path A).
- * Mints the user's personal ingest key (sk-lw-*), prints the OTLP
- * export block, and wires whatever out-of-band activation the tool
- * needs so the user pastes nothing manual.
- *
- * Tools handled today:
- *   - codex      : toml merge + env exports + the turn harvest codex runs
- *                  after a completed turn + the session context hooks
- *                  merged into the codex hooks.json
- *   - claude_code: env exports + the session context hooks merged into
- *                  ~/.claude/settings.json
- *   - gemini     : env exports (no toml needed; envs are read directly)
- *   - opencode   : env exports + the session context plugin written into
- *                  the opencode plugins directory
- *
- * Returning early when the slug isn't recognised keeps the surface
- * forward-compatible — adding a new template is a one-line edit
- * here once we know whether it needs an out-of-band activation step.
+ * Path B activation: mint key, export OTLP, wire out-of-band activation.
+ * Forward-compatible: new tools need one-line edits.
  */
 
-const SUPPORTED_TOOLS = [
-  "codex",
-  "claude_code",
-  "gemini",
-  "opencode",
-] as const;
+const SUPPORTED_TOOLS = ["codex", "claude_code", "gemini", "opencode"] as const;
 type SupportedTool = (typeof SUPPORTED_TOOLS)[number];
 
 export interface InstallOptions {
@@ -109,24 +82,17 @@ interface InstallReport {
   env_block: string[];
 }
 
-export async function installCommand(
-  toolArg: string,
-  options: InstallOptions = {},
-): Promise<void> {
+export async function installCommand(toolArg: string, options: InstallOptions = {}): Promise<void> {
   const cfg = loadConfig();
   if (!isLoggedIn(cfg)) {
-    process.stderr.write(
-      "Not logged in. Run `langwatch login --device` first.\n",
-    );
+    process.stderr.write("Not logged in. Run `langwatch login --device` first.\n");
     process.exit(1);
     return;
   }
 
   const tool = normaliseTool(toolArg);
   if (!tool) {
-    process.stderr.write(
-      `Unknown tool '${toolArg}'. Supported: ${SUPPORTED_TOOLS.join(", ")}.\n`,
-    );
+    process.stderr.write(`Unknown tool '${toolArg}'. Supported: ${SUPPORTED_TOOLS.join(", ")}.\n`);
     process.exit(1);
     return;
   }
@@ -146,9 +112,7 @@ export async function installCommand(
 
 function normaliseTool(raw: string): SupportedTool | null {
   const slug = raw.trim().toLowerCase().replace(/-/g, "_");
-  return (SUPPORTED_TOOLS as readonly string[]).includes(slug)
-    ? (slug as SupportedTool)
-    : null;
+  return (SUPPORTED_TOOLS as readonly string[]).includes(slug) ? (slug as SupportedTool) : null;
 }
 
 async function runInstall(
@@ -164,12 +128,13 @@ async function runInstall(
   // fresh. The SupportedTool slug doubles as the source_type the mint route
   // expects (claude_code / codex / gemini / opencode); the config keys the
   // pin by CLI tool slug, so read that back off the source type.
-  const { token, prefix, endpoint, minted, scope, projectLabel } =
-    await resolveIngestionCredential({
+  const { token, prefix, endpoint, minted, scope, projectLabel } = await resolveIngestionCredential(
+    {
       cfg,
       tool: TOOL_BY_SOURCE_TYPE[tool] ?? tool,
       sourceType: tool,
-    });
+    },
+  );
   const envBlock = buildEnvBlock(tool, endpoint, token);
 
   // A fresh mint revokes the tool's previous key, so the config cache is now
@@ -260,11 +225,7 @@ async function runInstall(
   return report;
 }
 
-function buildEnvBlock(
-  tool: SupportedTool,
-  endpoint: string,
-  token: string,
-): string[] {
+function buildEnvBlock(tool: SupportedTool, endpoint: string, token: string): string[] {
   const base = [
     `export OTEL_EXPORTER_OTLP_ENDPOINT="${endpoint}"`,
     `export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer ${token}"`,
@@ -289,22 +250,7 @@ function buildEnvBlock(
         // receiver collapses every sub-agent into one synthesized per-turn
         // trace. Content still rides the log events, joined by request_id.
         `export CLAUDE_CODE_ENHANCED_TELEMETRY_BETA=1`,
-        // OTel content unlock knobs (all ON, collect-everything):
-        //   OTEL_LOG_USER_PROMPTS=1     lifts user prompt text onto user_prompt events
-        //   OTEL_LOG_TOOL_DETAILS=1     lifts tool metadata expansion onto tool_* events
-        //   OTEL_LOG_TOOL_CONTENT=1     lifts tool_input (Bash command, Edit diff, file
-        //                               paths) onto tool_decision + tool_result so the
-        //                               trace shows WHAT the tool did
-        //   OTEL_LOG_RAW_API_BODIES=1   emits api_request_body + api_response_body
-        //                               events carrying the FULL JSON of every claude
-        //                               API call: system prompts, rolling message
-        //                               history, assistant response text + reasoning,
-        //                               tool_use blocks. THIS is the only OTel surface
-        //                               that carries assistant text. May include PII /
-        //                               secrets a user pasted into a prompt; payloads
-        //                               can grow large turn-over-turn — the langwatch
-        //                               receiver caps oversized bodies before they
-        //                               reach storage to keep the CH merge ceiling safe.
+        // OTel content unlock knobs: log prompts, tool details, tool content, api bodies
         `export OTEL_LOG_USER_PROMPTS=1`,
         `export OTEL_LOG_TOOL_DETAILS=1`,
         `export OTEL_LOG_TOOL_CONTENT=1`,
@@ -343,9 +289,7 @@ function buildEnvBlock(
 }
 
 function renderHumanReport(report: InstallReport): void {
-  process.stdout.write(
-    `${chalk.green("✓")} Minted ingestion key for ${chalk.bold(report.tool)}\n`,
-  );
+  process.stdout.write(`${chalk.green("✓")} Minted ingestion key for ${chalk.bold(report.tool)}\n`);
   process.stdout.write(`  endpoint: ${report.endpoint}\n`);
   process.stdout.write(`  token:    ${report.ingestion_token}\n`);
 
@@ -356,9 +300,7 @@ function renderHumanReport(report: InstallReport): void {
         : report.codex_config_action === "updated"
           ? "updated"
           : "already up to date";
-    process.stdout.write(
-      `${chalk.green("✓")} ${report.codex_config_path} ${verb2}\n`,
-    );
+    process.stdout.write(`${chalk.green("✓")} ${report.codex_config_path} ${verb2}\n`);
   }
 
   if (
@@ -366,12 +308,8 @@ function renderHumanReport(report: InstallReport): void {
     report.claude_plugin_action === "already_installed"
   ) {
     const pluginVerb =
-      report.claude_plugin_action === "installed"
-        ? "installed"
-        : "already up to date";
-    process.stdout.write(
-      `${chalk.green("✓")} LangWatch Claude Code plugin ${pluginVerb}\n`,
-    );
+      report.claude_plugin_action === "installed" ? "installed" : "already up to date";
+    process.stdout.write(`${chalk.green("✓")} LangWatch Claude Code plugin ${pluginVerb}\n`);
   }
 
   if (report.codex_turn_harvest_action === "installed") {
@@ -379,9 +317,7 @@ function renderHumanReport(report: InstallReport): void {
       `${chalk.green("✓")} Codex will record each turn's conversation as it completes\n`,
     );
   } else if (report.codex_turn_harvest_action === "blocked") {
-    process.stdout.write(
-      `${chalk.yellow("!")} ${CODEX_TURN_HARVEST_BLOCKED_MESSAGE}\n`,
-    );
+    process.stdout.write(`${chalk.yellow("!")} ${CODEX_TURN_HARVEST_BLOCKED_MESSAGE}\n`);
   }
 
   if (report.session_hooks_action) {
@@ -390,9 +326,7 @@ function renderHumanReport(report: InstallReport): void {
         ? "already up to date"
         : report.session_hooks_action;
     const what = report.tool === "opencode" ? "session plugin" : "session hooks";
-    process.stdout.write(
-      `${chalk.green("✓")} ${report.session_hooks_path} ${what} ${hooksVerb}\n`,
-    );
+    process.stdout.write(`${chalk.green("✓")} ${report.session_hooks_path} ${what} ${hooksVerb}\n`);
   }
 
   process.stdout.write("\nAdd to your shell rc (or run in this shell):\n");

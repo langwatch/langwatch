@@ -12,16 +12,12 @@ export const experimentRestoreCommand = async (
 ): Promise<CommandResult | void> => {
   await resolveCredentials();
 
-  const spinner = createSpinner(
-    `Restoring "${slug}" to version ${version}...`,
-  ).start();
+  const spinner = createSpinner(`Restoring "${slug}" to version ${version}...`).start();
 
   try {
     const parsedVersion = parsePositiveIntOrNull(version);
     if (parsedVersion === null) {
-      throw new Error(
-        `The version to restore is a version number, like 3. Got "${version}".`,
-      );
+      throw new Error(`The version to restore is a version number, like 3. Got "${version}".`);
     }
 
     const service = new ExperimentsApiService();

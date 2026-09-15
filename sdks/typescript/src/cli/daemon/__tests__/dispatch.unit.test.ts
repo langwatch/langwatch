@@ -57,9 +57,7 @@ describe("given a daemon served the command", () => {
 
       await runCli(ARGV);
 
-      expect(requestStop).toHaveBeenCalledWith(
-        "/tmp/lw-test/aaaaaaaaaaaaaaaa.sock",
-      );
+      expect(requestStop).toHaveBeenCalledWith("/tmp/lw-test/aaaaaaaaaaaaaaaa.sock");
       expect(execViaDaemon).toHaveBeenCalledTimes(1);
       expect(process.exitCode).toBe(124);
     });

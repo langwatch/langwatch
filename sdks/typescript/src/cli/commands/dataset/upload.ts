@@ -30,9 +30,7 @@ export const uploadCommand = async (
   const ifExists = (options?.ifExists ?? "append") as "append" | "replace" | "error";
   const validStrategies = ["append", "replace", "error"];
   if (!validStrategies.includes(ifExists)) {
-    console.error(
-      chalk.red(`Error: --if-exists must be one of: ${validStrategies.join(", ")}`),
-    );
+    console.error(chalk.red(`Error: --if-exists must be one of: ${validStrategies.join(", ")}`));
     process.exit(1);
   }
 
@@ -49,15 +47,14 @@ export const uploadCommand = async (
 
   const service = createDatasetService();
 
-  const strategyLabel = ifExists === "append"
-    ? "Uploading"
-    : ifExists === "replace"
-      ? "Replacing records and uploading"
-      : "Uploading (error if exists)";
+  const strategyLabel =
+    ifExists === "append"
+      ? "Uploading"
+      : ifExists === "replace"
+        ? "Replacing records and uploading"
+        : "Uploading (error if exists)";
 
-  const spinner = createSpinner(
-    `${strategyLabel} ${filename} to dataset "${slugOrId}"...`,
-  ).start();
+  const spinner = createSpinner(`${strategyLabel} ${filename} to dataset "${slugOrId}"...`).start();
 
   try {
     const result = await service.uploadWithStrategy(slugOrId, file, ifExists);
@@ -82,7 +79,9 @@ export const uploadCommand = async (
           console.log(`  ${chalk.bold("Slug:")}    ${result.dataset.slug}`);
           console.log(`  ${chalk.bold("ID:")}      ${result.dataset.id}`);
           if (result.dataset.platformUrl) {
-            console.log(`  ${chalk.bold("View:")}    ${chalk.underline(result.dataset.platformUrl)}`);
+            console.log(
+              `  ${chalk.bold("View:")}    ${chalk.underline(result.dataset.platformUrl)}`,
+            );
           }
         }
       },

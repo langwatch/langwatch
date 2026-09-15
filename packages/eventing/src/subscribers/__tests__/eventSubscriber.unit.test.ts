@@ -1,0 +1,88 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type { Event } from "../../domain/types.ts";
+import {
+  createMockEventStore,
+  createTestAggregateType,
+  createTestEvent,
+  createTestEventStoreReadContext,
+  createTestTenantId,
+  TEST_CONSTANTS,
+} from "../../services/__tests__/testHelpers.ts";
+import { EventSourcingService } from "../../services/eventSourcingService.ts";
+import type { EventSubscriberDefinition } from "../eventSubscriber.types.ts";
+
+describe("event subscribers", () => {
+  const aggregateType = createTestAggregateType();
+  const tenantId = createTestTenantId();
+  const context = createTestEventStoreReadContext(tenantId);
+
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(TEST_CONSTANTS.BASE_TIMESTAMP);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+  });
+
+  describe("given an event was durably stored", () => {
+    describe("when a matching subscriber handles it inline", () => {
+      /** @scenario "An event subscriber receives no projection state" */
+      it("receives the event envelope without loading the event log or a fold", async () => {
+        const eventStore = createMockEventStore<Event>();
+        const handle = vi.fn().mockResolvedValue(void 0);
+        const subscriber: EventSubscriberDefinition<Event> = {
+          name: "conversationProcess",
+          eventTypes: [],
+          handle,
+        };
+        const service = new EventSourcingService({
+          pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
+          aggregateType,
+          allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
+          eventStore,
+          subscribers: [subscriber],
+        });
+        const event = createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, aggregateType, tenantId);
+
+        await service.storeEvents([event], context);
+
+        expect(eventStore.storeEvents).toHaveBeenCalledWith([event], context, aggregateType);
+        expect(eventStore.getEvents).not.toHaveBeenCalled();
+        expect(eventStore.getEventsUpTo).not.toHaveBeenCalled();
+        expect(handle).toHaveBeenCalledWith(event, {
+          tenantId,
+          aggregateId: TEST_CONSTANTS.AGGREGATE_ID,
+        });
+      });
+    });
+  });
+
+  describe("given a subscriber selects specific event types", () => {
+    describe("when a different event is stored", () => {
+      it("does not invoke the subscriber", async () => {
+        const eventStore = createMockEventStore<Event>();
+        const handle = vi.fn().mockResolvedValue(void 0);
+        const subscriber: EventSubscriberDefinition<Event> = {
+          name: "startedTurnsOnly",
+          eventTypes: ["lw.test.started"],
+          handle,
+        };
+        const service = new EventSourcingService({
+          pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
+          aggregateType,
+          allowedEventTypes: [TEST_CONSTANTS.EVENT_TYPE_1, TEST_CONSTANTS.EVENT_TYPE_2],
+          eventStore,
+          subscribers: [subscriber],
+        });
+        const event = createTestEvent(TEST_CONSTANTS.AGGREGATE_ID, aggregateType, tenantId);
+
+        await service.storeEvents([event], context);
+
+        expect(eventStore.storeEvents).toHaveBeenCalledTimes(1);
+        expect(handle).not.toHaveBeenCalled();
+      });
+    });
+  });
+});

@@ -41,11 +41,7 @@ const CANNED_SCENARIO_UPDATED = {
   id: "scen_abc123",
   name: "Login Flow - Valid Credentials",
   situation: "User logs in with correct email and pass",
-  criteria: [
-    "Responds with welcome message",
-    "Sets session cookie",
-    "Redirects to dashboard",
-  ],
+  criteria: ["Responds with welcome message", "Sets session cookie", "Redirects to dashboard"],
   labels: ["auth", "happy-path"],
 };
 
@@ -71,29 +67,23 @@ function createMockServer(): Server {
       const url = req.url ?? "";
       res.setHeader("Content-Type", "application/json");
 
-      // GET /api/scenarios - list all scenarios
-      if (url === "/api/scenarios" && req.method === "GET") {
+      // GET /api/v1/scenarios - list all scenarios
+      if (url === "/api/v1/scenarios" && req.method === "GET") {
         res.writeHead(200);
         res.end(JSON.stringify(CANNED_SCENARIOS_LIST));
       }
-      // GET /api/scenarios/:id - get scenario detail
-      else if (
-        url.match(/^\/api\/scenarios\/scen_abc123(\?|$)/) &&
-        req.method === "GET"
-      ) {
+      // GET /api/v1/scenarios/:id - get scenario detail
+      else if (url.match(/^\/api\/v1\/scenarios\/scen_abc123(\?|$)/) && req.method === "GET") {
         res.writeHead(200);
         res.end(JSON.stringify(CANNED_SCENARIO_DETAIL));
       }
-      // GET /api/scenarios/:id - not found
-      else if (
-        url.match(/^\/api\/scenarios\/scen_nonexistent(\?|$)/) &&
-        req.method === "GET"
-      ) {
+      // GET /api/v1/scenarios/:id - not found
+      else if (url.match(/^\/api\/v1\/scenarios\/scen_nonexistent(\?|$)/) && req.method === "GET") {
         res.writeHead(404);
         res.end(JSON.stringify({ message: "Scenario not found" }));
       }
-      // POST /api/scenarios - create scenario
-      else if (url === "/api/scenarios" && req.method === "POST") {
+      // POST /api/v1/scenarios - create scenario
+      else if (url === "/api/v1/scenarios" && req.method === "POST") {
         const parsed = JSON.parse(body);
         if (!parsed.name) {
           res.writeHead(400);
@@ -103,35 +93,23 @@ function createMockServer(): Server {
           res.end(JSON.stringify(CANNED_SCENARIO_CREATED));
         }
       }
-      // PUT /api/scenarios/:id - update scenario
-      else if (
-        url.match(/^\/api\/scenarios\/scen_abc123$/) &&
-        req.method === "PUT"
-      ) {
+      // PUT /api/v1/scenarios/:id - update scenario
+      else if (url.match(/^\/api\/v1\/scenarios\/scen_abc123$/) && req.method === "PUT") {
         res.writeHead(200);
         res.end(JSON.stringify(CANNED_SCENARIO_UPDATED));
       }
-      // PUT /api/scenarios/:id - not found
-      else if (
-        url.match(/^\/api\/scenarios\/scen_nonexistent$/) &&
-        req.method === "PUT"
-      ) {
+      // PUT /api/v1/scenarios/:id - not found
+      else if (url.match(/^\/api\/v1\/scenarios\/scen_nonexistent$/) && req.method === "PUT") {
         res.writeHead(404);
         res.end(JSON.stringify({ message: "Scenario not found" }));
       }
-      // DELETE /api/scenarios/:id - archive scenario
-      else if (
-        url.match(/^\/api\/scenarios\/scen_abc123$/) &&
-        req.method === "DELETE"
-      ) {
+      // DELETE /api/v1/scenarios/:id - archive scenario
+      else if (url.match(/^\/api\/v1\/scenarios\/scen_abc123$/) && req.method === "DELETE") {
         res.writeHead(200);
         res.end(JSON.stringify(CANNED_SCENARIO_ARCHIVED));
-      }
-      else {
+      } else {
         res.writeHead(404);
-        res.end(
-          JSON.stringify({ message: `Not found: ${req.method} ${url}` })
-        );
+        res.end(JSON.stringify({ message: `Not found: ${req.method} ${url}` }));
       }
     });
   });
@@ -168,9 +146,7 @@ describe("MCP scenario tools integration", () => {
   describe("platform_list_scenarios", () => {
     describe("when the API returns scenarios", () => {
       it("returns a non-empty result", async () => {
-        const { handleListScenarios } = await import(
-          "../tools/list-scenarios.js"
-        );
+        const { handleListScenarios } = await import("../tools/list-scenarios.js");
         const result = await handleListScenarios({});
         expect(result.length).toBeGreaterThan(0);
       });
@@ -178,9 +154,7 @@ describe("MCP scenario tools integration", () => {
 
     describe("when format is json", () => {
       it("returns parseable JSON matching the API response", async () => {
-        const { handleListScenarios } = await import(
-          "../tools/list-scenarios.js"
-        );
+        const { handleListScenarios } = await import("../tools/list-scenarios.js");
         const result = await handleListScenarios({ format: "json" });
         expect(JSON.parse(result)).toEqual(CANNED_SCENARIOS_LIST);
       });
@@ -190,9 +164,7 @@ describe("MCP scenario tools integration", () => {
   describe("platform_get_scenario", () => {
     describe("when the scenario exists", () => {
       it("returns a non-empty result", async () => {
-        const { handleGetScenario } = await import(
-          "../tools/get-scenario.js"
-        );
+        const { handleGetScenario } = await import("../tools/get-scenario.js");
         const result = await handleGetScenario({ scenarioId: "scen_abc123" });
         expect(result.length).toBeGreaterThan(0);
       });
@@ -200,12 +172,8 @@ describe("MCP scenario tools integration", () => {
 
     describe("when the scenario does not exist", () => {
       it("propagates the 404 error", async () => {
-        const { handleGetScenario } = await import(
-          "../tools/get-scenario.js"
-        );
-        await expect(
-          handleGetScenario({ scenarioId: "scen_nonexistent" })
-        ).rejects.toThrow("404");
+        const { handleGetScenario } = await import("../tools/get-scenario.js");
+        await expect(handleGetScenario({ scenarioId: "scen_nonexistent" })).rejects.toThrow("404");
       });
     });
   });
@@ -213,9 +181,7 @@ describe("MCP scenario tools integration", () => {
   describe("platform_create_scenario", () => {
     describe("when valid data is provided", () => {
       it("returns confirmation with new scenario ID", async () => {
-        const { handleCreateScenario } = await import(
-          "../tools/create-scenario.js"
-        );
+        const { handleCreateScenario } = await import("../tools/create-scenario.js");
         const result = await handleCreateScenario({
           name: "Login Flow Happy Path",
           situation: "User attempts to log in with valid creds",
@@ -228,14 +194,12 @@ describe("MCP scenario tools integration", () => {
 
     describe("when name is empty", () => {
       it("propagates the validation error", async () => {
-        const { handleCreateScenario } = await import(
-          "../tools/create-scenario.js"
-        );
+        const { handleCreateScenario } = await import("../tools/create-scenario.js");
         await expect(
           handleCreateScenario({
             name: "",
             situation: "Some situation",
-          })
+          }),
         ).rejects.toThrow();
       });
     });
@@ -244,9 +208,7 @@ describe("MCP scenario tools integration", () => {
   describe("platform_update_scenario", () => {
     describe("when the scenario exists", () => {
       it("returns a non-empty result", async () => {
-        const { handleUpdateScenario } = await import(
-          "../tools/update-scenario.js"
-        );
+        const { handleUpdateScenario } = await import("../tools/update-scenario.js");
         const result = await handleUpdateScenario({
           scenarioId: "scen_abc123",
           name: "Login Flow - Valid Credentials",
@@ -257,14 +219,12 @@ describe("MCP scenario tools integration", () => {
 
     describe("when the scenario does not exist", () => {
       it("propagates the 404 error", async () => {
-        const { handleUpdateScenario } = await import(
-          "../tools/update-scenario.js"
-        );
+        const { handleUpdateScenario } = await import("../tools/update-scenario.js");
         await expect(
           handleUpdateScenario({
             scenarioId: "scen_nonexistent",
             name: "Updated Name",
-          })
+          }),
         ).rejects.toThrow("404");
       });
     });
@@ -273,9 +233,7 @@ describe("MCP scenario tools integration", () => {
   describe("platform_archive_scenario", () => {
     describe("when the scenario exists", () => {
       it("returns confirmation that scenario was archived", async () => {
-        const { handleArchiveScenario } = await import(
-          "../tools/archive-scenario.js"
-        );
+        const { handleArchiveScenario } = await import("../tools/archive-scenario.js");
         const result = await handleArchiveScenario({
           scenarioId: "scen_abc123",
         });

@@ -1,0 +1,292 @@
+{
+  "name": "@langwatch/workflow-web",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Browser-safe Workflow DSL, graph state, and workflow UI primitives.",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    "./surfaces/workflow-code-editor": {
+      "langwatch-declaration-source": "./src/ui/elements/code/workflow-code-editor.tsx",
+      "types": "./dist/ui/elements/code/workflow-code-editor.d.ts",
+      "default": "./src/ui/elements/code/workflow-code-editor.tsx"
+    },
+    ".": {
+      "langwatch-declaration-source": "./src/index.ts",
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    },
+    "./surfaces/copy-button": {
+      "langwatch-declaration-source": "./src/ui/sections/copy-button.tsx",
+      "types": "./dist/ui/sections/copy-button.d.ts",
+      "default": "./src/ui/sections/copy-button.tsx"
+    },
+    "./surfaces/generate-api-snippet-dialog": {
+      "langwatch-declaration-source": "./src/ui/sections/generate-api-snippet-dialog.tsx",
+      "types": "./dist/ui/sections/generate-api-snippet-dialog.d.ts",
+      "default": "./src/ui/sections/generate-api-snippet-dialog.tsx"
+    },
+    "./surfaces/hoverable-big-text": {
+      "langwatch-declaration-source": "./src/ui/sections/hoverable-big-text.tsx",
+      "types": "./dist/ui/sections/hoverable-big-text.d.ts",
+      "default": "./src/ui/sections/hoverable-big-text.tsx"
+    },
+    "./surfaces/markdown": {
+      "langwatch-declaration-source": "./src/ui/sections/markdown.tsx",
+      "types": "./dist/ui/sections/markdown.d.ts",
+      "default": "./src/ui/sections/markdown.tsx"
+    },
+    "./surfaces/code-block-editor": {
+      "langwatch-declaration-source": "./src/ui/sections/blocks/code-block-editor.tsx",
+      "types": "./dist/ui/sections/blocks/code-block-editor.d.ts",
+      "default": "./src/ui/sections/blocks/code-block-editor.tsx"
+    },
+    "./surfaces/render-code": {
+      "langwatch-declaration-source": "./src/ui/sections/code/render-code.tsx",
+      "types": "./dist/ui/sections/code/render-code.d.ts",
+      "default": "./src/ui/sections/code/render-code.tsx"
+    },
+    "./surfaces/run-via-api-data-source-picker": {
+      "langwatch-declaration-source": "./src/ui/elements/run-via-api/data-source-picker.tsx",
+      "types": "./dist/ui/elements/run-via-api/data-source-picker.d.ts",
+      "default": "./src/ui/elements/run-via-api/data-source-picker.tsx"
+    },
+    "./surfaces/run-snippets": {
+      "langwatch-declaration-source": "./src/model/run-via-api/run-snippets.ts",
+      "types": "./dist/model/run-via-api/run-snippets.d.ts",
+      "default": "./src/model/run-via-api/run-snippets.ts"
+    },
+    "./surfaces/run-via-api-tabs": {
+      "langwatch-declaration-source": "./src/ui/sections/run-via-api/use-run-via-api-tabs.ts",
+      "types": "./dist/ui/sections/run-via-api/use-run-via-api-tabs.d.ts",
+      "default": "./src/ui/sections/run-via-api/use-run-via-api-tabs.ts"
+    },
+    "./surfaces/isolated-error-boundary": {
+      "langwatch-declaration-source": "./src/ui/elements/isolated-error-boundary.tsx",
+      "types": "./dist/ui/elements/isolated-error-boundary.d.ts",
+      "default": "./src/ui/elements/isolated-error-boundary.tsx"
+    },
+    "./surfaces/redacted-field": {
+      "langwatch-declaration-source": "./src/ui/sections/redacted-field.tsx",
+      "types": "./dist/ui/sections/redacted-field.d.ts",
+      "default": "./src/ui/sections/redacted-field.tsx"
+    },
+    "./surfaces/deja-view-link": {
+      "langwatch-declaration-source": "./src/behavior/use-deja-view-link.ts",
+      "types": "./dist/behavior/use-deja-view-link.d.ts",
+      "default": "./src/behavior/use-deja-view-link.ts"
+    },
+    "./surfaces/feature-flag": {
+      "langwatch-declaration-source": "./src/behavior/use-feature-flag.ts",
+      "types": "./dist/behavior/use-feature-flag.d.ts",
+      "default": "./src/behavior/use-feature-flag.ts"
+    },
+    "./surfaces/workflow-host": {
+      "langwatch-declaration-source": "./src/model/workflow-host.ts",
+      "types": "./dist/model/workflow-host.d.ts",
+      "default": "./src/model/workflow-host.ts"
+    },
+    "./surfaces/add-model-provider-key": {
+      "langwatch-declaration-source": "./src/ui/elements/optimization_studio/add-model-provider-key.tsx",
+      "types": "./dist/ui/elements/optimization_studio/add-model-provider-key.d.ts",
+      "default": "./src/ui/elements/optimization_studio/add-model-provider-key.tsx"
+    },
+    "./surfaces/format-money": {
+      "langwatch-declaration-source": "./src/ui/elements/optimization_studio/format-money.tsx",
+      "types": "./dist/ui/elements/optimization_studio/format-money.d.ts",
+      "default": "./src/ui/elements/optimization_studio/format-money.tsx"
+    },
+    "./surfaces/version-history": {
+      "langwatch-declaration-source": "./src/ui/sections/optimization_studio/history.tsx",
+      "types": "./dist/ui/sections/optimization_studio/history.d.ts",
+      "default": "./src/ui/sections/optimization_studio/history.tsx"
+    },
+    "./surfaces/code-editor-transport": {
+      "langwatch-declaration-source": "./src/ui/sections/optimization_studio/code/workflow-code-editor.transport.tsx",
+      "types": "./dist/ui/sections/optimization_studio/code/workflow-code-editor.transport.d.ts",
+      "default": "./src/ui/sections/optimization_studio/code/workflow-code-editor.transport.tsx"
+    },
+    "./surfaces/emoji-picker-modal": {
+      "langwatch-declaration-source": "./src/ui/sections/optimization_studio/properties/modals/emoji-picker-modal.tsx",
+      "types": "./dist/ui/sections/optimization_studio/properties/modals/emoji-picker-modal.d.ts",
+      "default": "./src/ui/sections/optimization_studio/properties/modals/emoji-picker-modal.tsx"
+    },
+    "./surfaces/execution-state-error": {
+      "langwatch-declaration-source": "./src/ui/sections/optimization_studio/execution-state-error.ts",
+      "types": "./dist/ui/sections/optimization_studio/execution-state-error.d.ts",
+      "default": "./src/ui/sections/optimization_studio/execution-state-error.ts"
+    },
+    "./screens/workflows": {
+      "langwatch-declaration-source": "./src/workflows.ts",
+      "types": "./dist/workflows.d.ts",
+      "default": "./src/workflows.ts"
+    },
+    "./workflows": {
+      "types": "./dist/workflows.d.ts",
+      "default": "./src/workflows.ts"
+    },
+    "./surfaces/handled-error-views": {
+      "langwatch-declaration-source": "./src/ui/elements/studio-host/errors.tsx",
+      "types": "./dist/ui/elements/studio-host/errors.d.ts",
+      "default": "./src/ui/elements/studio-host/errors.tsx"
+    },
+    "./surfaces/studio-scope": {
+      "langwatch-declaration-source": "./src/behavior/studio-host/use-organization-team-project.ts",
+      "types": "./dist/behavior/studio-host/use-organization-team-project.d.ts",
+      "default": "./src/behavior/studio-host/use-organization-team-project.ts"
+    },
+    "./surfaces/workflow-api": {
+      "langwatch-declaration-source": "./src/model/workflow-api-client.ts",
+      "types": "./dist/model/workflow-api-client.d.ts",
+      "default": "./src/model/workflow-api-client.ts"
+    },
+    "./surfaces/component-types": {
+      "langwatch-declaration-source": "./src/model/types.ts",
+      "types": "./dist/model/types.d.ts",
+      "default": "./src/model/types.ts"
+    },
+    "./surfaces/next-link": {
+      "langwatch-declaration-source": "./src/ui/elements/compat/next-link.tsx",
+      "types": "./dist/ui/elements/compat/next-link.d.ts",
+      "default": "./src/ui/elements/compat/next-link.tsx"
+    },
+    "./surfaces/platform-defaults": {
+      "langwatch-declaration-source": "./src/model/constants.ts",
+      "types": "./dist/model/constants.d.ts",
+      "default": "./src/model/constants.ts"
+    },
+    "./surfaces/crisp-bubble-policy": {
+      "langwatch-declaration-source": "./src/behavior/crisp-bubble-policy.ts",
+      "types": "./dist/behavior/crisp-bubble-policy.d.ts",
+      "default": "./src/behavior/crisp-bubble-policy.ts"
+    },
+    "./surfaces/workflow-routes": {
+      "langwatch-declaration-source": "./src/model/routes.ts",
+      "types": "./dist/model/routes.d.ts",
+      "default": "./src/model/routes.ts"
+    },
+    "./surfaces/fetch-sse": {
+      "langwatch-declaration-source": "./src/model/sse/fetch-sse.ts",
+      "types": "./dist/model/sse/fetch-sse.d.ts",
+      "default": "./src/model/sse/fetch-sse.ts"
+    },
+    "./surfaces/workflow-icons": {
+      "langwatch-declaration-source": "./src/workflow-icons.ts",
+      "types": "./dist/workflow-icons.d.ts",
+      "default": "./src/workflow-icons.ts"
+    },
+    "./surfaces/workflow-card": {
+      "langwatch-declaration-source": "./src/workflow-card.ts",
+      "types": "./dist/workflow-card.d.ts",
+      "default": "./src/workflow-card.ts"
+    },
+    "./surfaces/code-agent": {
+      "langwatch-declaration-source": "./src/code-agent.ts",
+      "types": "./dist/code-agent.d.ts",
+      "default": "./src/code-agent.ts"
+    },
+    "./surfaces/workflow-templates": {
+      "langwatch-declaration-source": "./src/workflow-templates.ts",
+      "types": "./dist/workflow-templates.d.ts",
+      "default": "./src/workflow-templates.ts"
+    },
+    "./surfaces/studio-dataset-columns": {
+      "langwatch-declaration-source": "./src/studio-dataset-columns.ts",
+      "types": "./dist/studio-dataset-columns.d.ts",
+      "default": "./src/studio-dataset-columns.ts"
+    },
+    "./surfaces/studio-drawer-footer": {
+      "langwatch-declaration-source": "./src/studio-drawer-footer.ts",
+      "types": "./dist/studio-drawer-footer.d.ts",
+      "default": "./src/studio-drawer-footer.ts"
+    },
+    "./surfaces/evaluate-api-snippet": {
+      "langwatch-declaration-source": "./src/model/evaluate-api-snippet.ts",
+      "types": "./dist/model/evaluate-api-snippet.d.ts",
+      "default": "./src/model/evaluate-api-snippet.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "pnpm -w typecheck:declarations --project . && tsc --noEmit",
+    "test": "vitest run",
+    "test:unit": "vitest run"
+  },
+  "dependencies": {
+    "@chakra-ui/react": "catalog:",
+    "@langwatch/agent-contract": "workspace:*",
+    "@langwatch/agent-web": "workspace:*",
+    "@langwatch/api": "workspace:*",
+    "@langwatch/dataset-contract": "workspace:*",
+    "@langwatch/dataset-web": "workspace:*",
+    "@langwatch/design-system": "workspace:*",
+    "@langwatch/evaluator-contract": "workspace:*",
+    "@langwatch/evaluator-web": "workspace:*",
+    "@langwatch/experiment-web": "workspace:*",
+    "@langwatch/feature-flag-contract": "workspace:*",
+    "@langwatch/handled-error": "workspace:*",
+    "@langwatch/model-provider-contract": "workspace:*",
+    "@langwatch/model-provider-web": "workspace:*",
+    "@langwatch/observability": "workspace:*",
+    "@langwatch/prompt-contract": "workspace:*",
+    "@langwatch/prompt-web": "workspace:*",
+    "@langwatch/time": "workspace:*",
+    "@langwatch/trace-contract": "workspace:*",
+    "@langwatch/trace-web": "workspace:*",
+    "@langwatch/ui-host": "workspace:*",
+    "@langwatch/workflow-contract": "workspace:*",
+    "@microsoft/fetch-event-source": "^2.0.1",
+    "@monaco-editor/react": "catalog:",
+    "@tanstack/react-query": "catalog:",
+    "@trpc/client": "catalog:",
+    "@trpc/react-query": "catalog:",
+    "@xyflow/react": "catalog:",
+    "emoji-picker-react": "^4.19.1",
+    "fast-deep-equal": "catalog:",
+    "langwatch": "workspace:*",
+    "liquidjs": "catalog:",
+    "lodash-es": "catalog:",
+    "lucide-react": "catalog:",
+    "monaco-editor": "catalog:",
+    "monacopilot": "catalog:",
+    "motion": "catalog:",
+    "nanoid": "catalog:",
+    "numeral": "catalog:",
+    "react-dnd": "^16.0.1",
+    "react-dnd-html5-backend": "^16.0.1",
+    "react-error-boundary": "catalog:",
+    "react-feather": "catalog:",
+    "react-hook-form": "catalog:",
+    "react-icons": "catalog:",
+    "react-markdown": "catalog:",
+    "react-resizable-panels": "catalog:",
+    "react-spinners": "^0.17.0",
+    "remark-gfm": "catalog:",
+    "use-debounce": "catalog:",
+    "usehooks-ts": "catalog:",
+    "zod": "catalog:",
+    "zundo": "catalog:",
+    "zustand": "catalog:"
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "catalog:",
+    "@testing-library/react": "catalog:",
+    "@testing-library/user-event": "catalog:",
+    "@types/lodash-es": "catalog:",
+    "@types/numeral": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "jsdom": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "peerDependencies": {
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7"
+  }
+}

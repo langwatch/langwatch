@@ -4,31 +4,16 @@ import chalk from "chalk";
 import prompts from "prompts";
 import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
 import { rememberProjectName } from "@/cli/utils/identityNotice";
-import {
-  runDeviceFlowLogin,
-  runUnifiedLoginFlow,
-} from "@/cli/utils/governance/login-flow";
-import {
-  isLoggedIn,
-  loadConfig,
-  saveConfig,
-} from "@/cli/utils/governance/config";
-import {
-  fetchProjectKeyBySlug,
-  SessionApiError,
-} from "@/cli/utils/governance/session-api";
+import { runDeviceFlowLogin, runUnifiedLoginFlow } from "@/cli/utils/governance/login-flow";
+import { isLoggedIn, loadConfig, saveConfig } from "@/cli/utils/governance/config";
+import { fetchProjectKeyBySlug, SessionApiError } from "@/cli/utils/governance/session-api";
 import { recordCliLocation } from "@/cli/utils/governance/cli-location";
 import { resolveControlPlaneEndpoint } from "@/cli/utils/governance/resolveEndpoint";
 import { DEFAULT_ENDPOINT } from "@/internal/constants";
 import { normalizeEndpoint } from "@/internal/endpoint";
 
 /**
- * Always-on agent-hint banner shown above the interactive prompts on
- * `langwatch login` (no flags). Some agent harnesses fake a TTY but can't
- * actually answer prompts — this banner names the escape-hatch flags so
- * the agent (or the human staring at the stuck prompt) can re-invoke
- * with the right flag and proceed.
- *
+ * Agent-hint banner with escape-hatch flags (--device, --project).
  * Spec: specs/ai-governance/cli-onboarding/login-unified.feature
  */
 function printAgentHintBanner(): void {
@@ -38,9 +23,7 @@ function printAgentHintBanner(): void {
     ),
   );
   console.log(
-    chalk.gray(
-      "  --device                   AI tools / SSO (claude, codex, gemini, opencode)",
-    ),
+    chalk.gray("  --device                   AI tools / SSO (claude, codex, gemini, opencode)"),
   );
   console.log(
     chalk.gray(
@@ -48,26 +31,18 @@ function printAgentHintBanner(): void {
     ),
   );
   console.log(
-    chalk.gray(
-      "  --api-key <KEY>            project SDK key you already have, into .env",
-    ),
+    chalk.gray("  --api-key <KEY>            project SDK key you already have, into .env"),
   );
   console.log(
     chalk.gray(
       "  --token <TOKEN>            pre-minted device session (writes ~/.langwatch/config.json)",
     ),
   );
-  console.log(
-    chalk.gray(
-      "  --endpoint <URL>           self-hosted instance URL",
-    ),
-  );
+  console.log(chalk.gray("  --endpoint <URL>           self-hosted instance URL"));
   console.log();
 }
 
-const updateEnvFile = (
-  apiKey: string,
-): { created: boolean; updated: boolean; path: string } => {
+const updateEnvFile = (apiKey: string): { created: boolean; updated: boolean; path: string } => {
   const envPath = path.join(process.cwd(), ".env");
 
   // Check if .env exists
@@ -113,9 +88,7 @@ const updateEnvFile = (
  * Spec: specs/ai-governance/cli-onboarding/login-unified.feature
  */
 const failFastHeadlessProjectLogin = (): never => {
-  console.error(
-    chalk.red("Error: project login needs a browser, and this terminal has no TTY."),
-  );
+  console.error(chalk.red("Error: project login needs a browser, and this terminal has no TTY."));
   console.error(chalk.gray("Non-interactive options:"));
   console.error(
     chalk.cyan("  langwatch login --project <slug>") +
@@ -126,8 +99,7 @@ const failFastHeadlessProjectLogin = (): never => {
       chalk.gray("    writes a key you already have to .env"),
   );
   console.error(
-    chalk.cyan("  export LANGWATCH_API_KEY=<key>") +
-      chalk.gray("     or put it in .env yourself"),
+    chalk.cyan("  export LANGWATCH_API_KEY=<key>") + chalk.gray("     or put it in .env yourself"),
   );
   console.error(
     chalk.gray(
@@ -146,9 +118,7 @@ const failFastHeadlessProjectLogin = (): never => {
 const loginToProjectBySlug = async (slug: string): Promise<void> => {
   const cfg = loadConfig();
   if (!isLoggedIn(cfg)) {
-    console.error(
-      chalk.red("Error: `--project <slug>` needs a device login to authenticate you."),
-    );
+    console.error(chalk.red("Error: `--project <slug>` needs a device login to authenticate you."));
     console.error(
       chalk.gray("Run ") +
         chalk.cyan("langwatch login") +
@@ -189,16 +159,14 @@ const loginToProjectBySlug = async (slug: string): Promise<void> => {
   }
 };
 
-export const loginCommand = async (
-  options?: {
-    apiKey?: string;
-    device?: boolean;
-    project?: boolean | string;
-    browser?: string;
-    endpoint?: string;
-    token?: string;
-  },
-): Promise<void> => {
+export const loginCommand = async (options?: {
+  apiKey?: string;
+  device?: boolean;
+  project?: boolean | string;
+  browser?: string;
+  endpoint?: string;
+  token?: string;
+}): Promise<void> => {
   try {
     // First, so every flow below reads a config that already says how to run
     // this CLI; the Claude Code plugin's hooks look it up there.
@@ -459,15 +427,7 @@ export const loginCommand = async (
     }
     return;
   } catch (error) {
-    console.error(
-      chalk.red(
-        `Error during login: ${
-          formatApiErrorMessage({ error })
-        }`,
-      ),
-    );
+    console.error(chalk.red(`Error during login: ${formatApiErrorMessage({ error })}`));
     process.exit(1);
   }
 };
-
-

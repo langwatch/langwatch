@@ -1,5 +1,8 @@
 import { AVAILABLE_EVALUATORS } from "../../../../services/langevals/ts-integration/evaluators.generated.js";
-import type { EvaluatorDefinition, EvaluatorTypes } from "../../../../services/langevals/ts-integration/evaluators.generated.js";
+import type {
+  EvaluatorDefinition,
+  EvaluatorTypes,
+} from "../../../../services/langevals/ts-integration/evaluators.generated.js";
 
 /**
  * Formats evaluator schema information for the discover_schema tool.
@@ -51,8 +54,8 @@ function formatEvaluatorOverview(): string {
 }
 
 /**
- * Returns the full schema for a specific evaluator type.
- * Includes settings with descriptions and defaults, required/optional fields, env vars, and result fields.
+ * Returns the full schema for a specific evaluator type: settings, required/optional
+ * fields, env vars, and result fields.
  */
 function formatEvaluatorDetail(evaluatorType: string): string {
   const def = AVAILABLE_EVALUATORS[evaluatorType as EvaluatorTypes] as
@@ -118,12 +121,18 @@ function formatEvaluatorDetail(evaluatorType: string): string {
 
   lines.push("\n## Usage Example\n");
   lines.push("```json");
-  lines.push(JSON.stringify({
-    evaluatorType: evaluatorType,
-    settings: Object.fromEntries(
-      settingsEntries.map(([key, setting]) => [key, (setting as { default: unknown }).default]),
+  lines.push(
+    JSON.stringify(
+      {
+        evaluatorType: evaluatorType,
+        settings: Object.fromEntries(
+          settingsEntries.map(([key, setting]) => [key, (setting as { default: unknown }).default]),
+        ),
+      },
+      null,
+      2,
     ),
-  }, null, 2));
+  );
   lines.push("```");
 
   return lines.join("\n");

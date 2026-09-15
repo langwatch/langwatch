@@ -1,0 +1,79 @@
+/**
+ * The target area of the run dialog: the agent cards, the prompt picker, or the setup box a project with nothing to test reads instead.
+ * @see specs/features/agent-testing/run-dialog.feature
+ * @see specs/features/agents/connected-agents-ui.feature
+ */
+
+import { chakra, VStack } from "@chakra-ui/react";
+import type { TargetValue } from "../../../../model/scenario-target.ts";
+import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
+import { getRoutePath } from "@langwatch/workflow-web/surfaces/workflow-routes";
+import { FieldLabel } from "../../../elements/agent-testing/shared/dialog-fields.tsx";
+import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
+import { RemoveBlockButton } from "../../../elements/agent-testing/shared/remove-block-button.tsx";
+import { type PromptEntry, PromptPicker } from "./prompt-picker.tsx";
+import { AgentBlocks, type RunDialogAgent, SetupAgentBox } from "./run-target-picker.tsx";
+import type { RunDialogMode } from "./run-dialog-types.ts";
+
+type TargetSectionProps = {
+  mode: RunDialogMode;
+  agents: RunDialogAgent[];
+  prompts: PromptEntry[];
+  target: TargetValue;
+  onSelect: (target: NonNullable<TargetValue>) => void;
+  onRemovePromptPicker: () => void;
+  onSetupAgent: () => void;
+};
+
+/** The way to the page where the agents of the project are set up. */
+function ConfigureAgentsLink() {
+  const { project } = useOrganizationTeamProject();
+  if (!project) return null;
+
+  return (
+    <chakra.a
+      href={getRoutePath({ projectSlug: project.slug, route: "agents" })}
+      target="_blank"
+      rel="noopener noreferrer"
+      marginLeft="auto"
+      display="flex"
+      alignItems="center"
+      gap={1}
+      fontSize="11.5px"
+      fontWeight="medium"
+      color={FG_MUTED}
+      _hover={{ color: "fg" }}
+      data-testid="run-dialog-configure-agents"
+    >
+      Configure
+    </chakra.a>
+  );
+}
+
+/** The agent cards, the prompt picker, or the setup box. */
+export function TargetSection(props: TargetSectionProps) {
+  const { mode, agents, prompts, target, onSelect } = props;
+
+  return (
+    <VStack align="stretch" gap={0} data-testid="run-dialog-target-section">
+      <FieldLabel>
+        {mode === "prompts" ? "Prompt to be tested" : "Agent to be tested"}
+        {mode === "prompts" ? (
+          <RemoveBlockButton
+            label="Remove the prompt picker"
+            onClick={props.onRemovePromptPicker}
+          />
+        ) : (
+          <ConfigureAgentsLink />
+        )}
+      </FieldLabel>
+      {mode === "prompts" ? (
+        <PromptPicker prompts={prompts} selected={target} onSelect={onSelect} />
+      ) : agents.length > 0 ? (
+        <AgentBlocks agents={agents} selected={target} onSelect={onSelect} />
+      ) : (
+        <SetupAgentBox onSetup={props.onSetupAgent} />
+      )}
+    </VStack>
+  );
+}

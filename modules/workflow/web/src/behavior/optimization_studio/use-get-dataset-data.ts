@@ -1,0 +1,101 @@
+import type { TRPCClientErrorLike } from "@trpc/client";
+import type { UseTRPCQueryResult } from "@trpc/react-query/shared";
+import { useMemo } from "react";
+import { useOrganizationTeamProject } from "../studio-host/use-organization-team-project.ts";
+import type { WorkflowApiRouter, RouterOutputs } from "../../model/workflow-api.ts";
+import type { DatasetColumns, DatasetRecordEntry } from "@langwatch/dataset-contract";
+import { api } from "../../model/workflow-api-client.ts";
+import type { Entry } from "@langwatch/workflow-contract";
+import { transposeColumnsFirstToRowsFirstWithId } from "@langwatch/workflow-contract";
+import { datasetDatabaseRecordsToInMemoryDataset } from "../../model/studio-dataset.utils.ts";
+
+export const useGetDatasetData = ({
+  dataset,
+  preview = false,
+}: {
+  dataset: Entry["dataset"];
+  preview?: boolean;
+}): {
+  rows: DatasetRecordEntry[];
+  columns: DatasetColumns;
+  query: UseTRPCQueryResult<
+    RouterOutputs["datasetRecord"]["getHead"],
+    TRPCClientErrorLike<WorkflowApiRouter>
+  >;
+  total: number | undefined;
+} => {
+  const { project } = useOrganizationTeamProject();
+  const databaseDataset = api.datasetRecord.getHead.useQuery(
+    { projectId: project?.id ?? "", datasetId: dataset?.id ?? "" },
+    {
+      enabled: !!project && !!dataset?.id && dataset?.id !== "",
+      refetchOnWindowFocus: false,
+      refetchOnMount: false,
+      staleTime: 1000 * 60 * 60,
+      // ADR-032 I-READY: a still-preparing/failed dataset read throws
+      // PRECONDITION_FAILED. Don't retry that — treat it as "no rows yet" (the
+      // hook returns `rows ?? []` below) instead of hammering the server.
+      retry: (failureCount, error) => {
+        if ((error as { data?: { code?: string } })?.data?.code === "PRECONDITION_FAILED") {
+          return false;
+        }
+        return failureCount < 3;
+      },
+      trpc: {
+        context: {
+          skipBatch: true,
+        },
+      },
+    },
+  );
+  const databaseDataset_ =
+    databaseDataset.data?.dataset && "datasetRecords" in databaseDataset.data.dataset
+      ? datasetDatabaseRecordsToInMemoryDataset(databaseDataset.data.dataset)
+      : undefined;
+
+  const data: { records: DatasetRecordEntry[]; columnTypes: DatasetColumns } | undefined =
+    useMemo(() => {
+      if (dataset?.id) {
+        return databaseDataset_
+          ? {
+              records: databaseDataset_.datasetRecords,
+              columnTypes: databaseDataset_.columnTypes.slice(0, preview ? 5 : undefined),
+            }
+          : undefined;
+      }
+
+      if (dataset?.inline) {
+        return {
+          records: transposeColumnsFirstToRowsFirstWithId(dataset.inline.records),
+          columnTypes: dataset.inline.columnTypes,
+        };
+      }
+
+      return undefined;
+    }, [dataset?.id, dataset?.inline, databaseDataset_, preview]);
+
+  const columnSet = useMemo(() => {
+    return new Set(data?.columnTypes.map((col) => col.name));
+  }, [data?.columnTypes]);
+
+  const rows: DatasetRecordEntry[] | undefined = useMemo(() => {
+    const rows = data ? data.records.slice(0, preview ? 5 : undefined) : undefined;
+
+    return rows?.map((row) => {
+      const row_ = Object.fromEntries(
+        Object.entries(row).filter(([key]) => key === "id" || columnSet.has(key)),
+      );
+
+      return row_;
+    }) as DatasetRecordEntry[];
+  }, [data, preview, columnSet]);
+
+  return {
+    rows: rows ?? [],
+    columns: data?.columnTypes ?? [],
+    query: databaseDataset,
+    total: dataset?.inline?.records
+      ? (Object.values(dataset?.inline.records)[0]?.length ?? 0)
+      : databaseDataset.data?.total,
+  };
+};

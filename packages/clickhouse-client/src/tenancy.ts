@@ -1,22 +1,7 @@
 /**
- * Tenant routing, fail-closed.
- *
- * Some organisations are served by their own ClickHouse instance rather than
- * the shared one. Getting that wrong in either direction is a data-leak class
- * of bug, not a performance one: routing tenant A's read at tenant B's server
- * returns B's rows, and routing a private tenant's write at the shared server
- * puts their data somewhere they did not agree to.
- *
- * So every decision here is explicit and every unknown is an error. There is no
- * "fall back to shared and hope" path, because the shared instance is exactly
- * where a mistake is least visible - the query succeeds and returns plausible
- * rows.
- *
- * The lookup from tenant to organisation is cached and the cache is bounded.
- * It does not expire, and that is deliberate rather than an omission: a
- * project belongs to a team and a team to an organisation, and neither link is
- * reassignable, so the answer is fixed once it is known. The bound exists for
- * memory alone, since a long-lived worker sees a great many tenants.
+ * Fail-closed tenant routing: a wrong route is a data-leak bug, not a
+ * performance one, so every unknown is an error — never a silent fallback
+ * to shared, which is where a mistake is least visible.
  */
 
 /** Where a tenant's statements should be sent. */
@@ -63,26 +48,17 @@ export interface RoutingTable {
   /** Env vars that were present but unusable, for the caller to report. */
   readonly skipped: readonly { envVar: string; reason: string }[];
   /**
-   * Env vars whose `<label>__<organizationId>` split was a guess, because the
-   * part before the last separator contains one too. The route was still
-   * created from the guess, but the caller should surface these loudly: if the
-   * guess is wrong the intended organisation has no route at all and its
-   * tenants fall through to the shared instance.
+   * A guessed `<label>__<organizationId>` split. Surface loudly: wrong, and
+   * the intended organisation's tenants fall through to shared.
    */
   readonly ambiguous: readonly { envVar: string; organizationId: string }[];
 }
 
 /**
- * Parse the routing table out of an environment bag.
- *
- * Pure and total: it never throws for a malformed entry, it collects those in
- * `skipped` so a caller can log them all at once rather than dying on the first
- * one at module load. The single exception is a duplicate organisation, which
- * is ambiguous rather than merely malformed - there is no safe way to pick.
+ * Pure and total: never throws for a malformed entry (collected in
+ * `skipped`), except a duplicate organisation — there's no safe way to pick.
  */
-export function parseRoutingTable(
-  env: Record<string, string | undefined>,
-): RoutingTable {
+export function parseRoutingTable(env: Record<string, string | undefined>): RoutingTable {
   const routes = new Map<string, string>();
   const source = new Map<string, string>();
   const skipped: { envVar: string; reason: string }[] = [];
@@ -98,22 +74,15 @@ export function parseRoutingTable(
 
     const suffix = envVar.slice(PRIVATE_ROUTE_ENV_PREFIX.length);
     const separator = suffix.lastIndexOf("__");
-    const organizationId =
-      separator >= 0 ? suffix.slice(separator + 2) : suffix;
+    const organizationId = separator >= 0 ? suffix.slice(separator + 2) : suffix;
 
     if (organizationId === "") {
       skipped.push({ envVar, reason: "no organization id in the name" });
       continue;
     }
 
-    // `<label>__<organizationId>` cannot be split unambiguously when either
-    // half may itself contain the separator, and taking the last one is a
-    // guess. Guessing wrong is not a parse error, it is a silent fail-open:
-    // the intended organisation gets no route, so every one of its tenants
-    // falls through to the shared instance and reads and writes there.
-    //
-    // Nothing here can tell which split was meant, so say so and let the
-    // operator disambiguate rather than discovering it as misplaced data.
+    // Guessing wrong here is a silent fail-open: the intended organisation
+    // gets no route and its tenants fall through to shared.
     if (suffix.slice(0, Math.max(separator, 0)).includes("__")) {
       ambiguous.push({ envVar, organizationId });
     }
@@ -134,9 +103,15 @@ export function parseRoutingTable(
   return { routes, skipped, ambiguous };
 }
 
+/**
+ * A user aggregate spans every organisation it belongs to, so membership
+ * must not decide where it lands — placed on shared with no lookup.
+ */
+export const PLATFORM_TENANT = "__platform__" as const;
+
 /** Resolves a tenant to its organisation. Backed by the control-plane database. */
 export interface TenantDirectory {
-  /** Null means "no such tenant", which is an error, never a shared fallback. */
+  /** Null means "no such tenant" — an error, never a shared fallback. */
   organizationForTenant(tenantId: string): Promise<string | null>;
 }
 
@@ -144,13 +119,8 @@ export interface TenantRouterOptions {
   table: RoutingTable;
   directory: TenantDirectory;
   /**
-   * Bounds memory. The oldest entry is dropped past this.
-   *
-   * This is the only reason the cache evicts. A tenant's organisation is fixed
-   * at creation - a project belongs to a team, a team to an organisation, and
-   * nothing reassigns either - so a cached answer cannot go stale and there is
-   * no expiry to get right. What remains is a long-lived worker that sees many
-   * tenants, which without a bound grows this map for the life of the process.
+   * Bounds memory only — a cached answer never goes stale (org membership
+   * is fixed at creation), so eviction is the only reason to drop one.
    */
   maxCacheEntries?: number | undefined;
 }
@@ -218,10 +188,9 @@ export function createTenantRouter({
       if (tenantId === "") throw new UnknownTenantError(tenantId);
 
       const organizationId = await organizationFor(tenantId);
+      if (organizationId === PLATFORM_TENANT) return { kind: "shared" };
       const url = table.routes.get(organizationId);
-      return url === undefined
-        ? { kind: "shared" }
-        : { kind: "private", organizationId, url };
+      return url === undefined ? { kind: "shared" } : { kind: "private", organizationId, url };
     },
     invalidateAll() {
       cache.clear();

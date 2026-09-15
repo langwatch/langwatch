@@ -1,0 +1,155 @@
+import {
+  CONTRACT_ARTIFACT,
+  CONTRACT_ARTIFACT_SUFFIX,
+  PROCESS_MANAGER_SERVICE_PATTERN,
+  PURE_VALUE_CONSTRUCTORS,
+  RULES_PATTERN,
+  SERVER_HOMES,
+  SERVER_ONLY_CONTRACT_ARTIFACT,
+  SERVER_PATTERNS,
+  isLowerKebabFilename,
+  isFeatureApiContract,
+} from "../../grammar/feature-layout-policy.mjs";
+import { defineRule } from "../define-rule.mjs";
+
+function definitionOf(context, identifier) {
+  let scope = context.sourceCode.getScope(identifier);
+  while (scope && !scope.set.has(identifier.name)) scope = scope.upper;
+  return scope?.set.get(identifier.name)?.defs[0];
+}
+
+function isPureThrownError(context, node) {
+  if (node.parent?.type !== "ThrowStatement" || node.parent.argument !== node) return false;
+  if (node.callee.type !== "Identifier") return false;
+
+  const definition = definitionOf(context, node.callee);
+  if (node.callee.name === "Error" && !definition) return true;
+  if (definition?.type !== "ImportBinding") return false;
+
+  const declaration = definition.parent;
+  const imported = definition.node;
+  if (declaration.importKind === "type" || imported.importKind === "type") return false;
+  if (imported.type !== "ImportSpecifier") return false;
+  const name = imported.imported.name ?? imported.imported.value;
+  return (
+    /Error$/.test(name) && /^@langwatch\/[^/]+-contract(?:\/|$)/.test(declaration.source.value)
+  );
+}
+
+function contractVisitors(context, source) {
+  const { name, sourcePath } = source;
+  if (name === "index.ts" || isFeatureApiContract(sourcePath, source.feature)) return {};
+  const report = (messageId, data = {}) => ({
+    Program(node) {
+      context.report({ node, messageId, data: { name, ...data } });
+    },
+  });
+  if (/^(?:app|commands|errors|events|queries|service)\.ts$/.test(name)) {
+    return report("contractMissingSubject", { artifact: name.replace(/\.ts$/, "") });
+  }
+  if (SERVER_ONLY_CONTRACT_ARTIFACT.test(name)) return report("contractServerArtifact");
+  const malformedArtifact =
+    CONTRACT_ARTIFACT_SUFFIX.test(name) &&
+    !CONTRACT_ARTIFACT.test(name) &&
+    isLowerKebabFilename(name);
+  if (malformedArtifact) {
+    return report("contractFilename");
+  }
+  return {};
+}
+
+export const featureSourceLayoutRule = defineRule({
+  name: "feature-source-layout",
+  kind: "problem",
+  messages: {
+    contractMissingSubject: {
+      what: "Rename `{{name}}` to `<subject>.{{artifact}}.ts`, e.g. `agent.commands.ts`.",
+      fix: "Add the subject to the filename.",
+    },
+    contractServerArtifact: {
+      what: "Server artifact {{name}} cannot live in contract source.",
+      fix: "Move it to `server/src/<dir>/`.",
+    },
+    contractFilename: {
+      what: "Rename `{{name}}` to `<subject>.<artifact>.ts` in lower kebab case, e.g. `trace-search.service.ts`.",
+      fix: "Use one of the canonical contract artifacts.",
+    },
+    processManagerService: {
+      what: "Rename `{{path}}` to `processes/<subject>.process.ts`; a process manager is not a service.",
+      fix: "Move the file to `processes/` and rename its `.service.ts` suffix to `.process.ts`.",
+    },
+    rulesImpurity: {
+      what: "Rules module {{path}} may only export functions and constants (found {{found}}).",
+      fix: "Move the class or `new` into a service or adapter and pass its result in.",
+    },
+    serverPath: {
+      what: `\`{{path}}\` has no home in layout v0. Only this shape is allowed: ${SERVER_HOMES}.`,
+      fix: "Move it to the directory matching its artifact suffix.",
+    },
+  },
+  create(context, file) {
+    const source = file.strictSource;
+    if (!source) return {};
+    const { sourcePath, role } = source;
+
+    if (role === "contract") return contractVisitors(context, source);
+
+    if (role !== "server") return {};
+
+    if (PROCESS_MANAGER_SERVICE_PATTERN.test(sourcePath)) {
+      return {
+        Program(node) {
+          context.report({
+            node,
+            messageId: "processManagerService",
+            data: { path: sourcePath },
+          });
+        },
+      };
+    }
+
+    if (RULES_PATTERN.test(sourcePath)) {
+      let reported = false;
+      const report = (node, found) => {
+        if (reported) return;
+        reported = true;
+        context.report({
+          node,
+          messageId: "rulesImpurity",
+          data: { path: sourcePath, found },
+        });
+      };
+      return {
+        ClassDeclaration(node) {
+          report(node, "a class");
+        },
+        ClassExpression(node) {
+          report(node, "a class");
+        },
+        NewExpression(node) {
+          const pureValue =
+            node.callee?.type === "Identifier" &&
+            PURE_VALUE_CONSTRUCTORS.has(node.callee.name) &&
+            !definitionOf(context, node.callee);
+          if (pureValue || isPureThrownError(context, node)) {
+            return;
+          }
+          report(node, "a `new` expression");
+        },
+      };
+    }
+
+    const hasServerHome = SERVER_PATTERNS.some((pattern) => pattern.test(sourcePath));
+    if (hasServerHome) return {};
+
+    return {
+      Program(node) {
+        context.report({
+          node,
+          messageId: "serverPath",
+          data: { path: sourcePath },
+        });
+      },
+    };
+  },
+});

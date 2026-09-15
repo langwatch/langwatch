@@ -1,0 +1,179 @@
+import { readFileSync, readdirSync } from "node:fs";
+import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { describe, expect, it } from "vitest";
+import { expressive } from "../email-layout.tsx";
+import { mailTemplates } from "../index.ts";
+import { renderMailTemplate, type MailTemplate } from "../registry.ts";
+
+/**
+ * Snapshot tests on purpose: the rendered email is the product. Assertions check what
+ * snapshots cannot (links survived, subjects exist, dark mode present).
+ */
+
+const templatesDir = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+
+/** Every fixture of every template, flattened once. */
+const everyFixture: readonly {
+  template: MailTemplate;
+  fixture: string;
+  props: unknown;
+}[] = mailTemplates.flatMap((template) =>
+  template.fixtures.map((fixture) => ({
+    template,
+    fixture: fixture.name,
+    props: fixture.props,
+  })),
+);
+
+/** Every `https://…` or `mailto:` the props carry, wherever they carry it. */
+const linksIn = (props: unknown): string[] => {
+  if (typeof props === "string") {
+    return /^(https?:\/\/|mailto:)/.test(props) ? [props] : [];
+  }
+  if (Array.isArray(props)) return props.flatMap(linksIn);
+  if (typeof props === "object" && props !== null) {
+    return Object.values(props).flatMap(linksIn);
+  }
+  return [];
+};
+
+describe("given the mail template registry", () => {
+  describe("when the registry is compared against the templates folder", () => {
+    /**
+     * The registry is the discovery surface, so a template file it does not
+     * reach is invisible to the studio and to anybody reading the list. The
+     * check is on the barrel's own source because that is the single place a
+     * new file has to be named, and naming it is the whole of registering it.
+     *
+     * @scenario "A template that is not registered is caught"
+     */
+    it("lists every template component file", () => {
+      const barrel = readFileSync(resolve(templatesDir, "index.ts"), "utf8");
+      const componentFiles = readdirSync(templatesDir)
+        .filter((entry) => entry.endsWith(".tsx"))
+        .filter((entry) => entry !== "email-layout.tsx");
+
+      const unreached = componentFiles.filter((file) => !barrel.includes(`"./${file}"`));
+
+      expect(unreached).toEqual([]);
+    });
+
+    it("gives every template a unique identifier", () => {
+      const ids = mailTemplates.map((template) => template.id);
+      expect(new Set(ids).size).toBe(ids.length);
+    });
+
+    it("gives every template at least one fixture", () => {
+      const barren = mailTemplates.filter((template) => template.fixtures.length === 0);
+      expect(barren.map((template) => template.id)).toEqual([]);
+    });
+  });
+
+  describe("when props do not match the schema", () => {
+    /** @scenario "Props that do not match the schema are refused" */
+    it("refuses to render rather than leaving a gap in the message", () => {
+      const [template] = mailTemplates;
+      expect(template).toBeDefined();
+      expect(() => template?.element({})).toThrow();
+    });
+  });
+});
+
+describe.each(everyFixture)(
+  "given the $template.id email rendered from the $fixture fixture",
+  ({ template, fixture, props }) => {
+    describe("when it is rendered", () => {
+      /** @scenario "Every fixture renders an email" */
+      it("completes without failing", async () => {
+        await expect(renderMailTemplate(template, props)).resolves.toBeDefined();
+      });
+
+      /** @scenario "Every rendered email carries a subject line" */
+      it("comes back with a subject line", async () => {
+        const { subject } = await renderMailTemplate(template, props);
+        expect(subject.trim()).not.toBe("");
+      });
+
+      /** @scenario "Every rendered email has a plain text alternative" */
+      it("comes back with a plain text body", async () => {
+        const { text } = await renderMailTemplate(template, props);
+        expect(text.trim()).not.toBe("");
+      });
+
+      /** @scenario "Every link the props carry reaches the reader" */
+      it("carries every link address the props gave it", async () => {
+        const { html } = await renderMailTemplate(template, props);
+        for (const link of linksIn(props)) {
+          expect(html).toContain(link);
+        }
+      });
+
+      /** @scenario "Every email offers a dark colour scheme" */
+      it("declares both colour schemes and carries the dark rules", async () => {
+        const { html } = await renderMailTemplate(template, props);
+        expect(html).toContain('name="color-scheme"');
+        expect(html).toContain("color-scheme: light dark");
+        expect(html).toContain("@media (prefers-color-scheme: dark)");
+      });
+
+      /** @scenario "Every email carries the LangWatch wordmark" */
+      it("carries the wordmark with the brand name as its alternative text", async () => {
+        const { html } = await renderMailTemplate(template, props);
+        expect(html).toContain('alt="LangWatch"');
+      });
+
+      /**
+       * `Img` writes an inline `display: block` that a class rule without
+       * `!important` cannot beat, so the dark cut used to draw through on the
+       * cream page as a washed-out second logo under the real one.
+       *
+       * @scenario "Only the wordmark for the reader's colour scheme draws"
+       */
+      it("hides the wordmark cut that does not belong to the ground", async () => {
+        const { html } = await renderMailTemplate(template, props);
+        const drawing = [...html.matchAll(/<img[^>]*>/g)]
+          .map(([tag]) => tag)
+          .filter((tag) => /style="[^"]*display:block/.test(tag));
+
+        expect(drawing).toHaveLength(1);
+        expect(drawing[0]).toContain('class="lw-light-only"');
+        expect(html).toContain(".lw-dark-only { display: none !important;");
+        expect(html).toContain(".lw-light-only { display: none !important;");
+      });
+
+      /**
+       * `Body` keeps the class on `<body>` and copies its style onto an inner
+       * cell, so the cell that draws the frame around the card needs a class of
+       * its own or the page stays cream around a near-black card.
+       *
+       * @scenario "The dark cut paints the page around the card, not only the card"
+       */
+      it("gives the page ground a dark rule of its own", async () => {
+        const { html } = await renderMailTemplate(template, props);
+        expect(html).toContain('class="lw-page"');
+        expect(html).toContain(
+          `.lw-page { background-color: ${expressive.dark.page} !important; }`,
+        );
+      });
+
+      /**
+       * The application's orange is `#ED8926` and the expressive one is
+       * `#f56b1a`. Finding the first in a mail means a template drifted back
+       * onto the productive system.
+       *
+       * @scenario "No email is dressed in the application's design system"
+       */
+      it("uses no colour from the application's own system", async () => {
+        const { html } = await renderMailTemplate(template, props);
+        expect(html.toLowerCase()).not.toContain("#ed8926");
+      });
+
+      /** @scenario "The rendered email is pinned, because the output is the product" */
+      it("matches the stored snapshot", async () => {
+        const { html } = await renderMailTemplate(template, props);
+        expect(html).toMatchSnapshot(`${template.id} — ${fixture}`);
+      });
+    });
+  },
+);

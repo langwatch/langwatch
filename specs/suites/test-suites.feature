@@ -184,6 +184,14 @@ Feature: A test suite groups scenarios
     When the suite editor tries to name the scenarios directly
     Then the change is refused with "validation_error"
 
+  # The list route sends includeArchived; the service parsed the whole input
+  # through a strict id schema and refused the key it then read.
+  @unit
+  Scenario: Listing test suites with archived ones included answers
+    Given a project with archived and active test suites
+    When the test suites are listed with archived ones included
+    Then the repository is asked for that project with archived suites included
+
   # --- Fields on a test suite ---
 
   # A test suite declares typed fields beyond situation and criteria, and a

@@ -4,7 +4,7 @@ User-facing resource IDs (URLs, exports, support tickets, API contracts) use **K
 
 ```typescript
 import { generate } from "xksuid";
-import { KSUID_RESOURCES } from "~/utils/constants";
+import { KSUID_RESOURCES } from "./model/constants"; // package-local; see below
 
 const id = generate(KSUID_RESOURCES.MODEL_PROVIDER).toString();
 // → "provider_2lT9b...sortable-by-creation-time"
@@ -18,15 +18,17 @@ const id = generate(KSUID_RESOURCES.MODEL_PROVIDER).toString();
 
 ## When to use KSUID vs alternatives
 
-| ID shape | Use when |
-|---|---|
-| `generate(KSUID_RESOURCES.X).toString()` at service/repo create | User-facing entities: anything that shows up in a URL, an API response, an export, or a webhook |
+| ID shape                                                            | Use when                                                                                                                  |
+| ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `generate(KSUID_RESOURCES.X).toString()` at service/repo create     | User-facing entities: anything that shows up in a URL, an API response, an export, or a webhook                           |
 | `@default(nanoid())` / `@default(cuid())` left on the Prisma column | Internal join tables (`ModelProviderScope`, `ModelDefaultConfigScope`) — never shown to users, never linked to externally |
-| Bare `nanoid()` in seed scripts / one-shot migrations | Deterministic ids during data lift, not used at runtime |
+| Bare `nanoid()` in seed scripts / one-shot migrations               | Deterministic ids during data lift, not used at runtime                                                                   |
 
 ## Where to add a new resource type
 
-`platform/app/src/utils/constants.ts`:
+`KSUID_RESOURCES` (today duplicated in `modules/trace/web/src/model/constants.ts`
+and `modules/workflow/web/src/model/constants.ts` — add the prefix to
+both until they are folded back into one module):
 
 ```typescript
 export const KSUID_RESOURCES = {
@@ -44,7 +46,7 @@ Prefixes are short (≤8 chars), lowercase, no punctuation. Avoid abbreviations 
 The repository layer is the right place. Service decides "we need a new row," repository allocates the id + writes the row:
 
 ```typescript
-// model-providers/modelProvider.repository.ts
+// repositories/prisma/prisma.model-provider.repository.ts
 async create(input: CreateModelProviderInput): Promise<ModelProvider> {
   return await this.prisma.modelProvider.create({
     data: {

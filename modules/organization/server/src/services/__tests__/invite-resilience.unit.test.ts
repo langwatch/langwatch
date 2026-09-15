@@ -1,0 +1,395 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import type { AuthzGrantsService } from "@langwatch/authz-contract";
+import { InviteNotFoundError } from "@langwatch/organization-contract";
+import { InviteService } from "../invite.service.ts";
+import { resolveInviteDisplayStatus } from "../../rules/invite-display-status.rules.ts";
+import { PrismaOrganizationInviteRepository } from "../../repositories/prisma/prisma.organization-invite.repository.ts";
+
+/**
+ * D11 — resilient invitations (specs/identity/resilient-invitations.feature).
+ * The claim discipline and the visible states, at the service layer.
+ */
+
+const ledger = {
+  attachBindings: vi.fn(),
+  revokeBindingsWhere: vi.fn(),
+};
+
+function makePendingInvite(overrides: Record<string, unknown> = {}) {
+  return {
+    id: "inv-race-1",
+    email: "sam@acme.com",
+    inviteCode: "code-race-1",
+    status: "PENDING",
+    expiration: new Date(Date.now() + 86400000),
+    organizationId: "org-1",
+    teamIds: "team-1",
+    teamAssignments: null,
+    role: "MEMBER",
+    requestedBy: "user-inviter",
+    subscriptionId: null,
+    ...overrides,
+  } as any;
+}
+
+describe("InviteService resilience", () => {
+  let mockPrisma: any;
+  let service: InviteService;
+
+  beforeEach(() => {
+    ledger.attachBindings.mockReset();
+    ledger.revokeBindingsWhere.mockReset();
+    ledger.attachBindings.mockResolvedValue({ attached: [], duplicates: [] });
+    ledger.revokeBindingsWhere.mockResolvedValue(0);
+
+    mockPrisma = {
+      $connect: vi.fn(),
+      $transaction: (arg: unknown) =>
+        typeof arg === "function"
+          ? (arg as (tx: unknown) => unknown)(mockPrisma)
+          : Promise.all(arg as Promise<unknown>[]),
+      organizationInvite: {
+        findFirst: vi.fn(),
+        findUnique: vi.fn(),
+        findMany: vi.fn(),
+        create: vi.fn(),
+        update: vi.fn(),
+        updateMany: vi.fn(),
+      },
+      organizationUser: {
+        createMany: vi.fn(),
+        findFirst: vi.fn(),
+        findUnique: vi.fn(),
+      },
+      organization: { findFirst: vi.fn() },
+      customRole: { findMany: vi.fn() },
+    };
+
+    service = InviteService.create({
+      invites: PrismaOrganizationInviteRepository.create({ database: mockPrisma }),
+      seats: { getMemberCount: vi.fn(), getMembersLiteCount: vi.fn() } as any,
+      plans: { getActivePlan: vi.fn() } as any,
+      grants: ledger as unknown as AuthzGrantsService,
+      roles: {} as any,
+      throttle: {} as any,
+      baseHost: "https://app.langwatch.ai",
+    });
+  });
+
+  describe("given two acceptance attempts hold the same PENDING invite", () => {
+    describe("when both try to claim the row", () => {
+      /** @scenario "Two racers on one invitation cannot both win" */
+      it("refuses the loser with a stale-code refusal and writes them no membership", async () => {
+        // The loser's conditional claim matches nothing: the winner's
+        // transaction already moved the row off (PENDING, code-race-1).
+        mockPrisma.organizationInvite.updateMany.mockResolvedValue({
+          count: 0,
+        });
+        mockPrisma.organizationInvite.findUnique.mockResolvedValue({
+          status: "ACCEPTED",
+        });
+        // The loser is a different person: they hold no membership, so the
+        // claim failure is not their own retry to repair.
+        mockPrisma.organizationUser.findUnique.mockResolvedValue(null);
+
+        await expect(
+          service.applyInvite({
+            userId: "user-loser",
+            invite: makePendingInvite(),
+          }),
+        ).rejects.toBeInstanceOf(InviteNotFoundError);
+
+        expect(mockPrisma.organizationUser.createMany).not.toHaveBeenCalled();
+        expect(ledger.attachBindings).not.toHaveBeenCalled();
+      });
+
+      it("repairs instead of refusing when the loser is the winner racing itself", async () => {
+        mockPrisma.organizationInvite.updateMany.mockResolvedValue({
+          count: 0,
+        });
+        mockPrisma.organizationInvite.findUnique.mockResolvedValue({
+          status: "ACCEPTED",
+        });
+        mockPrisma.organizationUser.findUnique.mockResolvedValue({
+          userId: "user-winner",
+        });
+
+        await service.applyInvite({
+          userId: "user-winner",
+          invite: makePendingInvite(),
+        });
+
+        expect(ledger.attachBindings).toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe("given an acceptance already attached membership through the grants ledger", () => {
+    describe("when the acceptance is retried", () => {
+      /** @scenario "Membership lands exactly once however often acceptance retries" */
+      it("re-applies nothing that already landed and leaves the caller a member exactly once", async () => {
+        mockPrisma.organizationUser.findUnique.mockResolvedValue({
+          userId: "user-winner",
+        });
+
+        await service.applyInvite({
+          userId: "user-winner",
+          invite: makePendingInvite({ status: "ACCEPTED" }),
+        });
+
+        // Already ACCEPTED, so the row is never re-claimed and no second
+        // membership row is written — only the idempotent grant tail runs.
+        expect(mockPrisma.organizationInvite.updateMany).not.toHaveBeenCalled();
+        expect(mockPrisma.organizationUser.createMany).not.toHaveBeenCalled();
+        expect(ledger.attachBindings).toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe("given an admin revokes an invitation", () => {
+    describe("when the revocation runs", () => {
+      /** @scenario "A revoked invitation ends the journey quietly" */
+      it("keeps the row as a REVOKED state instead of deleting it", async () => {
+        mockPrisma.organizationInvite.updateMany.mockResolvedValue({
+          count: 1,
+        });
+
+        await service.revokeInvite({
+          organizationId: "org-1",
+          inviteId: "inv-race-1",
+        });
+
+        expect(mockPrisma.organizationInvite.updateMany).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: expect.objectContaining({
+              id: "inv-race-1",
+              organizationId: "org-1",
+            }),
+            data: { status: "REVOKED" },
+          }),
+        );
+      });
+
+      it("refuses to revoke an invitation that was already accepted", async () => {
+        mockPrisma.organizationInvite.updateMany.mockResolvedValue({
+          count: 0,
+        });
+
+        await expect(
+          service.revokeInvite({
+            organizationId: "org-1",
+            inviteId: "inv-accepted",
+          }),
+        ).rejects.toBeInstanceOf(InviteNotFoundError);
+      });
+    });
+  });
+
+  describe("given an expired invitation the inviter resends", () => {
+    beforeEach(() => {
+      mockPrisma.organizationInvite.findFirst.mockResolvedValue({
+        ...makePendingInvite(),
+        expiration: new Date(Date.now() - 1000),
+        organization: { id: "org-1", name: "Acme" },
+      });
+    });
+
+    describe("when the resend runs", () => {
+      /**
+       * @scenario "A leaked stale link dies on resend"
+       * @scenario "One click resends an expired invitation"
+       */
+      it("claims the row on the code it read and mints a fresh one", async () => {
+        mockPrisma.organizationInvite.updateMany.mockResolvedValue({
+          count: 1,
+        });
+
+        const { invite } = await service.resendInvite({
+          organizationId: "org-1",
+          inviteId: "inv-race-1",
+        });
+
+        // The claim names the OLD code — that conditionality is what makes
+        // the rotation a revocation: after it lands, the old link matches
+        // no row anywhere.
+        expect(mockPrisma.organizationInvite.updateMany).toHaveBeenCalledWith(
+          expect.objectContaining({
+            where: expect.objectContaining({
+              status: "PENDING",
+              inviteCode: "code-race-1",
+            }),
+            data: expect.objectContaining({
+              inviteCode: expect.not.stringMatching(/^code-race-1$/),
+              expiration: expect.any(Date),
+            }),
+          }),
+        );
+        expect(invite.inviteCode).not.toBe("code-race-1");
+        expect(invite.expiration!.getTime()).toBeGreaterThan(Date.now() + 13 * 24 * 60 * 60 * 1000);
+      });
+
+      it("loses quietly when another admin's resend claimed the row first", async () => {
+        mockPrisma.organizationInvite.updateMany.mockResolvedValue({
+          count: 0,
+        });
+
+        await expect(
+          service.resendInvite({
+            organizationId: "org-1",
+            inviteId: "inv-race-1",
+          }),
+        ).rejects.toBeInstanceOf(InviteNotFoundError);
+      });
+
+      it("refuses to resend a revoked invitation", async () => {
+        mockPrisma.organizationInvite.findFirst.mockResolvedValue({
+          ...makePendingInvite(),
+          status: "REVOKED",
+          organization: { id: "org-1", name: "Acme" },
+        });
+
+        await expect(
+          service.resendInvite({
+            organizationId: "org-1",
+            inviteId: "inv-race-1",
+          }),
+        ).rejects.toBeInstanceOf(InviteNotFoundError);
+        expect(mockPrisma.organizationInvite.updateMany).not.toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe("given a pending invitation the inviter extends", () => {
+    beforeEach(() => {
+      mockPrisma.organizationInvite.findFirst.mockResolvedValue({
+        ...makePendingInvite(),
+        expiration: new Date(Date.now() - 1000),
+        organization: { id: "org-1", name: "Acme" },
+      });
+    });
+
+    describe("when the extend runs", () => {
+      it("keeps the code and mails nothing, only pushing the expiry out", async () => {
+        mockPrisma.organizationInvite.updateMany.mockResolvedValue({
+          count: 1,
+        });
+
+        const { invite } = await service.extendInvite({
+          organizationId: "org-1",
+          inviteId: "inv-race-1",
+        });
+
+        // Unlike resendInvite, nothing about the code changes and nothing
+        // conditions the update on it — extending is meant to work on the
+        // exact link already sitting in an inbox.
+        expect(mockPrisma.organizationInvite.updateMany).toHaveBeenCalledWith({
+          where: { id: "inv-race-1", organizationId: "org-1", status: "PENDING" },
+          data: { expiration: expect.any(Date) },
+        });
+        expect(invite.inviteCode).toBe("code-race-1");
+        expect(invite.expiration!.getTime()).toBeGreaterThan(Date.now() + 13 * 24 * 60 * 60 * 1000);
+      });
+
+      it("loses quietly when the invite stopped being pending under it", async () => {
+        mockPrisma.organizationInvite.updateMany.mockResolvedValue({
+          count: 0,
+        });
+
+        await expect(
+          service.extendInvite({
+            organizationId: "org-1",
+            inviteId: "inv-race-1",
+          }),
+        ).rejects.toBeInstanceOf(InviteNotFoundError);
+      });
+
+      it("refuses to extend a revoked invitation", async () => {
+        mockPrisma.organizationInvite.findFirst.mockResolvedValue({
+          ...makePendingInvite(),
+          status: "REVOKED",
+          organization: { id: "org-1", name: "Acme" },
+        });
+
+        await expect(
+          service.extendInvite({
+            organizationId: "org-1",
+            inviteId: "inv-race-1",
+          }),
+        ).rejects.toBeInstanceOf(InviteNotFoundError);
+        expect(mockPrisma.organizationInvite.updateMany).not.toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe("given the production invite-expired-mid-debug support case", () => {
+    describe("when the inviter resends and the invitee accepts via any verified method", () => {
+      /** @scenario "The invite-expired-mid-debug support case replays green" */
+      it("lands membership without an ops action", async () => {
+        mockPrisma.organizationInvite.findFirst.mockResolvedValue({
+          ...makePendingInvite(),
+          expiration: new Date(Date.now() - 1000),
+          organization: { id: "org-1", name: "Acme" },
+        });
+        mockPrisma.organizationInvite.updateMany.mockResolvedValueOnce({ count: 1 });
+
+        const { invite: resent } = await service.resendInvite({
+          organizationId: "org-1",
+          inviteId: "inv-race-1",
+        });
+
+        const match = InviteService.matchInviteToAcceptor({
+          inviteEmail: resent.email,
+          sessionEmail: "sam@work.other",
+          matchable: [{ identifierId: "idf_debug", value: resent.email }],
+        });
+        expect(match.matches).toBe(true);
+
+        mockPrisma.organizationInvite.updateMany.mockResolvedValue({ count: 1 });
+        await service.applyInvite({
+          userId: "user-invitee",
+          invite: resent,
+          viaIdentifierId: match.viaIdentifierId,
+        });
+
+        expect(mockPrisma.organizationUser.createMany).toHaveBeenCalled();
+        expect(ledger.attachBindings).toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe("given the states a person sees", () => {
+    describe("when an invitation's expiry has passed", () => {
+      it("derives EXPIRED from a PENDING row past its expiration", () => {
+        const past = new Date(Date.now() - 1000);
+        expect(resolveInviteDisplayStatus({ status: "PENDING", expiration: past })).toBe("EXPIRED");
+      });
+
+      /** @scenario "An invitation expires visibly after fourteen days" */
+      it("shows the invite as EXPIRED with its expiry date on the members page", async () => {
+        const past = new Date(Date.now() - 1000);
+        mockPrisma.organizationInvite.findMany.mockResolvedValue([
+          { ...makePendingInvite(), expiration: past, requestedByUser: null },
+        ]);
+
+        const invites = await service.listInvites({ organizationId: "org-1" });
+
+        expect(invites).toHaveLength(1);
+        expect(invites[0]!.displayStatus).toBe("EXPIRED");
+        expect(invites[0]!.expiration).toEqual(past);
+      });
+
+      it("leaves every other state alone", () => {
+        const past = new Date(Date.now() - 1000);
+        const future = new Date(Date.now() + 1000);
+        expect(resolveInviteDisplayStatus({ status: "PENDING", expiration: future })).toBe(
+          "PENDING",
+        );
+        expect(resolveInviteDisplayStatus({ status: "PENDING", expiration: null })).toBe("PENDING");
+        expect(resolveInviteDisplayStatus({ status: "ACCEPTED", expiration: past })).toBe(
+          "ACCEPTED",
+        );
+        expect(resolveInviteDisplayStatus({ status: "REVOKED", expiration: past })).toBe("REVOKED");
+      });
+    });
+  });
+});

@@ -1,0 +1,19 @@
+/** SCIM management page key: `organization:manage`. */
+
+import { scimScreens } from "@langwatch/enterprise-scim-web/scim";
+import type { ComponentType } from "react";
+
+import type { UiPageLoaderRegistry } from "../../../../behavior/ui-page-loaders";
+import { uiPage } from "../../../../ui/sections/ui-page";
+import { ScimHost } from "./scim-host";
+
+/** The grant the platform page asked for, unchanged. */
+export const SCIM_PAGE_PERMISSION = "organization:manage";
+
+export const scimPageLoaders: UiPageLoaderRegistry = {
+  "pages/settings/scim": uiPage({
+    screen: async () => ({ default: (await scimScreens.scim()).default as ComponentType }),
+    host: ScimHost,
+    permission: SCIM_PAGE_PERMISSION,
+  }),
+};

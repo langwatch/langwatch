@@ -1,0 +1,124 @@
+import { Box, Button, HStack, Icon, Spacer, Text } from "@chakra-ui/react";
+import { keyframes } from "@emotion/react";
+import { CircleAlert, Swords } from "lucide-react";
+import { useMemo } from "react";
+
+import { Tooltip } from "@langwatch/design-system/tooltip";
+import { useEvaluationsV3Store } from "../../../behavior/experiments-v3/use-evaluations-v3-store.ts";
+import { useOpenComparisonEditor } from "../../../behavior/experiments-v3/use-open-evaluator-editor.ts";
+import { useTargetNames } from "../../../behavior/experiments-v3/use-target-name.ts";
+import { computeComparisonAggregate } from "@langwatch/experiment-contract";
+import { getEvaluatorMissingMappings } from "../../../model/experiments-v3/mapping-validation.ts";
+import { toComparisonConfig } from "@langwatch/experiment-contract";
+import { disambiguateNames } from "@langwatch/experiment-contract";
+import { ComparisonScoreboard } from "../../elements/experiments-v3/TargetSection/comparison-scoreboard.tsx";
+
+// Matches the pulse used for the equivalent per-target alert
+// (target-header.tsx) — same visual language for "needs your attention".
+const pulseAnimation = keyframes`
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.2); }
+`;
+
+/**
+ * Header for a chip-style comparison evaluator's dedicated result column.
+ */
+export function ComparisonColumnHeader({
+  evaluatorId,
+  name,
+}: {
+  evaluatorId: string;
+  name: string;
+}) {
+  const evaluator = useEvaluationsV3Store((state) =>
+    state.evaluators.find((e) => e.id === evaluatorId),
+  );
+  const results = useEvaluationsV3Store((state) => state.results);
+  const allTargets = useEvaluationsV3Store((state) => state.targets);
+  const activeDatasetId = useEvaluationsV3Store((state) => state.activeDatasetId);
+
+  const comparison = evaluator ? toComparisonConfig(evaluator) : undefined;
+  const variantIds = comparison?.variants;
+
+  const variantTargets = useMemo(
+    () => (variantIds ?? []).map((id) => allTargets.find((t) => t.id === id)),
+    [allTargets, variantIds],
+  );
+  const variantNames = useTargetNames(variantTargets);
+  const variantDisplayNames = useMemo(
+    () =>
+      disambiguateNames(
+        variantNames.map((variantName, i) => variantName || variantIds?.[i] || `Variant ${i + 1}`),
+      ),
+    [variantNames, variantIds],
+  );
+
+  // Chip-style verdicts hang under the first variant's column. Only rows that
+  // produced one can be tallied, so that array's length is the row count the
+  // aggregate needs — no dataset lookup required.
+  const anchorVariantId = variantIds?.[0];
+  const rowCount = anchorVariantId
+    ? (results.evaluatorResults[anchorVariantId]?.[evaluatorId]?.length ?? 0)
+    : 0;
+
+  const aggregate = useMemo(
+    () => (evaluator ? computeComparisonAggregate(evaluator, results, rowCount) : null),
+    [evaluator, results, rowCount],
+  );
+
+  const openComparisonEditor = useOpenComparisonEditor();
+
+  // This is the only surface showing missing config for chip-style comparisons.
+  const hasMissingMappings =
+    !!evaluator && !getEvaluatorMissingMappings(evaluator, activeDatasetId, "").isValid;
+
+  return (
+    <HStack gap={1.5} width="full">
+      <Button
+        variant="ghost"
+        size="xs"
+        paddingX={1}
+        marginLeft={-1}
+        height="auto"
+        fontWeight="medium"
+        disabled={!evaluator}
+        onClick={() => evaluator && openComparisonEditor(evaluator)}
+        data-testid="comparison-column-header-edit"
+      >
+        <Icon as={Swords} color="fg.muted" boxSize="14px" />
+        <Text fontSize="13px" fontWeight="medium">
+          {name}
+        </Text>
+      </Button>
+      {hasMissingMappings && (
+        <Tooltip
+          content="Needs configuration — click to pick variants"
+          positioning={{ placement: "top" }}
+          openDelay={0}
+          showArrow
+        >
+          <Box
+            css={{ animation: `${pulseAnimation} 2s ease-in-out infinite` }}
+            flexShrink={0}
+            data-testid="comparison-missing-mapping-alert"
+            onClick={() => evaluator && openComparisonEditor(evaluator)}
+            cursor="pointer"
+            _hover={{ transform: "scale(1.2)" }}
+            transition="transform 0.15s"
+          >
+            <Icon as={CircleAlert} color="yellow.fg" boxSize={4} />
+          </Box>
+        </Tooltip>
+      )}
+      <Spacer />
+      {aggregate && (
+        <ComparisonScoreboard
+          aggregate={aggregate}
+          variantTargets={variantTargets}
+          variantNames={variantNames}
+          variantDisplayNames={variantDisplayNames}
+        />
+      )}
+    </HStack>
+  );
+}

@@ -11,7 +11,7 @@ import (
 
 // The process watch (ADR-095): every daemon tick samples the machine's
 // dev-tooling processes — the TypeScript compiler (`tsc` or `tsgo`, one
-// class), gopls, biome, vitest workers, node, bun, claude — however they were
+// class), gopls, oxlint, vitest workers, node, bun, claude — however they were
 // spawned, ships the footprint to the local observability stack, and enforces
 // limits on the one class that has them (the compiler). Admission controls
 // bound how much tooling *starts*; this bounds how much *exists*, and records

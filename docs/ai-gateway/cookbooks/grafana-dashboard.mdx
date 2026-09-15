@@ -12,17 +12,17 @@ Pair it with [Prometheus alerts](/ai-gateway/cookbooks/prometheus-alerts) for th
 
 Nine rows, top to bottom:
 
-| Row | Panels | What it answers |
-|---|---|---|
-| Request health | rate, p50, p95, p99, 5xx share | Is this affecting callers? |
-| Provider health | circuit state, upstream latency, fallback events | Which credential is degrading, and is fallback covering it? |
-| Auth cache | hit rate, resolve-key round trips | Is cache pressure loading the control plane? |
-| Budgets | blocks by scope, spend records written and dropped | Which scope is rejecting traffic, and is spend reaching the ledger? |
-| Guardrails | verdicts by direction, blocks by direction | Policy enforcement against a policy regression |
-| Streaming | active streams, guardrail fail-open rate | Concurrency, and chunks passing through unchecked |
-| Prompt cache | hit and miss rate | Whether provider cache reads are happening at all |
-| Infrastructure | replicas, CPU, memory, goroutines | The Kubernetes side of everything above |
-| Lifecycle | draining pods, in-flight requests | A stuck drain, before the kubelet kills the pod |
+| Row             | Panels                                             | What it answers                                                     |
+| --------------- | -------------------------------------------------- | ------------------------------------------------------------------- |
+| Request health  | rate, p50, p95, p99, 5xx share                     | Is this affecting callers?                                          |
+| Provider health | circuit state, upstream latency, fallback events   | Which credential is degrading, and is fallback covering it?         |
+| Auth cache      | hit rate, resolve-key round trips                  | Is cache pressure loading the control plane?                        |
+| Budgets         | blocks by scope, spend records written and dropped | Which scope is rejecting traffic, and is spend reaching the ledger? |
+| Guardrails      | verdicts by direction, blocks by direction         | Policy enforcement against a policy regression                      |
+| Streaming       | active streams, guardrail fail-open rate           | Concurrency, and chunks passing through unchecked                   |
+| Prompt cache    | hit and miss rate                                  | Whether provider cache reads are happening at all                   |
+| Infrastructure  | replicas, CPU, memory, goroutines                  | The Kubernetes side of everything above                             |
+| Lifecycle       | draining pods, in-flight requests                  | A stuck drain, before the kubelet kills the pod                     |
 
 ## Prerequisites
 
@@ -80,10 +80,12 @@ Save the JSON below as `langwatch-gateway.json`, then in Grafana open **Dashboar
       "title": "Request rate",
       "datasource": "$datasource",
       "gridPos": { "x": 0, "y": 1, "w": 8, "h": 7 },
-      "targets": [{
-        "expr": "sum by (status) (rate(gateway_http_requests_total{namespace=\"$namespace\", pod=~\"$pod\"}[$__rate_interval]))",
-        "legendFormat": "{{status}}"
-      }],
+      "targets": [
+        {
+          "expr": "sum by (status) (rate(gateway_http_requests_total{namespace=\"$namespace\", pod=~\"$pod\"}[$__rate_interval]))",
+          "legendFormat": "{{status}}"
+        }
+      ],
       "fieldConfig": { "defaults": { "unit": "reqps" } }
     },
     {
@@ -92,9 +94,18 @@ Save the JSON below as `langwatch-gateway.json`, then in Grafana open **Dashboar
       "datasource": "$datasource",
       "gridPos": { "x": 8, "y": 1, "w": 8, "h": 7 },
       "targets": [
-        { "expr": "histogram_quantile(0.50, sum by (le) (rate(gateway_http_request_duration_seconds_bucket{namespace=\"$namespace\", pod=~\"$pod\"}[$__rate_interval])))", "legendFormat": "p50" },
-        { "expr": "histogram_quantile(0.95, sum by (le) (rate(gateway_http_request_duration_seconds_bucket{namespace=\"$namespace\", pod=~\"$pod\"}[$__rate_interval])))", "legendFormat": "p95" },
-        { "expr": "histogram_quantile(0.99, sum by (le) (rate(gateway_http_request_duration_seconds_bucket{namespace=\"$namespace\", pod=~\"$pod\"}[$__rate_interval])))", "legendFormat": "p99" }
+        {
+          "expr": "histogram_quantile(0.50, sum by (le) (rate(gateway_http_request_duration_seconds_bucket{namespace=\"$namespace\", pod=~\"$pod\"}[$__rate_interval])))",
+          "legendFormat": "p50"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum by (le) (rate(gateway_http_request_duration_seconds_bucket{namespace=\"$namespace\", pod=~\"$pod\"}[$__rate_interval])))",
+          "legendFormat": "p95"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum by (le) (rate(gateway_http_request_duration_seconds_bucket{namespace=\"$namespace\", pod=~\"$pod\"}[$__rate_interval])))",
+          "legendFormat": "p99"
+        }
       ],
       "fieldConfig": { "defaults": { "unit": "s" } }
     },
@@ -103,9 +114,11 @@ Save the JSON below as `langwatch-gateway.json`, then in Grafana open **Dashboar
       "title": "5xx rate",
       "datasource": "$datasource",
       "gridPos": { "x": 16, "y": 1, "w": 8, "h": 7 },
-      "targets": [{
-        "expr": "sum(rate(gateway_http_requests_total{namespace=\"$namespace\", status=~\"5..\"}[$__rate_interval])) / sum(rate(gateway_http_requests_total{namespace=\"$namespace\"}[$__rate_interval]))"
-      }],
+      "targets": [
+        {
+          "expr": "sum(rate(gateway_http_requests_total{namespace=\"$namespace\", status=~\"5..\"}[$__rate_interval])) / sum(rate(gateway_http_requests_total{namespace=\"$namespace\"}[$__rate_interval]))"
+        }
+      ],
       "fieldConfig": {
         "defaults": {
           "unit": "percentunit",
@@ -131,20 +144,24 @@ Save the JSON below as `langwatch-gateway.json`, then in Grafana open **Dashboar
       "title": "Circuit state by credential (0=closed 1=open 2=half-open)",
       "datasource": "$datasource",
       "gridPos": { "x": 0, "y": 9, "w": 12, "h": 7 },
-      "targets": [{
-        "expr": "gateway_circuit_state{namespace=\"$namespace\", pod=~\"$pod\"}",
-        "legendFormat": "{{credential_id}}"
-      }]
+      "targets": [
+        {
+          "expr": "gateway_circuit_state{namespace=\"$namespace\", pod=~\"$pod\"}",
+          "legendFormat": "{{credential_id}}"
+        }
+      ]
     },
     {
       "type": "timeseries",
       "title": "Upstream latency p95 by provider",
       "datasource": "$datasource",
       "gridPos": { "x": 12, "y": 9, "w": 12, "h": 7 },
-      "targets": [{
-        "expr": "histogram_quantile(0.95, sum by (provider, le) (rate(gateway_provider_duration_seconds_bucket{namespace=\"$namespace\"}[$__rate_interval])))",
-        "legendFormat": "{{provider}}"
-      }],
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95, sum by (provider, le) (rate(gateway_provider_duration_seconds_bucket{namespace=\"$namespace\"}[$__rate_interval])))",
+          "legendFormat": "{{provider}}"
+        }
+      ],
       "fieldConfig": { "defaults": { "unit": "s" } }
     },
     {
@@ -152,10 +169,12 @@ Save the JSON below as `langwatch-gateway.json`, then in Grafana open **Dashboar
       "title": "Fallback events per sec",
       "datasource": "$datasource",
       "gridPos": { "x": 0, "y": 16, "w": 24, "h": 6 },
-      "targets": [{
-        "expr": "sum by (from_credential, to_credential) (rate(gateway_fallback_events_total{namespace=\"$namespace\"}[$__rate_interval]))",
-        "legendFormat": "{{from_credential}} → {{to_credential}}"
-      }]
+      "targets": [
+        {
+          "expr": "sum by (from_credential, to_credential) (rate(gateway_fallback_events_total{namespace=\"$namespace\"}[$__rate_interval]))",
+          "legendFormat": "{{from_credential}} → {{to_credential}}"
+        }
+      ]
     },
 
     {
@@ -169,7 +188,10 @@ Save the JSON below as `langwatch-gateway.json`, then in Grafana open **Dashboar
       "datasource": "$datasource",
       "gridPos": { "x": 0, "y": 23, "w": 12, "h": 7 },
       "targets": [
-        { "expr": "sum(rate(gateway_auth_cache_hits_total{namespace=\"$namespace\", tier=\"l1\"}[$__rate_interval])) / sum(rate(gateway_auth_cache_lookups_total{namespace=\"$namespace\"}[$__rate_interval]))", "legendFormat": "hit rate" }
+        {
+          "expr": "sum(rate(gateway_auth_cache_hits_total{namespace=\"$namespace\", tier=\"l1\"}[$__rate_interval])) / sum(rate(gateway_auth_cache_lookups_total{namespace=\"$namespace\"}[$__rate_interval]))",
+          "legendFormat": "hit rate"
+        }
       ],
       "fieldConfig": { "defaults": { "unit": "percentunit" } }
     },
@@ -178,9 +200,11 @@ Save the JSON below as `langwatch-gateway.json`, then in Grafana open **Dashboar
       "title": "Resolve-key round-trips to control plane",
       "datasource": "$datasource",
       "gridPos": { "x": 12, "y": 23, "w": 12, "h": 7 },
-      "targets": [{
-        "expr": "sum(rate(gateway_control_plane_requests_total{namespace=\"$namespace\", endpoint=\"resolve-key\"}[$__rate_interval]))"
-      }],
+      "targets": [
+        {
+          "expr": "sum(rate(gateway_control_plane_requests_total{namespace=\"$namespace\", endpoint=\"resolve-key\"}[$__rate_interval]))"
+        }
+      ],
       "fieldConfig": { "defaults": { "unit": "reqps" } }
     },
 
@@ -195,10 +219,12 @@ Save the JSON below as `langwatch-gateway.json`, then in Grafana open **Dashboar
       "description": "The gateway records spend and the control plane writes the ledger. This counter is the only gateway-side signal that a hard cap rejected traffic.",
       "datasource": "$datasource",
       "gridPos": { "x": 0, "y": 31, "w": 12, "h": 7 },
-      "targets": [{
-        "expr": "sum by (scope) (rate(gateway_budget_blocks_total{namespace=\"$namespace\"}[$__rate_interval]))",
-        "legendFormat": "{{scope}}"
-      }]
+      "targets": [
+        {
+          "expr": "sum by (scope) (rate(gateway_budget_blocks_total{namespace=\"$namespace\"}[$__rate_interval]))",
+          "legendFormat": "{{scope}}"
+        }
+      ]
     },
     {
       "type": "timeseries",
@@ -207,8 +233,14 @@ Save the JSON below as `langwatch-gateway.json`, then in Grafana open **Dashboar
       "datasource": "$datasource",
       "gridPos": { "x": 12, "y": 31, "w": 12, "h": 7 },
       "targets": [
-        { "expr": "sum(rate(gateway_spend_spool_appended_total{namespace=\"$namespace\"}[$__rate_interval]))", "legendFormat": "written" },
-        { "expr": "sum by (reason) (rate(gateway_spend_spool_dropped_total{namespace=\"$namespace\"}[$__rate_interval]))", "legendFormat": "dropped / {{reason}}" }
+        {
+          "expr": "sum(rate(gateway_spend_spool_appended_total{namespace=\"$namespace\"}[$__rate_interval]))",
+          "legendFormat": "written"
+        },
+        {
+          "expr": "sum by (reason) (rate(gateway_spend_spool_dropped_total{namespace=\"$namespace\"}[$__rate_interval]))",
+          "legendFormat": "dropped / {{reason}}"
+        }
       ],
       "fieldConfig": { "defaults": { "unit": "reqps" } }
     },
@@ -223,20 +255,24 @@ Save the JSON below as `langwatch-gateway.json`, then in Grafana open **Dashboar
       "title": "Verdicts by direction",
       "datasource": "$datasource",
       "gridPos": { "x": 0, "y": 39, "w": 12, "h": 7 },
-      "targets": [{
-        "expr": "sum by (direction, verdict) (rate(gateway_guardrail_verdicts_total{namespace=\"$namespace\"}[$__rate_interval]))",
-        "legendFormat": "{{direction}} / {{verdict}}"
-      }]
+      "targets": [
+        {
+          "expr": "sum by (direction, verdict) (rate(gateway_guardrail_verdicts_total{namespace=\"$namespace\"}[$__rate_interval]))",
+          "legendFormat": "{{direction}} / {{verdict}}"
+        }
+      ]
     },
     {
       "type": "timeseries",
       "title": "Blocks by direction",
       "datasource": "$datasource",
       "gridPos": { "x": 12, "y": 39, "w": 12, "h": 7 },
-      "targets": [{
-        "expr": "sum by (direction) (rate(gateway_guardrail_verdicts_total{namespace=\"$namespace\", verdict=\"block\"}[$__rate_interval]))",
-        "legendFormat": "{{direction}}"
-      }]
+      "targets": [
+        {
+          "expr": "sum by (direction) (rate(gateway_guardrail_verdicts_total{namespace=\"$namespace\", verdict=\"block\"}[$__rate_interval]))",
+          "legendFormat": "{{direction}}"
+        }
+      ]
     },
 
     {
@@ -249,9 +285,11 @@ Save the JSON below as `langwatch-gateway.json`, then in Grafana open **Dashboar
       "title": "Active streams",
       "datasource": "$datasource",
       "gridPos": { "x": 0, "y": 47, "w": 12, "h": 7 },
-      "targets": [{
-        "expr": "sum(gateway_streaming_active{namespace=\"$namespace\", pod=~\"$pod\"})"
-      }]
+      "targets": [
+        {
+          "expr": "sum(gateway_streaming_active{namespace=\"$namespace\", pod=~\"$pod\"})"
+        }
+      ]
     },
     {
       "type": "timeseries",
@@ -259,10 +297,12 @@ Save the JSON below as `langwatch-gateway.json`, then in Grafana open **Dashboar
       "description": "Emitted on any direction when the control-plane guardrail call fails and the gateway lets the traffic through unchecked. Sustained > 0 means the evaluator is missing its SLO. The stream_chunk series is expected to be the noisy one, because that direction always fails open so a slow policy service never stalls a stream; treat it as the chunk-level enforcement gap. Use the langwatch.guardrail.stream_chunk_fail_open trace attribute to see why an individual bypass happened.",
       "datasource": "$datasource",
       "gridPos": { "x": 12, "y": 47, "w": 12, "h": 7 },
-      "targets": [{
-        "expr": "sum by (direction) (rate(gateway_guardrail_verdicts_total{namespace=\"$namespace\", verdict=\"fail_open\"}[$__rate_interval]))",
-        "legendFormat": "{{direction}}"
-      }]
+      "targets": [
+        {
+          "expr": "sum by (direction) (rate(gateway_guardrail_verdicts_total{namespace=\"$namespace\", verdict=\"fail_open\"}[$__rate_interval]))",
+          "legendFormat": "{{direction}}"
+        }
+      ]
     },
 
     {
@@ -275,10 +315,12 @@ Save the JSON below as `langwatch-gateway.json`, then in Grafana open **Dashboar
       "title": "Prompt cache outcomes",
       "datasource": "$datasource",
       "gridPos": { "x": 0, "y": 55, "w": 24, "h": 7 },
-      "targets": [{
-        "expr": "sum by (outcome) (rate(gateway_cache_hits_total{namespace=\"$namespace\"}[$__rate_interval]))",
-        "legendFormat": "{{outcome}}"
-      }]
+      "targets": [
+        {
+          "expr": "sum by (outcome) (rate(gateway_cache_hits_total{namespace=\"$namespace\"}[$__rate_interval]))",
+          "legendFormat": "{{outcome}}"
+        }
+      ]
     },
 
     {
@@ -291,9 +333,11 @@ Save the JSON below as `langwatch-gateway.json`, then in Grafana open **Dashboar
       "title": "Pod replicas ready",
       "datasource": "$datasource",
       "gridPos": { "x": 0, "y": 63, "w": 8, "h": 7 },
-      "targets": [{
-        "expr": "sum(kube_deployment_status_replicas_available{namespace=\"$namespace\", deployment=\"langwatch-gateway\"})"
-      }]
+      "targets": [
+        {
+          "expr": "sum(kube_deployment_status_replicas_available{namespace=\"$namespace\", deployment=\"langwatch-gateway\"})"
+        }
+      ]
     },
     {
       "type": "timeseries",
@@ -301,8 +345,14 @@ Save the JSON below as `langwatch-gateway.json`, then in Grafana open **Dashboar
       "datasource": "$datasource",
       "gridPos": { "x": 8, "y": 63, "w": 8, "h": 7 },
       "targets": [
-        { "expr": "sum by (pod) (rate(container_cpu_usage_seconds_total{namespace=\"$namespace\", pod=~\"langwatch-gateway-.*\"}[$__rate_interval]))", "legendFormat": "cpu / {{pod}}" },
-        { "expr": "sum by (pod) (container_memory_working_set_bytes{namespace=\"$namespace\", pod=~\"langwatch-gateway-.*\"}) / 1024 / 1024", "legendFormat": "mem MB / {{pod}}" }
+        {
+          "expr": "sum by (pod) (rate(container_cpu_usage_seconds_total{namespace=\"$namespace\", pod=~\"langwatch-gateway-.*\"}[$__rate_interval]))",
+          "legendFormat": "cpu / {{pod}}"
+        },
+        {
+          "expr": "sum by (pod) (container_memory_working_set_bytes{namespace=\"$namespace\", pod=~\"langwatch-gateway-.*\"}) / 1024 / 1024",
+          "legendFormat": "mem MB / {{pod}}"
+        }
       ]
     },
     {
@@ -311,10 +361,12 @@ Save the JSON below as `langwatch-gateway.json`, then in Grafana open **Dashboar
       "description": "Monotonic climb = goroutine leak. See the AI Gateway troubleshooting page.",
       "datasource": "$datasource",
       "gridPos": { "x": 16, "y": 63, "w": 8, "h": 7 },
-      "targets": [{
-        "expr": "go_goroutines{namespace=\"$namespace\", pod=~\"langwatch-gateway-.*\"}",
-        "legendFormat": "{{pod}}"
-      }]
+      "targets": [
+        {
+          "expr": "go_goroutines{namespace=\"$namespace\", pod=~\"langwatch-gateway-.*\"}",
+          "legendFormat": "{{pod}}"
+        }
+      ]
     },
 
     {
@@ -328,10 +380,12 @@ Save the JSON below as `langwatch-gateway.json`, then in Grafana open **Dashboar
       "description": "gateway_draining flips to 1 on SIGTERM; a pod stuck at 1 for > terminationGracePeriodSeconds is a hung handler (see the AI Gateway troubleshooting page).",
       "datasource": "$datasource",
       "gridPos": { "x": 0, "y": 71, "w": 12, "h": 7 },
-      "targets": [{
-        "expr": "sum by (pod) (gateway_draining{namespace=\"$namespace\"})",
-        "legendFormat": "{{pod}}"
-      }]
+      "targets": [
+        {
+          "expr": "sum by (pod) (gateway_draining{namespace=\"$namespace\"})",
+          "legendFormat": "{{pod}}"
+        }
+      ]
     },
     {
       "type": "timeseries",
@@ -339,10 +393,12 @@ Save the JSON below as `langwatch-gateway.json`, then in Grafana open **Dashboar
       "description": "Paired with Draining. A healthy drain curves to 0; flat while draining=1 means a handler is hung.",
       "datasource": "$datasource",
       "gridPos": { "x": 12, "y": 71, "w": 12, "h": 7 },
-      "targets": [{
-        "expr": "sum by (pod) (gateway_in_flight_requests{namespace=\"$namespace\"})",
-        "legendFormat": "{{pod}}"
-      }]
+      "targets": [
+        {
+          "expr": "sum by (pod) (gateway_in_flight_requests{namespace=\"$namespace\"})",
+          "legendFormat": "{{pod}}"
+        }
+      ]
     }
   ]
 }
@@ -368,8 +424,8 @@ Put the dashboard URL in each alert's `runbook_url`, or in the notification body
 receivers:
   - name: slack-gateway
     slack_configs:
-      - channel: '#ai-gateway-alerts'
-        title: '{{ .CommonAnnotations.summary }}'
+      - channel: "#ai-gateway-alerts"
+        title: "{{ .CommonAnnotations.summary }}"
         text: |
           {{ .CommonAnnotations.description }}
 

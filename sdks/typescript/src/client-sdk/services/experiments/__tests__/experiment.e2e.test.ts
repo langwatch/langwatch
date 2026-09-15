@@ -50,9 +50,9 @@ describe.skipIf(SKIP_INTEGRATION)("Experiment Integration", () => {
         endpoint: process.env.LANGWATCH_ENDPOINT,
       });
 
-      await expect(
-        badLangwatch.experiments.init("test-bad-key")
-      ).rejects.toThrow(ExperimentInitError);
+      await expect(badLangwatch.experiments.init("test-bad-key")).rejects.toThrow(
+        ExperimentInitError,
+      );
     });
   });
 
@@ -95,7 +95,7 @@ describe.skipIf(SKIP_INTEGRATION)("Experiment Integration", () => {
 
           currentConcurrent--;
         },
-        { concurrency: 3 }
+        { concurrency: 3 },
       );
 
       expect(maxConcurrent).toBeLessThanOrEqual(3);
@@ -184,11 +184,7 @@ describe.skipIf(SKIP_INTEGRATION)("Experiment Integration", () => {
 
     it("prints a CI-friendly summary after run completes against real server", async () => {
       const evaluation = await langwatch.experiments.init(`test-print-summary-${Date.now()}`);
-      const dataset = [
-        { q: "What is 2+2?" },
-        { q: "What is 3+3?" },
-        { q: "What is 4+4?" },
-      ];
+      const dataset = [{ q: "What is 2+2?" }, { q: "What is 3+3?" }, { q: "What is 4+4?" }];
 
       await evaluation.run(dataset, async ({ index }) => {
         evaluation.log("accuracy", {
@@ -293,7 +289,7 @@ describe.skipIf(SKIP_INTEGRATION)("Experiment Integration", () => {
           async () => {
             await new Promise((resolve) => setTimeout(resolve, 50));
             return { response: "GPT-4 response" };
-          }
+          },
         );
 
         results.push({
@@ -308,7 +304,7 @@ describe.skipIf(SKIP_INTEGRATION)("Experiment Integration", () => {
           async () => {
             await new Promise((resolve) => setTimeout(resolve, 30));
             return { response: "Claude response" };
-          }
+          },
         );
 
         results.push({
@@ -415,7 +411,9 @@ describe.skipIf(SKIP_INTEGRATION)("Experiment Integration", () => {
     });
 
     it("isolates context between concurrent withTarget blocks", async () => {
-      const evaluation = await langwatch.experiments.init(`test-withTarget-isolation-${Date.now()}`);
+      const evaluation = await langwatch.experiments.init(
+        `test-withTarget-isolation-${Date.now()}`,
+      );
       const dataset = [{ question: "Test" }];
 
       // Track that both withTarget blocks executed successfully
@@ -468,7 +466,7 @@ describe.skipIf(SKIP_INTEGRATION)("Experiment Integration", () => {
         await expect(
           evaluation.withTarget("error-target", null, async () => {
             throw new Error("Test error");
-          })
+          }),
         ).rejects.toThrow("Test error");
       });
     });
@@ -483,7 +481,12 @@ describe.skipIf(SKIP_INTEGRATION)("Experiment Integration", () => {
         { question: "Question C" },
       ];
 
-      const results: Array<{ index: number; target: string; question: string; response: string }> = [];
+      const results: Array<{
+        index: number;
+        target: string;
+        question: string;
+        response: string;
+      }> = [];
 
       await evaluation.run(
         dataset,
@@ -492,17 +495,27 @@ describe.skipIf(SKIP_INTEGRATION)("Experiment Integration", () => {
           await Promise.all([
             evaluation.withTarget("gpt-4", { model: "openai/gpt-4" }, async () => {
               await new Promise((resolve) => setTimeout(resolve, Math.random() * 50));
-              results.push({ index, target: "gpt-4", question: item.question, response: `GPT-4: ${item.question}` });
+              results.push({
+                index,
+                target: "gpt-4",
+                question: item.question,
+                response: `GPT-4: ${item.question}`,
+              });
               return { output: `GPT-4: ${item.question}` };
             }),
             evaluation.withTarget("claude", { model: "anthropic/claude-3" }, async () => {
               await new Promise((resolve) => setTimeout(resolve, Math.random() * 50));
-              results.push({ index, target: "claude", question: item.question, response: `Claude: ${item.question}` });
+              results.push({
+                index,
+                target: "claude",
+                question: item.question,
+                response: `Claude: ${item.question}`,
+              });
               return { output: `Claude: ${item.question}` };
             }),
           ]);
         },
-        { concurrency: 3 }
+        { concurrency: 3 },
       );
 
       // Should have 6 results (3 items × 2 targets)
@@ -559,14 +572,24 @@ describe("Evaluation Unit", () => {
     it("sends correct entry data for each target in concurrent execution", async () => {
       // This test verifies the fix for the race condition where concurrent
       // withTarget() calls would capture wrong item data due to shared state
-      const capturedBodies: Array<{ dataset: Array<{ index: number; target_id: string; entry: unknown; predicted: unknown }> }> = [];
+      const capturedBodies: Array<{
+        dataset: Array<{
+          index: number;
+          target_id: string;
+          entry: unknown;
+          predicted: unknown;
+        }>;
+      }> = [];
 
       // Mock fetch to capture API calls
       const originalFetch = globalThis.fetch;
       globalThis.fetch = vi.fn(async (input: RequestInfo | URL, options?: RequestInit) => {
-        const urlStr = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
+        const urlStr =
+          typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
         if (urlStr.includes("experiment/init")) {
-          return new Response(JSON.stringify({ slug: "test", path: "/test" }), { status: 200 });
+          return new Response(JSON.stringify({ slug: "test", path: "/test" }), {
+            status: 200,
+          });
         }
         if (urlStr.includes("log_results")) {
           capturedBodies.push(JSON.parse(options?.body as string));
@@ -604,7 +627,7 @@ describe("Evaluation Unit", () => {
               }),
             ]);
           },
-          { concurrency: 3 }
+          { concurrency: 3 },
         );
 
         // Wait for final flush

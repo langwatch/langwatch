@@ -5,10 +5,7 @@
  * to the OS pipe), so a flushed terminal line can never be lost on exit.
  */
 
-export type ProtocolSink = (
-  chunk: string,
-  callback: (error?: Error | null) => void,
-) => boolean;
+export type ProtocolSink = (chunk: string, callback: (error?: Error | null) => void) => boolean;
 
 export class ProtocolWriter {
   private chain: Promise<void> = Promise.resolve();

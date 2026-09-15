@@ -12,8 +12,7 @@ const jsonResponse = (body: unknown, init?: ResponseInit): Response =>
     ...init,
   });
 
-const requestAt = (call: number): Request =>
-  mockFetch.mock.calls[call]![0] as Request;
+const requestAt = (call: number): Request => mockFetch.mock.calls[call]![0] as Request;
 
 const ENDPOINT = "https://api.langwatch.test";
 
@@ -104,22 +103,16 @@ describe("WorkflowsApiService.run", () => {
         // 1) evaluate
         const startReq = requestAt(0);
         expect(startReq.method).toBe("POST");
-        expect(startReq.url).toBe(
-          `${ENDPOINT}/api/workflows/workflow_123/evaluate`,
-        );
+        expect(startReq.url).toBe(`${ENDPOINT}/api/v1/workflows/workflow_123/evaluate`);
         expect(await startReq.clone().json()).toEqual({
           data: [{ input: "ping" }],
         });
 
         // 2) poll v3 run status
-        expect(requestAt(1).url).toBe(
-          `${ENDPOINT}/api/evaluations/v3/runs/run_42`,
-        );
+        expect(requestAt(1).url).toBe(`${ENDPOINT}/api/evaluations/v3/runs/run_42`);
 
         // 3) results
-        expect(requestAt(2).url).toBe(
-          `${ENDPOINT}/api/evaluations/v3/runs/run_42/results`,
-        );
+        expect(requestAt(2).url).toBe(`${ENDPOINT}/api/evaluations/v3/runs/run_42/results`);
 
         expect(result.runId).toBe("run_42");
         expect(result.status).toBe("completed");
@@ -186,16 +179,11 @@ describe("WorkflowsApiService.run", () => {
     describe("when the evaluate call returns 400", () => {
       it("throws a WorkflowsApiError", async () => {
         mockFetch.mockResolvedValueOnce(
-          jsonResponse(
-            { error: "No committed version to evaluate" },
-            { status: 400 },
-          ),
+          jsonResponse({ error: "No committed version to evaluate" }, { status: 400 }),
         );
 
         const service = makeService();
-        const err = await service
-          .run("workflow_123", { pollInterval: 0 })
-          .catch((e) => e);
+        const err = await service.run("workflow_123", { pollInterval: 0 }).catch((e) => e);
 
         expect(err).toBeInstanceOf(WorkflowsApiError);
       });
@@ -233,9 +221,7 @@ describe("WorkflowsApiService.run", () => {
         mockFetch
           .mockResolvedValueOnce(jsonResponse(evaluateResponse))
           .mockResolvedValueOnce(jsonResponse(completedStatus))
-          .mockResolvedValueOnce(
-            jsonResponse({ error: "not yet available" }, { status: 404 }),
-          )
+          .mockResolvedValueOnce(jsonResponse({ error: "not yet available" }, { status: 404 }))
           .mockResolvedValueOnce(jsonResponse(resultsResponse));
 
         const service = makeService();

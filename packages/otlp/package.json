@@ -1,0 +1,36 @@
+{
+  "name": "@langwatch/otlp",
+  "version": "0.0.1",
+  "private": true,
+  "description": "The OTLP wire vocabulary shared by the log, metric and trace ingestion paths: the AnyValue schema, attribute-map flattening, and identifier decoding",
+  "keywords": [
+    "langwatch",
+    "opentelemetry",
+    "otlp"
+  ],
+  "license": "MIT",
+  "type": "module",
+  "main": "src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "pnpm -w typecheck:declarations --project . && tsc --noEmit",
+    "test": "vitest",
+    "test:unit": "vitest run"
+  },
+  "dependencies": {
+    "@langwatch/handled-error": "workspace:*",
+    "@opentelemetry/otlp-transformer": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "packageManager": "pnpm@10.24.0"
+}

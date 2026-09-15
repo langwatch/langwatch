@@ -1,16 +1,14 @@
 import { scopedApiKey } from "@/internal/credentialContext";
 import chalk from "chalk";
-import { createSpinner } from "../utils/spinner";
-import { resolveCredentials } from "../utils/apiKey";
-import {
-  createLangWatchApiClient,
-} from "@/internal/api/client";
+import { createSpinner } from "../utils/spinner.ts";
+import { resolveCredentials } from "../utils/apiKey.ts";
+import { createLangWatchApiClient } from "@/internal/api/client";
 import { buildAuthHeaders, isPersonalAccessToken } from "@/internal/api/auth";
 import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
-import { printResult, type RawOutputFlags } from "../utils/output";
-import { buildProgram } from "../program";
-import { buildCatalog, renderStatusSummary } from "../utils/commandCatalog";
+import { printResult, type RawOutputFlags } from "../utils/output.ts";
+import { buildProgram } from "../program.ts";
+import { buildCatalog, renderStatusSummary } from "../utils/commandCatalog.ts";
 import { TracesApiService } from "@/client-sdk/services/traces/traces-api.service";
 import { ExperimentsApiService } from "@/client-sdk/services/experiments/experiments-api.service";
 import { GatewayBudgetsApiService } from "@/client-sdk/services/gateway-budgets/gateway-budgets-api.service";
@@ -65,12 +63,6 @@ class CallTimeoutError extends Error {
 
 /**
  * Puts a hard floor under every network call status makes.
- *
- * `Promise.allSettled` never rejects, so without this there is no upper bound
- * on how long status blocks: the trace-search POST runs a ClickHouse COUNT over
- * a 24h partition and can hang indefinitely, and a hung call would simply never
- * settle. A timeout is reported the same way any other section failure is —
- * as an `errors` entry — so it withholds the all-clear rather than hiding.
  */
 async function withTimeout<T>(operation: () => Promise<T>, ms: number): Promise<T> {
   let timer: ReturnType<typeof setTimeout> | undefined;
@@ -118,15 +110,7 @@ export interface BudgetAtRisk {
 }
 
 /**
- * The "what needs my attention" half of the status document. Each section is
- * independent: a section that fails (no gateway access → 403 on budgets, a
- * backend hiccup on trace search) sets its field to `null` and records WHY in
- * `errors`, and never breaks the rest of status.
- *
- * Monitors are deliberately absent: the monitors REST surface
- * (`GET /api/monitors`) exposes configuration only — no firing/health state —
- * so there is nothing cheap and honest to report here. (Firing state lives in
- * ClickHouse evaluation results, which the API does not expose as a count.)
+ * The "what needs my attention" half of the status document.
  */
 export interface AttentionReport {
   erroredTraces24h: number | null;
@@ -148,7 +132,7 @@ export interface StatusDocument {
 }
 
 export const statusCommand = async (options?: RawOutputFlags): Promise<void> => {
-  await resolveCredentials();
+  const credentials = await resolveCredentials();
 
   const apiClient = createLangWatchApiClient();
   const apiKey = scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
@@ -164,9 +148,17 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
     advisories: {},
   };
 
-  async function fetchCount(url: string): Promise<{ data: unknown; error?: unknown; status?: number }> {
+  async function fetchCount(
+    url: string,
+    options?: { method?: "GET" | "POST"; body?: unknown },
+  ): Promise<{ data: unknown; error?: unknown; status?: number }> {
     const response = await langwatchFetch(`${endpoint}${url}`, {
-      headers: buildAuthHeaders({ apiKey }),
+      method: options?.method,
+      headers: {
+        ...buildAuthHeaders({ apiKey, projectId: credentials.projectId }),
+        ...(options?.body === undefined ? {} : { "Content-Type": "application/json" }),
+      },
+      ...(options?.body === undefined ? {} : { body: JSON.stringify(options.body) }),
     });
     if (!response.ok) {
       let body: unknown;
@@ -201,20 +193,12 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
   async function fetchRunningExperiments(): Promise<RunningExperiment[]> {
     const service = new ExperimentsApiService();
     const list = await service.listExperiments({ pageSize: EXPERIMENT_PAGE_SIZE });
-    // "Running" is a property of a run, and runs are only listed per
-    // experiment — so check the latest run of just the most recently active
-    // experiments rather than fanning out over all of them.
-    //
-    // Deliberately NOT windowed to the last 24h. `running` has no bounded
-    // duration: an experiment wedged in `running` for three days has a 72h-old
-    // `lastRunAt`, and those are precisely the ones worth surfacing. Recency is
-    // used to RANK candidates, never to filter them out.
+    // "Running" is a property of a run, and runs are only listed per experiment — so check the
+    // latest run of just the most recently active experiments rather than fanning out over all
+    // of them.
     const recent = list.experiments
       .filter((experiment) => experiment.lastRunAt !== null)
-      .sort(
-        (a, b) =>
-          new Date(b.lastRunAt ?? 0).getTime() - new Date(a.lastRunAt ?? 0).getTime(),
-      );
+      .sort((a, b) => new Date(b.lastRunAt ?? 0).getTime() - new Date(a.lastRunAt ?? 0).getTime());
     const candidates = recent.slice(0, RUNNING_EXPERIMENT_CANDIDATES);
 
     const checks = await Promise.allSettled(
@@ -244,7 +228,7 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
     // "nothing needs your attention".
     const failedChecks = checks.filter((check) => check.status === "rejected").length;
     const gaps: string[] = [];
-    // `GET /api/experiments` is ordered by `updatedAt desc`, NOT by `lastRunAt`
+    // `GET /api/v1/experiments` is ordered by `updatedAt desc`, NOT by `lastRunAt`
     // — so a running experiment whose row has a stale `updatedAt` can sit past
     // the page boundary and never be seen at all. An unread page is the single
     // biggest hole in this scan; it goes on the record first.
@@ -256,23 +240,18 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
     const running = checks.flatMap((check) =>
       check.status === "fulfilled" && check.value !== null ? [check.value] : [],
     );
-    // Only a gap when the cap plausibly HID something. Every experiment that
-    // ever ran has a non-null `lastRunAt`, so "there are more than 5 of them"
-    // describes almost every real project and would suppress the all-clear
-    // permanently. The candidates are ranked most-recently-active first: if
-    // every one we checked came back finished, the older, less-recently-active
-    // tail behind them is not evidence of anything running. It is only when the
-    // sample itself turned up a live run that the cap is hiding a population we
-    // have concrete reason to believe contains more.
+    // Only a gap when the cap plausibly HID something. Every experiment that ever ran has a
+    // non-null `lastRunAt`, so "there are more than 5 of them" describes almost every real
+    // project and would suppress the all-clear permanently. The candidates are ranked
+    // most-recently-active first: if every one we checked came back finished, the older,
+    // less-recently-active tail behind them is not evidence of anything running.
     if (running.length > 0 && recent.length > candidates.length) {
       gaps.push(
         `only the ${RUNNING_EXPERIMENT_CANDIDATES} most recently active of ${recent.length} candidate experiments were checked`,
       );
     }
     if (failedChecks > 0) {
-      gaps.push(
-        `${failedChecks} experiment${failedChecks === 1 ? "" : "s"} could not be checked`,
-      );
+      gaps.push(`${failedChecks} experiment${failedChecks === 1 ? "" : "s"} could not be checked`);
     }
     if (gaps.length > 0) {
       attention.errors.runningExperiments = `incomplete scan: ${gaps.join("; ")}`;
@@ -282,12 +261,9 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
   }
 
   /**
-   * `GET /api/gateway/v1/budgets` returns every scope dimension: org, team,
-   * project, virtual-key, principal, group, and per-person, with live ledger
-   * spend, so a virtual-key budget at 100% with `on_breach: block` is visible
-   * here like any other. The one honesty signal is `spend_available`: when the
-   * server could not total spend, the numbers are not real spend and the scan
-   * must say so instead of ticking green.
+   * `GET /api/gateway/v1/budgets` returns every scope dimension: org, team, project,
+   * virtual-key, principal, group, and per-person, with live ledger spend, so a virtual-key
+   * budget at 100% with `on_breach: block` is visible here like any other.
    */
   async function fetchBudgetsAtRisk(): Promise<BudgetAtRisk[]> {
     const budgets = await new GatewayBudgetsApiService({
@@ -308,8 +284,7 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
         // is 0, which passes the finite check and scores the budget at 0%, so
         // an unreadable budget would drop out of the at-risk list looking
         // healthy. Absent spend is unreadable, not zero spend.
-        const spent =
-          budget.spent_usd === null ? Number.NaN : Number(budget.spent_usd);
+        const spent = budget.spent_usd === null ? Number.NaN : Number(budget.spent_usd);
         // Neither "at risk" nor "fine" - we cannot say which, so say that.
         if (!Number.isFinite(limit) || !Number.isFinite(spent)) {
           unreadable.push(budget.name);
@@ -342,9 +317,7 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
         // limit x member_count. Without a member count (empty group) the
         // allowance covers nobody and any spend is over it.
         const effectiveLimit =
-          budget.scope_type === "group"
-            ? limit * (budget.member_count ?? 0)
-            : limit;
+          budget.scope_type === "group" ? limit * (budget.member_count ?? 0) : limit;
         return [
           {
             name: budget.name,
@@ -354,8 +327,7 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
             // breached state, not a 0%-utilized one. Scoring it 0 and dropping
             // it below the threshold is how a `block` budget that rejects every
             // single request turns into a green tick.
-            utilizationPct:
-              effectiveLimit <= 0 ? 100 : Math.round((spent / effectiveLimit) * 100),
+            utilizationPct: effectiveLimit <= 0 ? 100 : Math.round((spent / effectiveLimit) * 100),
             spentUsd: budget.spent_usd,
             limitUsd: budget.limit_usd,
             onBreach: budget.on_breach,
@@ -365,9 +337,7 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
 
     const gaps: string[] = [];
     if (!spend_available) {
-      gaps.push(
-        "spend could not be totalled server-side, so utilization is not real spend",
-      );
+      gaps.push("spend could not be totalled server-side, so utilization is not real spend");
     }
     if (unreadable.length > 0) {
       gaps.push(
@@ -391,14 +361,6 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
   }
 
   // Fetch counts for all major resources in parallel.
-  //
-  // Annotated rather than inferred: the array mixes `apiClient.GET` (whose
-  // FetchResponse is a DIFFERENT structural type per path) with `fetchCount`,
-  // so an inferred `fn` is a union of thunks that `withTimeout<T>` cannot
-  // unify. This is the shape the counting below actually reads.
-  // The annotation is what pins `fn` (see above), but `keyof typeof results` on
-  // a `Record<string, …>` is just `string` — it looks like key safety and isn't,
-  // so a typo'd key type-checks and emits a bogus row. Spell the keys out.
   const fetchers: {
     key: ResourceKey;
     fn: () => Promise<{
@@ -408,16 +370,20 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
       response?: { status?: number };
     }>;
   }[] = [
-    { key: "evaluators", fn: () => apiClient.GET("/api/evaluators") },
-    { key: "scenarios", fn: () => apiClient.GET("/api/scenarios") },
-    { key: "suites", fn: () => fetchCount("/api/suites") },
-    { key: "datasets", fn: () => apiClient.GET("/api/dataset") },
+    { key: "evaluators", fn: () => apiClient.GET("/api/v1/evaluators") },
+    { key: "scenarios", fn: () => apiClient.GET("/api/v1/scenarios") },
+    { key: "suites", fn: () => fetchCount("/api/v1/suites") },
+    { key: "datasets", fn: () => apiClient.GET("/api/v1/dataset") },
     { key: "agents", fn: () => apiClient.GET("/api/v1/agents") },
-    { key: "workflows", fn: () => apiClient.GET("/api/workflows") },
-    { key: "dashboards", fn: () => apiClient.GET("/api/dashboards") },
-    { key: "triggers", fn: () => fetchCount("/api/triggers") },
-    { key: "monitors", fn: () => fetchCount("/api/monitors") },
-    { key: "secrets", fn: () => fetchCount("/api/secrets") },
+    { key: "workflows", fn: () => apiClient.GET("/api/v1/workflows") },
+    { key: "dashboards", fn: () => apiClient.GET("/api/v1/dashboards") },
+    { key: "triggers", fn: () => fetchCount("/api/v1/triggers") },
+    { key: "monitors", fn: () => fetchCount("/api/v1/monitors") },
+    {
+      key: "secrets",
+      fn: () =>
+        fetchCount(`/api/v1/secret?projectId=${encodeURIComponent(credentials.projectId ?? "")}`),
+    },
   ];
 
   // Same reason as `fetchers` above: the three return number |
@@ -435,8 +401,9 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
       try {
         const result = await withTimeout(fn, LIST_CALL_TIMEOUT_MS);
         const { data, error } = result;
-        const status = (result as { status?: number; response?: { status?: number } }).status
-          ?? (result as { response?: { status?: number } }).response?.status;
+        const status =
+          (result as { status?: number; response?: { status?: number } }).status ??
+          (result as { response?: { status?: number } }).response?.status;
         if (error) {
           results[key] = {
             count: 0,
@@ -447,10 +414,18 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
         }
         if (Array.isArray(data)) {
           results[key] = { count: data.length };
-        } else if (data && typeof data === "object" && "data" in (data as Record<string, unknown>)) {
+        } else if (
+          data &&
+          typeof data === "object" &&
+          "data" in (data as Record<string, unknown>)
+        ) {
           const arr = (data as { data: unknown[] }).data;
           results[key] = { count: Array.isArray(arr) ? arr.length : 0 };
-        } else if (data && typeof data === "object" && "pagination" in (data as Record<string, unknown>)) {
+        } else if (
+          data &&
+          typeof data === "object" &&
+          "pagination" in (data as Record<string, unknown>)
+        ) {
           const pagination = (data as { pagination: { total: number } }).pagination;
           results[key] = { count: pagination.total };
         } else {
@@ -464,8 +439,10 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
       try {
         // The three section fetchers return number | RunningExperiment[] |
         // BudgetAtRisk[]; the AttentionReport field types line up by key.
-        (attention as unknown as Record<AttentionSectionKey, unknown>)[key] =
-          await withTimeout(fn, SECTION_CALL_TIMEOUT_MS);
+        (attention as unknown as Record<AttentionSectionKey, unknown>)[key] = await withTimeout(
+          fn,
+          SECTION_CALL_TIMEOUT_MS,
+        );
       } catch (err) {
         // Soft-fail: the section reads null and the reason lives in `errors`
         // (rendered dimly in human mode, verbatim in machine output). A timeout
@@ -499,19 +476,38 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
         const statuses = Object.values(results)
           .map((r) => r.status)
           .filter((s): s is number => typeof s === "number");
-        const allUnauthorized = statuses.length > 0 && statuses.every((s) => s === 401 || s === 403);
+        const allUnauthorized =
+          statuses.length > 0 && statuses.every((s) => s === 401 || s === 403);
         console.log();
         console.log(chalk.red("  ✗ Could not fetch any project resources."));
         console.log(chalk.gray(`    Reason: ${sampleError}`));
         console.log();
         if (allUnauthorized && isPersonalAccessToken(apiKey) && !process.env.LANGWATCH_PROJECT_ID) {
-          console.log(chalk.gray(`    Your PAT requires ${chalk.cyan("LANGWATCH_PROJECT_ID")} to be set.`));
-          console.log(chalk.gray(`    Set it via: ${chalk.cyan("export LANGWATCH_PROJECT_ID=<your-project-id>")}`));
-          console.log(chalk.gray(`    Or add to .env: ${chalk.cyan("LANGWATCH_PROJECT_ID=<your-project-id>")}`));
+          console.log(
+            chalk.gray(`    Your PAT requires ${chalk.cyan("LANGWATCH_PROJECT_ID")} to be set.`),
+          );
+          console.log(
+            chalk.gray(
+              `    Set it via: ${chalk.cyan("export LANGWATCH_PROJECT_ID=<your-project-id>")}`,
+            ),
+          );
+          console.log(
+            chalk.gray(
+              `    Or add to .env: ${chalk.cyan("LANGWATCH_PROJECT_ID=<your-project-id>")}`,
+            ),
+          );
         } else if (allUnauthorized) {
-          console.log(chalk.gray(`    Your API key appears to be invalid or revoked. Re-run ${chalk.cyan("langwatch login")} or check ${chalk.cyan("LANGWATCH_API_KEY")}.`));
+          console.log(
+            chalk.gray(
+              `    Your API key appears to be invalid or revoked. Re-run ${chalk.cyan("langwatch login")} or check ${chalk.cyan("LANGWATCH_API_KEY")}.`,
+            ),
+          );
         } else {
-          console.log(chalk.gray(`    Check ${chalk.cyan("LANGWATCH_API_KEY")} (current endpoint: ${chalk.cyan(endpoint)}).`));
+          console.log(
+            chalk.gray(
+              `    Check ${chalk.cyan("LANGWATCH_API_KEY")} (current endpoint: ${chalk.cyan(endpoint)}).`,
+            ),
+          );
         }
         console.log();
         process.exit(1);
@@ -539,7 +535,10 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
         console.log(
           chalk.yellow(
             `    ⚠ experiment "${experiment.name ?? experiment.slug}" is still running${progress}`,
-          ) + chalk.gray(`  →  langwatch experiment status ${experiment.slug} --run-id ${experiment.runId}`),
+          ) +
+            chalk.gray(
+              `  →  langwatch experiment status ${experiment.slug} --run-id ${experiment.runId}`,
+            ),
         );
       }
       for (const budget of attention.budgetsAtRisk ?? []) {
@@ -547,8 +546,7 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
         // A per-person template carries a headcount instead of a total, so it
         // reports the headcount and the cap each person carries.
         const overCap = budget.endUsersOver;
-        const breached =
-          overCap !== undefined ? overCap > 0 : budget.utilizationPct >= 100;
+        const breached = overCap !== undefined ? overCap > 0 : budget.utilizationPct >= 100;
         const standing =
           overCap !== undefined
             ? `${overCap} of ${budget.endUsersSeen} over cap, $${budget.limitUsd}/person`
@@ -567,9 +565,7 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
         if (Object.keys(attention.errors).length === 0 && errorCount === 0) {
           console.log(chalk.green("    ✓ nothing needs your attention"));
         } else {
-          console.log(
-            chalk.gray("    – nothing flagged, but some checks did not run"),
-          );
+          console.log(chalk.gray("    – nothing flagged, but some checks did not run"));
         }
       }
       // Sections that could not be fetched are noted dimly, never fatal.
@@ -593,9 +589,7 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
       for (const key of RESOURCE_KEYS) {
         const r = results[key];
         if (!r) continue;
-        const countStr = r.error
-          ? chalk.red(r.error)
-          : chalk.cyan(String(r.count));
+        const countStr = r.error ? chalk.red(r.error) : chalk.cyan(String(r.count));
         console.log(`    ${chalk.gray(key + ":")} ${" ".repeat(14 - key.length)}${countStr}`);
       }
 
@@ -608,7 +602,9 @@ export const statusCommand = async (options?: RawOutputFlags): Promise<void> => 
         console.log(chalk.gray(`    ${line}`));
       }
       console.log();
-      console.log(chalk.gray("  Run `langwatch commands` for the full catalog (args, flags, hints)."));
+      console.log(
+        chalk.gray("  Run `langwatch commands` for the full catalog (args, flags, hints)."),
+      );
       console.log();
     },
   });

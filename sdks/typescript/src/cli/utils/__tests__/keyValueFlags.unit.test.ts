@@ -9,11 +9,7 @@
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
-import {
-  coerceParameterValue,
-  parseKeyValueFlags,
-  parseRunParameterFlags,
-} from "../keyValueFlags";
+import { coerceParameterValue, parseKeyValueFlags, parseRunParameterFlags } from "../keyValueFlags";
 
 class ProcessExitError extends Error {
   constructor(public code: number) {
@@ -63,9 +59,7 @@ describe("coerceParameterValue()", () => {
       expect(coerceParameterValue({ value: "1.50" })).toBe("1.50");
       expect(coerceParameterValue({ value: "0x10" })).toBe("0x10");
       expect(coerceParameterValue({ value: "1e5" })).toBe("1e5");
-      expect(coerceParameterValue({ value: "12345678901234567890" })).toBe(
-        "12345678901234567890",
-      );
+      expect(coerceParameterValue({ value: "12345678901234567890" })).toBe("12345678901234567890");
       expect(coerceParameterValue({ value: " 5" })).toBe(" 5");
       expect(coerceParameterValue({ value: "" })).toBe("");
       expect(coerceParameterValue({ value: "Infinity" })).toBe("Infinity");
@@ -117,9 +111,7 @@ describe("parseRunParameterFlags()", () => {
 
   describe("given a value containing an equals sign", () => {
     it("splits on the first one, so the value keeps the rest", () => {
-      expect(
-        parseRunParameterFlags({ pairs: ["query=a=b"] }),
-      ).toEqual({ query: "a=b" });
+      expect(parseRunParameterFlags({ pairs: ["query=a=b"] })).toEqual({ query: "a=b" });
     });
   });
 
@@ -145,25 +137,21 @@ describe("parseRunParameterFlags()", () => {
 
   describe("given the same name twice", () => {
     it("keeps the last value, so an appended override wins", () => {
-      expect(
-        parseRunParameterFlags({ pairs: ["region=us-east", "region=eu-central"] }),
-      ).toEqual({ region: "eu-central" });
+      expect(parseRunParameterFlags({ pairs: ["region=us-east", "region=eu-central"] })).toEqual({
+        region: "eu-central",
+      });
     });
   });
 
   describe("given a pair with no equals sign", () => {
     it("ends the command instead of guessing what was meant", () => {
-      expect(() => parseRunParameterFlags({ pairs: ["region"] })).toThrow(
-        ProcessExitError,
-      );
+      expect(() => parseRunParameterFlags({ pairs: ["region"] })).toThrow(ProcessExitError);
     });
   });
 
   describe("given a pair with an empty name", () => {
     it("ends the command, since no scenario can declare a nameless parameter", () => {
-      expect(() => parseRunParameterFlags({ pairs: ["=eu-central"] })).toThrow(
-        ProcessExitError,
-      );
+      expect(() => parseRunParameterFlags({ pairs: ["=eu-central"] })).toThrow(ProcessExitError);
     });
   });
 });
@@ -182,17 +170,17 @@ describe("parseKeyValueFlags()", () => {
 
   describe("given a key containing a colon", () => {
     it("ends the command, since the pair would address a different key", () => {
-      expect(() =>
-        parseKeyValueFlags({ pairs: ["a:b=gold"], flag: "--metadata" }),
-      ).toThrow(ProcessExitError);
+      expect(() => parseKeyValueFlags({ pairs: ["a:b=gold"], flag: "--metadata" })).toThrow(
+        ProcessExitError,
+      );
     });
   });
 
   describe("given an empty value", () => {
     it("ends the command, since it would match every request lacking the key", () => {
-      expect(() =>
-        parseKeyValueFlags({ pairs: ["tier="], flag: "--metadata" }),
-      ).toThrow(ProcessExitError);
+      expect(() => parseKeyValueFlags({ pairs: ["tier="], flag: "--metadata" })).toThrow(
+        ProcessExitError,
+      );
     });
   });
 

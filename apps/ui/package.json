@@ -1,0 +1,166 @@
+{
+  "name": "@langwatch/ui",
+  "version": "0.1.0",
+  "private": true,
+  "description": "LangWatch browser process composition.",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./public-config": {
+      "types": "./src/behavior/public-config.ts",
+      "default": "./src/behavior/public-config.ts"
+    },
+    "./design-system": {
+      "types": "./src/behavior/design-system.ts",
+      "default": "./src/behavior/design-system.ts"
+    },
+    "./langy-theme": {
+      "types": "./src/model/langy-theme.ts",
+      "default": "./src/model/langy-theme.ts"
+    },
+    "./analytics-client": {
+      "types": "./src/behavior/analytics-client.ts",
+      "default": "./src/behavior/analytics-client.ts"
+    },
+    "./posthog-analytics": {
+      "types": "./src/behavior/posthog-analytics.ts",
+      "default": "./src/behavior/posthog-analytics.ts"
+    },
+    "./gtag-readiness": {
+      "types": "./src/behavior/gtag-readiness.ts",
+      "default": "./src/behavior/gtag-readiness.ts"
+    },
+    "./browser-tracing": {
+      "types": "./src/behavior/browser-tracing.ts",
+      "default": "./src/behavior/browser-tracing.ts"
+    },
+    "./navigation-tracing": {
+      "types": "./src/behavior/navigation-tracing.ts",
+      "default": "./src/behavior/navigation-tracing.ts"
+    },
+    "./poll-for-global": {
+      "types": "./src/behavior/poll-for-global.ts",
+      "default": "./src/behavior/poll-for-global.ts"
+    }
+  },
+  "scripts": {
+    "predev": "node ../../dev/scripts/ensure-built.mjs",
+    "dev": "vite --configLoader runner",
+    "build": "NODE_ENV=production vite build --configLoader runner",
+    "typecheck": "node ../../dev/scripts/typecheck-app.mjs ./tsconfig.declarations.json tsconfig.test.json",
+    "typecheck:fast": "pnpm -w typecheck:declarations --project apps/ui/tsconfig.declarations.json && tsc --noEmit -p tsconfig.json",
+    "test": "vitest run",
+    "test:unit": "vitest run"
+  },
+  "dependencies": {
+    "@better-auth/passkey": "catalog:",
+    "@chakra-ui/react": "catalog:",
+    "@langwatch/agent-contract": "workspace:*",
+    "@langwatch/agent-web": "workspace:*",
+    "@langwatch/analytics-web": "workspace:*",
+    "@langwatch/annotation-web": "workspace:*",
+    "@langwatch/api": "workspace:*",
+    "@langwatch/api-key-web": "workspace:*",
+    "@langwatch/auth-contract": "workspace:*",
+    "@langwatch/auth-web": "workspace:*",
+    "@langwatch/authz-contract": "workspace:*",
+    "@langwatch/authz-web": "workspace:*",
+    "@langwatch/automation-web": "workspace:*",
+    "@langwatch/config": "workspace:*",
+    "@langwatch/data-privacy-web": "workspace:*",
+    "@langwatch/data-retention-web": "workspace:*",
+    "@langwatch/dataset-web": "workspace:*",
+    "@langwatch/design-system": "workspace:*",
+    "@langwatch/enterprise-billing-contract": "workspace:*",
+    "@langwatch/enterprise-billing-web": "workspace:*",
+    "@langwatch/enterprise-governance-web": "workspace:*",
+    "@langwatch/enterprise-licensing-web": "workspace:*",
+    "@langwatch/enterprise-managed-provider-web": "workspace:*",
+    "@langwatch/enterprise-saas-contract": "workspace:*",
+    "@langwatch/enterprise-scim-web": "workspace:*",
+    "@langwatch/evaluation-contract": "workspace:*",
+    "@langwatch/evaluator-web": "workspace:*",
+    "@langwatch/experiment-web": "workspace:*",
+    "@langwatch/experiment-contract": "workspace:*",
+    "@langwatch/gateway-contract": "workspace:*",
+    "@langwatch/gateway-web": "workspace:*",
+    "@langwatch/github-web": "workspace:*",
+    "@langwatch/handled-error": "workspace:*",
+    "@langwatch/langy-web": "workspace:*",
+    "@langwatch/model-provider-contract": "workspace:*",
+    "@langwatch/model-provider-web": "workspace:*",
+    "@langwatch/monitor-web": "workspace:*",
+    "@langwatch/navigation-web": "workspace:*",
+    "@langwatch/notification-contract": "workspace:*",
+    "@langwatch/notification-web": "workspace:*",
+    "@langwatch/onboarding-web": "workspace:*",
+    "@langwatch/ops-contract": "workspace:*",
+    "@langwatch/ops-web": "workspace:*",
+    "@langwatch/organization-web": "workspace:*",
+    "@langwatch/project-web": "workspace:*",
+    "@langwatch/prompt-web": "workspace:*",
+    "@langwatch/react-rum": "workspace:*",
+    "@langwatch/scenario-contract": "workspace:*",
+    "@langwatch/scenario-web": "workspace:*",
+    "@langwatch/secret-web": "workspace:*",
+    "@langwatch/time": "workspace:*",
+    "@langwatch/topic-web": "workspace:*",
+    "@langwatch/trace-contract": "workspace:*",
+    "@langwatch/trace-web": "workspace:*",
+    "@langwatch/ui-drawer": "workspace:*",
+    "@langwatch/ui-host": "workspace:*",
+    "@langwatch/user-contract": "workspace:*",
+    "@langwatch/user-web": "workspace:*",
+    "@langwatch/workflow-contract": "workspace:*",
+    "@langwatch/workflow-web": "workspace:*",
+    "@tanstack/react-query": "catalog:",
+    "@trpc/client": "catalog:",
+    "@trpc/react-query": "catalog:",
+    "@trpc/server": "catalog:",
+    "better-auth": "catalog:",
+    "lucide-react": "catalog:",
+    "nprogress": "^0.2.0",
+    "posthog-js": "catalog:",
+    "react": "catalog:",
+    "react-contextual-analytics": "catalog:",
+    "react-dom": "catalog:",
+    "react-error-boundary": "catalog:",
+    "react-router": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@ai-sdk/openai": "catalog:",
+    "@elevenlabs/client": "catalog:",
+    "@langwatch/feature-flag-contract": "workspace:*",
+    "@langwatch/prisma-client": "workspace:*",
+    "@langwatch/scenario": "catalog:",
+    "@langwatch/scenario-server": "workspace:*",
+    "@opentelemetry/api": "catalog:",
+    "@opentelemetry/sdk-trace-base": "catalog:",
+    "@opentelemetry/semantic-conventions": "catalog:",
+    "@playwright/test": "catalog:",
+    "@testing-library/react": "catalog:",
+    "@testing-library/user-event": "catalog:",
+    "@types/nprogress": "^0.2.3",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "@vitejs/plugin-react": "catalog:",
+    "ai": "catalog:",
+    "dotenv": "catalog:",
+    "jsdom": "catalog:",
+    "nanoid": "^6.0.0",
+    "playwright": "catalog:",
+    "tsx": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vitest": "catalog:"
+  }
+}

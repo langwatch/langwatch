@@ -1,22 +1,8 @@
 /**
- * Integration tests asserting that the CLI surfaces actionable error
- * messages from the API instead of generic "Internal server error" blobs.
- *
- * Each scenario:
- *   1. Spins up a tiny HTTP server returning a known error body.
- *   2. Spawns the built CLI binary with a temp working directory pointing
- *      at that server via env vars.
- *   3. Asserts on the CLI stdout/stderr the user would actually see.
+ * Integration tests asserting that the CLI surfaces actionable error messages from the API
+ * instead of generic "Internal server error" blobs.
  */
-import {
-  describe,
-  expect,
-  it,
-  beforeAll,
-  afterAll,
-  beforeEach,
-  afterEach,
-} from "vitest";
+import { describe, expect, it, beforeAll, afterAll, beforeEach, afterEach } from "vitest";
 import * as fs from "fs";
 import * as path from "path";
 import * as os from "os";
@@ -51,9 +37,7 @@ function matchKey(method: string, urlPath: string): string | undefined {
         (keyPath ?? "")
           .split("/")
           .map((segment) =>
-            segment.startsWith(":")
-              ? "[^/]+"
-              : segment.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
+            segment.startsWith(":") ? "[^/]+" : segment.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
           )
           .join("/") +
         "$",
@@ -152,18 +136,21 @@ describe("CLI surfaces meaningful error messages from the API", () => {
   });
 
   describe("when prompt sync hits a 409 conflict for an active handle", () => {
-    /** @scenario Sync surfaces a specific conflict message when a handle is already in use by an active prompt */
+    /**
+     * @scenario Sync surfaces a specific conflict message when a handle is
+     * already in use by an active prompt
+     */
     it("shows the descriptive conflict message, not 'Internal server error'", async () => {
       await runCli(["prompt", "init"], testDir);
       await runCli(["prompt", "create", "my-prompt"], testDir);
 
       // Pull (push.ts fetches existing prompts before pushing) returns empty
-      pushResponse("GET", "/api/prompts/:id", {
+      pushResponse("GET", "/api/v1/prompts/:id", {
         status: 404,
         body: { error: "NotFoundError", message: "Prompt not found" },
       });
       // Sync returns 409 conflict
-      pushResponse("POST", "/api/prompts/:id/sync", {
+      pushResponse("POST", "/api/v1/prompts/:id/sync", {
         status: 409,
         body: {
           error: "Conflict",
@@ -174,9 +161,7 @@ describe("CLI surfaces meaningful error messages from the API", () => {
       const result = await runCli(["prompt", "sync"], testDir);
 
       expect(result.exitCode).toBe(1);
-      expect(result.combined.toLowerCase()).toContain(
-        "handle already exists",
-      );
+      expect(result.combined.toLowerCase()).toContain("handle already exists");
       expect(result.combined.toLowerCase()).not.toContain(
         "failed to sync prompt: internal server error",
       );
@@ -184,16 +169,19 @@ describe("CLI surfaces meaningful error messages from the API", () => {
   });
 
   describe("when the API returns a 500 with a non-generic message field", () => {
-    /** @scenario API errors surface a meaningful message, not the bare "Internal server error" label */
+    /**
+     * @scenario API errors surface a meaningful message, not the bare "Internal
+     * server error" label
+     */
     it("propagates the descriptive message instead of just the kind label", async () => {
       await runCli(["prompt", "init"], testDir);
       await runCli(["prompt", "create", "my-prompt"], testDir);
 
-      pushResponse("GET", "/api/prompts/:id", {
+      pushResponse("GET", "/api/v1/prompts/:id", {
         status: 404,
         body: { error: "NotFoundError", message: "Prompt not found" },
       });
-      pushResponse("POST", "/api/prompts/:id/sync", {
+      pushResponse("POST", "/api/v1/prompts/:id/sync", {
         status: 500,
         body: {
           error: "Internal server error",
@@ -214,11 +202,11 @@ describe("CLI surfaces meaningful error messages from the API", () => {
       await runCli(["prompt", "init"], testDir);
       await runCli(["prompt", "create", "my-prompt"], testDir);
 
-      pushResponse("GET", "/api/prompts/:id", {
+      pushResponse("GET", "/api/v1/prompts/:id", {
         status: 404,
         body: { error: "NotFoundError", message: "Prompt not found" },
       });
-      pushResponse("POST", "/api/prompts/:id/sync", {
+      pushResponse("POST", "/api/v1/prompts/:id/sync", {
         status: 500,
         body: { code: "MYSTERY_CODE", details: { traceId: "tr_123" } },
       });

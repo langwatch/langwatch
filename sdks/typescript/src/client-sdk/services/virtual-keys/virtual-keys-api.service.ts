@@ -302,10 +302,7 @@ export class VirtualKeysApiService {
       startCursor: options?.cursor,
       nextCursorOf: (page) => page.next_cursor,
       onEndlessWalk: (reason) =>
-        new VirtualKeysApiError(
-          `Failed to list virtual keys: ${reason}.`,
-          "list virtual keys",
-        ),
+        new VirtualKeysApiError(`Failed to list virtual keys: ${reason}.`, "list virtual keys"),
       fetchPage: (cursor) =>
         this.listPage({
           cursor,
@@ -333,10 +330,7 @@ export class VirtualKeysApiService {
       startCursor: options?.cursor,
       nextCursorOf: (page) => page.next_cursor,
       onEndlessWalk: (reason) =>
-        new VirtualKeysApiError(
-          `Failed to list virtual keys: ${reason}.`,
-          "list virtual keys",
-        ),
+        new VirtualKeysApiError(`Failed to list virtual keys: ${reason}.`, "list virtual keys"),
       fetchPage: (cursor) =>
         this.listPage({
           cursor,
@@ -390,10 +384,7 @@ export class VirtualKeysApiService {
     return virtual_key;
   }
 
-  async rotate(
-    id: string,
-    options?: MutationOptions,
-  ): Promise<VirtualKeyWithSecret> {
+  async rotate(id: string, options?: MutationOptions): Promise<VirtualKeyWithSecret> {
     return this.request<VirtualKeyWithSecret>(
       `rotate virtual key "${id}"`,
       `/api/gateway/v1/virtual-keys/${encodeURIComponent(id)}/rotate`,

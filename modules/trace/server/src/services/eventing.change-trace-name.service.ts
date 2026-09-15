@@ -1,0 +1,32 @@
+import { defineCommand } from "@langwatch/eventing";
+import {
+  CHANGE_TRACE_NAME_COMMAND_TYPE,
+  TRACE_NAME_CHANGED_EVENT_TYPE,
+  TRACE_NAME_CHANGED_EVENT_VERSION_LATEST,
+} from "@langwatch/trace-contract";
+import { traceNameChangedEventDataSchema } from "@langwatch/trace-contract";
+
+/** Persists user-driven rename with idempotency; resilient against later root-span arrivals. */
+const changeTraceNameDefinition = defineCommand({
+  commandType: CHANGE_TRACE_NAME_COMMAND_TYPE,
+  eventType: TRACE_NAME_CHANGED_EVENT_TYPE,
+  eventVersion: TRACE_NAME_CHANGED_EVENT_VERSION_LATEST,
+  aggregateType: "trace",
+  schema: traceNameChangedEventDataSchema,
+  aggregateId: (d) => d.traceId,
+  idempotencyKey: (d) => `${d.tenantId}:${d.traceId}:change_trace_name:${d.newName}`,
+  spanAttributes: (d) => ({
+    "payload.trace.id": d.traceId,
+    "payload.new_name.length": d.newName.length,
+    "payload.changed_by_user_id": d.changedByUserId ?? "",
+  }),
+  makeJobId: (d) => `${d.tenantId}:${d.traceId}:change_trace_name`,
+});
+
+export class EventingChangeTraceNameAdapter extends changeTraceNameDefinition {
+  static create(): EventingChangeTraceNameAdapter {
+    return new EventingChangeTraceNameAdapter();
+  }
+}
+
+export const changeTraceNameCommand = EventingChangeTraceNameAdapter;

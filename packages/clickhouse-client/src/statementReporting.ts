@@ -27,15 +27,15 @@
  * for both and so breaks both at once.
  */
 
-import { quietly } from "./observability";
-import { QUERY_CAUSE_FIELD, RETRY_CAUSE_FIELD } from "./resilience";
-import type { RetryAttemptNotice } from "./retry";
+import { quietly } from "./observability.ts";
+import { QUERY_CAUSE_FIELD, RETRY_CAUSE_FIELD } from "./resilience.ts";
+import type { RetryAttemptNotice } from "./retry.ts";
 import {
   extractQueryPreview,
   extractRawQuery,
   safeQueryMeta,
   type VendorQueryType,
-} from "./statementShape";
+} from "./statementShape.ts";
 
 /**
  * How a statement ended, as the metric counts it. `inband_error` is a
@@ -55,10 +55,7 @@ export interface StatementMetrics {
     table: string;
     durationSeconds: number;
   }): void;
-  incrementCount(input: {
-    queryType: VendorQueryType;
-    outcome: StatementOutcome;
-  }): void;
+  incrementCount(input: { queryType: VendorQueryType; outcome: StatementOutcome }): void;
 }
 
 /** The subset of a structured logger this package writes through. */
@@ -161,13 +158,7 @@ export class StatementReporter {
    * observation — was already recorded when the query resolved. Observing a
    * second duration for the same statement would double-count it.
    */
-  count({
-    queryType,
-    outcome,
-  }: {
-    queryType: VendorQueryType;
-    outcome: StatementOutcome;
-  }): void {
+  count({ queryType, outcome }: { queryType: VendorQueryType; outcome: StatementOutcome }): void {
     this.metrics.incrementCount({ queryType, outcome });
   }
 
@@ -223,10 +214,7 @@ export class StatementReporter {
         `ClickHouse ${operation} failed`,
       );
     } catch (loggingError) {
-      this.noticeLogger.error(
-        { loggingError },
-        "Failed to log ClickHouse query failure",
-      );
+      this.noticeLogger.error({ loggingError }, "Failed to log ClickHouse query failure");
     }
   }
 
@@ -249,9 +237,7 @@ export class StatementReporter {
       // per call. Worth warning even when fast, because the cost is request
       // count, not latency.
       const coldScanTable =
-        operation === "query"
-          ? this.detectColdScan(extractRawQuery(params))
-          : null;
+        operation === "query" ? this.detectColdScan(extractRawQuery(params)) : null;
 
       if (coldScanTable !== null) {
         this.outcomeLogger.warn(
@@ -280,10 +266,7 @@ export class StatementReporter {
         );
       }
     } catch (loggingError) {
-      this.noticeLogger.error(
-        { loggingError },
-        "Failed to log ClickHouse query success",
-      );
+      this.noticeLogger.error({ loggingError }, "Failed to log ClickHouse query success");
     }
   }
 

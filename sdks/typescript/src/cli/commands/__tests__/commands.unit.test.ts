@@ -32,8 +32,7 @@ describe("commandsCommand", () => {
     }
   });
 
-  const logged = (): string =>
-    consoleLogSpy.mock.calls.flat().join("\n");
+  const logged = (): string => consoleLogSpy.mock.calls.flat().join("\n");
 
   it("renders the compact tree as its human form", () => {
     commandsCommand({}).table();
@@ -96,8 +95,7 @@ describe("helpTreeCommand", () => {
     }
   });
 
-  const logged = (): string =>
-    consoleLogSpy.mock.calls.flat().join("\n");
+  const logged = (): string => consoleLogSpy.mock.calls.flat().join("\n");
 
   it("prints the annotated tree as plain text by default", () => {
     // No explicit format request, so it prints itself and returns nothing for

@@ -1,0 +1,11 @@
+# `x.toISOString()` on a proven instant. `fractionalSecondDigits: 3` keeps the
+# printed bytes identical: `Instant.toString()` omits the `.000` that
+# `Date.toISOString()` always writes.
+id: temporal-instant-iso-string
+language: TypeScript
+severity: warning
+message: >
+  An instant prints ISO-8601 through `toString`.
+rule:
+  pattern: $RECEIVER.toISOString()
+fix: "$RECEIVER.toString({ fractionalSecondDigits: 3 })"

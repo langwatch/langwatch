@@ -1,11 +1,11 @@
 import { scopedApiKey } from "@/internal/credentialContext";
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
-import { resolveCredentials } from "../../utils/apiKey";
-import { formatFetchError } from "../../utils/formatFetchError";
-import { formatTable } from "../../utils/formatting";
-import { failSpinner } from "../../utils/spinnerError";
-import type { CommandResult } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner.ts";
+import { resolveCredentials } from "../../utils/apiKey.ts";
+import { formatFetchError } from "../../utils/formatFetchError.ts";
+import { formatTable } from "../../utils/formatting.ts";
+import { failSpinner } from "../../utils/spinnerError.ts";
+import type { CommandResult } from "../../utils/output.ts";
 import { buildAuthHeaders } from "@/internal/api/auth";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
@@ -19,8 +19,7 @@ export const listMonitorsCommand = async (): Promise<CommandResult | void> => {
   await resolveCredentials();
 
   const apiKey = scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
-  const endpoint =
-    resolveControlPlaneUrl();
+  const endpoint = resolveControlPlaneUrl();
 
   const spinner = createSpinner("Fetching monitors...").start();
 
@@ -33,7 +32,7 @@ export const listMonitorsCommand = async (): Promise<CommandResult | void> => {
     sample: number;
   }>;
   try {
-    const response = await langwatchFetch(`${endpoint}/api/monitors`, {
+    const response = await langwatchFetch(`${endpoint}/api/v1/monitors`, {
       headers: buildAuthHeaders({ apiKey }),
     });
 
@@ -52,9 +51,7 @@ export const listMonitorsCommand = async (): Promise<CommandResult | void> => {
       sample: number;
     }>;
 
-    spinner.succeed(
-      `Found ${monitors.length} monitor${monitors.length !== 1 ? "s" : ""}`
-    );
+    spinner.succeed(`Found ${monitors.length} monitor${monitors.length !== 1 ? "s" : ""}`);
   } catch (error) {
     // No explicit `format`: see traces/search.ts — the preAction hook covers
     // every spelling; the `-f` commander default must not override it.
@@ -70,9 +67,7 @@ export const listMonitorsCommand = async (): Promise<CommandResult | void> => {
         console.log(chalk.gray("No monitors found."));
         console.log(chalk.gray("Create one with:"));
         console.log(
-          chalk.cyan(
-            '  langwatch monitor create "Toxicity Check" --check-type ragas/toxicity'
-          )
+          chalk.cyan('  langwatch monitor create "Toxicity Check" --check-type ragas/toxicity'),
         );
         return;
       }

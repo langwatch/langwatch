@@ -1,0 +1,23 @@
+name: Declaration build cache
+description: Reuse successful declaration artifacts from this branch and the default branch.
+
+runs:
+  using: composite
+  steps:
+    - name: Configure declaration cache directory
+      shell: bash
+      env:
+        DECLARATION_CACHE_DIRECTORY: ${{ runner.temp }}/langwatch-declarations
+      run: echo "LANGWATCH_DECLARATION_CACHE_DIR=$DECLARATION_CACHE_DIRECTORY" >> "$GITHUB_ENV"
+
+    # Per-job, per-commit archives can grow; immutable inner entries validate
+    # their own source, compiler and dependency keys before restoring anything.
+    - name: Restore declaration artifacts
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ${{ runner.temp }}/langwatch-declarations
+        key: declarations-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.job }}-${{ github.sha }}
+        restore-keys: |
+          declarations-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml') }}-${{ github.job }}-
+          declarations-v1-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml') }}-
+          declarations-v1-${{ runner.os }}-${{ runner.arch }}-

@@ -1,0 +1,304 @@
+import { describe, expect, it } from "vitest";
+import type { GithubInstallationLookup } from "../github-installation-access.service.ts";
+import type {
+  GithubAppTokenCache,
+  GithubPullRequestSummary,
+} from "../../app/github.app.ts";
+import type { GithubHost } from "../../app/github.members.ts";
+import { GithubPullRequestsRepository } from "../../repositories/github-pull-requests.repository.ts";
+import type {
+  GithubBranchCheckRow,
+  UpsertGithubBranchCheckInput,
+} from "../../repositories/github-pull-requests.repository.ts";
+import {
+  GithubBranchMappingService,
+  type BranchMappingTarget,
+} from "../github-branch-mapping.service.ts";
+import { Temporal } from "@langwatch/time";
+
+const NOW = new Date("2026-01-01T00:00:00Z").getTime();
+
+const target: BranchMappingTarget = {
+  organizationId: "org-1",
+  repositoryHost: "github.com",
+  repositoryOwner: "langwatch",
+  repositoryName: "langwatch",
+  headBranch: "feat/x",
+  origin: "sweep",
+};
+
+class FakeHost implements GithubHost {
+  getHost(): string {
+    return "github.com";
+  }
+  getApiBase(): string {
+    return "https://api.github.com";
+  }
+  getWebBase(): string {
+    return "https://github.com";
+  }
+  getAppInstallUrl(): string {
+    return "https://github.com/apps/x";
+  }
+  isMappable(): boolean {
+    return true;
+  }
+  normalize(host: string): string {
+    return host;
+  }
+}
+
+class FakeInstallations implements GithubInstallationLookup {
+  installation: { organizationId: string } | null = null;
+  findByInstallationId(): Promise<{ organizationId: string } | null> {
+    return Promise.resolve(this.installation);
+  }
+  tryResolveInstallationForRepository(): Promise<{
+    installationId: string;
+    repositoryId: string;
+  } | null> {
+    return Promise.resolve({ installationId: "install-1", repositoryId: "repo-1" });
+  }
+}
+
+class FakeAppTokens implements GithubAppTokenCache {
+  pullRequests: GithubPullRequestSummary[] = [];
+  listPullRequestsForHead(): Promise<GithubPullRequestSummary[]> {
+    return Promise.resolve(this.pullRequests);
+  }
+  getPullRequest(): Promise<GithubPullRequestSummary> {
+    throw new Error("not used");
+  }
+}
+
+class FakeRepository extends GithubPullRequestsRepository {
+  readonly upserts: UpsertGithubBranchCheckInput[] = [];
+  branchCheck: GithubBranchCheckRow | null = null;
+
+  upsertPullRequests(): Promise<void> {
+    return Promise.resolve();
+  }
+  findAllByBranches(): Promise<never[]> {
+    return Promise.resolve([]);
+  }
+  findAllByBranchKeys(): Promise<never[]> {
+    return Promise.resolve([]);
+  }
+  findByNumber(): Promise<null> {
+    return Promise.resolve(null);
+  }
+  refreshSnapshot(): Promise<void> {
+    return Promise.resolve();
+  }
+  tryFindBranchCheck(): Promise<GithubBranchCheckRow | null> {
+    return Promise.resolve(this.branchCheck);
+  }
+  upsertBranchCheck(input: UpsertGithubBranchCheckInput): Promise<void> {
+    this.upserts.push(input);
+    return Promise.resolve();
+  }
+  claimBranchLookup(): Promise<boolean> {
+    return Promise.resolve(true);
+  }
+  bringBranchRecheckForward(): Promise<void> {
+    return Promise.resolve();
+  }
+  touchBranchCheckRequestedAt(): Promise<void> {
+    return Promise.resolve();
+  }
+}
+
+function service(
+  repository: FakeRepository,
+  appTokens = new FakeAppTokens(),
+  installations = new FakeInstallations(),
+) {
+  return GithubBranchMappingService.create({
+    repository,
+    installations,
+    appTokens,
+    host: new FakeHost(),
+    now: () => NOW,
+  });
+}
+
+const pullRequestEvent = {
+  action: "opened",
+  installationId: "install-1",
+  repositoryOwner: "langwatch",
+  repositoryName: "langwatch",
+  headBranch: "feat/x",
+  pullRequest: {
+    number: 1,
+    htmlUrl: "https://github.com/langwatch/langwatch/pull/1",
+    title: "Add linkage",
+    state: "open",
+    draft: false,
+    mergedAt: null,
+    closedAt: null,
+    createdAt: "2026-01-01T00:00:00Z",
+    updatedAt: "2026-01-01T00:00:00Z",
+    authorLogin: "ada",
+  },
+};
+
+describe("given a branch with no pull request that the sweep asks GitHub about", () => {
+  describe("when the sweep records the empty answer", () => {
+    /** @scenario "The sweep does not renew the demand it selects on" */
+    it("leaves the branch's last demand time unchanged", async () => {
+      const repository = new FakeRepository();
+
+      await service(repository).map({ ...target, origin: "sweep" });
+
+      expect(repository.upserts).toHaveLength(1);
+      expect(repository.upserts[0]?.lastRequestedAt).toBeNull();
+    });
+  });
+});
+
+describe("given a branch with no pull request", () => {
+  describe("when a session folds on that branch and the mapping runs", () => {
+    /** @scenario "A session folding on a branch records demand for it" */
+    it("moves the branch's last demand time to the time of the fold", async () => {
+      const repository = new FakeRepository();
+
+      await service(repository).map({ ...target, origin: "demand" });
+
+      expect(repository.upserts).toHaveLength(1);
+      expect(repository.upserts[0]?.lastRequestedAt).toEqual(
+        Temporal.Instant.fromEpochMilliseconds(NOW),
+      );
+    });
+  });
+});
+
+describe("given an announcement carrying an installation with no local record", () => {
+  describe("when it arrives", () => {
+    /** @scenario "An announcement for a connection this instance does not hold is dropped" */
+    it("stores nothing for it", async () => {
+      const repository = new FakeRepository();
+      const installations = new FakeInstallations();
+      installations.installation = null;
+
+      const applied = await service(
+        repository,
+        new FakeAppTokens(),
+        installations,
+      ).applyPullRequestEvent(pullRequestEvent);
+
+      expect(applied).toBe(false);
+      expect(repository.upserts).toHaveLength(0);
+    });
+  });
+});
+
+describe("given an announcement that a label was added to a pull request", () => {
+  describe("when it arrives", () => {
+    /** @scenario "An announcement that changes nothing the page shows is dropped" */
+    it("writes nothing", async () => {
+      const repository = new FakeRepository();
+      const installations = new FakeInstallations();
+      installations.installation = { organizationId: "org-1" };
+
+      const applied = await service(
+        repository,
+        new FakeAppTokens(),
+        installations,
+      ).applyPullRequestEvent({
+        ...pullRequestEvent,
+        action: "labeled",
+      });
+
+      expect(applied).toBe(false);
+      expect(repository.upserts).toHaveLength(0);
+    });
+  });
+});
+
+const GHES = "github.acme-corp.internal";
+
+/** An instance bound to a GitHub Enterprise Server host, and to nothing else. */
+class EnterpriseHost implements GithubHost {
+  getHost(): string {
+    return GHES;
+  }
+  getApiBase(): string {
+    return `https://${GHES}/api/v3`;
+  }
+  getWebBase(): string {
+    return `https://${GHES}`;
+  }
+  getAppInstallUrl(): string {
+    return `https://${GHES}/github-apps/x`;
+  }
+  isMappable(repositoryHost: string): boolean {
+    return repositoryHost === "" || repositoryHost.toLowerCase() === GHES;
+  }
+  normalize(): string {
+    return GHES;
+  }
+}
+
+function enterpriseService(
+  repository: FakeRepository,
+  appTokens = new FakeAppTokens(),
+  installations = new FakeInstallations(),
+) {
+  return GithubBranchMappingService.create({
+    repository,
+    installations,
+    appTokens,
+    host: new EnterpriseHost(),
+    now: () => NOW,
+  });
+}
+
+describe("given an instance bound to a GitHub Enterprise Server host", () => {
+  describe("when GitHub announces a pull request", () => {
+    /** @scenario "A pull request announced over the webhook is recorded under the configured host" */
+    it("records it under the configured host, not github.com", async () => {
+      const repository = new FakeRepository();
+      const installations = new FakeInstallations();
+      installations.installation = { organizationId: "org-1" };
+
+      const applied = await enterpriseService(
+        repository,
+        new FakeAppTokens(),
+        installations,
+      ).applyPullRequestEvent(pullRequestEvent);
+
+      expect(applied).toBe(true);
+      expect(repository.upserts[0]).toMatchObject({
+        organizationId: "org-1",
+        repositoryHost: GHES,
+        repositoryFullName: "langwatch/langwatch",
+      });
+    });
+  });
+
+  describe("when a branch on that host is mapped", () => {
+    /** @scenario "A repository on the configured host is mapped" */
+    it("asks GitHub and keys the answer by that host", async () => {
+      const repository = new FakeRepository();
+
+      await enterpriseService(repository).map({ ...target, repositoryHost: GHES });
+
+      expect(repository.upserts[0]).toMatchObject({ repositoryHost: GHES });
+    });
+  });
+
+  describe("when a branch on github.com is mapped", () => {
+    /** @scenario "A repository on github.com is not mapped by an Enterprise Server instance" */
+    it("asks GitHub nothing, because this instance has no connection there", async () => {
+      const repository = new FakeRepository();
+
+      const recorded = await enterpriseService(repository).map({
+        ...target,
+        repositoryHost: "github.com",
+      });
+
+      expect(recorded).toBe(0);
+      expect(repository.upserts).toHaveLength(0);
+    });
+  });
+});

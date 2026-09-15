@@ -122,7 +122,7 @@ func (o *Orchestrator) langyChild(st domain.Stack, opts PlanOptions, base []stri
 	laRoot := filepath.Join(o.cfg.Home, "langyagent", st.Slug)
 	_ = os.MkdirAll(filepath.Join(laRoot, "sessions"), 0o755)
 	_ = os.MkdirAll(filepath.Join(laRoot, "workspace"), 0o755)
-	piWorkerPath := filepath.Join(opts.RepoRoot, "services", "langyworker", "out", "langy-worker")
+	piWorkerPath := filepath.Join(opts.RepoRoot, ".bin", "langy-worker", "langy-worker")
 	// A missing wrapper binary fails every worker spawn with exec-not-found,
 	// which reads as a bug rather than a setup gap. Say so at startup, once,
 	// while the operator is still looking at the terminal.
@@ -138,6 +138,7 @@ func (o *Orchestrator) langyChild(st domain.Stack, opts PlanOptions, base []stri
 		Name: "langyagent", Dir: opts.RepoRoot, Color: palette[6],
 		Shell: goServiceShell(opts.RepoRoot, "langyagent", opts.ShouldGoWatch),
 		Env: append(append([]string{}, base...),
+			domain.LaneEnv("langyagent"),
 			fmt.Sprintf("PORT=%d", port),
 			"SESSIONS_ROOT="+filepath.Join(laRoot, "sessions"),
 			"LANGY_WORKSPACE_ROOT="+filepath.Join(laRoot, "workspace"),
@@ -217,10 +218,11 @@ func langyContainerShell(o langyContainerOpts) string {
 		"-p", fmt.Sprintf("127.0.0.1:%d:%d", o.Port, o.Port),
 		"-e", fmt.Sprintf("PORT=%d", o.Port),
 		"-e", "ENVIRONMENT=local",
-		// Pretty, human-readable console logging (clog reads LOG_FORMAT), matching the
+		// The shared structured format (clog reads LOG_FORMAT), which haven renders
+		// for the terminal like every other lane. Matching the
 		// host-run Go services and the TS app so every haven dev lane reads the same.
 		// Unconditional in the container tier — it is always a human at the console.
-		"-e", "LOG_FORMAT=pretty",
+		"-e", "LOG_FORMAT=json",
 		"-e", "LANGY_INTERNAL_SECRET=" + o.Secret,
 		"-e", fmt.Sprintf("LANGY_MAX_WORKERS=%d", localLangyMaxWorkers),
 		"-e", fmt.Sprintf("LANGY_WORKER_IDLE_MS=%d", langyWorkerIdleMS(localLangyWorkerIdleMS)),

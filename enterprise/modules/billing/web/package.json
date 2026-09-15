@@ -1,0 +1,64 @@
+{
+  "name": "@langwatch/enterprise-billing-web",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Browser-safe LangWatch Enterprise billing UI.",
+  "license": "SEE LICENSE IN ../../../LICENSE.md",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "exports": {
+    "./billing": {
+      "types": "./dist/billing.d.ts",
+      "default": "./src/billing.ts"
+    },
+    "./surfaces/contact-sales": {
+      "types": "./dist/ui/sections/contact-sales/index.d.ts",
+      "default": "./src/ui/sections/contact-sales/index.ts"
+    },
+    "./surfaces/seat-proration-preview": {
+      "types": "./dist/ui/sections/seat-proration-preview/index.d.ts",
+      "default": "./src/ui/sections/seat-proration-preview/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "pnpm -w typecheck:declarations --project . && tsc --noEmit",
+    "test": "vitest run",
+    "test:unit": "vitest run"
+  },
+  "dependencies": {
+    "@langwatch/api": "workspace:*",
+    "@langwatch/design-system": "workspace:*",
+    "@langwatch/enterprise-billing-contract": "workspace:*",
+    "@langwatch/enterprise-licensing-contract": "workspace:*",
+    "@langwatch/enterprise-licensing-web": "workspace:*",
+    "@langwatch/entitlement-contract": "workspace:*",
+    "@langwatch/plans": "workspace:*",
+    "@langwatch/time": "workspace:*",
+    "@langwatch/ui-host": "workspace:*",
+    "lucide-react": "catalog:",
+    "numeral": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@chakra-ui/react": "catalog:",
+    "@emotion/react": "catalog:",
+    "@testing-library/jest-dom": "catalog:",
+    "@testing-library/react": "catalog:",
+    "@types/numeral": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "jsdom": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "peerDependencies": {
+    "@chakra-ui/react": "^3.36.0",
+    "@emotion/react": "^11.14.0",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7"
+  }
+}

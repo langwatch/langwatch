@@ -31,6 +31,9 @@ Feature: Redis is an owned client, never a module singleton
   # reached as `getApp().clickhouse`. This feature applies the same rule to Redis.
   #
   # See dev/docs/adr/093-redis-is-an-owned-client.md.
+  # ADR-111 preserves this ownership rule while replacing the global App:
+  # standalone API and worker processes own separate clients, while the
+  # contributor-only combined parent may share one explicitly.
 
   Rule: The client package never connects as an import side effect
 

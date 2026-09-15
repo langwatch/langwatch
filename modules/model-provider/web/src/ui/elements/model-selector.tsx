@@ -1,0 +1,730 @@
+import {
+  Box,
+  Button,
+  createListCollection,
+  Field,
+  HStack,
+  Input,
+  Skeleton,
+  Text,
+} from "@chakra-ui/react";
+import { AlertTriangle, Search } from "lucide-react";
+import React, { useEffect, useMemo, useState } from "react";
+import { LuSettings2 } from "react-icons/lu";
+import { modelProviderIcons, ProviderIconGlyph } from "./modelProviders/icons-map.tsx";
+import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
+import { isCodexModel, isModelAllowedForFeature } from "@langwatch/model-provider-contract";
+import {
+  buildCustomModelDisplayNames,
+  modelDisplayLabel,
+} from "@langwatch/model-provider-contract";
+import {
+  allLitellmModels,
+  type ModelProviderEditorValue as MaybeStoredModelProvider,
+} from "@langwatch/model-provider-contract";
+import { api } from "@langwatch/workflow-web/surfaces/workflow-api";
+import { titleCase } from "@langwatch/design-system/string-casing";
+import {
+  MODEL_ICON_SIZE,
+  MODEL_ICON_SIZE_SM,
+} from "@langwatch/prompt-web/surfaces/llm-config-constants";
+import { NoModelsConfiguredCallout } from "./no-models-configured-callout.tsx";
+import { InputGroup } from "@langwatch/design-system/input-group";
+import { Link } from "@langwatch/ui-host/link";
+import { Select } from "@langwatch/design-system/select";
+import { Tooltip } from "@langwatch/design-system/tooltip";
+
+export type ModelOption = {
+  label: string;
+  value: string;
+  icon: React.ReactNode;
+  isDisabled: boolean;
+  mode?: "chat" | "embedding" | undefined;
+  isCustom?: boolean;
+};
+
+export const modelSelectorOptions: ModelOption[] = Object.entries(allLitellmModels).map(
+  ([key, value]) => ({
+    label: key,
+    value: key,
+    icon: modelProviderIcons[key.split("/")[0] as keyof typeof modelProviderIcons],
+    isDisabled: false,
+    mode: value.mode as "chat" | "embedding",
+  }),
+);
+
+export const allModelOptions = modelSelectorOptions.map((option) => option.value);
+
+export type ModelOptionGroup = {
+  provider: string;
+  icon: React.ReactNode;
+  models: ModelOption[];
+};
+
+export type GroupedModelOptions = ModelOptionGroup[];
+
+/**
+ * Fail-closed gate for restricted-provider models (codex today): a picker
+ * only offers them when it declares a licensed `featureKey`. Exported for tests.
+ */
+export const filterRestrictedModels = ({
+  models,
+  featureKey,
+}: {
+  models: string[];
+  featureKey?: string | undefined;
+}): string[] =>
+  models.filter((model) =>
+    featureKey === undefined
+      ? !isCodexModel(model)
+      : isModelAllowedForFeature({ modelId: model, featureKey }),
+  );
+
+const SCOPE_RANK = { PROJECT: 3, TEAM: 2, ORGANIZATION: 1 } as const;
+const scopeRank = (scopeType?: string): number =>
+  SCOPE_RANK[scopeType as keyof typeof SCOPE_RANK] ?? 0;
+
+/**
+ * Provider keys whose registry models in `mode` must not be offered, because the row
+ * `resolveServingRow` actually picks (its scope-collapse winner, not the union of rows) cannot
+ * serve them.
+ */
+export const providersWithoutRegistryModels = (
+  rows: Array<{
+    provider: string;
+    enabled: boolean;
+    scopeType?: string | undefined;
+    embeddingsUnsupported?: boolean | undefined;
+  }>,
+  mode: "chat" | "embedding",
+): Set<string> => {
+  const unavailable = new Set<string>();
+  if (mode !== "embedding") return unavailable;
+
+  const byProvider = new Map<string, typeof rows>();
+  for (const row of rows) {
+    if (!row.enabled) continue;
+    const group = byProvider.get(row.provider);
+    if (group) {
+      group.push(row);
+    } else {
+      byProvider.set(row.provider, [row]);
+    }
+  }
+
+  for (const [provider, group] of byProvider) {
+    const topTier = Math.max(...group.map((r) => scopeRank(r.scopeType)));
+    const contenders = group.filter((r) => scopeRank(r.scopeType) === topTier);
+    if (contenders.some((r) => r.embeddingsUnsupported)) {
+      unavailable.add(provider);
+    }
+  }
+  return unavailable;
+};
+
+/**
+ * A real union by model id: the first row that declares a model wins.
+ * Concatenating instead put one model in the picker twice.
+ */
+const unionCustomModels = <T extends { modelId: string }>(
+  first: readonly T[] | null | undefined,
+  second: readonly T[] | null | undefined,
+): T[] => {
+  const byModelId = new Map<string, T>();
+  for (const model of [...(first ?? []), ...(second ?? [])]) {
+    if (!byModelId.has(model.modelId)) byModelId.set(model.modelId, model);
+  }
+  return [...byModelId.values()];
+};
+
+/**
+ * Adapt the array shape into the legacy `Record<provider, config>` shape
+ * `getCustomModels` expects, merging multi-scope rows (enabled if any is,
+ * custom model lists union).
+ */
+const mergeProviderRowsByKey = (
+  rows: readonly MaybeStoredModelProvider[],
+): Record<string, MaybeStoredModelProvider> => {
+  const byKey: Record<string, MaybeStoredModelProvider> = {};
+  for (const row of rows) {
+    const existing = byKey[row.provider];
+    if (!existing) {
+      byKey[row.provider] = row;
+      continue;
+    }
+    byKey[row.provider] = {
+      ...existing,
+      enabled: existing.enabled || row.enabled,
+      customModels: unionCustomModels(existing.customModels, row.customModels),
+      customEmbeddingsModels: unionCustomModels(
+        existing.customEmbeddingsModels,
+        row.customEmbeddingsModels,
+      ),
+    };
+  }
+  return byKey;
+};
+
+/** Custom model ids across every provider row, whether or not the row is enabled. */
+const allCustomModelIds = (
+  providersByKey: Record<string, MaybeStoredModelProvider>,
+  mode: "chat" | "embedding",
+): Set<string> => {
+  const ids = new Set<string>();
+  for (const [providerKey, config] of Object.entries(providersByKey)) {
+    const customList = mode === "chat" ? config.customModels : config.customEmbeddingsModels;
+    for (const model of customList ?? []) ids.add(`${providerKey}/${model.modelId}`);
+  }
+
+  return ids;
+};
+
+/** One group per provider, custom models at the top of each. */
+const groupOptionsByProvider = (selectOptions: ModelOption[]): GroupedModelOptions => {
+  const byProvider: Record<string, ModelOption[]> = {};
+  for (const option of selectOptions) {
+    const provider = option.value.split("/")[0]!;
+    byProvider[provider] ??= [];
+    byProvider[provider].push(option);
+  }
+
+  return Object.entries(byProvider).map(([provider, models]) => ({
+    provider,
+    icon: modelProviderIcons[provider as keyof typeof modelProviderIcons],
+    models: [...models.filter((m) => m.isCustom), ...models.filter((m) => !m.isCustom)],
+  }));
+};
+
+export const useModelSelectionOptions = (
+  options: string[],
+  model: string,
+  mode: "chat" | "embedding" = "chat",
+  opts?: { featureKey?: string | undefined },
+) => {
+  const { project } = useOrganizationTeamProject();
+  // `listAllForProjectForFrontend` returns only providers actually stored
+  // against a scope reachable from this project, unlike the legacy
+  // env-fed-defaults merge that leaked unrelated providers into the picker.
+  const modelProviders = api.modelProvider.listAllForProjectForFrontend.useQuery(
+    { projectId: project?.id ?? "" },
+    { enabled: !!project?.id },
+  );
+
+  // Memoized as one block: the derivation runs on data changes, not on every
+  // render of the caller. Without this, each render handed back fresh
+  // `selectOptions` / `groupedByProvider` arrays, so every downstream
+  // `useMemo` keyed on them recomputed too — the langy composer's model pill
+  // rebuilt its whole combobox collection per parent render because of it.
+  const providers = modelProviders.data;
+  const featureKey = opts?.featureKey;
+  const { selectOptions, groupedByProvider } = useMemo(() => {
+    const providersByKey = mergeProviderRowsByKey(providers ?? []);
+
+    const customModelIdSet = allCustomModelIds(providersByKey, mode);
+
+    // Gemini's Agent Platform door serves chat but not embeddings (404 on
+    // :batchEmbedContents), so registry embedding models are dropped here.
+    // Explicit custom models stay — the customer's own claim.
+    const withoutRegistryModels = providersWithoutRegistryModels(providers ?? [], mode);
+
+    const allModels = filterRestrictedModels({
+      models: getCustomModels(providersByKey, options, mode),
+      featureKey,
+    }).filter(
+      (model) => customModelIdSet.has(model) || !withoutRegistryModels.has(model.split("/")[0]!),
+    );
+
+    const displayNames = buildCustomModelDisplayNames(providers ?? []);
+
+    const selectOptions: ModelOption[] = allModels.map((modelValue) => {
+      const provider = modelValue.split("/")[0]!;
+
+      return {
+        label: modelDisplayLabel({ fullModelId: modelValue, displayNames }),
+        value: modelValue,
+        icon: modelProviderIcons[provider as keyof typeof modelProviderIcons],
+        isDisabled: false,
+        mode: mode,
+        isCustom: customModelIdSet.has(modelValue),
+      };
+    });
+
+    const groupedByProvider = groupOptionsByProvider(selectOptions);
+
+    return { selectOptions, groupedByProvider };
+  }, [providers, options, mode, featureKey]);
+
+  const modelOption = selectOptions.find((opt) => opt.value === model);
+
+  // THE LOCAL DEV ESCAPE HATCH DID NOT TRAVEL. It read `import.meta.env.PROD`,
+  // and a reusable package may not read the environment (ADR-101) — the same
+  // refusal `@langwatch/prompt-web`'s own model selector records. What is lost
+  // is `?__no_models=1` making the empty state visually testable in a dev
+  // build; the empty state itself is unchanged.
+  const forceEmpty = false;
+
+  return {
+    modelOption,
+    selectOptions,
+    groupedByProvider,
+    /** True while the providers query is in flight. Callers that
+     *  render their own trigger should show a skeleton instead of the
+     *  empty-state callout so the user doesn't see a "No models
+     *  configured" flash before the data resolves. */
+    isLoading: modelProviders.isLoading,
+    /** True when the project has zero models of the requested mode
+     *  available. Lets callers that render their own trigger (e.g.
+     *  LLMConfigField) swap to the empty-state callout instead of
+     *  echoing back the stale persisted value. */
+    isEmpty: selectOptions.length === 0 || forceEmpty,
+  };
+};
+
+type SelectorSize = "sm" | "md" | "full";
+
+/** Missing provider reads as a refusal; an unknown model only as unresolved. */
+function selectedModelColor({
+  isProviderMissing,
+  isUnknown,
+}: {
+  isProviderMissing: boolean;
+  isUnknown: boolean;
+}): string | undefined {
+  if (isProviderMissing) return "red.600";
+  if (isUnknown) return "gray.500";
+
+  return undefined;
+}
+
+const SKELETON_WIDTHS: Record<SelectorSize, string> = {
+  full: "full",
+  sm: "180px",
+  md: "240px",
+};
+
+const SKELETON_HEIGHTS: Record<SelectorSize, string> = {
+  full: "40px",
+  sm: "28px",
+  md: "40px",
+};
+
+const TRIGGER_WIDTHS: Record<SelectorSize, string> = {
+  full: "100%",
+  sm: "auto",
+  md: "auto",
+};
+
+/** Chakra's Select has no "full" size; the width carries that instead. */
+const SELECT_SIZES: Record<SelectorSize, "sm" | "md" | undefined> = {
+  full: undefined,
+  sm: "sm",
+  md: "md",
+};
+
+/** Case-insensitive match on either the label or the model id, groups dropped when empty. */
+function filterGroupsBySearch(groups: GroupedModelOptions, search: string): GroupedModelOptions {
+  const needle = search.toLowerCase();
+
+  return groups
+    .map((group) => ({
+      ...group,
+      models: group.models.filter(
+        (item) =>
+          item.label.toLowerCase().includes(needle) || item.value.toLowerCase().includes(needle),
+      ),
+    }))
+    .filter((group) => group.models.length > 0);
+}
+
+/** After a search, the highlight follows the first surviving row. */
+function highlightAfterSearch({
+  current,
+  items,
+}: {
+  current: string | null;
+  items: ModelOption[];
+}): { changed: boolean; value: string | null } {
+  const stillListed = items.some((item) => item.value === current);
+  if (stillListed) return { changed: false, value: current };
+
+  const firstValue = items[0]?.value ?? null;
+
+  return { changed: firstValue !== current, value: firstValue };
+}
+
+function UpdateNeededMark({ size }: { size: SelectorSize }) {
+  const isSmall = size === "sm";
+
+  return (
+    <HStack gap={1} color="red.600" flexShrink={0}>
+      <AlertTriangle size={isSmall ? 12 : 14} aria-hidden />
+      <Text
+        fontSize={isSmall ? "2xs" : "xs"}
+        fontWeight="medium"
+        textTransform="uppercase"
+        letterSpacing="wide"
+      >
+        Update needed
+      </Text>
+    </HStack>
+  );
+}
+
+/**
+ * Provider gone (deleted, or never configured at any reachable scope): the
+ * value is still persisted on the form, but it has to change before the
+ * feature can run. Same chip treatment ModelChip renders in the table.
+ */
+function SelectedModelValue({
+  isProviderMissing,
+  isUnknown,
+  label,
+  providerKey,
+  showIcon,
+  size,
+}: {
+  isProviderMissing: boolean;
+  isUnknown: boolean;
+  label: string;
+  providerKey: string;
+  showIcon: boolean;
+  size: SelectorSize;
+}) {
+  const isSmall = size === "sm";
+
+  return (
+    <HStack overflow="hidden" gap={2} align="center">
+      {showIcon && (
+        <ProviderIconGlyph
+          provider={providerKey as keyof typeof modelProviderIcons}
+          size={isSmall ? MODEL_ICON_SIZE_SM : MODEL_ICON_SIZE}
+        />
+      )}
+      <Box
+        fontSize={isSmall ? 12 : 14}
+        fontFamily="mono"
+        lineClamp={1}
+        wordBreak="break-all"
+        color={selectedModelColor({ isProviderMissing, isUnknown })}
+        textDecoration={isProviderMissing ? "line-through" : undefined}
+      >
+        {label}
+      </Box>
+      {isProviderMissing && (
+        <Tooltip
+          content={`${providerKey} provider isn't enabled here. Re-add the provider or pick a different model to use it.`}
+          positioning={{ placement: "top" }}
+          showArrow
+        >
+          <UpdateNeededMark size={size} />
+        </Tooltip>
+      )}
+    </HStack>
+  );
+}
+
+function ModelOptionItem({
+  item,
+  showDivider,
+  size,
+}: {
+  item: ModelOption;
+  showDivider: boolean;
+  size: SelectorSize;
+}) {
+  const isSmall = size === "sm";
+
+  return (
+    <>
+      {showDivider && <Box borderBottom="1px solid" borderColor="border" marginX={2} marginY={1} />}
+      <Select.Item item={item}>
+        <HStack gap={2}>
+          {item.icon && (
+            <ProviderIconGlyph
+              provider={item.value.split("/")[0] as keyof typeof modelProviderIcons}
+              size={MODEL_ICON_SIZE}
+            />
+          )}
+          <Box fontSize={isSmall ? 12 : 14} fontFamily="mono" paddingY={isSmall ? 0 : "2px"}>
+            {item.label}
+          </Box>
+        </HStack>
+      </Select.Item>
+    </>
+  );
+}
+
+/** A subtle divider marks where a group's custom models end and the registry's begin. */
+function ModelOptionGroup({
+  group,
+  size,
+}: {
+  group: GroupedModelOptions[number];
+  size: SelectorSize;
+}) {
+  const hasCustom = group.models.some((m) => m.isCustom);
+  const hasRegistry = group.models.some((m) => !m.isCustom);
+  const isMixed = hasCustom && hasRegistry;
+
+  return (
+    <Select.ItemGroup
+      label={
+        <HStack gap={2} paddingX={2}>
+          <Text fontWeight="medium">{titleCase(group.provider)}</Text>
+        </HStack>
+      }
+    >
+      {group.models.map((item, itemIndex) => (
+        <ModelOptionItem
+          key={item.value}
+          item={item}
+          showDivider={Boolean(isMixed && !item.isCustom && group.models[itemIndex - 1]?.isCustom)}
+          size={size}
+        />
+      ))}
+    </Select.ItemGroup>
+  );
+}
+
+function ConfigureModelsAction({ size }: { size: SelectorSize }) {
+  return (
+    <Box
+      position="sticky"
+      bottom={0}
+      bg="bg.panel"
+      borderTop="1px solid"
+      borderColor="border"
+      zIndex="1"
+    >
+      <Button
+        width="full"
+        fontWeight="500"
+        color="fg.muted"
+        paddingY={5}
+        justifyContent="flex-start"
+        variant="ghost"
+        colorPalette="gray"
+        size="sm"
+        borderRadius="none"
+        asChild
+      >
+        <Link
+          href="/settings/model-providers"
+          isExternal
+          _hover={{ textDecoration: "none" }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <LuSettings2 />
+          <Text fontSize={size === "sm" ? 12 : 14}>Configure available models</Text>
+        </Link>
+      </Button>
+    </Box>
+  );
+}
+
+export const ModelSelector = React.memo(function ModelSelector({
+  model,
+  options,
+  onChange,
+  size = "md",
+  mode,
+  showConfigureAction = false,
+  forFeatureLabel,
+  open,
+  onOpenChange,
+}: {
+  model: string;
+  options: string[];
+  onChange: (model: string) => void;
+  size?: "sm" | "md" | "full";
+  mode?: "chat" | "embedding";
+  /** When true, shows a "Configure available models" link at the bottom of the dropdown */
+  showConfigureAction?: boolean;
+  /** Surface-specific label used in the empty-state callout when no
+   *  models are available — e.g. "for AI search", "for evaluators".
+   *  Optional; the callout falls back to a generic message. */
+  forFeatureLabel?: string;
+  /** Controlled open state. Pass with onOpenChange to drive the dropdown
+   *  from outside — e.g. force-close it when the parent collapses. */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+}) {
+  const { selectOptions, groupedByProvider, isEmpty, isLoading } = useModelSelectionOptions(
+    options,
+    model,
+    mode,
+  );
+
+  // ALL hooks must run unconditionally — keep the empty-state early
+  // return *after* every hook below so we don't violate React's rules
+  // of hooks when isEmpty flips between renders.
+  const [modelSearch, setModelSearch] = useState("");
+
+  const filteredGroups = filterGroupsBySearch(groupedByProvider, modelSearch);
+
+  // Flatten for collection (needed by Chakra Select)
+  const allFilteredModels = filteredGroups.flatMap((group) => group.models);
+
+  const modelCollection = createListCollection({
+    items: allFilteredModels,
+  });
+
+  const selectedItem = selectOptions.find((option) => option.value === model);
+
+  // Model might not be in the list if it's a custom model or unknown
+  const isUnknown = !selectedItem;
+
+  // Provider gone (deleted or never configured at any reachable
+  // scope) — the value is still persisted on the form but the user
+  // needs to update it before the evaluation can run. Same chip
+  // treatment ModelChip renders in the Default Models table.
+  const providerKey = model.split("/")[0] ?? "";
+  const isProviderMissing =
+    !!model && !!providerKey && !groupedByProvider.some((group) => group.provider === providerKey);
+
+  const selectValueText = (
+    <SelectedModelValue
+      isProviderMissing={isProviderMissing}
+      isUnknown={isUnknown}
+      label={selectedItem?.label ?? model}
+      providerKey={providerKey}
+      showIcon={Boolean(selectedItem?.icon)}
+      size={size}
+    />
+  );
+
+  const [highlightedValue, setHighlightedValue] = useState<string | null>(model);
+
+  useEffect(() => {
+    const next = highlightAfterSearch({ current: highlightedValue, items: allFilteredModels });
+    if (next.changed) setHighlightedValue(next.value);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [modelSearch]);
+
+  // Skeleton while the providers query is in flight so the empty
+  // state doesn't flash before the data resolves.
+  if (isLoading) {
+    return (
+      <Skeleton width={SKELETON_WIDTHS[size]} height={SKELETON_HEIGHTS[size]} borderRadius="md" />
+    );
+  }
+
+  // Honest empty state: when the project has zero enabled providers
+  // (or zero models of the requested mode), render a guided callout
+  // instead of the dropdown. The prior behaviour was to render the
+  // System fallback string ("openai/gpt-5.2") in gray, which looked
+  // like a real selection but errored at runtime.
+  if (isEmpty) {
+    return <NoModelsConfiguredCallout size={size} forFeatureLabel={forFeatureLabel} />;
+  }
+
+  return (
+    <Select.Root
+      collection={modelCollection}
+      value={[model]}
+      onChange={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+      }}
+      onValueChange={(change) => {
+        const selectedValue = change.value[0];
+        if (selectedValue) {
+          onChange(selectedValue);
+        }
+      }}
+      {...(open !== undefined ? { open } : {})}
+      {...(onOpenChange ? { onOpenChange: (e) => onOpenChange(e.open) } : {})}
+      loopFocus={true}
+      highlightedValue={highlightedValue}
+      onHighlightChange={(details) => {
+        setHighlightedValue(details.highlightedValue);
+      }}
+      size={SELECT_SIZES[size]}
+    >
+      <Select.Trigger
+        className="fix-hidden-inputs"
+        width={TRIGGER_WIDTHS[size]}
+        background="bg"
+        borderRadius="lg"
+        padding={0}
+        onPointerDown={(e) => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <Select.ValueText placeholder={selectValueText}>{() => selectValueText}</Select.ValueText>
+      </Select.Trigger>
+      <Select.Content>
+        <Field.Root asChild>
+          <Box position="sticky" top={0} zIndex="1">
+            <InputGroup
+              startElement={<Search size={16} />}
+              startOffset="-4px"
+              background="bg.panel"
+              width="calc(100%)"
+              paddingY={1}
+              borderBottom="1px solid"
+              borderColor="border"
+            >
+              <Input
+                variant={"plain" as any}
+                size="sm"
+                placeholder="Search models"
+                type="search"
+                background="transparent"
+                color="fg"
+                value={modelSearch}
+                onChange={(e) => setModelSearch(e.target.value)}
+              />
+            </InputGroup>
+          </Box>
+        </Field.Root>
+        {filteredGroups.map((group) => (
+          <ModelOptionGroup key={group.provider} group={group} size={size} />
+        ))}
+        {showConfigureAction && <ConfigureModelsAction size={size} />}
+      </Select.Content>
+    </Select.Root>
+  );
+});
+
+/** Every custom model id an enabled provider declares for this mode. */
+const enabledCustomModelIds = (
+  modelProviders: Record<string, MaybeStoredModelProvider>,
+  mode: "chat" | "embedding",
+): string[] => {
+  const ids: string[] = [];
+  for (const [providerKey, config] of Object.entries(modelProviders)) {
+    if (!config.enabled) continue;
+
+    const customList = mode === "chat" ? config.customModels : config.customEmbeddingsModels;
+    for (const model of customList ?? []) ids.push(`${providerKey}/${model.modelId}`);
+  }
+
+  return ids;
+};
+
+/** Combines registry models (`options`, filtered by `mode`) with custom models, custom first. */
+export const getCustomModels = (
+  modelProviders: Record<string, MaybeStoredModelProvider>,
+  options: string[],
+  mode: "chat" | "embedding" = "chat",
+): string[] => {
+  const customModelIds = enabledCustomModelIds(modelProviders, mode);
+  const registryModelIds: string[] = [];
+  const customSet = new Set(customModelIds);
+
+  // Include registry models from enabled providers, filtered by mode
+  for (const option of options) {
+    const provider = option.split("/")[0]!;
+    if (!modelProviders[provider]?.enabled) continue;
+
+    const registryMode = allLitellmModels[option]?.mode;
+    if (registryMode && registryMode !== mode) continue;
+
+    // Skip if already added as a custom model (same ID)
+    if (customSet.has(option)) continue;
+
+    registryModelIds.push(option);
+  }
+
+  return [...customModelIds, ...registryModelIds];
+};

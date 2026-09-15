@@ -14,15 +14,15 @@ can live at exactly one scope pass `singleSelect`.
 
 ## The scope kinds
 
-| Kind          | Means                                         | Backed by                          |
-|---------------|-----------------------------------------------|------------------------------------|
-| `ORGANIZATION`| Everyone in the org                           | `ModelProviderScopeType` enum      |
-| `TEAM`        | Every project in a team                       | `ModelProviderScopeType` enum      |
-| `PROJECT`     | One project                                   | `ModelProviderScopeType` enum      |
-| `DEPARTMENT`  | Every member of a department (a people group) | picker/badge only, no enum row     |
-| `GROUP`       | Every member of a group                       | badge only, `GatewayBudgetScopeType`|
-| `PRINCIPAL`   | One person                                    | badge only, `GatewayBudgetScopeType`|
-| `VIRTUAL_KEY` | One virtual key                               | badge only, `GatewayBudgetScopeType`|
+| Kind           | Means                                         | Backed by                            |
+| -------------- | --------------------------------------------- | ------------------------------------ |
+| `ORGANIZATION` | Everyone in the org                           | `ModelProviderScopeType` enum        |
+| `TEAM`         | Every project in a team                       | `ModelProviderScopeType` enum        |
+| `PROJECT`      | One project                                   | `ModelProviderScopeType` enum        |
+| `DEPARTMENT`   | Every member of a department (a people group) | picker/badge only, no enum row       |
+| `GROUP`        | Every member of a group                       | badge only, `GatewayBudgetScopeType` |
+| `PRINCIPAL`    | One person                                    | badge only, `GatewayBudgetScopeType` |
+| `VIRTUAL_KEY`  | One virtual key                               | badge only, `GatewayBudgetScopeType` |
 
 `GROUP` / `PRINCIPAL` / `VIRTUAL_KEY` are read-side only: gateway budgets
 target them, and `ProviderScopeChips` renders them, but `ScopeChipPicker` never
@@ -57,7 +57,7 @@ const [scopes, setScopes] = useState<ScopeChipPickerEntry[]>([]);
   onChange={setScopes}
   allowedScopeTypes={["ORGANIZATION", "DEPARTMENT"]}
   availableDepartments={api.departments.list.useQuery({ organizationId }).data ?? []}
-/>
+/>;
 ```
 
 - Use `ScopeTriadEntry` / `ScopeTriadType` for triad-only state; use

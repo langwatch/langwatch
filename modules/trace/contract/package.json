@@ -1,0 +1,42 @@
+{
+  "name": "@langwatch/trace-contract",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Portable trace read contracts and viewer-safe DTOs.",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc --project tsconfig.build.json",
+    "typecheck": "pnpm -w typecheck:declarations --project . && tsc --noEmit",
+    "test": "vitest run",
+    "test:unit": "vitest run"
+  },
+  "dependencies": {
+    "@langwatch/analytics-contract": "workspace:*",
+    "@langwatch/api": "workspace:*",
+    "@langwatch/config": "workspace:*",
+    "@langwatch/data-privacy-contract": "workspace:*",
+    "@langwatch/evaluation-contract": "workspace:*",
+    "@langwatch/handled-error": "workspace:*",
+    "@langwatch/runtime-composition": "workspace:*",
+    "liqe": "catalog:",
+    "ohm-js": "^17.5.0",
+    "ts-pattern": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

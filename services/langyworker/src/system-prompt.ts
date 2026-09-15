@@ -28,7 +28,11 @@ export type SystemPromptParts = {
   turnSystem?: string;
 };
 
-export function composeSystemPrompt({ personaPrompt, agentsMd, turnSystem }: SystemPromptParts): string {
+export function composeSystemPrompt({
+  personaPrompt,
+  agentsMd,
+  turnSystem,
+}: SystemPromptParts): string {
   const sections = [personaPrompt, turnSystem, agentsMd]
     .map((section) => section?.trim() ?? "")
     .filter((section) => section.length > 0);

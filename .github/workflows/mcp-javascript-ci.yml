@@ -79,6 +79,19 @@ jobs:
         with:
           install: "@langwatch/mcp-server..."
 
+      # Restored after install so pnpm can't clobber it; keyed rolling
+      # per-SHA with a prefix fallback, mirroring the app CI tsbuildinfo
+      # caches. The package writes mcp-server.tsbuildinfo here per the
+      # repo-wide per-package tsBuildInfoFile rule.
+      - name: Cache TypeScript incremental build info
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: mcp/typescript/node_modules/.cache/tsbuildinfo
+          key: ${{ runner.os }}-mcp-tsbuildinfo-${{ hashFiles('pnpm-lock.yaml', 'mcp/typescript/tsconfig.json') }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-mcp-tsbuildinfo-${{ hashFiles('pnpm-lock.yaml', 'mcp/typescript/tsconfig.json') }}-
+            ${{ runner.os }}-mcp-tsbuildinfo-
+
       - name: Run typecheck
         working-directory: mcp/typescript
         run: ./node_modules/.bin/tsc --noEmit --project ./tsconfig.json

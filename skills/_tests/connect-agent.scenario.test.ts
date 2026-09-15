@@ -1,4 +1,8 @@
-import scenario, { type ScenarioExecutionStateLike, assertSkillWasRead, bashCommands } from "@langwatch/scenario";
+import scenario, {
+  type ScenarioExecutionStateLike,
+  assertSkillWasRead,
+  bashCommands,
+} from "@langwatch/scenario";
 import fs from "fs";
 import { describe, it, expect } from "vitest";
 import dotenv from "dotenv";
@@ -50,9 +54,7 @@ function readAll(files: string[]): string {
 
 function transcriptText(state: ScenarioExecutionStateLike): string {
   return state.messages
-    .map((m) =>
-      typeof m.content === "string" ? m.content : JSON.stringify(m.content ?? ""),
-    )
+    .map((m) => (typeof m.content === "string" ? m.content : JSON.stringify(m.content ?? "")))
     .join("\n")
     .replace(/\\/g, "");
 }
@@ -84,8 +86,7 @@ describe("Connect Agent Skill", () => {
           const endpoint = process.env.LANGWATCH_ENDPOINT?.trim();
           fs.writeFileSync(
             path.join(tempFolder, ".env"),
-            `LANGWATCH_API_KEY=${apiKey}\n` +
-              (endpoint ? `LANGWATCH_ENDPOINT=${endpoint}\n` : ""),
+            `LANGWATCH_API_KEY=${apiKey}\n` + (endpoint ? `LANGWATCH_ENDPOINT=${endpoint}\n` : ""),
           );
         }
 
@@ -198,8 +199,7 @@ describe("Connect Agent Skill", () => {
           const endpoint = process.env.LANGWATCH_ENDPOINT?.trim();
           fs.writeFileSync(
             path.join(tempFolder, ".env"),
-            `LANGWATCH_API_KEY=${apiKey}\n` +
-              (endpoint ? `LANGWATCH_ENDPOINT=${endpoint}\n` : ""),
+            `LANGWATCH_API_KEY=${apiKey}\n` + (endpoint ? `LANGWATCH_ENDPOINT=${endpoint}\n` : ""),
           );
         }
 

@@ -1,0 +1,332 @@
+/// <reference path="../../model/ambient.d.ts" />
+import { Alert, Badge, Box, HStack, Text, VStack } from "@chakra-ui/react";
+import type { SignInMethod } from "@langwatch/identity-contract";
+import type { ReactNode } from "react";
+import { useState } from "react";
+import { useOptionalAuthHost } from "../../model/auth-host.ts";
+import { signInMethodActionLabel } from "../../model/method-labels.ts";
+import { signInRoutingReasonCopy } from "../../model/routing-reason-copy.ts";
+import "../elements/auth-front-door.css";
+import { MONO_FONT } from "../../model/front-door-theme.ts";
+import { MethodButton } from "../elements/method-button.tsx";
+import { PasskeySignInButton } from "./passkey-sign-in-button.tsx";
+import { SignInMethodIcon } from "../elements/sign-in-method-icon.tsx";
+
+/**
+ * A dev stack rarely has social credentials mounted, hiding the social rail
+ * from the people iterating on it. In dev the rail shows the cloud's full
+ * social set; everywhere else it shows exactly what the decision offered.
+ */
+export function useShowsAllSocialMethods(): boolean {
+  return useOptionalAuthHost()?.publicEnvironment().NODE_ENV === "development";
+}
+
+/** The cloud's social set. Ids are the real provider ids, so a click dials
+ *  the real provider and the marks and labels are the real ones. */
+const SOCIAL_METHODS: readonly SignInMethod[] = [
+  { id: "google", kind: "federated", connectionId: null },
+  { id: "github", kind: "federated", connectionId: null },
+  { id: "azure-ad", kind: "federated", connectionId: null },
+];
+
+/**
+ * The method picker: exactly the methods the decision named, in that order
+ * (ADR-117 §2, §6). Holds no routing logic; the "Last used" badge is this
+ * BROWSER's own memory. Sign-in and sign-up both render it.
+ */
+export function SignInMethodPicker({
+  methodSet,
+  reasonCode,
+  lastUsedMethodId,
+  onFederatedMethodChosen,
+  renderLocalMethod,
+  callbackUrl,
+  onPasskeyError,
+}: {
+  methodSet: readonly SignInMethod[];
+  reasonCode: string;
+  /** The method this browser last got in with, badged where it appears. */
+  lastUsedMethodId?: string | null;
+  onFederatedMethodChosen: (method: SignInMethod) => void;
+  renderLocalMethod?: (method: SignInMethod) => ReactNode;
+  /** Where a completed ceremony lands. The passkey seat dials for itself. */
+  callbackUrl?: string;
+  /** A refused ceremony, sent to the card's one alert at the top. */
+  onPasskeyError: (error: unknown) => void;
+}) {
+  const guidance = signInRoutingReasonCopy(reasonCode);
+  // A WebAuthn ceremony hands the screen to the browser and the operating
+  // system: while one is in flight, a second click on another method would
+  // open a competing prompt on top of it. Scoped to this picker rather than a
+  // shared store — sign-in and sign-up never render two pickers at once, so
+  // there is nothing for a wider scope to buy.
+  const [passkeyIsBusy, setPasskeyIsBusy] = useState(false);
+
+  return (
+    <VStack width="full" align="stretch" gap={4} data-testid="method-picker">
+      {guidance ? (
+        <Alert.Root status="info" borderStartWidth="4px" borderStartColor="colorPalette.solid">
+          <Alert.Content>
+            <Alert.Title>{guidance.title}</Alert.Title>
+            <Alert.Description>{guidance.describe}</Alert.Description>
+          </Alert.Content>
+        </Alert.Root>
+      ) : null}
+
+      {methodSet.length === 0 ? (
+        <Text>
+          There is no way to sign in to this installation yet. Ask whoever runs it to set one up.
+        </Text>
+      ) : null}
+
+      {methodSet.map((method) => (
+        <MethodEntry
+          key={`${method.kind}:${method.id}:${method.connectionId ?? ""}`}
+          method={method}
+          isLastUsed={lastUsedMethodId === method.id}
+          onFederatedMethodChosen={onFederatedMethodChosen}
+          renderLocalMethod={renderLocalMethod}
+          callbackUrl={callbackUrl}
+          onPasskeyError={onPasskeyError}
+          passkeyIsBusy={passkeyIsBusy}
+          onPasskeyBusyChange={setPasskeyIsBusy}
+        />
+      ))}
+    </VStack>
+  );
+}
+
+/**
+ * Whether the address step has anything to offer under its "or" at all. Ask
+ * this before passing `alternatives`; pass nothing when the answer is no.
+ */
+export function hasAlternativeMethods({
+  methodSet,
+  showsAllSocial,
+}: {
+  methodSet: readonly SignInMethod[];
+  showsAllSocial: boolean;
+}): boolean {
+  return (
+    showsAllSocial ||
+    methodSet.some((method) => method.kind === "federated" || method.kind === "passkey")
+  );
+}
+
+/**
+ * The methods a person can take instead of typing an address, in the order
+ * the decision named them. Every button is live — a method appears here
+ * because it can be dialed, or not at all.
+ */
+export function AlternativeMethods({
+  methodSet,
+  lastUsedMethodId,
+  onFederatedMethodChosen,
+  callbackUrl,
+  onPasskeyError,
+}: {
+  methodSet: readonly SignInMethod[];
+  lastUsedMethodId?: string | null;
+  onFederatedMethodChosen: (method: SignInMethod) => void;
+  callbackUrl?: string;
+  /** A refused ceremony, sent to the card's one alert at the top. */
+  onPasskeyError: (error: unknown) => void;
+}) {
+  const showsAllSocial = useShowsAllSocialMethods();
+  const offered = methodSet.filter((method) => method.kind === "federated");
+  const offeredIds = new Set(offered.map((method) => method.id));
+  const methods = showsAllSocial
+    ? [...offered, ...SOCIAL_METHODS.filter((method) => !offeredIds.has(method.id))]
+    : offered;
+  // See `SignInMethodPicker`: the same local flag, so a second click here
+  // cannot start a competing WebAuthn prompt while one is already running.
+  const [passkeyIsBusy, setPasskeyIsBusy] = useState(false);
+
+  return (
+    <VStack width="full" align="stretch" gap={3} data-testid="alternative-methods">
+      {/* First in the rail, and above the providers, because it is the only
+          way in that asks for NOTHING — no address here, none at the step
+          this rail sits under, and no second screen at the provider's end.
+          A passkey names the account by itself, so ordering it under three
+          hand-offs would be putting the longest routes in front of the
+          shortest. It stays under the address field rather than over it: the
+          address is what most people came to type. */}
+      {methodSet.some((method) => method.kind === "passkey") ? (
+        <PasskeySignInButton
+          callbackUrl={callbackUrl}
+          badge={lastUsedMethodId === "passkey" ? <LastUsedBadge /> : null}
+          onError={onPasskeyError}
+          onBusyChange={setPasskeyIsBusy}
+        />
+      ) : null}
+      <StandsBackWhileBusy isBusy={passkeyIsBusy}>
+        <VStack width="full" align="stretch" gap={3}>
+          {methods.map((method) => (
+            <FederatedMethodButton
+              key={method.id}
+              method={method}
+              isLastUsed={lastUsedMethodId === method.id}
+              onChosen={onFederatedMethodChosen}
+            />
+          ))}
+        </VStack>
+      </StandsBackWhileBusy>
+    </VStack>
+  );
+}
+
+/**
+ * The seat any other way in sits in while a passkey ceremony is running.
+ *
+ * A system sheet is already over the page; a live rail underneath it invites
+ * a second hand-off on top of the first. `inert` is the primitive that means
+ * "unavailable" all at once — no pointer events, no focus, out of the tab
+ * order — rather than merely faint, and it is restored the moment the flag
+ * that started it clears, which happens on every way the ceremony can end.
+ */
+function StandsBackWhileBusy({ isBusy, children }: { isBusy: boolean; children: ReactNode }) {
+  return (
+    <Box
+      inert={isBusy ? true : undefined}
+      opacity={isBusy ? 0.45 : 1}
+      transition="opacity 160ms ease"
+      data-standing-back={isBusy ? "true" : undefined}
+    >
+      {children}
+    </Box>
+  );
+}
+
+/**
+ * One full-width button per federated method, marked and named the way the
+ * provider is: the mark is what somebody scanning the screen looks for.
+ */
+export function FederatedMethodButton({
+  method,
+  isLastUsed,
+  onChosen,
+}: {
+  method: SignInMethod;
+  isLastUsed?: boolean;
+  onChosen: (method: SignInMethod) => void;
+}) {
+  return (
+    <MethodButton
+      icon={<SignInMethodIcon method={method} />}
+      label={signInMethodActionLabel(method)}
+      badge={isLastUsed ? <LastUsedBadge /> : null}
+      onClick={() => onChosen(method)}
+    />
+  );
+}
+
+export function LastUsedBadge() {
+  return (
+    <Badge
+      borderRadius="full"
+      paddingX="9px"
+      fontSize="10px"
+      fontWeight={500}
+      backgroundColor={"frontDoor.tint"}
+      color={"frontDoor.ink"}
+      data-testid="last-used-method"
+    >
+      Last used
+    </Badge>
+  );
+}
+
+/** A thin "or" between the address step and the methods beside it, said the
+ *  way the site says its small technical words: mono, spaced, quiet. */
+export function MethodDivider() {
+  return (
+    <HStack width="full" gap="10px" paddingY="6px">
+      <Divider />
+      <Text
+        fontFamily={MONO_FONT}
+        fontSize="10px"
+        textTransform="uppercase"
+        letterSpacing="0.16em"
+        color="fg.muted"
+      >
+        or
+      </Text>
+      <Divider />
+    </HStack>
+  );
+}
+
+function Divider() {
+  return <div className="lw-front-door-hairline" />;
+}
+
+function MethodEntry({
+  method,
+  isLastUsed,
+  onFederatedMethodChosen,
+  renderLocalMethod,
+  callbackUrl,
+  onPasskeyError,
+  passkeyIsBusy,
+  onPasskeyBusyChange,
+}: {
+  method: SignInMethod;
+  isLastUsed: boolean;
+  onFederatedMethodChosen: (method: SignInMethod) => void;
+  renderLocalMethod?: (method: SignInMethod) => ReactNode;
+  callbackUrl?: string;
+  onPasskeyError: (error: unknown) => void;
+  /** Another seat's ceremony is running; this one stands back while it does. */
+  passkeyIsBusy: boolean;
+  /** Told by the passkey seat itself, whenever its own ceremony starts or ends. */
+  onPasskeyBusyChange: (isBusy: boolean) => void;
+}) {
+  if (method.kind === "federated") {
+    return (
+      <StandsBackWhileBusy isBusy={passkeyIsBusy}>
+        <FederatedMethodButton
+          method={method}
+          isLastUsed={isLastUsed}
+          onChosen={onFederatedMethodChosen}
+        />
+      </StandsBackWhileBusy>
+    );
+  }
+
+  // A passkey is local — this deployment authenticates it — but it is a
+  // BUTTON, so it wears its badge floated on the seat the way the providers
+  // do rather than stacked above it like a form. Drawn here rather than by
+  // each door, so both doors offer it identically. Never stood back from its
+  // own busy flag — it is the seat the ceremony started from, and it already
+  // shows its own working state and takes no second press.
+  if (method.kind === "passkey") {
+    return (
+      <PasskeySignInButton
+        callbackUrl={callbackUrl}
+        badge={isLastUsed ? <LastUsedBadge /> : null}
+        onError={onPasskeyError}
+        onBusyChange={onPasskeyBusyChange}
+      />
+    );
+  }
+
+  const local = renderLocalMethod?.(method);
+  if (local) {
+    return (
+      <StandsBackWhileBusy isBusy={passkeyIsBusy}>
+        <VStack width="full" align="stretch" gap={2}>
+          {isLastUsed ? (
+            <HStack width="full">
+              <LastUsedBadge />
+            </HStack>
+          ) : null}
+          {local}
+        </VStack>
+      </StandsBackWhileBusy>
+    );
+  }
+
+  // A local method the screen has nothing to render for is still named, so
+  // the picker never silently drops a method the decision offered.
+  return <Text>{signInMethodActionLabel(method)}</Text>;
+}

@@ -1,0 +1,97 @@
+/**
+ * @vitest-environment node
+ *
+ * Real Postgres round-trip for config shape recovery (langwatch#6397).
+ */
+
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import {
+  PrismaConfigService,
+  PrismaConnectionService,
+  PrismaQueryGuard,
+  type PrismaConnection,
+  type PrismaQueryContext,
+  type PrismaQueryExecutor,
+} from "@langwatch/prisma-client";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { cleanupTestRows } from "@langwatch/test-harness";
+import { EvaluatorSettingsService } from "../evaluator-settings.service.ts";
+
+/**
+ * The tenancy guard names a project on every query. This suite writes the rows
+ * it then reads, so it composes the client without a guard rather than teaching
+ * one about rows that do not exist yet.
+ */
+class AllowTestQueries extends PrismaQueryGuard {
+  execute(context: PrismaQueryContext, next: PrismaQueryExecutor): Promise<unknown> {
+    return next(context.args);
+  }
+}
+
+const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL;
+const PROJECT_ID = "proj_6397_roundtrip";
+const USER_PROMPT = "Is the response empathetic and polite in tone?";
+
+describe.skipIf(!DB_URL)("evaluator config round-trip through Postgres", () => {
+  // Optional: vitest runs `afterAll` even when `beforeAll` threw, so a teardown
+  // that dereferences this unconditionally replaces the real setup error with a
+  // "cannot read property of undefined" and hides why the suite failed.
+  let connection: PrismaConnection | undefined;
+  let prisma: PrismaClient | undefined;
+
+  beforeAll(async () => {
+    connection = PrismaConnectionService.create({ guard: new AllowTestQueries() }).connect(
+      PrismaConfigService.create().resolve({ databaseUrl: DB_URL ?? "", log: ["error"] }),
+    );
+    prisma = connection.client as PrismaClient;
+    await cleanupTestRows(prisma, [["evaluator", { projectId: PROJECT_ID }]]);
+  });
+
+  afterAll(async () => {
+    if (!prisma) return;
+    await cleanupTestRows(prisma, [["evaluator", { projectId: PROJECT_ID }]]);
+    await prisma.$disconnect();
+  });
+
+  describe("given a row nothing on the write side will ever convert", () => {
+    it("recovers the user's prompt at read time, with no migration", async () => {
+      // Raw SQL on purpose: this bypasses the repository, so the row lands in
+      // exactly the broken shape the customer's evaluator is already in.
+      await prisma!.$executeRawUnsafe(
+        `INSERT INTO "Evaluator" (id, "projectId", name, type, config, "createdAt", "updatedAt")
+         VALUES ($1, $2, $3, $4, $5::jsonb, now(), now())`,
+        "eval_6397_legacy",
+        PROJECT_ID,
+        "legacy tone judge",
+        "evaluator",
+        JSON.stringify({
+          evaluatorType: "langevals/llm_boolean",
+          prompt: USER_PROMPT,
+          model: "openai/gpt-5-mini",
+        }),
+      );
+
+      const row = await prisma!.evaluator.findFirstOrThrow({
+        where: { id: "eval_6397_legacy", projectId: PROJECT_ID },
+      });
+
+      const { settings } = EvaluatorSettingsService.create().resolve({
+        config: row.config as Record<string, unknown>,
+        parameters: null,
+        // Read back from Postgres rather than restated: recovery is gated on
+        // this column, and reading it proves the value survives the write
+        // path. (The column is an unconstrained `String`, so this is not the
+        // database agreeing to anything — just the row answering for itself.)
+        evaluatorRecordType: row.type,
+      });
+
+      // Exact, not partial: `toMatchObject` cannot fail if the resolver leaks
+      // `evaluatorType` (a CONFIG_METADATA_KEY) into the payload sent to the
+      // judge, and stripping that metadata is half of what the resolver does.
+      expect(settings).toEqual({
+        prompt: USER_PROMPT,
+        model: "openai/gpt-5-mini",
+      });
+    });
+  });
+});

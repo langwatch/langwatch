@@ -3,7 +3,7 @@ Feature: CI checkouts leave the marketing media on the server
   I want jobs to fetch only the tree they build against
   So that a dozen parallel checkouts do not each pull 165 MB they never read
 
-  # docs/media, docs/images and assets/ hold the repository's marketing media —
+  # docs/media and docs/images hold the repository's marketing media —
   # 165 MB of .gif and .mp4, a single 26 MB mp4 and gifs of 20/16/10 MB —
   # against 81 MB for platform/, the thing we build. Naming a sparse-checkout
   # makes actions/checkout fetch with --filter=blob:none, so those blobs never
@@ -34,7 +34,7 @@ Feature: CI checkouts leave the marketing media on the server
   @unit
   Scenario: A job that needs the working tree still leaves the media behind
     Given the checkout step reads working-tree content
-    Then it excludes "docs/media", "docs/images" and "assets"
+    Then it excludes "docs/media" and "docs/images"
     And it selects non-cone mode
 
   @unit
@@ -82,11 +82,13 @@ Feature: CI checkouts leave the marketing media on the server
 
   @unit
   Scenario: The exclusions are root-anchored
-    Given a checkout step that excludes "assets"
-    Then it excludes only the repository-root "assets/"
-    # services/langyagent/internal/assets holds AGENTS.md, which
-    # shipped-evaluator-types.unit.test.ts reads. A non-anchored "assets"
-    # pattern would drop it.
+    Given a checkout step that excludes "docs/images"
+    Then it excludes only the repository-root "docs/images/"
+    # A non-anchored pattern also matches nested directories of that name, and
+    # the tree holds several: sdks/python/docs, and the images/ a package may
+    # carry. The rule was written when assets/ was still excluded, where a bare
+    # "assets" would have dropped services/langyagent/internal/assets —
+    # shipped-evaluator-types.unit.test.ts reads the AGENTS.md in it.
 
   @unit
   Scenario: A new job added without the exclusion fails the check

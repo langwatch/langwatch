@@ -38,13 +38,9 @@ const escapeMarkdownTableCell = (value: string): string =>
 const formatInlineCode = (value: string): string =>
   `\`${value.replace(/[\\`|]/g, (c) => `\\${c}`).replace(/\n/g, " ")}\``;
 
-export async function handleExperimentList(params: {
-  limit?: number;
-}): Promise<string> {
+export async function handleExperimentList(params: { limit?: number }): Promise<string> {
   const requested =
-    typeof params.limit === "number" && params.limit > 0
-      ? params.limit
-      : DEFAULT_LIMIT;
+    typeof params.limit === "number" && params.limit > 0 ? params.limit : DEFAULT_LIMIT;
   const effectiveLimit = Math.min(requested, MAX_LIMIT);
 
   const search = new URLSearchParams();
@@ -52,7 +48,7 @@ export async function handleExperimentList(params: {
 
   const result = (await makeRequest(
     "GET",
-    `/api/experiments?${search.toString()}`,
+    `/api/v1/experiments?${search.toString()}`,
   )) as ExperimentListResponse;
 
   if (result.experiments.length === 0) {
@@ -88,8 +84,6 @@ export async function handleExperimentList(params: {
   }
 
   lines.push("");
-  lines.push(
-    "> Use `platform_experiment_list_runs` with one of these slugs to see its runs.",
-  );
+  lines.push("> Use `platform_experiment_list_runs` with one of these slugs to see its runs.");
   return lines.join("\n");
 }

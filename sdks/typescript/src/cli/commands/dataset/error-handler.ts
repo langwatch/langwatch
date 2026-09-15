@@ -8,19 +8,9 @@ import {
 import { failSpinner } from "../../utils/spinnerError";
 
 /**
- * Centralized error handler for all dataset CLI commands.
- * Every branch funnels through failSpinner, so a machine caller always gets
- * the structured `{ ok: false }` document and a person gets one fail line
- * (plus an optional detail line for plan limits) — never two disconnected
- * lines. Exits with code 1.
- *
- * @param spinner - The ora spinner to fail. The spinner's message is the
- *   only top-level error line rendered — we never emit a separate
- *   `console.error` that would produce two disconnected lines.
- * @param error - The caught error
- * @param context - Human-readable action description (e.g. "create dataset",
- *   "upload records"). Used as a fallback prefix when the error doesn't
- *   already carry one.
+ * Unified error line via failSpinner, never two disconnected lines.
+ * @param spinner Ora spinner (message is the only error line)
+ * @param error Caught error; @param context Action description
  */
 export function handleDatasetCommandError({
   spinner,
@@ -62,11 +52,7 @@ export function handleDatasetCommandError({
       action: context,
     });
     if (error.current !== undefined && error.max !== undefined) {
-      console.error(
-        chalk.gray(
-          `  Current ${error.limitType}: ${error.current} / ${error.max}`,
-        ),
-      );
+      console.error(chalk.gray(`  Current ${error.limitType}: ${error.current} / ${error.max}`));
     }
   } else if (error instanceof DatasetApiError) {
     // DatasetApiError.message is already built with formatApiErrorForOperation

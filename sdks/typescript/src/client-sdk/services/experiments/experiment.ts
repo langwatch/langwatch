@@ -1,12 +1,5 @@
 /**
  * Experiment - Main class for running batch experiments
- *
- * Provides a clean API for running experiments over datasets with:
- * - Automatic tracing per iteration
- * - Parallel execution with concurrency control
- * - Batched result sending
- * - Built-in evaluator support
- * - Multi-target comparison with withTarget() context isolation
  */
 
 import { AsyncLocalStorage } from "node:async_hooks";
@@ -17,13 +10,13 @@ import type { LangwatchApiClient } from "@/internal/api/client";
 import type { Logger } from "@/logger";
 import { ensureSetup } from "@/observability-sdk/setup/node";
 import { resolveEndpoint } from "@/internal/endpoint";
-import { generateHumanReadableId } from "./humanReadableId";
+import { generateHumanReadableId } from "./humanReadableId.ts";
 import {
   ExperimentInitError,
   TargetMetadataConflictError,
   ComparisonError,
   EvaluatorError,
-} from "./errors";
+} from "./errors/index.ts";
 import type {
   Batch,
   BatchEntry,
@@ -45,8 +38,8 @@ import type {
   TargetResult,
   TargetExecutionContext,
   TargetContext,
-} from "./types";
-import type { CapturedTargetOutput } from "./comparison";
+} from "./types.ts";
+import type { CapturedTargetOutput } from "./comparison.ts";
 import {
   COMPARISON_EVALUATOR_SLUG,
   DEFAULT_COMPARISON_NAME,
@@ -58,8 +51,8 @@ import {
   describeSkippedComparison,
   renderTargetOutput,
   toComparisonVerdict,
-} from "./comparison";
-import { printSummary } from "./printSummary";
+} from "./comparison.ts";
+import { printSummary } from "./printSummary.ts";
 import { buildAuthHeaders } from "@/internal/api/auth";
 import { langwatchFetch } from "@/internal/http/langwatchFetch";
 
@@ -68,25 +61,11 @@ const DEBOUNCE_INTERVAL_MS = 1000;
 
 /**
  * How many rows of captured target outputs compare() keeps around.
- *
- * A comparison runs while its row is still being processed, and at most
- * `concurrency` rows are ever in flight, so this bound sits orders of
- * magnitude above what any run needs while keeping memory flat over a dataset
- * of any size.
  */
 const MAX_COMPARISON_ROWS_RETAINED = 1000;
 
 /**
  * How long an evaluator call may take before the socket is given up on.
- *
- * The ceiling has to clear the slowest legitimate judge: a comparison with
- * swap-and-reconcile on makes two sequential LLM calls over every candidate
- * the row produced, and a large reasoning model can spend minutes on each. It
- * exists because the alternative is worse: a judge that accepts the socket and
- * never answers would hold its slot in the concurrency window for the life of
- * the process, so a single dead connection stalls the whole run rather than
- * costing it one row. This is the ceiling the Python SDK already applies to
- * the same endpoint.
  */
 export const EVALUATOR_TIMEOUT_MS = 900_000;
 
@@ -100,14 +79,8 @@ type SummaryEvaluation = Pick<
 type SummaryEntry = Pick<BatchEntry, "duration" | "error" | "cost" | "target_id">;
 
 /**
- * AsyncLocalStorage for iteration context isolation.
- * This stores the current item, index and trace for each iteration,
- * preventing race conditions in concurrent execution.
- *
- * `traceId` is the row's own iteration trace, and is null for a row whose
- * targets each opened a trace of their own: there is no single trace such a
- * row belongs to, and naming one would attribute its comparison to a trace
- * that judged something else.
+ * AsyncLocalStorage for iteration context isolation. This stores the current item, index
+ * and trace for each iteration, preventing race conditions in concurrent execution.
  */
 type IterationContext = {
   index: number;
@@ -183,7 +156,7 @@ export class Experiment {
       logger: Logger;
       runId?: string;
       concurrency?: number;
-    }
+    },
   ) {
     this.name = name;
     this.experimentSlug = name;
@@ -206,7 +179,7 @@ export class Experiment {
       endpoint: string;
       apiKey: string;
       logger: Logger;
-    } & ExperimentInitOptions
+    } & ExperimentInitOptions,
   ): Promise<Experiment> {
     // Ensure observability is set up for proper tracing
     ensureSetup();
@@ -222,12 +195,12 @@ export class Experiment {
   private async initialize(): Promise<void> {
     if (!this.apiKey) {
       throw new ExperimentInitError(
-        "API key is required. Set LANGWATCH_API_KEY or pass apiKey to LangWatch constructor."
+        "API key is required. Set LANGWATCH_API_KEY or pass apiKey to LangWatch constructor.",
       );
     }
 
     try {
-      const response = await langwatchFetch(`${this.endpoint}/api/experiment/init`, {
+      const response = await langwatchFetch(`${this.endpoint}/api/v1/experiment/init`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -263,31 +236,17 @@ export class Experiment {
       }
       throw new ExperimentInitError(
         `Failed to initialize evaluation: ${error instanceof Error ? error.message : String(error)}`,
-        error instanceof Error ? error : undefined
+        error instanceof Error ? error : undefined,
       );
     }
   }
 
   /**
-   * Run evaluation over a dataset with a callback
-   *
+   * Run evaluation over a dataset with a callback.
    * @param dataset - Array of items to evaluate
    * @param callback - Function called for each item with { item, index, span }
-   * @param options - Concurrency options
-   *
-   * @example
-   * ```typescript
-   * await evaluation.run(dataset, async ({ item, index, span }) => {
-   *   const response = await myAgent(item.question);
-   *   evaluation.log('accuracy', { index, score: 0.95 });
-   * }, { concurrency: 4 });
-   * ```
    */
-  async run<T>(
-    dataset: T[],
-    callback: RunCallback<T>,
-    options?: RunOptions
-  ): Promise<void> {
+  async run<T>(dataset: T[], callback: RunCallback<T>, options?: RunOptions): Promise<void> {
     if (!this.initialized) {
       await this.initialize();
     }
@@ -320,9 +279,10 @@ export class Experiment {
 
     // Flush OTEL spans so all child spans created inside callbacks are exported
     const provider = trace.getTracerProvider();
-    const delegate = "getDelegate" in provider && typeof provider.getDelegate === "function"
-      ? provider.getDelegate()
-      : provider;
+    const delegate =
+      "getDelegate" in provider && typeof provider.getDelegate === "function"
+        ? provider.getDelegate()
+        : provider;
     if (delegate && "forceFlush" in delegate && typeof delegate.forceFlush === "function") {
       await delegate.forceFlush();
     }
@@ -338,7 +298,7 @@ export class Experiment {
     tracer: ReturnType<typeof trace.getTracer>,
     item: T,
     index: number,
-    callback: RunCallback<T>
+    callback: RunCallback<T>,
   ): Promise<void> {
     const startTime = Date.now();
     let error: Error | undefined;
@@ -357,9 +317,15 @@ export class Experiment {
         try {
           // Create a minimal span context for the callback
           const span = {
-            setStatus: () => { /* no-op */ },
-            recordException: () => { /* no-op */ },
-            end: () => { /* no-op */ },
+            setStatus: () => {
+              /* no-op */
+            },
+            recordException: () => {
+              /* no-op */
+            },
+            end: () => {
+              /* no-op */
+            },
           } as unknown as LangWatchSpan;
 
           const ctx: RunContext<T> = { item, index, span };
@@ -415,7 +381,7 @@ export class Experiment {
             } finally {
               span.end();
             }
-          }
+          },
         );
       });
     }
@@ -451,24 +417,9 @@ export class Experiment {
   }
 
   /**
-   * Log a custom metric result
-   *
    * @param metric - Name of the metric
    * @param options - Metric options including index, score, passed, etc.
-   *
-   * If called inside a withTarget() block, the target and index are automatically
-   * inferred from the context and don't need to be specified.
-   *
    * @example
-   * ```typescript
-   * // Explicit target (outside withTarget)
-   * evaluation.log('accuracy', { index, score: 0.95, target: 'gpt-4' });
-   *
-   * // Implicit target (inside withTarget)
-   * await evaluation.withTarget('gpt-4', { model: 'openai/gpt-4' }, async () => {
-   *   evaluation.log('accuracy', { score: 0.95 }); // target and index auto-inferred
-   * });
-   * ```
    */
   log(metric: string, options: LogOptions): void {
     // Get context from AsyncLocalStorage (if inside withTarget)
@@ -541,30 +492,9 @@ export class Experiment {
   }
 
   /**
-   * Run a built-in evaluator
-   *
    * @param evaluatorSlug - The evaluator identifier (e.g., 'ragas/faithfulness')
    * @param options - Evaluator options including data and settings
-   *
-   * If called inside a withTarget() block, the target and index are automatically
-   * inferred from the context and don't need to be specified.
-   *
    * @example
-   * ```typescript
-   * // Inside withTarget() - target and index auto-inferred
-   * await evaluation.withTarget('gpt-4', { model: 'openai/gpt-4' }, async () => {
-   *   await evaluation.evaluate('ragas/faithfulness', {
-   *     data: { input, output, contexts },
-   *   });
-   * });
-   *
-   * // Or explicit index/target
-   * await evaluation.evaluate('ragas/faithfulness', {
-   *   index,
-   *   data: { input, output, contexts },
-   *   target: 'gpt-4',
-   * });
-   * ```
    */
   async evaluate(evaluatorSlug: string, options: EvaluateOptions): Promise<void> {
     // Get context from AsyncLocalStorage (if inside withTarget)
@@ -634,7 +564,7 @@ export class Experiment {
       const wrappedError = new EvaluatorError(
         evaluatorSlug,
         error instanceof Error ? error.message : String(error),
-        error instanceof Error ? error : undefined
+        error instanceof Error ? error : undefined,
       );
 
       this.log(name ?? evaluatorSlug, {
@@ -672,7 +602,7 @@ export class Experiment {
     asGuardrail?: boolean;
   }): Promise<RunEvaluatorResponse> {
     const response = await langwatchFetch(
-      `${this.endpoint}/api/evaluations/${evaluatorSlug}/evaluate`,
+      `${this.endpoint}/api/v1/evaluations/${evaluatorSlug}/evaluate`,
       {
         method: "POST",
         headers: {
@@ -688,7 +618,7 @@ export class Experiment {
           as_guardrail: asGuardrail,
         }),
         signal: AbortSignal.timeout(EVALUATOR_TIMEOUT_MS),
-      }
+      },
     );
 
     if (!response.ok) {
@@ -700,56 +630,16 @@ export class Experiment {
   }
 
   /**
-   * Compare a row's targets and pick the best one
-   *
-   * Every target that recorded an output for the row is judged together in a
-   * single call, and the winner comes back named with the target name you
-   * registered. Call it once the row's withTarget() calls have all settled,
-   * which under the usual Promise.all is right after the await.
-   *
-   * The verdict grades no single target, so it is recorded against the row.
-   *
-   * The row is named the way log() names it: inside a run() callback it is
-   * inferred from the row being processed, and outside one it is required.
-   *
-   * A row with fewer than two outputs cannot be compared: it is recorded as
-   * skipped, naming the targets that produced nothing, and the run carries on.
-   * A judge that fails or cannot be reached comes back as an `error` verdict
-   * for the same reason, and stays distinct from `inconclusive`, which is the
-   * judge telling you something about your candidates. Naming a target that
-   * produced no output is a different thing again, and throws, because a
-   * two-way verdict read as the three-way one you asked for is worse than a
-   * failure.
-   *
    * @param options - How the judge should read the row, and which row when
-   *                  it cannot be inferred
    * @returns The verdict, including the candidates it actually saw
-   *
    * @example
-   * ```typescript
-   * await experiment.run(dataset, async ({ item }) => {
-   *   await Promise.all([
-   *     experiment.withTarget('gpt-5-mini', () => askGpt(item.question)),
-   *     experiment.withTarget('claude-sonnet-5', () => askClaude(item.question)),
-   *   ]);
-   *
-   *   const verdict = await experiment.compare({ input: item.question });
-   *   console.log(verdict.winner);
-   * });
-   * ```
    */
   async compare(options: ComparisonOptions = {}): Promise<ComparisonVerdict> {
-    const {
-      name = DEFAULT_COMPARISON_NAME,
-      targets,
-      input,
-      golden,
-    } = options;
+    const { name = DEFAULT_COMPARISON_NAME, targets, input, golden } = options;
 
     const index = this.resolveComparisonRow(options.index);
 
-    const captured =
-      this.capturedOutputs.get(index) ?? new Map<string, CapturedTargetOutput>();
+    const captured = this.capturedOutputs.get(index) ?? new Map<string, CapturedTargetOutput>();
 
     if (targets) {
       const missing = targets.filter((target) => !captured.has(target));
@@ -758,7 +648,7 @@ export class Experiment {
           `Cannot compare row ${index}: no output was recorded for ${missing
             .map((target) => `'${target}'`)
             .join(", ")}. Compare a row once every withTarget() call for it has settled.`,
-          missing
+          missing,
         );
       }
     }
@@ -768,14 +658,12 @@ export class Experiment {
     // would reshuffle what the judge sees from one row to the next.
     const requested = targets ? new Set(targets) : null;
     const candidates = Array.from(this.targets.keys()).filter(
-      (target) =>
-        captured.has(target) && (requested === null || requested.has(target))
+      (target) => captured.has(target) && (requested === null || requested.has(target)),
     );
 
     if (candidates.length < 2) {
       const missing = Array.from(this.targets.keys()).filter(
-        (target) =>
-          !captured.has(target) && (requested === null || requested.has(target))
+        (target) => !captured.has(target) && (requested === null || requested.has(target)),
       );
       const verdict: ComparisonVerdict = {
         status: "skipped",
@@ -810,9 +698,7 @@ export class Experiment {
         data,
         settings,
         name,
-        traceId:
-          iterationContextStorage.getStore()?.traceId ??
-          this.getTraceIdFromContext(),
+        traceId: iterationContextStorage.getStore()?.traceId ?? this.getTraceIdFromContext(),
         spanId: this.getSpanIdFromContext(),
       });
     } catch (error) {
@@ -838,23 +724,13 @@ export class Experiment {
 
   /**
    * The row a comparison is about
-   *
-   * Inferred from the row being processed, the same way withTarget() and
-   * log() infer theirs, so a comparison inside a run() callback never repeats
-   * an index the SDK already has. It reads that row from the iteration's own
-   * context, which is what keeps a run of many rows at once from handing one
-   * row's comparison the row a neighbour happens to be on.
-   *
-   * What it deliberately does not do is fall back to a row: judging row 0
-   * because no row was named would hand back a confident verdict about
-   * candidates the caller never asked about.
    */
   private resolveComparisonRow(index?: number): number {
     const resolved = index ?? iterationContextStorage.getStore()?.index;
 
     if (resolved === undefined) {
       throw new ComparisonError(
-        "Cannot compare: no row was given and none could be inferred. Pass index explicitly when comparing outside a run() iteration."
+        "Cannot compare: no row was given and none could be inferred. Pass index explicitly when comparing outside a run() iteration.",
       );
     }
 
@@ -863,14 +739,6 @@ export class Experiment {
 
   /**
    * Record a comparison verdict against the row
-   *
-   * The verdict the caller is handed is the only input, so the row can never
-   * say one thing while the return value says another.
-   *
-   * Deliberately not routed through log(): a comparison grades no single
-   * target, so it must not pick one up from an ambient withTarget() context,
-   * and it is recorded under the judge's own evaluator id so the results page
-   * can tell it apart from a hand-logged metric.
    */
   private recordComparison({
     name,
@@ -892,9 +760,7 @@ export class Experiment {
     this.pushEvaluation({
       name,
       evaluator: COMPARISON_EVALUATOR_SLUG,
-      trace_id:
-        iterationContextStorage.getStore()?.traceId ??
-        this.getTraceIdFromContext(),
+      trace_id: iterationContextStorage.getStore()?.traceId ?? this.getTraceIdFromContext(),
       status,
       // The results page keys a comparison column off this candidate list.
       data: {
@@ -916,58 +782,24 @@ export class Experiment {
   }
 
   /**
-   * Execute code within a target context with automatic tracing
-   *
-   * Creates a new span for this target execution and sets up context
-   * so that log() calls inside the callback automatically use this target.
-   * Duration and output are captured automatically.
-   *
-   * This creates a dataset entry per target (like Evaluations V3), enabling
-   * proper per-target latency and cost tracking.
-   *
+   * Execute code within a target context with automatic tracing.
    * @param targetName - Unique identifier for the target
-   * @param metadata - Optional metadata for comparison (e.g., { model: 'gpt-4' })
    * @param callback - Function to execute within the target context
-   * @returns The callback result along with captured metrics
-   *
-   * @example
-   * ```typescript
-   * await evaluation.run(dataset, async ({ item, index }) => {
-   *   // Compare GPT-4 and Claude on the same input
-   *   const [gpt4Result, claudeResult] = await Promise.all([
-   *     evaluation.withTarget('gpt-4', { model: 'openai/gpt-4' }, async () => {
-   *       const response = await openai.chat(item.question);
-   *       evaluation.log('quality', { score: 0.95 }); // target auto-inferred
-   *       return response;
-   *     }),
-   *     evaluation.withTarget('claude-3', { model: 'anthropic/claude-3' }, async () => {
-   *       const response = await anthropic.messages(item.question);
-   *       evaluation.log('quality', { score: 0.85 }); // target auto-inferred
-   *       return response;
-   *     }),
-   *   ]);
-   * });
-   * ```
    */
   async withTarget<R>(
     targetName: string,
     metadata: TargetMetadata | null,
-    callback: TargetCallback<R>
+    callback: TargetCallback<R>,
   ): Promise<TargetResult<R>>;
-  async withTarget<R>(
-    targetName: string,
-    callback: TargetCallback<R>
-  ): Promise<TargetResult<R>>;
+  async withTarget<R>(targetName: string, callback: TargetCallback<R>): Promise<TargetResult<R>>;
   async withTarget<R>(
     targetName: string,
     metadataOrCallback: TargetMetadata | null | TargetCallback<R>,
-    maybeCallback?: TargetCallback<R>
+    maybeCallback?: TargetCallback<R>,
   ): Promise<TargetResult<R>> {
     // Handle overloads
-    const metadata =
-      typeof metadataOrCallback === "function" ? null : metadataOrCallback;
-    const callback =
-      typeof metadataOrCallback === "function" ? metadataOrCallback : maybeCallback!;
+    const metadata = typeof metadataOrCallback === "function" ? null : metadataOrCallback;
+    const callback = typeof metadataOrCallback === "function" ? metadataOrCallback : maybeCallback!;
 
     // On FIRST withTarget() call ever in this evaluation:
     // - Set flag to skip creating iteration-level traces going forward
@@ -1048,7 +880,7 @@ export class Experiment {
         } finally {
           span.end();
         }
-      }
+      },
     );
 
     const duration = Date.now() - startTime;
@@ -1056,9 +888,8 @@ export class Experiment {
     // Serialize the result as "predicted" output (similar to Evaluations V3)
     let predicted: Record<string, unknown> | null = null;
     if (result !== undefined && result !== null) {
-      predicted = typeof result === "object"
-        ? (result as Record<string, unknown>)
-        : { output: result };
+      predicted =
+        typeof result === "object" ? (result as Record<string, unknown>) : { output: result };
     }
 
     // Create a dataset entry for this target execution (like Evaluations V3)
@@ -1069,7 +900,7 @@ export class Experiment {
       entry: this.serializeItem(currentItem),
       duration,
       error: callbackError?.message ?? null,
-      trace_id: traceId || null,  // null if no tracer configured (no-op)
+      trace_id: traceId || null, // null if no tracer configured (no-op)
       target_id: targetName,
       predicted,
     };
@@ -1099,11 +930,6 @@ export class Experiment {
 
   /**
    * Keep a target's output for the row so compare() can reach it later
-   *
-   * The batch this output also went into is flushed on a timer and cleared, so
-   * a comparison that read its candidates from there would find them missing
-   * whenever the flush landed first. A target that produced nothing is not
-   * captured at all: it has no output to judge.
    */
   private captureTargetOutput({
     index,
@@ -1174,30 +1000,20 @@ export class Experiment {
     if (now - this.lastSentMs >= DEBOUNCE_INTERVAL_MS) {
       this.sendBatch();
     } else {
-      this.flushTimeout ??= setTimeout(() => {
-        this.flushTimeout = null;
-        this.sendBatch();
-      }, DEBOUNCE_INTERVAL_MS - (now - this.lastSentMs));
+      this.flushTimeout ??= setTimeout(
+        () => {
+          this.flushTimeout = null;
+          this.sendBatch();
+        },
+        DEBOUNCE_INTERVAL_MS - (now - this.lastSentMs),
+      );
     }
   }
 
   /**
    * Print a CI-friendly summary and optionally exit with code 1 on failure.
-   *
-   * Mirrors `ExperimentRunResult.printSummary` for parity — SDK-driven experiments
-   * can now fail CI builds the same way platform experiments do.
-   *
    * @param exitOnFailure - If true (default), calls `process.exit(1)` when any evaluation failed.
-   *
    * @example
-   * ```typescript
-   * const experiment = await langwatch.experiments.init("ci-quality-check");
-   * await experiment.run(dataset, async ({ item, index }) => {
-   *   const response = await myLLM(item.input);
-   *   await experiment.evaluate("ragas/faithfulness", { index, data: { input: item.input, output: response } });
-   * });
-   * experiment.printSummary();
-   * ```
    */
   printSummary(exitOnFailure = true): void {
     const evaluators = new Map<
@@ -1234,13 +1050,25 @@ export class Experiment {
 
     const targets = new Map<
       string,
-      { passed: number; failed: number; latencySum: number; latencyCount: number; cost: number }
+      {
+        passed: number;
+        failed: number;
+        latencySum: number;
+        latencyCount: number;
+        cost: number;
+      }
     >();
     for (const entry of this.cumulativeEntries) {
       const tid = entry.target_id;
       if (!tid) continue;
       if (!targets.has(tid)) {
-        targets.set(tid, { passed: 0, failed: 0, latencySum: 0, latencyCount: 0, cost: 0 });
+        targets.set(tid, {
+          passed: 0,
+          failed: 0,
+          latencySum: 0,
+          latencyCount: 0,
+          cost: 0,
+        });
       }
       const stats = targets.get(tid)!;
       if (typeof entry.duration === "number") {
@@ -1260,7 +1088,13 @@ export class Experiment {
       const tid = e.target_id;
       if (!tid) continue;
       if (!targets.has(tid)) {
-        targets.set(tid, { passed: 0, failed: 0, latencySum: 0, latencyCount: 0, cost: 0 });
+        targets.set(tid, {
+          passed: 0,
+          failed: 0,
+          latencySum: 0,
+          latencyCount: 0,
+          cost: 0,
+        });
       }
       const stats = targets.get(tid)!;
       if (e.status === "error" || e.passed === false) stats.failed += 1;
@@ -1383,7 +1217,7 @@ export class Experiment {
     };
 
     // Fire and forget (with error logging)
-    this.pendingFlush = langwatchFetch(`${this.endpoint}/api/evaluations/batch/log_results`, {
+    this.pendingFlush = langwatchFetch(`${this.endpoint}/api/v1/evaluations/batch/log_results`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

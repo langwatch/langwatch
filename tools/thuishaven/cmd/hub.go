@@ -33,7 +33,7 @@ func runHub(ctx context.Context, d deps) error {
 		}
 		switch {
 		case out.RunCleanup:
-			if err := runInteractiveClean(ctx, d, pruneStaleThreshold(invocation{})); err != nil {
+			if err := runInteractiveClean(ctx, newCleanRun(d, invocation{})); err != nil {
 				fmt.Fprintf(os.Stderr, "haven: cleanup failed: %v\n", err)
 			}
 		case out.OpenGitDir != "":

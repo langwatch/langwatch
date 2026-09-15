@@ -1,0 +1,214 @@
+import { MAX_RUN_CONFIGURATIONS } from "@langwatch/scenario-contract";
+/**
+ * The expressions that read a configuration off a run row, and the repository that reads the
+ * configurations a project's plans already ran with.
+ * @see specs/features/agent-testing/run-configuration-history.feature
+ */
+import type { ResultsFilter } from "@langwatch/scenario-contract";
+import {
+  ATOM_SORT_KEY,
+  LANGWATCH_METADATA,
+  TARGET_KEY_EXPR,
+  TARGET_PARAMETERS_EXPR,
+  ResultAtomsClickHouseRepository,
+  type ResultAtomsClickHouseClientResolver,
+} from "./clickhouse.result-atoms.repository.ts";
+
+/** The target's type: `http`, `prompt`, `code` or `workflow`. */
+export const TARGET_TYPE_EXPR = `JSONExtractString(${LANGWATCH_METADATA}, 'targetType')`;
+
+/**
+ * A target as one comparable string, `<type>:<targetKey>`. The same two fields the shared key
+ * recipe joins, in the same order, so the pre-collapse this drives groups the rows the final key
+ * would group: one agent run with two sets of overrides is two targets here as it is there.
+ */
+export const TARGET_PAIR_EXPR = `concat(${TARGET_TYPE_EXPR}, ':', ${TARGET_KEY_EXPR})`;
+
+/**
+ * The simulator model the plan was configured with, '' when it named none. A run recorded before
+ * the models were stamped extracts as '' too, which is correct: both mean "no model was chosen" and
+ * both key the same way.
+ */
+export const SIMULATOR_MODEL_EXPR = `JSONExtractString(${LANGWATCH_METADATA}, 'simulatorModel')`;
+
+/** The judge model the plan was configured with, '' when it named none. */
+export const JUDGE_MODEL_EXPR = `JSONExtractString(${LANGWATCH_METADATA}, 'judgeModel')`;
+
+/**
+ * The resolved run parameters, as the raw JSON object they were stored as. Raw rather than a map
+ * read: the values are strings, numbers and booleans, and re-typing them in SQL would lose which
+ * they were. A run with no parameters extracts as the empty string.
+ */
+export const RUN_PARAMETERS_EXPR = `JSONExtractRaw(ifNull(Metadata, '{}'), 'parameters')`;
+
+/**
+ * Only runs the platform pointed at a target can be a configuration. A run pushed from an SDK or
+ * from CI carries no target, so the dialog has nothing to offer back for it. Dropping those rows
+ * here also keeps the target pair from ever reading as a bare ':'.
+ */
+export const HAS_TARGET_CLAUSE = `AND JSONExtractString(${LANGWATCH_METADATA}, 'targetReferenceId') != ''`;
+
+/**
+ * Whether the run carried a note, as 1 or 0. It never reads the note. A run plan that took a note
+ * last time takes one again, so the dialog opens the note block expanded and empty. The text
+ * belongs to one run and is carried over by nothing.
+ */
+export const HAS_NOTE_EXPR = `JSONExtractString(ifNull(Metadata, '{}'), 'note') != ''`;
+
+/**
+ * One configuration as the store folds it, before the plan row is joined. Every value is a string
+ * because ClickHouse serialises UInt64 that way, and because the parameters are handed over as the
+ * raw JSON they were stored as.
+ */
+export interface RawRunConfigurationRow {
+  SetId: string;
+  /** `<type>:<targetKey>` per target, sorted by the database. */
+  TargetPairs: string[];
+  /**
+   * The raw overrides of each target, '' for a target with none, in the same
+   * order as `TargetPairs`.
+   */
+  TargetParameters: string[];
+  RepeatCount: string;
+  SimulatorModel: string;
+  JudgeModel: string;
+  /**
+   * The raw merged parameters of the first scenario run against a target with no overrides, or of
+   * the first scenario run at all when every target carries some; '' when the run resolved none.
+   */
+  Parameters: string;
+  /** The raw overrides of the target `Parameters` was read from, or ''. */
+  FirstTargetParameters: string;
+  /** "1" when any run of this configuration carried a note, never the note. */
+  UsesNote: string;
+  LastRunAtMs: string;
+}
+
+/**
+ * Reads the configurations a project's plans already ran with. A sibling of the atom repository
+ * rather than a method on it: the atom reads answer "what happened", this one answers "what was it
+ * asked to do".
+ */
+export abstract class RunConfigurationsRepository {
+  /** One row per distinct configuration, newest first. */
+  abstract findConfigurations(input: {
+    filter: ResultsFilter;
+    limit?: number;
+  }): Promise<RawRunConfigurationRow[]>;
+}
+
+/**
+ * Reads the configurations a project's plans already ran with, over ClickHouse.
+ */
+export class RunConfigurationsClickHouseRepository extends RunConfigurationsRepository {
+  static create(
+    resolveClient: ResultAtomsClickHouseClientResolver,
+  ): RunConfigurationsClickHouseRepository {
+    return new RunConfigurationsClickHouseRepository(resolveClient);
+  }
+
+  private constructor(private readonly resolveClient: ResultAtomsClickHouseClientResolver) {
+    super();
+  }
+
+  private async getClient(tenantId: string): ReturnType<ResultAtomsClickHouseClientResolver> {
+    if (!tenantId) {
+      throw new Error("tenantId is required for ClickHouse client resolution");
+    }
+
+    return this.resolveClient(tenantId);
+  }
+
+  /**
+   * One row per distinct configuration, newest first.
+   */
+  async findConfigurations({
+    filter,
+    limit = MAX_RUN_CONFIGURATIONS,
+  }: {
+    filter: ResultsFilter;
+    limit?: number;
+  }): Promise<RawRunConfigurationRow[]> {
+    // An empty set list means "none of them". Sending no filter at all would
+    // read the whole project instead, which is the opposite answer.
+    if (filter.scenarioSetIds?.length === 0) return [];
+
+    const filters = ResultAtomsClickHouseRepository.buildAtomFilters(filter);
+    const client = await this.getClient(filter.projectId);
+
+    const result = await client.query({
+      query: `SELECT
+          SetId,
+          arrayMap(target -> target.1, Targets) AS TargetPairs,
+          arrayMap(target -> target.2, Targets) AS TargetParameters,
+          toString(RepeatCount)     AS RepeatCount,
+          SimulatorModel,
+          JudgeModel,
+          Parameters,
+          FirstTargetParameters,
+          toString(max(HasNote))    AS UsesNote,
+          toString(max(BatchRunAt)) AS LastRunAtMs
+        FROM (
+          SELECT
+            SetId,
+            arraySort(groupUniqArray(tuple(TargetPair, TargetParameters))) AS Targets,
+            max(PairRuns)                          AS RepeatCount,
+            max(SimulatorModel)                    AS SimulatorModel,
+            max(JudgeModel)                        AS JudgeModel,
+            if(countIf(TargetParameters = '') > 0,
+               argMinIf(Parameters, FirstRunId, TargetParameters = ''),
+               argMin(Parameters, FirstRunId))     AS Parameters,
+            if(countIf(TargetParameters = '') > 0,
+               '',
+               argMin(TargetParameters, FirstRunId)) AS FirstTargetParameters,
+            max(HasNote)                           AS HasNote,
+            max(PairRunAt)                         AS BatchRunAt
+          FROM (
+            SELECT
+              SetId,
+              BatchRunId,
+              TargetPair,
+              any(TargetParameters)      AS TargetParameters,
+              count()                    AS PairRuns,
+              max(SimulatorModel)        AS SimulatorModel,
+              max(JudgeModel)            AS JudgeModel,
+              any(Parameters)            AS Parameters,
+              max(HasNote)               AS HasNote,
+              min(ScenarioRunId)         AS FirstRunId,
+              max(RunAt)                 AS PairRunAt
+            FROM (
+              SELECT
+                ScenarioSetId              AS SetId,
+                BatchRunId,
+                ScenarioId,
+                ScenarioRunId,
+                ${TARGET_PAIR_EXPR}        AS TargetPair,
+                ${TARGET_PARAMETERS_EXPR}  AS TargetParameters,
+                ${SIMULATOR_MODEL_EXPR}    AS SimulatorModel,
+                ${JUDGE_MODEL_EXPR}        AS JudgeModel,
+                ${RUN_PARAMETERS_EXPR}     AS Parameters,
+                ${HAS_NOTE_EXPR}           AS HasNote,
+                ${ATOM_SORT_KEY}           AS RunAt
+              ${ResultAtomsClickHouseRepository.atomScopeSql(filters)}
+                ${HAS_TARGET_CLAUSE}
+            )
+            GROUP BY SetId, BatchRunId, ScenarioId, TargetPair
+          )
+          GROUP BY SetId, BatchRunId
+        )
+        GROUP BY
+          SetId, Targets, RepeatCount, SimulatorModel, JudgeModel,
+          Parameters, FirstTargetParameters
+        ORDER BY max(BatchRunAt) DESC
+        LIMIT {configurationLimit:UInt32}`,
+      query_params: {
+        tenantId: filter.projectId,
+        ...filters.params,
+        configurationLimit: String(Math.min(Math.max(1, limit), MAX_RUN_CONFIGURATIONS)),
+      },
+      format: "JSONEachRow",
+    });
+
+    return result.json<RawRunConfigurationRow>();
+  }
+}

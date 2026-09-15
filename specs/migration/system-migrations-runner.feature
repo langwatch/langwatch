@@ -17,6 +17,20 @@ Feature: Running system migrations across organizations
     Given a registered system migration
     And an organization "org_acme"
 
+  Scenario: A project-rooted migration keeps enrollment and execution axes distinct
+    Given an explicitly configured project-rooted migration
+    And project "project_one" belongs to enrolled organization "org_acme"
+    When the migration pass reaches that project
+    Then organization enrollment decides admission
+    And the migration receives "project_one" as its tenant identifier
+    And its persisted checkpoint is keyed by "project_one"
+
+  Scenario: Project-rooted startup migrations prove completion for projects
+    Given an explicitly configured project-rooted startup migration
+    When startup drives and verifies the migration
+    Then both execution and completion verification enumerate project identifiers
+    And an organization identifier is never substituted for a project identifier
+
   # ═══ Passes and claims ════════════════════════════════════════════════
 
   @unit
@@ -126,6 +140,16 @@ Feature: Running system migrations across organizations
     Then the preflight fails
     And it says how many passes it gave up after
     And runtime processes do not start
+
+  # Main drove this loop in the background of every worker boot, so how fast a
+  # fleet converged was a function of the deploy cadence. It is an ordered step
+  # of the boot chain now — a task the image runs before the process starts.
+  @unit
+  Scenario: The boot chain drives the migrations to convergence before the process starts
+    Given the boot chain runs the system-migrations pass task
+    When the fleet stops advancing
+    Then the task returns and the boot chain continues to the process it was going to start
+    And a pass that fails outright ends the task without failing the boot chain
 
   @unit
   Scenario: A failed pass prevents startup

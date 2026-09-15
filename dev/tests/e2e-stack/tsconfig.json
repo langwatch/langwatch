@@ -1,0 +1,10 @@
+{
+  "extends": "../../../tsconfig.base.json",
+  "compilerOptions": {
+    "module": "ESNext",
+    "lib": ["ES2023"],
+    "types": ["node"],
+    "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo/e2e-stack.tsbuildinfo"
+  },
+  "include": ["src/**/*.ts"]
+}

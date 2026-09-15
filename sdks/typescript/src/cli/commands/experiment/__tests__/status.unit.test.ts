@@ -15,7 +15,11 @@ vi.mock("@/client-sdk/services/experiments/experiments-api.service", async (impo
 });
 
 vi.mock("../../../utils/apiKey", () => ({
-  resolveCredentials: vi.fn(async () => ({ apiKey: "test-key", source: "env", endpoint: "https://app.langwatch.ai" })),
+  resolveCredentials: vi.fn(async () => ({
+    apiKey: "test-key",
+    source: "env",
+    endpoint: "https://app.langwatch.ai",
+  })),
 }));
 
 vi.mock("ora", () => ({
@@ -54,12 +58,14 @@ describe("experimentStatusCommand()", () => {
     mockListRuns = vi.fn().mockResolvedValue({
       runs: [{ runId: "latest_run" }, { runId: "older_run" }],
     });
-    vi.mocked(ExperimentsApiService).mockImplementation(function () { return ({
-      startRun: vi.fn(),
-      getRunStatus: mockGetRunStatus,
-      getRunResults: mockGetRunResults,
-      listRuns: mockListRuns,
-    }) as unknown as ExperimentsApiService; });
+    vi.mocked(ExperimentsApiService).mockImplementation(function () {
+      return {
+        startRun: vi.fn(),
+        getRunStatus: mockGetRunStatus,
+        getRunResults: mockGetRunResults,
+        listRuns: mockListRuns,
+      } as unknown as ExperimentsApiService;
+    });
     logSpy = vi.spyOn(console, "log").mockImplementation(noop);
     vi.spyOn(console, "error").mockImplementation(noop);
     vi.spyOn(process, "exit").mockImplementation((code) => {
@@ -149,12 +155,10 @@ describe("experimentStatusCommand()", () => {
 
     it("propagates a real fallback error instead of masking it as not-found", async () => {
       mockGetRunStatus.mockRejectedValue(new Error("Run not found"));
-      mockGetRunResults.mockRejectedValue(
-        new Error("get run results: 500 Internal Server Error"),
-      );
-      await expect(
-        experimentStatusCommand("doc-qa", { runId: "sdk_run" }),
-      ).rejects.toMatchObject({ code: 1 });
+      mockGetRunResults.mockRejectedValue(new Error("get run results: 500 Internal Server Error"));
+      await expect(experimentStatusCommand("doc-qa", { runId: "sdk_run" })).rejects.toMatchObject({
+        code: 1,
+      });
     });
   });
 

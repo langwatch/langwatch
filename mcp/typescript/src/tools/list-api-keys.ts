@@ -12,7 +12,11 @@ export async function handleListApiKeys(): Promise<string> {
   lines.push(`# API Keys (${keys.length} total)\n`);
 
   for (const k of keys) {
-    const status = k.revokedAt ? "REVOKED" : k.expiresAt && new Date(k.expiresAt) < new Date() ? "EXPIRED" : "ACTIVE";
+    const status = k.revokedAt
+      ? "REVOKED"
+      : k.expiresAt && new Date(k.expiresAt) < new Date()
+        ? "EXPIRED"
+        : "ACTIVE";
     lines.push(`## ${k.name}`);
     lines.push(`**ID**: ${k.id}`);
     lines.push(`**Status**: ${status}`);

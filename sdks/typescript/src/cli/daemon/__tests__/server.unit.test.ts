@@ -167,9 +167,7 @@ describe("stagingSocketPath", () => {
   describe("given the shared socket path", () => {
     describe("when a daemon derives the name it will bind", () => {
       it("stays in the same directory, so publishing is a same-filesystem link", () => {
-        expect(path.dirname(stagingSocketPath(shared, 4242))).toBe(
-          path.dirname(shared),
-        );
+        expect(path.dirname(stagingSocketPath(shared, 4242))).toBe(path.dirname(shared));
       });
 
       it("stays within the sockaddr_un budget the shared path was sized against", () => {
@@ -192,9 +190,7 @@ describe("stagingSocketPath", () => {
 
     describe("when two daemons race to start", () => {
       it("gives them different files to bind", () => {
-        expect(stagingSocketPath(shared, 101)).not.toBe(
-          stagingSocketPath(shared, 102),
-        );
+        expect(stagingSocketPath(shared, 101)).not.toBe(stagingSocketPath(shared, 102));
         expect(stagingSocketPath(shared, 101)).not.toBe(shared);
       });
     });
@@ -251,9 +247,7 @@ describe("publishSocket", () => {
         fs.writeFileSync(socketPath, "theirs");
         const theirs = identify(socketPath);
 
-        expect(() => publishSocket(stagingPath, socketPath)).toThrow(
-          DaemonAlreadyRunningError,
-        );
+        expect(() => publishSocket(stagingPath, socketPath)).toThrow(DaemonAlreadyRunningError);
 
         expect(identify(socketPath)).toEqual(theirs);
         expect(fs.readFileSync(socketPath, "utf8")).toBe("theirs");
@@ -284,9 +278,7 @@ describe("publishSocket", () => {
         fs.writeFileSync(socketPath, "theirs");
         const theirs = identify(socketPath);
 
-        expect(() => publishSocket(stagingPath, socketPath)).toThrow(
-          DaemonAlreadyRunningError,
-        );
+        expect(() => publishSocket(stagingPath, socketPath)).toThrow(DaemonAlreadyRunningError);
 
         // The winner still answers to the shared name. A rename here would
         // have left it running, holding resolved credentials, on an inode no

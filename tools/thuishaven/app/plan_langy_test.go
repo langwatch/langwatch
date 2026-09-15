@@ -15,8 +15,8 @@ func TestLangyContainerShell(t *testing.T) {
 				t.Fatalf("missing loopback publish in: %s", sh)
 			}
 		})
-		t.Run("sets PORT, ENVIRONMENT, pretty logging and the internal secret", func(t *testing.T) {
-			for _, want := range []string{"'PORT=49624'", "'ENVIRONMENT=local'", "'LOG_FORMAT=pretty'", "'LANGY_INTERNAL_SECRET=sekret'"} {
+		t.Run("sets PORT, ENVIRONMENT, structured logging and the internal secret", func(t *testing.T) {
+			for _, want := range []string{"'PORT=49624'", "'ENVIRONMENT=local'", "'LOG_FORMAT=json'", "'LANGY_INTERNAL_SECRET=sekret'"} {
 				if !strings.Contains(sh, want) {
 					t.Fatalf("missing %s in: %s", want, sh)
 				}

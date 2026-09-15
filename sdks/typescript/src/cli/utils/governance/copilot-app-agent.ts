@@ -1,12 +1,7 @@
 /**
  * Imperative install/remove of the Copilot app login agent (ADR-039
- * §Extension). The pure descriptor + env live in `copilot-app.ts`; this
- * module writes that descriptor to disk and registers/unregisters it with
- * the OS service manager (launchd / systemd --user / Task Scheduler).
- *
- * fs and the OS register command are injected so the orchestration is
- * unit-testable without touching the machine; the default wiring shells
- * out for real.
+ * §Extension): writes the descriptor to disk and registers it with the OS
+ * service manager; fs/OS commands are injected for unit-testability.
  */
 
 import { execFileSync } from "node:child_process";
@@ -52,28 +47,20 @@ const defaultIo: AgentIo = {
 };
 
 /** The file registered with the OS service manager (no side effects). */
-export function copilotAppAgentPath(
-  platform: AppPlatform,
-  home: string,
-): string {
-  return renderLaunchAgent({ platform, home, execPath: "", env: {} })
-    .registerPath;
+export function copilotAppAgentPath(platform: AppPlatform, home: string): string {
+  return renderLaunchAgent({ platform, home, execPath: "", env: {} }).registerPath;
 }
 
 /** Every file the agent writes on this platform — for cleanup. Paths are
  * env-independent, so an empty-env render yields the full set. */
 function copilotAppAgentFiles(platform: AppPlatform, home: string): string[] {
-  return renderLaunchAgent({ platform, home, execPath: "", env: {} }).files.map(
-    (f) => f.path,
-  );
+  return renderLaunchAgent({ platform, home, execPath: "", env: {} }).files.map((f) => f.path);
 }
 
 /**
- * Whether ANY agent file is on disk. Deliberately not just the register
- * descriptor: on win32 the token-bearing `.cmd` wrapper is a separate
- * file, and a partial removal that lost the XML but kept the wrapper must
- * still be listed by logout (and its credential deleted) rather than
- * silently under-reported.
+ * Whether ANY agent file is on disk — not just the register descriptor,
+ * since on win32 the token-bearing `.cmd` wrapper is separate, and a partial
+ * removal must still be listed by logout so its credential gets deleted.
  */
 export function isCopilotAppAgentInstalled(
   platform: AppPlatform,
@@ -98,25 +85,17 @@ interface OsCommand {
 }
 
 /** The OS commands that register the descriptor, per platform. */
-function registerCommands(
-  platform: AppPlatform,
-  descriptorPath: string,
-): OsCommand[] {
+function registerCommands(platform: AppPlatform, descriptorPath: string): OsCommand[] {
   switch (platform) {
     case "darwin":
       return [
-        // bootout first so re-connect re-points idempotently; on a first
-        // install nothing is loaded yet, so this one failure is expected.
-        // `bootstrap`/`bootout` (not legacy `load`/`unload`): the legacy
-        // verbs print their failure to stderr and EXIT 0, so a rejected
-        // plist would be reported as a successful install with capture
-        // silently off — verified against launchd on macOS 15.
+        // bootout first so re-connect re-points idempotently (expected to
+        // fail on a first install, nothing loaded yet). Use bootstrap/bootout,
+        // not legacy load/unload: those print failure to stderr but EXIT 0,
+        // silently reporting a rejected plist as a successful install.
         {
           cmd: "launchctl",
-          args: [
-            "bootout",
-            `${launchdGuiDomain()}/${COPILOT_APP_AGENT_LABEL}`,
-          ],
+          args: ["bootout", `${launchdGuiDomain()}/${COPILOT_APP_AGENT_LABEL}`],
           tolerateFailure: true,
         },
         {
@@ -167,36 +146,24 @@ function unregisterCommands(platform: AppPlatform): OsCommand[] {
       return [
         {
           cmd: "launchctl",
-          args: [
-            "bootout",
-            `${launchdGuiDomain()}/${COPILOT_APP_AGENT_LABEL}`,
-          ],
+          args: ["bootout", `${launchdGuiDomain()}/${COPILOT_APP_AGENT_LABEL}`],
         },
       ];
     case "linux":
       return [
         {
           cmd: "systemctl",
-          args: [
-            "--user",
-            "disable",
-            "--now",
-            `${COPILOT_APP_AGENT_LABEL}.service`,
-          ],
+          args: ["--user", "disable", "--now", `${COPILOT_APP_AGENT_LABEL}.service`],
         },
       ];
     case "win32":
-      return [
-        { cmd: "schtasks", args: ["/Delete", "/TN", COPILOT_APP_AGENT_LABEL, "/F"] },
-      ];
+      return [{ cmd: "schtasks", args: ["/Delete", "/TN", COPILOT_APP_AGENT_LABEL, "/F"] }];
   }
 }
 
 /**
- * Install (or re-point) the login agent: write the descriptor and
- * register it with the OS. Idempotent — re-running overwrites the
- * descriptor and re-registers, never stacking a second agent (one label,
- * one file).
+ * Install (or re-point) the login agent: write the descriptor and register
+ * it with the OS. Idempotent — never stacks a second agent (one label, file).
  */
 export class CopilotAppAgentError extends Error {
   constructor(
@@ -213,10 +180,7 @@ export class CopilotAppAgentError extends Error {
   }
 }
 
-export function installCopilotAppAgent(
-  spec: LaunchAgentSpec,
-  io: AgentIo = defaultIo,
-): string {
+export function installCopilotAppAgent(spec: LaunchAgentSpec, io: AgentIo = defaultIo): string {
   const descriptor = renderLaunchAgent(spec);
   for (const file of descriptor.files) {
     io.mkdirp(path.dirname(file.path));
@@ -229,13 +193,11 @@ export function installCopilotAppAgent(
     try {
       io.run(cmd, args);
     } catch (err) {
-      // Only the expected first-install darwin bootout is tolerated.
-      // Every other service-manager failure means the agent is NOT
-      // registered — unwind the token-bearing files just written (a
-      // descriptor that failed to register would otherwise sit on disk as
-      // a live credential the OS may still pick up at next login), then
-      // surface it so the caller never reports a mint + "connected" while
-      // capture is actually off.
+      // Only the expected first-install darwin bootout is tolerated. Any
+      // other failure means the agent is NOT registered: unwind the
+      // token-bearing files just written (else a live credential sits on
+      // disk) and surface the error so the caller never reports "connected"
+      // while capture is actually off.
       if (!tolerateFailure) {
         for (const file of descriptor.files) {
           io.removeFile(file.path);

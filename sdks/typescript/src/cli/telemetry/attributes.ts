@@ -16,7 +16,7 @@
  * This vocabulary is a published contract. Add to it freely; renaming or
  * repurposing a key breaks the reader on the other side.
  *
- * Spec: specs/telemetry/langy-live-events.feature
+ * Spec: sdks/typescript/specs/telemetry/langy-live-events.feature
  */
 
 /** Attribute keys carried on every live CLI event. */
@@ -73,8 +73,7 @@ export const LANGWATCH_EVENTS = {
   error: "error",
 } as const;
 
-export type LangWatchEvent =
-  (typeof LANGWATCH_EVENTS)[keyof typeof LANGWATCH_EVENTS];
+export type LangWatchEvent = (typeof LANGWATCH_EVENTS)[keyof typeof LANGWATCH_EVENTS];
 
 /**
  * Switches the OTLP transport on. Unset (or any value other than a truthy one)

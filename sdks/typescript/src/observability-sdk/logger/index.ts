@@ -4,9 +4,7 @@ import {
   type LoggerProvider,
   createNoopLogger,
 } from "@opentelemetry/api-logs";
-import {
-  type LangWatchLogger,
-} from "./types";
+import { type LangWatchLogger } from "./types";
 import { LangWatchLoggerInternal } from "./implementation";
 
 /**
@@ -15,8 +13,7 @@ import { LangWatchLoggerInternal } from "./implementation";
  * replacement: a provider whose loggers are always the shared no-op logger.
  */
 const NOOP_LOGGER_PROVIDER: LoggerProvider = {
-  getLogger: (_name: string, _version?: string, _options?: LoggerOptions) =>
-    createNoopLogger(),
+  getLogger: (_name: string, _version?: string, _options?: LoggerOptions) => createNoopLogger(),
 };
 
 /**
@@ -42,9 +39,7 @@ let currentLoggerProvider: LoggerProvider = NOOP_LOGGER_PROVIDER;
  * @see {@link getLangWatchLoggerFromProvider}
  * @see {@link createLangWatchLogger}
  */
-export function setLangWatchLoggerProvider(
-  loggerProvider: LoggerProvider,
-): void {
+export function setLangWatchLoggerProvider(loggerProvider: LoggerProvider): void {
   currentLoggerProvider = loggerProvider;
 }
 
@@ -67,10 +62,7 @@ export function setLangWatchLoggerProvider(
  *
  * @see {@link setLangWatchLoggerProvider}
  */
-export function getLangWatchLogger(
-  name: string,
-  version?: string,
-): LangWatchLogger {
+export function getLangWatchLogger(name: string, version?: string): LangWatchLogger {
   return getLangWatchLoggerFromProvider(currentLoggerProvider, name, version);
 }
 

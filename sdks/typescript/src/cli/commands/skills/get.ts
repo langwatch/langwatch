@@ -1,17 +1,8 @@
 /**
- * `langwatch skills get <name>` — print a skill's body, raw, on stdout.
- * Agents pipe this straight into their context, so the default output is the
- * SKILL.md content itself in BOTH human and auto-detected agent mode (same
- * precedent as `help-tree`); any EXPLICIT machine request (`-o json|agents|
- * yaml`, `--json`, `--jq`, `-f json`) returns the skill as a structured
- * document instead — an explicit `-o agents` is a request for compact JSON,
- * not for the raw body an agent caller would have gotten anyway.
+ * Print skill's SKILL.md body raw by default; structured document for
+ * explicit format requests.
  */
-import {
-  hasExplicitFormatRequest,
-  printResult,
-  type RawOutputFlags,
-} from "../../utils/output";
+import { hasExplicitFormatRequest, printResult, type RawOutputFlags } from "../../utils/output";
 import { findSkill, SKILLS_BUNDLE } from "./installer";
 import { throwValidationError } from "./validation";
 

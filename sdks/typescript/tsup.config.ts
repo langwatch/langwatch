@@ -10,17 +10,14 @@ import packageJson from "./package.json";
 // zod is bundled, not external, and that is load-bearing rather than a size
 // tradeoff. The SDK validates its own API responses with zod 4 APIs
 // (`.loose()`, `z.core`). Left external, the specifier `zod` is resolved by
-// whoever consumes the SDK — and a consumer is entitled to pin zod 3 and to
-// collapse every copy onto it, which is exactly what the application in this
-// repo does (`resolve.dedupe: ["zod"]`, needed because zod 3 instanceof-checks
-// its own classes). The SDK then calls a v4 method on a v3 object and dies with
+// whoever consumes the SDK. A consumer-selected, incompatible runtime can then
+// replace the version the SDK was built and tested against, and the SDK dies with
 // `z.object(...).loose is not a function` at first import.
 //
 // Bundling is safe precisely because zod never crosses the public API as a
 // VALUE: every schema is internal to response validation, so no caller-owned
 // schema has to satisfy an instanceof against the SDK's copy. Making the
-// library carry its own runtime is what lets it be linked into a workspace that
-// pins a different major.
+// library carry its own runtime is what makes response validation deterministic.
 const noExternal = [/^@langwatch\/langy(\/|$)/, /^zod(\/|$)/];
 
 // `__CLI_VERSION__` is a bare identifier in src/cli/program.ts.

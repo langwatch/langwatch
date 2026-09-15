@@ -56,7 +56,7 @@ const queryOf = (call: number): string => {
 };
 
 /** Reads an iterator to exhaustion and hands back every row it yielded. */
-const drain = async <T,>(rows: AsyncIterable<T>): Promise<T[]> => {
+const drain = async <T>(rows: AsyncIterable<T>): Promise<T[]> => {
   const collected: T[] = [];
   for await (const row of rows) collected.push(row);
   return collected;
@@ -127,15 +127,11 @@ describe("VirtualKeysApiService cursor paging", () => {
       await new VirtualKeysApiService().list();
 
       expect(queryOf(0)).toBe("limit=200");
-      expect(new URLSearchParams(queryOf(1)).get("cursor")).toBe(
-        "op aq ue/+cursor",
-      );
+      expect(new URLSearchParams(queryOf(1)).get("cursor")).toBe("op aq ue/+cursor");
     });
 
     it("stops after one request against a server that sends no cursor at all", async () => {
-      mockFetch.mockResolvedValueOnce(
-        jsonResponse({ data: [virtualKey("a")] }),
-      );
+      mockFetch.mockResolvedValueOnce(jsonResponse({ data: [virtualKey("a")] }));
 
       const keys = await new VirtualKeysApiService().list();
 
@@ -145,13 +141,9 @@ describe("VirtualKeysApiService cursor paging", () => {
 
     it("raises rather than truncating when the cursor chain never ends", async () => {
       // A fresh Response per call: a body can only be read once.
-      mockFetch.mockImplementation(() =>
-        Promise.resolve(jsonResponse(page(["a"], "stuck"))),
-      );
+      mockFetch.mockImplementation(() => Promise.resolve(jsonResponse(page(["a"], "stuck"))));
 
-      await expect(new VirtualKeysApiService().list()).rejects.toBeInstanceOf(
-        VirtualKeysApiError,
-      );
+      await expect(new VirtualKeysApiService().list()).rejects.toBeInstanceOf(VirtualKeysApiError);
     });
   });
 
@@ -187,9 +179,7 @@ describe("VirtualKeysApiService cursor paging", () => {
     });
 
     it("leaves the rest of the walk unread when the consumer stops early", async () => {
-      mockFetch.mockResolvedValueOnce(
-        jsonResponse(page(["a", "b"], "cursor-1")),
-      );
+      mockFetch.mockResolvedValueOnce(jsonResponse(page(["a", "b"], "cursor-1")));
 
       const seen: string[] = [];
       for await (const key of new VirtualKeysApiService().iterate()) {
@@ -211,14 +201,12 @@ describe("VirtualKeysApiService cursor paging", () => {
 
     it("raises rather than looping forever when the cursor chain never ends", async () => {
       // A fresh Response per call: a body can only be read once.
-      mockFetch.mockImplementation(() =>
-        Promise.resolve(jsonResponse(page(["a"], "stuck"))),
-      );
+      mockFetch.mockImplementation(() => Promise.resolve(jsonResponse(page(["a"], "stuck"))));
 
       // The guard fires on the second page, long before this drains.
-      await expect(
-        drain(new VirtualKeysApiService().iterate()),
-      ).rejects.toBeInstanceOf(VirtualKeysApiError);
+      await expect(drain(new VirtualKeysApiService().iterate())).rejects.toBeInstanceOf(
+        VirtualKeysApiError,
+      );
     });
   });
 
@@ -248,9 +236,9 @@ describe("VirtualKeysApiService cursor paging", () => {
         ),
       );
 
-      await expect(
-        new VirtualKeysApiService().listPage({ cursor: "made-up" }),
-      ).rejects.toThrow(/cursor/i);
+      await expect(new VirtualKeysApiService().listPage({ cursor: "made-up" })).rejects.toThrow(
+        /cursor/i,
+      );
     });
   });
   describe("filtering by your own identifier", () => {
@@ -271,9 +259,7 @@ describe("VirtualKeysApiService cursor paging", () => {
 
       // A filter dropped after page one silently widens the answer.
       for (const call of [0, 1]) {
-        expect(new URLSearchParams(queryOf(call)).get("external_id")).toBe(
-          "tenant-7",
-        );
+        expect(new URLSearchParams(queryOf(call)).get("external_id")).toBe("tenant-7");
       }
     });
 
@@ -285,9 +271,7 @@ describe("VirtualKeysApiService cursor paging", () => {
       await drain(new VirtualKeysApiService().iterate({ externalId: "tenant-7" }));
 
       for (const call of [0, 1]) {
-        expect(new URLSearchParams(queryOf(call)).get("external_id")).toBe(
-          "tenant-7",
-        );
+        expect(new URLSearchParams(queryOf(call)).get("external_id")).toBe("tenant-7");
       }
     });
   });

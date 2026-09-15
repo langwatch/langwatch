@@ -1,0 +1,18 @@
+import { createContext, useContext } from "react";
+import type { PromptTemplateFieldsLookup } from "../../model/experiments-v3/mapping-validation.ts";
+
+/**
+ * Publishes, for every prompt target that carries no local draft, the variables its
+ * saved template consumes. Mapping validation reads it to tell a variable the prompt
+ * really uses from one it only declares.
+ */
+export const PromptTemplateFieldsContext = createContext<PromptTemplateFieldsLookup | undefined>(
+  undefined,
+);
+
+/**
+ * The template-field lookup to hand to `getTargetMissingMappings`,
+ * `targetHasMissingMappings` or `validateWorkbench`.
+ */
+export const usePromptTemplateFields = (): PromptTemplateFieldsLookup | undefined =>
+  useContext(PromptTemplateFieldsContext);

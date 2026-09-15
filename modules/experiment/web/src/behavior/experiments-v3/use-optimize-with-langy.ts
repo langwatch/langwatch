@@ -1,0 +1,46 @@
+import { useCallback } from "react";
+
+import { absorbContextTarget } from "@langwatch/langy-web/surfaces/langy-context";
+import { useLangyStore } from "@langwatch/langy-web/surfaces/langy-store";
+import { useFeatureFlag } from "@langwatch/workflow-web/surfaces/feature-flag";
+import { useOrganizationTeamProject } from "@langwatch/ui-host/use-organization-team-project";
+import type { TargetConfig } from "../../model/experiments-v3/types.ts";
+import { useEvaluationsV3Store } from "./use-evaluations-v3-store.ts";
+
+/**
+ * The "Optimize this prompt" handoff: choose the experiment chip the page already
+ * offers, absorb the target's prompt as picked context, and hand Langy an auto-sent
+ * ask.
+ */
+type OptimizeHandler = ({ target, name }: { target: TargetConfig; name: string }) => void;
+
+export const useOptimizeWithLangy = (): OptimizeHandler | undefined => {
+  const { project, organization } = useOrganizationTeamProject({
+    redirectToOnboarding: false,
+    redirectToProjectOnboarding: false,
+  });
+  const uiActionsEnabled = useFeatureFlag("release_langy_ui_actions", {
+    projectId: project?.id,
+    organizationId: organization?.id,
+    enabled: !!project?.id,
+  });
+
+  const optimize = useCallback<OptimizeHandler>(({ target, name }) => {
+    const slug = useEvaluationsV3Store.getState().experimentSlug;
+    const { chooseChip, askLangy } = useLangyStore.getState();
+    if (slug) chooseChip(`experiment:${slug}`);
+    if (target.promptId) {
+      absorbContextTarget({
+        id: `prompt:${target.promptId}`,
+        kind: "prompt",
+        label: `prompt: ${name}`,
+        ref: target.promptId,
+      });
+    }
+    askLangy(
+      `Optimize the prompt in the "${name}" column. Keep that column unchanged as the baseline and work on a duplicate.`,
+    );
+  }, []);
+
+  return uiActionsEnabled.enabled ? optimize : undefined;
+};

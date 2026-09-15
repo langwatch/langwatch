@@ -53,7 +53,9 @@ Add `lw_gateway_rps` only when you run prometheus-adapter and it scrapes the gat
 Use `behavior` for scale-up and scale-down stabilization when the traffic shape needs it. It is passed to the HPA as written.
 
 <Note>
-Every replica polls the control plane's change feed on its own, so the poll rate against the control plane grows with the replica count. Watch the control plane once you pass a few dozen replicas.
+  Every replica polls the control plane's change feed on its own, so the poll rate against the
+  control plane grows with the replica count. Watch the control plane once you pass a few dozen
+  replicas.
 </Note>
 
 ## Topology spread
@@ -99,11 +101,11 @@ The key cache is fixed at 10,000 entries per pod and is not configurable. Past t
 
 What you can tune is how long a cached key survives without the control plane, and how often its configuration is re-read:
 
-| Variable | Default | Effect |
-|---|---|---|
-| `LW_GATEWAY_AUTH_CACHE_CONFIG_TTL_SECONDS` | `60` | Age at which a cached key's configuration is re-fetched in the background |
-| `LW_GATEWAY_AUTH_CACHE_SOFT_BUMP_SECONDS` | `300` | Extension granted per failed refresh while the control plane is unreachable |
-| `LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS` | `21600` | Cap on serving a key past its token expiry |
+| Variable                                   | Default | Effect                                                                      |
+| ------------------------------------------ | ------- | --------------------------------------------------------------------------- |
+| `LW_GATEWAY_AUTH_CACHE_CONFIG_TTL_SECONDS` | `60`    | Age at which a cached key's configuration is re-fetched in the background   |
+| `LW_GATEWAY_AUTH_CACHE_SOFT_BUMP_SECONDS`  | `300`   | Extension granted per failed refresh while the control plane is unreachable |
+| `LW_GATEWAY_AUTH_CACHE_HARD_GRACE_SECONDS` | `21600` | Cap on serving a key past its token expiry                                  |
 
 Add them to the pod yourself; the chart does not render them. See [Config](/ai-gateway/self-hosting/config#auth-cache).
 

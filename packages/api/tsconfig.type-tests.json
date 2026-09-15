@@ -1,0 +1,37 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "tsBuildInfoFile": "dist/tsconfig.type-tests.tsbuildinfo"
+  },
+  "include": ["src/**/*", "type-tests/**/*"],
+  "references": [
+    {
+      "path": "tsconfig.build.json"
+    },
+    {
+      "path": "../actor/tsconfig.build.json"
+    },
+    {
+      "path": "../time/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/api-key/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/authz/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../handled-error/tsconfig.build.json"
+    },
+    {
+      "path": "../observability/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/project/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/stored-object/contract/tsconfig.build.json"
+    }
+  ]
+}

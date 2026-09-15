@@ -67,34 +67,34 @@ Forces and constraints (locked 2026-08-14):
 
 ## Constants
 
-| Name | Value | Purpose |
-|---|---|---|
+| Name            | Value                                         | Purpose                                                                                                         |
+| --------------- | --------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
 | SAML sub prefix | `"samlp\|"` (6 chars, trailing pipe included) | The only strategy prefix granted the override; trailing pipe prevents matching a hypothetical `samlpx` strategy |
 
 ## Invariants
 
-| Invariant | Meaning | Satisfied by / test anchor |
-|---|---|---|
-| Only `samlp\|` subs are upgraded | `auth0\|…`, `google-oauth2\|…`, `waad\|…`, absent/non-string subs never gain `emailVerified: true` | `isSamlSub` unit cases + mapped-profile assertion in `ee/sso/__tests__` |
-| Non-SAML profiles are untouched | The mapped object contains no `emailVerified` key for non-SAML subs (claim value flows through) | assertion `"emailVerified" not in mapped` |
-| SAML profiles map to `emailVerified: true` | Linking gate passes for SAML sign-ins | assertion on mapped object |
-| Rest of the mapping unchanged | name/email/image behavior identical to before | existing `fallbackName` tests keep passing |
+| Invariant                                  | Meaning                                                                                            | Satisfied by / test anchor                                              |
+| ------------------------------------------ | -------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------- |
+| Only `samlp\|` subs are upgraded           | `auth0\|…`, `google-oauth2\|…`, `waad\|…`, absent/non-string subs never gain `emailVerified: true` | `isSamlSub` unit cases + mapped-profile assertion in `ee/sso/__tests__` |
+| Non-SAML profiles are untouched            | The mapped object contains no `emailVerified` key for non-SAML subs (claim value flows through)    | assertion `"emailVerified" not in mapped`                               |
+| SAML profiles map to `emailVerified: true` | Linking gate passes for SAML sign-ins                                                              | assertion on mapped object                                              |
+| Rest of the mapping unchanged              | name/email/image behavior identical to before                                                      | existing `fallbackName` tests keep passing                              |
 
 ## Assumptions
 
-| Assumption | What breaks if false |
-|---|---|
-| Auth0 SAML subs always start `samlp\|` | Fix silently doesn't fire; user stays locked out — incomplete, not wrong. Verified against Auth0 docs; first real sign-in (debug logs are on) confirms on our tenant |
-| No tenant-side self-signup path yields a `samlp\|` sub | Account takeover via linking. Holds tenant-side: Auth0 database signups mint `auth0\|` subs, and only operator-created SAML connections mint `samlp\|`. IdP-side self-registration (an open-registration IdP behind a SAML connection) is NOT excluded by construction — that risk is the load-bearing assumption below |
-| Every SAML connection in the tenant maps `email` from an IdP-controlled attribute | **This is the load-bearing assumption (red-team, v2).** `samlp\|` proves *authenticated via SAML*, not *owns this email*. If any SAML connection in the configured Auth0 tenant sources email from a user-editable attribute or an open-registration IdP, an attacker can assert a victim's email and link into their existing account — the exact link today's code refuses. The domain guard does not stop it: existing users are soft-flagged, only first-time signups hard-block (`hooks.ts`). Holds when the operator creates connections deliberately against trusted corporate IdPs — the same trust class as the tenant's client secret |
-| `mapProfileToUser` return overrides the claim | Fix is a no-op. Verified by reading BetterAuth 1.6.23 source (`routes.mjs:~209`) — pinned-version fact, re-check on BetterAuth upgrades |
+| Assumption                                                                        | What breaks if false                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| --------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Auth0 SAML subs always start `samlp\|`                                            | Fix silently doesn't fire; user stays locked out — incomplete, not wrong. Verified against Auth0 docs; first real sign-in (debug logs are on) confirms on our tenant                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| No tenant-side self-signup path yields a `samlp\|` sub                            | Account takeover via linking. Holds tenant-side: Auth0 database signups mint `auth0\|` subs, and only operator-created SAML connections mint `samlp\|`. IdP-side self-registration (an open-registration IdP behind a SAML connection) is NOT excluded by construction — that risk is the load-bearing assumption below                                                                                                                                                                                                                                                                                                                         |
+| Every SAML connection in the tenant maps `email` from an IdP-controlled attribute | **This is the load-bearing assumption (red-team, v2).** `samlp\|` proves _authenticated via SAML_, not _owns this email_. If any SAML connection in the configured Auth0 tenant sources email from a user-editable attribute or an open-registration IdP, an attacker can assert a victim's email and link into their existing account — the exact link today's code refuses. The domain guard does not stop it: existing users are soft-flagged, only first-time signups hard-block (`hooks.ts`). Holds when the operator creates connections deliberately against trusted corporate IdPs — the same trust class as the tenant's client secret |
+| `mapProfileToUser` return overrides the claim                                     | Fix is a no-op. Verified by reading BetterAuth 1.6.23 source (`routes.mjs:~209`) — pinned-version fact, re-check on BetterAuth upgrades                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 
 ## Gates
 
-| Path | Reversible? | Blast radius | Gate |
-|---|---|---|---|
-| SAML sign-in links to existing user | Code-revert yes; a wrong link made in the window is not | High (auth boundary) | Human review of the PR + invariant unit tests + first real sign-in verified end-to-end before announcing: Auth0 debug logs (the IdP side) AND the resulting `Account` row linked to the pre-existing `User` (read-only production query on `Account.providerAccountId LIKE 'samlp\|%'`) — Auth0 logs alone don't prove BetterAuth persisted the link |
-| Fresh SAML user created with `emailVerified: true` | Yes (flag flip in DB) | Small — skips a verification email for users their own IdP already vouched for | Covered by the same first-sign-in verification: the created `User` row's `emailVerified` is checked in the same read-only query |
+| Path                                               | Reversible?                                             | Blast radius                                                                   | Gate                                                                                                                                                                                                                                                                                                                                                 |
+| -------------------------------------------------- | ------------------------------------------------------- | ------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| SAML sign-in links to existing user                | Code-revert yes; a wrong link made in the window is not | High (auth boundary)                                                           | Human review of the PR + invariant unit tests + first real sign-in verified end-to-end before announcing: Auth0 debug logs (the IdP side) AND the resulting `Account` row linked to the pre-existing `User` (read-only production query on `Account.providerAccountId LIKE 'samlp\|%'`) — Auth0 logs alone don't prove BetterAuth persisted the link |
+| Fresh SAML user created with `emailVerified: true` | Yes (flag flip in DB)                                   | Small — skips a verification email for users their own IdP already vouched for | Covered by the same first-sign-in verification: the created `User` row's `emailVerified` is checked in the same read-only query                                                                                                                                                                                                                      |
 
 ## Schema
 
@@ -115,7 +115,7 @@ while the change was live — those would need manual review.
   scale and puts our correctness in their hands.
 - **Flip `emailVerified` in our DB per affected user** — already true for
   the current users and still insufficient: the gate also checks the
-  *incoming* profile's flag (`!isTrustedProvider && !userInfo.emailVerified`).
+  _incoming_ profile's flag (`!isTrustedProvider && !userInfo.emailVerified`).
 - **Per-connection allowlist (e.g. `SAML_TRUSTED_CONNECTIONS` env var)** —
   raised by red-team (v2), re-asked, rejected: it violates the no-config
   constraint, adds an env change + restart to every future SSO onboarding,

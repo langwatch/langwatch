@@ -1,12 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
-import type { QueryDriver, QueryRequest } from "../query";
-import { ClickHouseQueryClient } from "../client";
+import type { QueryDriver, QueryRequest } from "../query.ts";
+import { ClickHouseQueryClient } from "../client.ts";
 import {
   checkTenantScope,
   TenantGuard,
   type TenantGuardOptions,
   TenantScopeError,
-} from "../tenantGuard";
+} from "../tenantGuard.ts";
 
 const TENANT = "project_abc";
 
@@ -23,10 +23,7 @@ describe("checkTenantScope", () => {
   describe("given a properly scoped statement", () => {
     describe("when the statement is checked", () => {
       it.each([
-        [
-          "a bare predicate",
-          "SELECT 1 FROM t WHERE TenantId = {tenantId:String}",
-        ],
+        ["a bare predicate", "SELECT 1 FROM t WHERE TenantId = {tenantId:String}"],
         [
           "an aliased predicate",
           "SELECT 1 FROM stored_spans AS t WHERE t.TenantId = {tenantId:String}",
@@ -35,10 +32,7 @@ describe("checkTenantScope", () => {
           "a predicate inside parentheses",
           "SELECT 1 FROM t WHERE (TenantId = {tenantId:String}) AND x = 1",
         ],
-        [
-          "an unusually named parameter",
-          "SELECT 1 FROM t WHERE TenantId = {scope_id:String}",
-        ],
+        ["an unusually named parameter", "SELECT 1 FROM t WHERE TenantId = {scope_id:String}"],
       ])("accepts %s", (_label, sql) => {
         const param = /\{\s*(\w+)\s*:/.exec(sql)?.[1] as string;
 
@@ -120,9 +114,9 @@ describe("checkTenantScope", () => {
         ["a line comment", "SELECT 1 FROM t -- WHERE TenantId = {t:String}"],
         ["a block comment", "/* TenantId = {t:String} */ SELECT 1 FROM t"],
       ])("refuses %s, which is the case the guard exists for", (_label, sql) => {
-        expect(
-          checkTenantScope({ sql, params: { t: TENANT }, tenantId: TENANT }),
-        ).toEqual({ kind: "missing-predicate" });
+        expect(checkTenantScope({ sql, params: { t: TENANT }, tenantId: TENANT })).toEqual({
+          kind: "missing-predicate",
+        });
       });
     });
   });
@@ -130,10 +124,7 @@ describe("checkTenantScope", () => {
   describe("given a disjunction that can weaken the predicate", () => {
     describe("when the OR sits at or above the predicate's depth", () => {
       it.each([
-        [
-          "a trailing OR",
-          "SELECT 1 FROM t WHERE TenantId = {t:String} OR Status = 'x'",
-        ],
+        ["a trailing OR", "SELECT 1 FROM t WHERE TenantId = {t:String} OR Status = 'x'"],
         [
           "an OR outside the predicate's brackets",
           "SELECT 1 FROM t WHERE (TenantId = {t:String}) OR Status = 'x'",
@@ -147,9 +138,9 @@ describe("checkTenantScope", () => {
           "SELECT * FROM (SELECT Id FROM t WHERE TenantId = {t:String}) WHERE a = 1 OR b = 2",
         ],
       ])("refuses %s", (_label, sql) => {
-        expect(
-          checkTenantScope({ sql, params: { t: TENANT }, tenantId: TENANT }),
-        ).toEqual({ kind: "weakening-disjunction" });
+        expect(checkTenantScope({ sql, params: { t: TENANT }, tenantId: TENANT })).toEqual({
+          kind: "weakening-disjunction",
+        });
       });
     });
 
@@ -168,9 +159,7 @@ describe("checkTenantScope", () => {
           "SELECT 1 FROM t WHERE TenantId = {t:String} ORDER BY OccurredAt",
         ],
       ])("accepts %s, because it cannot weaken the scoping", (_label, sql) => {
-        expect(
-          checkTenantScope({ sql, params: { t: TENANT }, tenantId: TENANT }),
-        ).toBeNull();
+        expect(checkTenantScope({ sql, params: { t: TENANT }, tenantId: TENANT })).toBeNull();
       });
     });
   });
@@ -194,9 +183,7 @@ describe("checkTenantScope", () => {
           "SELECT * FROM (SELECT Id FROM t WHERE TenantId = {t:String}) UNION ALL SELECT Id FROM t",
         ],
       ])("still accepts %s", (_label, sql) => {
-        expect(
-          checkTenantScope({ sql, params: { t: TENANT }, tenantId: TENANT }),
-        ).toBeNull();
+        expect(checkTenantScope({ sql, params: { t: TENANT }, tenantId: TENANT })).toBeNull();
       });
     });
   });
@@ -245,12 +232,9 @@ describe("checkTenantScope", () => {
  * "refuses BEFORE the statement runs" a real claim — the driver spy is the
  * only thing that can witness it.
  */
-function guardedBy(
-  execute: QueryDriver["execute"],
-  options: TenantGuardOptions = {},
-) {
+function guardedBy(execute: QueryDriver["execute"], options: TenantGuardOptions = {}) {
   const client = new ClickHouseQueryClient({
-    driver: { execute },
+    driver: { execute, insert: async () => {}, command: async () => {} },
     tenantGuard: new TenantGuard(options),
   });
   return (request: QueryRequest) => client.query(request);
@@ -284,9 +268,9 @@ describe("TenantGuard", () => {
       it("explains how to fix it", async () => {
         const execute = guardedBy(passthrough);
 
-        await expect(
-          execute(request({ sql: "SELECT 1 FROM t", params: {} })),
-        ).rejects.toThrow(/TenantId = \{param:String\}/);
+        await expect(execute(request({ sql: "SELECT 1 FROM t", params: {} }))).rejects.toThrow(
+          /TenantId = \{param:String\}/,
+        );
       });
     });
   });

@@ -8,7 +8,7 @@ import {
   type EvaluatorAttachment,
   TestSuitesApiError,
   TestSuitesApiService,
-} from "../test-suites-api.service";
+} from "../test-suites-api.service.ts";
 import { isLangWatchHandledError } from "@/internal/api/errors";
 import type { LangwatchApiClient } from "@/internal/api/client";
 import { LangWatch } from "@/client-sdk/index";
@@ -42,11 +42,7 @@ const sqlEvaluator: EvaluatorAttachment = {
   },
 };
 
-const serviceWith = (result: {
-  data?: unknown;
-  error?: unknown;
-  response?: Response;
-}) => {
+const serviceWith = (result: { data?: unknown; error?: unknown; response?: Response }) => {
   const calls = {
     GET: vi.fn(async (_path: string, _init?: RequestInit) => result),
     POST: vi.fn(async (_path: string, init?: { body?: Record<string, unknown> }) => {
@@ -105,9 +101,7 @@ describe("TestSuitesApiService", () => {
       expect(calls.GET).toHaveBeenCalledWith("/api/v1/test-suites/{id}", {
         params: { path: { id: "suite_abc" } },
       });
-      expect(suite.scenarios).toEqual([
-        { id: "scenario_1", name: "Refund a paid order" },
-      ]);
+      expect(suite.scenarios).toEqual([{ id: "scenario_1", name: "Refund a paid order" }]);
     });
   });
 

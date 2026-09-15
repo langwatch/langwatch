@@ -1,0 +1,169 @@
+/**
+ * The wiring behind the results column: permissions, view mode,
+ * cancellation, export and the run dialog, plus the header line for the
+ * selected run and the settings it was started with.
+ * @see specs/features/agent-testing/results-tabs.feature
+ */
+
+import { useExportScenarioRuns } from "../../../../behavior/suites/use-export-scenario-runs.ts";
+import { useCan } from "../../../../behavior/use-can.ts";
+import { useNow } from "../../../../behavior/use-now.ts";
+import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
+import { formatTimeAgoCompact } from "@langwatch/ui-host/format-time-ago";
+import type { PeriodControls } from "./period-controls.ts";
+import type { RunPlanDetailRun } from "./run-plan-detail-header.tsx";
+import type { RunPlan } from "../../../../behavior/agent-testing/results/run-plans.ts";
+import type {
+  RunPlanBatches,
+  RunPlanSelection,
+} from "../../../../behavior/agent-testing/results/use-run-plan-batches.ts";
+import { useRunPlanCancel } from "./use-run-plan-cancel.ts";
+import { useRunPlanRunDialog } from "./use-run-plan-run-dialog.ts";
+import { useRunPlanViewMode } from "./use-run-plan-view-mode.ts";
+import { format } from "@langwatch/time";
+import { useCallback, useMemo, useState } from "react";
+import type { RunActor, ScenarioRunData } from "@langwatch/scenario-contract";
+import { api } from "../../../../behavior/scenario-api.ts";
+import { useSession } from "../../../../behavior/auth-session.ts";
+import { summarizeEvaluations } from "./evaluation-summaries.ts";
+import { type RunSettings, readRunSettings, runActorName } from "./run-settings.ts";
+import { type BatchTarget, isComparison, useBatchTargets } from "./use-batch-targets.ts";
+
+export type RunPlanResultsColumnState = {
+  canManage: boolean;
+  viewMode: ReturnType<typeof useRunPlanViewMode>["viewMode"];
+  onViewModeChange: ReturnType<typeof useRunPlanViewMode>["handleViewModeChange"];
+  cancel: ReturnType<typeof useRunPlanCancel>;
+  exportRuns: ReturnType<typeof useExportScenarioRuns>;
+  isExportDisabled: boolean;
+  /** The header line for the selected run, or nothing when none is selected. */
+  run: RunPlanDetailRun | null;
+  /** What the selected run was configured with, once there is one to read. */
+  runSettings: RunSettings | null;
+  /** When the selected run started, as the settings block prints it. */
+  runStartedLabel: string | null;
+  /**
+   * Who started the selected run, in the words this reader knows them by, or
+   * nothing when the run recorded no person.
+   */
+  runStartedByLabel: string | null;
+  isRunSettingsShown: boolean;
+  toggleRunSettings: () => void;
+  runDialog: ReturnType<typeof useRunPlanRunDialog>;
+  /** The targets of the selected run, in order and in colour. */
+  targets: BatchTarget[];
+};
+
+/** One stable empty list, so a plan with no run selected keeps its identity. */
+const NO_RUNS: ScenarioRunData[] = [];
+
+/**
+ * What the settings row calls whoever started a run.
+ * @see specs/features/agent-testing/results-tabs.feature
+ */
+function useRunStartedByLabel(actor: RunActor | null): string | null {
+  const { organization } = useOrganizationTeamProject();
+  // The reader's own id, which is what lets a run they started read as "You".
+  // Read without requiring a session: the page is already behind the sign-in
+  // gate, and a redirect does not belong to this hook.
+  const { data: session } = useSession();
+  const viewerUserId = session?.user?.id;
+  const needsMemberName = actor?.label === "user" && !!actor.id && actor.id !== viewerUserId;
+
+  const members = api.organization.getOrganizationWithMembersAndTheirTeams.useQuery(
+    { organizationId: organization?.id ?? "" },
+    { enabled: !!organization?.id && needsMemberName },
+  );
+
+  // Members whose row carries no name are left out, so an empty name can
+  // never reach the row as an empty label.
+  const memberNameById = useMemo(() => {
+    const byId = new Map<string, string>();
+    for (const member of members.data?.members ?? []) {
+      const name = member.user.name?.trim();
+      if (name) byId.set(member.user.id, name);
+    }
+    return byId;
+  }, [members.data]);
+
+  return runActorName({ actor, viewerUserId, memberNameById });
+}
+
+export function useRunPlanResultsColumn({
+  plan,
+  batches,
+  selection,
+  periodControls,
+}: {
+  plan: RunPlan;
+  batches: RunPlanBatches;
+  selection: RunPlanSelection;
+  periodControls: PeriodControls;
+}): RunPlanResultsColumnState {
+  const { project } = useOrganizationTeamProject();
+  const { can } = useCan();
+  const now = useNow();
+  const canManage = can("scenarios:manage");
+  const { viewMode, handleViewModeChange } = useRunPlanViewMode();
+  const runDialog = useRunPlanRunDialog({ plan, canManage });
+  const [isRunSettingsShown, setRunSettingsShown] = useState(false);
+  const toggleRunSettings = useCallback(() => setRunSettingsShown((shown) => !shown), []);
+
+  const selectedRuns = selection.selectedBatch?.scenarioRuns ?? NO_RUNS;
+  const runSettings = useMemo(() => readRunSettings(selectedRuns), [selectedRuns]);
+  const targets = useBatchTargets(selectedRuns);
+  const evaluatorSummaries = useMemo(
+    () => summarizeEvaluations({ runs: selectedRuns }),
+    [selectedRuns],
+  );
+
+  // The date as well as the age: the runs rail already says "2h ago", and a
+  // person reading the settings of an old run wants the day it ran.
+  const startedAt = selection.selectedBatch?.timestamp ?? null;
+  const runStartedLabel =
+    startedAt === null
+      ? null
+      : `${format(new Date(startedAt), "d MMM yyyy, HH:mm")} · ${formatTimeAgoCompact(startedAt, now)}`;
+
+  const runStartedByLabel = useRunStartedByLabel(runSettings?.actor ?? null);
+
+  const cancel = useRunPlanCancel({
+    scenarioSetId: plan.scenarioSetId,
+    selectedBatchRunId: selection.selectedBatch?.batchRunId ?? null,
+    refetch: batches.refetch,
+  });
+
+  const exportRuns = useExportScenarioRuns({
+    projectId: project?.id,
+    scenarioSetId: plan.scenarioSetId,
+    startDate: periodControls.period.startDate.getTime(),
+    endDate: periodControls.period.endDate.getTime(),
+  });
+
+  return {
+    canManage,
+    viewMode,
+    onViewModeChange: handleViewModeChange,
+    cancel,
+    exportRuns,
+    isExportDisabled: batches.isLoading || exportRuns.isExporting || batches.batchRuns.length === 0,
+    run: selection.selectedBatch
+      ? {
+          title: selection.title ?? "",
+          note: selection.note,
+          // A comparison carries no summary of the whole run: one number over
+          // two targets says nothing about either, and each column carries
+          // its own.
+          summary: isComparison(targets) ? null : selection.summary,
+          evaluators: evaluatorSummaries,
+        }
+      : null,
+    runSettings,
+    runStartedLabel,
+    runStartedByLabel,
+    isRunSettingsShown,
+    toggleRunSettings,
+    runDialog,
+    targets,
+  };
+}

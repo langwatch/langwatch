@@ -1,8 +1,8 @@
 Feature: Automation dispatch on the process-manager substrate
   Automations own an event-sourced pipeline. Trace and evaluation subscribers
   record ID-only trigger matches on that pipeline, where per-trigger ordering,
-  durable settlement timers, and leased intent delivery replace the legacy
-  ReactorOutbox stack. (ADR-052; timing per ADR-026/027, spam prevention per
+  durable settlement timers, and leased intent delivery form the automation
+  dispatch substrate. (ADR-052; timing per ADR-026/027, spam prevention per
   ADR-031, graph alerts per ADR-034, persist class per ADR-035, templates per
   ADR-036/041, and webhook delivery per ADR-040.)
 
@@ -82,12 +82,6 @@ Feature: Automation dispatch on the process-manager substrate
     And both match the same trace in the same settle window
     When the settled matches dispatch
     Then each automation dispatches its own page
-
-  @unit
-  Scenario: An old single-trace persist intent still dispatches after the paging change
-    Given a pending persist intent written before the paging change
-    When the intent dispatches
-    Then the single trace is dispatched exactly as a one-trace page
 
   @unit
   Scenario: A terminal failure for one trace does not fail its page-mates
@@ -200,10 +194,3 @@ Feature: Automation dispatch on the process-manager substrate
     Given two workers polling the same due sweep wake
     When both attempt to consume it
     Then exactly one revision-fenced commit succeeds
-
-  # --- Legacy remnants ---
-
-  Scenario: In-flight legacy jobs are tombstoned at cutover
-    Given a legacy settle, cadence, or graph-evaluation job staged before the deploy
-    When the event router receives it
-    Then it is acknowledged and dropped with a warning instead of being parsed as an event

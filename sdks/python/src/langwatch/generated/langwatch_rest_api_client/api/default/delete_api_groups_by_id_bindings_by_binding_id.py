@@ -15,7 +15,7 @@ def _get_kwargs(
 
     _kwargs: dict[str, Any] = {
         "method": "delete",
-        "url": "/api/groups/{id}/bindings/{binding_id}".format(
+        "url": "/api/v1/groups/{id}/bindings/{binding_id}".format(
             id=quote(str(id), safe=""),
             binding_id=quote(str(binding_id), safe=""),
         ),

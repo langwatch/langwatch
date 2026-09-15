@@ -8,21 +8,12 @@
  */
 
 /** The role a binding grants at its scope. `CUSTOM` defers to a custom role. */
-export const MANAGEMENT_ROLES = [
-  "ADMIN",
-  "MEMBER",
-  "VIEWER",
-  "CUSTOM",
-] as const;
+export const MANAGEMENT_ROLES = ["ADMIN", "MEMBER", "VIEWER", "CUSTOM"] as const;
 
 export type ManagementRole = (typeof MANAGEMENT_ROLES)[number];
 
 /** Where a binding takes effect. */
-export const MANAGEMENT_SCOPE_TYPES = [
-  "ORGANIZATION",
-  "TEAM",
-  "PROJECT",
-] as const;
+export const MANAGEMENT_SCOPE_TYPES = ["ORGANIZATION", "TEAM", "PROJECT"] as const;
 
 export type ManagementScopeType = (typeof MANAGEMENT_SCOPE_TYPES)[number];
 

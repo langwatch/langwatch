@@ -1,10 +1,6 @@
 /**
- * `langwatch scenario version list|get`: reading the saved versions of a test
- * scenario from the command line.
- *
- * The command line also WRITES history; that half is in
- * cli-scenarios-service.unit.test.ts.
- *
+ * `langwatch scenario version list|get`: reading the saved versions of a test scenario
+ * from the command line.
  * Spec: specs/features/scenario-cli.feature
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
@@ -36,10 +32,7 @@ vi.mock("ora", () => ({
   }),
 }));
 
-import {
-  ScenariosApiError,
-  ScenariosApiService,
-} from "@/client-sdk/services/scenarios";
+import { ScenariosApiError, ScenariosApiService } from "@/client-sdk/services/scenarios";
 import { listScenarioVersionsCommand } from "../versions/list";
 import { getScenarioVersionCommand } from "../versions/get";
 
@@ -158,13 +151,13 @@ describe("the scenario version commands", () => {
       mockGetVersion.mockRejectedValue(
         new ScenariosApiError(
           "scenario_version_not_found",
-          "GET /api/scenarios/scenario_abc123/versions/9",
+          "GET /api/v1/scenarios/scenario_abc123/versions/9",
         ),
       );
 
-      await expect(
-        getScenarioVersionCommand("scenario_abc123", "9"),
-      ).rejects.toThrow(ProcessExitError);
+      await expect(getScenarioVersionCommand("scenario_abc123", "9")).rejects.toThrow(
+        ProcessExitError,
+      );
     });
   });
 });

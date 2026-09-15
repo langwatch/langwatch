@@ -106,10 +106,7 @@ export async function listAgents(params?: {
 }
 
 export async function getAgent(id: string): Promise<AgentSummary> {
-  return makeRequest(
-    "GET",
-    `/api/v1/agents/${encodeURIComponent(id)}`,
-  ) as Promise<AgentSummary>;
+  return makeRequest("GET", `/api/v1/agents/${encodeURIComponent(id)}`) as Promise<AgentSummary>;
 }
 
 export async function createAgent(data: {
@@ -177,7 +174,9 @@ const isMessageList = (value: unknown): value is AgentCallMessage[] =>
   Array.isArray(value) &&
   value.every(
     (item) =>
-      typeof item === "object" && item !== null && typeof (item as AgentCallMessage).role === "string",
+      typeof item === "object" &&
+      item !== null &&
+      typeof (item as AgentCallMessage).role === "string",
   );
 
 /**
@@ -285,8 +284,8 @@ export async function runAgent({
 }
 
 export async function deleteAgent(id: string): Promise<{ id: string; name: string }> {
-  return makeRequest(
-    "DELETE",
-    `/api/v1/agents/${encodeURIComponent(id)}`,
-  ) as Promise<{ id: string; name: string }>;
+  return makeRequest("DELETE", `/api/v1/agents/${encodeURIComponent(id)}`) as Promise<{
+    id: string;
+    name: string;
+  }>;
 }

@@ -1,0 +1,378 @@
+import {
+  Box,
+  Combobox,
+  createListCollection,
+  HStack,
+  Portal,
+  Text,
+  VStack,
+} from "@chakra-ui/react";
+import { Cpu, Plus, Sparkles, Waypoints } from "lucide-react";
+import { useEffect, useMemo } from "react";
+import { LANGY_SKILLS, type LangySkill } from "../../../../model/shared/langy/langy-skills.ts";
+import {
+  absorbContextTarget,
+  type LangyContextTarget as LangyContextTargetDescriptor,
+  useLangyContextTargetStore,
+} from "../../../../behavior/langy-context-target.store.ts";
+import { type LangyContextChip } from "../../../../behavior/langy.store.ts";
+
+/**
+ * The composer's command palette — `/` for skills, `#` for context.
+ */
+
+export type PaletteMode = "context" | "skills";
+
+/**
+ * Everything the palette needs to introduce itself.
+ */
+const MODE_CHROME: Record<
+  PaletteMode,
+  {
+    title: string;
+    sigil: string;
+    placeholder: string;
+    /** Nothing to offer at all, whatever the reader types. */
+    nothing: string;
+    /** Rows exist; this query matched none of them. */
+    noMatch: string;
+  }
+> = {
+  context: {
+    title: "Context",
+    sigil: "#",
+    placeholder: "Reference something on this page…  (Esc to cancel)",
+    nothing: "Nothing on this page can be referenced yet.",
+    noMatch: "Nothing on this page matches that.",
+  },
+  skills: {
+    title: "Skills",
+    sigil: "/",
+    placeholder: "Pick a skill for Langy to use…  (Esc to cancel)",
+    nothing: "No skills are available here.",
+    noMatch: "No skill matches that.",
+  },
+};
+
+/** Row groups, in the order they are shown AND navigated. */
+type PaletteGroup = "Context" | "On this page" | "Commands" | "Skills" | "Recipes" | "Platform";
+
+const GROUP_ORDER: Record<PaletteMode, PaletteGroup[]> = {
+  context: ["Context", "On this page"],
+  skills: ["Skills", "Recipes", "Platform", "Commands"],
+};
+
+/** One row of the palette. A skill, a chip, a page target, or a command. */
+interface PaletteItem {
+  value: string;
+  label: string;
+  detail: string;
+  group: PaletteGroup;
+  searchText: string;
+}
+
+/** The value prefixes a palette row can carry, in the order they are stripped. */
+const SPOTLIGHT_PREFIXES = ["chip:", "target:"] as const;
+
+/** The mark each palette group carries beside its rows. */
+function PaletteGroupIcon({ group }: { group: PaletteGroup }) {
+  if (group === "Commands") return <Cpu size={13} />;
+  if (group === "On this page") return <Plus size={13} />;
+  if (group === "Context") return <Waypoints size={13} />;
+  return <Sparkles size={13} />;
+}
+
+/** Where a skill lands in the list, by where its ability comes from. */
+function groupForSkill(skill: LangySkill): PaletteGroup {
+  if (skill.source === "recipe") return "Recipes";
+  if (skill.source === "client-command") return "Commands";
+  if (skill.source === "cli") return "Platform";
+  return "Skills";
+}
+
+function buildItems({
+  mode,
+  chips,
+  pageTargets,
+}: {
+  mode: PaletteMode;
+  chips: LangyContextChip[];
+  pageTargets: LangyContextTargetDescriptor[];
+}): PaletteItem[] {
+  if (mode === "skills") {
+    // TODO(merge): main gates mutually-exclusive skills (e.g. lwql-charts vs
+    // playground-widgets on `release_custom_chart_playground`) via
+    // `isSkillAvailable({ skill, isFlagEnabled })` reading `skill.featureFlag`
+    // / `skill.excludedByFlag`. Neither exists yet on this branch's
+    // `LangySkill` (../../../../model/shared/langy/langy-skills.ts) — that
+    // file is outside this lane's owned paths, so the gate is not ported
+    // here. Porting it means adding those two optional fields plus the
+    // `isSkillAvailable` export there, then filtering here the way main does.
+    return LANGY_SKILLS.map((skill) => ({
+      value: `skill:${skill.id}`,
+      label: skill.label,
+      detail: skill.summary,
+      group: groupForSkill(skill),
+      searchText: skill.searchText,
+    }));
+  }
+  return [
+    ...chips.map((chip) => ({
+      value: `chip:${chip.id}`,
+      label: chip.label,
+      detail: chip.kind,
+      group: "Context" as const,
+      searchText: `${chip.label} ${chip.kind}`.toLowerCase(),
+    })),
+    ...pageTargets.map((target) => ({
+      value: `target:${target.id}`,
+      label: target.label,
+      detail: target.kind,
+      group: "On this page" as const,
+      searchText: `${target.label} ${target.kind}`.toLowerCase(),
+    })),
+  ];
+}
+
+export function LangyComposerPalette({
+  mode,
+  query,
+  chips,
+  onQueryChange,
+  onPickChip,
+  onPickSkill,
+  onClose,
+}: {
+  mode: PaletteMode;
+  query: string;
+  /** Resource chips available to reference with `#`. */
+  chips: LangyContextChip[];
+  onQueryChange: (value: string) => void;
+  onPickChip: (id: string) => void;
+  /** A skill picked from `/` — the composer drops its question into the draft. */
+  onPickSkill?: (skill: LangySkill) => void;
+  onClose: () => void;
+}) {
+  // The registry of things mounted on the page (only populated while the panel
+  // is open). Subscribed here — not in the composer — so its churn only ever
+  // re-renders the palette, which exists for seconds at a time.
+  const registeredTargets = useLangyContextTargetStore((s) => s.targets);
+  const activeChipIds = useLangyContextTargetStore((s) => s.activeChipIds);
+  const setSpotlight = useLangyContextTargetStore((s) => s.setSpotlight);
+  const chrome = MODE_CHROME[mode];
+
+  // A row that names something on the page lights that thing up while the
+  // pointer is on it — the palette says which card it means instead of asking
+  // the user to match a label against nine of them. Cleared on the way out, so
+  // a dismissed palette never leaves the page glowing.
+  useEffect(() => () => setSpotlight(null), [setSpotlight]);
+  const spotlightFor = (value: string) => {
+    for (const prefix of SPOTLIGHT_PREFIXES) {
+      if (value.startsWith(prefix)) return value.slice(prefix.length);
+    }
+    return null;
+  };
+
+  const items = useMemo(() => {
+    const pageTargets = Object.values(registeredTargets).filter(
+      (target) => !activeChipIds.has(target.id),
+    );
+    return buildItems({ mode, chips, pageTargets });
+  }, [mode, chips, registeredTargets, activeChipIds]);
+
+  const collection = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    const filtered = q ? items.filter((item) => item.searchText.includes(q)) : items;
+    // `#` is CONTEXT, and only context.
+    const order = GROUP_ORDER[mode];
+    const sorted = [...filtered].sort((a, b) => order.indexOf(a.group) - order.indexOf(b.group));
+    return createListCollection({
+      items: sorted,
+      itemToValue: (item) => item.value,
+      itemToString: (item) => item.label,
+    });
+  }, [items, query, mode, registeredTargets]);
+
+  /** The groups actually present, in display order. */
+  const groups = useMemo(() => {
+    const present = new Set(collection.items.map((item) => item.group));
+    return GROUP_ORDER[mode].filter((group) => present.has(group));
+  }, [collection, mode]);
+
+  const pick = (value: string) => {
+    if (value.startsWith("chip:")) {
+      onPickChip(value.slice("chip:".length));
+      return;
+    }
+    if (value.startsWith("skill:")) {
+      const id = value.slice("skill:".length);
+      const skill = LANGY_SKILLS.find((candidate) => candidate.id === id);
+      if (skill) onPickSkill?.(skill);
+      onClose();
+      return;
+    }
+    if (value.startsWith("target:")) {
+      const target = useLangyContextTargetStore.getState().targets[value.slice("target:".length)];
+      if (target) absorbContextTarget(target);
+      onClose();
+      return;
+    }
+  };
+
+  return (
+    <Combobox.Root
+      collection={collection}
+      // Always open: the palette only exists while it is open. Its lifetime IS
+      // the interaction, so there is no closed state to model.
+      open
+      openOnClick
+      inputValue={query}
+      selectionBehavior="clear"
+      onInputValueChange={(details) => onQueryChange(details.inputValue)}
+      onValueChange={(details) => {
+        const value = details.value?.[0];
+        if (value) pick(value);
+      }}
+      onOpenChange={(details) => {
+        // Ark closes on Escape and on outside-click. Either way the user is
+        // done — hand focus back to the message.
+        if (!details.open) onClose();
+      }}
+      positioning={{ placement: "top-start", gutter: 8, sameWidth: true }}
+    >
+      {/* The Control is the anchor AND the field. Rendered inside the composer
+          card, so the listbox lands exactly above the composer with no
+          getAnchorRect guesswork. */}
+      <Combobox.Control width="full">
+        <HStack gap={1.5} paddingX={3} paddingTop={2.5} paddingBottom={1} align="center">
+          {/* The title badge. It carries the key you pressed as well as the
+              name of the mode, so "which one is this, and what opened it" is
+              answered without leaving the bar. */}
+          <HStack
+            gap={1}
+            flexShrink={0}
+            paddingLeft={1.5}
+            paddingRight={2}
+            paddingY={0.5}
+            borderRadius="full"
+            background="orange.subtle"
+            color="orange.fg"
+          >
+            <Box display="grid" placeItems="center">
+              {mode === "skills" ? <Sparkles size={11} /> : <Waypoints size={11} />}
+            </Box>
+            <Text textStyle="2xs" fontWeight="semibold" data-testid="langy-palette-title">
+              {chrome.title}
+            </Text>
+            <Text textStyle="2xs" opacity={0.7} fontFamily="mono">
+              {chrome.sigil}
+            </Text>
+          </HStack>
+          <Combobox.Input
+            autoFocus
+            placeholder={chrome.placeholder}
+            flex={1}
+            minWidth={0}
+            border="none"
+            background="transparent"
+            fontSize="sm"
+            color="fg"
+            _focusVisible={{ outline: "none" }}
+            onKeyDown={(event) => {
+              // Backspacing past the empty query dismisses the palette — the
+              // same gesture that deletes the `/` you just typed.
+              if (event.key === "Backspace" && query.length === 0) {
+                event.preventDefault();
+                onClose();
+              }
+            }}
+          />
+        </HStack>
+      </Combobox.Control>
+
+      <Portal>
+        <Combobox.Positioner>
+          <Combobox.Content
+            maxHeight="280px"
+            overflowY="auto"
+            padding={1}
+            background="bg.panel/80"
+            borderWidth="1px"
+            borderColor="border.muted"
+            borderRadius="langyCard"
+            boxShadow="lg"
+            css={{
+              backdropFilter: "blur(18px) saturate(0.6)",
+              WebkitBackdropFilter: "blur(18px) saturate(0.6)",
+            }}
+          >
+            <Combobox.Empty paddingX={2} paddingY={3}>
+              <Text textStyle="xs" color="fg.muted" data-testid="langy-palette-empty">
+                {/* Which of the two emptinesses this is. `items` is the whole
+                    offer before any filtering, so an empty one means the page
+                    had nothing to give — telling that reader "nothing matches
+                    that" answers a search they never ran. */}
+                {items.length === 0 ? chrome.nothing : chrome.noMatch}
+              </Text>
+            </Combobox.Empty>
+
+            {groups.map((group) => (
+              <Combobox.ItemGroup key={group}>
+                <Combobox.ItemGroupLabel paddingX={2} paddingTop={2} paddingBottom={1}>
+                  <Text
+                    textStyle="2xs"
+                    fontWeight="semibold"
+                    color="fg.subtle"
+                    letterSpacing="0.04em"
+                    textTransform="uppercase"
+                  >
+                    {group}
+                  </Text>
+                </Combobox.ItemGroupLabel>
+                {collection.items
+                  .filter((item) => item.group === group)
+                  .map((item) => (
+                    <Combobox.Item
+                      item={item}
+                      key={item.value}
+                      borderRadius="md"
+                      paddingX={2}
+                      paddingY={1.5}
+                      _hover={{ background: "bg.subtle" }}
+                      _highlighted={{ background: "bg.subtle" }}
+                      onMouseEnter={() => setSpotlight(spotlightFor(item.value))}
+                      onMouseLeave={() => setSpotlight(null)}
+                    >
+                      <HStack gap={2.5} width="full" align="start">
+                        <Box
+                          color="fg.subtle"
+                          flexShrink={0}
+                          display="grid"
+                          placeItems="center"
+                          paddingTop="1px"
+                        >
+                          <PaletteGroupIcon group={item.group} />
+                        </Box>
+                        <VStack align="start" gap={0} flex={1} minWidth={0}>
+                          <Combobox.ItemText css={{ width: "100%" }}>
+                            <Text textStyle="sm" color="fg" truncate>
+                              {item.label}
+                            </Text>
+                          </Combobox.ItemText>
+                          {/* The detail line is the honest one: for a CLI skill
+                              it is the verbs the feature map actually declares. */}
+                          <Text textStyle="2xs" color="fg.subtle" truncate maxWidth="100%">
+                            {item.detail}
+                          </Text>
+                        </VStack>
+                      </HStack>
+                    </Combobox.Item>
+                  ))}
+              </Combobox.ItemGroup>
+            ))}
+          </Combobox.Content>
+        </Combobox.Positioner>
+      </Portal>
+    </Combobox.Root>
+  );
+}

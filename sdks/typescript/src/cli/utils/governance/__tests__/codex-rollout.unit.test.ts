@@ -8,25 +8,47 @@ function rollout(...objs: unknown[]): string {
   return objs.map(line).join("\n");
 }
 
-const taskStarted = (traceId: string, turnId: string, startedAt = 1_780_000_000) =>
-  ({ type: "event_msg", payload: { type: "task_started", turn_id: turnId, trace_id: traceId, started_at: startedAt } });
-const turnContext = (turnId: string, model = "gpt-5.5") =>
-  ({ type: "turn_context", payload: { turn_id: turnId, model } });
-const developerMsg = (text: string) =>
-  ({ type: "response_item", payload: { type: "message", role: "developer", content: [{ type: "input_text", text }] } });
-const userMsg = (text: string) =>
-  ({ type: "response_item", payload: { type: "message", role: "user", content: [{ type: "input_text", text }] } });
+const taskStarted = (traceId: string, turnId: string, startedAt = 1_780_000_000) => ({
+  type: "event_msg",
+  payload: { type: "task_started", turn_id: turnId, trace_id: traceId, started_at: startedAt },
+});
+const turnContext = (turnId: string, model = "gpt-5.5") => ({
+  type: "turn_context",
+  payload: { turn_id: turnId, model },
+});
+const developerMsg = (text: string) => ({
+  type: "response_item",
+  payload: { type: "message", role: "developer", content: [{ type: "input_text", text }] },
+});
+const userMsg = (text: string) => ({
+  type: "response_item",
+  payload: { type: "message", role: "user", content: [{ type: "input_text", text }] },
+});
 /** A user message carrying several content parts, the shape codex injects in. */
-const userMsgParts = (...texts: string[]) =>
-  ({ type: "response_item", payload: { type: "message", role: "user", content: texts.map((text) => ({ type: "input_text", text })) } });
-const assistantMsg = (text: string) =>
-  ({ type: "response_item", payload: { type: "message", role: "assistant", content: [{ type: "output_text", text }] } });
-const agentMessage = (message: string) =>
-  ({ type: "event_msg", payload: { type: "agent_message", message, phase: "final_answer" } });
-const functionCall = (name: string, args: string, callId: string) =>
-  ({ type: "response_item", payload: { type: "function_call", name, arguments: args, call_id: callId } });
-const functionCallOutput = (callId: string, output: string) =>
-  ({ type: "response_item", payload: { type: "function_call_output", call_id: callId, output } });
+const userMsgParts = (...texts: string[]) => ({
+  type: "response_item",
+  payload: {
+    type: "message",
+    role: "user",
+    content: texts.map((text) => ({ type: "input_text", text })),
+  },
+});
+const assistantMsg = (text: string) => ({
+  type: "response_item",
+  payload: { type: "message", role: "assistant", content: [{ type: "output_text", text }] },
+});
+const agentMessage = (message: string) => ({
+  type: "event_msg",
+  payload: { type: "agent_message", message, phase: "final_answer" },
+});
+const functionCall = (name: string, args: string, callId: string) => ({
+  type: "response_item",
+  payload: { type: "function_call", name, arguments: args, call_id: callId },
+});
+const functionCallOutput = (callId: string, output: string) => ({
+  type: "response_item",
+  payload: { type: "function_call_output", call_id: callId, output },
+});
 
 const lastUser = (messages: CodexChatMessage[]) =>
   [...messages].reverse().find((m) => m.role === "user")?.content;
@@ -51,9 +73,7 @@ describe("parseCodexRollout", () => {
           output: "a.txt b.txt",
           model: "gpt-5.5",
         });
-        expect(turns[0]!.inputMessages).toEqual([
-          { role: "user", content: "list the files" },
-        ]);
+        expect(turns[0]!.inputMessages).toEqual([{ role: "user", content: "list the files" }]);
         expect(turns[0]!.startedAtMs).toBe(1_780_000_000 * 1000);
       });
     });
@@ -86,9 +106,7 @@ describe("parseCodexRollout", () => {
 
         expect(turns).toHaveLength(TURNS);
         for (const turn of turns) {
-          expect(JSON.stringify(turn.inputMessages).length).toBeLessThanOrEqual(
-            120_000,
-          );
+          expect(JSON.stringify(turn.inputMessages).length).toBeLessThanOrEqual(120_000);
         }
         // Reading the conversation again per dropped message takes seconds on
         // this transcript, and minutes on a session that ran for weeks.
@@ -134,9 +152,7 @@ describe("parseCodexRollout", () => {
 
         expect(turns).toHaveLength(1);
         expect(turns[0]!.inputMessages).toHaveLength(2);
-        expect(turns[0]!.inputMessages[0]!.content).toContain(
-          "environment_context",
-        );
+        expect(turns[0]!.inputMessages[0]!.content).toContain("environment_context");
         expect(lastUser(turns[0]!.inputMessages)).toBe("fix the bug");
       });
     });
@@ -158,9 +174,7 @@ describe("parseCodexRollout", () => {
         );
 
         expect(turns.map((t) => t.traceId)).toEqual(["t-one", "t-two"]);
-        expect(turns[0]!.inputMessages).toEqual([
-          { role: "user", content: "first question" },
-        ]);
+        expect(turns[0]!.inputMessages).toEqual([{ role: "user", content: "first question" }]);
         expect(turns[0]!.output).toBe("first answer");
         // Turn two carries the full prior conversation, as sent to the model.
         expect(turns[1]!.inputMessages).toEqual([
@@ -257,8 +271,7 @@ describe("parseCodexRollout", () => {
               type: "function",
               function: {
                 name: "exec",
-                arguments:
-                  'const r = await tools.exec_command({"cmd":"echo hi"});',
+                arguments: 'const r = await tools.exec_command({"cmd":"echo hi"});',
               },
             },
           ],
@@ -295,9 +308,7 @@ describe("parseCodexRollout", () => {
           ),
         );
 
-        const toolMessage = turns[0]!.inputMessages.find(
-          (m) => m.role === "tool",
-        );
+        const toolMessage = turns[0]!.inputMessages.find((m) => m.role === "tool");
         expect(toolMessage?.content).toContain("mango-auto-hook");
         expect(toolMessage?.content).not.toContain("input_text");
       });
@@ -374,9 +385,7 @@ describe("parseCodexRollout", () => {
         const laterOutput = msgs.find((m) => m.role === "tool");
         expect(orphanCall?.tool_calls?.[0]?.id).toBeTruthy();
         expect(laterOutput?.tool_call_id).toBeTruthy();
-        expect(laterOutput?.tool_call_id).not.toBe(
-          orphanCall?.tool_calls?.[0]?.id,
-        );
+        expect(laterOutput?.tool_call_id).not.toBe(orphanCall?.tool_calls?.[0]?.id);
       });
     });
   });
@@ -395,9 +404,7 @@ describe("parseCodexRollout", () => {
         );
 
         expect(turns[0]!.output).toBe("done");
-        expect(turns[0]!.inputMessages).toEqual([
-          { role: "user", content: "hi" },
-        ]);
+        expect(turns[0]!.inputMessages).toEqual([{ role: "user", content: "hi" }]);
       });
     });
   });
@@ -466,8 +473,10 @@ describe("parseCodexRollout", () => {
   });
 
   describe("given user_message events recording what the user typed", () => {
-    const typed = (message: string) =>
-      ({ type: "event_msg", payload: { type: "user_message", message } });
+    const typed = (message: string) => ({
+      type: "event_msg",
+      payload: { type: "user_message", message },
+    });
 
     describe("when the rollout is parsed", () => {
       /** @scenario "The harvest names the session by the first thing the user asked" */
@@ -522,8 +531,10 @@ describe("parseCodexRollout", () => {
   });
 
   describe("given a session that records the prompt in both places", () => {
-    const typedEvent = (message: string) =>
-      ({ type: "event_msg", payload: { type: "user_message", message } });
+    const typedEvent = (message: string) => ({
+      type: "event_msg",
+      payload: { type: "user_message", message },
+    });
 
     describe("when the rollout is parsed", () => {
       /** @scenario "The event names the session even when the conversation also carries a prompt" */

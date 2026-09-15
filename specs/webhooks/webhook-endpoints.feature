@@ -259,6 +259,21 @@ Feature: Webhook endpoints, signed outbound event delivery
       # Messages already planned against the old transport are in flight in
       # the outbox.
 
+  Rule: A test fire refuses by name on a process that composes no dispatch
+
+    # The interactive process serves both doors over this application, but it
+    # never dispatches a real delivery itself - that is the worker's own
+    # delivery process manager, a separate composition this application does
+    # not share. A test fire asked of the interactive process must say so by
+    # name rather than crash on an unsupplied collaborator.
+
+    @unit
+    Scenario: A test fire from the interactive process refuses by name
+      Given the interactive process, which never dispatches deliveries itself
+      When an endpoint's test fire is requested
+      Then the request is refused as service unavailable
+      And the refusal names dispatch, not an unknown error
+
   Rule: Deliveries are signed and attributable
 
     @unit
@@ -415,6 +430,14 @@ Feature: Webhook endpoints, signed outbound event delivery
       Given an organization whose plan lacks webhook endpoints
       When it calls the webhook endpoints api
       Then the request is rejected as an enterprise feature
+
+    @integration
+    Scenario: The plan gate answers on a deployment with no Enterprise governance application
+      Given a deployment that composed no Enterprise governance application
+      And an organization whose plan lacks webhook endpoints
+      When it calls the webhook endpoints api
+      Then the request is refused as forbidden, naming the plan
+      So a knowable refusal is never reported as an unknown platform failure
 
   Rule: The emitted events log is the primitive, webhooks ride it
 

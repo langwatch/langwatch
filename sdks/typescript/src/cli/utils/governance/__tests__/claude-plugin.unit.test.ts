@@ -1,13 +1,4 @@
-/**
- * Putting the LangWatch Claude Code plugin on a machine: what it asks the
- * `claude` binary to do, what it does when any of that fails, and how long a
- * failure keeps it from trying again.
- *
- * `node:child_process` is the only thing mocked. The settings file, the plugin
- * state files and the CLI config are real files under a temp HOME.
- *
- * Feature: specs/ai-governance/cli-wrappers/claude-plugin-install.feature
- */
+/** Claude plugin installation: behavior on success and failure. */
 
 import * as fs from "node:fs";
 
@@ -20,8 +11,7 @@ import { installClaudePluginHarness } from "./claude-plugin-test-helpers";
 const { spawnSyncMock } = vi.hoisted(() => ({ spawnSyncMock: vi.fn() }));
 
 vi.mock("node:child_process", async () => {
-  const actual =
-    await vi.importActual<typeof ChildProcessModule>("node:child_process");
+  const actual = await vi.importActual<typeof ChildProcessModule>("node:child_process");
   return { ...actual, spawnSync: spawnSyncMock };
 });
 
@@ -125,9 +115,7 @@ describe("ensureLangwatchClaudePlugin", () => {
       const { ensureLangwatchClaudePlugin } = await loadModule();
       ensureLangwatchClaudePlugin({ interactive: true });
 
-      expect(fs.readFileSync(settingsPath(), "utf8")).not.toContain(
-        "langwatch ingest hook",
-      );
+      expect(fs.readFileSync(settingsPath(), "utf8")).not.toContain("langwatch ingest hook");
     });
   });
 
@@ -137,9 +125,7 @@ describe("ensureLangwatchClaudePlugin", () => {
       answerClaude({ pluginHelp: 1 });
       const { ensureLangwatchClaudePlugin } = await loadModule();
 
-      expect(ensureLangwatchClaudePlugin({ interactive: true }).action).toBe(
-        "unavailable",
-      );
+      expect(ensureLangwatchClaudePlugin({ interactive: true }).action).toBe("unavailable");
       expect(commandsRun()).toEqual(["plugin --help"]);
     });
 
@@ -162,9 +148,7 @@ describe("ensureLangwatchClaudePlugin", () => {
       expect(ensureLangwatchClaudePlugin({ interactive: true })).toEqual({
         action: "installed",
       });
-      expect(commandsRun()).toContain(
-        "plugin install langwatch@langwatch --scope user",
-      );
+      expect(commandsRun()).toContain("plugin install langwatch@langwatch --scope user");
     });
 
     it("gives up when the marketplace is still unknown afterwards", async () => {
@@ -173,9 +157,7 @@ describe("ensureLangwatchClaudePlugin", () => {
 
       const result = ensureLangwatchClaudePlugin({ interactive: true });
       expect(result.action).toBe("failed");
-      expect(commandsRun()).not.toContain(
-        "plugin install langwatch@langwatch --scope user",
-      );
+      expect(commandsRun()).not.toContain("plugin install langwatch@langwatch --scope user");
     });
   });
 
@@ -231,17 +213,12 @@ describe("ensureLangwatchClaudePlugin", () => {
     /** @scenario "A day after a failed install the plugin is attempted again" */
     it("attempts the install again and clears the stamp on success", async () => {
       writeConfig({
-        claude_plugin_last_failure:
-          Math.floor(Date.now() / 1000) - 2 * 24 * 60 * 60,
+        claude_plugin_last_failure: Math.floor(Date.now() / 1000) - 2 * 24 * 60 * 60,
       });
       const { ensureLangwatchClaudePlugin } = await loadModule();
 
-      expect(ensureLangwatchClaudePlugin({ interactive: true }).action).toBe(
-        "installed",
-      );
-      expect(commandsRun()).toContain(
-        "plugin install langwatch@langwatch --scope user",
-      );
+      expect(ensureLangwatchClaudePlugin({ interactive: true }).action).toBe("installed");
+      expect(commandsRun()).toContain("plugin install langwatch@langwatch --scope user");
       expect(readConfig().claude_plugin_last_failure).toBeUndefined();
     });
   });
@@ -250,14 +227,11 @@ describe("ensureLangwatchClaudePlugin", () => {
     /** @scenario "A clock that disagrees with the last failure does not block the retry" */
     it("attempts the install rather than waiting for the clock to catch up", async () => {
       writeConfig({
-        claude_plugin_last_failure:
-          Math.floor(Date.now() / 1000) + 365 * 24 * 60 * 60,
+        claude_plugin_last_failure: Math.floor(Date.now() / 1000) + 365 * 24 * 60 * 60,
       });
       const { ensureLangwatchClaudePlugin } = await loadModule();
 
-      expect(ensureLangwatchClaudePlugin({ interactive: true }).action).toBe(
-        "installed",
-      );
+      expect(ensureLangwatchClaudePlugin({ interactive: true }).action).toBe("installed");
     });
   });
 });

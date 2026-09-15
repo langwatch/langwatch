@@ -6,7 +6,10 @@ keywords: audit log, compliance, csv export, langwatch
 ---
 
 <Note>
-  **Available on Enterprise plans.** Reading the audit log needs an Enterprise plan, and a self-hosted deployment needs an Enterprise license. Without one the page shows an upgrade notice and the API refuses the query. To enable it, contact [enterprise@langwatch.ai](mailto:enterprise@langwatch.ai).
+  **Available on Enterprise plans.** Reading the audit log needs an Enterprise plan, and a
+  self-hosted deployment needs an Enterprise license. Without one the page shows an upgrade notice
+  and the API refuses the query. To enable it, contact
+  [enterprise@langwatch.ai](mailto:enterprise@langwatch.ai).
 </Note>
 
 ## What is logged
@@ -24,31 +27,34 @@ Sign-ins are not logged. Reads of product data (opening a trace, running a searc
 
 ## What a row contains
 
-| Column | Content |
-|--------|---------|
-| Timestamp | When the action ran |
-| Source | **Platform** for a settings or API change, **Gateway** for a LangWatch AI Gateway change |
-| User | Name and email of the person who acted |
-| Action | The action name, for example `organization.updateMemberRole`, `role.create` or `gateway.virtual_key.rotated` |
-| Target | The kind and id of the changed object on Gateway rows, for example `virtual_key` |
-| Project | The project the action applied to, when it applied to one |
-| IP Address | The client address of the request |
-| Error | The error message when the action was refused |
+| Column     | Content                                                                                                      |
+| ---------- | ------------------------------------------------------------------------------------------------------------ |
+| Timestamp  | When the action ran                                                                                          |
+| Source     | **Platform** for a settings or API change, **Gateway** for a LangWatch AI Gateway change                     |
+| User       | Name and email of the person who acted                                                                       |
+| Action     | The action name, for example `organization.updateMemberRole`, `role.create` or `gateway.virtual_key.rotated` |
+| Target     | The kind and id of the changed object on Gateway rows, for example `virtual_key`                             |
+| Project    | The project the action applied to, when it applied to one                                                    |
+| IP Address | The client address of the request                                                                            |
+| Error      | The error message when the action was refused                                                                |
 
 The CSV export adds the user agent, the request arguments, and the before and after state of Gateway rows. Secret values in the arguments are replaced by `[redacted]`.
 
 <Frame>
-<img src="/images/platform/audit-log.png" alt="Settings > Audit Log with the filters and a page of rows" />
+  <img
+    src="/images/platform/audit-log.png"
+    alt="Settings > Audit Log with the filters and a page of rows"
+  />
 </Frame>
 
 ## Filters
 
-| Filter | Behavior |
-|--------|----------|
-| Search by User | Matches one member by name or email |
+| Filter           | Behavior                                                                                            |
+| ---------------- | --------------------------------------------------------------------------------------------------- |
+| Search by User   | Matches one member by name or email                                                                 |
 | Filter by Action | Case-insensitive substring match on the action name. `virtual_key` matches every virtual key action |
-| Project | One project, or all. Rows with no project are always included |
-| Select Date | A date range or a preset period. The default is the last 30 days |
+| Project          | One project, or all. Rows with no project are always included                                       |
+| Select Date      | A date range or a preset period. The default is the last 30 days                                    |
 
 Every filter is in the page URL, so you can share a filtered view. A virtual key or a budget page links here with its own target already filtered.
 

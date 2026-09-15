@@ -10,10 +10,7 @@ vi.mock("../langwatch-api.js", async (importOriginal) => {
 
 import { LangWatchApiError, makeRequest } from "../langwatch-api.js";
 import { handleExperimentStatus } from "../tools/run-experiment.js";
-import {
-  deriveRunStatus,
-  isTerminalStatus,
-} from "../tools/experiment-run-status.js";
+import { deriveRunStatus, isTerminalStatus } from "../tools/experiment-run-status.js";
 
 const mockMakeRequest = vi.mocked(makeRequest);
 
@@ -44,9 +41,7 @@ describe("deriveRunStatus()", () => {
   describe("when no terminal marker and no recent updates", () => {
     it("is interrupted", () => {
       const now = 1_000_000;
-      expect(deriveRunStatus({ updatedAt: now - 6 * 60 * 1000 }, now)).toBe(
-        "interrupted",
-      );
+      expect(deriveRunStatus({ updatedAt: now - 6 * 60 * 1000 }, now)).toBe("interrupted");
     });
   });
 
@@ -72,10 +67,7 @@ describe("handleExperimentStatus()", () => {
 
       const out = await handleExperimentStatus({ runId: "run_1" });
 
-      expect(mockMakeRequest).toHaveBeenCalledWith(
-        "GET",
-        "/api/experiments/runs/run_1",
-      );
+      expect(mockMakeRequest).toHaveBeenCalledWith("GET", "/api/v1/experiments/runs/run_1");
       expect(out).toContain("**Status**: completed");
       expect(out).toContain("3/3 cells");
     });
@@ -84,9 +76,7 @@ describe("handleExperimentStatus()", () => {
   describe("given an SDK-logged run with no Redis state", () => {
     it("falls back to deriving status from the results endpoint", async () => {
       mockMakeRequest
-        .mockRejectedValueOnce(
-          new LangWatchApiError("missing", 404, "Run not found"),
-        )
+        .mockRejectedValueOnce(new LangWatchApiError("missing", 404, "Run not found"))
         .mockResolvedValueOnce({
           progress: 5,
           total: 5,
@@ -104,15 +94,11 @@ describe("handleExperimentStatus()", () => {
         experimentSlug: "doc-qa",
       });
 
-      expect(mockMakeRequest).toHaveBeenNthCalledWith(
-        1,
-        "GET",
-        "/api/experiments/runs/sdk_run",
-      );
+      expect(mockMakeRequest).toHaveBeenNthCalledWith(1, "GET", "/api/v1/experiments/runs/sdk_run");
       expect(mockMakeRequest).toHaveBeenNthCalledWith(
         2,
         "GET",
-        "/api/experiments/runs/sdk_run/results?experimentSlug=doc-qa",
+        "/api/v1/experiments/runs/sdk_run/results?experimentSlug=doc-qa",
       );
       expect(out).toContain("**Status**: completed");
       expect(out).toContain("5/5 cells");
@@ -121,9 +107,7 @@ describe("handleExperimentStatus()", () => {
 
     it("reports interrupted for a stale unfinished SDK run", async () => {
       mockMakeRequest
-        .mockRejectedValueOnce(
-          new LangWatchApiError("missing", 404, "Run not found"),
-        )
+        .mockRejectedValueOnce(new LangWatchApiError("missing", 404, "Run not found"))
         .mockResolvedValueOnce({
           progress: 2,
           total: 5,
@@ -149,12 +133,8 @@ describe("handleExperimentStatus()", () => {
   describe("given the run cannot be found anywhere", () => {
     it("returns actionable guidance instead of a raw 404", async () => {
       mockMakeRequest
-        .mockRejectedValueOnce(
-          new LangWatchApiError("missing", 404, "Run not found"),
-        )
-        .mockRejectedValueOnce(
-          new LangWatchApiError("missing", 404, "Run not found"),
-        );
+        .mockRejectedValueOnce(new LangWatchApiError("missing", 404, "Run not found"))
+        .mockRejectedValueOnce(new LangWatchApiError("missing", 404, "Run not found"));
 
       const out = await handleExperimentStatus({
         runId: "nope",
@@ -167,23 +147,15 @@ describe("handleExperimentStatus()", () => {
     });
 
     it("rethrows non-404 errors from the status endpoint", async () => {
-      mockMakeRequest.mockRejectedValueOnce(
-        new LangWatchApiError("boom", 500, "Internal error"),
-      );
+      mockMakeRequest.mockRejectedValueOnce(new LangWatchApiError("boom", 500, "Internal error"));
 
-      await expect(
-        handleExperimentStatus({ runId: "nope" }),
-      ).rejects.toThrow();
+      await expect(handleExperimentStatus({ runId: "nope" })).rejects.toThrow();
     });
 
     it("propagates a real (non-404) error from the results fallback instead of faking not-found", async () => {
       mockMakeRequest
-        .mockRejectedValueOnce(
-          new LangWatchApiError("missing", 404, "Run not found"),
-        )
-        .mockRejectedValueOnce(
-          new LangWatchApiError("boom", 500, "Internal error"),
-        );
+        .mockRejectedValueOnce(new LangWatchApiError("missing", 404, "Run not found"))
+        .mockRejectedValueOnce(new LangWatchApiError("boom", 500, "Internal error"));
 
       // The fallback's 500 ("boom") must surface, not the original 404 ("missing").
       await expect(

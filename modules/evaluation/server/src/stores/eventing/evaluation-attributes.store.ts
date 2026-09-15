@@ -1,0 +1,131 @@
+import type { FoldProjectionStore, ProjectionStoreContext } from "@langwatch/eventing";
+import type { AnalyticsService } from "@langwatch/analytics-contract";
+import {
+  EVALUATION_ANALYTICS_PROJECTION_VERSION_LATEST,
+  type EvaluationAnalyticsData,
+} from "../../projections/evaluation-analytics-fold.projection.ts";
+import {
+  type EvaluationAnalyticsRow,
+  EvaluationAnalyticsRowProjection,
+} from "../../projections/evaluation-analytics-row.projection.ts";
+import type { EvaluationAnalyticsAttributePolicy } from "../../app/evaluation.members.ts";
+
+/**
+ * FoldProjectionStore adapter for slim evaluation_analytics fold (ADR-066);
+ * read-back via typed columns.
+ */
+export class EvaluationAnalyticsStore implements FoldProjectionStore<EvaluationAnalyticsData> {
+  static create(input: {
+    analytics: AnalyticsService;
+    attributePolicy: EvaluationAnalyticsAttributePolicy;
+    defaultRetentionDays: number;
+  }): EvaluationAnalyticsStore {
+    return new EvaluationAnalyticsStore(
+      input.analytics,
+      input.attributePolicy,
+      input.defaultRetentionDays,
+    );
+  }
+
+  private readonly rowProjection = EvaluationAnalyticsRowProjection.create();
+
+  private constructor(
+    private readonly analytics: AnalyticsService,
+    private readonly attributePolicy: EvaluationAnalyticsAttributePolicy,
+    private readonly defaultRetentionDays: number,
+  ) {}
+
+  async store(state: EvaluationAnalyticsData, context: ProjectionStoreContext): Promise<void> {
+    const entry = this.toRow(state, context);
+    if (!entry) return;
+    await this.analytics.upsertEvaluationAnalytics({
+      row: entry.row,
+      retentionDays: entry.retentionDays,
+      appliedEventIds: entry.appliedEventIds,
+    });
+  }
+
+  async storeBatch(
+    entries: Array<{
+      state: EvaluationAnalyticsData;
+      context: ProjectionStoreContext;
+    }>,
+  ): Promise<void> {
+    const batchRows = entries
+      .map(({ state, context }) => this.toRow(state, context))
+      .filter((entry): entry is NonNullable<typeof entry> => entry !== null);
+
+    if (batchRows.length === 0) return;
+
+    await this.analytics.upsertEvaluationAnalyticsBatch(
+      batchRows.map(({ row, retentionDays, appliedEventIds }) => ({
+        row,
+        retentionDays,
+        appliedEventIds,
+      })),
+    );
+  }
+
+  private toRow(
+    state: EvaluationAnalyticsData,
+    context: ProjectionStoreContext,
+  ): {
+    row: EvaluationAnalyticsRow;
+    retentionDays: number;
+    appliedEventIds: string[];
+  } | null {
+    // ALWAYS writes; gate removed because evaluationId stamped from aggregateId always.
+    const stateWithId: EvaluationAnalyticsData = state.evaluationId
+      ? state
+      : { ...state, evaluationId: String(context.aggregateId) };
+    return {
+      row: this.rowProjection.project({
+        state: stateWithId,
+        tenantId: String(context.tenantId),
+        version: EVALUATION_ANALYTICS_PROJECTION_VERSION_LATEST,
+        attributePolicy: this.attributePolicy,
+      }),
+      retentionDays: context.retentionPolicy?.traces ?? this.defaultRetentionDays,
+      appliedEventIds: context.appliedEventIds ? [...context.appliedEventIds] : [],
+    };
+  }
+
+  /** Read committed state with watermark (ADR-066); decode via projection version. */
+  async getWithApplied(
+    aggregateId: string,
+    context: ProjectionStoreContext,
+  ): Promise<{
+    state: EvaluationAnalyticsData | null;
+    appliedEventIds: string[];
+    miss?: "absent" | "undecodable";
+  }> {
+    const found = await this.analytics.findEvaluationAnalytics({
+      tenantId: String(context.tenantId),
+      evaluationId: aggregateId,
+      window: context.readWindow,
+    });
+    if (!found) return { state: null, appliedEventIds: [], miss: "absent" };
+    // Stale schema snapshot: the read-back columns did not exist when this row
+    // was written, so decoding it would fabricate state. Answer as for "no row"
+    // — the watermark is dropped too, because a watermark without the state it
+    // belongs to would suppress the very events the re-fold needs — but report
+    // it as `undecodable`, not `absent`: the row was FOUND and refused, so the
+    // executor must not answer with an unwindowed re-read that can only find
+    // the same row again.
+    if (found.row.version !== EVALUATION_ANALYTICS_PROJECTION_VERSION_LATEST) {
+      return { state: null, appliedEventIds: [], miss: "undecodable" };
+    }
+    return {
+      state: this.rowProjection.fromRow(found.row),
+      appliedEventIds: found.appliedEventIds,
+    };
+  }
+
+  /** State only; delegates to `getWithApplied` so the two paths cannot diverge. */
+  async tryGet(
+    aggregateId: string,
+    context: ProjectionStoreContext,
+  ): Promise<EvaluationAnalyticsData | null> {
+    return (await this.getWithApplied(aggregateId, context)).state;
+  }
+}

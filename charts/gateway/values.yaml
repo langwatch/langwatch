@@ -5,7 +5,7 @@ image:
   # Self-hosters who mirror to an internal registry can override
   # `repository` without changing anything else.
   repository: docker.io/langwatch/ai-gateway
-  tag: ""            # defaults to .Chart.AppVersion; releases also publish `latest` and `<short-sha>`
+  tag: "" # defaults to .Chart.AppVersion; releases also publish `latest` and `<short-sha>`
   pullPolicy: IfNotPresent
 
 replicaCount: 2
@@ -74,8 +74,8 @@ ingress:
     secretName: gateway-tls
   annotations:
     cert-manager.io/cluster-issuer: letsencrypt-prod
-    nginx.ingress.kubernetes.io/proxy-buffering: "off"        # SSE needs unbuffered
-    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"     # long-lived streams
+    nginx.ingress.kubernetes.io/proxy-buffering: "off" # SSE needs unbuffered
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600" # long-lived streams
     nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
     nginx.ingress.kubernetes.io/proxy-request-buffering: "off"
 
@@ -119,7 +119,7 @@ cache:
   lruSize: 50000
   refreshInterval: 60s
   jwtRefreshThreshold: 5m
-  bootstrapAllKeys: false   # enterprise opt-in to survive control-plane outage
+  bootstrapAllKeys: false # enterprise opt-in to survive control-plane outage
 
 bifrost:
   poolSize: 200
@@ -148,7 +148,7 @@ otel:
   maxQueueSize: 8192
 
 logging:
-  level: info   # debug|info|warn|error
+  level: info # debug|info|warn|error
 
 # Admin / operator listener. Exposes /debug/pprof/* on a loopback-bound
 # port inside the pod. Operators reach it via `kubectl port-forward`
@@ -178,7 +178,7 @@ admin:
 budget:
   # Fraction of the hard limit at which a `warn`-mode scope starts
   # reporting a warn verdict.
-  warnThresholdPct: "0.9"  # 90%
+  warnThresholdPct: "0.9" # 90%
 
 # Spend emission. Every request writes a spend record to a bounded on-disk
 # spool that a background drainer ships to the control plane, which is where
@@ -263,7 +263,7 @@ terminationGracePeriodSeconds: 75
 # ~3 MiB prompts plus base64 images with room to spare, and sits well
 # below the 512Mi memory limit. Set to 0 to disable (not recommended).
 security:
-  maxRequestBodyBytes: 33554432  # 32 MiB
+  maxRequestBodyBytes: 33554432 # 32 MiB
 
   # Application-layer SSRF admission for tenant-supplied provider endpoints.
   # Keep false for local/self-hosted installs that intentionally reach HTTP,
@@ -314,7 +314,7 @@ probes:
   startup:
     initialDelaySeconds: 5
     periodSeconds: 2
-    failureThreshold: 60   # allows ~2min bootstrap for bootstrapAllKeys tenants
+    failureThreshold: 60 # allows ~2min bootstrap for bootstrapAllKeys tenants
   readiness:
     periodSeconds: 5
     timeoutSeconds: 1

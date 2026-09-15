@@ -3,9 +3,7 @@ import { describe, expect, it } from "vitest";
 import { formatEventLine, pickFreshEvents } from "../tail";
 import type { ActivityEventDetailRow } from "@/cli/utils/governance/cli-api";
 
-const mkEvent = (
-  overrides: Partial<ActivityEventDetailRow>,
-): ActivityEventDetailRow => ({
+const mkEvent = (overrides: Partial<ActivityEventDetailRow>): ActivityEventDetailRow => ({
   eventId: "evt-default",
   eventType: "api.call",
   actor: "u@example",
@@ -20,15 +18,14 @@ const mkEvent = (
   ...overrides,
 });
 
-// eslint-disable-next-line no-control-regex -- intentional: stripping ANSI escape codes from chalk output
+// eslint-disable-next-line no-control-regex
+// intentional: stripping ANSI escape codes from chalk output
 const stripAnsi = (s: string) => s.replace(/\x1b\[[0-9;]*m/g, "");
 
 describe("pickFreshEvents", () => {
   describe("when next batch contains nothing newer than the cursor", () => {
     it("returns an empty array", () => {
-      const next = [
-        mkEvent({ eventId: "a", eventTimestampIso: "2026-04-27T07:00:00.000Z" }),
-      ];
+      const next = [mkEvent({ eventId: "a", eventTimestampIso: "2026-04-27T07:00:00.000Z" })];
       const fresh = pickFreshEvents(next, {
         cursorIso: "2026-04-27T08:00:00.000Z",
         seen: new Set(),
@@ -57,7 +54,10 @@ describe("pickFreshEvents", () => {
   describe("when next batch contains an event AT the cursor boundary not yet seen", () => {
     it("includes it (handles same-timestamp burst)", () => {
       const next = [
-        mkEvent({ eventId: "boundary-new", eventTimestampIso: "2026-04-27T07:00:00.000Z" }),
+        mkEvent({
+          eventId: "boundary-new",
+          eventTimestampIso: "2026-04-27T07:00:00.000Z",
+        }),
       ];
       const fresh = pickFreshEvents(next, {
         cursorIso: "2026-04-27T07:00:00.000Z",
@@ -70,7 +70,10 @@ describe("pickFreshEvents", () => {
   describe("when next batch contains an event AT the cursor boundary already seen", () => {
     it("excludes it (no double-print on poll)", () => {
       const next = [
-        mkEvent({ eventId: "already-seen", eventTimestampIso: "2026-04-27T07:00:00.000Z" }),
+        mkEvent({
+          eventId: "already-seen",
+          eventTimestampIso: "2026-04-27T07:00:00.000Z",
+        }),
       ];
       const fresh = pickFreshEvents(next, {
         cursorIso: "2026-04-27T07:00:00.000Z",
@@ -144,9 +147,7 @@ describe("formatEventLine", () => {
   describe("when cost is 0", () => {
     it("suppresses the cost cell entirely (no '$0.0000' clutter)", () => {
       const line = stripAnsi(
-        formatEventLine(
-          mkEvent({ costUsd: 0, tokensInput: 10, tokensOutput: 20 }),
-        ),
+        formatEventLine(mkEvent({ costUsd: 0, tokensInput: 10, tokensOutput: 20 })),
       );
       expect(line).not.toContain("$");
       expect(line).toContain("10/20 tok");
@@ -156,9 +157,7 @@ describe("formatEventLine", () => {
   describe("when both token counts are 0", () => {
     it("suppresses the tokens cell entirely", () => {
       const line = stripAnsi(
-        formatEventLine(
-          mkEvent({ costUsd: 0.5, tokensInput: 0, tokensOutput: 0 }),
-        ),
+        formatEventLine(mkEvent({ costUsd: 0.5, tokensInput: 0, tokensOutput: 0 })),
       );
       expect(line).not.toContain("tok");
       expect(line).toContain("$0.5000");

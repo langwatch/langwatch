@@ -275,15 +275,14 @@ describe("handleGetTrace()", () => {
     it("shows the formatted digest", async () => {
       mockGetTraceById.mockResolvedValue({
         trace_id: "trace-abc",
-        formatted_trace: "Root [server] 1200ms\n  LLM Call [llm] 800ms\n    Input: Hello\n    Output: Hi there",
+        formatted_trace:
+          "Root [server] 1200ms\n  LLM Call [llm] 800ms\n    Input: Hello\n    Output: Hi there",
         timestamps: {
           started_at: "2024-01-01T00:00:00Z",
           updated_at: "2024-01-01T00:01:00Z",
         },
         metadata: { user_id: "user-123" },
-        evaluations: [
-          { name: "Toxicity", passed: true, score: 0.95 },
-        ],
+        evaluations: [{ name: "Toxicity", passed: true, score: 0.95 }],
       });
 
       const result = await handleGetTrace({ traceId: "trace-abc" });
@@ -416,9 +415,7 @@ describe("handleGetAnalytics()", () => {
         metric: "performance.completion_time",
       });
 
-      expect(result).toContain(
-        "# Analytics: performance.completion_time (avg)"
-      );
+      expect(result).toContain("# Analytics: performance.completion_time (avg)");
       expect(result).toContain("| Date | Value |");
       expect(result).toContain("| 2024-01-01 | 42 |");
       expect(result).toContain("| 2024-01-02 | 55 |");
@@ -554,9 +551,7 @@ describe("handleListPrompts()", () => {
   });
 
   it("includes usage tip about platform_get_prompt", async () => {
-    mockListPrompts.mockResolvedValue([
-      { handle: "test", name: "Test", latestVersionNumber: 1 },
-    ]);
+    mockListPrompts.mockResolvedValue([{ handle: "test", name: "Test", latestVersionNumber: 1 }]);
 
     const result = await handleListPrompts();
 
@@ -606,7 +601,6 @@ describe("handleGetPrompt()", () => {
       expect(result).toContain("### system\nYou are helpful.");
       expect(result).toContain("### user\nHi there");
     });
-
   });
 
   describe("when prompt has no versions", () => {
@@ -759,7 +753,10 @@ describe("handleGetPrompt() with tag options", () => {
 
       await handleGetPrompt({ idOrHandle: "pizza-prompt", tag: "production" });
 
-      expect(mockGetPrompt).toHaveBeenCalledWith("pizza-prompt", { version: undefined, tag: "production" });
+      expect(mockGetPrompt).toHaveBeenCalledWith("pizza-prompt", {
+        version: undefined,
+        tag: "production",
+      });
     });
   });
 });

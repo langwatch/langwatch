@@ -1,13 +1,5 @@
 /**
- * The two promises the session context hook makes to every session it runs in:
- * nothing on stdout ever, and never a reason the session stalls or fails.
- *
- * A SessionStart hook's stdout is injected into the user's session context, so
- * a stray line would land in the model's prompt. Everything it cannot act on
- * (no repository, an unreadable payload, a tool it has no hook for, a collector
- * that refuses the post, a pipe nobody closes) has to end the same way: quietly
- * and soon.
- *
+ * Session context hook promises: silent on stdout, never blocks the session.
  * Feature: specs/ai-governance/cli-wrappers/session-context-hook.feature
  */
 
@@ -16,11 +8,7 @@ import { PassThrough } from "node:stream";
 import { describe, expect, it } from "vitest";
 
 import { readStdin } from "../hook-input";
-import {
-  installHookHarness,
-  SESSION_ID,
-  unreachableCollector,
-} from "./hook-harness";
+import { installHookHarness, SESSION_ID, unreachableCollector } from "./hook-harness";
 
 const hook = installHookHarness();
 const { posted } = hook;
@@ -34,7 +22,10 @@ const oversizedWrite = () => {
 
 describe("the session context hook's silence", () => {
   describe("given a directory that is not a git repository", () => {
-    /** @scenario "Outside a git repository with nothing to declare the hook sends nothing and exits zero" */
+    /**
+     * @scenario "Outside a git repository with nothing to declare, the hook
+     * sends nothing and exits zero"
+     */
     it("posts nothing, records nothing and exits zero", async () => {
       await hook.runHook({ git: {} });
 
@@ -113,9 +104,7 @@ describe("the session context hook's silence", () => {
       const stream = new PassThrough();
       stream.write('{"session_id":"');
 
-      await expect(readStdin({ stream, timeoutMs: 20 })).resolves.toBe(
-        '{"session_id":"',
-      );
+      await expect(readStdin({ stream, timeoutMs: 20 })).resolves.toBe('{"session_id":"');
     });
 
     /** @scenario "A payload that never arrives does not outlive the session" */
@@ -131,18 +120,18 @@ describe("the session context hook's silence", () => {
       const stream = new PassThrough();
       stream.end('{"session_id":"abc"}');
 
-      await expect(readStdin({ stream, timeoutMs: 5_000 })).resolves.toBe(
-        '{"session_id":"abc"}',
-      );
+      await expect(readStdin({ stream, timeoutMs: 5_000 })).resolves.toBe('{"session_id":"abc"}');
     });
   });
 
   describe("given a seam writing far more than a payload holds", () => {
-    /** @scenario "An oversized payload sends no session context and leaves the session undisturbed" */
+    /**
+     * @scenario "An oversized payload sends no session context and leaves the
+     * session undisturbed"
+     */
     it("posts nothing, writes nothing and exits zero", async () => {
       await hook.runHook({
-        readInput: () =>
-          readStdin({ stream: oversizedWrite(), timeoutMs: 5_000 }),
+        readInput: () => readStdin({ stream: oversizedWrite(), timeoutMs: 5_000 }),
       });
 
       expect(posted).toEqual([]);

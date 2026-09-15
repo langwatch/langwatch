@@ -17,7 +17,9 @@ export const deleteDashboardCommand = async (id: string): Promise<CommandResult 
 
   try {
     const result = await service.delete(id);
-    spinner.succeed(`Deleted dashboard "${chalk.cyan(result.name)}" ${chalk.gray(`(id: ${result.id})`)}`);
+    spinner.succeed(
+      `Deleted dashboard "${chalk.cyan(result.name)}" ${chalk.gray(`(id: ${result.id})`)}`,
+    );
 
     return {
       data: result,

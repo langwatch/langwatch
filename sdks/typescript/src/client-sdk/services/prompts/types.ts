@@ -3,16 +3,13 @@ import type { paths } from "@/internal/generated/openapi/api-client";
 import {
   type corePromptDataSchema,
   type promptMetadataSchema,
-  type promptDataSchema
+  type promptDataSchema,
 } from "./schema";
 
 /**
  * Type for template variables - supporting common data types
  */
-export type TemplateVariables = Record<
-  string,
-  string | number | boolean | object | null
->;
+export type TemplateVariables = Record<string, string | number | boolean | object | null>;
 
 /**
  * Core data needed for prompt functionality
@@ -31,27 +28,28 @@ export type PromptData = z.infer<typeof promptDataSchema>;
 
 // Extract API types from OpenAPI schema for backwards compatibility
 export type CreatePromptBody = NonNullable<
-  paths["/api/prompts"]["post"]["requestBody"]
+  paths["/api/v1/prompts"]["post"]["requestBody"]
 >["content"]["application/json"];
 
 export type UpdatePromptBody = NonNullable<
-  paths["/api/prompts/{id}"]["put"]["requestBody"]
+  paths["/api/v1/prompts/{id}"]["put"]["requestBody"]
 >["content"]["application/json"];
 
 export type PromptResponse = NonNullable<
-  paths["/api/prompts/{id}"]["get"]["responses"]["200"]["content"]["application/json"]
+  paths["/api/v1/prompts/{id}"]["get"]["responses"]["200"]["content"]["application/json"]
 >;
 
 // Extract the PromptScope type from the API client
-export type PromptScope = paths["/api/prompts"]["post"]["responses"]["200"]["content"]["application/json"]["scope"];
+export type PromptScope =
+  paths["/api/v1/prompts"]["post"]["responses"]["200"]["content"]["application/json"]["scope"];
 
 // Extract tag definition types from the OpenAPI schema
 export type TagDefinition = NonNullable<
-  paths["/api/prompts/tags"]["get"]["responses"]["200"]["content"]["application/json"]
+  paths["/api/v1/prompts/tags"]["get"]["responses"]["200"]["content"]["application/json"]
 >[number];
 
 export type CreatedTag = NonNullable<
-  paths["/api/prompts/tags"]["post"]["responses"]["201"]["content"]["application/json"]
+  paths["/api/v1/prompts/tags"]["post"]["responses"]["201"]["content"]["application/json"]
 >;
 
 /**
@@ -68,4 +66,3 @@ export enum FetchPolicy {
   /** Never fetch, use materialized files only */
   MATERIALIZED_ONLY = "MATERIALIZED_ONLY",
 }
-

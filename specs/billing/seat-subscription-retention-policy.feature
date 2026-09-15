@@ -82,3 +82,36 @@ Feature: Seat subscription provisions an organization retention policy
     Given an organization whose only active subscription is cancelled
     When the cancellation is finalized
     Then the organization-scoped retention policies are left in place
+
+  # seat-sync.service.ts, seat-event-subscription.service.ts, customer.service.ts,
+  # currency.service.ts, stripe-customer-currency.service.ts
+
+  @unit @unimplemented
+  Scenario: Adding a member raises the billed seat count
+    Given an organization billed for three seats
+    When a fourth member is added
+    Then Stripe is told the organization now holds four seats
+
+  @unit @unimplemented
+  Scenario: A seat sync for an organization with no subscription is a no-op
+    Given an organization that has never subscribed
+    When its seats are synced
+    Then nothing is sent to Stripe and no error reaches the caller
+
+  @unit @unimplemented
+  Scenario: A seat sync that Stripe rejects reports a named failure
+    Given an organization whose Stripe customer no longer exists
+    When its seats are synced
+    Then the sync fails with a handled error naming the missing customer, not an unknown error
+
+  @unit @unimplemented
+  Scenario: A customer in a euro country is created in euros
+    Given a new customer whose billing country uses the euro
+    When the Stripe customer is created
+    Then its currency is EUR and every later price is quoted in EUR
+
+  @unit @unimplemented
+  Scenario: An existing customer's currency is never rewritten
+    Given a Stripe customer already transacting in dollars
+    When the organization's billing country changes to a euro country
+    Then the customer keeps its dollar currency

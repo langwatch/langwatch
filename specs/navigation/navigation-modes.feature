@@ -28,6 +28,13 @@ Feature: Navigation modes
     Then the mode is "icon-rail"
 
   @integration
+  Scenario: The first client frame matches the server default and the stored mode applies after mount
+    Given my device stored a navigation mode before the first render
+    When the navigation mode hook renders for the first time
+    Then its first frame reports the server default, matching what the server rendered
+    And it reports the stored mode after mount
+
+  @integration
   Scenario: Garbage in storage counts as no stored choice
     Given my device stored "banana" as the navigation mode
     When the app shell reads the stored navigation mode

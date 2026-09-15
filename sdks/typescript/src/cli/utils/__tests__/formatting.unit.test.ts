@@ -148,10 +148,7 @@ describe("formatTable()", () => {
 
     it("pads columns to align with the longest value", () => {
       formatTable({
-        data: [
-          { Col: "short" },
-          { Col: "a longer value" },
-        ],
+        data: [{ Col: "short" }, { Col: "a longer value" }],
         headers: ["Col"],
       });
 

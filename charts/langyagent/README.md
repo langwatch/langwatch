@@ -110,10 +110,10 @@ Override the Secret/key names via `secrets.existingSecretName` and
 
 Both probes hit the manager's HTTP listener (port `8080`, named `http`):
 
-| Probe            | Endpoint  | Validates                                  |
-|------------------|-----------|--------------------------------------------|
-| `readinessProbe` | `/health` | Manager is accepting requests              |
-| `livenessProbe`  | `/health` | Manager process is responsive              |
+| Probe            | Endpoint  | Validates                     |
+| ---------------- | --------- | ----------------------------- |
+| `readinessProbe` | `/health` | Manager is accepting requests |
+| `livenessProbe`  | `/health` | Manager process is responsive |
 
 ## Scaling
 
@@ -150,7 +150,7 @@ anywhere. Adjust the selectors if your `langwatch-app` pod labels differ.
 `npm install`. When enabled, the `:443` rule denies `networkPolicy.privateExcept`
 (v4) and `networkPolicy.privateExceptV6` (v6) so a compromised worker cannot use
 public egress to reach internal services on `:443`. The v4 defaults include
-`100.64.0.0/10` (RFC 6598 CGNAT) because EKS *custom networking* / secondary
+`100.64.0.0/10` (RFC 6598 CGNAT) because EKS _custom networking_ / secondary
 CIDRs place pods — and sometimes nodes and the apiserver ENI — in that range,
 which the RFC1918 ranges do NOT cover. **If your service CIDR or a VPC CIDR lives
 outside RFC1918, append it to `privateExcept`.** The metadata service over plain

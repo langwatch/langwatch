@@ -1,0 +1,314 @@
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import type { Cluster, Redis } from "ioredis";
+import {
+  type MigrationCohort,
+  type MigrationPassSummary,
+  type SystemMigration,
+  SystemMigrationRunnerService,
+  runSystemMigrationsAtStartup,
+} from "@langwatch/system-migrations";
+import { createLogger } from "@langwatch/observability";
+import {
+  migrationRunsOnThisInstallation,
+  userMigrates,
+} from "../rules/ops-system-migration-cohort.rules.ts";
+import { NullOrganizationDataplaneAdapter } from "../services/null.organization-dataplane.service.ts";
+import type { OrganizationDataplaneResolver } from "./ops.app.ts";
+import { SystemMigrationCohortService } from "../services/system-migration-cohort.service.ts";
+import { PrismaMigrationMembershipRepository } from "../repositories/prisma/prisma.migration-membership.repository.ts";
+import { PrismaUserTenantSourceRepository } from "../repositories/prisma/prisma.user-tenant-source.repository.ts";
+import { RedisMigrationLeaseRepository } from "../repositories/redis/redis.migration-lease.repository.ts";
+import { PrismaOrganizationTenantSourceRepository } from "../repositories/prisma/prisma.organization-tenant-source.repository.ts";
+import { PrismaProjectTenantSourceRepository } from "../repositories/prisma/prisma.project-tenant-source.repository.ts";
+import { PrismaSystemMigrationEnrollmentRepository } from "../repositories/prisma/prisma.system-migration-enrollment.repository.ts";
+import { PrismaSystemMigrationStateRepository } from "../repositories/prisma/prisma.system-migration-state.repository.ts";
+
+const logger = createLogger("langwatch:ops:system-migrations:pass");
+
+export class UserStartupMigrationsUnsupportedError extends Error {
+  readonly migrationNames: readonly string[];
+
+  constructor(migrationNames: readonly string[]) {
+    super(
+      `User-rooted migrations cannot run in startup mode: ${migrationNames.join(", ")}. Run them in background mode.`,
+    );
+    this.name = "UserStartupMigrationsUnsupportedError";
+    this.migrationNames = migrationNames;
+  }
+}
+
+/** Both legs count into one summary: the convergence loop stops when a whole
+ *  pass moved nothing, so one leg still advancing has to keep it non-zero. */
+function mergeSummaries(a: MigrationPassSummary, b: MigrationPassSummary): MigrationPassSummary {
+  return {
+    tenantsSeen: a.tenantsSeen + b.tenantsSeen,
+    finalized: a.finalized + b.finalized,
+    held: a.held + b.held,
+    parked: a.parked + b.parked,
+    skipped: a.skipped + b.skipped,
+    alreadyFinalized: a.alreadyFinalized + b.alreadyFinalized,
+    alreadyRolledBack: a.alreadyRolledBack + b.alreadyRolledBack,
+    claimed: a.claimed + b.claimed,
+    advanced: a.advanced + b.advanced,
+    finiteHeld: (a.finiteHeld ?? 0) + (b.finiteHeld ?? 0),
+  };
+}
+
+export type OpsSystemMigrationsOptions = Readonly<{
+  database: PrismaClient;
+  redis: Redis | Cluster | null;
+  /** Cloud pacing is per-organization enrollment; self-hosted admits everyone. */
+  isSaaS: () => boolean;
+  /** The organization-rooted migrations this installation registered. */
+  migrations: () => readonly SystemMigration[];
+  tenantAxis?: "organization" | "project";
+  /**
+   * The USER-rooted migrations this installation registered (ADR-101 §6),
+   * driven as a second leg of the same pass over the same lease and state
+   * table. Admitted per user through organization membership.
+   */
+  userMigrations: () => readonly SystemMigration[];
+  /**
+   * The abandoned-newborn sweep (ADR-116 §3), on the pass's own cadence. A LEG
+   * rather than a registered migration, because what it hunts is a claim with
+   * no user row behind it - a tenant no source enumerates.
+   */
+  newbornSweep: () => Promise<unknown>;
+  /**
+   * Where each organization's data lives. Not a filter - a private data plane
+   * never holds an organization back - but a pass that admits one says which
+   * instance it landed on. Omitted, every organization reads as shared.
+   */
+  dataplane?: OrganizationDataplaneResolver;
+}>;
+
+/**
+ * Composes one migration pass over this feature's Prisma state, enrollment and
+ * tenant-source repositories and its Redis lease. Was main's
+ * `app-layer/system-migrations/runtime.ts`, minus the migration registry.
+ */
+export class OpsSystemMigrations {
+  static create(options: OpsSystemMigrationsOptions): OpsSystemMigrations {
+    return new OpsSystemMigrations(options);
+  }
+
+  private constructor(private readonly options: OpsSystemMigrationsOptions) {}
+
+  async runStartup({
+    signal,
+    maxPasses,
+    pollDelayMs,
+  }: {
+    signal?: AbortSignal;
+    maxPasses?: number;
+    pollDelayMs?: number;
+  } = {}): Promise<void> {
+    const isSaaS = this.options.isSaaS();
+    const startupUserMigrations = this.released({
+      migrations: this.options.userMigrations(),
+      isSaaS,
+    }).filter((migration) => (migration.executionMode ?? "background") === "startup");
+    if (startupUserMigrations.length > 0) {
+      throw new UserStartupMigrationsUnsupportedError(
+        startupUserMigrations.map((migration) => migration.name),
+      );
+    }
+
+    const organization = await this.organizationRunner({
+      isSaaS,
+      executionMode: "startup",
+    });
+    await runSystemMigrationsAtStartup({
+      runPass: ({ signal: passSignal }) => organization.runner.runPass({ signal: passSignal }),
+      state: organization.state,
+      tenants: organization.tenants,
+      migrations: organization.migrations,
+      cohort: organization.cohort,
+      signal,
+      maxPasses,
+      pollDelayMs,
+    });
+  }
+
+  async runPass({ signal }: { signal?: AbortSignal }): Promise<MigrationPassSummary> {
+    const isSaaS = this.options.isSaaS();
+    const enrollments = PrismaSystemMigrationEnrollmentRepository.create({
+      prisma: this.options.database,
+    });
+
+    const organization = await this.organizationRunner({ isSaaS, enrollments });
+    const userMigrations = this.released({ migrations: this.options.userMigrations(), isSaaS });
+    // Both legs' cohorts resolve BEFORE either pass starts, so the two legs
+    // read enrollment at the same moment: an operator enrolling mid-pass moves
+    // both legs on the next pass, never one leg now and the other later.
+    const userCohort =
+      userMigrations.length === 0
+        ? null
+        : await this.userCohort({ isSaaS, enrollments, migrations: userMigrations });
+
+    const summary = await organization.runner.runPass({ signal });
+
+    const merged =
+      userCohort === null
+        ? summary
+        : mergeSummaries(
+            summary,
+            await new SystemMigrationRunnerService({
+              state: organization.state,
+              lease: organization.lease,
+              tenants: PrismaUserTenantSourceRepository.create({ prisma: this.options.database }),
+              cohort: userCohort,
+              migrations: userMigrations,
+            }).runPass({ signal }),
+          );
+
+    await this.sweepAbandonedNewborns();
+    return merged;
+  }
+
+  private async organizationRunner({
+    isSaaS,
+    enrollments = PrismaSystemMigrationEnrollmentRepository.create({
+      prisma: this.options.database,
+    }),
+    executionMode,
+  }: {
+    isSaaS: boolean;
+    enrollments?: PrismaSystemMigrationEnrollmentRepository;
+    executionMode?: "background" | "startup";
+  }) {
+    const state = PrismaSystemMigrationStateRepository.create({ prisma: this.options.database });
+    const lease = RedisMigrationLeaseRepository.create({ redis: this.options.redis });
+    const migrations = this.released({ migrations: this.options.migrations(), isSaaS }).filter(
+      (migration) =>
+        executionMode === void 0 || (migration.executionMode ?? "background") === executionMode,
+    );
+    const organizationCohort = await this.cohort({ isSaaS, enrollments, migrations });
+    const projectTenants =
+      this.options.tenantAxis === "project"
+        ? PrismaProjectTenantSourceRepository.create(this.options.database)
+        : null;
+    const cohort: MigrationCohort =
+      projectTenants && isSaaS
+        ? async ({ tenantId, migrationName }) =>
+            organizationCohort({
+              tenantId: await projectTenants.getOrganizationId(tenantId),
+              migrationName,
+            })
+        : organizationCohort;
+    const tenants =
+      projectTenants ??
+      PrismaOrganizationTenantSourceRepository.create({
+        prisma: this.options.database,
+      });
+    return {
+      state,
+      lease,
+      tenants,
+      migrations,
+      cohort,
+      runner: new SystemMigrationRunnerService({ state, lease, tenants, cohort, migrations }),
+    };
+  }
+
+  /**
+   * The user-rooted leg's cohort. Enrollment is read once, fresh, at the start
+   * of the pass; membership is answered per candidate user against the
+   * enrolled organizations only.
+   */
+  async userCohort({
+    isSaaS,
+    enrollments,
+    migrations,
+  }: {
+    isSaaS: boolean;
+    enrollments: PrismaSystemMigrationEnrollmentRepository;
+    migrations: readonly SystemMigration[];
+  }): Promise<MigrationCohort> {
+    const automatic = new Set(
+      migrations.filter((one) => one.enrolledAutomatically).map((one) => one.name),
+    );
+    const memberships = PrismaMigrationMembershipRepository.create({
+      prisma: this.options.database,
+    });
+    const enrolled = isSaaS
+      ? await enrollments.findEnrolledOrganizationIdsByMigration()
+      : new Map<string, Set<string>>();
+    return async ({ tenantId, migrationName }) => {
+      const enrolledAutomatically = automatic.has(migrationName);
+      const organizationIds = [...(enrolled.get(migrationName) ?? [])];
+      const memberOfEnrolledOrganization =
+        isSaaS && !enrolledAutomatically && organizationIds.length > 0
+          ? await memberships.isMemberOfAny({ userId: tenantId, organizationIds })
+          : false;
+      return userMigrates({ isSaaS, enrolledAutomatically, memberOfEnrolledOrganization });
+    };
+  }
+
+  /**
+   * Never terminal: the sweep removes rows the pass did not write, so a pass
+   * that reported nothing because a sweep threw would hide the migration
+   * outcome an operator asked for.
+   */
+  private async sweepAbandonedNewborns(): Promise<void> {
+    try {
+      await this.options.newbornSweep();
+    } catch (error) {
+      logger.warn(
+        { error },
+        "the abandoned-newborn sweep failed; the claims stay and the next pass retries",
+      );
+    }
+  }
+
+  /** Self-hosted drives only the migrations already released for it. */
+  private released({
+    migrations,
+    isSaaS,
+  }: {
+    migrations: readonly SystemMigration[];
+    isSaaS: boolean;
+  }): readonly SystemMigration[] {
+    return migrations.filter((migration) =>
+      migrationRunsOnThisInstallation({
+        isSaaS,
+        runsAutomaticallyOnSelfHosted: migration.runsAutomaticallyOnSelfHosted,
+      }),
+    );
+  }
+
+  /**
+   * Read once, fresh, at the start of the run rather than per tenant: one
+   * query instead of one per tenant per migration. Self-hosted never reads
+   * enrollment at all - there is nothing to pace.
+   */
+  private async cohort({
+    isSaaS,
+    enrollments,
+    migrations,
+  }: {
+    isSaaS: boolean;
+    enrollments: PrismaSystemMigrationEnrollmentRepository;
+    migrations: readonly SystemMigration[];
+  }): Promise<(args: { tenantId: string; migrationName: string }) => boolean> {
+    const enrolled = isSaaS
+      ? await enrollments.findEnrolledOrganizationIdsByMigration()
+      : new Map<string, Set<string>>();
+    const cohort = SystemMigrationCohortService.create({
+      isSaaS,
+      enrolled,
+      migrations,
+      dataplane: this.options.dataplane ?? NullOrganizationDataplaneAdapter.create(),
+    });
+    return ({ tenantId, migrationName }) => {
+      const admission = cohort.admits({ organizationId: tenantId, migrationName });
+      if (admission.admitted && admission.dataplane.kind === "private") {
+        logger.debug(
+          { migrationName, organizationId: tenantId, endpoint: admission.dataplane.endpoint },
+          "organization with a dedicated data plane is in this migration's cohort",
+        );
+      }
+      return admission.admitted;
+    };
+  }
+}

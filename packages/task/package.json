@@ -1,0 +1,34 @@
+{
+  "name": "@langwatch/task",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The task interface: an abstract Task, a catalogue that resolves one by name, a launcher that runs it to an exit code, and the TaskHostPort a task uses to reach infrastructure that might not be there.",
+  "license": "MIT",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "pnpm -w typecheck:declarations --project . && tsc --noEmit -p .",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@langwatch/handled-error": "workspace:*",
+    "@langwatch/observability": "workspace:*",
+    "@langwatch/time": "workspace:*",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

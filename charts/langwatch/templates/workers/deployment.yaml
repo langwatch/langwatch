@@ -130,9 +130,9 @@ spec:
             {{- include "langwatch.containerSecurityContext" (dict "ctx" . "component" .Values.workers) | nindent 12 }}
           image: "{{ .Values.images.app.repository }}:{{ .Values.images.app.tag }}"
           imagePullPolicy: "{{ .Values.images.app.pullPolicy }}"
-          workingDir: /app/platform/app
+          workingDir: /app/apps/worker
           command: ['pnpm']
-          args: ['run', 'start:workers']
+          args: ['run', 'start']
           env:
             {{- include "langwatch.sharedEnv" . | nindent 12 }}
             {{- include "langwatch.shutdownEnv" (dict "component" .Values.workers "name" "workers") | nindent 12 }}
@@ -148,8 +148,8 @@ spec:
             {{- /* Langy turns are dispatched from HERE, not from the app: the
                    process outbox in the event-sourcing runtime POSTs the turn to
                    the Go manager and the liveness subscriber re-drives a stalled
-                   one (see startWorkers.ts, "Langy turns self-drive"). Both run
-                   in the worker stack, so a workers pod without this pair builds
+                   one (see apps/worker's langy conversation composition). Both
+                   run in the worker process, so a workers pod without this pair builds
                    its Langy port with an empty URL and every turn dies where no
                    one is looking — the app pod, which HAS the pair, never makes
                    that call. Same Secret and same Service as the app block. */}}

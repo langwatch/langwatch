@@ -1,0 +1,36 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "declaration": false,
+    "emitDeclarationOnly": false,
+    "noEmit": true,
+    "tsBuildInfoFile": "dist/tsconfig.tests.tsbuildinfo",
+    "types": ["node", "vitest/globals"]
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": [],
+
+  "references": [
+    {
+      "path": "tsconfig.build.json"
+    },
+    {
+      "path": "../group-queue/tsconfig.build.json"
+    },
+    {
+      "path": "../handled-error/tsconfig.build.json"
+    },
+    {
+      "path": "../observability/tsconfig.build.json"
+    },
+    {
+      "path": "../prisma-client/tsconfig.build.json"
+    },
+    {
+      "path": "../test-harness/tsconfig.build.json"
+    },
+    {
+      "path": "../time/tsconfig.build.json"
+    }
+  ]
+}

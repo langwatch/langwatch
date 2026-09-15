@@ -19,9 +19,7 @@ export async function handleSearchTraces(params: {
   format?: "digest" | "json";
 }): Promise<string> {
   const now = Date.now();
-  const startDate = params.startDate
-    ? parseRelativeDate(params.startDate)
-    : now - 86400000;
+  const startDate = params.startDate ? parseRelativeDate(params.startDate) : now - 86400000;
   const endDate = params.endDate ? parseRelativeDate(params.endDate) : now;
   const format = params.format ?? "digest";
 
@@ -45,9 +43,7 @@ export async function handleSearchTraces(params: {
   }
 
   const lines: string[] = [];
-  lines.push(
-    `Found ${result.pagination?.totalHits ?? traces.length} traces:\n`
-  );
+  lines.push(`Found ${result.pagination?.totalHits ?? traces.length} traces:\n`);
 
   for (const trace of traces) {
     lines.push(`### Trace: ${trace.trace_id}`);
@@ -55,18 +51,10 @@ export async function handleSearchTraces(params: {
     if (trace.formatted_trace) {
       lines.push(trace.formatted_trace);
     } else {
-      const inputStr = trace.input?.value
-        ? String(trace.input.value)
-        : "N/A";
-      const outputStr = trace.output?.value
-        ? String(trace.output.value)
-        : "N/A";
-      lines.push(
-        `- **Input**: ${inputStr.slice(0, 100)}${inputStr.length > 100 ? "..." : ""}`
-      );
-      lines.push(
-        `- **Output**: ${outputStr.slice(0, 100)}${outputStr.length > 100 ? "..." : ""}`
-      );
+      const inputStr = trace.input?.value ? String(trace.input.value) : "N/A";
+      const outputStr = trace.output?.value ? String(trace.output.value) : "N/A";
+      lines.push(`- **Input**: ${inputStr.slice(0, 100)}${inputStr.length > 100 ? "..." : ""}`);
+      lines.push(`- **Output**: ${outputStr.slice(0, 100)}${outputStr.length > 100 ? "..." : ""}`);
     }
 
     if (trace.timestamps) {
@@ -83,12 +71,12 @@ export async function handleSearchTraces(params: {
 
   if (result.pagination?.scrollId) {
     lines.push(
-      `\n**More results available.** Use scrollId: "${result.pagination.scrollId}" to get next page.`
+      `\n**More results available.** Use scrollId: "${result.pagination.scrollId}" to get next page.`,
     );
   }
 
   lines.push(
-    '\n> Tip: Use `get_trace` with a trace_id for full details. Use `search_traces` with `format: "json"` for raw data. Use `discover_schema` to see available filter fields.'
+    '\n> Tip: Use `get_trace` with a trace_id for full details. Use `search_traces` with `format: "json"` for raw data. Use `discover_schema` to see available filter fields.',
   );
 
   return lines.join("\n");

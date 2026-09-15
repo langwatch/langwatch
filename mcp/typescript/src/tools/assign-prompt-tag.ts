@@ -5,7 +5,11 @@ export async function handleAssignPromptTag(params: {
   tag: string;
   versionId: string;
 }): Promise<string> {
-  await apiAssignPromptTag({ idOrHandle: params.idOrHandle, tag: params.tag, versionId: params.versionId });
+  await apiAssignPromptTag({
+    idOrHandle: params.idOrHandle,
+    tag: params.tag,
+    versionId: params.versionId,
+  });
 
   const lines: string[] = [];
   lines.push("Tag assigned successfully!\n");

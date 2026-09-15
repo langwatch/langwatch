@@ -49,10 +49,10 @@ Feature: make quickstart is the single dev environment entry point with intent-b
   # --- Default = fastest path (#3860 AC#3) ---
 
   @unit
-  Scenario: frontend-only pins host-side Redis for in-process workers, no other compose
+  Scenario: frontend-only pins host-side Redis for the worker lane, no other compose
     When write_overrides is called with mode=frontend-only
-    Then platform/app/.env.dev-up contains NEXTAUTH_PROVIDER=email
-    And REDIS_URL pointing at localhost:6379 (for the in-process workers)
+    Then .env.dev-up contains NEXTAUTH_PROVIDER=email
+    And REDIS_URL pointing at localhost:6379 (for the host-side worker lane)
     And it does NOT override DATABASE_URL, CLICKHOUSE_URL, or LANGWATCH_NLP_SERVICE
 
   @integration @unimplemented
@@ -61,7 +61,7 @@ Feature: make quickstart is the single dev environment entry point with intent-b
     Then the command completes in under 5 seconds with a hint to run "pnpm dev"
 
   # --- Host-Redis verification before reuse (#5143, CodeRabbit 4579126710) ---
-  # frontend-only runs the workers in-process under `pnpm dev`, so it
+  # frontend-only runs the worker lane on the host under `pnpm dev`, so it
   # needs a usable local Redis on host :6379. A bare port-in-use check is not
   # enough — the listener might be a non-Redis process or a Redis that needs
   # auth/TLS. dev.sh verifies the listener with `redis-cli ... ping` (PONG)
@@ -91,7 +91,7 @@ Feature: make quickstart is the single dev environment entry point with intent-b
   Scenario: frontend-only reuses a verified usable Redis without starting a container
     Given host port 6379 is in use and the listener verifies as a usable Redis
     When run_frontend_only runs
-    Then it reuses the existing Redis for the in-process workers
+    Then it reuses the existing Redis for the worker lane
     And it does not start a redis compose container
 
   @unit
@@ -105,7 +105,7 @@ Feature: make quickstart is the single dev environment entry point with intent-b
   Scenario: frontend-only starts its own redis container when 6379 is free
     Given host port 6379 is free
     When run_frontend_only runs
-    Then it starts its own redis compose container for the in-process workers
+    Then it starts its own redis compose container for the worker lane
 
   # --- Container presets reuse their own running redis (#5213) ---
   # Container presets (all-local, all-local-nlp, dev-storage, full-local) start a
@@ -168,7 +168,7 @@ Feature: make quickstart is the single dev environment entry point with intent-b
   @unit
   Scenario: all-local overrides only DATABASE_URL, REDIS_URL, CLICKHOUSE_URL
     When write_overrides is called with mode=all-local
-    Then platform/app/.env.dev-up contains DATABASE_URL pointing at postgres:5432
+    Then .env.dev-up contains DATABASE_URL pointing at postgres:5432
     And REDIS_URL pointing at redis:6379
     And CLICKHOUSE_URL pointing at clickhouse:8123
     And it does NOT contain LANGWATCH_NLP_SERVICE or LANGEVALS_ENDPOINT
@@ -194,16 +194,16 @@ Feature: make quickstart is the single dev environment entry point with intent-b
 
   @unit @unimplemented
   Scenario: contributor's .env is the source of truth for non-overridden values
-    Given platform/app/.env defines OPENAI_API_KEY and LANGWATCH_NLP_SERVICE
+    Given .env defines OPENAI_API_KEY and LANGWATCH_NLP_SERVICE
     When I run "make quickstart all-local"
     Then OPENAI_API_KEY in the running container is the value from .env
     And LANGWATCH_NLP_SERVICE is the value from .env (no override for this mode)
 
   @unit
-  Scenario: write_overrides replaces platform/app/.env.dev-up — does not append
+  Scenario: write_overrides replaces .env.dev-up — does not append
     Given a previous run wrote all-local overrides
     When write_overrides runs again with mode=frontend-only
-    Then platform/app/.env.dev-up no longer contains DATABASE_URL
+    Then .env.dev-up no longer contains DATABASE_URL
     And it contains the frontend-only overrides NEXTAUTH_PROVIDER and REDIS_URL pointing at localhost:6379
     And the previous all-local REDIS_URL (redis:6379) was replaced, not appended
 
@@ -242,8 +242,8 @@ Feature: make quickstart is the single dev environment entry point with intent-b
   # --- Fail-fast + idempotency (#3860 AC#7) ---
 
   @unit @unimplemented
-  Scenario: quickstart errors when platform/app/.env has IS_SAAS=true with BLOCK_LOCAL_HTTP_CALLS=false
-    Given platform/app/.env contains IS_SAAS=true and BLOCK_LOCAL_HTTP_CALLS=false
+  Scenario: quickstart errors when .env has IS_SAAS=true with BLOCK_LOCAL_HTTP_CALLS=false
+    Given .env contains IS_SAAS=true and BLOCK_LOCAL_HTTP_CALLS=false
     When I run "make quickstart all-local"
     Then quickstart exits non-zero with a SSRF-guard error message
 

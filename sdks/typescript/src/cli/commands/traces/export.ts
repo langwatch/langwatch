@@ -1,15 +1,15 @@
 import { scopedApiKey } from "@/internal/credentialContext";
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
+import { createSpinner } from "../../utils/spinner.ts";
 import fs from "fs";
-import { resolveCredentials } from "../../utils/apiKey";
-import { formatFetchError } from "../../utils/formatFetchError";
-import { failSpinner } from "../../utils/spinnerError";
-import { createCommandEvents, type CommandEvents } from "../../telemetry/events";
-import { cliAuthHeaders } from "../../utils/authHeaders";
+import { resolveCredentials } from "../../utils/apiKey.ts";
+import { formatFetchError } from "../../utils/formatFetchError.ts";
+import { failSpinner } from "../../utils/spinnerError.ts";
+import { createCommandEvents, type CommandEvents } from "../../telemetry/events.ts";
+import { cliAuthHeaders } from "../../utils/authHeaders.ts";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
-import { parseOriginOption } from "./origin-filter";
+import { parseOriginOption } from "./origin-filter.ts";
 import { langwatchFetch } from "@/internal/http/langwatchFetch";
 
 /** Rows are serialised in chunks so the progress bar moves as the file is built. */
@@ -23,10 +23,9 @@ const PROGRESS_CHUNK = 25;
 const SERVER_PAGE_CAP = 1000;
 
 /**
- * Page size used when spans are requested. Each coding-agent trace's spans
- * are joined with a bounded but heavy per-trace log read server-side, so the
- * CLI asks for smaller pages and lets the cursor walk cover the rest — same
- * total work, no long single request.
+ * Page size used when spans are requested. Each coding-agent trace's spans are joined with
+ * a bounded but heavy per-trace log read server-side, so the CLI asks for smaller pages
+ * and lets the cursor walk cover the rest — same total work, no long single request.
  */
 const SPANS_PAGE_CAP = 200;
 
@@ -84,16 +83,12 @@ export const exportTracesCommand = async (options: {
   const startDate = options.startDate
     ? new Date(options.startDate).getTime()
     : now - 7 * 24 * 60 * 60 * 1000; // 7 days ago
-  const endDate = options.endDate
-    ? new Date(options.endDate).getTime()
-    : now;
+  const endDate = options.endDate ? new Date(options.endDate).getTime() : now;
 
   const limit = options.limit ? Number(options.limit) : 1000;
   if (!Number.isSafeInteger(limit) || limit <= 0) {
     console.error(
-      chalk.red(
-        `Error: --limit must be a positive whole number, got "${options.limit}"`,
-      ),
+      chalk.red(`Error: --limit must be a positive whole number, got "${options.limit}"`),
     );
     process.exit(1);
   }
@@ -123,7 +118,7 @@ export const exportTracesCommand = async (options: {
         options.includeSpans ? SPANS_PAGE_CAP : SERVER_PAGE_CAP,
       );
 
-      const response = await langwatchFetch(`${endpoint}/api/traces/search`, {
+      const response = await langwatchFetch(`${endpoint}/api/v1/traces/search`, {
         method: "POST",
         signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
         headers: {
@@ -189,7 +184,9 @@ export const exportTracesCommand = async (options: {
       if (!scrollId || exhausted || traces.length >= limit) break;
     }
 
-    spinner.succeed(`Exported ${traces.length} trace${traces.length !== 1 ? "s" : ""}${matched > traces.length ? ` (${matched} total)` : ""}`);
+    spinner.succeed(
+      `Exported ${traces.length} trace${traces.length !== 1 ? "s" : ""}${matched > traces.length ? ` (${matched} total)` : ""}`,
+    );
 
     // Serialising each trace is real per-row work, so this progress is genuinely
     // the file being built — not a bar invented for the sake of having one.
@@ -275,22 +272,14 @@ const serialise = ({
   return [CSV_HEADERS.join(","), ...lines].join("\n") + "\n";
 };
 
-const serialiseTrace = ({
-  trace,
-  format,
-}: {
-  trace: ExportedTrace;
-  format: string;
-}): string => {
+const serialiseTrace = ({ trace, format }: { trace: ExportedTrace; format: string }): string => {
   if (format !== "csv") return JSON.stringify(trace);
 
   return [
     trace.trace_id,
     csvEscape(trace.input?.value ?? ""),
     csvEscape(trace.output?.value ?? ""),
-    trace.timestamps?.started_at
-      ? new Date(trace.timestamps.started_at).toISOString()
-      : "",
+    trace.timestamps?.started_at ? new Date(trace.timestamps.started_at).toISOString() : "",
     trace.error ? csvEscape(JSON.stringify(trace.error)) : "",
     csvNumber(trace.metrics?.prompt_tokens),
     csvNumber(trace.metrics?.completion_tokens),

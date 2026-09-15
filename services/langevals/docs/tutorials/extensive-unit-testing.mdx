@@ -6,7 +6,9 @@ Welcome to the Extensive Unit Testing tutorial. This guide will explain how to c
 Our first example use case will focus on the [**Entity Extraction**](https://en.wikipedia.org/wiki/Named-entity_recognition) task. Imagine you have a list of addresses in unstructured text format, and you want to use an LLM to transform it into a spreadsheet. There are many questions you might have, such as which model to choose, how to determine the best model, and how often the model fails to produce the expected results.
 
 ## Prepare the Data
+
 The first step is to model our data using a Pydantic schema. This helps validate and structure the data, making it easier to serialize entries into JSON strings later.
+
 ```python
 from pydantic import BaseModel
 
@@ -18,6 +20,7 @@ class Address(BaseModel):
 ```
 
 Once we have modeled our data format, we can create a small dataset with three examples.
+
 ```python
 import pandas as pd
 
@@ -48,8 +51,11 @@ entries = pd.DataFrame(
     }
 )
 ```
+
 In this example `entries` is a [Pandas DataFrame](https://pandas.pydata.org/docs/reference/api/pandas.DataFrame.html) object with two columns: input and expected_output. The expected_output column contains the expected results, which we will use to compare with the model’s responses during evaluation.
+
 ## Evaluate different models
+
 Now we can start our tests. Let’s compare different models. We define an array with the models we’re interested in and create a litellm client to perform the API calls to these models. Next, we create a test function and annotate it with `@pytest`.
 
 Our test function calls the LLM with `entry.input` and compares the response with `entry.expected_output`.
@@ -79,9 +85,11 @@ def test_extracts_the_right_address(entry, model):
     assert address.model_dump_json() == entry.expected_output
 
 ```
+
 In this test we leverage `@pytest.mark.parametrize` to run the same test function with different parameters. Using itertools.product, we pair each model with each entry, resulting in 9 different test cases.
 
 Wow, right? Now you can see how each model performs on a larger scale.
+
 <AccordionGroup>
 <Accordion title="Example Test Output">
 At the example test output we can see that `groq/llama3-70b-8192` underperforms on this particular task.
@@ -105,17 +113,19 @@ model = 'groq/llama3-70b-8192'
         )
 
 >       assert address.model_dump_json() == entry.expected_output
-E       assert '{"number":12..."country":""}' == '{"number":12...untry":"USA"}'
-E
-E         Skipping 60 identical leading characters in diff, use -v to show
-E         - country":"USA"}
-E         ?           ---
-E         + country":""}
-...
-FAILED t_25254c19b35c4a58a520690924724e02.py::test_extracts_the_right_address[entry2-groq/llama3-70b-8192] - assert '{"number":12..."country":""}' == '{"number":12...untry":"USA"}'
-FAILED t_25254c19b35c4a58a520690924724e02.py::test_extracts_the_right_address[entry5-groq/llama3-70b-8192] - assert '{"number":56..."country":""}' == '{"number":56...ry":"France"}'
-FAILED t_25254c19b35c4a58a520690924724e02.py::test_extracts_the_right_address[entry8-groq/llama3-70b-8192] - assert '{"number":90..."country":""}' == '{"number":90...ry":"Brazil"}'
-```
+>
+> E assert '{"number":12..."country":""}' == '{"number":12...untry":"USA"}'
+> E
+> E Skipping 60 identical leading characters in diff, use -v to show
+> E - country":"USA"}
+> E ? ---
+> E + country":""}
+> ...
+> FAILED t_25254c19b35c4a58a520690924724e02.py::test_extracts_the_right_address[entry2-groq/llama3-70b-8192] - assert '{"number":12..."country":""}' == '{"number":12...untry":"USA"}'
+> FAILED t_25254c19b35c4a58a520690924724e02.py::test_extracts_the_right_address[entry5-groq/llama3-70b-8192] - assert '{"number":56..."country":""}' == '{"number":56...ry":"France"}'
+> FAILED t_25254c19b35c4a58a520690924724e02.py::test_extracts_the_right_address[entry8-groq/llama3-70b-8192] - assert '{"number":90..."country":""}' == '{"number":90...ry":"Brazil"}'
+
+````
 </Accordion>
 </AccordionGroup>
 
@@ -135,8 +145,10 @@ def test_extracts_the_right_address(entry, model):
     )
 
     assert address.model_dump_json() == entry.expected_output
-```
+````
+
 In this example we added the second `@pytest` decorator that allows the test result to be a PASS even if only 60% of the tests are successful. For instance, if the LLM sometimes returns “United States” instead of “USA”, we can still consider it a pass if it meets our acceptable level of uncertainty.
+
 <AccordionGroup>
 <Accordion title="Example Test Output">
 In this example, 3 test runs failed (same as in the previous output), marked with `x`. Despite the failures, the overall test suite passes because the `pass_rate` is set to 0.6, and 6 out of 9 tests passed.
@@ -156,8 +168,8 @@ t_25254c19b35c4a58a520690924724e02.py::test_extracts_the_right_address[entry5-gr
 t_25254c19b35c4a58a520690924724e02.py::test_extracts_the_right_address[entry6-gpt-3.5-turbo]
 t_25254c19b35c4a58a520690924724e02.py::test_extracts_the_right_address[entry7-gpt-4-turbo]
 t_25254c19b35c4a58a520690924724e02.py::test_extracts_the_right_address[entry8-groq/llama3-70b-8192]
-  /Users/zhenyabudnyk/DevProjects/langwatch-saas/langevals/notebooks/.venv/lib/python3.12/site-packages/instructor/process_response.py:222: DeprecationWarning: FUNCTIONS is deprecated and will be removed in future versions
-    if mode == Mode.FUNCTIONS:
+/Users/zhenyabudnyk/DevProjects/langwatch-saas/langevals/notebooks/.venv/lib/python3.12/site-packages/instructor/process_response.py:222: DeprecationWarning: FUNCTIONS is deprecated and will be removed in future versions
+if mode == Mode.FUNCTIONS:
 
 t_25254c19b35c4a58a520690924724e02.py::test_extracts_the_right_address[entry0-gpt-3.5-turbo]
 t_25254c19b35c4a58a520690924724e02.py::test_extracts_the_right_address[entry1-gpt-4-turbo]
@@ -167,11 +179,12 @@ t_25254c19b35c4a58a520690924724e02.py::test_extracts_the_right_address[entry4-gp
 t_25254c19b35c4a58a520690924724e02.py::test_extracts_the_right_address[entry5-groq/llama3-70b-8192]
 t_25254c19b35c4a58a520690924724e02.py::test_extracts_the_right_address[entry6-gpt-3.5-turbo]
 ...
-	[<TracebackEntry /Users/zhenyabudnyk/DevProjects/langwatch-saas/langevals/notebooks/.venv/lib/python3.12/site-packages/_pytest/runner.py:341>, <TracebackEntry /Users/zhenyabudnyk/DevProjects/langwatch-saas/langevals/notebooks/.venv/lib/python3.12/site-packages/flaky/flaky_pytest_plugin.py:146>, <TracebackEntry /Users/zhenyabudnyk/DevProjects/langwatch-saas/langevals/notebooks/.venv/lib/python3.12/site-packages/pluggy/_hooks.py:513>, <TracebackEntry /Users/zhenyabudnyk/DevProjects/langwatch-saas/langevals/notebooks/.venv/lib/python3.12/site-packages/pluggy/_manager.py:120>, <TracebackEntry /Users/zhenyabudnyk/DevProjects/langwatch-saas/langevals/notebooks/.venv/lib/python3.12/site-packages/pluggy/_callers.py:139>, <TracebackEntry /Users/zhenyabudnyk/DevProjects/langwatch-saas/langevals/notebooks/.venv/lib/python3.12/site-packages/pluggy/_callers.py:122>, <TracebackEntry /Users/zhenyabudnyk/DevProjects/langwatch-saas/langevals/notebooks/.venv/lib/python3.12/site-packages/_pytest/threadexception.py:87>, <TracebackEntry /Users/zhenyabudnyk/DevProjects/langwatch-saas/langevals/notebooks/.venv/lib/python3.12/site-packages/_pytest/threadexception.py:63>, <TracebackEntry /Users/zhenyabudnyk/DevProjects/langwatch-saas/langevals/notebooks/.venv/lib/python3.12/site-packages/pluggy/_callers.py:122>, <TracebackEntry /Users/zhenyabudnyk/DevProjects/langwatch-saas/langevals/notebooks/.venv/lib/python3.12/site-packages/_pytest/unraisableexception.py:90>, <TracebackEntry /Users/zhenyabudnyk/DevProjects/langwatch-saas/langevals/notebooks/.venv/lib/python3.12/site-packages/_pytest/unraisableexception.py:65>, <TracebackEntry /Users/zhenyabudnyk/DevProjects/langwatch-saas/langevals/notebooks/.venv/lib/python3.12/site-packages/pluggy/_callers.py:122>, <TracebackEntry /Users/zhenyabudnyk/DevProjects/langwatch-saas/langevals/notebooks/.venv/lib/python3.12/site-packages/_pytest/logging.py:850>, <TracebackEntry /Users/zhenyabudnyk/DevProjects/langwatch-saas/langevals/notebooks/.venv/lib/python3.12/site-packages/_pytest/logging.py:833>, <TracebackEntry /Users/zhenyabudnyk/DevProjects/langwatch-saas/langevals/notebooks/.venv/lib/python3.12/site-packages/pluggy/_callers.py:122>, <TracebackEntry /Users/zhenyabudnyk/DevProjects/langwatch-saas/langevals/notebooks/.venv/lib/python3.12/site-packages/_pytest/capture.py:878>, <TracebackEntry /Users/zhenyabudnyk/DevProjects/langwatch-saas/langevals/notebooks/.venv/lib/python3.12/site-packages/pluggy/_callers.py:122>, <TracebackEntry /Users/zhenyabudnyk/DevProjects/langwatch-saas/langevals/notebooks/.venv/lib/python3.12/site-packages/_pytest/skipping.py:257>, <TracebackEntry /Users/zhenyabudnyk/DevProjects/langwatch-saas/langevals/notebooks/.venv/lib/python3.12/site-packages/pluggy/_callers.py:103>, <TracebackEntry /Users/zhenyabudnyk/DevProjects/langwatch-saas/langevals/notebooks/.venv/lib/python3.12/site-packages/_pytest/runner.py:183>, <TracebackEntry /Users/zhenyabudnyk/DevProjects/langwatch-saas/langevals/notebooks/.venv/lib/python3.12/site-packages/_pytest/runner.py:173>, <TracebackEntry /Users/zhenyabudnyk/DevProjects/langwatch-saas/langevals/notebooks/.venv/lib/python3.12/site-packages/_pytest/python.py:1632>, <TracebackEntry /Users/zhenyabudnyk/DevProjects/langwatch-saas/langevals/notebooks/.venv/lib/python3.12/site-packages/pluggy/_hooks.py:513>, <TracebackEntry /Users/zhenyabudnyk/DevProjects/langwatch-saas/langevals/notebooks/.venv/lib/python3.12/site-packages/pluggy/_manager.py:120>, <TracebackEntry /Users/zhenyabudnyk/DevProjects/langwatch-saas/langevals/notebooks/.venv/lib/python3.12/site-packages/pluggy/_callers.py:139>, <TracebackEntry /Users/zhenyabudnyk/DevProjects/langwatch-saas/langevals/notebooks/.venv/lib/python3.12/site-packages/pluggy/_callers.py:103>, <TracebackEntry /Users/zhenyabudnyk/DevProjects/langwatch-saas/langevals/notebooks/.venv/lib/python3.12/site-packages/_pytest/python.py:162>, <TracebackEntry /var/folders/pj/64p7tp0s5rbc57h_h3qdws4c0000gn/T/ipykernel_12166/4222739897.py:64>]
+[<TracebackEntry /Users/zhenyabudnyk/DevProjects/langwatch-saas/langevals/notebooks/.venv/lib/python3.12/site-packages/_pytest/runner.py:341>, <TracebackEntry /Users/zhenyabudnyk/DevProjects/langwatch-saas/langevals/notebooks/.venv/lib/python3.12/site-packages/flaky/flaky_pytest_plugin.py:146>, <TracebackEntry /Users/zhenyabudnyk/DevProjects/langwatch-saas/langevals/notebooks/.venv/lib/python3.12/site-packages/pluggy/_hooks.py:513>, <TracebackEntry /Users/zhenyabudnyk/DevProjects/langwatch-saas/langevals/notebooks/.venv/lib/python3.12/site-packages/pluggy/_manager.py:120>, <TracebackEntry /Users/zhenyabudnyk/DevProjects/langwatch-saas/langevals/notebooks/.venv/lib/python3.12/site-packages/pluggy/_callers.py:139>, <TracebackEntry /Users/zhenyabudnyk/DevProjects/langwatch-saas/langevals/notebooks/.venv/lib/python3.12/site-packages/pluggy/_callers.py:122>, <TracebackEntry /Users/zhenyabudnyk/DevProjects/langwatch-saas/langevals/notebooks/.venv/lib/python3.12/site-packages/_pytest/threadexception.py:87>, <TracebackEntry /Users/zhenyabudnyk/DevProjects/langwatch-saas/langevals/notebooks/.venv/lib/python3.12/site-packages/_pytest/threadexception.py:63>, <TracebackEntry /Users/zhenyabudnyk/DevProjects/langwatch-saas/langevals/notebooks/.venv/lib/python3.12/site-packages/pluggy/_callers.py:122>, <TracebackEntry /Users/zhenyabudnyk/DevProjects/langwatch-saas/langevals/notebooks/.venv/lib/python3.12/site-packages/_pytest/unraisableexception.py:90>, <TracebackEntry /Users/zhenyabudnyk/DevProjects/langwatch-saas/langevals/notebooks/.venv/lib/python3.12/site-packages/_pytest/unraisableexception.py:65>, <TracebackEntry /Users/zhenyabudnyk/DevProjects/langwatch-saas/langevals/notebooks/.venv/lib/python3.12/site-packages/pluggy/_callers.py:122>, <TracebackEntry /Users/zhenyabudnyk/DevProjects/langwatch-saas/langevals/notebooks/.venv/lib/python3.12/site-packages/_pytest/logging.py:850>, <TracebackEntry /Users/zhenyabudnyk/DevProjects/langwatch-saas/langevals/notebooks/.venv/lib/python3.12/site-packages/_pytest/logging.py:833>, <TracebackEntry /Users/zhenyabudnyk/DevProjects/langwatch-saas/langevals/notebooks/.venv/lib/python3.12/site-packages/pluggy/_callers.py:122>, <TracebackEntry /Users/zhenyabudnyk/DevProjects/langwatch-saas/langevals/notebooks/.venv/lib/python3.12/site-packages/_pytest/capture.py:878>, <TracebackEntry /Users/zhenyabudnyk/DevProjects/langwatch-saas/langevals/notebooks/.venv/lib/python3.12/site-packages/pluggy/_callers.py:122>, <TracebackEntry /Users/zhenyabudnyk/DevProjects/langwatch-saas/langevals/notebooks/.venv/lib/python3.12/site-packages/_pytest/skipping.py:257>, <TracebackEntry /Users/zhenyabudnyk/DevProjects/langwatch-saas/langevals/notebooks/.venv/lib/python3.12/site-packages/pluggy/_callers.py:103>, <TracebackEntry /Users/zhenyabudnyk/DevProjects/langwatch-saas/langevals/notebooks/.venv/lib/python3.12/site-packages/_pytest/runner.py:183>, <TracebackEntry /Users/zhenyabudnyk/DevProjects/langwatch-saas/langevals/notebooks/.venv/lib/python3.12/site-packages/_pytest/runner.py:173>, <TracebackEntry /Users/zhenyabudnyk/DevProjects/langwatch-saas/langevals/notebooks/.venv/lib/python3.12/site-packages/_pytest/python.py:1632>, <TracebackEntry /Users/zhenyabudnyk/DevProjects/langwatch-saas/langevals/notebooks/.venv/lib/python3.12/site-packages/pluggy/_hooks.py:513>, <TracebackEntry /Users/zhenyabudnyk/DevProjects/langwatch-saas/langevals/notebooks/.venv/lib/python3.12/site-packages/pluggy/_manager.py:120>, <TracebackEntry /Users/zhenyabudnyk/DevProjects/langwatch-saas/langevals/notebooks/.venv/lib/python3.12/site-packages/pluggy/_callers.py:139>, <TracebackEntry /Users/zhenyabudnyk/DevProjects/langwatch-saas/langevals/notebooks/.venv/lib/python3.12/site-packages/pluggy/_callers.py:103>, <TracebackEntry /Users/zhenyabudnyk/DevProjects/langwatch-saas/langevals/notebooks/.venv/lib/python3.12/site-packages/_pytest/python.py:162>, <TracebackEntry /var/folders/pj/64p7tp0s5rbc57h_h3qdws4c0000gn/T/ipykernel_12166/4222739897.py:64>]
 
 ===End Flaky Test Report===
 6 passed, 3 xfailed, 19 warnings in 12.66s
-```
+
+````
 </Accordion>
 </AccordionGroup>
 
@@ -230,7 +243,8 @@ FAILED t_25254c19b35c4a58a520690924724e02.py::test_extracts_the_right_address[en
 FAILED t_25254c19b35c4a58a520690924724e02.py::test_extracts_the_right_address[entry5-groq/llama3-70b-8192] - assert '{"number":56..."country":""}' == '{"number":56...ry":"France"}'
 FAILED t_25254c19b35c4a58a520690924724e02.py::test_extracts_the_right_address[entry8-groq/llama3-70b-8192] - assert '{"number":90..."country":""}' == '{"number":90...ry":"Brazil"}'
 3 failed, 6 passed, 35 warnings in 34.99s
-```
+````
+
 </Accordion>
 </AccordionGroup>
 
@@ -239,7 +253,7 @@ FAILED t_25254c19b35c4a58a520690924724e02.py::test_extracts_the_right_address[en
 Lets take another use-case - generation of recipes. As the task becomes more nuanced it is also harder to properly evaluate the quality of LLM's response.
 LLM-as-a-Judge approach comes in hand in such situations. For example, you can use `CustomLLMBooleanEvaluator` to check if the generated recipes are all vegetarian.
 
-```python
+````python
 from langevals import expect
 import litellm
 import pandas as pd
@@ -289,13 +303,16 @@ def test_generate_tweet_recipes(entry):
 <Accordion title="Example Nice Expect Output">
 ```bash
 FAILED tests/test_llm_as_judge.py::test_llm_as_judge[entry0] - AssertionError: Custom LLM Boolean Evaluator to_pass FAILED - The recipe for a quick breakfast with bacon includes bacon strips, making it a non-vegetarian recipe.
-```
+````
+
 </Accordion>
 </AccordionGroup>
 
 ## Other Evaluators
+
 Just like `CustomLLMBooleanEvaluator`, you can use any other evaluator available from LangEvals to prevent regression on a variety of cases,
 for example, here we check that the LLM answers are always in english, regardless of the language used in the question, we also measure how relevant the answers are to the question:
+
 ```python
 import litellm
 from litellm import ModelResponse
@@ -348,6 +365,7 @@ def test_language_and_relevancy(entry):
         answer_relevancy_checker
     ).to_be_greater_than(0.8)
 ```
+
 In this example we are now not only validating a boolean assertion,
 but also making sure that 80% of our samples keep an answer relevancy score above 0.8 from the Ragas Answer Relevancy Evaluator.
 
@@ -361,6 +379,7 @@ test_language_and_relevancy[entry1] passed 1 out of the required 1 times. Succes
 test_language_and_relevancy[entry2] passed 1 out of the required 1 times. Success!
 
 ===End Flaky Test Report===
+
 ```
 </Accordion>
 </AccordionGroup>
@@ -373,3 +392,4 @@ test_language_and_relevancy[entry2] passed 1 out of the required 1 times. Succes
 
 
 
+```

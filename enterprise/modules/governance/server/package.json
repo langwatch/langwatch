@@ -1,0 +1,74 @@
+{
+  "name": "@langwatch/enterprise-governance-server",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Server-side LangWatch Enterprise governance services.",
+  "license": "SEE LICENSE IN ../../../LICENSE.md",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./dist/index.d.ts",
+  "imports": {
+    "#*": {
+      "types": "./dist/*.d.ts",
+      "default": "./src/*.ts"
+    }
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    },
+    "./testing": {
+      "types": "./dist/__tests__/testing.d.ts",
+      "default": "./src/__tests__/testing.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "pnpm -w typecheck:declarations --project . && tsc --noEmit",
+    "test": "vitest run",
+    "test:unit": "vitest run",
+    "test:integration": "vitest run --config vitest.integration.config.ts"
+  },
+  "dependencies": {
+    "@langwatch/api": "workspace:*",
+    "@langwatch/api-key-contract": "workspace:*",
+    "@langwatch/auth-contract": "workspace:*",
+    "@langwatch/authz-contract": "workspace:*",
+    "@langwatch/enterprise-governance-contract": "workspace:*",
+    "@langwatch/enterprise-plan-gate": "workspace:*",
+    "@langwatch/entitlement-contract": "workspace:*",
+    "@langwatch/eventing": "workspace:*",
+    "@langwatch/gateway-contract": "workspace:*",
+    "@langwatch/handled-error": "workspace:*",
+    "@langwatch/ksuid": "workspace:*",
+    "@langwatch/model-provider-contract": "workspace:*",
+    "@langwatch/observability": "workspace:*",
+    "@langwatch/organization-contract": "workspace:*",
+    "@langwatch/otlp": "workspace:*",
+    "@langwatch/prisma-client": "workspace:*",
+    "@langwatch/runtime-composition": "workspace:*",
+    "@langwatch/project-contract": "workspace:*",
+    "@langwatch/project-server": "workspace:*",
+    "@langwatch/time": "workspace:*",
+    "@langwatch/trace-contract": "workspace:*",
+    "@langwatch/trace-server": "workspace:*",
+    "@opentelemetry/otlp-transformer": "catalog:",
+    "@trpc/server": "catalog:",
+    "hono": "catalog:",
+    "hono-openapi": "catalog:",
+    "jsonpath-plus": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@clickhouse/client": "catalog:",
+    "@langwatch/clickhouse-client": "workspace:*",
+    "@langwatch/gateway-server": "workspace:*",
+    "@langwatch/test-harness": "workspace:*",
+    "nanoid": "^6.0.0",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

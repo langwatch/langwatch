@@ -1,9 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { SpanStatusCode, SpanKind, trace as otelTrace, type SpanOptions } from "@opentelemetry/api";
-import {
-  getLangWatchTracer,
-  getLangWatchTracerFromProvider,
-} from "..";
+import { getLangWatchTracer, getLangWatchTracerFromProvider } from "..";
 import { type LangWatchTracer } from "../types";
 import { type LangWatchSpan } from "../../span";
 import {
@@ -56,7 +53,9 @@ describe("tracer.ts", () => {
   describe("getLangWatchTracer", () => {
     it("gets tracer from global provider", () => {
       // Mock the global tracer provider
-      const globalGetTracerSpy = vi.spyOn(otelTrace, 'getTracerProvider').mockReturnValue(mockProvider);
+      const globalGetTracerSpy = vi
+        .spyOn(otelTrace, "getTracerProvider")
+        .mockReturnValue(mockProvider);
 
       const globalTracer = getLangWatchTracer("global-tracer", "2.0.0");
 
@@ -82,7 +81,7 @@ describe("tracer.ts", () => {
     });
 
     it("passes options and context to underlying tracer", () => {
-      const options = { kind: SpanKind.CLIENT, attributes: { "test": "value" } };
+      const options = { kind: SpanKind.CLIENT, attributes: { test: "value" } };
       const context = {} as any; // Mock context
 
       const span = langwatchTracer.startSpan("test-span", options, context);
@@ -98,10 +97,7 @@ describe("tracer.ts", () => {
       const span = langwatchTracer.startSpan("test-span");
 
       // Test that we can chain LangWatch-specific methods
-      const result = span
-        .setType("llm")
-        .setInput("test input")
-        .setOutput("test output");
+      const result = span.setType("llm").setInput("test input").setOutput("test output");
 
       expect(result).toBe(span);
     });
@@ -284,7 +280,7 @@ describe("tracer.ts", () => {
 
       it("handles delayed async callbacks", async () => {
         const callback = vi.fn(async (span: LangWatchSpan) => {
-          await new Promise(resolve => setTimeout(resolve, 10));
+          await new Promise((resolve) => setTimeout(resolve, 10));
           span.setType("llm");
           return "delayed-result";
         });
@@ -403,7 +399,7 @@ describe("tracer.ts", () => {
           finally: vi.fn((onFinally: any) => {
             setTimeout(() => onFinally(), 10);
             return thenable;
-          })
+          }),
         };
 
         const callback = vi.fn(() => thenable);
@@ -442,7 +438,9 @@ describe("tracer.ts", () => {
           throw rejectionError;
         });
 
-        await expect(langwatchTracer.withActiveSpan("rejection-span", callback)).rejects.toThrow(rejectionError);
+        await expect(langwatchTracer.withActiveSpan("rejection-span", callback)).rejects.toThrow(
+          rejectionError,
+        );
       });
 
       it("handles promise that resolves to another promise", async () => {
@@ -486,14 +484,16 @@ describe("tracer.ts", () => {
         });
 
         // Should still reject with original error, not recordException error
-        await expect(langwatchTracer.withActiveSpan("exception-span", callback)).rejects.toThrow(originalError);
+        await expect(langwatchTracer.withActiveSpan("exception-span", callback)).rejects.toThrow(
+          originalError,
+        );
 
         expect(callback).toHaveBeenCalled();
       });
     });
   });
 
-    describe("argument normalization", () => {
+  describe("argument normalization", () => {
     it("handles different argument patterns for startActiveSpan", () => {
       // Test all valid argument combinations
       const callback = vi.fn(() => "result");
@@ -566,7 +566,7 @@ describe("tracer.ts", () => {
       (customMockTracer as any).customMethod = vi.fn();
 
       const customProvider = new MockTracerProvider();
-      vi.spyOn(customProvider, 'getTracer').mockReturnValue(customMockTracer);
+      vi.spyOn(customProvider, "getTracer").mockReturnValue(customMockTracer);
 
       const customLangwatchTracer = getLangWatchTracerFromProvider(customProvider, "custom-tracer");
 
@@ -586,21 +586,22 @@ describe("tracer.ts", () => {
       const testError = new Error("Complex error scenario");
 
       await errorTestUtils.testErrorPropagation(
-        () => langwatchTracer.withActiveSpan("error-span", async (span) => {
-          span.setType("llm");
-          span.setAttribute("test.before.error", true);
+        () =>
+          langwatchTracer.withActiveSpan("error-span", async (span) => {
+            span.setType("llm");
+            span.setAttribute("test.before.error", true);
 
-          // Simulate some async work before error
-          await createDelayedPromise("work", 5);
+            // Simulate some async work before error
+            await createDelayedPromise("work", 5);
 
-          throw testError;
-        }),
+            throw testError;
+          }),
         testError,
         () => {
           // Verify cleanup occurred
           const span = mockTracer.getSpan("error-span");
           expect(span?.ended).toBe(true);
-        }
+        },
       );
     });
 
@@ -612,7 +613,10 @@ describe("tracer.ts", () => {
 
       const operations = [
         () => langwatchTracer.withActiveSpan("success-1", async () => "success"),
-        () => langwatchTracer.withActiveSpan("failure", async () => { throw partialError; }),
+        () =>
+          langwatchTracer.withActiveSpan("failure", async () => {
+            throw partialError;
+          }),
         () => langwatchTracer.withActiveSpan("success-2", async () => "success"),
       ];
 
@@ -631,16 +635,13 @@ describe("tracer.ts", () => {
       const langwatchTracer = getLangWatchTracerFromProvider(mockProvider, "perf-tracer", "1.0.0");
       const mockTracer = mockProvider.getTracerByName("perf-tracer", "1.0.0")!;
 
-      const operations = await performanceUtils.createConcurrentOperations(
-        async (i) => {
-          return langwatchTracer.withActiveSpan(`perf-span-${i}`, (span) => {
-            span.setType("llm");
-            span.setAttribute("index", i);
-            return i * 2;
-          });
-        },
-        100
-      );
+      const operations = await performanceUtils.createConcurrentOperations(async (i) => {
+        return langwatchTracer.withActiveSpan(`perf-span-${i}`, (span) => {
+          span.setType("llm");
+          span.setAttribute("index", i);
+          return i * 2;
+        });
+      }, 100);
 
       expect(operations).toHaveLength(100);
       operations.forEach((result, index) => {
@@ -650,14 +651,18 @@ describe("tracer.ts", () => {
       // Verify all spans were created and ended properly
       expect(mockTracer.getSpanCount()).toBe(100);
 
-      mockTracer.spans.forEach(span => {
+      mockTracer.spans.forEach((span) => {
         expect(span.ended).toBe(true);
       });
     });
 
     it("handles nested spans with proper parent-child relationships", async () => {
       const mockProvider = new MockTracerProvider();
-      const langwatchTracer = getLangWatchTracerFromProvider(mockProvider, "nested-tracer", "1.0.0");
+      const langwatchTracer = getLangWatchTracerFromProvider(
+        mockProvider,
+        "nested-tracer",
+        "1.0.0",
+      );
       const mockTracer = mockProvider.getTracerByName("nested-tracer", "1.0.0")!;
 
       const result = await langwatchTracer.withActiveSpan("parent", async (parentSpan) => {
@@ -671,7 +676,7 @@ describe("tracer.ts", () => {
           langwatchTracer.withActiveSpan("child-2", (child) => {
             child.setType("tool");
             return "child-2-result";
-          })
+          }),
         ];
 
         return { parent: "parent-result", children: childResults };
@@ -679,7 +684,7 @@ describe("tracer.ts", () => {
 
       expect(result).toEqual({
         parent: "parent-result",
-        children: ["child-1-result", "child-2-result"]
+        children: ["child-1-result", "child-2-result"],
       });
 
       // Verify span creation
@@ -752,11 +757,11 @@ describe("tracer.ts", () => {
             // Simulate minimal async work
             await Promise.resolve();
             return `result-${i}`;
-          })
+          }),
         );
       }
 
-      return Promise.all(operations).then(results => {
+      return Promise.all(operations).then((results) => {
         expect(results).toHaveLength(20);
         results.forEach((result, i) => {
           expect(result).toBe(`result-${i}`);
@@ -808,7 +813,7 @@ describe("tracer.ts", () => {
           span.setType("llm");
           await createDelayedPromise(`result-${i}`, Math.random() * 10);
           return `result-${i}`;
-        })
+        }),
       );
 
       const results = await Promise.all(promises);
@@ -830,7 +835,7 @@ describe("tracer.ts", () => {
             innerSpan.setType("llm");
             throw outerError;
           });
-        })
+        }),
       ).rejects.toThrow(outerError);
 
       // Verify error was handled

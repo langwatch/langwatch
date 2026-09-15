@@ -1,11 +1,7 @@
 /**
  * `langwatch agent tunnel` (hidden alias `agent dev`): expose a local agent
- * server through a public tunnel and repoint a registered HTTP agent at it,
- * so platform scenarios run against the local process. Ctrl-C restores the
- * previous URL.
- *
- * The session phases live in `./tunnel/`: input resolution, the local auth
- * proxy, quick-tunnel provisioning, and the config write-back / restore.
+ * through a public tunnel and repoint a registered HTTP agent at it. Ctrl-C
+ * restores the previous URL. Session phases live in `./tunnel/`.
  */
 
 import * as crypto from "node:crypto";
@@ -39,10 +35,8 @@ const HEALTH_INTERVAL_MS = 30_000;
 const HEALTH_FAILURE_THRESHOLD = 3;
 
 /**
- * How long one probe may take. A half-open socket at the edge is exactly the
- * failure the monitor looks for, and it is also the case where `fetch` never
- * settles. The next check is chained off the current one, so an unbounded
- * probe would stop the monitor for the rest of the session.
+ * How long one probe may take. A half-open socket is exactly the failure
+ * being monitored for, and also the case where `fetch` never settles.
  */
 const HEALTH_PROBE_TIMEOUT_MS = 10_000;
 
@@ -150,9 +144,8 @@ export async function startAgentTunnelSession(
   // real URL still stashed under devTunnel. Restore it before provisioning:
   // if THIS session dies before its own write-back, the agent is left on the
   // real URL rather than on a dead tunnel.
-  const staleStash = (
-    agent.config as { devTunnel?: { previousUrl?: string } } | undefined
-  )?.devTunnel;
+  const staleStash = (agent.config as { devTunnel?: { previousUrl?: string } } | undefined)
+    ?.devTunnel;
   if (updateUrl && staleStash?.previousUrl) {
     try {
       const fresh = await service.get(agent.id);
@@ -181,9 +174,7 @@ export async function startAgentTunnelSession(
       ),
     );
   }
-  const secret = useAuthProxy
-    ? crypto.randomBytes(24).toString("base64url")
-    : undefined;
+  const secret = useAuthProxy ? crypto.randomBytes(24).toString("base64url") : undefined;
 
   let proxy: AuthProxy | undefined;
   if (useAuthProxy && secret) {
@@ -213,9 +204,7 @@ export async function startAgentTunnelSession(
   let needsRestore = false;
 
   if (updateUrl) {
-    const spinner = createSpinner(
-      `Pointing agent "${agent.name}" at the tunnel...`,
-    ).start();
+    const spinner = createSpinner(`Pointing agent "${agent.name}" at the tunnel...`).start();
     try {
       const fresh = await service.get(agent.id);
       const config = applyDevTunnel({
@@ -258,9 +247,7 @@ export async function startAgentTunnelSession(
         if (restored) {
           await service.update(agent.id, { config: restored });
           console.log(
-            `Restored agent "${agent.name}"${
-              previousUrl ? ` to ${chalk.cyan(previousUrl)}` : ""
-            }.`,
+            `Restored agent "${agent.name}"${previousUrl ? ` to ${chalk.cyan(previousUrl)}` : ""}.`,
           );
         }
       } catch {
@@ -286,23 +273,18 @@ export async function startAgentTunnelSession(
   // event racing a crash handler) shares the ONE in-flight restore instead of
   // starting another.
   let shutdownPromise: Promise<void> | undefined;
-  const shutdown = (code = 0): Promise<void> =>
-    (shutdownPromise ??= performShutdown(code));
+  const shutdown = (code = 0): Promise<void> => (shutdownPromise ??= performShutdown(code));
 
   const attachTunnelEnd = (attached: TunnelHandle): void => {
     attached.once("exit", () => {
       if (shutdownPromise || attached !== currentTunnel) return;
-      console.error(
-        chalk.yellow("The tunnel process ended. Restoring the agent URL."),
-      );
+      console.error(chalk.yellow("The tunnel process ended. Restoring the agent URL."));
       void shutdown(0);
     });
     attached.once("error", (error) => {
       if (shutdownPromise || attached !== currentTunnel) return;
       console.error(
-        chalk.yellow(
-          `The tunnel reported an error (${error.message}). Restoring the agent URL.`,
-        ),
+        chalk.yellow(`The tunnel reported an error (${error.message}). Restoring the agent URL.`),
       );
       void shutdown(1);
     });
@@ -318,9 +300,7 @@ export async function startAgentTunnelSession(
     try {
       const response = await fetch(currentTunnelUrl, {
         method: "GET",
-        signal: AbortSignal.timeout(
-          hooks.healthProbeTimeoutMs ?? HEALTH_PROBE_TIMEOUT_MS,
-        ),
+        signal: AbortSignal.timeout(hooks.healthProbeTimeoutMs ?? HEALTH_PROBE_TIMEOUT_MS),
       });
       return response.status !== 530;
     } catch {
@@ -341,9 +321,7 @@ export async function startAgentTunnelSession(
 
   const reprovisionTunnel = async (): Promise<void> => {
     console.error(
-      chalk.yellow(
-        "The tunnel stopped answering. Provisioning a replacement tunnel...",
-      ),
+      chalk.yellow("The tunnel stopped answering. Provisioning a replacement tunnel..."),
     );
     const previous = currentTunnel;
     const started = await startQuickTunnel({ localUrl: tunnelTarget });
@@ -366,8 +344,7 @@ export async function startAgentTunnelSession(
   // A bring-your-own tunnel is not ours to replace, and with --no-update-url
   // the caller pointed things at the printed URL themselves, so a silent swap
   // would strand them. Both only get the warning.
-  const canReprovision =
-    updateUrl && !options.tunnelUrl && currentTunnel !== undefined;
+  const canReprovision = updateUrl && !options.tunnelUrl && currentTunnel !== undefined;
   let consecutiveFailures = 0;
 
   const runHealthCheck = async (): Promise<void> => {
@@ -417,18 +394,12 @@ export async function startAgentTunnelSession(
 }
 
 /** The `agent tunnel` command action: run the session until a signal ends it. */
-export const agentTunnelCommand = async (
-  options: AgentTunnelOptions,
-): Promise<void> => {
+export const agentTunnelCommand = async (options: AgentTunnelOptions): Promise<void> => {
   const session = await startAgentTunnelSession(options);
 
-  // A session is event-driven, and with `--tunnel-url` there is neither a
-  // tunnel child process nor a local auth proxy to hold the event loop open —
-  // the health monitor's timer is unref'd on purpose so it can never wedge a
-  // shutdown. Without a ref'd handle the process ran out of work right after
-  // printing the banner and exited, leaving the agent pointing at the caller's
-  // tunnel with the real URL still stashed under devTunnel. Hold the loop for
-  // exactly as long as the session runs.
+  // With `--tunnel-url` there is no tunnel child process or auth proxy to
+  // hold the event loop open (the health monitor's timer is unref'd), so a
+  // ref'd keep-alive holds it for exactly as long as the session runs.
   const keepAlive = setInterval(() => undefined, KEEP_ALIVE_INTERVAL_MS);
 
   let shutdownRequested = false;

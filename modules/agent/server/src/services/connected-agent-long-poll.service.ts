@@ -1,0 +1,450 @@
+import type { AgentCallSignal } from "@langwatch/agent-contract";
+/**
+ * The HTTP side of connected agents, for a process whose network blocks
+ * WebSockets (ADR-128): the same frames over `register`/`poll`/`frames`.
+ * Delivery is once only — a call is claimed under its own key before handout.
+ */
+
+import {
+  AgentRegisterRefusedError,
+  AgentSessionUnknownError,
+  CALL_KEY_SLACK_SECONDS,
+  HTTP_SESSION_TTL_SECONDS,
+  MAX_CALL_TIMEOUT_MS,
+  POLL_WAIT_MS,
+  PRESENCE_TTL_SECONDS,
+  PROTOCOL_VERSION,
+  type CallFrame,
+  type CancelFrame,
+  type RegisteredFrame,
+  type AgentConnectRegisterAnswer,
+  type AgentConnectCredentials,
+  registerFrameSchema,
+  type SdkFrame,
+} from "@langwatch/agent-contract";
+import { nanoid } from "nanoid";
+import { z } from "zod";
+import { InstanceWatchService, type Watch } from "./connected-agent-instance-watch.service.ts";
+import { type InstanceNudge } from "@langwatch/agent-contract";
+import {
+  callDeliveredKey,
+  callKey,
+  httpSessionKey,
+  pendingKey,
+} from "../rules/connected-agent-keys.rules.ts";
+import type { ResolvedConnectCredential } from "./connected-agent-credential.service.ts";
+import { AgentSessionService, type SessionInfo } from "./connected-agent-session.service.ts";
+
+/** The most call ids a poll may announce as in flight. */
+const MAX_IN_FLIGHT_IDS = 1000;
+
+/**
+ * Slack past the presence TTL before a pod concludes an instance is gone:
+ * the meta hash it reads expires with that TTL, and a poll on another pod
+ * inside the window has renewed it.
+ */
+const GONE_CHECK_SLACK_MS = 5_000;
+
+/** The delivered marker outlives the longest call and its slack. */
+const DELIVERED_TTL_SECONDS = Math.ceil(MAX_CALL_TIMEOUT_MS / 1000) + CALL_KEY_SLACK_SECONDS;
+
+/** What the store keeps for one HTTP session, under its token. */
+const storedSessionSchema = z.object({
+  principalId: z.string(),
+  token: z.string(),
+  instanceId: z.string(),
+  projectId: z.string(),
+  projectSlug: z.string(),
+  agentIds: z.array(z.string()),
+  meta: z.object({
+    instanceId: z.string(),
+    projectId: z.string(),
+    hostname: z.string(),
+    username: z.string(),
+    pid: z.number(),
+    sdk: z.object({
+      name: z.string(),
+      version: z.string(),
+      language: z.string(),
+    }),
+    label: z.string().nullable(),
+    podId: z.string(),
+    connectedAt: z.number(),
+    maxConcurrency: z.number(),
+  }),
+});
+type StoredSession = z.infer<typeof storedSessionSchema>;
+
+/** What one pod keeps per instance it has served: the channel, and who waits on it. */
+export interface LongPollTransportOptions {
+  session: AgentSessionService;
+  /** How long a poll waits for a frame before it answers empty. */
+  pollWaitMs?: number;
+  /** How long a pod keeps a watch after its last poll; test knob. */
+  watchTtlMs?: number;
+}
+
+export class LongPollTransportService {
+  static create(options: LongPollTransportOptions): LongPollTransportService {
+    return new LongPollTransportService(options);
+  }
+
+  readonly #core: AgentSessionService;
+  readonly #pollWaitMs: number;
+  readonly #watchesOfInstances: InstanceWatchService;
+  #closed = false;
+
+  private constructor(options: LongPollTransportOptions) {
+    this.#core = options.session;
+    this.#pollWaitMs = options.pollWaitMs ?? POLL_WAIT_MS;
+    this.#watchesOfInstances = InstanceWatchService.create({
+      core: this.#core,
+      watchTtlMs: options.watchTtlMs ?? PRESENCE_TTL_SECONDS * 1000 + GONE_CHECK_SLACK_MS,
+    });
+  }
+
+  /** How many instances this pod watches. */
+  get watchCount(): number {
+    return this.#watchesOfInstances.watchCount;
+  }
+
+  /**
+   * Registers the agents of a process and opens its session. Every refusal
+   * is a `refused` frame with the status of its reason.
+   */
+  async register({
+    credentials,
+    body,
+  }: {
+    credentials: AgentConnectCredentials;
+    body: unknown;
+  }): Promise<AgentConnectRegisterAnswer> {
+    const findReplicaRefusal = this.#core.findReplicaRefusal();
+    if (findReplicaRefusal) {
+      return this.#refused(findReplicaRefusal);
+    }
+
+    let resolved: ResolvedConnectCredential;
+    try {
+      resolved = await this.#core.authenticate(credentials);
+    } catch (error) {
+      return this.#refused(error);
+    }
+
+    const parsed = registerFrameSchema.safeParse(body);
+    if (!parsed.success) {
+      return this.#refused(
+        new AgentRegisterRefusedError({
+          reason: "protocol_invalid",
+          message: `The body must be a register frame with protocol ${PROTOCOL_VERSION}.`,
+        }),
+      );
+    }
+
+    const frame = parsed.data;
+
+    let session: SessionInfo;
+    let registered: RegisteredFrame;
+    try {
+      ({ session, registered } = await this.#core.registerInstance({
+        frame,
+        resolved,
+        heartbeatIntervalMs: this.#pollWaitMs,
+      }));
+    } catch (error) {
+      return this.#refused(error);
+    }
+
+    const token = `ait_${nanoid(32)}`;
+    await this.#saveSession({
+      principalId: session.principalId,
+      token,
+      instanceId: session.instanceId,
+      projectId: session.projectId,
+      projectSlug: session.projectSlug,
+      agentIds: [...session.agentIds],
+      meta: session.meta,
+    });
+    // The calls the process says it is still working on are never handed
+    // out again, the way a socket re-register skips them.
+    for (const callId of frame.instance.inFlightCallIds) {
+      const call = await this.#core.findCallForSession(session, callId);
+      if (!call) {
+        continue;
+      }
+      await this.#core.runtime.store.setIfAbsent(
+        callDeliveredKey(session.projectId, callId),
+        "1",
+        DELIVERED_TTL_SECONDS,
+      );
+    }
+
+    await this.#watchesOfInstances.ensureWatch(session);
+
+    return { frame: registered, instanceToken: token };
+  }
+
+  /**
+   * Waits up to the poll wait for the next frames, refreshing presence in and out.
+   * @throws {AgentRegisterRefusedError} the credential is refused
+   * @throws {AgentSessionUnknownError} the token names no live session
+   */
+  async poll({
+    credentials,
+    token,
+    inFlightCallIds,
+    signal,
+  }: {
+    credentials: AgentConnectCredentials;
+    token: string | undefined;
+    inFlightCallIds: string[];
+    signal?: AgentCallSignal;
+  }): Promise<{ frames: (CallFrame | CancelFrame)[] }> {
+    const { session, stored } = await this.#openSession({ credentials, token });
+    const watch = await this.#watchesOfInstances.ensureWatch(session);
+    await this.#touch(stored, session);
+    const frames = await this.#collectFrames({
+      session,
+      watch,
+      inFlight: new Set(inFlightCallIds.slice(0, MAX_IN_FLIGHT_IDS)),
+      signal,
+    });
+    if (!this.#closed) {
+      await this.#touch(stored, session);
+    }
+
+    return { frames };
+  }
+
+  /** Drains what is waiting, or waits for a nudge until the poll wait passes. */
+  async #collectFrames({
+    session,
+    watch,
+    inFlight,
+    signal,
+  }: {
+    session: SessionInfo;
+    watch: Watch;
+    inFlight: Set<string>;
+    signal?: AgentCallSignal;
+  }): Promise<(CallFrame | CancelFrame)[]> {
+    const frames: (CallFrame | CancelFrame)[] = [];
+    const deadline = this.#core.now() + this.#pollWaitMs;
+    for (;;) {
+      frames.push(...(await this.#drain({ session, inFlight })));
+      const remaining = deadline - this.#core.now();
+      if (this.#settled({ frames, signal }) || remaining <= 0) {
+        return frames;
+      }
+
+      const nudge = await this.#watchesOfInstances.findNextNudge({
+        watch,
+        ms: remaining,
+        signal,
+      });
+      const outcome = nudgeOutcome({ nudge, closed: this.#closed });
+      if (outcome === "stop") {
+        return frames;
+      }
+
+      if (outcome === "drain") {
+        continue;
+      }
+
+      inFlight.delete(outcome.cancel);
+      frames.push({
+        type: "cancel",
+        protocol: PROTOCOL_VERSION,
+        callId: outcome.cancel,
+      });
+    }
+  }
+
+  /**
+   * Takes the frames a process posts: ack, result and deregister.
+   * @throws {AgentRegisterRefusedError} the credential is refused
+   * @throws {AgentSessionUnknownError} the token names no live session
+   */
+  async frames({
+    credentials,
+    token,
+    frames,
+  }: {
+    credentials: AgentConnectCredentials;
+    token: string | undefined;
+    frames: Exclude<SdkFrame, { type: "register" }>[];
+  }): Promise<{ accepted: number }> {
+    const { session, stored } = await this.#openSession({ credentials, token });
+    for (const frame of frames) {
+      switch (frame.type) {
+        case "ack":
+          await this.#core.ack(session, frame.callId);
+          break;
+        case "result":
+          await this.#core.result(session, frame);
+          break;
+        case "deregister":
+          await this.#deregister(stored, session);
+          return { accepted: frames.length };
+      }
+    }
+
+    return { accepted: frames.length };
+  }
+
+  /** Releases every waiting poll and every watch; sessions stay in the store. */
+  async close(): Promise<void> {
+    this.#closed = true;
+    await this.#watchesOfInstances.closeAll();
+  }
+
+  #refused(error: unknown): AgentConnectRegisterAnswer {
+    const { frame } = this.#core.refusal(error);
+    return { frame };
+  }
+
+  async #openSession({
+    credentials,
+    token,
+  }: {
+    credentials: AgentConnectCredentials;
+    token: string | undefined;
+  }): Promise<{ session: SessionInfo; stored: StoredSession }> {
+    const resolved = await this.#core.authenticate(credentials);
+    if (!token) {
+      throw new AgentSessionUnknownError();
+    }
+
+    // Read under the credential's own project: a token minted in another
+    // project names no session here, whatever instance it registered.
+    const raw = await this.#core.runtime.store.tryGet(httpSessionKey(resolved.project.id, token));
+    if (!raw) {
+      throw new AgentSessionUnknownError();
+    }
+
+    const parsed = storedSessionSchema.safeParse(JSON.parse(raw));
+    if (
+      !parsed.success ||
+      parsed.data.projectId !== resolved.project.id ||
+      parsed.data.principalId !== resolved.principalId
+    ) {
+      throw new AgentSessionUnknownError();
+    }
+
+    const stored = parsed.data;
+
+    return {
+      stored,
+      session: {
+        principalId: stored.principalId,
+        instanceId: stored.instanceId,
+        projectId: stored.projectId,
+        projectSlug: stored.projectSlug,
+        agentIds: new Set(stored.agentIds),
+        meta: stored.meta,
+      },
+    };
+  }
+
+  async #saveSession(stored: StoredSession): Promise<void> {
+    await this.#core.runtime.store.set(
+      httpSessionKey(stored.projectId, stored.token),
+      JSON.stringify(stored),
+      HTTP_SESSION_TTL_SECONDS,
+    );
+  }
+
+  /** A poll is a heartbeat: the session and the presence both live on. */
+  async #touch(stored: StoredSession, session: SessionInfo): Promise<void> {
+    await this.#saveSession(stored);
+    await this.#core.refreshPresence(session);
+  }
+
+  /**
+   * The frames an instance has waiting: every pending call not yet handed
+   * out, and a cancel for every call it holds whose envelope is gone.
+   */
+  async #drain({
+    session,
+    inFlight,
+  }: {
+    session: SessionInfo;
+    inFlight: Set<string>;
+  }): Promise<(CallFrame | CancelFrame)[]> {
+    const store = this.#core.runtime.store;
+    const frames: (CallFrame | CancelFrame)[] = [];
+    const pending = await store.zrangebyscore(
+      pendingKey(session.projectId, session.instanceId),
+      this.#core.now(),
+    );
+    for (const callId of pending) {
+      if (inFlight.has(callId)) {
+        continue;
+      }
+
+      const call = await this.#core.findCallForSession(session, callId);
+      if (!call) {
+        continue;
+      }
+
+      const claimed = await store.setIfAbsent(
+        callDeliveredKey(session.projectId, callId),
+        "1",
+        DELIVERED_TTL_SECONDS,
+      );
+      if (!claimed) {
+        continue;
+      }
+
+      frames.push(this.#core.callFrame(call));
+    }
+
+    for (const callId of inFlight) {
+      if (await store.tryGet(callKey(session.projectId, callId))) {
+        continue;
+      }
+
+      // The dispatcher deletes the envelope when it cancels a call.
+      frames.push({ type: "cancel", protocol: PROTOCOL_VERSION, callId });
+    }
+
+    return frames;
+  }
+
+  /** A poll answers as soon as it holds a frame, or when its request or this pod is going away. */
+  #settled({ frames, signal }: { frames: unknown[]; signal?: AgentCallSignal }): boolean {
+    return frames.length > 0 || signal?.aborted === true || this.#closed;
+  }
+
+  async #deregister(stored: StoredSession, session: SessionInfo): Promise<void> {
+    const store = this.#core.runtime.store;
+    await store.del(httpSessionKey(stored.projectId, stored.token));
+    await this.#watchesOfInstances.drop(session);
+
+    const pending = await store.zrangebyscore(pendingKey(session.projectId, session.instanceId), 0);
+    await this.#core.retire(session, pending);
+  }
+}
+
+/**
+ * What a poll does with a nudge: no nudge is the wait passing or the request
+ * going away, an empty cancel is the wake of a closing watch, a call means
+ * the pending set is read again, and a cancel is a frame.
+ */
+function nudgeOutcome({
+  nudge,
+  closed,
+}: {
+  nudge: InstanceNudge | null;
+  closed: boolean;
+}): "stop" | "drain" | { cancel: string } {
+  if (!nudge || closed) {
+    return "stop";
+  }
+
+  if ("call" in nudge) {
+    return "drain";
+  }
+
+  return nudge.cancel ? { cancel: nudge.cancel } : "stop";
+}

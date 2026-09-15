@@ -1,0 +1,616 @@
+export type {
+  AuthenticationResponseJSON,
+  PublicKeyCredentialCreationOptionsJSON,
+  PublicKeyCredentialRequestOptionsJSON,
+} from "@simplewebauthn/server";
+import { passkey } from "@better-auth/passkey";
+import {
+  isCredentialMutationPath,
+  isEmailAuthPath,
+  isGateDependentPath,
+  isGatedSsoPath,
+  isPasswordResetPath,
+  normalizedRequestPathname,
+  requestPathname,
+  type AuthApi,
+} from "@langwatch/auth-contract";
+import { createLogger } from "@langwatch/observability";
+import {
+  DroppedBetterAuthSecondaryStorageAdapter,
+  RedisBetterAuthSecondaryStorageAdapter,
+} from "./better-auth-secondary-storage.ts";
+import type { SignInMethodPolicy } from "@langwatch/identity-contract";
+import type { BetterAuthHooksRepository } from "../../repositories/better-auth-hooks.repository.ts";
+import type { UserApi } from "@langwatch/user-contract";
+import type { RedisConnection } from "@langwatch/redis-client";
+import { compare, hash } from "bcrypt";
+import { type BetterAuthOptions, betterAuth } from "better-auth";
+import { APIError } from "better-auth/api";
+import { genericOAuth } from "better-auth/plugins/generic-oauth";
+import { twoFactor } from "better-auth/plugins/two-factor";
+import type {
+  BetterAuthAnnouncements,
+  BetterAuthFederation,
+  BetterAuthIdentityCeremonies,
+  BetterAuthPendingInvite,
+  BetterAuthStorage,
+} from "./better-auth.collaborators.ts";
+import {
+  afterAccountCreate,
+  afterAccountUpdate,
+  afterSessionCreate,
+  afterUserCreate,
+  tryBeforeAccountCreate,
+  beforeSessionCreate,
+  beforeUserCreate,
+  type BetterAuthHookCollaborators,
+} from "./better-auth-hooks.api.ts";
+import { passkeySignUpRegistration, type SignUpVerification } from "./passkey-sign-up.api.ts";
+import { runSignInRouterShadow, type SignInRouterShadow } from "./sign-in-router-shadow.api.ts";
+
+const logger = createLogger("langwatch:better-auth");
+
+/**
+ * Everything about this deployment the option set is built from.
+ */
+export type BetterAuthDeploymentConfiguration = Readonly<{
+  /** `betterAuth({ baseURL })` — where this instance believes it is served. */
+  baseUrl: string;
+  /**
+   * The externally reachable origin, where a proxy makes it differ from {@link baseUrl}.
+   */
+  publicBaseUrl?: string | undefined;
+  /** The signing secret. Never logged, never reported, never defaulted. */
+  secret: string;
+  /**
+   * Whether the email/password routes MOUNT. See {@link isEmailPasswordEnabled}
+   * for the rule; mounting is not the gate, the request hook is.
+   */
+  emailPasswordEnabled: boolean;
+  /** Whether the two-factor plugin is mounted. */
+  mfaEnrollmentOpen: boolean;
+  /** Whether the passkey plugin is mounted. */
+  passkeysEnabled: boolean;
+  /** Salts the provisional handle a passkey sign-up ceremony is minted with. */
+  passkeyHandleSecret: string;
+  /** Social providers this deployment mounted, already built. */
+  socialProviders: NonNullable<BetterAuthOptions["socialProviders"]>;
+  /** Generic-OIDC connections this deployment mounted, already built. */
+  genericOAuthConfigs: readonly Parameters<typeof genericOAuth>[0]["config"][number][];
+}>;
+
+/**
+ * Whether BetterAuth's email/password (credentials) routes are MOUNTED.
+ * (ADR-027). Mounting is not the gate: the `before` hook below is what blocks
+ */
+export const isEmailPasswordEnabled = (deployment: {
+  authProvider: string | undefined;
+  isSaas: boolean;
+}): boolean => deployment.authProvider === "email" || !deployment.isSaas;
+
+/**
+ * Wires Better Auth's secondary storage to the process's Redis connection.
+ * Used by rate limiting (below) so limits are enforced across pods. The
+ * presence of the connection decides the session strategy (ADR-093).
+ *
+ * A process with no connection still gets a store rather than nothing: reads
+ * degrade to a miss the database answers, and every dropped write is reported.
+ */
+export function createSecondaryStorage(
+  redis: RedisConnection | null,
+): NonNullable<BetterAuthOptions["secondaryStorage"]> {
+  return redis
+    ? RedisBetterAuthSecondaryStorageAdapter.create(redis)
+    : DroppedBetterAuthSecondaryStorageAdapter.create();
+}
+
+/**
+ * Seals better-auth's own sign-up route, unconditionally, before any licence
+ * or gate state is read. Local account creation belongs to `user.register`,
+ * which writes the pending-confirmation latch; runs before the email-mode
+ * early return below or plain email-mode sign-up (the fleet's common case)
+ * would stay wide open to the raw route.
+ */
+function refuseDirectEmailSignUp(pathname: string): void {
+  if (!pathname.endsWith("/sign-up/email")) return;
+
+  throw APIError.from("NOT_FOUND", { code: "NOT_FOUND", message: "Not found" });
+}
+
+/**
+ * Whether a licensed deployment should refuse this credential route, the
+ * ADR-027 gate site #3 decision.
+ * ADR-117 §4 is what changed here, and only in mechanism: the question used to
+ */
+function refusesCredentialRoute({
+  pathname,
+  isResetPath,
+  policy,
+}: {
+  pathname: string;
+  isResetPath: boolean;
+  policy: SignInMethodPolicy;
+}): boolean {
+  if (!isResetPath && !isEmailAuthPath(pathname)) return false;
+
+  return policy.defaultMethods.some((method) => method.kind === "federated");
+}
+
+/**
+ * Builds the Better Auth transport around the process-owned mailer.
+ */
+export const createAuthOptions = ({
+  repo,
+  deployment,
+  storage,
+  federation,
+  identity,
+  shadow,
+  hooks,
+}: {
+  repo: BetterAuthHooksRepository;
+  deployment: BetterAuthDeploymentConfiguration;
+  storage: BetterAuthStorage;
+  federation: BetterAuthFederation;
+  identity: BetterAuthIdentityCeremonies;
+  shadow: SignInRouterShadow;
+  hooks: BetterAuthHookCollaborators;
+}): BetterAuthOptions & {
+  // `emailAndPassword` is optional on `BetterAuthOptions` but this factory
+  // always states it, and `enabled` inside it is REQUIRED. Saying so keeps the
+  // spread below from degrading the credentials gate to "unset", which
+  // better-auth would then have to guess at.
+  emailAndPassword: NonNullable<BetterAuthOptions["emailAndPassword"]>;
+} => ({
+  baseURL: deployment.baseUrl,
+  trustedOrigins: [
+    deployment.baseUrl,
+    // Behind a reverse proxy (preview deploys, tunneling services), the
+    // public base URL is the external one while the base URL may be the
+    // internal one. Accept both so sign-in/sign-up don't fail with
+    // "Invalid origin".
+    ...(deployment.publicBaseUrl && deployment.publicBaseUrl !== deployment.baseUrl
+      ? [deployment.publicBaseUrl]
+      : []),
+  ],
+  secret: deployment.secret,
+  /**
+   * The identity storage adapter (ADR-116 §1) — one `database:` entry,
+   * forever.
+   */
+  database: storage.adapter() as NonNullable<BetterAuthOptions["database"]>,
+
+  /**
+   * Tell BetterAuth's rate limiter (and session IP tracking) which headers carry the real
+   * client IP.
+   */
+  advanced: {
+    ipAddress: {
+      ipAddressHeaders: ["cf-connecting-ip", "x-forwarded-for", "x-real-ip"],
+    },
+  },
+
+  /**
+   * Route OAuth callback errors to our Next.js `/auth/error` page (which handles the
+   * friendly messages for `DIFFERENT_EMAIL_NOT_ALLOWED`, `SSO_PROVIDER_NOT_ALLOWED`,
+   * `OAuthAccountNotLinked`, etc.).
+   */
+  onAPIError: {
+    errorURL: `${deployment.baseUrl}/auth/error`,
+  },
+
+  // Map BetterAuth's expected models to the existing capitalized Prisma tables.
+  // Field mappings translate BetterAuth's canonical names to the legacy
+  // snake_case / NextAuth column names we keep in place — no column renames.
+  user: {
+    modelName: "User",
+    additionalFields: {
+      pendingSsoSetup: { type: "boolean", defaultValue: false, input: false },
+      deactivatedAt: { type: "date", required: false, input: false },
+      lastLoginAt: { type: "date", required: false, input: false },
+    },
+  },
+  session: {
+    modelName: "Session",
+    fields: {
+      token: "sessionToken",
+      expiresAt: "expires",
+    },
+    additionalFields: {
+      impersonating: { type: "string", required: false, input: false },
+    },
+    // Preserve NextAuth's 30-day session TTL. BetterAuth defaults to 7 days,
+    // which would force users to re-auth more often than before. Match the
+    // old NextAuth `maxAge: 30 * 24 * 60 * 60` value for parity.
+    expiresIn: 30 * 24 * 60 * 60,
+    // Refresh the session expiry on use but not on every request — the old
+    // NextAuth behavior was "rolling, but not thrashing the DB".
+    updateAge: 24 * 60 * 60,
+    /**
+     * REQUIRED when `secondaryStorage` is set. Without this, BetterAuth's `createSession`
+     * skips the main adapter (Prisma) and only writes to Redis.
+     */
+    storeSessionInDatabase: true,
+  },
+  account: {
+    modelName: "Account",
+    fields: {
+      accountId: "providerAccountId",
+      providerId: "provider",
+      accessToken: "access_token",
+      refreshToken: "refresh_token",
+      accessTokenExpiresAt: "expires_at",
+      idToken: "id_token",
+      scope: "scope",
+    },
+    /**
+     * Allow an OAuth sign-in to link to an existing User row when the email matches AND that
+     * User's `emailVerified` is true.
+     */
+    accountLinking: {
+      enabled: true,
+    },
+  },
+  verification: {
+    modelName: "VerificationToken",
+    fields: {
+      identifier: "identifier",
+      value: "token",
+      expiresAt: "expires",
+    },
+  },
+
+  /**
+   * Credentials signin/signup is ONLY enabled in on-prem `email` mode.
+   * ADR-027: on self-hosted (`!IS_SAAS`) the routes are always MOUNTED —
+   */
+  emailAndPassword: {
+    enabled: deployment.emailPasswordEnabled,
+    password: {
+      hash: async (password: string) => hash(password, 10),
+      verify: async ({ password, hash: storedHash }) => compare(password, storedHash),
+    },
+    /**
+     * Reset-link lifetime. Kept at BetterAuth's one-hour default but stated
+     * explicitly so the email copy ("this link expires in 1 hour") and the
+     * token expiry can't silently drift apart.
+     */
+    resetPasswordTokenExpiresIn: 60 * 60,
+    /**
+     * Password reset wired to transactional mailer. Deliberately reachable on
+     * denied SSO deployments for recovery (ADR-027); after reset, force-logout all sessions.
+     */
+  },
+
+  /**
+   * Rate limiting to mitigate credential stuffing / brute force on signin. Defaults apply to
+   * every /api/auth/* path; customRules tighten the credentials signin path specifically.
+   */
+  rateLimit: {
+    enabled: true,
+    window: 60,
+    max: 100,
+    storage: "memory",
+    customRules: {
+      "/sign-in/email": { window: 60 * 15, max: 30 },
+      "/sign-up/email": { window: 60 * 60, max: 50 },
+      "/sign-in/social": { window: 60 * 15, max: 50 },
+      // BetterAuth's password reset endpoints are `request-password-reset` and `reset-password`.
+      // The NextAuth-era rule named `/forget-password` didn't match anything under BetterAuth —
+      // we ported it literally during the migration without checking the new endpoint names.
+      "/request-password-reset": { window: 60 * 60, max: 5 },
+      "/reset-password": { window: 60 * 60, max: 5 },
+      // Passkey sign-up drops the session requirement from these two, so they are an
+      // unauthenticated way to create an account and are limited as one — alongside
+      // `/sign-up/email`, which is the same thing by another door. Options are generated once
+      // per attempt and verification runs only after a system prompt, so a person doing this by
+      // hand never approaches either number.
+      "/passkey/generate-register-options": { window: 60 * 60, max: 50 },
+      "/passkey/verify-registration": { window: 60 * 60, max: 50 },
+    },
+  },
+
+  secondaryStorage: undefined,
+  socialProviders: deployment.socialProviders,
+  plugins: genericOAuthPlugins(deployment),
+
+  databaseHooks: {
+    user: {
+      create: {
+        before: async (user) =>
+          beforeUserCreate({
+            repo,
+            user: user as {
+              email: string;
+              deactivatedAt?: Date | null;
+            } & Record<string, unknown>,
+          }),
+        after: async (user) => {
+          await afterUserCreate({
+            repo,
+            user: user as { id: string; email: string; name: string },
+            collaborators: hooks,
+          });
+        },
+      },
+      delete: {
+        /**
+         * ADR-101 §2: a user delete is an ERASURE, and erasure is what wipes
+         * `Identifier.value` and `identifierHash`. Before the row goes, so a refused ceremony
+         * refuses the delete with it; a no-op for users whose backfill has not latched.
+         */
+        before: async (user) => {
+          await identity.beforeUserDelete(user as { id: string });
+        },
+      },
+    },
+    account: {
+      create: {
+        before: async (account) => {
+          await tryBeforeAccountCreate({
+            repo,
+            account: {
+              userId: account.userId,
+              providerId: account.providerId,
+              accountId: account.accountId,
+            },
+            federation,
+          });
+          // ADR-101 §2: the account row is an identifier attach. Returning
+          // the row data pins its id, which is what makes the live identifier id and the backfill's
+          // derived id the same id.
+          // The BRIDGE ceremonies, not the bare ones (ADR-116 §5): the
+          return identity.tryBeforeAccountCreate(account);
+        },
+        after: async (account) => {
+          if (!account.userId || !account.providerId || !account.accountId) return;
+          await afterAccountCreate({
+            repo,
+            account: {
+              userId: account.userId as string,
+              providerId: account.providerId as string,
+              accountId: account.accountId as string,
+            },
+          });
+        },
+      },
+      update: {
+        after: async (account) => {
+          // BetterAuth refreshes tokens on the linked Account row on every
+          // OAuth sign-in. Use that as the trigger to reconcile pendingSsoSetup
+          // for users whose correct-provider account is already linked.
+          if (!account.userId || !account.providerId || !account.accountId) return;
+          await afterAccountUpdate({
+            repo,
+            account: {
+              userId: account.userId as string,
+              providerId: account.providerId as string,
+              accountId: account.accountId as string,
+            },
+          });
+        },
+      },
+      delete: {
+        /** ADR-101 §2: an account row removed is an identifier detach — and
+         *  the adapter's own, for anyone it routes to the identity branch. */
+        before: async (account) => {
+          await identity.beforeAccountDelete(account);
+        },
+      },
+    },
+    session: {
+      create: {
+        before: async (session) =>
+          beforeSessionCreate({
+            repo,
+            session: { userId: session.userId },
+          }),
+        after: async (session) => {
+          await afterSessionCreate({
+            repo,
+            userId: session.userId,
+            announcements: hooks.announcements,
+          });
+        },
+      },
+    },
+  },
+
+  // BetterAuth logger wiring
+  logger: {
+    disabled: false,
+    log: (level, message, ...args) => {
+      if (level === "error") {
+        logger.error({ args }, message);
+      } else if (level === "warn") {
+        logger.warn({ args }, message);
+      } else {
+        logger.info({ args }, message);
+      }
+    },
+  },
+
+  /**
+   * BetterAuth mounts credential endpoints even when email/password is off.
+   * In SSO mode, ADR-027 uses this same memoized gate: allow blocks email
+   */
+  hooks: {
+    before: async (ctx) => {
+      const url = ctx.request?.url ?? "";
+      const pathname = normalizedRequestPathname(url);
+
+      // Runs before every other check, including the email-mode early
+      // return two lines down: raw password sign-up must not bypass
+      // confirmed registration on ANY deployment, licensed or not.
+      refuseDirectEmailSignUp(pathname);
+
+      // ADR-117 §7: shadow mode's entire live-path footprint. It runs before
+      // the email-mode early return on purpose — an email-mode deployment is a
+      // routing decision the router has to agree with too, and it is the
+      // commonest one in the fleet. With the flag off it returns having read
+      // nothing, computed nothing and logged nothing.
+      await runSignInRouterShadow({ pathname, url, body: ctx.body, shadow });
+
+      // Deployments that name no federated method never register an IdP, so
+      // there is no policy to enforce — leave every route untouched (zero
+      // behavior change from `main`). Synchronous by contract (ADR-117 §4):
+      // an email-mode deployment must not wait on the licensing store to be
+      // told it has nothing to wait for.
+      if (!federation.federationCapable()) return;
+
+      // Credential-mutation block: keyed off the CONFIGURED mode, blocked in
+      // every gate state (ADR-027 Constants table). The password-reset pair
+      // is excluded here — it's gate-dependent, handled below.
+      if (isCredentialMutationPath(pathname)) {
+        throw APIError.from("BAD_REQUEST", {
+          code: "EMAIL_PASSWORD_DISABLED",
+          message:
+            "Credential management is disabled in cloud/SSO mode — your account is managed by your identity provider.",
+        });
+      }
+
+      const isResetPath = isPasswordResetPath(pathname);
+
+      // Nothing below this line can change the answer for the rest of the
+      // route table, so it never waits on the gate (see `isGateDependentPath`).
+      if (!isGateDependentPath(url)) return;
+
+      // ADR-117 §4: the hook is the ENFORCEMENT BACKSTOP now, and it asks the
+      // router's method policy rather than raw env.
+      // `/callback/auth0|okta` rewrite. Every ADR-027 semantic is unchanged:
+      const policy = await federation.resolveSignInMethodPolicy();
+
+      if (policy.federationLicensed) {
+        // Gate ALLOW (site #3): refuse the routes that would otherwise mint a
+        // password account on a licensed SSO-capable deployment (v5 BLOCKER).
+        if (refusesCredentialRoute({ pathname, isResetPath, policy })) {
+          throw APIError.from("BAD_REQUEST", {
+            code: "EMAIL_PASSWORD_DISABLED",
+            message:
+              "Credential management is disabled — your account is managed by your identity provider.",
+          });
+        }
+        return;
+      }
+
+      // Gate DENY (site #2): run in email mode, exactly as if the SSO env vars
+      // were unset. The reset pair stays open so OAuth-born users self-recover.
+      if (!isResetPath && isGatedSsoPath(url)) {
+        logger.warn(
+          { path: requestPathname(url), reason: "no_license" },
+          "Blocked SSO request: deployment has no genuine license",
+        );
+        throw APIError.from("FORBIDDEN", {
+          code: "SSO_LICENSE_REQUIRED",
+          message:
+            "SSO is not available on this deployment — sign in with your email and password instead.",
+        });
+      }
+    },
+  },
+});
+
+/**
+ * The generic-OIDC plugin, mounted only when this deployment configured a connection for
+ * it.
+ */
+function genericOAuthPlugins(
+  deployment: BetterAuthDeploymentConfiguration,
+): NonNullable<BetterAuthOptions["plugins"]> {
+  if (deployment.genericOAuthConfigs.length === 0) return [];
+  return [genericOAuth({ config: [...deployment.genericOAuthConfigs] })];
+}
+
+/**
+ * Everything the deployment's one Better Auth instance is built from.
+ */
+export type BetterAuthTransportOptions = Readonly<{
+  /** The Auth service whose sessions this instance mints and revokes. */
+  auth: AuthApi;
+  /** The persistence boundary every database hook reads and writes through. */
+  database: BetterAuthHooksRepository;
+  /** The instance's storage engine — see {@link BetterAuthStorage}. */
+  storage: BetterAuthStorage;
+  deployment: BetterAuthDeploymentConfiguration;
+  federation: BetterAuthFederation;
+  identity: BetterAuthIdentityCeremonies;
+  invites: BetterAuthPendingInvite;
+  announcements: BetterAuthAnnouncements;
+  shadow: SignInRouterShadow;
+  /** The grant ledger an SSO auto-join writes its membership through. */
+  authzGrants: BetterAuthHookCollaborators["authzGrants"];
+  /**
+   * Sends the password-reset link.
+   */
+  sendResetPassword: (input: { email: string; token: string }) => Promise<void>;
+  /** The process's Redis, or null to keep sessions in the database alone. */
+  redis: RedisConnection | null;
+  signUpVerification: SignUpVerification;
+  users: UserApi;
+}>;
+
+/**
+ * Builds the deployment's ONE Better Auth instance.
+ */
+export const createBetterAuthTransport = ({
+  announcements,
+  auth,
+  authzGrants,
+  database,
+  deployment,
+  federation,
+  identity,
+  invites,
+  redis,
+  sendResetPassword,
+  shadow,
+  signUpVerification,
+  storage,
+  users,
+}: BetterAuthTransportOptions) => {
+  const secondaryStorage = createSecondaryStorage(redis);
+  const authOptions = createAuthOptions({
+    repo: database,
+    deployment,
+    storage,
+    federation,
+    identity,
+    shadow,
+    hooks: { federation, invites, announcements, authzGrants },
+  });
+  return betterAuth({
+    ...authOptions,
+    plugins: [
+      ...genericOAuthPlugins(deployment),
+      ...(deployment.mfaEnrollmentOpen ? [twoFactor()] : []),
+      ...(deployment.passkeysEnabled
+        ? [
+            passkey({
+              registration: passkeySignUpRegistration({
+                announcements,
+                handleSecret: deployment.passkeyHandleSecret,
+                users,
+                verification: signUpVerification,
+              }),
+            }),
+          ]
+        : []),
+    ],
+    secondaryStorage,
+    rateLimit: {
+      ...authOptions.rateLimit,
+      storage: redis ? "secondary-storage" : "memory",
+    },
+    emailAndPassword: {
+      ...authOptions.emailAndPassword,
+      sendResetPassword: async ({ user, token }) => {
+        await sendResetPassword({ email: user.email, token });
+      },
+      onPasswordReset: async ({ user }) => {
+        await auth.revokeAllBrowserSessions({ userId: user.id });
+      },
+    },
+  });
+};
+
+export type BetterAuthTransport = ReturnType<typeof createBetterAuthTransport>;

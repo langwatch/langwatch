@@ -1,8 +1,5 @@
 import chalk from "chalk";
-import {
-  PromptsApiService,
-  PromptsError,
-} from "@/client-sdk/services/prompts";
+import { PromptsApiService, PromptsError } from "@/client-sdk/services/prompts";
 import type { SyncResult } from "../types";
 import { FileManager } from "../utils/fileManager";
 import { ensureProjectInitialized } from "../utils/init";
@@ -58,9 +55,9 @@ export const syncCommand = async (): Promise<void> => {
         console.log(
           chalk.green(
             `✓ Pulled ${chalk.cyan(`${name}@${versionSpec}`)} ${chalk.gray(
-              `(version ${version})`
-            )} → ${chalk.gray(displayPath)}`
-          )
+              `(version ${version})`,
+            )} → ${chalk.gray(displayPath)}`,
+          ),
         );
       }
     }
@@ -71,9 +68,9 @@ export const syncCommand = async (): Promise<void> => {
         console.log(
           chalk.green(
             `✓ Pushed ${chalk.cyan(name)} ${chalk.gray(
-              `(version ${version})`
-            )} from ${chalk.gray(localPath)}`
-          )
+              `(version ${version})`,
+            )} from ${chalk.gray(localPath)}`,
+          ),
         );
       }
     }
@@ -81,11 +78,7 @@ export const syncCommand = async (): Promise<void> => {
     // Print cleaned up files
     if (result.cleaned.length > 0) {
       for (const name of result.cleaned) {
-        console.log(
-          chalk.yellow(
-            `✓ Cleaned ${chalk.cyan(name)} (no longer in dependencies)`
-          )
-        );
+        console.log(chalk.yellow(`✓ Cleaned ${chalk.cyan(name)} (no longer in dependencies)`));
       }
     }
 
@@ -98,21 +91,16 @@ export const syncCommand = async (): Promise<void> => {
 
     // Print summary
     const duration = ((Date.now() - startTime) / 1000).toFixed(1);
-    const totalActions =
-      result.fetched.length + result.pushed.length + result.cleaned.length;
+    const totalActions = result.fetched.length + result.pushed.length + result.cleaned.length;
 
     if (totalActions === 0 && result.errors.length === 0) {
       console.log(chalk.gray(`Synced in ${duration}s, no changes`));
     } else {
       const summary = [];
-      if (result.fetched.length > 0)
-        summary.push(`${result.fetched.length} fetched`);
-      if (result.pushed.length > 0)
-        summary.push(`${result.pushed.length} pushed`);
-      if (result.cleaned.length > 0)
-        summary.push(`${result.cleaned.length} cleaned`);
-      if (result.errors.length > 0)
-        summary.push(`${result.errors.length} errors`);
+      if (result.fetched.length > 0) summary.push(`${result.fetched.length} fetched`);
+      if (result.pushed.length > 0) summary.push(`${result.pushed.length} pushed`);
+      if (result.cleaned.length > 0) summary.push(`${result.cleaned.length} cleaned`);
+      if (result.errors.length > 0) summary.push(`${result.errors.length} errors`);
 
       console.log(chalk.gray(`Synced ${summary.join(", ")} in ${duration}s`));
     }
@@ -124,13 +112,7 @@ export const syncCommand = async (): Promise<void> => {
     if (error instanceof PromptsError) {
       console.error(chalk.red(`Error: ${error.message}`));
     } else {
-      console.error(
-        chalk.red(
-          `Unexpected error: ${
-            formatApiErrorMessage({ error })
-          }`
-        )
-      );
+      console.error(chalk.red(`Unexpected error: ${formatApiErrorMessage({ error })}`));
     }
     process.exit(1);
   }

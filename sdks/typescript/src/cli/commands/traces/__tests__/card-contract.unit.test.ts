@@ -1,13 +1,4 @@
-/**
- * The CLI's `--format json` output IS the Langy panel's input. This pins the two
- * together: the document the command actually prints is parsed with the very
- * schema the app parses it with (`@langwatch/langy/cards`), so a change to either
- * side that breaks the other fails here rather than in the panel.
- *
- * This is the only place the CLI imports the card schemas — they cost ~28ms of
- * zod to load and no command needs them at runtime, so they stay out of the hot
- * path and earn their keep as a contract test instead.
- */
+// Contract test pinning CLI JSON output schema to Langy panel expectations.
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
   cardKindFor,
@@ -15,14 +6,20 @@ import {
   tracesCardSchema,
   traceIdOf,
   type TraceSummary,
-} from "@langwatch/langy/cards";
+} from "@langwatch/langy-contract/cards";
 
 vi.mock("@/client-sdk/services/traces/traces-api.service", async (importOriginal) => {
   const actual = await importOriginal<Record<string, unknown>>();
   return { ...actual, TracesApiService: vi.fn() };
 });
 
-vi.mock("../../../utils/apiKey", () => ({ resolveCredentials: vi.fn(async () => ({ apiKey: "test-key", source: "env", endpoint: "https://app.langwatch.ai" })) }));
+vi.mock("../../../utils/apiKey", () => ({
+  resolveCredentials: vi.fn(async () => ({
+    apiKey: "test-key",
+    source: "env",
+    endpoint: "https://app.langwatch.ai",
+  })),
+}));
 
 vi.mock("ora", () => ({
   default: () => ({
@@ -125,9 +122,7 @@ describe("the CLI's json output against the shared card contract", () => {
       it("still prints the document — an empty list is an answer, prose is corruption", async () => {
         vi.mocked(TracesApiService).mockImplementation(function () {
           return {
-            search: vi
-              .fn()
-              .mockResolvedValue({ traces: [], pagination: { totalHits: 0 } }),
+            search: vi.fn().mockResolvedValue({ traces: [], pagination: { totalHits: 0 } }),
             get: vi.fn(),
           } as unknown as TracesApiService;
         });

@@ -1,0 +1,68 @@
+import { describe, expect, it } from "vitest";
+import type { LegacyModelProviderExecution } from "../legacy-model-provider.rules.ts";
+import { prepareEnvKeys } from "../legacy-model-provider.rules.ts";
+
+// prepareEnvKeys reads the credential names off the provider's keysSchema. Providers whose
+// credentials are valid in more than one combination wrap their object in
+// `.superRefine(...)` (openai and anthropic: either an API key or a base URL), which moves
+// the zod shape one level down. A shape reader that does not unwrap it returns no keys at
+// all and the provider dispatches with no credentials.
+describe("prepareEnvKeys", () => {
+  // Typed as what `prepareEnvKeys` takes, not as the editor value it was
+  // aliased to: the two are different shapes, and the cast was hiding that the
+  // row handed to the function under test could never be one it accepts.
+  const providerRow = (
+    provider: string,
+    customKeys: Record<string, string>,
+  ): LegacyModelProviderExecution =>
+    ({ provider, customKeys }) as unknown as LegacyModelProviderExecution;
+
+  describe("given a provider whose credentials allow either a key or a base URL", () => {
+    it("returns the anthropic credentials stored on the row", () => {
+      expect(
+        prepareEnvKeys({
+          modelProvider: providerRow("anthropic", {
+            ANTHROPIC_API_KEY: "sk-ant-row",
+            ANTHROPIC_BASE_URL: "http://vllm:8000",
+          }),
+          environment: {},
+        }),
+      ).toEqual({
+        ANTHROPIC_API_KEY: "sk-ant-row",
+        ANTHROPIC_BASE_URL: "http://vllm:8000",
+      });
+    });
+
+    it("returns the openai credentials stored on the row", () => {
+      expect(
+        prepareEnvKeys({
+          modelProvider: providerRow("openai", { OPENAI_API_KEY: "sk-openai-row" }),
+          environment: {},
+        }),
+      ).toEqual({
+        OPENAI_API_KEY: "sk-openai-row",
+      });
+    });
+  });
+
+  describe("given a provider with a plain credentials object", () => {
+    it("returns the credentials stored on the row", () => {
+      expect(
+        prepareEnvKeys({
+          modelProvider: providerRow("groq", { GROQ_API_KEY: "gsk-row" }),
+          environment: {},
+        }),
+      ).toEqual({
+        GROQ_API_KEY: "gsk-row",
+      });
+    });
+  });
+
+  describe("given an unknown provider", () => {
+    it("returns no keys", () => {
+      expect(
+        prepareEnvKeys({ modelProvider: providerRow("not-a-provider", {}), environment: {} }),
+      ).toEqual({});
+    });
+  });
+});

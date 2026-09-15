@@ -1,0 +1,98 @@
+import type { WireVersionedPrompt } from "../../../model/wire-versioned-prompt.ts";
+import { Box, Button, HStack, useDisclosure } from "@chakra-ui/react";
+import { useFormContext } from "react-hook-form";
+
+import { GenerateApiSnippetButton } from "@langwatch/design-system/generate-api-snippet-button";
+import { useOrganizationTeamProject } from "@langwatch/workflow-web/surfaces/studio-scope";
+import { DeployPromptDialog } from "./deploy-prompt-dialog.tsx";
+import { GeneratePromptApiSnippetDialog } from "../../elements/prompts/generate-prompt-api-snippet-dialog.tsx";
+import { SavePromptButton } from "./save-prompt-button.tsx";
+import { ModelSelectFieldMini } from "../../elements/prompts/forms/fields/model-select-field-mini.tsx";
+import { VersionHistoryButton } from "../../elements/prompts/forms/prompt-config-form/version-history-button.tsx";
+import { type PromptConfigFormValues } from "@langwatch/prompt-contract";
+
+export type PromptEditorHeaderProps = {
+  /** Callback when save button is clicked */
+  onSave: () => void;
+  /** Whether there are unsaved changes */
+  hasUnsavedChanges: boolean;
+  /** Whether the form is valid */
+  isValid?: boolean;
+  /** Whether save is in progress */
+  isSaving?: boolean;
+  /** Callback when a version is restored from history */
+  onVersionRestore?: (prompt: WireVersionedPrompt) => Promise<void>;
+  /**
+   * Controls which elements are rendered.
+   * - "full" (default): model selector + history, API, and save buttons
+   * - "model-only": only the model selector (for use in drawers where buttons move to a footer)
+   */
+  variant?: "full" | "model-only";
+  /** When true the version history panel opens automatically on mount. */
+  openHistoryOnLoad?: boolean;
+};
+
+/**
+ * Shared header for prompt editing, used in both the playground and the
+ * editor drawer: model selector, version history, API snippet, and a Save
+ * button with "Update to vX" logic.
+ */
+export function PromptEditorHeader({
+  onSave,
+  hasUnsavedChanges,
+  isValid = true,
+  isSaving = false,
+  onVersionRestore,
+  variant = "full",
+  openHistoryOnLoad,
+}: PromptEditorHeaderProps) {
+  const { project } = useOrganizationTeamProject();
+  const formMethods = useFormContext<PromptConfigFormValues>();
+  const handle = formMethods.watch("handle");
+  const configId = formMethods.watch("configId");
+  const deployDialog = useDisclosure();
+
+  return (
+    <Box width="full" display="flex" gap={8} justifyContent="space-between">
+      <ModelSelectFieldMini />
+      {variant === "full" && (
+        <HStack gap={2} flexShrink={0}>
+          {configId && onVersionRestore && (
+            <VersionHistoryButton
+              configId={configId}
+              currentVersionId={formMethods.watch("versionMetadata")?.versionId}
+              onRestoreSuccess={onVersionRestore}
+              hasUnsavedChanges={hasUnsavedChanges}
+              initialOpen={openHistoryOnLoad}
+            />
+          )}
+          {configId && handle && project?.id && (
+            <>
+              <Button variant="outline" size="sm" onClick={deployDialog.onOpen}>
+                Deploy
+              </Button>
+              <DeployPromptDialog
+                isOpen={deployDialog.open}
+                onClose={deployDialog.onClose}
+                configId={configId}
+                handle={handle}
+                projectId={project.id}
+              />
+            </>
+          )}
+          <GeneratePromptApiSnippetDialog promptHandle={handle} apiKey={project?.apiKey}>
+            <GeneratePromptApiSnippetDialog.Trigger>
+              <GenerateApiSnippetButton hasHandle={!!handle} />
+            </GeneratePromptApiSnippetDialog.Trigger>
+          </GeneratePromptApiSnippetDialog>
+          <SavePromptButton
+            onSave={onSave}
+            hasUnsavedChanges={hasUnsavedChanges}
+            isValid={isValid}
+            isSaving={isSaving}
+          />
+        </HStack>
+      )}
+    </Box>
+  );
+}

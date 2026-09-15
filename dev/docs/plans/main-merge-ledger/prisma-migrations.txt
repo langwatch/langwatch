@@ -1,0 +1,5 @@
+platform/app/prisma/migrations/20260827120001_default_suite/migration.sql
+platform/app/prisma/migrations/20260827120002_folder_rows_hold_no_execution_settings/migration.sql
+platform/app/prisma/migrations/20260828120001_test_suite_vocabulary/migration.sql
+platform/app/prisma/migrations/20260830120001_connected_agents/migration.sql
+platform/app/prisma/migrations/20260831120000_grant_role_key_live_index/migration.sql

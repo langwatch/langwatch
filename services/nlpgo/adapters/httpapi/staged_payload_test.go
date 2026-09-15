@@ -126,3 +126,41 @@ func TestReadStudioRequestBody_InlineBodyWhenNoHeader(t *testing.T) {
 		t.Fatalf("inline body mismatch: got %q want %q", body, want)
 	}
 }
+
+// The test-only origin override. It exists so an integration test can drive
+// the whole staging round trip against a fake object store on loopback; these
+// cases pin that it admits exactly one origin and that a deployed environment
+// ignores it entirely.
+func TestStagedPayloadTestOnlyOrigin(t *testing.T) {
+	const staged = "http://127.0.0.1:55615/bucket/nlpgo-staging/p1/body.json?sig=x"
+	const awsStaged = "https://b.s3.eu-central-1.amazonaws.com/k?X-Amz-Signature=a"
+
+	cases := []struct {
+		name        string
+		environment string
+		origin      string
+		url         string
+		wantValid   bool
+	}{
+		{"admits the one origin it names", "test", "http://127.0.0.1:55615", staged, true},
+		{"refuses another port on the same host", "test", "http://127.0.0.1:55615", "http://127.0.0.1:9999/k", false},
+		{"refuses the metadata endpoint", "test", "http://127.0.0.1:55615", "http://169.254.169.254/latest/meta-data", false},
+		{"ignores the variable in production", "production", "http://127.0.0.1:55615", staged, false},
+		{"leaves the S3 rule alone when unset", "test", "", staged, false},
+		{"still admits a real S3 host", "test", "http://127.0.0.1:55615", awsStaged, true},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv("ENVIRONMENT", tc.environment)
+			t.Setenv(StagedPayloadTestOnlyOriginEnv, tc.origin)
+
+			err := validateStagedPayloadURL(tc.url)
+			if tc.wantValid && err != nil {
+				t.Errorf("expected %q valid, got %v", tc.url, err)
+			}
+			if !tc.wantValid && err == nil {
+				t.Errorf("expected %q rejected, got nil error", tc.url)
+			}
+		})
+	}
+}

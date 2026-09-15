@@ -32,9 +32,7 @@ export const listCommand = async (): Promise<CommandResult | void> => {
       message: `${pagination.total.toLocaleString()} dataset${pagination.total === 1 ? "" : "s"}`,
     });
 
-    spinner.succeed(
-      `Found ${pagination.total} dataset${pagination.total !== 1 ? "s" : ""}`,
-    );
+    spinner.succeed(`Found ${pagination.total} dataset${pagination.total !== 1 ? "s" : ""}`);
 
     events.completed({
       count: datasets.length,
@@ -50,7 +48,9 @@ export const listCommand = async (): Promise<CommandResult | void> => {
           console.log(chalk.gray("No datasets found."));
           console.log(chalk.gray("Create your first dataset with:"));
           console.log(
-            chalk.cyan('  langwatch dataset create "My Dataset" --columns input:string,output:string'),
+            chalk.cyan(
+              '  langwatch dataset create "My Dataset" --columns input:string,output:string',
+            ),
           );
         } else {
           console.log();

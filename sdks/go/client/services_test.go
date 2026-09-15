@@ -20,7 +20,7 @@ func TestDatasets(t *testing.T) {
 			var mu sync.Mutex
 			var gotQuery string
 			c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
-				assert.Equal(t, "/api/dataset", r.URL.Path)
+				assert.Equal(t, "/api/v1/dataset", r.URL.Path)
 				mu.Lock()
 				gotQuery = r.URL.Query().Encode()
 				mu.Unlock()
@@ -48,7 +48,7 @@ func TestDatasets(t *testing.T) {
 			var gotBody map[string]any
 			c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 				assert.Equal(t, http.MethodPost, r.Method)
-				assert.Equal(t, "/api/dataset/golden/records", r.URL.Path)
+				assert.Equal(t, "/api/v1/dataset/golden/records", r.URL.Path)
 				raw, _ := io.ReadAll(r.Body)
 				mu.Lock()
 				_ = json.Unmarshal(raw, &gotBody)
@@ -73,7 +73,7 @@ func TestTraces(t *testing.T) {
 			var gotBody map[string]any
 			c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 				assert.Equal(t, http.MethodPost, r.Method)
-				assert.Equal(t, "/api/traces/search", r.URL.Path)
+				assert.Equal(t, "/api/v1/traces/search", r.URL.Path)
 				raw, _ := io.ReadAll(r.Body)
 				mu.Lock()
 				_ = json.Unmarshal(raw, &gotBody)
@@ -102,7 +102,7 @@ func TestTraces(t *testing.T) {
 			var mu sync.Mutex
 			var gotQuery string
 			c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
-				assert.Equal(t, "/api/traces/trace_1", r.URL.Path)
+				assert.Equal(t, "/api/v1/traces/trace_1", r.URL.Path)
 				mu.Lock()
 				gotQuery = r.URL.Query().Encode()
 				mu.Unlock()
@@ -124,7 +124,7 @@ func TestAnnotations(t *testing.T) {
 		// @scenario "Listing every annotation returns the annotations"
 		t.Run("when listing every annotation", func(t *testing.T) {
 			c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
-				assert.Equal(t, "/api/annotations", r.URL.Path)
+				assert.Equal(t, "/api/v1/annotations", r.URL.Path)
 				_, _ = w.Write([]byte(`{"data":[{"id":"ann_1"},{"id":"ann_2"}]}`))
 			})
 			list, err := c.Annotations.List(context.Background())
@@ -136,7 +136,7 @@ func TestAnnotations(t *testing.T) {
 		// @scenario "Fetching one annotation returns the annotation"
 		t.Run("when fetching one annotation by id", func(t *testing.T) {
 			c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
-				assert.Equal(t, "/api/annotations/ann_1", r.URL.Path)
+				assert.Equal(t, "/api/v1/annotations/ann_1", r.URL.Path)
 				_, _ = w.Write([]byte(`{"data":{"id":"ann_1","comment":"Great"}}`))
 			})
 			a, err := c.Annotations.Get(context.Background(), "ann_1")
@@ -147,7 +147,7 @@ func TestAnnotations(t *testing.T) {
 		// @scenario "Listing a trace's annotations returns the annotations"
 		t.Run("when listing the annotations on a trace", func(t *testing.T) {
 			c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
-				assert.Equal(t, "/api/annotations/trace/trace_1", r.URL.Path)
+				assert.Equal(t, "/api/v1/annotations/trace/trace_1", r.URL.Path)
 				_, _ = w.Write([]byte(`{"data":[{"id":"ann_1"}]}`))
 			})
 			list, err := c.Annotations.ListByTrace(context.Background(), "trace_1")
@@ -162,7 +162,7 @@ func TestAnnotations(t *testing.T) {
 			var gotBody map[string]any
 			c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 				assert.Equal(t, http.MethodPost, r.Method)
-				assert.Equal(t, "/api/annotations/trace/trace_1", r.URL.Path)
+				assert.Equal(t, "/api/v1/annotations/trace/trace_1", r.URL.Path)
 				raw, _ := io.ReadAll(r.Body)
 				mu.Lock()
 				_ = json.Unmarshal(raw, &gotBody)
@@ -189,7 +189,7 @@ func TestAnnotations(t *testing.T) {
 			var gotBody map[string]any
 			c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 				assert.Equal(t, http.MethodPatch, r.Method)
-				assert.Equal(t, "/api/annotations/ann_1", r.URL.Path)
+				assert.Equal(t, "/api/v1/annotations/ann_1", r.URL.Path)
 				raw, _ := io.ReadAll(r.Body)
 				mu.Lock()
 				_ = json.Unmarshal(raw, &gotBody)
@@ -218,7 +218,7 @@ func TestAnnotations(t *testing.T) {
 		t.Run("when listing annotations", func(t *testing.T) {
 			c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 				assert.Equal(t, http.MethodGet, r.Method)
-				assert.Equal(t, "/api/annotations", r.URL.Path)
+				assert.Equal(t, "/api/v1/annotations", r.URL.Path)
 				_, _ = w.Write([]byte(`{"data":[]}`))
 			})
 			list, err := c.Annotations.List(context.Background())
@@ -287,7 +287,7 @@ func TestTriggersService(t *testing.T) {
 	t.Run("given triggers exist", func(t *testing.T) {
 		t.Run("when listing", func(t *testing.T) {
 			c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
-				assert.Equal(t, "/api/triggers", r.URL.Path)
+				assert.Equal(t, "/api/v1/triggers", r.URL.Path)
 				_, _ = w.Write([]byte(`[{"id":"trig_1","name":"Alert","active":true,"action":"send_email","actionParams":{},"filters":{},"platformUrl":"https://x","createdAt":"","updatedAt":""}]`))
 			})
 			triggers, err := c.Triggers.List(context.Background())
@@ -307,7 +307,7 @@ func TestMonitorsService(t *testing.T) {
 			var gotBody map[string]any
 			c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
 				assert.Equal(t, http.MethodPost, r.Method)
-				assert.Equal(t, "/api/monitors/mon_1/toggle", r.URL.Path)
+				assert.Equal(t, "/api/v1/monitors/mon_1/toggle", r.URL.Path)
 				raw, _ := io.ReadAll(r.Body)
 				mu.Lock()
 				_ = json.Unmarshal(raw, &gotBody)
@@ -339,7 +339,7 @@ func TestScenariosService(t *testing.T) {
 			var mu sync.Mutex
 			var gotQuery string
 			c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
-				assert.Equal(t, "/api/simulation-runs", r.URL.Path)
+				assert.Equal(t, "/api/v1/simulation-runs", r.URL.Path)
 				mu.Lock()
 				gotQuery = r.URL.Query().Encode()
 				mu.Unlock()

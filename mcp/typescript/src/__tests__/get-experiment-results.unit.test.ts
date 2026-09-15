@@ -26,7 +26,14 @@ const sample = {
   ],
   evaluations: [
     { evaluator: "quality", index: 0, status: "processed", score: 0.9, passed: true },
-    { evaluator: "quality", index: 2, status: "processed", score: 0.2, passed: false, details: "off-topic" },
+    {
+      evaluator: "quality",
+      index: 2,
+      status: "processed",
+      score: 0.2,
+      passed: false,
+      details: "off-topic",
+    },
     { evaluator: "safety", index: 0, status: "processed", score: 1.0, passed: true },
   ],
   timestamps: { createdAt: 0, updatedAt: 0, finishedAt: 1 },
@@ -44,7 +51,7 @@ describe("handleExperimentResults()", () => {
         await handleExperimentResults({ runId: "run_1" });
         expect(mockMakeRequest).toHaveBeenCalledWith(
           "GET",
-          "/api/experiments/runs/run_1/results",
+          "/api/v1/experiments/runs/run_1/results",
         );
       });
 

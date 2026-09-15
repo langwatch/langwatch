@@ -1,14 +1,13 @@
 /**
- * The `/api/roles` management family: the organization's custom RBAC roles and
- * the permission catalog they are built from.
- *
- * CLI-only, and deliberately not exported from the client SDK's public index.
+ * The `/api/v1/roles` management family: the organization's custom RBAC roles and the
+ * permission catalog they are built from.
  */
 import { resolveEndpoint } from "@/internal/endpoint";
 import {
   createManagementRequest,
-  resolveManagementToken,
+  managementPath,
   type ManagementRequest,
+  resolveManagementToken,
 } from "../_shared/management-request";
 
 export interface CustomRole {
@@ -63,44 +62,37 @@ export class RolesApiService {
     this.#request = createManagementRequest({
       endpoint: resolveEndpoint(config?.endpoint),
       token: resolveManagementToken({ apiKey: config?.apiKey }),
-      errorFactory: ({ message, operation, body }) =>
-        new RolesApiError(message, operation, body),
+      errorFactory: ({ message, operation, body }) => new RolesApiError(message, operation, body),
     });
   }
 
   async list(): Promise<{ roles: CustomRole[] }> {
     return this.#request({
       operation: "list custom roles",
-      path: "/api/roles",
+      path: managementPath("/api/v1/roles"),
     });
   }
 
   async get(id: string): Promise<CustomRole> {
     return this.#request({
       operation: `fetch custom role "${id}"`,
-      path: `/api/roles/${encodeURIComponent(id)}`,
+      path: managementPath(`/api/v1/roles/${encodeURIComponent(id)}`),
     });
   }
 
   async create(input: CreateRoleInput): Promise<CustomRole> {
     return this.#request({
       operation: "create custom role",
-      path: "/api/roles",
+      path: managementPath("/api/v1/roles"),
       method: "POST",
       body: input,
     });
   }
 
-  async update({
-    id,
-    input,
-  }: {
-    id: string;
-    input: UpdateRoleInput;
-  }): Promise<CustomRole> {
+  async update({ id, input }: { id: string; input: UpdateRoleInput }): Promise<CustomRole> {
     return this.#request({
       operation: `update custom role "${id}"`,
-      path: `/api/roles/${encodeURIComponent(id)}`,
+      path: managementPath(`/api/v1/roles/${encodeURIComponent(id)}`),
       method: "PATCH",
       body: input,
     });
@@ -109,7 +101,7 @@ export class RolesApiService {
   async delete(id: string): Promise<{ success: true }> {
     return this.#request({
       operation: `delete custom role "${id}"`,
-      path: `/api/roles/${encodeURIComponent(id)}`,
+      path: managementPath(`/api/v1/roles/${encodeURIComponent(id)}`),
       method: "DELETE",
     });
   }
@@ -117,7 +109,7 @@ export class RolesApiService {
   async permissions(): Promise<PermissionCatalog> {
     return this.#request({
       operation: "fetch the permission catalog",
-      path: "/api/roles/permissions",
+      path: managementPath("/api/v1/roles/permissions"),
     });
   }
 }

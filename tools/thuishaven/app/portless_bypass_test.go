@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"fmt"
+	"slices"
 	"testing"
 
 	"go.uber.org/zap"
@@ -148,6 +149,89 @@ func TestPortlessEnabledProvisionsThroughProxy(t *testing.T) {
 	}
 	if len(proxy.registered) == 0 {
 		t.Error("services must be registered with the proxy when portless is enabled")
+	}
+}
+
+// @scenario "The additive api.<slug> hostname routes to the api process"
+func TestAPIGetsItsOwnAdditiveHostnameThroughTheProxy(t *testing.T) {
+	store := &fakeStore{slugCache: map[string]string{"/wt/x": "x"}}
+	sys := &playPortSystem{}
+	proxy := &recordingProxy{}
+	o := &Orchestrator{
+		cfg:   Config{Naming: domain.DefaultNaming(""), PortlessDisabled: false},
+		store: store, sys: sys, proxy: proxy, log: zap.NewNop(),
+	}
+	p := UpParams{WorktreeDir: "/wt/x", IsLinkedWorktree: true, Branch: "x"}
+
+	st, cleanup, err := o.provision(context.Background(), p, PlanOptions{Selection: domain.DefaultSelection()}, false)
+	if err != nil {
+		t.Fatalf("provision: %v", err)
+	}
+	defer cleanup()
+
+	api, ok := serviceByName(st.Services, domain.APIService)
+	if !ok {
+		t.Fatal("no api service in the provisioned stack - api.<slug> must be additive alongside app.<slug>.../api")
+	}
+	if api.Port != st.APIPort {
+		t.Errorf("api service port = %d, want the same port as app's own /api backend (%d)", api.Port, st.APIPort)
+	}
+	wantScheme, wantPort := proxy.Endpoint()
+	wantURL := o.cfg.Naming.URL(domain.APIService, st.Slug, wantScheme, wantPort)
+	if api.URL != wantURL {
+		t.Errorf("api URL = %q, want %q", api.URL, wantURL)
+	}
+
+	registered := false
+	for _, r := range proxy.registered {
+		if r == domain.APIService+"."+st.Slug {
+			registered = true
+		}
+	}
+	if !registered {
+		t.Errorf("api.<slug> must be registered with the proxy, got %v", proxy.registered)
+	}
+
+	// app's own hostname keeps working unchanged - this is additive, not a
+	// replacement.
+	app, ok := serviceByName(st.Services, "app")
+	if !ok || app.URL == api.URL {
+		t.Fatalf("app must keep its own distinct hostname, got app=%+v api=%+v", app, api)
+	}
+
+	cleanup()
+	if !slices.Contains(proxy.removed, domain.APIService+"."+st.Slug) {
+		t.Errorf("teardown must remove api.<slug>'s route along with every other service's, got %v", proxy.removed)
+	}
+}
+
+// @scenario "The additive api.<slug> hostname routes to the api process"
+func TestAPIHostnameFollowsPortlessBypassLikeEveryOtherService(t *testing.T) {
+	store := &fakeStore{slugCache: map[string]string{"/wt/x": "x"}}
+	sys := &playPortSystem{}
+	proxy := &recordingProxy{}
+	o := &Orchestrator{
+		cfg:   Config{Naming: domain.DefaultNaming(""), PortlessDisabled: true},
+		store: store, sys: sys, proxy: proxy, log: zap.NewNop(),
+	}
+	p := UpParams{WorktreeDir: "/wt/x", IsLinkedWorktree: true, Branch: "x"}
+
+	st, cleanup, err := o.provision(context.Background(), p, PlanOptions{Selection: domain.DefaultSelection()}, false)
+	if err != nil {
+		t.Fatalf("provision: %v", err)
+	}
+	defer cleanup()
+
+	api, ok := serviceByName(st.Services, domain.APIService)
+	if !ok {
+		t.Fatal("no api service provisioned")
+	}
+	wantURL := fmt.Sprintf("http://api.%s.langwatch.localhost:%d", st.Slug, api.Port)
+	if api.URL != wantURL {
+		t.Errorf("api URL = %q, want %q - plain http on its own loopback port under PORTLESS=0", api.URL, wantURL)
+	}
+	if len(proxy.registered) != 0 {
+		t.Errorf("no service, including api, should be registered with the proxy under PORTLESS=0, got %v", proxy.registered)
 	}
 }
 

@@ -1,0 +1,22 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "lib": ["es2023", "dom", "dom.iterable"],
+    "types": [],
+    "noUncheckedIndexedAccess": true,
+    "noImplicitReturns": true,
+    "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo/ui.tsbuildinfo",
+    "verbatimModuleSyntax": true,
+    // `better-auth`'s real declarations reach its server half and a SQL query
+    // builder: 576 files, 251 of them kysely, in a program that runs in a
+    // browser. These two entries point the CHECKER at the trimmed contract in
+    // `packages/browser-types/`; vite still resolves the real packages at runtime.
+    "paths": {
+      "better-auth/react": ["../../packages/browser-types/better-auth-react.d.ts"],
+      "@better-auth/passkey/client": ["../../packages/browser-types/better-auth-passkey-client.d.ts"]
+    }
+  },
+  "include": ["src/**/*.ts", "src/**/*.tsx"],
+  "exclude": ["**/__tests__/**", "**/__mocks__/**", "**/tests/**", "**/*.test.*", "**/*.spec.*"]
+}

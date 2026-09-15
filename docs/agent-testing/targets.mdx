@@ -9,15 +9,19 @@ description: A target is the agent, prompt, code agent or workflow a run sends t
 
 Every turn of a scenario goes to the target, which answers as the agent under test. Each type receives the conversation in a different form.
 
-| Type | Where it is created | What it receives |
-|---|---|---|
-| **HTTP Agent** | **Agents**, **New Agent**, **HTTP Agent** | An HTTP request built from the URL, the headers and the body template you configure, with `{{ messages }}`, `{{ input }}`, `{{ threadId }}` and `{{ params.NAME }}` rendered in. |
-| **Prompt** | **Prompts** | The prompt template of the project, with its inputs bound by name and `{{ messages }}` as the transcript. |
-| **Code Agent** | **Agents**, **New Agent**, **Code Agent** | A Python `__call__(message)` run by the platform, with `params` and `secrets` injected. |
-| **Workflow Agent** | **Agents**, **New Agent**, **Workflow Agent** | The workflow's entry inputs, one per parameter. |
+| Type               | Where it is created                           | What it receives                                                                                                                                                                 |
+| ------------------ | --------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **HTTP Agent**     | **Agents**, **New Agent**, **HTTP Agent**     | An HTTP request built from the URL, the headers and the body template you configure, with `{{ messages }}`, `{{ input }}`, `{{ threadId }}` and `{{ params.NAME }}` rendered in. |
+| **Prompt**         | **Prompts**                                   | The prompt template of the project, with its inputs bound by name and `{{ messages }}` as the transcript.                                                                        |
+| **Code Agent**     | **Agents**, **New Agent**, **Code Agent**     | A Python `__call__(message)` run by the platform, with `params` and `secrets` injected.                                                                                          |
+| **Workflow Agent** | **Agents**, **New Agent**, **Workflow Agent** | The workflow's entry inputs, one per parameter.                                                                                                                                  |
 
 <Frame>
-<img className="block" src="/images/agent-testing/agent-type-selector.png" alt="The Choose Agent Connection Type dialog with Connect from Code, HTTP Agent, Code Agent and Workflow Agent" />
+  <img
+    className="block"
+    src="/images/agent-testing/agent-type-selector.png"
+    alt="The Choose Agent Connection Type dialog with Connect from Code, HTTP Agent, Code Agent and Workflow Agent"
+  />
 </Frame>
 
 An HTTP agent is the target for an agent that runs in your own infrastructure; [Connect your agent](/agent-testing/connect-your-agent) registers one. A prompt is the target when the agent is one model call with a prompt you keep in LangWatch.
@@ -27,7 +31,11 @@ An HTTP agent is the target for an agent that runs in your own infrastructure; [
 The run dialog asks for the **Agent to be tested**. **Run against a prompt** in **Customize your run** swaps it for **Prompt to be tested** and lists the prompts of the project.
 
 <Frame>
-<img className="block" src="/images/agent-testing/run-dialog-prompt-target.png" alt="The run dialog with Prompt to be tested selected" />
+  <img
+    className="block"
+    src="/images/agent-testing/run-dialog-prompt-target.png"
+    alt="The run dialog with Prompt to be tested selected"
+  />
 </Frame>
 
 **Setup agent**, the first step on an empty Scenarios tab, creates the first HTTP agent of the project.

@@ -1,0 +1,131 @@
+import { type RefObject, useCallback, useEffect, useRef, useState } from "react";
+import { useFocusSectionStore } from "../../../../../behavior/focus-section.store.ts";
+
+/**
+ * Wires an accordion stack to the cross-component focus pipeline:
+ */
+function watchForSectionAndGlow(
+  root: HTMLElement,
+  tryScrollAndGlow: () => boolean,
+  clearFocus: () => void,
+): { observer: MutationObserver; bailTimer: number } {
+  const observer = new MutationObserver(() => {
+    if (tryScrollAndGlow()) {
+      observer.disconnect();
+      window.clearTimeout(bailTimer);
+    }
+  });
+  observer.observe(root, { childList: true, subtree: true });
+  // Safety net so we don't keep observing forever if the section
+  // never shows up (wrong trace, focus request to a section this
+  // stack doesn't render, etc.). 5s is generous for slow detail
+  // queries on dev infra.
+  const bailTimer = window.setTimeout(() => {
+    observer.disconnect();
+    clearFocus();
+  }, 5000);
+  return { observer, bailTimer };
+}
+
+export function useSectionFocusGlow({
+  traceId,
+  sections,
+  openSections,
+  setOpenSections,
+  containerRef,
+}: {
+  traceId: string;
+  sections: readonly string[];
+  openSections: string[];
+  setOpenSections: (next: string[]) => void;
+  containerRef: RefObject<HTMLElement | null>;
+}) {
+  const pendingFocus = useFocusSectionStore((s) => s.pending);
+  const clearFocus = useFocusSectionStore((s) => s.clear);
+  const [glow, setGlow] = useState<{
+    target: HTMLElement;
+    nonce: number;
+  } | null>(null);
+  const handleGlowDone = useCallback(() => setGlow(null), []);
+  // Refs so the effect can read latest open-state without re-running
+  // (and thus retriggering scroll) every time the list reference changes.
+  const openSectionsRef = useRef(openSections);
+  openSectionsRef.current = openSections;
+  const setOpenSectionsRef = useRef(setOpenSections);
+  setOpenSectionsRef.current = setOpenSections;
+
+  useEffect(() => {
+    if (!pendingFocus) return;
+    if (pendingFocus.traceId !== traceId) return;
+    if (!sections.includes(pendingFocus.section)) return;
+    const currentOpen = openSectionsRef.current;
+    setOpenSectionsRef.current(
+      currentOpen.includes(pendingFocus.section)
+        ? currentOpen
+        : [...currentOpen, pendingFocus.section],
+    );
+    const root = containerRef.current;
+    if (!root) return;
+    return scrollSectionIntoGlow({
+      clearFocus,
+      nonce: pendingFocus.nonce,
+      root,
+      section: pendingFocus.section,
+      setGlow,
+    });
+  }, [pendingFocus, traceId, sections, containerRef, clearFocus]);
+
+  return { glow, handleGlowDone };
+}
+
+/**
+ * Scrolls the named section into view and pulses it, waiting for the section to
+ * mount when the stack has not rendered it yet. Returns the effect's cleanup.
+ */
+function scrollSectionIntoGlow({
+  clearFocus,
+  nonce,
+  root,
+  section,
+  setGlow,
+}: {
+  clearFocus: () => void;
+  nonce: number;
+  root: HTMLElement;
+  section: string;
+  setGlow: (glow: { target: HTMLElement; nonce: number }) => void;
+}): () => void {
+  let observer: MutationObserver | null = null;
+  let bailTimer = 0;
+  const scrollAndGlow = () => {
+    const el = root.querySelector<HTMLElement>(`[data-section="${section}"]`);
+    if (!el) return false;
+    el.scrollIntoView({ behavior: "smooth", block: "start" });
+    // Mount the overlay AFTER the scroll starts so the pulse lands
+    // on the section already in view rather than ticking out
+    // mid-scroll. The nonce keys the overlay so a re-click
+    // remounts + restarts the keyframe.
+    setGlow({ target: el, nonce });
+    clearFocus();
+    return true;
+  };
+  // Two rAFs so the accordion has actually expanded before we measure
+  // + scroll. The first flushes the open-state setState; layout
+  // commits on the second.
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      if (scrollAndGlow()) return;
+      // The target section isn't in the DOM yet — common when the
+      // span tab just mounted and `useSpanDetail` is still loading
+      // (the skeleton renders instead of the accordion stack). Watch
+      // for the section to appear, then run the same scroll+glow.
+      const watch = watchForSectionAndGlow(root, scrollAndGlow, clearFocus);
+      observer = watch.observer;
+      bailTimer = watch.bailTimer;
+    });
+  });
+  return () => {
+    observer?.disconnect();
+    window.clearTimeout(bailTimer);
+  };
+}

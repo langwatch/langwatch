@@ -48,10 +48,7 @@ Queue producers and consumers can use `getJobContextMetadata` and `createContext
 OpenTelemetry helpers are also isolated from the browser-safe package root:
 
 ```ts
-import {
-  getActiveTraceId,
-  injectTraceContextHeaders,
-} from "@langwatch/observability/tracing";
+import { getActiveTraceId, injectTraceContextHeaders } from "@langwatch/observability/tracing";
 
 const { headers, traceId } = injectTraceContextHeaders({ headers: {} });
 ```
@@ -70,14 +67,20 @@ logHttpRequest(logger, {
 });
 ```
 
-## Environment variables
+## Process configuration
 
-| Variable | Default | Description |
-|---|---|---|
-| `PINO_LOG_LEVEL` | `debug` in Node.js, `info` in browser | Base logger level |
-| `LOG_CONSOLE_LEVEL` | `info` | Console level (`PINO_CONSOLE_LEVEL` is the compatibility fallback) |
-| `LOG_OTEL_LEVEL` | `debug` | OTel level (`PINO_OTEL_LEVEL` is the compatibility fallback) |
-| `PINO_OTEL_ENABLED` | `false` | Set to `true` to enable OTel log export |
+The package does not read environment variables. Each process composition root
+maps its deployment environment into `LoggerConfiguration`, calls
+`configureLogger()` before importing modules that create loggers, then reuses
+that configured factory for the process lifetime. The legacy environment names
+remain process-composition compatibility inputs:
+
+| Variable            | Default                               | Description                                                        |
+| ------------------- | ------------------------------------- | ------------------------------------------------------------------ |
+| `PINO_LOG_LEVEL`    | `debug` in Node.js, `info` in browser | Base logger level                                                  |
+| `LOG_CONSOLE_LEVEL` | `info`                                | Console level (`PINO_CONSOLE_LEVEL` is the compatibility fallback) |
+| `LOG_OTEL_LEVEL`    | `debug`                               | OTel level (`PINO_OTEL_LEVEL` is the compatibility fallback)       |
+| `PINO_OTEL_ENABLED` | `false`                               | Set to `true` to enable OTel log export                            |
 
 ## Testing
 

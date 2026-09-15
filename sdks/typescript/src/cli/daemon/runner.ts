@@ -96,10 +96,7 @@ function positiveIntFromEnv(value: string | undefined, fallback: number): number
 }
 
 /** What the daemon does when an abandoned command never settles. */
-export type WedgedHandler = (details: {
-  requestId: string;
-  graceMs: number;
-}) => void;
+export type WedgedHandler = (details: { requestId: string; graceMs: number }) => void;
 
 /**
  * The default: stop being a daemon.

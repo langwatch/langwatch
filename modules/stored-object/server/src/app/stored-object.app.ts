@@ -1,0 +1,263 @@
+/**
+ * The stored-object feature's application. Two shapes of read reach an object
+ * and they are not one operation: the portable capability answers metadata and
+ * an async iterable, the byte surface needs the ROW. Each has its own name.
+ */
+import type { Readable } from "node:stream";
+import { reads, type MembersRead } from "@langwatch/infrastructure/members";
+import type { FeatureSetup } from "@langwatch/runtime-composition";
+import { StoredObjectApi } from "@langwatch/stored-object-contract";
+import { z } from "zod";
+import { buildStoredObjectInfrastructure } from "./stored-object-composition.build.ts";
+import type {
+  DeleteProjectStoredObjectsResult,
+  ReadStoredObjectResult,
+  StoreStoredObjectFromBytesInput,
+  StoreStoredObjectFromBytesResult,
+  StoredObjectFileRow,
+  StoredObjectHead,
+  StoredObjectIdDeriver,
+  StoredObjectMetadata,
+  StoredObjectOwnerResolver,
+  StoredObjectReference,
+  StoredObjectsConfirmUploadInput,
+  StoredObjectsCreateUploadInput,
+  StoredObjectsCreateUploadOutput,
+  StoredObjectsDeleteInput,
+  StoredObjectsDeleteOutput,
+  StoredObjectsGetInput,
+  StoredObjectsGetOutput,
+} from "@langwatch/stored-object-contract";
+import type {
+  StoredObjectDelivery,
+  StoredObjectStorage,
+  StoredObjectUploadTokenCodec,
+} from "./stored-object.members.ts";
+import type { StoredObjectRepositories } from "../repositories/stored-object.repositories.ts";
+import { StoredObjectService } from "../services/stored-object.service.ts";
+
+/**
+ * The contract's byte read, narrowed to the Node stream this process's byte
+ * backends hand over: `Readable` is an `AsyncIterable<Uint8Array>`, so the
+ * narrower answer still satisfies the contract's `readById`.
+ */
+export type StoredObjectFileStreamRead =
+  | { row: StoredObjectFileRow; stream: Readable }
+  | { row: StoredObjectFileRow; status: "missing" };
+
+/**
+ * The stored-object reads the byte surface and the probe perform, as the
+ * process supplies them. Separate from the portable capability because it is
+ * shaped differently rather than merely narrower.
+ */
+export interface StoredObjectFileReader {
+  headById(input: Readonly<{ projectId: string; id: string }>): Promise<StoredObjectHead>;
+  tryGetById(
+    input: Readonly<{ projectId: string; id: string }>,
+  ): Promise<StoredObjectFileStreamRead | null>;
+}
+
+export type StoredObjectInfrastructure = Readonly<{
+  storage: StoredObjectStorage;
+  delivery: StoredObjectDelivery;
+  uploadTokens: StoredObjectUploadTokenCodec;
+  idDeriver: StoredObjectIdDeriver;
+  maximumUploadBytes: number;
+  uploadExpiryMs: number;
+  /** The row-and-stream reads the byte surface and the probe perform. */
+  files: StoredObjectFileReader;
+  /** Which project owns an object, when the URL does not say. */
+  owners: StoredObjectOwnerResolver;
+}>;
+
+/**
+ * Stored-objects backend selection config; routes as plain object for JSON schema parsing.
+ */
+const storedObjectS3ConfigSchema = z.object({
+  bucket: z.string().optional(),
+  endpoint: z.string().optional(),
+  region: z.string().optional(),
+  accessKeyId: z.string().optional(),
+  secretAccessKey: z.string().optional(),
+  sessionToken: z.string().optional(),
+});
+
+const storedObjectAzureConfigSchema = z.object({
+  authMode: z.string().optional(),
+  accountName: z.string().optional(),
+  accountKey: z.string().optional(),
+  container: z.string().optional(),
+  endpoint: z.string().optional(),
+  authorityHost: z.string().optional(),
+  tokenAudience: z.string().optional(),
+  allowInsecureTokenEndpointForTests: z.boolean().default(false),
+  identity: z
+    .object({
+      tenantId: z.string().optional(),
+      clientId: z.string().optional(),
+      federatedTokenFile: z.string().optional(),
+    })
+    .default(() => ({})),
+});
+
+const storedObjectAppConfigSchema = z.object({
+  backend: z.enum(["s3", "azure"]).optional(),
+  localFilesystemRoot: z.string().optional(),
+  s3: storedObjectS3ConfigSchema.default(() => ({})),
+  azure: storedObjectAzureConfigSchema.default(() => ({
+    allowInsecureTokenEndpointForTests: false,
+    identity: {},
+  })),
+  azureSpoolRetentionConfirmed: z.boolean().default(false),
+  /** One organization's own S3 account, keyed by organization id. */
+  routes: z
+    .record(
+      z.string(),
+      z.object({
+        endpoint: z.string().optional(),
+        bucket: z.string().optional(),
+        accessKeyId: z.string().optional(),
+        secretAccessKey: z.string().optional(),
+      }),
+    )
+    .default(() => ({})),
+});
+export type StoredObjectAppConfig = z.infer<typeof storedObjectAppConfigSchema>;
+
+/** {@link StoredObjectSetup}'s members, once built into what the app composes over. */
+type StoredObjectDependencies = Record<never, never>;
+
+type StoredObjectSetup = FeatureSetup<
+  StoredObjectDependencies,
+  MembersRead<typeof StoredObjectApp.reads>,
+  StoredObjectAppConfig,
+  StoredObjectRepositories
+>;
+
+export class StoredObjectApp implements StoredObjectApi {
+  static readonly contract = StoredObjectApi;
+  static readonly dependencies = {};
+  static readonly configSchema = storedObjectAppConfigSchema;
+  static readonly reads = reads("prisma", "clickhouse", "logger");
+
+  /**
+   * Builds this process's own {@link StoredObjectInfrastructure} from the
+   * members it reads and its own config, then composes over it exactly as
+   * {@link StoredObjectApp.fromInfrastructure} does.
+   */
+  static create(setup: StoredObjectSetup): StoredObjectApp {
+    const infrastructure = buildStoredObjectInfrastructure({
+      members: setup.members,
+      config: setup.config,
+      resources: setup.resources,
+    });
+
+    return StoredObjectApp.fromInfrastructure({
+      infrastructure,
+      repositories: setup.repositories,
+    });
+  }
+
+  /**
+   * Composes over an already-built {@link StoredObjectInfrastructure}. Kept
+   * because every unit test's fixture still builds one directly rather than
+   * reading process members.
+   */
+  static fromInfrastructure(setup: {
+    infrastructure: StoredObjectInfrastructure;
+    repositories: StoredObjectRepositories;
+  }): StoredObjectApp {
+    const { infrastructure: members, repositories } = setup;
+
+    return new StoredObjectApp(
+      StoredObjectService.create({
+        records: repositories.records,
+        storage: members.storage,
+        delivery: members.delivery,
+        uploadTokens: members.uploadTokens,
+        idDeriver: members.idDeriver,
+        maximumUploadBytes: members.maximumUploadBytes,
+        uploadExpiryMs: members.uploadExpiryMs,
+      }),
+      members.files,
+      members.owners,
+    );
+  }
+
+  #storedObjects: StoredObjectService;
+  #files: StoredObjectFileReader;
+  #owners: StoredObjectOwnerResolver;
+
+  private constructor(
+    storedObjects: StoredObjectService,
+    files: StoredObjectFileReader,
+    owners: StoredObjectOwnerResolver,
+  ) {
+    this.#storedObjects = storedObjects;
+    this.#files = files;
+    this.#owners = owners;
+  }
+
+  /** Begins an upload and answers where to put the bytes. */
+  createUpload(input: StoredObjectsCreateUploadInput): Promise<StoredObjectsCreateUploadOutput> {
+    return this.#storedObjects.createUpload(input);
+  }
+
+  /** Completes an upload the caller has finished writing. */
+  confirmUpload(input: StoredObjectsConfirmUploadInput): Promise<StoredObjectReference> {
+    return this.#storedObjects.confirmUpload(input);
+  }
+
+  /** A fresh delivery capability for one object. */
+  resolveDelivery(input: StoredObjectsGetInput): Promise<StoredObjectsGetOutput> {
+    return this.#storedObjects.resolveDelivery(input);
+  }
+
+  /** Removes one object. Idempotent from the caller's side. */
+  delete(input: StoredObjectsDeleteInput): Promise<StoredObjectsDeleteOutput> {
+    return this.#storedObjects.delete(input);
+  }
+
+  /** Whether an object's row AND its bytes exist. */
+  headById(input: Readonly<{ projectId: string; id: string }>): Promise<StoredObjectHead> {
+    return this.#files.headById(input);
+  }
+
+  /** One object's row and, when the bytes are there, a stream of them. */
+  readById(
+    input: Readonly<{ projectId: string; id: string }>,
+  ): Promise<StoredObjectFileStreamRead | null> {
+    return this.#files.tryGetById(input);
+  }
+
+  /**
+   * Which project owns an object, for a URL that does not say. A transient
+   * outage on one instance raises rather than answering "no owner": a degraded
+   * instance must not read as a deleted object.
+   */
+  resolveOwner(input: { id: string }): Promise<{ projectId: string } | null> {
+    return this.#owners.tryResolve(input);
+  }
+
+  storeFromBytes(
+    input: StoreStoredObjectFromBytesInput,
+  ): Promise<StoreStoredObjectFromBytesResult> {
+    return this.#storedObjects.storeFromBytes(input);
+  }
+
+  getMetadata(input: { projectId: string; id: string }): Promise<StoredObjectMetadata> {
+    return this.#storedObjects.getMetadata(input);
+  }
+
+  getById(input: { projectId: string; id: string }): Promise<ReadStoredObjectResult> {
+    return this.#storedObjects.getById(input);
+  }
+
+  getStorageUsageByProject(input: { projectId: string; purpose?: string }) {
+    return this.#storedObjects.getStorageUsageByProject(input);
+  }
+
+  deleteOwnedBy(input: { projectId: string }): Promise<DeleteProjectStoredObjectsResult> {
+    return this.#storedObjects.deleteOwnedBy(input);
+  }
+}

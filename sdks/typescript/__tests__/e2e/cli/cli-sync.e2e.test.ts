@@ -7,26 +7,13 @@
  * TODO: To run against the actual server locally, set CI=false
  */
 
-import {
-  describe,
-  expect,
-  it,
-  afterEach,
-  beforeEach,
-  afterAll,
-  beforeAll,
-} from "vitest";
+import { describe, expect, it, afterEach, beforeEach, afterAll, beforeAll } from "vitest";
 import * as fs from "fs";
 import * as path from "path";
 import { randomUUID } from "crypto";
 
 import { config } from "dotenv";
-import {
-  expectations,
-  CliRunner,
-  LockFileManager,
-  PromptFileManager,
-} from "./helpers";
+import { expectations, CliRunner, LockFileManager, PromptFileManager } from "./helpers";
 import { LangWatch } from "../../../dist";
 import { ApiHelpers } from "./helpers/api-helpers";
 
@@ -120,8 +107,7 @@ describe("CLI E2E", () => {
         // Verify prompt file content. Tracks the CLI default template; the
         // template intentionally omits modelParameters.temperature because
         // the gpt-5 family rejects a custom temperature.
-        expect(localPromptFileManagement.getPromptFileContent(promptHandle))
-          .toMatchInlineSnapshot(`
+        expect(localPromptFileManagement.getPromptFileContent(promptHandle)).toMatchInlineSnapshot(`
           "model: openai/gpt-5.5
           messages:
             - role: system
@@ -132,8 +118,7 @@ describe("CLI E2E", () => {
         `);
 
         // Add to config
-        const filePath =
-          localPromptFileManagement.getPromptFilePath(promptHandle);
+        const filePath = localPromptFileManagement.getPromptFilePath(promptHandle);
         cli.run(`prompt add ${promptHandle} ${filePath}`);
 
         // First sync - should create on remote
@@ -171,8 +156,7 @@ describe("CLI E2E", () => {
             { role: "user", content: "You are an updated user message." },
           ],
         });
-        expect(localPromptFileManagement.getPromptFileContent(promptHandle))
-          .toMatchInlineSnapshot(`
+        expect(localPromptFileManagement.getPromptFileContent(promptHandle)).toMatchInlineSnapshot(`
         "model: gpt-4-turbo
         messages:
           - role: system
@@ -226,16 +210,14 @@ describe("CLI E2E", () => {
         promptHandle = createUniquePromptName();
         const createResult = cli.run(`prompt create ${promptHandle}`);
         expectCliResultSuccess(createResult);
-        const filePath =
-          localPromptFileManagement.getPromptFilePath(promptHandle);
+        const filePath = localPromptFileManagement.getPromptFilePath(promptHandle);
         const addResult = cli.run(`prompt add ${promptHandle} ${filePath}`);
         expectCliResultSuccess(addResult);
 
         // First sync - should create on remote
         const sync1 = cli.run("prompt sync");
         expectCliResultSuccess(sync1);
-        const localPrompt =
-          localPromptFileManagement.readPromptFile(promptHandle);
+        const localPrompt = localPromptFileManagement.readPromptFile(promptHandle);
 
         // Verify remote prompt
         const remotePrompt = await langwatch.prompts.get(promptHandle);
@@ -314,8 +296,7 @@ describe("CLI E2E", () => {
             ],
           });
 
-          const current =
-            localPromptFileManagement.readPromptFile(promptHandle);
+          const current = localPromptFileManagement.readPromptFile(promptHandle);
           // Run sync and choose local version ('l')
           const sync = await cli.runInteractive({
             command: `prompt sync`,
@@ -361,9 +342,8 @@ describe("CLI E2E", () => {
       });
 
       it("pulls down the latest version from remote into materialized", async () => {
-        expect(
-          materializedPromptFileManagement.getPromptFileContent(promptHandle),
-        ).toMatchInlineSnapshot(`
+        expect(materializedPromptFileManagement.getPromptFileContent(promptHandle))
+          .toMatchInlineSnapshot(`
           "model: gpt-4-turbo
           messages:
             - role: system
@@ -376,9 +356,7 @@ describe("CLI E2E", () => {
 
       // Skipped due to chronic CI flake — see langwatch/langwatch#3240.
       it.skip("should not be in the prompts directory", () => {
-        expect(() =>
-          localPromptFileManagement.getPromptFileContent(promptHandle),
-        ).toThrow();
+        expect(() => localPromptFileManagement.getPromptFileContent(promptHandle)).toThrow();
       });
 
       describe("when remote is updated", () => {
@@ -387,17 +365,14 @@ describe("CLI E2E", () => {
             commitMessage: "Updated via CLI sync",
             temperature: 0.8,
             model: "gpt-4-turbo",
-            messages: [
-              { role: "system", content: "I am an updated system message." },
-            ],
+            messages: [{ role: "system", content: "I am an updated system message." }],
           });
 
           const sync = cli.run("prompt sync");
           expectCliResultSuccess(sync);
 
-          expect(
-            materializedPromptFileManagement.getPromptFileContent(promptHandle),
-          ).toMatchInlineSnapshot(`
+          expect(materializedPromptFileManagement.getPromptFileContent(promptHandle))
+            .toMatchInlineSnapshot(`
             "model: gpt-4-turbo
             messages:
               - role: system
@@ -420,9 +395,8 @@ describe("CLI E2E", () => {
           const sync = cli.run("prompt sync");
           expectCliResultSuccess(sync);
 
-          expect(
-            materializedPromptFileManagement.getPromptFileContent(promptHandle),
-          ).toMatchInlineSnapshot(`
+          expect(materializedPromptFileManagement.getPromptFileContent(promptHandle))
+            .toMatchInlineSnapshot(`
             "model: gpt-4-turbo
             messages:
               - role: system

@@ -1,8 +1,5 @@
 import { makeRequest } from "./langwatch-api.js";
-import type {
-  RunParameters,
-  RunPlanRunResult,
-} from "./langwatch-api-run-plans.js";
+import type { RunParameters, RunPlanRunResult } from "./langwatch-api-run-plans.js";
 import type { RunPlanTargetWire } from "./schemas/run-plan.js";
 import type {
   EvaluatorAttachmentWire,
@@ -87,21 +84,14 @@ export async function updateTestSuite(params: {
 }
 
 /** Renames a test suite. */
-export async function renameTestSuite(params: {
-  id: string;
-  name: string;
-}): Promise<TestSuite> {
-  return makeRequest(
-    "PATCH",
-    `/api/v1/test-suites/${encodeURIComponent(params.id)}`,
-    { name: params.name },
-  ) as Promise<TestSuite>;
+export async function renameTestSuite(params: { id: string; name: string }): Promise<TestSuite> {
+  return makeRequest("PATCH", `/api/v1/test-suites/${encodeURIComponent(params.id)}`, {
+    name: params.name,
+  }) as Promise<TestSuite>;
 }
 
 /** Archives a test suite and the scenarios filed in it. */
-export async function archiveTestSuite(
-  id: string,
-): Promise<TestSuiteArchiveResponse> {
+export async function archiveTestSuite(id: string): Promise<TestSuiteArchiveResponse> {
   return makeRequest(
     "DELETE",
     `/api/v1/test-suites/${encodeURIComponent(id)}`,

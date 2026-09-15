@@ -1,0 +1,73 @@
+import { Button, HStack, Text, VStack } from "@chakra-ui/react";
+
+import { Dialog } from "../dialog.tsx";
+
+import type { PersonalFeatureKey } from "./use-personal-feature-gate.ts";
+
+const FEATURE_LABEL: Record<PersonalFeatureKey, string> = {
+  evaluations: "Evaluations",
+  datasets: "Datasets",
+  annotations: "Annotations",
+  automations: "Automations",
+};
+
+// Click-to-enable dialog for advanced actions on personal workspace
+// (bundle off).
+// Spec: specs/ai-gateway/governance/personal-workspace-features.feature
+// (@modal scenarios)
+export function PersonalFeatureGateDialog({
+  state,
+}: {
+  state: {
+    open: boolean;
+    feature: PersonalFeatureKey;
+    onConfirm: () => void;
+    onCancel: () => void;
+    isEnabling: boolean;
+  };
+}) {
+  const label = FEATURE_LABEL[state.feature];
+  return (
+    <Dialog.Root
+      open={state.open}
+      onOpenChange={(details) => {
+        if (!details.open) state.onCancel();
+      }}
+      modal
+      size="sm"
+    >
+      <Dialog.Content>
+        <Dialog.Header>
+          <Dialog.Title>Enable advanced features?</Dialog.Title>
+        </Dialog.Header>
+        <Dialog.Body>
+          <VStack align="start" gap={3}>
+            <Text fontSize="sm">
+              {label} is part of the advanced-features bundle for your personal workspace. Turning
+              it on enables Evaluations, Datasets, Annotations, and Automations together.
+            </Text>
+            <Text fontSize="xs" color="fg.muted">
+              You can disable them later in /me/configure, your data is preserved and reappears on
+              re-enable.
+            </Text>
+          </VStack>
+        </Dialog.Body>
+        <Dialog.Footer>
+          <HStack gap={2}>
+            <Button variant="ghost" size="sm" onClick={state.onCancel} disabled={state.isEnabling}>
+              Cancel
+            </Button>
+            <Button
+              size="sm"
+              colorPalette="blue"
+              onClick={state.onConfirm}
+              loading={state.isEnabling}
+            >
+              Enable and continue
+            </Button>
+          </HStack>
+        </Dialog.Footer>
+      </Dialog.Content>
+    </Dialog.Root>
+  );
+}

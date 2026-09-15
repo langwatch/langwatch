@@ -1,36 +1,5 @@
-/**
- * Native, lightweight secrets redaction.
- *
- * Scrubs credentials (cloud + provider API keys, JWTs, private-key blocks,
- * database-URL passwords, bearer tokens) out of free text, plus a key-name pass
- * for obviously-sensitive attribute names. Runs in-process: no external
- * service, all patterns precompiled and linear-time. Detected secrets are
- * replaced with the typed `[SECRET]` marker, which the trace view reads back
- * and which keeps the secrets evaluator able to flag a credential that was
- * already scrubbed at ingestion.
- *
- * Matching works in three layers, because a list of known vendors alone cannot
- * keep up with the number of services that mint API keys:
- *
- *  1. Known shapes. Exact prefixes for cloud and developer-service credentials,
- *     the highest-precision layer and the one that names the vendor.
- *  2. Shape alone. A vendor-style prefix followed by a high-entropy body catches
- *     a key from a service nobody has ever added to the list.
- *  3. Context. A credential named in prose and then given a value is redacted
- *     even when the value has no recognisable shape at all.
- *
- * Layers 2 and 3 are gated on Shannon entropy and character-class mix, because
- * over-redaction is a bug of the same severity as a leak: the terminal replay
- * and the trace explorer are worth nothing if identifiers, hashes and model
- * names come back as placeholders. `__tests__/secrets.unit.test.ts` carries an
- * adversarial negative corpus that pins that limit.
- *
- * Shared across the platform: the ingestion pipeline redacts every span with
- * these rules, and the `langwatch` CLI ships a verbatim mirror (see
- * `sessionReport.ts`) so issue reports are scrubbed with the exact same rules
- * before leaving the user's machine.
- */
-import { SECRET_MARKER } from "./markers.js";
+/** In-process credential redaction: scrubs API keys, JWTs, tokens from free text. */
+import { SECRET_MARKER } from "./markers.ts";
 
 /** The placeholder a redacted secret is replaced with. */
 export const SECRETS_REDACTION_MARKER = SECRET_MARKER;
@@ -43,48 +12,23 @@ interface ValueRule {
   id: string;
   description: string;
   regex: RegExp;
-  /** Builds the replacement for one match; defaults to the full marker. Groups
-   *  let a rule keep the non-secret context (scheme/user/host, the `Bearer `
-   *  prefix). */
+  /** Builds replacement for one match; defaults to full marker. Groups preserve context. */
   render?: (...groups: string[]) => string;
-  /**
-   * Second-stage test for rules whose regex is deliberately loose, taking the
-   * match and its capture groups. A match that fails it is left verbatim and
-   * not counted, which is what lets the entropy and context rules describe a
-   * broad shape in the pattern and then decide on the candidate itself.
-   */
+  /** Second-stage test: accepts or rejects a candidate after regex match. */
   accept?: (groups: string[]) => boolean;
-  /**
-   * Cheap whole-string guard run before the regex. Skips the scan entirely when
-   * the input cannot contain a match, which keeps the broad rules off the bill
-   * for the many strings that are ordinary prose.
-   */
+  /** Cheap guard to skip scan if input cannot contain a match. */
   precondition?: (text: string) => boolean;
-  /**
-   * Text the rule requires in front of the match but leaves out of it, written
-   * to end at the match. A rule anchors on its own literal for speed and reads
-   * what precedes it in a lookbehind; the credential still begins where that
-   * lookbehind begins, so the reported span has to start there too. Applied to
-   * the text before the match, and only by the detection path: redaction never
-   * rewrites what the match does not cover.
-   */
+  /** Pattern that must precede the match but is left out of the reported span. */
   precededBy?: RegExp;
 }
 
-/**
- * Entropy is measured over at most this many leading characters. A greedy match
- * can span a whole log line, and scoring the sample rather than the line keeps
- * the cost per candidate constant without changing the verdict: key material is
- * uniformly random, so its first 256 characters score like all of it.
- */
+/** Entropy sample size: score leading chars, not full greedy match. */
 const ENTROPY_SAMPLE_LENGTH = 256;
 
 /** Shannon entropy of `value` in bits per character, over a bounded sample. */
 function shannonEntropyBits(value: string): number {
   const sample =
-    value.length > ENTROPY_SAMPLE_LENGTH
-      ? value.slice(0, ENTROPY_SAMPLE_LENGTH)
-      : value;
+    value.length > ENTROPY_SAMPLE_LENGTH ? value.slice(0, ENTROPY_SAMPLE_LENGTH) : value;
   const counts = new Map<string, number>();
   for (const char of sample) {
     counts.set(char, (counts.get(char) ?? 0) + 1);
@@ -136,7 +80,7 @@ const TOKEN_END = String.raw`(?![A-Za-z0-9_-])`;
 const VENDOR_KEY_PATTERNS = [
   // LangWatch's own API, ingest and legacy personal-access tokens, minted as
   // `{prefix}{lookupId}_{secret}` by
-  // platform/app/src/server/api-key/api-key-token.utils.ts. Matched on the
+  // modules/api-key/contract/src/api-key.tokens.ts. Matched on the
   // prefix plus three body characters, like every other known vendor, so a
   // truncated or short-bodied one still redacts: `sk-lw-` would otherwise reach
   // only the generic `sk-` rule and its 20-character floor, and `ik-lw-`
@@ -222,10 +166,7 @@ const SHAPED_TOKEN_MIN_ENTROPY = 3.9;
  * new false positives, and it needs no vendor to be named.
  */
 function isKeyShapedBody(body: string): boolean {
-  if (
-    body.length < SHAPED_TOKEN_MIN_BODY ||
-    body.length > SHAPED_TOKEN_MAX_BODY
-  ) {
+  if (body.length < SHAPED_TOKEN_MIN_BODY || body.length > SHAPED_TOKEN_MAX_BODY) {
     return false;
   }
   const { lower, upper, digit } = countCharClasses(body);
@@ -408,8 +349,7 @@ const PLACEHOLDER_VALUE_REGEX =
  * or a SCREAMING_SNAKE name. The underscore is required on the bare form so an
  * all-uppercase secret (a base32 TOTP seed, say) is not mistaken for a name.
  */
-const ENV_REFERENCE_REGEX =
-  /^(?:\$[A-Za-z_][A-Za-z0-9_]*|[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+)$/;
+const ENV_REFERENCE_REGEX = /^(?:\$[A-Za-z_][A-Za-z0-9_]*|[A-Z][A-Z0-9]*(?:_[A-Z0-9]+)+)$/;
 
 /** `process.env.OPENAI_API_KEY`, `config.auth.token`: code, not key material. */
 const CODE_EXPRESSION_REGEX = /^[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)+$/;
@@ -643,8 +583,7 @@ const VALUE_RULES: ValueRule[] = [
     // in prose is a sentence, not a header, and matching it redacted one.
     id: "authorization_scheme_token",
     description: "Non-Bearer authorization scheme token",
-    regex:
-      /\b(Authorization:\s*(?:Token|SSWS|GenieKey|Splunk|OAuth)\s+)[A-Za-z0-9._~+/-]{10,}=*/gi,
+    regex: /\b(Authorization:\s*(?:Token|SSWS|GenieKey|Splunk|OAuth)\s+)[A-Za-z0-9._~+/-]{10,}=*/gi,
     render: (_m, prefix) => `${prefix}${REPLACEMENT}`,
   },
   {
@@ -667,8 +606,7 @@ const VALUE_RULES: ValueRule[] = [
         `([0-9a-f]{${HEX_BODY_MIN},${HEX_BODY_MAX}})${TOKEN_END}`,
       "gi",
     ),
-    accept: (groups) =>
-      !IDENTIFIER_PREFIXES.has((groups[1] ?? "").toLowerCase()),
+    accept: (groups) => !IDENTIFIER_PREFIXES.has((groups[1] ?? "").toLowerCase()),
     precondition: (text) => text.includes("_"),
   },
   {
@@ -696,9 +634,7 @@ const VALUE_RULES: ValueRule[] = [
       `${TOKEN_START}([A-Za-z][A-Za-z0-9]{1,11})[_-]([A-Za-z0-9_+/-]{${SHAPED_TOKEN_MIN_BODY},})${TOKEN_END}`,
       "g",
     ),
-    accept: (groups) =>
-      !isNonCredentialPrefix(groups[1] ?? "") &&
-      isKeyShapedBody(groups[2] ?? ""),
+    accept: (groups) => !isNonCredentialPrefix(groups[1] ?? "") && isKeyShapedBody(groups[2] ?? ""),
     precondition: (text) => text.includes("_") || text.includes("-"),
   },
   {
@@ -875,7 +811,7 @@ function guardCustomPattern(pattern: string): string {
 const ORDINARY_TEXT_PROBES = [
   "the user asked the agent to summarise the meeting notes",
   "<task-notification>",
-  "platform/app/src/server/traces/trace.service.ts",
+  "modules/trace/server/src/services/trace-legacy-read.service.ts",
   "2026-08-10T14:32:11.482Z",
   "claude-opus-5",
   // The identifiers a tracing product is made of. Without these a pattern like
@@ -1039,10 +975,7 @@ function sliceEndAfter(text: string, start: number): number {
     // which is the unbounded scan the budget exists to prevent.
     const lookahead = text.slice(target, target + SAFE_CUT_LOOKAHEAD);
     const next = lookahead.search(/\s/);
-    end =
-      next === -1
-        ? Math.min(target + SAFE_CUT_LOOKAHEAD, text.length)
-        : target + next;
+    end = next === -1 ? Math.min(target + SAFE_CUT_LOOKAHEAD, text.length) : target + next;
   }
 
   const begin = text.lastIndexOf(PEM_BEGIN, end);
@@ -1107,9 +1040,7 @@ export function redactSecretsInText({
  * absent or empty list becomes `null`, which the rule loop reads as "run
  * everything" without a lookup per rule.
  */
-function toSkipSet(
-  skipRuleIds: readonly string[] | undefined,
-): ReadonlySet<string> | null {
+function toSkipSet(skipRuleIds: readonly string[] | undefined): ReadonlySet<string> | null {
   if (!skipRuleIds || skipRuleIds.length === 0) return null;
   return new Set(skipRuleIds);
 }
@@ -1177,11 +1108,7 @@ export function detectSecretsInText({
   customPatterns?: readonly RegExp[];
   skipRuleIds?: readonly string[];
 }): SecretMatch[] {
-  if (
-    typeof text !== "string" ||
-    text.length === 0 ||
-    text.length > MAX_SCAN_LENGTH
-  ) {
+  if (typeof text !== "string" || text.length === 0 || text.length > MAX_SCAN_LENGTH) {
     return [];
   }
 
@@ -1235,9 +1162,7 @@ function lengthPrecedingMatch({
 
 /** Whether a rule's second-stage test rejects this candidate. */
 function ruleDeclines(rule: ValueRule, match: RegExpMatchArray): boolean {
-  return (
-    rule.accept !== undefined && !rule.accept(match as unknown as string[])
-  );
+  return rule.accept !== undefined && !rule.accept(match as unknown as string[]);
 }
 
 /** How much of a match the rule claims: all of it, or up to the value boundary. */
@@ -1273,9 +1198,7 @@ function matchesOfCustomPattern(pattern: RegExp, text: string): SecretMatch[] {
 function withoutOverlaps(matches: SecretMatch[]): SecretMatch[] {
   const kept: SecretMatch[] = [];
   for (const match of matches) {
-    const overlaps = kept.some(
-      (other) => match.start < other.end && other.start < match.end,
-    );
+    const overlaps = kept.some((other) => match.start < other.end && other.start < match.end);
     if (!overlaps) kept.push(match);
   }
   return kept.sort((a, b) => a.start - b.start);

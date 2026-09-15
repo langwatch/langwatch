@@ -21,16 +21,12 @@ export class ChartInputError extends Error {}
  * `--param active=true` a boolean) so a saved parameter keeps the type the
  * statement's placeholder declares; anything else is sent as the string.
  */
-export const parseParameterFlags = (
-  flags: string[],
-): Record<string, ChartParameterValue> => {
+export const parseParameterFlags = (flags: string[]): Record<string, ChartParameterValue> => {
   const parameters: Record<string, ChartParameterValue> = {};
   for (const flag of flags) {
     const separator = flag.indexOf("=");
     if (separator <= 0) {
-      throw new ChartInputError(
-        `Invalid --param "${flag}": expected key=value`,
-      );
+      throw new ChartInputError(`Invalid --param "${flag}": expected key=value`);
     }
     const key = flag.slice(0, separator);
     const raw = flag.slice(separator + 1);
@@ -74,15 +70,11 @@ export const resolveDefinitionInput = (
   if (!hasDefinitionFlag) return undefined;
 
   if (flags.sql !== undefined && flags.sqlFile !== undefined) {
-    throw new ChartInputError(
-      "Pass either --sql or --sql-file, not both",
-    );
+    throw new ChartInputError("Pass either --sql or --sql-file, not both");
   }
   const sql = flags.sql ?? (flags.sqlFile ? readSqlFile(flags.sqlFile) : undefined);
   if (sql === undefined || sql.trim().length === 0) {
-    throw new ChartInputError(
-      "A definition needs its statement: pass --sql or --sql-file",
-    );
+    throw new ChartInputError("A definition needs its statement: pass --sql or --sql-file");
   }
 
   const definition: SavedChartDefinitionInput = {
@@ -114,15 +106,11 @@ const readSpecFile = (path: string): Record<string, unknown> => {
   try {
     const parsed: unknown = JSON.parse(raw);
     if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
-      throw new ChartInputError(
-        `Specification file is not a JSON object: ${path}`,
-      );
+      throw new ChartInputError(`Specification file is not a JSON object: ${path}`);
     }
     return parsed as Record<string, unknown>;
   } catch (error) {
     if (error instanceof ChartInputError) throw error;
-    throw new ChartInputError(
-      `Specification file is not valid JSON: ${path}`,
-    );
+    throw new ChartInputError(`Specification file is not valid JSON: ${path}`);
   }
 };

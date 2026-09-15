@@ -1,3 +1,4 @@
+import { nowInstant } from "@langwatch/time";
 /**
  * How far back a read of a time-partitioned table has to look.
  *
@@ -35,10 +36,7 @@ export interface RetentionDaysProvider {
    * Retention in days for this tenant's copy of `table`, or null when the
    * policy cascade cannot answer.
    */
-  getRetentionDays(input: {
-    tenantId: string;
-    table: string;
-  }): Promise<number | null>;
+  tryGetRetentionDays(input: { tenantId: string; table: string }): Promise<number | null>;
 }
 
 /** The subset of a structured logger this needs; keeps the package dep-free. */
@@ -95,10 +93,7 @@ export class RetentionFloorService {
   private readonly cacheMaxEntries: number;
 
   /** Insertion-ordered, which is what makes the oldest entry evictable. */
-  private readonly cache = new Map<
-    string,
-    { days: number; expiresAtMs: number }
-  >();
+  private readonly cache = new Map<string, { days: number; expiresAtMs: number }>();
 
   /**
    * One provider call per key at a time; later arrivals await the first.
@@ -129,10 +124,8 @@ export class RetentionFloorService {
   }
 
   /** The oldest timestamp a read of `table` for `tenantId` can find a row at. */
-  async getFloorMs(
-    query: RetentionFloorQuery & { nowMs?: number },
-  ): Promise<number> {
-    const { nowMs = Date.now(), ...rest } = query;
+  async getFloorMs(query: RetentionFloorQuery & { nowMs?: number }): Promise<number> {
+    const { nowMs = nowInstant().epochMilliseconds, ...rest } = query;
     return nowMs - (await this.getLookbackMs(rest));
   }
 
@@ -166,7 +159,7 @@ export class RetentionFloorService {
     // NUL-joined: neither a tenant id nor a table name can contain it, so two
     // different pairs can never collide on one key.
     const key = `${tenantId}\u0000${table}`;
-    const nowMs = Date.now();
+    const nowMs = nowInstant().epochMilliseconds;
     const hit = this.cache.get(key);
     if (hit && hit.expiresAtMs > nowMs) return hit.days;
 
@@ -211,7 +204,7 @@ export class RetentionFloorService {
   }): Promise<number> {
     let days: number;
     try {
-      const resolved = await provider.getRetentionDays({
+      const resolved = await provider.tryGetRetentionDays({
         tenantId,
         table,
       });
@@ -221,9 +214,7 @@ export class RetentionFloorService {
       // the floor into an invalid ClickHouse timestamp parameter — an
       // unbounded read by another name, which is what this exists to stop.
       days =
-        typeof resolved === "number" &&
-        Number.isFinite(resolved) &&
-        resolved > 0
+        typeof resolved === "number" && Number.isFinite(resolved) && resolved > 0
           ? resolved
           : this.defaultRetentionDays;
     } catch (error) {
@@ -240,15 +231,7 @@ export class RetentionFloorService {
     return days;
   }
 
-  private remember({
-    key,
-    days,
-    nowMs,
-  }: {
-    key: string;
-    days: number;
-    nowMs: number;
-  }): void {
+  private remember({ key, days, nowMs }: { key: string; days: number; nowMs: number }): void {
     // Refresh insertion order so an entry being rewritten is not also the
     // next one evicted.
     this.cache.delete(key);

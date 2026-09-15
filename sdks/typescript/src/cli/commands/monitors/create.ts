@@ -1,11 +1,11 @@
 import { scopedApiKey } from "@/internal/credentialContext";
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
-import { resolveCredentials } from "../../utils/apiKey";
-import { formatFetchError } from "../../utils/formatFetchError";
-import { failSpinner } from "../../utils/spinnerError";
-import { commandValidationError, reportCommandError } from "../../utils/errorOutput";
-import type { CommandResult } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner.ts";
+import { resolveCredentials } from "../../utils/apiKey.ts";
+import { formatFetchError } from "../../utils/formatFetchError.ts";
+import { failSpinner } from "../../utils/spinnerError.ts";
+import { commandValidationError, reportCommandError } from "../../utils/errorOutput.ts";
+import type { CommandResult } from "../../utils/output.ts";
 import { buildAuthHeaders } from "@/internal/api/auth";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
@@ -23,7 +23,7 @@ export const createMonitorCommand = async (
     evaluatorId?: string;
     level?: string;
     parameters?: string;
-  }
+  },
 ): Promise<CommandResult | void> => {
   await resolveCredentials();
 
@@ -43,16 +43,13 @@ export const createMonitorCommand = async (
   const validModes = ["ON_MESSAGE", "AS_GUARDRAIL", "MANUALLY"];
   if (options.executionMode && !validModes.includes(options.executionMode)) {
     reportCommandError({
-      error: commandValidationError(
-        `--execution-mode must be one of: ${validModes.join(", ")}`,
-      ),
+      error: commandValidationError(`--execution-mode must be one of: ${validModes.join(", ")}`),
     });
     process.exit(1);
   }
 
   const apiKey = scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
-  const endpoint =
-    resolveControlPlaneUrl();
+  const endpoint = resolveControlPlaneUrl();
 
   const spinner = createSpinner(`Creating monitor "${name}"...`).start();
 
@@ -69,7 +66,7 @@ export const createMonitorCommand = async (
       parameters = JSON.parse(options.parameters) as Record<string, unknown>;
     }
 
-    const response = await langwatchFetch(`${endpoint}/api/monitors`, {
+    const response = await langwatchFetch(`${endpoint}/api/v1/monitors`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

@@ -51,17 +51,9 @@ import { emitEvaluationEvent, type AddEvaluationParams } from "../evaluation";
  * });
  * ```
  */
-export function getLangWatchTracer(
-  name: string,
-  version?: string,
-): LangWatchTracer {
-  return getLangWatchTracerFromProvider(
-    trace.getTracerProvider(),
-    name,
-    version,
-  );
+export function getLangWatchTracer(name: string, version?: string): LangWatchTracer {
+  return getLangWatchTracerFromProvider(trace.getTracerProvider(), name, version);
 }
-
 
 /**
  * Get a LangWatch tracer from a specific OpenTelemetry tracer provider.
@@ -243,8 +235,7 @@ export function getLangWatchTracerFromProvider(
 function normalizeSpanArgs(args: any[]) {
   const [name, arg2, arg3, arg4] = args;
 
-  if (typeof arg4 === "function")
-    return { name, options: arg2, context: arg3, fn: arg4 };
+  if (typeof arg4 === "function") return { name, options: arg2, context: arg3, fn: arg4 };
 
   if (typeof arg3 === "function") return { name, options: arg2, fn: arg3 };
   if (typeof arg2 === "function") return { name, fn: arg2 };

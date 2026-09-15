@@ -39,7 +39,7 @@ from tenacity import (
 import langwatch
 from langwatch.domain import SpanTimestamps
 from langwatch.http_client import create_async_client, create_client
-from pksuid import PKSUID
+from langwatch_ksuid import generate as generate_ksuid
 from langwatch.telemetry.span import LangWatchSpan
 from langwatch.telemetry.context import get_current_span
 from langwatch.state import get_api_key, get_endpoint, get_instance
@@ -305,7 +305,7 @@ def _prepare_data(
     client = get_instance()
 
     return {
-        "url": get_endpoint() + f"/api/evaluations/{slug}/evaluate",
+        "url": get_endpoint() + f"/api/v1/evaluations/{slug}/evaluate",
         "json": {
             "trace_id": (
                 None
@@ -473,7 +473,7 @@ def _add_evaluation(  # type: ignore
             span_id = format(span_ctx.span_id, "x")
 
         evaluation = _EvaluationTypedDict(
-            evaluation_id=evaluation_id or str(PKSUID("eval")),
+            evaluation_id=evaluation_id or str(generate_ksuid("eval")),
             span_id=span_id,
             name=name,
             type=type,

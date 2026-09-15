@@ -1,0 +1,68 @@
+name: ksuid-python-cd
+
+on:
+  release:
+    types:
+      - published
+  workflow_dispatch:
+
+# A publish run drains — see publish-docker-app.
+concurrency:
+  group: ksuid-python-cd-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    if: startsWith(github.event.release.tag_name, 'ksuid-python@') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      - name: Set up Python
+        run: uv python install 3.11
+
+      - name: Run tests
+        working-directory: packages/ksuid-python
+        run: |
+          uv sync --dev
+          uv run pytest tests/ -v
+
+      - name: Build package
+        working-directory: packages/ksuid-python
+        run: uv build --out-dir dist
+
+      - name: Publish package
+        uses: pypa/gh-action-pypi-publish@dc37677b2e1c63e2034f94d8a5b11f265b73ba33
+        with:
+          packages_dir: packages/ksuid-python/dist/
+          user: __token__
+          password: ${{ secrets.PYPI_API_TOKEN }}
+
+      - name: Get version from tag or manifest
+        id: get_version
+        run: |
+          if [ "${{ github.event_name }}" = "release" ]; then
+            VERSION=${GITHUB_REF#refs/tags/ksuid-python@v}
+          else
+            VERSION=$(cat .github/.release-please-manifest.json | jq -r '."packages/ksuid-python"')
+          fi
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+
+      - name: Notify Slack
+        env:
+          SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL: ${{ secrets.SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL }}
+        run: |
+          bash .github/scripts/notify-slack-release.sh \
+            packages/ksuid-python/CHANGELOG.md \
+            "KSUID (Python)" \
+            "${{ steps.get_version.outputs.version }}"

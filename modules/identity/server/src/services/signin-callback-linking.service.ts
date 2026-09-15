@@ -1,0 +1,301 @@
+import {
+  identifierDomain,
+  type IdentifierProvider,
+  type LinkProposalReason,
+  normalizeIdentifierValue,
+} from "@langwatch/identity-contract";
+import type { IdentityCeremonyClock } from "../rules/ceremony-types.rules.ts";
+import type { IdentityLinkProposalWrites } from "../rules/identity-writes.rules.ts";
+import { IdentityJitDisabledError, IdentityLinkProposedError } from "@langwatch/identity-contract";
+
+/**
+ * What happens when an SSO callback comes back (ADR-117 §3), in one place and
+ */
+
+/** What an IdP handed back. */
+export interface CallbackAssertion {
+  /** The connection whose callback this is; null until D04 gives the legacy
+   *  env provider a connection of its own. */
+  connectionId: string | null;
+  provider: IdentifierProvider;
+  /** The IdP's own subject for this person. */
+  subject: string;
+  /** The address the IdP asserts, raw; null when it asserts none. */
+  email: string | null;
+  /** Whether the IdP asserts that address as verified. */
+  emailVerified: boolean;
+  /** Whether this connection may provision someone it has never seen. */
+  allowsJit: boolean;
+}
+
+/** A user the asserted address matched, and the evidence they carry. */
+export interface CallbackUserMatch {
+  userId: string;
+  /** The user holds the asserted address themselves, VERIFIED — or, before
+   *  they latch, the legacy `emailVerified` column says so. This is the
+   *  second side of the two-sided evidence. */
+  holdsVerifiedEmail: boolean;
+  /** Domains of every live identifier this user holds. An identifier on a
+   *  domain the connection does not own is one the organization cannot vouch
+   *  for, and a callback may not claim the row that carries it. */
+  identifierDomains: readonly string[];
+}
+
+/**
+ * The user-level reads and writes a callback needs BEFORE the ADR-116 storage
+ */
+export interface SignInCallbackDirectory {
+  findUserByProviderSubject(input: {
+    connectionId: string | null;
+    provider: IdentifierProvider;
+    subject: string;
+  }): Promise<{ userId: string } | null>;
+
+  findUsersByEmail(input: { normalizedEmail: string }): Promise<readonly CallbackUserMatch[]>;
+
+  /**
+   * Links the callback's provider account to a user through better-auth's own
+   * account creation, which fires the ceremony that attaches the identifier.
+   * Never a hand-written `Account` insert.
+   */
+  linkProviderAccount(input: {
+    userId: string;
+    connectionId: string | null;
+    provider: IdentifierProvider;
+    subject: string;
+    normalizedEmail: string;
+  }): Promise<void>;
+
+  /** Just-in-time provisioning, where the connection allows it. */
+  provisionUser(input: {
+    connectionId: string | null;
+    provider: IdentifierProvider;
+    subject: string;
+    normalizedEmail: string;
+  }): Promise<{ userId: string }>;
+}
+
+/**
+ * The before/after audit pair around a link (ADR-117 §3). Two records rather
+ */
+export interface SignInCallbackAudit {
+  linkAttempted(record: CallbackAuditRecord): void;
+  linkRecorded(record: CallbackAuditRecord): void;
+}
+
+export interface CallbackAuditRecord {
+  userId: string;
+  connectionId: string | null;
+  provider: IdentifierProvider;
+  subject: string;
+  domain: string | null;
+}
+
+export type CallbackLinkOutcome =
+  | { kind: "signed_in"; userId: string; linked: false }
+  | { kind: "linked"; userId: string; linked: true }
+  | { kind: "provisioned"; userId: string; linked: true };
+
+export interface SignInCallbackLinkingDeps {
+  directory: SignInCallbackDirectory;
+  proposals: IdentityLinkProposalWrites;
+  audit: SignInCallbackAudit;
+  clock: IdentityCeremonyClock;
+  /** Mints a proposal's own id, so a proposal can be pointed at. */
+  newProposalId: () => string;
+}
+
+export class SignInCallbackLinkingService {
+  static create(deps: SignInCallbackLinkingDeps): SignInCallbackLinkingService {
+    return new SignInCallbackLinkingService(deps);
+  }
+
+  private readonly directory: SignInCallbackDirectory;
+  private readonly proposals: IdentityLinkProposalWrites;
+  private readonly audit: SignInCallbackAudit;
+  private readonly clock: IdentityCeremonyClock;
+  private readonly newProposalId: () => string;
+
+  private constructor(deps: SignInCallbackLinkingDeps) {
+    this.directory = deps.directory;
+    this.proposals = deps.proposals;
+    this.audit = deps.audit;
+    this.clock = deps.clock;
+    this.newProposalId = deps.newProposalId;
+  }
+
+  async complete(assertion: CallbackAssertion): Promise<CallbackLinkOutcome> {
+    const known = await this.directory.findUserByProviderSubject({
+      connectionId: assertion.connectionId,
+      provider: assertion.provider,
+      subject: assertion.subject,
+    });
+    // Nothing is created and no event is emitted: this person has signed in
+    // through this connection before, and saying so again states no new fact.
+    if (known) {
+      return { kind: "signed_in", userId: known.userId, linked: false };
+    }
+
+    const normalizedEmail = assertion.email ? normalizeIdentifierValue(assertion.email) : null;
+    if (!normalizedEmail) {
+      return this.provision(assertion, null);
+    }
+
+    const candidates = await this.directory.findUsersByEmail({
+      normalizedEmail,
+    });
+    if (candidates.length === 0) {
+      return this.provision(assertion, normalizedEmail);
+    }
+
+    const refusal = this.refusalFor({ assertion, candidates });
+    if (refusal) {
+      // One proposal per candidate. An ambiguous match has no single subject,
+      // and picking one to hang the proposal on would be the guess this whole
+      // branch exists to avoid — every row a connection reached for gets the
+      // fact that it did.
+      for (const candidate of candidates) {
+        await this.propose({
+          assertion,
+          normalizedEmail,
+          userId: candidate.userId,
+          reason: refusal,
+        });
+      }
+
+      throw new IdentityLinkProposedError();
+    }
+
+    const [target] = candidates;
+    if (!target) {
+      return this.provision(assertion, normalizedEmail);
+    }
+
+    return this.link({ assertion, normalizedEmail, userId: target.userId });
+  }
+
+  /**
+   * An administrator confirmed a proposal: the link is made the same way an
+   * automatic one is. The proposal is what changed, not the mechanism — which
+   * is the point of proposing rather than guessing.
+   */
+  async confirmProposal({
+    assertion,
+    userId,
+  }: {
+    assertion: CallbackAssertion;
+    userId: string;
+  }): Promise<CallbackLinkOutcome> {
+    const normalizedEmail = assertion.email ? normalizeIdentifierValue(assertion.email) : "";
+
+    return this.link({ assertion, normalizedEmail, userId });
+  }
+
+  /**
+   * Why this match is not unambiguous, or null when it is. Order matters only
+   * for the reason code an operator reads; any one of them refuses.
+   */
+  private refusalFor({
+    assertion,
+    candidates,
+  }: {
+    assertion: CallbackAssertion;
+    candidates: readonly CallbackUserMatch[];
+  }): LinkProposalReason | null {
+    if (candidates.length > 1) {
+      return "ambiguous_candidates";
+    }
+
+    const target = candidates[0];
+    if (!target) {
+      return "ambiguous_candidates";
+    }
+
+    // One side of the evidence is the IdP's assertion, the other is the
+    // user's own. An unverified orphan row fails the second and is never
+    // auto-linked, which is the anti-hijack invariant, kept.
+    if (!assertion.emailVerified || !target.holdsVerifiedEmail) {
+      return "unverified_orphan";
+    }
+
+    const vouched = assertion.email
+      ? identifierDomain(normalizeIdentifierValue(assertion.email))
+      : null;
+    const unvouched = target.identifierDomains.filter((domain) => domain !== vouched);
+
+    return unvouched.length > 0 ? "unvouched_identifiers" : null;
+  }
+
+  private async link({
+    assertion,
+    normalizedEmail,
+    userId,
+  }: {
+    assertion: CallbackAssertion;
+    normalizedEmail: string;
+    userId: string;
+  }): Promise<CallbackLinkOutcome> {
+    const record: CallbackAuditRecord = {
+      userId,
+      connectionId: assertion.connectionId,
+      provider: assertion.provider,
+      subject: assertion.subject,
+      domain: identifierDomain(normalizedEmail),
+    };
+    this.audit.linkAttempted(record);
+    await this.directory.linkProviderAccount({
+      userId,
+      connectionId: assertion.connectionId,
+      provider: assertion.provider,
+      subject: assertion.subject,
+      normalizedEmail,
+    });
+    this.audit.linkRecorded(record);
+
+    return { kind: "linked", userId, linked: true };
+  }
+
+  private async propose({
+    assertion,
+    normalizedEmail,
+    userId,
+    reason,
+  }: {
+    assertion: CallbackAssertion;
+    normalizedEmail: string;
+    userId: string;
+    reason: LinkProposalReason;
+  }): Promise<void> {
+    await this.proposals.proposeLink({
+      tenantId: userId,
+      userId,
+      commandId: this.clock.newCommandId(),
+      proposalId: this.newProposalId(),
+      connectionId: assertion.connectionId,
+      provider: assertion.provider,
+      providerAccountId: assertion.subject,
+      value: normalizedEmail,
+      reason,
+      occurredAtMs: this.clock.now(),
+      actor: { type: "system", id: null },
+    });
+  }
+
+  private async provision(
+    assertion: CallbackAssertion,
+    normalizedEmail: string | null,
+  ): Promise<CallbackLinkOutcome> {
+    if (!assertion.allowsJit || !normalizedEmail) {
+      throw new IdentityJitDisabledError();
+    }
+
+    const { userId } = await this.directory.provisionUser({
+      connectionId: assertion.connectionId,
+      provider: assertion.provider,
+      subject: assertion.subject,
+      normalizedEmail,
+    });
+
+    return { kind: "provisioned", userId, linked: true };
+  }
+}

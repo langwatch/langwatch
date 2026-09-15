@@ -10,9 +10,7 @@ import { createCliRunPlansService } from "./cli-run-plans-service";
  *
  * @see specs/features/run-plan-cli.feature
  */
-export const archiveRunPlanCommand = async (
-  id: string,
-): Promise<CommandResult | void> => {
+export const archiveRunPlanCommand = async (id: string): Promise<CommandResult | void> => {
   await resolveCredentials();
 
   const service = createCliRunPlansService();

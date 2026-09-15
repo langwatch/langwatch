@@ -1,23 +1,9 @@
 /**
- * The end-to-end fidelity test: the REAL built CLI, running REAL commands
- * against a REAL HTTP server, once in-process and once through a real daemon,
- * asserting the two are indistinguishable.
- *
- * Everything else in the daemon test suite mocks something. This mocks nothing,
- * which is the only way to know that commander, chalk, ora, dotenv, the client
- * SDK and `process.exit` all behave the same inside a warm process as they do
- * in a cold one.
- *
- * Requires `pnpm build` (like the other CLI integration tests in this package).
+ * The end-to-end fidelity test: the REAL built CLI, running REAL commands against a REAL
+ * HTTP server, once in-process and once through a real daemon, asserting the two are
+ * indistinguishable.
  */
-import {
-  afterAll,
-  afterEach,
-  beforeAll,
-  describe,
-  expect,
-  it,
-} from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { spawn } from "node:child_process";
 import * as fs from "node:fs";
 import * as http from "node:http";
@@ -82,8 +68,7 @@ const runViaDaemon = (
   args: string[],
   env: Record<string, string> = {},
   cwd: string = workDir,
-): Promise<RunResult> =>
-  run(args, { ...env, LANGWATCH_NO_DAEMON: "0" }, cwd);
+): Promise<RunResult> => run(args, { ...env, LANGWATCH_NO_DAEMON: "0" }, cwd);
 
 const daemonStatus = async (): Promise<{
   running: boolean;
@@ -96,9 +81,7 @@ const daemonStatus = async (): Promise<{
   return JSON.parse(result.stdout) as { running: boolean; served?: number };
 };
 
-const startDaemon = async (
-  env: Record<string, string> = {},
-): Promise<void> => {
+const startDaemon = async (env: Record<string, string> = {}): Promise<void> => {
   await run(["daemon", "start"], { LANGWATCH_NO_DAEMON: "0", ...env });
   // Poll the daemon's own status rather than sleeping: it is up when it answers.
   for (let attempt = 0; attempt < 100; attempt++) {
@@ -115,9 +98,7 @@ const stopDaemon = async (): Promise<void> => {
 describe("the CLI served by a daemon", () => {
   beforeAll(async () => {
     if (!fs.existsSync(CLI_PATH)) {
-      throw new Error(
-        `${CLI_PATH} is missing — run \`pnpm build\` before the integration tests.`,
-      );
+      throw new Error(`${CLI_PATH} is missing — run \`pnpm build\` before the integration tests.`);
     }
 
     server = http.createServer((req, res) => {
@@ -126,7 +107,7 @@ describe("the CLI served by a daemon", () => {
       req.on("data", (chunk) => (body += chunk));
       req.on("end", () => {
         res.setHeader("content-type", "application/json");
-        if (req.url?.startsWith("/api/traces/search")) {
+        if (req.url?.startsWith("/api/v1/traces/search")) {
           res.end(
             JSON.stringify({
               traces: [],
@@ -139,9 +120,7 @@ describe("the CLI served by a daemon", () => {
         res.end(JSON.stringify({ error: "not found" }));
       });
     });
-    await new Promise<void>((resolve) =>
-      server.listen(0, "127.0.0.1", resolve),
-    );
+    await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
     endpoint = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
 
     // A short socket dir: unix sockets cap out around 104 bytes of path, and the
@@ -165,12 +144,7 @@ describe("the CLI served by a daemon", () => {
     describe("when a command runs with the daemon path enabled", () => {
       it("behaves exactly as it does today", async () => {
         const inProcess = await run(["trace", "search", "--format", "json"]);
-        const withDaemonEnabled = await runViaDaemon([
-          "trace",
-          "search",
-          "--format",
-          "json",
-        ]);
+        const withDaemonEnabled = await runViaDaemon(["trace", "search", "--format", "json"]);
 
         expect(withDaemonEnabled.exitCode).toBe(inProcess.exitCode);
         expect(withDaemonEnabled.stdout).toBe(inProcess.stdout);
@@ -273,17 +247,10 @@ describe("the CLI served by a daemon", () => {
         // The daemon's own cwd is the home directory. A command that reads a
         // local file must still see the caller's.
         const callerDir = fs.mkdtempSync(path.join(os.tmpdir(), "lw-cwd-"));
-        fs.writeFileSync(
-          path.join(callerDir, "prompts.json"),
-          JSON.stringify({ prompts: {} }),
-        );
+        fs.writeFileSync(path.join(callerDir, "prompts.json"), JSON.stringify({ prompts: {} }));
 
         const inProcess = await run(["prompt", "list", "--format", "json"], {}, callerDir);
-        const served = await runViaDaemon(
-          ["prompt", "list", "--format", "json"],
-          {},
-          callerDir,
-        );
+        const served = await runViaDaemon(["prompt", "list", "--format", "json"], {}, callerDir);
 
         expect(served.exitCode).toBe(inProcess.exitCode);
         expect(served.stdout).toBe(inProcess.stdout);

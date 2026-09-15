@@ -1,0 +1,23 @@
+{
+  // The three generated files, and nothing else.
+  //
+  // They needed a home that type-checks: nothing imported them, so a renamed
+  // export in any of the 44 module packages would have gone unnoticed until a
+  // process failed to boot. A tsconfig alone could not be that home, because
+  // every project this repository checks is reached through a package's own
+  // `typecheck` script, and because resolving `@langwatch/<id>-server` needs
+  // the dependency edges pnpm links from a package.json. So this directory is
+  // the package, and the three composition roots import it instead of naming
+  // 44 modules each.
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["es2022"],
+    "types": [],
+    "noEmit": true,
+    "incremental": true,
+    "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo/installed-modules.tsbuildinfo",
+    "verbatimModuleSyntax": true,
+    "rootDir": "."
+  },
+  "include": ["*.generated.ts"]
+}

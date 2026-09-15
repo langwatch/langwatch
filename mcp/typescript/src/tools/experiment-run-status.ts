@@ -15,16 +15,10 @@ export interface RunTimestamps {
   stoppedAt?: number | null;
 }
 
-export const deriveRunStatus = (
-  timestamps: RunTimestamps,
-  now: number = Date.now(),
-): RunStatus => {
+export const deriveRunStatus = (timestamps: RunTimestamps, now: number = Date.now()): RunStatus => {
   if (timestamps.stoppedAt != null) return "stopped";
   if (timestamps.finishedAt != null) return "completed";
-  if (
-    timestamps.updatedAt != null &&
-    now - timestamps.updatedAt > INTERRUPTED_THRESHOLD_MS
-  ) {
+  if (timestamps.updatedAt != null && now - timestamps.updatedAt > INTERRUPTED_THRESHOLD_MS) {
     return "interrupted";
   }
   return "running";

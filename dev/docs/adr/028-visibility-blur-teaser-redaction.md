@@ -10,7 +10,7 @@
 
 Issue #4745. PR #4720 provisions organization-scoped retention policies at the 49-day platform floor on paid entry points — behaviorally inert today; this ADR is the feature it was built for. [ADR-027](./027-storage-gb-billing.md) (storage billing) references the 14-day Free visibility window in its customer matrix and explicitly defers the read-path mechanism to this decision.
 
-The model (from #4745): the 49-day deletion floor is **not** a limitation — it is the *action window*. Pricing tiers are expressed as **visibility** windows on top of a fixed deletion policy. Free users' data past 14 days is not gone; it is held as a recoverable upgrade incentive until retention deletes it at 49 days.
+The model (from #4745): the 49-day deletion floor is **not** a limitation — it is the _action window_. Pricing tiers are expressed as **visibility** windows on top of a fixed deletion policy. Free users' data past 14 days is not gone; it is held as a recoverable upgrade incentive until retention deletes it at 49 days.
 
 Hard constraints (locked):
 
@@ -27,7 +27,7 @@ Read-path reality (verified in code): all user-facing reads thread `startDate`/`
 
 ### 1. Teaser redaction, not hiding, not UI blur
 
-Free users see that traces older than 14 days **exist** — rows in lists, timestamps, durations, status, costs — but content is **truncated server-side to a deterministic teaser**: the first `max(50, min(300, ceil(length × 0.10)))` characters per text field — where `length` and the kept prefix are counted in **UTF-16 code units** (JavaScript `String.prototype.length`/`slice` semantics; the single implementation lives in `teaserOf`, so no cross-stack drift is possible). **Content** is classified broadly (red-team finding): input, output, span payloads, messages, log bodies, **`params` and `metadata` string values, and error/stack bodies** — errors routinely embed prompts. **Metadata** stays visible: model name, ids, timestamps, durations, token counts, costs, status. Structured payloads truncate the JSON-stringified value with the same rule — and since system prompts live at the *head* of typical LLM payloads, the head is what the cap protects against: 300 chars of a multi-KB payload exposes a fragment of the system prompt's opening, accepted as exactly the teaser's purpose, never more. The response carries `redacted: true` plus the plan threshold so every surface renders the upgrade CTA: *"your data is still here — upgrade to see it."*
+Free users see that traces older than 14 days **exist** — rows in lists, timestamps, durations, status, costs — but content is **truncated server-side to a deterministic teaser**: the first `max(50, min(300, ceil(length × 0.10)))` characters per text field — where `length` and the kept prefix are counted in **UTF-16 code units** (JavaScript `String.prototype.length`/`slice` semantics; the single implementation lives in `teaserOf`, so no cross-stack drift is possible). **Content** is classified broadly (red-team finding): input, output, span payloads, messages, log bodies, **`params` and `metadata` string values, and error/stack bodies** — errors routinely embed prompts. **Metadata** stays visible: model name, ids, timestamps, durations, token counts, costs, status. Structured payloads truncate the JSON-stringified value with the same rule — and since system prompts live at the _head_ of typical LLM payloads, the head is what the cap protects against: 300 chars of a multi-KB payload exposes a fragment of the system prompt's opening, accepted as exactly the teaser's purpose, never more. The response carries `redacted: true` plus the plan threshold so every surface renders the upgrade CTA: _"your data is still here — upgrade to see it."_
 
 Why teaser over the alternatives: full hiding (clamping the time window) kills the upsell — users can't miss what they can't see. UI-only blur ships the full payload to the browser — indefensible at this blast radius. The ~10% teaser is the memory hook ("oh right, I need that trace") while leaking nothing material; the 50-char floor keeps tiny traces legible as teasers, the 300-char cap stops large traces from leaking meaningful content.
 
@@ -61,24 +61,24 @@ Every read evaluates the **current** plan against the trace's age (`now − Occu
 
 ## Constants
 
-| Constant | Value | Purpose |
-|---|---|---|
-| `FREE_VISIBILITY_DAYS` | `14` | Free-tier blur threshold; lives on `FREE_PLAN.visibilityDays` (both FREE configs — SaaS and self-hosted) |
-| `PlanInfo.visibilityDays` | `number \| null` | `null` = no blur (all paid/licensed plans) |
-| `TEASER_MIN_CHARS` | `50` | Floor so tiny traces still tease |
-| `TEASER_MAX_CHARS` | `300` | Cap so large traces don't leak content |
-| `TEASER_FRACTION` | `0.10` | `keep = max(50, min(300, ceil(len × 0.10)))` per text field |
-| Age anchor | `OccurredAt`/`StartedAt` vs `now()` at read time | Same column retention/partitioning uses; no new columns |
+| Constant                  | Value                                            | Purpose                                                                                                  |
+| ------------------------- | ------------------------------------------------ | -------------------------------------------------------------------------------------------------------- |
+| `FREE_VISIBILITY_DAYS`    | `14`                                             | Free-tier blur threshold; lives on `FREE_PLAN.visibilityDays` (both FREE configs — SaaS and self-hosted) |
+| `PlanInfo.visibilityDays` | `number \| null`                                 | `null` = no blur (all paid/licensed plans)                                                               |
+| `TEASER_MIN_CHARS`        | `50`                                             | Floor so tiny traces still tease                                                                         |
+| `TEASER_MAX_CHARS`        | `300`                                            | Cap so large traces don't leak content                                                                   |
+| `TEASER_FRACTION`         | `0.10`                                           | `keep = max(50, min(300, ceil(len × 0.10)))` per text field                                              |
+| Age anchor                | `OccurredAt`/`StartedAt` vs `now()` at read time | Same column retention/partitioning uses; no new columns                                                  |
 
 ## Invariants
 
-| Invariant | Meaning | Test anchor |
-|---|---|---|
-| **No content escape** | No surface (tRPC, REST, share, export) returns >teaser chars of any text field of a beyond-window trace for a Free org | Integration test per surface: Free org, 15-day-old trace, assert every text field ≤ teaser length and `redacted: true` |
-| **Paying users never blurred** | Any org whose plan resolves `visibilityDays = null` gets byte-identical responses to today | Integration test: paid org, 40-day-old trace, deep-equal against unredacted fixture |
-| **Instant lift / instant re-blur** | Plan change flips redaction on the next read with no intermediate state | Test: same trace read under Free → blurred; flip plan provider to paid → unblurred; flip back → blurred. No DB writes between reads |
-| **Aggregates unaffected** | Analytics totals are identical with and without the gate | Test: analytics over a window spanning the threshold equals pre-gate fixture |
-| **Existence preserved** | List counts and trace metadata (ids, timestamps, durations, status, cost) identical for Free before/after gating | Test: list endpoint row count + metadata fields unchanged; only content fields shortened |
+| Invariant                          | Meaning                                                                                                                | Test anchor                                                                                                                         |
+| ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| **No content escape**              | No surface (tRPC, REST, share, export) returns >teaser chars of any text field of a beyond-window trace for a Free org | Integration test per surface: Free org, 15-day-old trace, assert every text field ≤ teaser length and `redacted: true`              |
+| **Paying users never blurred**     | Any org whose plan resolves `visibilityDays = null` gets byte-identical responses to today                             | Integration test: paid org, 40-day-old trace, deep-equal against unredacted fixture                                                 |
+| **Instant lift / instant re-blur** | Plan change flips redaction on the next read with no intermediate state                                                | Test: same trace read under Free → blurred; flip plan provider to paid → unblurred; flip back → blurred. No DB writes between reads |
+| **Aggregates unaffected**          | Analytics totals are identical with and without the gate                                                               | Test: analytics over a window spanning the threshold equals pre-gate fixture                                                        |
+| **Existence preserved**            | List counts and trace metadata (ids, timestamps, durations, status, cost) identical for Free before/after gating       | Test: list endpoint row count + metadata fields unchanged; only content fields shortened                                            |
 
 ## Schema
 
@@ -97,18 +97,21 @@ None. No Prisma migration, no ClickHouse migration, no new columns — the desig
 ## Consequences
 
 **Positive.**
+
 - The 49d floor + 14d blur turns retention into a recoverable upgrade window instead of silent data loss — the exact intent of #4745, with the teaser as a concrete memory hook.
 - Zero state: no migrations, no jobs, instant plan-change semantics both directions by construction.
 - Plan logic in exactly one new service; repositories untouched and plan-blind.
 - ADR-027's customer-matrix story (14d visibility / 45–49d recovery) becomes real before the billing notice goes out.
 
 **Negative.**
+
 - Redaction cost is per-read CPU on the service layer (string slicing per text field). Negligible per trace; bounded on lists by page size.
 - Every read surface must route through the redacting services — a new REST endpoint that queries repositories directly bypasses the gate silently. Mitigation: the no-content-escape integration suite runs per surface, and code review treats direct repository reads of trace content as a flag (sweep at implementation time).
 - Teaser truncation of JSON payloads can produce syntactically broken JSON heads — surfaces must render them as text teasers, never parse them.
 - Share links created by paid orgs that later downgrade re-blur retroactively — correct per the stateless model, but support must know it's by design.
 
 **Neutral.**
+
 - Aggregates remaining full means a determined Free user can mine some signal (counts, costs) from old periods. Accepted — that signal is the dashboard's value, not the trace content's.
 - Self-hosted unlicensed sees the blur on their own hardware; consistent with license-as-feature-gate (ADR-027), and the unlock is the license, not a config flag.
 
@@ -120,7 +123,7 @@ None blocking. Two implementation notes for the build PR: (a) the exact field li
 
 Two pieces, both server-anchored:
 
-1. **The truncation marker ships in the payload.** `teaserOf` appends `" …"` to every value it cuts, so *every* surface — platform UI, REST, SDKs, exports — shows "there is more data here" with zero client-side decoration. (Values short enough to survive untruncated carry no marker.)
+1. **The truncation marker ships in the payload.** `teaserOf` appends `" …"` to every value it cuts, so _every_ surface — platform UI, REST, SDKs, exports — shows "there is more data here" with zero client-side decoration. (Values short enough to survive untruncated carry no marker.)
 2. **The UI gate is a container overlay, not a per-field widget.** A shared `BlurredContentGate` wraps the whole content section of each tab (traces-v2 Summary, legacy thread view). The real teased content sits at the top and stays readable; a progressive backdrop blur — transparent at the top, maximal at the bottom — dissolves the rest of the container, with the centered card: "Your data is still here — Upgrade to unlock" → plans page. No fabricated text: the backdrop blur over real (teased) content replaces it.
 
 Rejected: client-side fabricated filler (v3 of this section — superseded; an extra moving part whose only job the container blur does better); server-side filler (feeds fabricated content to SDK/API consumers as if real); hard-cutoff lock banner.

@@ -134,13 +134,16 @@ describe("the real command tree", () => {
       ["workbench", "get-state"],
     ];
 
-    it.each(agentDriven)("lets `%s %s` be asked for json the way the skills ask", async (group, name) => {
-      const { buildProgram } = await import("../../program.js");
-      const command = findCommand(buildProgram(), [group, name]);
+    it.each(agentDriven)(
+      "lets `%s %s` be asked for json the way the skills ask",
+      async (group, name) => {
+        const { buildProgram } = await import("../../program.js");
+        const command = findCommand(buildProgram(), [group, name]);
 
-      expect(command).toBeDefined();
-      expect(command!.options.map((option) => option.long)).toContain("--format");
-    });
+        expect(command).toBeDefined();
+        expect(command!.options.map((option) => option.long)).toContain("--format");
+      },
+    );
   });
 
   describe("every leaf command", () => {
@@ -233,8 +236,7 @@ describe("the real command tree", () => {
       const root = buildProgram();
 
       const unaccounted = leafPaths(root).filter(
-        (path) =>
-          !holdouts.has(path) && !isOutputAware(findCommand(root, path.split(" "))!),
+        (path) => !holdouts.has(path) && !isOutputAware(findCommand(root, path.split(" "))!),
       );
 
       expect(

@@ -11,9 +11,7 @@ import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
  */
 export function createDatasetService(): DatasetService {
   const apiKey = scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
-  const endpoint = (
-    resolveControlPlaneUrl()
-  ).replace(/\/$/, "");
+  const endpoint = resolveControlPlaneUrl().replace(/\/$/, "");
 
   return new DatasetService({
     langwatchApiClient: createLangWatchApiClient(apiKey, endpoint),

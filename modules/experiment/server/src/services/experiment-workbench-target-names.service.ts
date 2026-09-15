@@ -1,0 +1,166 @@
+import { createLogger } from "@langwatch/observability";
+import { pickTargetName, type TargetConfig } from "@langwatch/experiment-contract";
+import type { PromptApi } from "@langwatch/prompt-contract";
+
+/**
+ * Resolves agent/evaluator names so run errors match to columns. Missing
+ * entities absent; fallback to column id.
+ */
+export abstract class ExperimentTargetEntityNames {
+  abstract findAgentNames(input: {
+    projectId: string;
+    ids: string[];
+  }): Promise<Record<string, string>>;
+  abstract findEvaluatorNames(input: {
+    projectId: string;
+    ids: string[];
+  }): Promise<Record<string, string>>;
+}
+
+const logger = createLogger("langwatch:experiment:workbench-target-names");
+
+/**
+ * What each column of a saved workbench is called, keyed by target id.
+ */
+export class ExperimentWorkbenchTargetNamesService {
+  private constructor() {}
+
+  static create(): ExperimentWorkbenchTargetNamesService {
+    return new ExperimentWorkbenchTargetNamesService();
+  }
+
+  async resolve({
+    projectId,
+    targets,
+    prompts: promptService,
+    entities,
+  }: {
+    projectId: string;
+    targets: TargetConfig[];
+    /**
+     * The process's own Prompt service, injected rather than built here.
+     */
+    prompts: PromptApi;
+    /** Agent and evaluator names, which are rows this feature does not own. */
+    entities: ExperimentTargetEntityNames;
+  }): Promise<Record<string, string>> {
+    try {
+      const [prompts, agents, evaluators] = await Promise.all([
+        loadPrompts({ projectId, targets, promptService }),
+        loadNamedRows({
+          ids: idsOf(targets, "agent", (target) => target.dbAgentId),
+          find: (ids) => entities.findAgentNames({ projectId, ids }),
+        }),
+        loadNamedRows({
+          ids: idsOf(targets, "evaluator", (target) => target.targetEvaluatorId),
+          find: (ids) => entities.findEvaluatorNames({ projectId, ids }),
+        }),
+      ]);
+
+      const names: Record<string, string> = {};
+      for (const target of targets) {
+        const entity = entityFor({ target, prompts, agents, evaluators });
+        const name = pickTargetName({ target, entity, isLoading: false });
+        if (name) {
+          names[target.id] = name;
+        }
+      }
+
+      return names;
+    } catch (error) {
+      logger.warn(
+        { error, projectId },
+        "Could not resolve workbench column names; falling back to target ids",
+      );
+
+      return {};
+    }
+  }
+}
+
+/** What a target of one kind points at, with the blanks and repeats dropped. */
+const idsOf = (
+  targets: TargetConfig[],
+  type: TargetConfig["type"],
+  idOf: (target: TargetConfig) => string | undefined,
+): string[] => [
+  ...new Set(
+    targets
+      .filter((target) => target.type === type)
+      .map(idOf)
+      .filter((id): id is string => !!id),
+  ),
+];
+
+const loadNamedRows = async ({
+  ids,
+  find,
+}: {
+  ids: string[];
+  find: (ids: string[]) => Promise<Record<string, string>>;
+}): Promise<Map<string, { name: string }>> => {
+  if (ids.length === 0) {
+    return new Map();
+  }
+
+  const names = await find(ids);
+
+  return new Map(Object.entries(names).map(([id, name]) => [id, { name }]));
+};
+
+/**
+ * One lookup per distinct prompt, through the service the run itself uses, so
+ * a handle reads the same in both places.
+ */
+const loadPrompts = async ({
+  projectId,
+  targets,
+  promptService,
+}: {
+  projectId: string;
+  targets: TargetConfig[];
+  promptService: PromptApi;
+}): Promise<Map<string, { handle?: string | null }>> => {
+  // One lookup per distinct prompt, all in flight at once: the agent branch and
+  // the evaluator branch beside this one batch their rows, so a serial loop
+  // here sets the latency floor for the whole resolution.
+  const found = await Promise.all(
+    idsOf(targets, "prompt", (t) => t.promptId).map(async (promptId) => ({
+      promptId,
+      prompt: await promptService.tryGetPromptByIdOrHandle({
+        idOrHandle: promptId,
+        projectId,
+      }),
+    })),
+  );
+  const byId = new Map<string, { handle?: string | null }>();
+  for (const { promptId, prompt } of found) {
+    if (prompt) {
+      byId.set(promptId, prompt);
+    }
+  }
+
+  return byId;
+};
+
+const entityFor = ({
+  target,
+  prompts,
+  agents,
+  evaluators,
+}: {
+  target: TargetConfig;
+  prompts: Map<string, { handle?: string | null }>;
+  agents: Map<string, { name: string }>;
+  evaluators: Map<string, { name: string }>;
+}): { name?: string | null; handle?: string | null } | undefined => {
+  if (target.type === "prompt") {
+    return prompts.get(target.promptId ?? "");
+  }
+
+  if (target.type === "agent") {
+    return agents.get(target.dbAgentId ?? "");
+  }
+
+  return evaluators.get(target.targetEvaluatorId ?? "");
+};

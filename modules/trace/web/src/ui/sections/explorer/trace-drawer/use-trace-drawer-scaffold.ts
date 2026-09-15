@@ -1,0 +1,175 @@
+import { type RefObject, useCallback, useEffect, useMemo, useRef } from "react";
+import { getTopDrawer, useDrawer } from "../../../../behavior/use-drawer.ts";
+import type { SpanTreeNode, TraceHeader } from "@langwatch/trace-contract";
+import { api } from "../../../../behavior/trace-api.ts";
+import { useConversationContext } from "../hooks/use-conversation-context.ts";
+import { useConversationPrefetch } from "../hooks/use-conversation-prefetch.ts";
+import { useDrawerUrlSync } from "../hooks/use-drawer-url-sync.ts";
+import { usePrefetchSpanDetail } from "../hooks/use-prefetch-span-detail.ts";
+import { useSpanTreeWithCaptured } from "../hooks/use-span-tree.ts";
+import { useTraceDrawerNavigation } from "../hooks/use-trace-drawer-navigation.ts";
+import { useTraceDrawerShortcuts } from "../hooks/use-trace-drawer-shortcuts.ts";
+import { useTraceHeader } from "../hooks/use-trace-header.ts";
+import { useTraceRefresh } from "../hooks/use-trace-refresh.ts";
+import { useDrawerStore } from "../../../../behavior/drawer.store.ts";
+import { guardTraceEditExit } from "../utils/trace-edit-mode.ts";
+
+interface TraceDrawerScaffold {
+  traceId: string | undefined;
+  trace: TraceHeader | null;
+  spanTree: SpanTreeNode[];
+  selectedSpan: SpanTreeNode | null;
+  isLoading: boolean;
+  headerQuery: ReturnType<typeof useTraceHeader>;
+  spanTreeQuery: ReturnType<typeof useSpanTreeWithCaptured>["corrected"];
+  canGoBack: boolean;
+  goBackInTraceHistory: () => void;
+  handleClose: () => void;
+  drawerContentRef: RefObject<HTMLDivElement | null>;
+  drawerBodyRef: RefObject<HTMLDivElement | null>;
+  scrollContentRef: RefObject<HTMLDivElement | null>;
+}
+
+/**
+ * Data wiring + cross-cutting effects for the trace drawer.
+ */
+export function useTraceDrawerScaffold(): TraceDrawerScaffold {
+  // `goBack` so closing the drawer pops just our entry off the drawer stack — e.g. closing a
+  // trace opened via the scenarioRunDetail drawer restores that drawer instead of nuking the
+  // whole drawer state, which `closeDrawer` would do.
+  const { goBack, closeDrawer } = useDrawer();
+
+  // The drawer store is the source of truth for `traceId` — see
+  // `useTraceDrawerUrlHydrator` (mounted at the page level) for the URL → store sync.
+  const traceId = useDrawerStore((s) => s.traceId) ?? undefined;
+
+  // Single source of truth — the drawer store. URL is just a serialization.
+  useDrawerUrlSync();
+
+  const selectedSpanId = useDrawerStore((s) => s.selectedSpanId);
+  const setMaximized = useDrawerStore((s) => s.setMaximized);
+
+  // The captured tree feeds the header the one thing it cannot work out on its own: how
+  // many of the trace's spans a correction removes, which is what keeps the header's
+  // span count agreeing with the waterfall below it.
+  const { captured: capturedSpanTree, display: spanTreeQuery } = useSpanTreeWithCaptured();
+  const headerQuery = useTraceHeader({ spans: capturedSpanTree.data });
+  // `useTraceHeader` uses React Query's `keepPreviousData`, so the previous trace's
+  // data lingers until the new fetch resolves.
+  const trace = headerQuery.data && headerQuery.data.traceId === traceId ? headerQuery.data : null;
+  const spanTree = spanTreeQuery.data && trace ? spanTreeQuery.data : [];
+  // Show the full-shell skeleton whenever we have a traceId in the URL but no result
+  // yet — including the moment before the project context has loaded and the query is
+  // still disabled.
+  const isLoading = traceId ? !trace && !headerQuery.error : false;
+
+  const conversationContext = useConversationContext(
+    trace?.conversationId ?? null,
+    trace?.traceId ?? null,
+  );
+  // Warm sibling trace headers so navigating between turns is instant.
+  useConversationPrefetch(trace?.conversationId ?? null, trace?.traceId ?? null);
+
+  const { navigateToTrace, goBack: goBackInTraceHistory, canGoBack } = useTraceDrawerNavigation();
+
+  // Same hook DrawerHeader's refresh button uses — re-instantiated here so
+  // the `R` shortcut can fire even if the header is in a refreshing-spinner
+  // state. The hook is memoized per traceId, so duplicating it is free.
+  const { refresh: refreshActiveTrace } = useTraceRefresh(traceId ?? "");
+
+  const selectedSpan = useMemo(
+    () => (selectedSpanId ? (spanTree.find((s) => s.spanId === selectedSpanId) ?? null) : null),
+    [selectedSpanId, spanTree],
+  );
+
+  // Prefetch the previous + next span's detail whenever a span is selected
+  // so [/] navigation feels instantaneous.
+  const prefetchSpan = usePrefetchSpanDetail();
+  useEffect(() => {
+    if (!selectedSpanId || spanTree.length === 0) return;
+    const idx = spanTree.findIndex((s) => s.spanId === selectedSpanId);
+    if (idx === -1) return;
+    const prev = spanTree[idx - 1];
+    const next = spanTree[idx + 1];
+    if (prev) prefetchSpan(prev.spanId);
+    if (next) prefetchSpan(next.spanId);
+  }, [selectedSpanId, spanTree, prefetchSpan]);
+
+  const trpcUtils = api.useUtils();
+  const closeDrawerNow = useCallback(() => {
+    // Cancel any in-flight per-trace queries so closing during a slow load doesn't leave the
+    // request running, racing a future re-open and burning bandwidth/CH cycles for nothing.
+    if (traceId) {
+      void trpcUtils.tracesV2.header.cancel();
+      void trpcUtils.tracesV2.spanTree.cancel();
+    }
+    setMaximized(false);
+    // Clear the store first — the page-level mount in `TracesPage`
+    // reads `traceId` from here, so unmounting it synchronously
+    // matches the click flow's synchronous open. The URL push that
+    // follows is just cleanup for deep-link / browser-history.
+    useDrawerStore.getState().closeDrawer();
+    // This drawer mounts from its own store, so it can be on screen while the
+    // shared drawer stack is describing something else entirely. Walking back
+    // through a stack that is not about this drawer is what re-opens a drawer
+    // the reader had already left; when the stack does not have us on top,
+    // closing is just a close.
+    if (getTopDrawer() === "traceV2Details") goBack();
+    else closeDrawer();
+  }, [goBack, closeDrawer, setMaximized, trpcUtils, traceId]);
+
+  // Closing the drawer on an unsaved correction asks first: the drawer is the
+  // only place that correction exists, so closing is the same as discarding it.
+  const handleClose = useCallback(() => {
+    guardTraceEditExit(closeDrawerNow);
+  }, [closeDrawerNow]);
+
+  const drawerContentRef = useRef<HTMLDivElement>(null);
+  const drawerBodyRef = useRef<HTMLDivElement>(null);
+  const scrollContentRef = useRef<HTMLDivElement>(null);
+
+  // Double-click anywhere outside the drawer panel to close. Only relevant
+  // in the *pinned* mode — when unpinned, the drawer is modal and a single
+  // click outside already dismisses it, so the dblclick gesture would just
+  // be a redundant second close path that fights the modal backdrop.
+  const pinned = useDrawerStore((s) => s.pinned);
+  useEffect(() => {
+    if (!pinned) return;
+    const handleDoubleClick = (e: MouseEvent) => {
+      const content = drawerContentRef.current;
+      if (!content) return;
+      const target = e.target as Node | null;
+      if (target && content.contains(target)) return;
+      handleClose();
+    };
+    document.addEventListener("dblclick", handleDoubleClick);
+    return () => document.removeEventListener("dblclick", handleDoubleClick);
+  }, [handleClose, pinned]);
+
+  useTraceDrawerShortcuts({
+    trace,
+    spanTree,
+    conversationContext,
+    navigateToTrace,
+    goBack: goBackInTraceHistory,
+    canGoBack,
+    refreshActiveTrace,
+    onClose: handleClose,
+  });
+
+  return {
+    traceId,
+    trace,
+    spanTree,
+    selectedSpan,
+    isLoading,
+    headerQuery,
+    spanTreeQuery,
+    canGoBack,
+    goBackInTraceHistory,
+    handleClose,
+    drawerContentRef,
+    drawerBodyRef,
+    scrollContentRef,
+  };
+}

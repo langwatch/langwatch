@@ -1,0 +1,83 @@
+import {
+  LicenseGenerationCapability,
+  buildMintedPlan,
+  type GenerateLicenseInput,
+  type GenerateLicenseOutput,
+  type LicenseData,
+} from "@langwatch/enterprise-licensing-contract";
+import { getPlanTemplate, quotedPlanLimits } from "@langwatch/plans";
+import type { LicenseCryptography } from "../app/licensing.members.ts";
+import { fromDate, nowInstant, toDate } from "@langwatch/time";
+
+/**
+ * Generates a signed, encoded license key. Pure business logic — no HTTP, no Prisma, no env var
+ * access. Private key and all parameters passed explicitly.
+ */
+export class LicenseGenerationService extends LicenseGenerationCapability {
+  private constructor(private readonly cryptography: LicenseCryptography) {
+    super();
+  }
+
+  static create(cryptography: LicenseCryptography): LicenseGenerationService {
+    return new LicenseGenerationService(cryptography);
+  }
+
+  generate({
+    organizationId,
+    organizationName,
+    email,
+    planType,
+    maxMembers,
+    maxMembersLite,
+    maxMessagesPerMonth,
+    expiresAt: requestedExpiresAt,
+    privateKey,
+    now = toDate(nowInstant()),
+  }: GenerateLicenseInput): GenerateLicenseOutput {
+    const template = getPlanTemplate(planType);
+    if (!template) {
+      throw new Error(`Unknown plan type: ${planType}`);
+    }
+
+    const seats = maxMembers > 0 ? maxMembers : 1;
+    const oneYearOut = toDate(fromDate(now));
+    oneYearOut.setFullYear(oneYearOut.getFullYear() + 1);
+    const expiresAt = requestedExpiresAt ?? oneYearOut;
+    if (Number.isNaN(expiresAt.getTime())) {
+      throw new Error("Expiration date is not a date");
+    }
+
+    if (expiresAt <= now) {
+      throw new Error("Expiration date must be in the future");
+    }
+
+    const licenseData: LicenseData = {
+      licenseId: this.cryptography.generateLicenseId(),
+      version: 1,
+      organizationName: organizationName.trim() || email,
+      email,
+      issuedAt: now.toISOString(),
+      expiresAt: expiresAt.toISOString(),
+      plan: buildMintedPlan({
+        type: template.type,
+        name: template.name,
+        ...quotedPlanLimits({
+          members: seats,
+          membersLite: maxMembersLite ?? template.maxMembersLite,
+          messagesPerMonth: maxMessagesPerMonth ?? template.maxMessagesPerMonth,
+          publish: template.canPublish,
+        }),
+        webhookEndpointsEnabled: template.webhookEndpointsEnabled,
+        usageUnit: template.usageUnit,
+      }),
+      // The binding: without it the key activates on any organization.
+      ...(organizationId ? { organizationId } : {}),
+    };
+    const signedLicense = this.cryptography.signLicense(licenseData, privateKey);
+
+    return {
+      licenseKey: this.cryptography.encodeLicenseKey(signedLicense),
+      licenseData,
+    };
+  }
+}

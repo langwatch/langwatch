@@ -1,0 +1,125 @@
+/**
+ * What the simulation screens are mounted inside: the tRPC Provider their
+ * hooks run on, and the host port for project, team, organization, reader,
+ * grants, address and feedback. `setQuery` merges over the reading here.
+ */
+
+import {
+  scenarioApi,
+  ScenarioHostProvider,
+  type ScenarioHostPort,
+} from "@langwatch/scenario-web/simulations";
+import { useMemo, type ComponentType, type ReactNode } from "react";
+
+import { useUiCapabilities } from "@langwatch/ui-host/capabilities";
+
+export function ScenarioHost({ children }: { children: ReactNode }) {
+  const { session, navigation, route, feedback } = useUiCapabilities();
+  const scope = session.activeScope();
+  const actor = session.currentUser();
+
+  const organizations = scenarioApi.organization.getAll.useQuery(
+    { isDemo: false },
+    { enabled: !!actor },
+  );
+
+  const placement = useMemo(() => {
+    if (!scope.projectId) return void 0;
+    for (const organization of organizations.data ?? []) {
+      for (const team of organization.teams) {
+        const found = team.projects.find(
+          (candidate: { id: string }) => candidate.id === scope.projectId,
+        );
+        if (found) return { organization, team, project: found };
+      }
+    }
+    return void 0;
+  }, [organizations.data, scope.projectId]);
+
+  const reading = route.reading();
+
+  const host = useMemo<ScenarioHostPort>(
+    () => ({
+      project: () =>
+        placement
+          ? {
+              id: placement.project.id,
+              slug: placement.project.slug,
+              name: placement.project.name,
+              ...(placement.project.apiKey === void 0 ? {} : { apiKey: placement.project.apiKey }),
+              ...(placement.project.firstMessage === void 0
+                ? {}
+                : { firstMessage: placement.project.firstMessage }),
+            }
+          : void 0,
+      organization: () =>
+        placement
+          ? {
+              id: placement.organization.id,
+              name: placement.organization.name,
+              ...(placement.organization.slug === void 0
+                ? {}
+                : { slug: placement.organization.slug }),
+            }
+          : void 0,
+      team: () =>
+        placement
+          ? {
+              id: placement.team.id,
+              name: placement.team.name,
+              ...(placement.team.isPersonal === void 0
+                ? {}
+                : { isPersonal: placement.team.isPersonal }),
+              ...(placement.team.ownerUserId === void 0
+                ? {}
+                : { ownerUserId: placement.team.ownerUserId }),
+              ...(placement.team.members === void 0 ? {} : { members: placement.team.members }),
+            }
+          : void 0,
+      // The graph read doesn't carry it, and nothing here turns on it —
+      // every gate reads a grant instead.
+      organizationRole: () => void 0,
+      currentUser: () =>
+        actor ? { id: actor.id, name: actor.name, email: actor.email, image: actor.image } : void 0,
+      hasPermission: (permission) => session.hasPermission(permission),
+      isLoading: () => !!actor && organizations.isLoading,
+      /**
+       * The splat included. `/:project/simulations/*` is one page serving
+       * five addresses, and `params["*"]` is how it knows which.
+       */
+      route: () => ({
+        params: {
+          ...reading.params,
+          path: (reading.params["*"] ?? "").split("/").filter(Boolean),
+        },
+        query: reading.query,
+        pathname: reading.pathname ?? "",
+      }),
+      setQuery: (next, options) => route.setQuery({ ...reading.query, ...next }, options),
+      navigate: (to, options) =>
+        options?.replace ? navigation.replace(to) : navigation.navigate(to),
+      succeeded: (notice) => feedback.succeeded(notice),
+      failed: (failure) => feedback.failed(failure),
+    }),
+    [placement, actor, session, organizations.isLoading, reading, route, navigation, feedback],
+  );
+
+  return <ScenarioHostProvider value={host}>{children}</ScenarioHostProvider>;
+}
+
+/**
+ * Wraps one of this family's drawers in the same host: `CurrentDrawer`
+ * mounts above the outlet, so a drawer opened elsewhere renders outside
+ * whatever provider the page below brought.
+ */
+export function withScenarioDrawerHost<P extends object>(
+  Drawer: ComponentType<P>,
+): ComponentType<P> {
+  const Mounted = (props: P) => (
+    <ScenarioHost>
+      <Drawer {...props} />
+    </ScenarioHost>
+  );
+  Mounted.displayName = `withScenarioDrawerHost(${Drawer.displayName ?? Drawer.name ?? "Drawer"})`;
+  return Mounted;
+}

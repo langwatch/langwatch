@@ -25,24 +25,13 @@ import { ExecutionWindow, installProcessInterceptors } from "./execution";
 import { createCommandExecutor, type CommandExecutor } from "./runner";
 import { noopTelemetry, type DaemonTelemetry } from "./telemetry";
 
-/** 10 minutes: long enough to span an agent's think-time, short enough to never feel like a leak. */
+/** 10 minutes: long enough for agent think-time, short enough to never feel
+ * like a leak. */
 export const DEFAULT_IDLE_TIMEOUT_MS = 10 * 60 * 1000;
 
-/**
- * How long `stop()` waits for in-flight requests before tearing the execution
- * window down underneath them.
- *
- * Shutdown restores the daemon's own cwd and environment (ExecutionWindow.reset),
- * so a request still running when that happens would finish against the WRONG
- * globals — and version-skew eviction makes shutdown-while-serving a routine
- * dev-loop event, not an exotic one. 5s covers any command close enough to
- * finishing to be worth waiting for; past that the client is told to fall back
- * and the connection is cut.
- *
- * For a client that has not committed output — everything under the client's
- * buffer cap, which is very nearly everything — that is a clean in-process
- * re-run. For one that HAS committed, it is not: see the note in `stop()`.
- */
+/** Shutdown waits for in-flight requests before tearing down the execution
+ * window. 5s covers close-to-finishing commands; past that, client falls back
+ * and connection cuts. See stop() for committed output handling. */
 export const DEFAULT_SHUTDOWN_GRACE_MS = 5_000;
 
 export interface DaemonServerOptions {
@@ -215,10 +204,7 @@ function identifyFile(filePath: string): FileIdentity | null {
  * idle minutes) in which the file genuinely does change hands; what is left is
  * the microseconds between the stat and the unlink.
  */
-export function unlinkIfSameFile(
-  filePath: string,
-  expected: FileIdentity | null,
-): boolean {
+export function unlinkIfSameFile(filePath: string, expected: FileIdentity | null): boolean {
   if (expected === null) return false;
 
   const current = identifyFile(filePath);
@@ -267,9 +253,7 @@ export async function cleanStaleSocket(socketPath: string): Promise<boolean> {
  * that a shared path is only ever approved when this one fits as well.
  */
 export function stagingSocketPath(socketPath: string, pid: number): string {
-  const base = socketPath.endsWith(".sock")
-    ? socketPath.slice(0, -".sock".length)
-    : socketPath;
+  const base = socketPath.endsWith(".sock") ? socketPath.slice(0, -".sock".length) : socketPath;
   return `${base}.${pid}`;
 }
 
@@ -351,8 +335,7 @@ export function createDaemonServer(options: DaemonServerOptions): DaemonServer {
   const startedAt = Date.now();
 
   const window = new ExecutionWindow();
-  const executor =
-    options.executor ?? createCommandExecutor({ window, telemetry });
+  const executor = options.executor ?? createCommandExecutor({ window, telemetry });
 
   let served = 0;
   let inflight = 0;
@@ -408,9 +391,7 @@ export function createDaemonServer(options: DaemonServerOptions): DaemonServer {
     });
   };
 
-  const stop = async (
-    reason: "idle" | "stop-requested" | "signal",
-  ): Promise<void> => {
+  const stop = async (reason: "idle" | "stop-requested" | "signal"): Promise<void> => {
     if (stopping) return closedPromise;
     stopping = true;
     if (idleTimer) clearTimeout(idleTimer);
@@ -482,9 +463,8 @@ export function createDaemonServer(options: DaemonServerOptions): DaemonServer {
         // write buffer, which would throw away the very frame being sent. The
         // callback fires once it is flushed, and destroying there bounds the
         // teardown instead of leaving a half-closed socket holding the loop open.
-        connection.end(
-          encodeFrame({ t: "fallback", reason: "shutting-down-mid-command" }),
-          () => connection.destroy(),
+        connection.end(encodeFrame({ t: "fallback", reason: "shutting-down-mid-command" }), () =>
+          connection.destroy(),
         );
       }
       connections.clear();
@@ -668,8 +648,7 @@ export function createDaemonServer(options: DaemonServerOptions): DaemonServer {
               // client can safely run the command itself.
               send({
                 t: "fallback",
-                reason:
-                  error instanceof Error ? error.message : "execution-failed",
+                reason: error instanceof Error ? error.message : "execution-failed",
               });
               finish();
               endRequest();
@@ -714,9 +693,7 @@ export function createDaemonServer(options: DaemonServerOptions): DaemonServer {
         ? stagingPath
         : null;
     if (tooLong !== null) {
-      throw new Error(
-        `socket path is too long for a unix domain socket: ${tooLong}`,
-      );
+      throw new Error(`socket path is too long for a unix domain socket: ${tooLong}`);
     }
 
     ensureSocketDir(options.socketDir);

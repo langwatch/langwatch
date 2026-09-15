@@ -83,12 +83,7 @@ export interface StatusFrame {
   t: "status";
 }
 
-export type ClientFrame =
-  | HelloFrame
-  | ExecFrame
-  | CancelFrame
-  | StopFrame
-  | StatusFrame;
+export type ClientFrame = HelloFrame | ExecFrame | CancelFrame | StopFrame | StatusFrame;
 
 /** Daemon -> client: handshake accepted. */
 export interface HelloOkFrame {
@@ -196,8 +191,7 @@ export class FrameDecoder<T extends AnyFrame = AnyFrame> {
   constructor(private readonly maxLineBytes = 64 * 1024 * 1024) {}
 
   push(chunk: Buffer | string): T[] {
-    this.buffer +=
-      typeof chunk === "string" ? chunk : this.utf8.write(chunk);
+    this.buffer += typeof chunk === "string" ? chunk : this.utf8.write(chunk);
     if (this.buffer.length > this.maxLineBytes) {
       this.buffer = "";
       throw new Error("daemon protocol: frame exceeded maximum size");

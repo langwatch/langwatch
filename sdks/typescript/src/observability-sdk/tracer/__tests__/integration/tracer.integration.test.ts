@@ -20,24 +20,28 @@ import type { setupObservability } from "../../../setup/node";
 const TEST_COMPLEX_INPUT = {
   messages: [
     { role: "user", content: "Generate a haiku about TypeScript" },
-    { role: "system", content: "You are a helpful assistant" }
+    { role: "system", content: "You are a helpful assistant" },
   ],
   config: { temperature: 0.7, maxTokens: 150, model: "gpt-4" },
   metadata: { userId: "user-123", sessionId: "session-456" },
   features: ["chat", "analysis"],
   enabled: true,
   count: 42,
-  score: null
+  score: null,
 } as const;
 
 const TEST_COMPLEX_OUTPUT = {
   response: {
     text: "Types flow like code,\nCompiler catches all bugs,\nJavaScript evolved.",
     confidence: 0.95,
-    reasoning: ["greeting_detected", "help_offered"]
+    reasoning: ["greeting_detected", "help_offered"],
   },
   usage: { promptTokens: 15, completionTokens: 25 },
-  timing: { startTime: "2024-01-15T10:30:00.123Z", endTime: "2024-01-15T10:30:01.456Z", latencyMs: 1333 }
+  timing: {
+    startTime: "2024-01-15T10:30:00.123Z",
+    endTime: "2024-01-15T10:30:01.456Z",
+    latencyMs: 1333,
+  },
 } as const;
 
 describe("Tracer Integration Tests", () => {
@@ -60,7 +64,7 @@ describe("Tracer Integration Tests", () => {
       spanProcessors: [spanProcessor],
       attributes: {
         "test.suite": "tracer-integration",
-        "test.environment": "vitest"
+        "test.environment": "vitest",
       },
     });
   });
@@ -86,7 +90,7 @@ describe("Tracer Integration Tests", () => {
           .setMetrics({
             promptTokens: 15,
             completionTokens: 25,
-            cost: 0.0012
+            cost: 0.0012,
           });
       });
 
@@ -128,11 +132,11 @@ describe("Tracer Integration Tests", () => {
 
       // Verify events were recorded
       expect(span.events).toHaveLength(1);
-      const eventNames = span.events.map(e => e.name);
+      const eventNames = span.events.map((e) => e.name);
       expect(eventNames).toContain("hehe");
 
       // Verify event data format
-      const userEvent = span.events.find(e => e.name === "hehe");
+      const userEvent = span.events.find((e) => e.name === "hehe");
       if (!userEvent?.attributes) {
         throw new Error("Expected user event with attributes");
       }
@@ -146,10 +150,7 @@ describe("Tracer Integration Tests", () => {
 
         // Child span 1
         await tracer.withActiveSpan("llm-generation", async (child1) => {
-          child1
-            .setType("llm")
-            .setInput("Generate content")
-            .setOutput("Generated content");
+          child1.setType("llm").setInput("Generate content").setOutput("Generated content");
         });
 
         // Child span 2
@@ -169,9 +170,9 @@ describe("Tracer Integration Tests", () => {
       expect(exportedSpans).toHaveLength(3);
 
       // Find spans by name
-      const parentSpan = exportedSpans.find(s => s.name === "parent-workflow");
-      const child1Span = exportedSpans.find(s => s.name === "llm-generation");
-      const child2Span = exportedSpans.find(s => s.name === "data-processing");
+      const parentSpan = exportedSpans.find((s) => s.name === "parent-workflow");
+      const child1Span = exportedSpans.find((s) => s.name === "llm-generation");
+      const child2Span = exportedSpans.find((s) => s.name === "data-processing");
 
       expect(parentSpan).toBeDefined();
       expect(child1Span).toBeDefined();
@@ -201,13 +202,10 @@ describe("Tracer Integration Tests", () => {
 
       await expect(
         tracer.withActiveSpan("failing-operation", async (span) => {
-          span
-            .addEvent("halp")
-            .setType("llm")
-            .setInput("This will fail");
+          span.addEvent("halp").setType("llm").setInput("This will fail");
 
           throw new Error("Integration test error");
-        })
+        }),
       ).rejects.toThrow("Integration test error");
 
       await spanProcessor.forceFlush();
@@ -230,11 +228,11 @@ describe("Tracer Integration Tests", () => {
 
       // Verify events were recorded before error
       expect(span.events.length).toBeGreaterThan(0);
-      const hasUserMessage = span.events.some(e => e.name === "halp");
+      const hasUserMessage = span.events.some((e) => e.name === "halp");
       expect(hasUserMessage).toBe(true);
 
       // Verify exception was recorded
-      const hasExceptionEvent = span.events.some(e => e.name === "exception");
+      const hasExceptionEvent = span.events.some((e) => e.name === "exception");
       expect(hasExceptionEvent).toBe(true);
     });
   });
@@ -253,7 +251,7 @@ describe("Tracer Integration Tests", () => {
         .setRAGContext({
           document_id: "doc-123",
           chunk_id: "chunk-456",
-          content: "Relevant context data"
+          content: "Relevant context data",
         })
         .setOutput({ result: "Manual span completed" });
 
@@ -327,11 +325,11 @@ describe("Tracer Integration Tests", () => {
             .setAttribute("operation.index", i);
 
           // Simulate some async work
-          await new Promise(resolve => setTimeout(resolve, Math.random() * 10));
+          await new Promise((resolve) => setTimeout(resolve, Math.random() * 10));
 
           span.setOutput(`Result ${i}`);
           return i;
-        })
+        }),
       );
 
       const results = await Promise.all(concurrentOperations);
@@ -344,7 +342,7 @@ describe("Tracer Integration Tests", () => {
       expect(exportedSpans).toHaveLength(10);
 
       // Verify all spans have unique IDs and proper attributes
-      const spanIds = new Set(exportedSpans.map(s => s.spanContext().spanId));
+      const spanIds = new Set(exportedSpans.map((s) => s.spanContext().spanId));
       expect(spanIds.size).toBe(10); // All unique
 
       exportedSpans.forEach((span) => {
@@ -368,7 +366,7 @@ describe("Tracer Integration Tests", () => {
 
           // Immediate completion - stress test lifecycle
           return `result-${i}`;
-        })
+        }),
       );
 
       const results = await Promise.all(rapidOperations);
@@ -380,9 +378,8 @@ describe("Tracer Integration Tests", () => {
       expect(exportedSpans).toHaveLength(cycles);
 
       // Verify all spans were properly created and ended
-      const allCompleted = exportedSpans.every(span =>
-        span.status.code === SpanStatusCode.OK &&
-        span.endTime[0] > 0
+      const allCompleted = exportedSpans.every(
+        (span) => span.status.code === SpanStatusCode.OK && span.endTime[0] > 0,
       );
       expect(allCompleted).toBe(true);
     });
@@ -395,8 +392,8 @@ describe("Tracer Integration Tests", () => {
         data: "x".repeat(50_000), // 50KB string
         numbers: Array.from({ length: 1000 }, (_, i) => i),
         nested: {
-          level1: { level2: { level3: "deeply nested data" } }
-        }
+          level1: { level2: { level3: "deeply nested data" } },
+        },
       };
 
       await tracer.withActiveSpan("large-data-span", async (span) => {
@@ -565,7 +562,7 @@ describe("Tracer Integration Tests", () => {
               tracer.withActiveSpan(`concurrent-nested-${i}`, async (span) => {
                 span.setType("agent").setInput(`Concurrent nested ${i}`);
                 return i;
-              })
+              }),
             );
 
             const results = await Promise.all(concurrentNested);
@@ -590,12 +587,12 @@ describe("Tracer Integration Tests", () => {
       expect(exportedSpans.length).toBeGreaterThanOrEqual(8); // Allow for some flexibility
 
       // Verify parent span completed successfully
-      const parentSpan = exportedSpans.find(s => s.name === "parent-span");
+      const parentSpan = exportedSpans.find((s) => s.name === "parent-span");
       expect(parentSpan).toBeDefined();
       expect(parentSpan?.status.code).toBe(1); // OK status
 
       // Verify all spans are in the same trace (proper context propagation)
-      const traceIds = new Set(exportedSpans.map(s => s.spanContext().traceId));
+      const traceIds = new Set(exportedSpans.map((s) => s.spanContext().traceId));
       expect(traceIds.size).toBe(1); // All spans should be in the same trace
     });
 
@@ -607,7 +604,7 @@ describe("Tracer Integration Tests", () => {
         span.setType("tool").setInput("Operation during shutdown");
 
         // Simulate some work
-        await new Promise(resolve => setTimeout(resolve, 10));
+        await new Promise((resolve) => setTimeout(resolve, 10));
 
         // Try to continue working on span even if provider is shutting down
         span.setAttribute("continued.work", true);

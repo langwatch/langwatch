@@ -1,0 +1,46 @@
+{
+  "name": "@langwatch/group-queue",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Typed Redis-backed queues with per-group FIFO ordering and independent producer and consumer capabilities.",
+  "license": "MIT",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    },
+    "./operational": {
+      "types": "./dist/operational.d.ts",
+      "default": "./src/operational.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "pnpm -w typecheck:declarations --project . && tsc --noEmit && tsc -p tsconfig.type-tests.json",
+    "test": "vitest run",
+    "test:unit": "vitest run",
+    "test:integration": "vitest run --config vitest.integration.config.ts"
+  },
+  "dependencies": {
+    "@langwatch/config": "workspace:*",
+    "@langwatch/observability": "workspace:*",
+    "@langwatch/stored-object-contract": "workspace:*",
+    "@langwatch/task": "workspace:*",
+    "@langwatch/time": "workspace:*",
+    "@opentelemetry/api": "catalog:",
+    "fastq": "^1.20.1",
+    "ioredis": "catalog:",
+    "msgpackr": "^2.0.4",
+    "prom-client": "catalog:"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

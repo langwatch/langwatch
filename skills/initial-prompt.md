@@ -12,24 +12,23 @@ The architecture for it needs to be very well thought to accomodate all use case
 We want to renovate our onboarding to have four paths, and in each of those four paths, they will have a prompt/skill which allows them to:
 
 - Devs using claude code
-    - "Instrument my code with LangWatch"
-    - "Create an evaluation experiment for my agent" (jupyter notebooks if in python, script if typescript)
-    - "Add agent simulation tests for my agent"
-    - "Version my agent prompts"
-    - "Red team my agent for vulnerabilities"
-    - "All of the above, take my agent to the next level"
+  - "Instrument my code with LangWatch"
+  - "Create an evaluation experiment for my agent" (jupyter notebooks if in python, script if typescript)
+  - "Add agent simulation tests for my agent"
+  - "Version my agent prompts"
+  - "Red team my agent for vulnerabilities"
+  - "All of the above, take my agent to the next level"
 
 - PMs using claude on the web
-    - "Create an experiment to test my prompt"
-    - "Write scenario simulation tests for my agent"
-    - "Tell me how my agent has been performing"
+  - "Create an experiment to test my prompt"
+  - "Write scenario simulation tests for my agent"
+  - "Tell me how my agent has been performing"
 
 - PMs via the platform
-    - Create experiments, scenarios, prompt playground etc, but all clickops
+  - Create experiments, scenarios, prompt playground etc, but all clickops
 
 - Devs manual setup
-    - Current onboarding instructions pretty much
-
+  - Current onboarding instructions pretty much
 
 So, as you can see, its a lot of skills, an in each of them a lot of different situations to test already, for example instrumentation can be python or typescript, can be langgraph or agno, vercel or mastra, etc, experiment can be for a RAG, or it can be for an image classifier, agent simulation can be a conversational agent, or a analytics sql queriying agent, and so on
 

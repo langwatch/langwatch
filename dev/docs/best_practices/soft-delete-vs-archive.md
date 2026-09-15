@@ -11,12 +11,12 @@ All resources that support "removal" from the UI should use **`archivedAt`** (ar
 
 ### Current state
 
-| Resource          | Field        | Pattern   | Notes                                     |
-|-------------------|--------------|-----------|--------------------------------------------|
-| Scenario          | `archivedAt` | Archive   | Correct                                    |
-| Agent             | `archivedAt` | Archive   | Correct                                    |
-| SimulationSuite   | `archivedAt` | Archive   | Correct                                    |
-| LlmPromptConfig   | `deletedAt`  | Soft-delete | Needs migration to `archivedAt` ([#1889](https://github.com/langwatch/langwatch/issues/1889)) |
+| Resource        | Field        | Pattern     | Notes                                                                                         |
+| --------------- | ------------ | ----------- | --------------------------------------------------------------------------------------------- |
+| Scenario        | `archivedAt` | Archive     | Correct                                                                                       |
+| Agent           | `archivedAt` | Archive     | Correct                                                                                       |
+| SimulationSuite | `archivedAt` | Archive     | Correct                                                                                       |
+| LlmPromptConfig | `deletedAt`  | Soft-delete | Needs migration to `archivedAt` ([#1889](https://github.com/langwatch/langwatch/issues/1889)) |
 
 ### Impact on suite runs
 

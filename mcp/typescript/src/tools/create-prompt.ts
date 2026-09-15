@@ -32,7 +32,7 @@ export async function handleCreatePrompt(params: {
   const handle = params.handle?.trim() || toHandle(params.name);
   if (!handle || !HANDLE_PATTERN.test(handle)) {
     throw new Error(
-      `Invalid prompt handle "${handle || ""}". Handle must match ${HANDLE_PATTERN}. Provide a valid \`handle\` explicitly.`
+      `Invalid prompt handle "${handle || ""}". Handle must match ${HANDLE_PATTERN}. Provide a valid \`handle\` explicitly.`,
     );
   }
 
@@ -49,10 +49,8 @@ export async function handleCreatePrompt(params: {
   if (result.handle) lines.push(`**Handle**: ${result.handle}`);
   lines.push(`**Name**: ${result.name || params.name}`);
   lines.push(`**Model**: ${params.model}`);
-  if (result.latestVersionNumber != null)
-    lines.push(`**Version**: v${result.latestVersionNumber}`);
-  if (params.tags && params.tags.length > 0)
-    lines.push(`**Tags**: ${params.tags.join(", ")}`);
+  if (result.latestVersionNumber != null) lines.push(`**Version**: v${result.latestVersionNumber}`);
+  if (params.tags && params.tags.length > 0) lines.push(`**Tags**: ${params.tags.join(", ")}`);
 
   return lines.join("\n");
 }

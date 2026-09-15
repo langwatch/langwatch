@@ -1,0 +1,73 @@
+import { LuCode, LuEye, LuList, LuMessageSquare } from "react-icons/lu";
+import type { ChatLayout } from "./transcript/index.ts";
+import type { MarkdownSubmode, ViewFormat } from "./use-io-viewer-state.ts";
+
+/**
+ * The format options for a panel, with the inline submode toggles the active format
+ * carries.
+ */
+export function formatSelectOptions({
+  formatOptions,
+  isChat,
+  chatLayout,
+  onChatLayoutChange,
+  markdownSubmode,
+  onMarkdownSubmodeChange,
+}: {
+  formatOptions: readonly ViewFormat[];
+  isChat: boolean;
+  chatLayout: ChatLayout;
+  onChatLayoutChange: (layout: ChatLayout) => void;
+  markdownSubmode: MarkdownSubmode;
+  onMarkdownSubmodeChange: (submode: MarkdownSubmode) => void;
+}) {
+  return formatOptions.map((option) => {
+    if (option === "pretty" && isChat) {
+      return {
+        value: option,
+        submodes: {
+          value: chatLayout,
+          onChange: onChatLayoutChange,
+          options: [
+            {
+              value: "thread",
+              label: "Thread",
+              icon: LuList,
+              tooltip: "Thread layout",
+            },
+            {
+              value: "bubbles",
+              label: "Bubbles",
+              icon: LuMessageSquare,
+              tooltip: "Bubble layout",
+            },
+          ],
+        },
+      };
+    }
+    if (option === "markdown") {
+      return {
+        value: option,
+        submodes: {
+          value: markdownSubmode,
+          onChange: onMarkdownSubmodeChange,
+          options: [
+            {
+              value: "rendered",
+              label: "Rendered",
+              icon: LuEye,
+              tooltip: "Rendered markdown view",
+            },
+            {
+              value: "source",
+              label: "Source",
+              icon: LuCode,
+              tooltip: "Source markdown view",
+            },
+          ],
+        },
+      };
+    }
+    return { value: option };
+  });
+}

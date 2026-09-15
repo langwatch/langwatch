@@ -34,21 +34,21 @@ export const NATIVE_ONLY_SKILLS = [
 ] as const;
 
 export interface PublishedSkill {
-	slug: string; // unique skill name
-	src: string; // absolute path to the canonical SKILL.mdx
-	isRecipe: boolean; // recipes publish nested under recipes/<slug>; Langy flattens them
-	// The feature flag gating this skill's offer, read from its own
-	// `feature-flag` front-matter. Absent = always offered. Every consumer of
-	// this list reads it from here rather than re-parsing frontmatter itself,
-	// so a skill's gate can only ever drift by editing its own SKILL.mdx.
-	featureFlag?: string;
+  slug: string; // unique skill name
+  src: string; // absolute path to the canonical SKILL.mdx
+  isRecipe: boolean; // recipes publish nested under recipes/<slug>; Langy flattens them
+  // The feature flag gating this skill's offer, read from its own
+  // `feature-flag` front-matter. Absent = always offered. Every consumer of
+  // this list reads it from here rather than re-parsing frontmatter itself,
+  // so a skill's gate can only ever drift by editing its own SKILL.mdx.
+  featureFlag?: string;
 }
 
 /** Reads a skill's `feature-flag` front-matter key, if it declares one. */
 function featureFlagOf(src: string): string | undefined {
-	if (!fs.existsSync(src)) return undefined;
-	const { frontmatter } = splitFrontmatter(fs.readFileSync(src, "utf8"));
-	return frontmatter["feature-flag"];
+  if (!fs.existsSync(src)) return undefined;
+  const { frontmatter } = splitFrontmatter(fs.readFileSync(src, "utf8"));
+  return frontmatter["feature-flag"];
 }
 
 // The single definition of the public set: curated FEATURE_SKILLS plus every
@@ -62,39 +62,39 @@ function featureFlagOf(src: string): string | undefined {
 // gate for on a static public directory, so it filters on `featureFlag`
 // itself rather than this function silently dropping the skill everywhere.
 export function listPublishedSkills(skillsRoot: string): PublishedSkill[] {
-	const out: PublishedSkill[] = FEATURE_SKILLS.map((slug) => {
-		const src = path.join(skillsRoot, slug, "SKILL.mdx");
-		return { slug, src, isRecipe: false, featureFlag: featureFlagOf(src) };
-	});
+  const out: PublishedSkill[] = FEATURE_SKILLS.map((slug) => {
+    const src = path.join(skillsRoot, slug, "SKILL.mdx");
+    return { slug, src, isRecipe: false, featureFlag: featureFlagOf(src) };
+  });
 
-	const recipesDir = path.join(skillsRoot, "recipes");
-	if (fs.existsSync(recipesDir)) {
-		const names = fs
-			.readdirSync(recipesDir, { withFileTypes: true })
-			.filter((e) => e.isDirectory())
-			.map((e) => e.name)
-			.sort(); // deterministic output across machines
-		for (const name of names) {
-			const src = path.join(recipesDir, name, "SKILL.mdx");
-			if (fs.existsSync(src)) {
-				out.push({
-					slug: name,
-					src,
-					isRecipe: true,
-					featureFlag: featureFlagOf(src),
-				});
-			}
-		}
-	}
-	return out;
+  const recipesDir = path.join(skillsRoot, "recipes");
+  if (fs.existsSync(recipesDir)) {
+    const names = fs
+      .readdirSync(recipesDir, { withFileTypes: true })
+      .filter((e) => e.isDirectory())
+      .map((e) => e.name)
+      .sort(); // deterministic output across machines
+    for (const name of names) {
+      const src = path.join(recipesDir, name, "SKILL.mdx");
+      if (fs.existsSync(src)) {
+        out.push({
+          slug: name,
+          src,
+          isRecipe: true,
+          featureFlag: featureFlagOf(src),
+        });
+      }
+    }
+  }
+  return out;
 }
 
 export function listNativeSkills(skillsRoot: string): PublishedSkill[] {
-	return [
-		...listPublishedSkills(skillsRoot),
-		...NATIVE_ONLY_SKILLS.map((slug) => {
-			const src = path.join(skillsRoot, slug, "SKILL.mdx");
-			return { slug, src, isRecipe: false, featureFlag: featureFlagOf(src) };
-		}),
-	];
+  return [
+    ...listPublishedSkills(skillsRoot),
+    ...NATIVE_ONLY_SKILLS.map((slug) => {
+      const src = path.join(skillsRoot, slug, "SKILL.mdx");
+      return { slug, src, isRecipe: false, featureFlag: featureFlagOf(src) };
+    }),
+  ];
 }

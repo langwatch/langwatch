@@ -1,7 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 vi.mock("../../../utils/apiKey", () => ({
-  resolveCredentials: vi.fn(async () => ({ apiKey: "test-key", source: "env", endpoint: "https://app.langwatch.ai" })),
+  resolveCredentials: vi.fn(async () => ({
+    apiKey: "test-key",
+    source: "env",
+    endpoint: "https://app.langwatch.ai",
+  })),
 }));
 
 vi.mock("ora", () => ({
@@ -15,6 +19,7 @@ vi.mock("ora", () => ({
 import { listSimulationRunsCommand } from "../list";
 import { getSimulationRunCommand } from "../get";
 import { setOutputFormat } from "../../../utils/outputScope";
+import { stripAnsi } from "../../../utils/formatting";
 
 class ProcessExitError extends Error {
   constructor(public code: number) {
@@ -80,7 +85,7 @@ describe("listSimulationRunsCommand()", () => {
       await listSimulationRunsCommand({});
 
       expect(mockFetch).toHaveBeenCalledWith(
-        expect.stringContaining("/api/simulation-runs"),
+        expect.stringContaining("/api/v1/simulation-runs"),
         expect.objectContaining({ method: "GET" }),
       );
     });
@@ -169,9 +174,7 @@ describe("listSimulationRunsCommand()", () => {
 
       setOutputFormat("json");
       try {
-        await expect(
-          listSimulationRunsCommand({ limit: "200" }),
-        ).rejects.toThrow(ProcessExitError);
+        await expect(listSimulationRunsCommand({ limit: "200" })).rejects.toThrow(ProcessExitError);
       } finally {
         setOutputFormat(undefined);
       }
@@ -267,7 +270,7 @@ describe("getSimulationRunCommand()", () => {
       await getSimulationRunCommand("run_abc123");
 
       expect(mockFetch).toHaveBeenCalledWith(
-        "http://localhost:5560/api/simulation-runs/run_abc123",
+        "http://localhost:5560/api/v1/simulation-runs/run_abc123",
         expect.objectContaining({ method: "GET" }),
       );
     });
@@ -326,10 +329,7 @@ describe("getSimulationRunCommand()", () => {
 });
 
 /**
- * The note belongs to the batch and the version is the scenario version the
- * run used. Both read as named fields: the run's raw metadata is internal and
- * never part of what the CLI shows or returns.
- *
+ * The note belongs to the batch and the version is the scenario version the run used.
  * Spec: specs/features/simulation-runs-cli.feature
  */
 describe("the note and the scenario version", () => {
@@ -346,7 +346,7 @@ describe("the note and the scenario version", () => {
     process.env.LANGWATCH_ENDPOINT = "http://localhost:5560";
   });
 
-  const printed = () => vi.mocked(console.log).mock.calls.flat().join("\n");
+  const printed = () => stripAnsi(vi.mocked(console.log).mock.calls.flat().join("\n"));
 
   describe("listSimulationRunsCommand()", () => {
     /** @scenario "List simulation runs shows the note and the scenario version" */
@@ -414,8 +414,7 @@ describe("the note and the scenario version", () => {
     it("shows the note of the batch and the version the run used", async () => {
       mockFetch.mockResolvedValue({
         ok: true,
-        json: async () =>
-          makeRun({ note: "after the retry fix", scenarioVersion: 3 }),
+        json: async () => makeRun({ note: "after the retry fix", scenarioVersion: 3 }),
       });
 
       const result = await getSimulationRunCommand("run_abc123");

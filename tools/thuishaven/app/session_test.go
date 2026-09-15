@@ -54,10 +54,17 @@ func TestSessionSnapshot(t *testing.T) {
 			t.Errorf("branch = %q, want feat/x", r.Branch)
 		}
 
-		t.Run("when a routed child is ours, it is restartable", func(t *testing.T) {
-			app, ok := findService(r, "app")
-			if !ok || !app.Restartable || app.Fallback {
-				t.Errorf("app should be a restartable, non-fallback service, got %+v (ok=%v)", app, ok)
+		// The routed hostname is app.<slug>, but the PROCESS on that port is the
+		// browser application's lane, and `haven restart`/`haven logs` name it
+		// ui. The dashboard has to agree with them or the bounce it offers is
+		// spelled differently from the one that works.
+		t.Run("when a routed child is ours, it is restartable under its lane name", func(t *testing.T) {
+			ui, ok := findService(r, "ui")
+			if !ok || !ui.Restartable || ui.Fallback {
+				t.Errorf("ui should be a restartable, non-fallback service, got %+v (ok=%v)", ui, ok)
+			}
+			if _, wrong := findService(r, "app"); wrong {
+				t.Error("the routed hostname's internal name must not be offered as a lane")
 			}
 		})
 

@@ -25,7 +25,9 @@ const DefaultLangyInternalSecret = "langy-local-development-secret"
 // which the control plane reads ONLY outside production — it fails loud if that
 // var is ever set in prod, where the default is fixed. A seeded DB overrides
 // this with a two-year, partition-aligned RetentionPolicy so the seeded history
-// survives (see the seed:retention step).
+// survives. NOTHING DOES THAT TODAY: the step that pinned it (seed:retention)
+// went with the platform application, and no shipped preset loads backdated
+// data that would need it. Restore both together — see db.go's seedPreset.
 const DefaultRetentionDays = 7
 
 // svc looks a service up by name; a zero value is fine for the string formatting
@@ -39,12 +41,12 @@ func (s Stack) svc(name string) Service {
 	return Service{}
 }
 
-// OverlayEnv returns the KEY=VALUE lines that carry the resolved hostname URLs +
-// ports. These are (a) written to platform/app/.env.portless — the overlay every TS
-// entry point loads last with override:true so it beats anything pinned in .env —
-// and (b) injected directly into each supervised child. Deriving them from the
-// Stack (which already holds every URL/port) keeps this the single source of
-// truth with no file round-trip.
+// OverlayEnv returns the KEY=VALUE lines that carry the resolved hostname URLs
+// + ports. They are injected directly into the environment of every child haven
+// starts, and printed by `haven env` for a shell — nothing writes them to a
+// file. Deriving them from the Stack (which already holds every URL/port) keeps
+// this the single source of truth, and keeping them in memory means a checkout
+// never holds a stale copy of a stack that has since come down.
 func (s Stack) OverlayEnv() []string {
 	app, gw, nlp, langy := s.svc("app"), s.svc("gateway"), s.svc("nlp"), s.svc("langyagent")
 	// The API is same-origin with the app: the browser (and any agent) uses one
@@ -84,18 +86,19 @@ func (s Stack) OverlayEnv() []string {
 		// on Node trusting the portless CA.
 		fmt.Sprintf("LW_GATEWAY_INTERNAL_URL=http://127.0.0.1:%d", gw.Port),
 		fmt.Sprintf("REDIS_DB_INDEX=%d", s.RedisDB),
-		// Pretty, human-readable console logging for the Go services (clog reads
-		// LOG_FORMAT; the TS app's pino is already pretty in dev via NODE_ENV). Haven
-		// is always a human at the console, so the dev lanes should read like prose,
-		// not JSON. Haven-dev only — this overlay never exists in prod, where the Go
-		// services keep their JSON default. The collector still receives structured
-		// records regardless of the console format (clog tees the two).
-		"LOG_FORMAT=pretty",
+		// The shared structured format on every lane, dev included
+		// (dev/docs/best_practices/dev-log-format.md). Haven is always a human at
+		// the console, and it is haven that renders for them — one renderer over
+		// eight identical streams, instead of eight pretty consoles that each
+		// invent their own clock and level column. `LOG_FORMAT=pretty` is still
+		// there for a lane run bare in its own terminal.
+		"LOG_FORMAT=json",
 		// A tiny default retention for the dev stack: an unseeded worktree keeps a
 		// week of data so ClickHouse stays small and whole weekly partitions drop
 		// cleanly. Haven-dev only — the control plane fails loud if this var is set
-		// in prod, where the platform default is fixed. Seeding overrides it with a
-		// two-year, partition-aligned RetentionPolicy (the seed:retention step).
+		// in prod, where the platform default is fixed. Nothing raises it: the
+		// seed:retention step that did went with the platform application, and no
+		// shipped preset loads data old enough to need it (see db.go).
 		fmt.Sprintf("LANGWATCH_DEFAULT_RETENTION_DAYS=%d", DefaultRetentionDays),
 	}
 	// The IdP simulator is an opt-in lane; only a worktree actually running (or
@@ -120,6 +123,17 @@ func (s Stack) OverlayEnv() []string {
 		if idp.DNSPort != 0 {
 			env = append(env, fmt.Sprintf("SSO_DOMAIN_PROOF_DNS_SERVERS=127.0.0.1:%d", idp.DNSPort))
 		}
+	}
+	// The design system's Storybook. The ui lane frames it at /design-system and
+	// starts one itself on the first visit unless something is already listening
+	// on the port it derives — so naming haven's port here is what makes the two
+	// agree: the lane haven supervises IS the listener the route finds, instead
+	// of a second Storybook building the same stories on a different port.
+	// Emitted only when there is a Storybook to point at (a local lane, or a
+	// baseline stack's), so a worktree that never selected it keeps today's
+	// start-on-first-visit behavior untouched.
+	if sb := s.svc(DesignSystemService); sb.Port != 0 {
+		env = append(env, fmt.Sprintf("LANGWATCH_STORYBOOK_PORT=%d", sb.Port))
 	}
 	// A stable local API key so the seed always mints the same credential and any
 	// agent can authenticate without rediscovering it per worktree. Emitted as
@@ -147,7 +161,7 @@ func (s Stack) OverlayEnv() []string {
 		"LANGWATCH_PUBLIC_ACCESS_TOKEN="+DefaultPublicAccessToken,
 		// ee/admin/isAdmin.ts gates platform-admin (impersonation etc.) on this
 		// comma-separated list. The seeded admin needs to be in it, or logging in
-		// as admin@haven.localhost gets a normal user, not a platform admin.
+		// as DefaultAdminEmail gets a normal user, not a platform admin.
 		"ADMIN_EMAILS="+DefaultAdminEmail,
 	)
 	// langyagent (the worker manager): the control plane dials it at its loopback
@@ -207,6 +221,7 @@ func (s Stack) OverlayEnv() []string {
 		env = append(env, fmt.Sprintf("REDIS_URL=redis://127.0.0.1:%d", s.RedisPort))
 	}
 	env = append(env, s.observabilityEnv()...)
+	env = append(env, NodeOptionsEnvFromProcess())
 	return env
 }
 
@@ -225,7 +240,7 @@ func (s Stack) OverlayEnv() []string {
 // lost, just relocated.
 func (s Stack) observabilityEnv() []string {
 	if s.ObservabilityOTLPPort == 0 {
-		return nil
+		return TelemetryOffEnv()
 	}
 	otlp := fmt.Sprintf("http://127.0.0.1:%d", s.ObservabilityOTLPPort)
 	env := []string{
@@ -270,15 +285,68 @@ func (s Stack) observabilityEnv() []string {
 	return env
 }
 
-// OverlayFile renders the .env.portless file body (header + OverlayEnv).
-func (s Stack) OverlayFile() string {
-	var b strings.Builder
-	b.WriteString("# --- generated by haven (thuishaven) — do not edit ---\n")
-	b.WriteString(fmt.Sprintf("# Portless hostname routing for the %q stack (worktree: %s).\n", s.Slug, s.WorktreeDir))
-	b.WriteString("# Loaded last with override:true so these win over anything pinned in .env.\n")
-	for _, line := range s.OverlayEnv() {
-		b.WriteString(line)
-		b.WriteByte('\n')
+// LaneEnv is the line that tells one supervised child which lane it is. It is
+// the same signal dev/scripts/lane.sh sets for the plain `pnpm dev` path
+// (LANGWATCH_LANE) and that the Makefile's `service`/`service-watch` targets
+// check before piping a Go service's own JSON through their own copy of
+// dev/scripts/log-render.mjs (Makefile:141): a renderer is already in front of
+// every lane haven supervises, so a nested one must not run too, or the same
+// line prints twice - once rendered by the launcher script, once by haven.
+// Every child gets it, not only the Go lanes that read it today, so the
+// invariant holds for whatever a future recipe checks.
+func LaneEnv(lane string) string {
+	return "LANGWATCH_LANE=" + lane
+}
+
+// MailProviderEnvVars are the env keys that mean a developer configured an
+// outgoing-mail provider explicitly. Any one of them present in the resolved
+// environment means haven must inject nothing: silently rewiring mail a
+// developer deliberately routed to SendGrid, Resend, SES or a hand-rolled SMTP
+// endpoint would send their test traffic somewhere they did not choose.
+var MailProviderEnvVars = []string{
+	"EMAIL_PROVIDER", "SMTP_URL", "SMTP_HOST", "SENDGRID_API_KEY", "RESEND_API_KEY", "USE_AWS_SES",
+}
+
+// HasEmailProviderConfigured reports whether resolved — the environment the
+// app process will actually see, already merged with its own precedence —
+// names an email provider. resolved is a plain map so callers build it once
+// (process env layered over the worktree's .env) and this stays pure and
+// trivially testable with a literal fixture.
+func HasEmailProviderConfigured(resolved map[string]string) bool {
+	for _, key := range MailProviderEnvVars {
+		if resolved[key] != "" {
+			return true
+		}
 	}
-	return b.String()
+	return false
+}
+
+// MailSMTPEnv is the SMTP override that routes the app's outgoing mail at the
+// local sink, or nil when the developer already configured a provider (see
+// HasEmailProviderConfigured) — the sink still catches whatever is addressed
+// to it directly, but haven injects nothing over a deliberate choice.
+func MailSMTPEnv(resolved map[string]string, smtpPort int) []string {
+	if HasEmailProviderConfigured(resolved) {
+		return nil
+	}
+	return []string{
+		"EMAIL_PROVIDER=smtp",
+		"SMTP_HOST=127.0.0.1",
+		fmt.Sprintf("SMTP_PORT=%d", smtpPort),
+		"SMTP_SECURE=false",
+	}
+}
+
+// EnvMap turns KEY=VALUE lines into a map, for callers that need to look a
+// value up or render the set as an object rather than replay it into a child.
+func EnvMap(lines []string) map[string]string {
+	m := make(map[string]string, len(lines))
+	for _, line := range lines {
+		key, value, ok := strings.Cut(line, "=")
+		if !ok {
+			continue
+		}
+		m[key] = value
+	}
+	return m
 }

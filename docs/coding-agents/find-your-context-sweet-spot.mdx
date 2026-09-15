@@ -172,7 +172,8 @@ The sweet spot is the highest context share where all three stay flat. The repor
 The published version of this investigation ran on 287,748 real model calls and produced the cost curve your report draws for your own sessions:
 
 <Frame caption="Tokens per productive step against the compaction threshold. The optimum sat at 220k, and every threshold between 170k and 316k stayed within 10 percent of it. Letting the context fill to 900k costs 2.3 times the optimum.">
-  ![Tokens per productive step against the compaction threshold](/images/coding-agents/fig05-sweetspot.webp)
+  ![Tokens per productive step against the compaction
+  threshold](/images/coding-agents/fig05-sweetspot.webp)
 </Frame>
 
 The same investigation priced the compaction itself beyond the tokens it re-bills: for the first 30 steps after one, the share of user messages containing a correction runs at up to 2.4 times the baseline, and it takes about 60 steps to return to steady state.

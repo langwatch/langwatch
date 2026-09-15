@@ -20,7 +20,7 @@ def _get_kwargs(
 
     _kwargs: dict[str, Any] = {
         "method": "delete",
-        "url": "/api/monitors/{id}".format(
+        "url": "/api/v1/monitors/{id}".format(
             id=quote(str(id), safe=""),
         ),
     }

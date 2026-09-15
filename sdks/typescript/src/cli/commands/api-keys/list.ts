@@ -51,7 +51,9 @@ export const listApiKeysCommand = async (): Promise<CommandResult | void> => {
             Status: status,
             Bindings: String(k.roleBindings.length),
             Expires: k.expiresAt ? new Date(k.expiresAt).toLocaleDateString() : chalk.gray("never"),
-            "Last used": k.lastUsedAt ? new Date(k.lastUsedAt).toLocaleDateString() : chalk.gray("—"),
+            "Last used": k.lastUsedAt
+              ? new Date(k.lastUsedAt).toLocaleDateString()
+              : chalk.gray("—"),
             Created: new Date(k.createdAt).toLocaleDateString(),
           };
         });

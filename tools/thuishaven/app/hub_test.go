@@ -29,6 +29,11 @@ type fakeStore struct {
 	heavyRuns          int
 	observed           map[string]time.Duration
 	reapEvents         []domain.ReapEvent
+	heavyRunSnapshots  []HeavyRunSnapshot
+	runHistory         []domain.RunRecord
+	appendHistoryErr   error
+	prereqSkips        map[string]bool
+	containerPosture   string
 }
 
 func (f *fakeStore) SaveStack(domain.Stack) error { return nil }
@@ -48,11 +53,10 @@ func (f *fakeStore) ReadSlugCache(dir string) (string, bool) {
 	s, ok := f.slugCache[dir]
 	return s, ok
 }
-func (f *fakeStore) WriteSlugCache(string, string) error     { return nil }
-func (f *fakeStore) WriteOverlay(string, domain.Stack) error { return nil }
-func (f *fakeStore) WriteHMRGate(string, int64) error        { return nil }
-func (f *fakeStore) ReadHMRGate(string) (int64, bool)        { return 0, false }
-func (f *fakeStore) ClearHMRGate(string)                     {}
+func (f *fakeStore) WriteSlugCache(string, string) error { return nil }
+func (f *fakeStore) WriteHMRGate(string, int64) error    { return nil }
+func (f *fakeStore) ReadHMRGate(string) (int64, bool)    { return 0, false }
+func (f *fakeStore) ClearHMRGate(string)                 {}
 func (f *fakeStore) TouchDBActivity(slug string) error {
 	f.touched = append(f.touched, slug)
 	if f.dbActivity == nil {
@@ -81,6 +85,16 @@ func (f *fakeStore) WriteSelection(worktreeDir string, sel domain.Selection) err
 		f.selection = map[string]domain.Selection{}
 	}
 	f.selection[worktreeDir] = sel
+	return nil
+}
+func (f *fakeStore) ReadPrereqSkips() map[string]bool { return f.prereqSkips }
+func (f *fakeStore) ReadContainerPosture() string     { return f.containerPosture }
+func (f *fakeStore) WriteContainerPosture(p string) error {
+	f.containerPosture = p
+	return nil
+}
+func (f *fakeStore) WritePrereqSkips(skips map[string]bool) error {
+	f.prereqSkips = skips
 	return nil
 }
 func (f *fakeStore) ClaimDaemon(DaemonInfo) (bool, error) { return true, nil }
@@ -115,6 +129,16 @@ func (f *fakeStore) AppendReapEvent(ev domain.ReapEvent) error {
 	return nil
 }
 func (f *fakeStore) ReapEvents() []domain.ReapEvent { return f.reapEvents }
+
+func (f *fakeStore) HeavyRunSnapshots() []HeavyRunSnapshot { return f.heavyRunSnapshots }
+func (f *fakeStore) AppendRunHistory(rec domain.RunRecord) error {
+	if f.appendHistoryErr != nil {
+		return f.appendHistoryErr
+	}
+	f.runHistory = append(f.runHistory, rec)
+	return nil
+}
+func (f *fakeStore) RunHistory() []domain.RunRecord { return f.runHistory }
 
 // fakeClaudeSettings records what `haven setup` asked to install.
 type fakeClaudeSettings struct {
@@ -193,6 +217,7 @@ func (f *fakeProxy) Endpoint() (string, int)            { return "https", 443 }
 func (f *fakeProxy) CACertPath() string                 { return "" }
 func (f *fakeProxy) Shutdown() error                    { return nil }
 func (f *fakeProxy) Install() error                     { return nil }
+func (f *fakeProxy) Version() string                    { return domain.PortlessVersion }
 
 type fakeDBServer struct {
 	databases []string
@@ -225,6 +250,8 @@ type fakeHygiene struct {
 	dirtyDirs    map[string]bool
 	lastActivity map[string]time.Time
 	goneDirs     map[string]bool
+	mergedDirs   map[string]bool
+	lastTouched  map[string]time.Time
 	// mu guards the two removal logs: DestroyWorktrees removes concurrently.
 	mu               sync.Mutex
 	removed          []string
@@ -272,7 +299,19 @@ func (f *fakeHygiene) LastActivity(dir string) (time.Time, bool) {
 	t, ok := f.lastActivity[dir]
 	return t, ok
 }
-func (f *fakeHygiene) UpstreamGone(dir, _ string) bool { return f.goneDirs[dir] }
+func (f *fakeHygiene) UpstreamGone(dir, _ string) bool   { return f.goneDirs[dir] }
+func (f *fakeHygiene) MergedIntoMain(dir, _ string) bool { return f.mergedDirs[dir] }
+
+// LastTouched is the directory's own mtime. The fake keeps a separate map so a
+// test can make a worktree's HEAD look ancient while the directory is fresh —
+// the exact shape a diff drive has, and the one the temporary rule must survive.
+func (f *fakeHygiene) LastTouched(dir string) (time.Time, bool) {
+	if f.lastTouched == nil {
+		return f.LastActivity(dir)
+	}
+	t, ok := f.lastTouched[dir]
+	return t, ok
+}
 
 func hubOrchestrator(store *fakeStore, sys *fakeSystem, proxy *fakeProxy, ch, pg *fakeDBServer, hyg *fakeHygiene) *Orchestrator {
 	return &Orchestrator{

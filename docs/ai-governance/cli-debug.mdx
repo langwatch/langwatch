@@ -173,7 +173,7 @@ If a source exists but no events have landed yet (status `awaiting_first_event`)
 ```text
 $ langwatch ingest tail brand-new-source-id
 No events for this source yet. Once your upstream platform starts
-sending OTel/audit logs to /api/ingest/* with the source's bearer
+sending OTel/audit logs to /api/v1/ingest/* with the source's bearer
 secret, events will land here.
 ```
 
@@ -199,7 +199,7 @@ The 401-on-expired-session path also clears the cached token, so the next invoca
 
 ## Error catalog
 
-The `langwatch login` flow itself can fail before the device-flow handshake completes if the org isn't configured for CLI sign-in. Each entry below names the error code returned by `/api/auth/cli/personal-virtual-keys/approve`, the human-readable hint shown to the developer, and the admin remediation.
+The `langwatch login` flow itself can fail before the device-flow handshake completes if the org isn't configured for CLI sign-in. Each entry below names the error code returned by `/api/v1/auth/cli/personal-virtual-keys/approve`, the human-readable hint shown to the developer, and the admin remediation.
 
 ### `409 no_default_routing_policy`
 
@@ -231,14 +231,14 @@ The five wrapped tools (`langwatch claude`, `langwatch codex`, `langwatch cursor
 
 Per-tool assertions:
 
-| Group | Tools | What's pinned |
-|---|---|---|
-| Login state gating | `claude` | `langwatch claude` refuses to run when no session is active and prints the correct re-auth hint |
-| Env-var injection | `claude`, `codex`, `cursor`, `gemini`, `opencode` | Wrapper exports the right base-URL + token vars per tool: `ANTHROPIC_BASE_URL` + `ANTHROPIC_AUTH_TOKEN` for `claude`; `OPENAI_BASE_URL` + `OPENAI_API_KEY` for `codex`; both pairs for `cursor` + `opencode` (multi-provider); `GOOGLE_GENAI_API_BASE` + `GEMINI_API_KEY` for `gemini` |
-| Routing | `claude`, `codex`, `opencode` | Inbound HTTP request to the fake gateway carries Bearer = the personal Virtual Key minted at login |
-| Budget pre-check | `claude` | Gateway 402 response surfaces as wrapper exit code 2 ("budget exhausted"); 200 passes through; 5xx surfaces as upstream-failure |
-| Tool-not-found | `claude` | Wrapper exit code 127 + "binary not found" hint when the wrapped binary isn't on PATH |
-| Exit-code propagation | `claude` (0, 42), `codex` (1) | Wrapper returns the wrapped tool's exit code byte-for-byte |
+| Group                 | Tools                                             | What's pinned                                                                                                                                                                                                                                                                          |
+| --------------------- | ------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Login state gating    | `claude`                                          | `langwatch claude` refuses to run when no session is active and prints the correct re-auth hint                                                                                                                                                                                        |
+| Env-var injection     | `claude`, `codex`, `cursor`, `gemini`, `opencode` | Wrapper exports the right base-URL + token vars per tool: `ANTHROPIC_BASE_URL` + `ANTHROPIC_AUTH_TOKEN` for `claude`; `OPENAI_BASE_URL` + `OPENAI_API_KEY` for `codex`; both pairs for `cursor` + `opencode` (multi-provider); `GOOGLE_GENAI_API_BASE` + `GEMINI_API_KEY` for `gemini` |
+| Routing               | `claude`, `codex`, `opencode`                     | Inbound HTTP request to the fake gateway carries Bearer = the personal Virtual Key minted at login                                                                                                                                                                                     |
+| Budget pre-check      | `claude`                                          | Gateway 402 response surfaces as wrapper exit code 2 ("budget exhausted"); 200 passes through; 5xx surfaces as upstream-failure                                                                                                                                                        |
+| Tool-not-found        | `claude`                                          | Wrapper exit code 127 + "binary not found" hint when the wrapped binary isn't on PATH                                                                                                                                                                                                  |
+| Exit-code propagation | `claude` (0, 42), `codex` (1)                     | Wrapper returns the wrapped tool's exit code byte-for-byte                                                                                                                                                                                                                             |
 
 The behavioral pins live in `specs/ai-gateway/wrapper-e2e/{claude,codex,cursor,gemini,opencode}.feature`; the concrete test-shape pin is `specs/ai-governance/cli-wrappers/wrap-login-routing.feature`.
 
@@ -246,11 +246,11 @@ The behavioral pins live in `specs/ai-gateway/wrapper-e2e/{claude,codex,cursor,g
 
 Three surfaces, one backend:
 
-| Surface | Audience | Contract |
-|---------|----------|----------|
-| Web `/governance` admin oversight | Governance admin in a browser | tRPC: `api.governance.setupState`, `api.activityMonitor.*`, `api.ingestionSources.*` |
-| Web `/governance/ingestion-sources/:id` detail | Per-source SRE | tRPC: `api.activityMonitor.eventsForSource`, `api.activityMonitor.sourceHealthMetrics` |
-| **CLI `governance status`, `ingest list/health/tail`** | **Terminal-first SRE, on-call** | **REST: `GET /api/auth/cli/governance/*`, Bearer adapter that imports the same service classes the tRPC procedures use, byte-for-byte matching IO** |
+| Surface                                                | Audience                        | Contract                                                                                                                                            |
+| ------------------------------------------------------ | ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Web `/governance` admin oversight                      | Governance admin in a browser   | tRPC: `api.governance.setupState`, `api.activityMonitor.*`, `api.ingestionSources.*`                                                                |
+| Web `/governance/ingestion-sources/:id` detail         | Per-source SRE                  | tRPC: `api.activityMonitor.eventsForSource`, `api.activityMonitor.sourceHealthMetrics`                                                              |
+| **CLI `governance status`, `ingest list/health/tail`** | **Terminal-first SRE, on-call** | **REST: `GET /api/v1/auth/cli/governance/*`, Bearer adapter that imports the same service classes the tRPC procedures use, byte-for-byte matching IO** |
 
 The REST endpoints reuse the existing `validateAccessToken()` Bearer helper that's been in production since the device-flow CLI shipped, so opening this surface doesn't introduce a new auth path. Per-account governance entitlement is enforced at the endpoint layer.
 

@@ -15,8 +15,9 @@
  * query; the text of it belongs in the code, where it already is.
  */
 
-import { quietly } from "./observability";
-import type { QueryRequest, QueryResult } from "./query";
+import { quietly } from "./observability.ts";
+import type { QueryRequest, QueryResult } from "./query.ts";
+import { nowInstant } from "@langwatch/time";
 
 /**
  * A failure, reduced to what is safe to ship.
@@ -33,7 +34,7 @@ export interface QueryErrorDescriptor {
   status?: number | undefined;
 }
 
-export interface SpanPort {
+export interface Span {
   setAttribute(key: string, value: string | number | boolean): void;
   recordError(error: QueryErrorDescriptor): void;
   end(): void;
@@ -58,8 +59,8 @@ export function describeQueryError(error: unknown): QueryErrorDescriptor {
   };
 }
 
-export interface TracerPort {
-  startSpan(name: string): SpanPort;
+export interface Tracer {
+  startSpan(name: string): Span;
 }
 
 export interface QueryOutcome {
@@ -70,7 +71,7 @@ export interface QueryOutcome {
 }
 
 export interface TraceOptions {
-  tracer: TracerPort;
+  tracer: Tracer;
   /** Defaults to `clickhouse.query`. */
   spanName?: string | undefined;
   /** Called on every completion, success or failure. For counters. */
@@ -89,7 +90,6 @@ export const SPAN_ATTRIBUTES = {
   bytesRead: "db.response.read_bytes",
 } as const;
 
-
 /**
  * Records one span per statement.
  *
@@ -102,7 +102,7 @@ export const SPAN_ATTRIBUTES = {
  * tracer must not be able to fail a query that would otherwise have succeeded.
  */
 export class QueryTracer {
-  private readonly tracer: TracerPort;
+  private readonly tracer: Tracer;
   private readonly spanName: string;
   private readonly onComplete: TraceOptions["onComplete"];
   private readonly now: () => number;
@@ -111,7 +111,7 @@ export class QueryTracer {
     tracer,
     spanName = "clickhouse.query",
     onComplete,
-    now = () => Date.now(),
+    now = () => nowInstant().epochMilliseconds,
   }: TraceOptions) {
     this.tracer = tracer;
     this.spanName = spanName;
@@ -127,7 +127,7 @@ export class QueryTracer {
     request: QueryRequest;
     task: () => Promise<QueryResult<Row>>;
   }): Promise<QueryResult<Row>> {
-    let span: SpanPort | undefined;
+    let span: Span | undefined;
     quietly(() => {
       span = this.tracer.startSpan(this.spanName);
     });
@@ -144,10 +144,7 @@ export class QueryTracer {
       // Recorded so an audit can enumerate every statement that opted out of
       // the tenant predicate, and why, without reading the code.
       if (request.unscoped !== undefined) {
-        span.setAttribute(
-          SPAN_ATTRIBUTES.unscopedReason,
-          request.unscoped.reason,
-        );
+        span.setAttribute(SPAN_ATTRIBUTES.unscopedReason, request.unscoped.reason);
       }
     });
 

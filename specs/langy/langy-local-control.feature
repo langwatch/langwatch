@@ -301,6 +301,24 @@ Feature: Langy works in a folder shared from the developer's machine
 
   Rule: The session key is the only credential and it ends with the conversation
 
+    # The local surface declares `langy:create`, and a declaration nothing
+    # enforces is decoration: a key deliberately narrowed below it must be
+    # refused on the strength of its OWN grants, not on what the person who
+    # holds it may otherwise do in Langy.
+
+    @unit
+    Scenario: A key without the local surface's permission is refused
+      Given a key held by someone with Langy access, carrying no "langy:create"
+      When the command line calls the local surface with it
+      Then the call is refused before any conversation is read
+      And the refusal is the deployment's own key-ceiling refusal
+
+    @unit
+    Scenario: A key carrying the permission reaches the local surface
+      Given a key carrying "langy:create" for the conversation's project
+      When the command line calls the local surface with it
+      Then the call is served
+
     @integration
     Scenario: The CLI connects with the session key alone
       Given an approved control request

@@ -4,6 +4,9 @@ Feature: Production HTTP server — runtime-configurable CDN asset base
   So that one image serves assets same-origin for self-host and from a
   commit-prefixed CDN for SaaS, and a rolling deploy never strands a tab on a 404
 
+  # ADR-111 moves the UI build and static server into separate application
+  # workspaces without changing this runtime asset-delivery contract.
+
   # Background: Vite hashes asset filenames per build and, before this change,
   # baked an absolute base ("/") into every chunk URL at build time. During a
   # rolling deploy two builds serve behind one Service, so a tab that fetched the

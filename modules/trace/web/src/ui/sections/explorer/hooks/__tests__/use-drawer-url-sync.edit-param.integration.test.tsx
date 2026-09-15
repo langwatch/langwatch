@@ -1,0 +1,85 @@
+/**
+ * What `drawer.edit` means to the store-to-URL effect.
+ * @vitest-environment jsdom
+ */
+
+import { renderHook } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const harness = vi.hoisted(() => ({
+  query: {} as Record<string, string>,
+  updateDrawerParams: vi.fn(),
+}));
+
+vi.mock("../../../../../behavior/use-drawer.ts", () => ({
+  useDrawerParams: () => {
+    const params: Record<string, string | undefined> = {};
+    for (const [key, value] of Object.entries(harness.query)) {
+      if (key.startsWith("drawer.") && key !== "drawer.open") {
+        params[key.replace("drawer.", "")] = value;
+      }
+    }
+    return params;
+  },
+  useUpdateDrawerParams: () => harness.updateDrawerParams,
+}));
+
+vi.mock("@langwatch/ui-host/use-router", () => ({
+  useRouter: () => ({ query: harness.query }),
+}));
+
+import { useDrawerStore } from "../../../../../behavior/drawer.store.ts";
+import { useDrawerUrlSync } from "../use-drawer-url-sync.ts";
+
+/** The params an open drawer already carries, so only `drawer.edit` is in play. */
+function openOn({ traceId, edit }: { traceId: string; edit?: string }) {
+  harness.query = {
+    "drawer.open": "traceV2Details",
+    "drawer.traceId": traceId,
+    "drawer.mode": "summary",
+    "drawer.viz": "waterfall",
+    ...(edit ? { "drawer.edit": edit } : {}),
+  };
+}
+
+beforeEach(() => {
+  harness.updateDrawerParams.mockClear();
+  useDrawerStore.getState().hydrateUrlState({
+    viewMode: "summary",
+    vizTab: "waterfall",
+    selectedSpanId: null,
+    pinnedSpanIds: [],
+    isEditing: false,
+  });
+});
+
+describe("useDrawerUrlSync", () => {
+  describe("given a sample trace carrying drawer.edit in its URL", () => {
+    it("leaves the URL alone, because edit mode never reads that trace", () => {
+      openOn({ traceId: "lw-preview-1", edit: "1" });
+
+      renderHook(() => useDrawerUrlSync());
+
+      expect(harness.updateDrawerParams).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given a real trace carrying drawer.edit in its URL", () => {
+    it("leaves the URL alone once the store is editing it", () => {
+      openOn({ traceId: "trace-1", edit: "1" });
+      useDrawerStore.getState().setIsEditing(true);
+
+      renderHook(() => useDrawerUrlSync());
+
+      expect(harness.updateDrawerParams).not.toHaveBeenCalled();
+    });
+
+    it("drops the param when the store is not editing", () => {
+      openOn({ traceId: "trace-1", edit: "1" });
+
+      renderHook(() => useDrawerUrlSync());
+
+      expect(harness.updateDrawerParams).toHaveBeenCalledWith({ edit: undefined }, { push: false });
+    });
+  });
+});

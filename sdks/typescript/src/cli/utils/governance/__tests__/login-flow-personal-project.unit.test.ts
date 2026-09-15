@@ -10,8 +10,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const pollUntilDone = vi.fn();
 vi.mock("../device-flow", async () => {
-  const actual =
-    await vi.importActual<typeof import("../device-flow")>("../device-flow");
+  const actual = await vi.importActual<typeof import("../device-flow")>("../device-flow");
   return {
     ...actual,
     startDeviceCode: vi.fn(async () => ({

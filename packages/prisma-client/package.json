@@ -1,0 +1,70 @@
+{
+  "name": "@langwatch/prisma-client",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Explicitly configured Prisma/Postgres construction and lifecycle services, the tenancy query guards every process composes its client with, plus the canonical LangWatch schema, migrations, and generated client.",
+  "license": "MIT",
+  "files": [
+    "prisma",
+    "src"
+  ],
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    },
+    "./generated": {
+      "types": "./dist/generated/client.d.ts",
+      "default": "./src/generated/client.ts"
+    },
+    "./errors": {
+      "types": "./dist/prisma-error-codes.d.ts",
+      "default": "./src/prisma-error-codes.ts"
+    },
+    "./ownership": {
+      "types": "./dist/ownership.d.ts",
+      "default": "./src/ownership.ts"
+    }
+  },
+  "scripts": {
+    "prisma:generate": "prisma generate --config ./prisma.config.ts && node scripts/generate-table-catalogue.mjs",
+    "typecheck": "pnpm -w typecheck:declarations --project . && tsc --noEmit",
+    "test": "vitest run --exclude \"**/*.integration.test.ts\"",
+    "test:unit": "vitest run --exclude \"**/*.integration.test.ts\"",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
+    "db:seed": "node --experimental-transform-types --env-file-if-exists=../../.env prisma/seed.ts"
+  },
+  "dependencies": {
+    "@langwatch/api-key-contract": "workspace:*",
+    "@langwatch/observability": "workspace:*",
+    "@langwatch/time": "workspace:*",
+    "@prisma/adapter-pg": "7.9.1",
+    "@prisma/client": "catalog:",
+    "lodash-es": "catalog:",
+    "pg": "^8.22.0",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@langwatch/api-key-server": "workspace:*",
+    "@langwatch/enterprise-licensing-contract": "workspace:*",
+    "@langwatch/enterprise-licensing-server": "workspace:*",
+    "@langwatch/model-provider-contract": "workspace:*",
+    "@langwatch/prompt-contract": "workspace:*",
+    "@langwatch/role-contract": "workspace:*",
+    "@langwatch/secret-server": "workspace:*",
+    "@langwatch/secrets": "workspace:*",
+    "@langwatch/workflow-contract": "workspace:*",
+    "@types/bcrypt": "catalog:",
+    "@types/lodash-es": "catalog:",
+    "@types/node": "catalog:",
+    "@types/pg": "^8.20.3",
+    "bcrypt": "catalog:",
+    "dotenv": "catalog:",
+    "prisma": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

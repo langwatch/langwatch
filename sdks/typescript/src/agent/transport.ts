@@ -1,13 +1,5 @@
 /**
- * The connection the client speaks over, behind one small interface so the
- * client never depends on how the frames travel.
- *
- * Two transports carry the same frames. The WebSocket is the default and it
- * needs the `ws` package: the platform authenticates from the request
- * headers of the upgrade, and no global `WebSocket` constructor can send
- * them. HTTP long polling is for a network that blocks WebSockets: one POST
- * registers, a GET waits for the next frames, a POST carries the answers. It
- * speaks through the global `fetch` (Node 20+).
+ * Connection abstraction for frame transport (WebSocket default, HTTP fallback).
  */
 
 import { createRequire } from "node:module";
@@ -106,10 +98,7 @@ const wrapWs = (socket: WsWebSocket): SocketLike => {
   };
 };
 
-type WsConstructor = new (
-  url: string,
-  options: { headers: Record<string, string> },
-) => WsWebSocket;
+type WsConstructor = new (url: string, options: { headers: Record<string, string> }) => WsWebSocket;
 
 /**
  * The `ws` constructor, or null when the package cannot be loaded. It is
@@ -163,7 +152,8 @@ const EMPTY_POLL_FLOOR_MS = 250;
  */
 const CLOSE_DEADLINE_MS = 500;
 
-const describe = (error: unknown): string => (error instanceof Error ? error.message : String(error));
+const describe = (error: unknown): string =>
+  error instanceof Error ? error.message : String(error);
 
 const wait = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms).unref());
 
@@ -226,7 +216,8 @@ export class HttpLongPollSocket implements SocketLike {
       return;
     }
     if (frame.type === "ack" && typeof frame.callId === "string") this.inFlight.add(frame.callId);
-    if (frame.type === "result" && typeof frame.callId === "string") this.inFlight.delete(frame.callId);
+    if (frame.type === "result" && typeof frame.callId === "string")
+      this.inFlight.delete(frame.callId);
     this.outbox = this.outbox
       .then(() => this.registered)
       .then(() => this.post(data))
@@ -301,7 +292,8 @@ export class HttpLongPollSocket implements SocketLike {
         signal: this.polls.signal,
       });
     } catch (error) {
-      if (!this.closed) this.fail(`could not reach ${this.url}/register (${describe(error)})`, 1006);
+      if (!this.closed)
+        this.fail(`could not reach ${this.url}/register (${describe(error)})`, 1006);
       return;
     }
     const body = await this.jsonOf(response);
@@ -325,7 +317,10 @@ export class HttpLongPollSocket implements SocketLike {
 
   private async pollLoop(): Promise<void> {
     while (!this.closed && this.token) {
-      const query = this.inFlight.size > 0 ? `?inFlight=${encodeURIComponent([...this.inFlight].join(","))}` : "";
+      const query =
+        this.inFlight.size > 0
+          ? `?inFlight=${encodeURIComponent([...this.inFlight].join(","))}`
+          : "";
       const startedAt = Date.now();
       let response: Response;
       try {
@@ -340,12 +335,16 @@ export class HttpLongPollSocket implements SocketLike {
       }
       if (this.closed) return;
       if (response.status === 410) {
-        this.fail("the platform no longer knows this instance, registering again", SESSION_LOST_CLOSE_CODE);
+        this.fail(
+          "the platform no longer knows this instance, registering again",
+          SESSION_LOST_CLOSE_CODE,
+        );
         return;
       }
       const body = await this.jsonOf(response);
       if (!response.ok) {
-        const answered = body && typeof body.frame === "object" && body.frame !== null ? body.frame : null;
+        const answered =
+          body && typeof body.frame === "object" && body.frame !== null ? body.frame : null;
         if (answered) this.emitMessage(JSON.stringify(answered));
         if ((answered as { type?: unknown } | null)?.type === "refused") {
           // The platform refused the credential: the client prints and gives
@@ -358,7 +357,8 @@ export class HttpLongPollSocket implements SocketLike {
       const frames = Array.isArray(body?.frames) ? (body.frames as unknown[]) : [];
       for (const frame of frames) {
         const entry = frame as { type?: unknown; callId?: unknown };
-        if (entry.type === "cancel" && typeof entry.callId === "string") this.inFlight.delete(entry.callId);
+        if (entry.type === "cancel" && typeof entry.callId === "string")
+          this.inFlight.delete(entry.callId);
         this.emitMessage(JSON.stringify(frame));
       }
       for (const listener of this.pingListeners) listener();
@@ -387,7 +387,10 @@ export class HttpLongPollSocket implements SocketLike {
       }
       if (response?.ok) return;
       if (response?.status === 410) {
-        this.fail("the platform no longer knows this instance, registering again", SESSION_LOST_CLOSE_CODE);
+        this.fail(
+          "the platform no longer knows this instance, registering again",
+          SESSION_LOST_CLOSE_CODE,
+        );
         return;
       }
       if (response && response.status < 500) return;
@@ -403,7 +406,9 @@ export class HttpLongPollSocket implements SocketLike {
   private async jsonOf(response: Response): Promise<Record<string, unknown> | null> {
     try {
       const parsed = (await response.json()) as unknown;
-      return typeof parsed === "object" && parsed !== null ? (parsed as Record<string, unknown>) : null;
+      return typeof parsed === "object" && parsed !== null
+        ? (parsed as Record<string, unknown>)
+        : null;
     } catch {
       return null;
     }

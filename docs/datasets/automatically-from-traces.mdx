@@ -13,22 +13,14 @@ An automation with the **Add to dataset** action appends a row for every trace t
 
 <div style={{ display: "flex", justifyContent: "center" }}>
   <Frame caption="Add Automation" style={{ maxWidth: "300px" }}>
-    <img
-      className="block"
-      src="/images/add-automation-filter.png"
-      alt="LangWatch"
-    />
+    <img className="block" src="/images/add-automation-filter.png" alt="LangWatch" />
   </Frame>
 </div>
 
 3. Pick **Add to dataset** as the action, choose the dataset, and map the trace fields to its columns. Columns named `input`, `output`, `expected_output`, `contexts`, `total_cost`, `spans`, `trace_id` and `timestamp` are mapped for you; any other column maps to the metadata key with the same name until you change it.
 
 <Frame caption="Add To Dataset">
-<img
-  className="block"
-  src="/images/add-to-dataset-automation.png"
-  alt="LangWatch"
-/>
+  <img className="block" src="/images/add-to-dataset-automation.png" alt="LangWatch" />
 </Frame>
 
 4. Save. From then on, every trace that matches the filter adds one row to the dataset.

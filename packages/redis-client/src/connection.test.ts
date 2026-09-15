@@ -33,7 +33,7 @@ vi.mock("ioredis", () => {
   return { default: FakeIORedis, Cluster: FakeCluster };
 });
 
-const { RedisConnectionService } = await import("./connection");
+const { RedisConnectionService } = await import("./connection.ts");
 
 function createLoggerSpy() {
   return { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
@@ -145,9 +145,7 @@ describe("RedisConnectionService", () => {
     });
 
     it("returns null without a URL, constructing nothing", () => {
-      expect(
-        new RedisConnectionService().connectStandalone({ url: void 0 }),
-      ).toBeNull();
+      expect(new RedisConnectionService().connectStandalone({ url: void 0 })).toBeNull();
       expect(standaloneCalls).toHaveLength(0);
     });
   });
@@ -162,9 +160,7 @@ describe("RedisConnectionService", () => {
       });
 
       expect(logger.warn).toHaveBeenCalledTimes(1);
-      expect(logger.warn.mock.calls[0]?.[1]).toContain(
-        "only supports database 0",
-      );
+      expect(logger.warn.mock.calls[0]?.[1]).toContain("only supports database 0");
     });
 
     it("reports connection lifecycle events", () => {
@@ -182,10 +178,7 @@ describe("RedisConnectionService", () => {
 
       const error = new Error("boom");
       connection.emit("error", error);
-      expect(logger.error).toHaveBeenCalledWith(
-        { mode: "standalone", db: 0, error },
-        "error",
-      );
+      expect(logger.error).toHaveBeenCalledWith({ mode: "standalone", db: 0, error }, "error");
     });
 
     it("warns even when no connection is created", () => {
@@ -205,14 +198,12 @@ describe("RedisConnectionService", () => {
 
   describe("when a resolved configuration is supplied directly", () => {
     it("connects without re-resolving it", async () => {
-      const { RedisConfigService } = await import("./config");
+      const { RedisConfigService } = await import("./config.ts");
       const config = new RedisConfigService().resolve({
         url: "redis://localhost:6379",
       });
 
-      expect(
-        new RedisConnectionService().connectResolved({ config }),
-      ).not.toBeNull();
+      expect(new RedisConnectionService().connectResolved({ config })).not.toBeNull();
       expect(standaloneCalls).toHaveLength(1);
     });
   });

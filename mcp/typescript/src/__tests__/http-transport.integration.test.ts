@@ -24,10 +24,7 @@ function stubVerifier(validKeys: string[]): ApiKeyVerifier {
 }
 
 /** Helper to create auth + MCP headers */
-function mcpHeaders({
-  sessionId,
-  apiKey,
-}: { sessionId?: string; apiKey?: string } = {}) {
+function mcpHeaders({ sessionId, apiKey }: { sessionId?: string; apiKey?: string } = {}) {
   const headers: Record<string, string> = {
     ...MCP_POST_HEADERS,
     Authorization: `Bearer ${apiKey ?? BEARER_TOKEN}`,
@@ -101,9 +98,7 @@ describe("HTTP transport", () => {
         headers: { Origin: "http://localhost:5173" },
       });
 
-      expect(response.headers.get("access-control-allow-origin")).toBe(
-        "http://localhost:5173"
-      );
+      expect(response.headers.get("access-control-allow-origin")).toBe("http://localhost:5173");
       expect(response.headers.get("vary")).toContain("Origin");
     });
 
@@ -113,12 +108,8 @@ describe("HTTP transport", () => {
       });
 
       expect(response.status).toBe(204);
-      expect(response.headers.get("access-control-allow-methods")).toContain(
-        "POST"
-      );
-      expect(response.headers.get("access-control-allow-headers")).toContain(
-        "mcp-session-id"
-      );
+      expect(response.headers.get("access-control-allow-methods")).toContain("POST");
+      expect(response.headers.get("access-control-allow-headers")).toContain("mcp-session-id");
     });
 
     it("includes Authorization in allowed headers for CORS", async () => {
@@ -126,9 +117,7 @@ describe("HTTP transport", () => {
         method: "OPTIONS",
       });
 
-      expect(response.headers.get("access-control-allow-headers")).toContain(
-        "Authorization"
-      );
+      expect(response.headers.get("access-control-allow-headers")).toContain("Authorization");
     });
   });
 
@@ -252,9 +241,7 @@ describe("HTTP transport", () => {
   describe("OAuth 2.0 endpoints", () => {
     describe("/.well-known/oauth-authorization-server", () => {
       it("returns OAuth metadata with token endpoint", async () => {
-        const response = await fetch(
-          `${baseUrl}/.well-known/oauth-authorization-server`
-        );
+        const response = await fetch(`${baseUrl}/.well-known/oauth-authorization-server`);
         const body = await response.json();
 
         expect(response.status).toBe(200);
@@ -347,9 +334,7 @@ describe("HTTP transport", () => {
         });
 
         expect(response.status).toBe(200);
-        expect(response.headers.get("content-type")).toContain(
-          "text/event-stream"
-        );
+        expect(response.headers.get("content-type")).toContain("text/event-stream");
 
         controller.abort();
       });
@@ -377,9 +362,7 @@ describe("HTTP transport", () => {
       });
 
       expect(response.status).toBe(200);
-      expect(response.headers.get("content-type")).toContain(
-        "text/event-stream"
-      );
+      expect(response.headers.get("content-type")).toContain("text/event-stream");
 
       const reader = response.body!.getReader();
       const decoder = new TextDecoder();

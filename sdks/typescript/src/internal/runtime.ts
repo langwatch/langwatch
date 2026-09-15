@@ -29,7 +29,9 @@ export function detectRuntime(globals?: any): JsRuntime {
     if (process.env.NODE_ENV === "test") {
       g = globals;
     } else {
-      console.warn("[LangWatch Observability] overriding detectRuntime is only supported when running in NODE_ENV=test");
+      console.warn(
+        "[LangWatch Observability] overriding detectRuntime is only supported when running in NODE_ENV=test",
+      );
     }
   }
 
@@ -38,7 +40,7 @@ export function detectRuntime(globals?: any): JsRuntime {
       "Deno" in g &&
       typeof g.Deno === "object" &&
       g.Deno &&
-      'version' in g.Deno &&
+      "version" in g.Deno &&
       typeof g.Deno.version === "object"
     ) {
       return "deno";
@@ -47,7 +49,7 @@ export function detectRuntime(globals?: any): JsRuntime {
       "Bun" in g &&
       typeof g.Bun === "object" &&
       g.Bun &&
-      'version' in g.Bun &&
+      "version" in g.Bun &&
       typeof g.Bun.version === "string"
     ) {
       return "bun";
@@ -61,10 +63,7 @@ export function detectRuntime(globals?: any): JsRuntime {
     ) {
       return "node";
     }
-    if (
-      typeof g.window?.document !== "undefined" &&
-      g === g.window
-    ) {
+    if (typeof g.window?.document !== "undefined" && g === g.window) {
       return "web";
     }
     return "unknown";

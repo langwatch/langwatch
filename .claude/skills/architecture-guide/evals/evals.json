@@ -1,0 +1,23 @@
+{
+  "skill_name": "architecture-guide",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "Where should a helper that formats a model provider name for display live? It is used by both the API's REST responses and the settings screen.",
+      "expected_output": "Names the contract package of the owning module (model-provider/contract) as the home for a framework-free shared value, rejects a shared utils folder, and explains the dependency direction.",
+      "files": []
+    },
+    {
+      "id": 2,
+      "prompt": "feature-source-layout is failing on modules/trace/server/src/utils/spanTree.ts. Why, and where does it go?",
+      "expected_output": "Explains the closed server grammar, that utils/ is not a layer, and places the code in a service, a rules module, or the contract if pure, with the canonical kebab filename.",
+      "files": []
+    },
+    {
+      "id": 3,
+      "prompt": "Explain how a screen in a module's web package ends up as a page a user can open.",
+      "expected_output": "Walks the install steps: the flat web entry export, catalogue.json, the private apps/ui module folder whose host implements the HostPort and whose routes use uiPage (host, guard, screen), the WebInstallation in installed-ui-features, the pinned page keys, feature-map.json.",
+      "files": []
+    }
+  ]
+}

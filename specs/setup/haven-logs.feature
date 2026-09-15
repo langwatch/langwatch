@@ -19,6 +19,25 @@ Feature: haven logs
     And every line is labelled with its service
     And warnings and errors are visually distinct
 
+  # Every child writes the same structured JSON in every environment, and the
+  # terminal rendering lives in one place instead of in eight pretty consoles.
+  # See dev/docs/best_practices/dev-log-format.md.
+  Scenario: One rendering, whatever the service logs with
+    Given services that log through different libraries
+    When the developer runs "haven logs"
+    Then every line shows the time, the service and the level in the same fixed columns
+    And a line that is not structured keeps the service column and reads unchanged
+    And an error's stack trace is indented under the line it belongs to
+
+  Scenario: The raw bytes are one flag away
+    When the developer runs "haven logs --raw"
+    Then each line is exactly what the service wrote, unrendered
+
+  Scenario: A machine consumer gets one object per line
+    When the developer runs "haven logs --json"
+    Then every line is a JSON object carrying the service it came from
+    And a line that was not structured is still emitted as an object
+
   Scenario: Filtering to one service is a plain argument
     When the developer runs "haven logs nlp"
     Then only nlp's lines appear

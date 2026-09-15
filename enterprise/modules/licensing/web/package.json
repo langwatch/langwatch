@@ -1,0 +1,68 @@
+{
+  "name": "@langwatch/enterprise-licensing-web",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Browser-safe LangWatch Enterprise licensing surfaces: license state, seat and limit display, and the mint form's plan defaults.",
+  "license": "SEE LICENSE IN ../../../LICENSE.md",
+  "files": [
+    "src"
+  ],
+  "type": "module",
+  "exports": {
+    "./surfaces/global-upgrade-modal": {
+      "types": "./dist/ui/sections/global-upgrade-modal/index.d.ts",
+      "default": "./src/ui/sections/global-upgrade-modal/index.ts"
+    },
+    "./surfaces/license-error-interceptor": {
+      "types": "./dist/ui/sections/license-error-interceptor/index.d.ts",
+      "default": "./src/ui/sections/license-error-interceptor/index.ts"
+    },
+    "./surfaces/resource-limits": {
+      "types": "./dist/ui/sections/resource-limits/index.d.ts",
+      "default": "./src/ui/sections/resource-limits/index.ts"
+    },
+    "./surfaces/seat-types": {
+      "types": "./dist/ui/sections/seat-types/index.d.ts",
+      "default": "./src/ui/sections/seat-types/index.ts"
+    },
+    "./licensing": {
+      "types": "./dist/licensing.d.ts",
+      "default": "./src/licensing.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "pnpm -w typecheck:declarations --project . && tsc --noEmit",
+    "test": "vitest run",
+    "test:unit": "vitest run"
+  },
+  "dependencies": {
+    "@langwatch/api": "workspace:*",
+    "@langwatch/design-system": "workspace:*",
+    "@langwatch/enterprise-licensing-contract": "workspace:*",
+    "@langwatch/plans": "workspace:*",
+    "@langwatch/time": "workspace:*",
+    "@langwatch/ui-host": "workspace:*",
+    "lucide-react": "catalog:"
+  },
+  "devDependencies": {
+    "@chakra-ui/react": "catalog:",
+    "@emotion/react": "catalog:",
+    "@langwatch/authz-contract": "workspace:*",
+    "@testing-library/jest-dom": "catalog:",
+    "@testing-library/react": "catalog:",
+    "@testing-library/user-event": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "jsdom": "catalog:",
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "peerDependencies": {
+    "@chakra-ui/react": "^3.36.0",
+    "@emotion/react": "^11.14.0",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7"
+  }
+}

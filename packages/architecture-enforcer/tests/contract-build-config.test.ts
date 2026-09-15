@@ -1,0 +1,99 @@
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterEach, describe, expect, it } from "vitest";
+import { lintStrictContractBuildConfigs, type ClassifiedPackage } from "../src/index.ts";
+import { snapshotOf } from "./workspace.ts";
+
+let root = "";
+
+function contractPackage(feature: string, hasBuildScript = true): ClassifiedPackage {
+  const featureRoot = join(root, "modules", feature);
+  const contractRoot = join(featureRoot, "contract");
+  return {
+    name: `@langwatch/${feature}-contract`,
+    root: contractRoot,
+    manifestPath: join(contractRoot, "package.json"),
+    manifest: hasBuildScript ? { scripts: { build: "tsc --build" } } : {},
+    kind: "contract",
+    feature,
+    featureRoot,
+    layoutVersion: 0,
+    subjects: [],
+    enterprise: false,
+  };
+}
+
+function writeConfig(feature: string, config: Record<string, unknown>): void {
+  const directory = join(root, "modules", feature, "contract");
+  mkdirSync(directory, { recursive: true });
+  writeFileSync(join(directory, "tsconfig.build.json"), JSON.stringify(config));
+}
+
+describe("strict contract declaration build configs", () => {
+  afterEach(() => {
+    if (root) {
+      rmSync(root, { recursive: true, force: true });
+    }
+    root = "";
+  });
+
+  it("discovers a newly added strict feature rather than relying on a feature list", () => {
+    root = mkdtempSync(join(tmpdir(), "contract-build-config-"));
+    writeConfig("future-feature", {
+      compilerOptions: { rootDir: "src" },
+      include: ["src/**/*.ts"],
+      exclude: ["tests"],
+    });
+
+    expect(lintStrictContractBuildConfigs(snapshotOf({ root, packages: [contractPackage("future-feature")] }))).toEqual([]);
+  });
+
+  it("accepts recursive test-root exclusions used by canonical contracts", () => {
+    root = mkdtempSync(join(tmpdir(), "contract-build-config-"));
+    writeConfig("recursive-feature", {
+      compilerOptions: { rootDir: "src" },
+      include: ["src/**/*.ts"],
+      exclude: ["**/__tests__/**", "**/__mocks__/**", "**/tests/**", "**/*.test.*", "**/*.spec.*"],
+    });
+
+    expect(lintStrictContractBuildConfigs(snapshotOf({ root, packages: [contractPackage("recursive-feature")] }))).toEqual(
+      [],
+    );
+  });
+
+  it("rejects an exclusion scoped only below src", () => {
+    root = mkdtempSync(join(tmpdir(), "contract-build-config-"));
+    writeConfig("nested-feature", {
+      compilerOptions: { rootDir: "src" },
+      include: ["src/**/*.ts"],
+      exclude: ["src/tests/**"],
+    });
+
+    expect(lintStrictContractBuildConfigs(snapshotOf({ root, packages: [contractPackage("nested-feature")] }))).toMatchObject(
+      [{ policy: "contract-build-config" }],
+    );
+  });
+
+  /** @scenario "Strict services, ports, and contract builds remain mechanically bounded" */
+  it("rejects a config that can include a package test root", () => {
+    root = mkdtempSync(join(tmpdir(), "contract-build-config-"));
+    writeConfig("api-key", {
+      compilerOptions: {},
+      include: ["**/*.ts"],
+      exclude: [],
+    });
+
+    expect(lintStrictContractBuildConfigs(snapshotOf({ root, packages: [contractPackage("api-key")] }))).toMatchObject([
+      { policy: "contract-build-config" },
+    ]);
+  });
+
+  it("requires the build config when a discovered strict contract has a build script", () => {
+    root = mkdtempSync(join(tmpdir(), "contract-build-config-"));
+
+    expect(lintStrictContractBuildConfigs(snapshotOf({ root, packages: [contractPackage("new-contract")] }))).toMatchObject([
+      { policy: "contract-build-config" },
+    ]);
+  });
+});

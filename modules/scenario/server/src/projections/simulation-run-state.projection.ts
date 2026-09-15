@@ -1,0 +1,815 @@
+import type { FoldProjectionStore, Projection } from "@langwatch/eventing";
+import {
+  AbstractFoldProjection,
+  type FoldEventHandlers,
+  ValidationError,
+} from "@langwatch/eventing";
+import { createLogger } from "@langwatch/observability";
+import { SIMULATION_PROJECTION_VERSIONS } from "@langwatch/scenario-contract";
+import {
+  type GatedVerdict,
+  gatedStatus,
+  gatedVerdict,
+  runAwaitsEvaluations,
+  ScenarioRunStatus,
+} from "@langwatch/scenario-contract";
+import type { ScenarioEvaluationResult } from "@langwatch/scenario-contract";
+import { simulationMessageSchema } from "@langwatch/scenario-contract";
+import type {
+  SimulationMessageSnapshotEvent,
+  SimulationRunAgentInstanceRecordedEvent,
+  SimulationRunCancelRequestedEvent,
+  SimulationRunCutAtLimitRecordedEvent,
+  SimulationRunDeletedEvent,
+  SimulationRunEvaluatedEvent,
+  SimulationRunFinishedEvent,
+  SimulationRunMetricsComputedEvent,
+  SimulationRunQueuedEvent,
+  SimulationRunStartedEvent,
+  SimulationTextMessageEndEvent,
+  SimulationTextMessageStartEvent,
+} from "@langwatch/scenario-contract";
+import {
+  SimulationMessageSnapshotEventSchema,
+  SimulationRunAgentInstanceRecordedEventSchema,
+  SimulationRunCancelRequestedEventSchema,
+  SimulationRunCutAtLimitRecordedEventSchema,
+  SimulationRunDeletedEventSchema,
+  SimulationRunEvaluatedEventSchema,
+  SimulationRunFinishedEventSchema,
+  SimulationRunMetricsComputedEventSchema,
+  SimulationRunQueuedEventSchema,
+  SimulationRunStartedEventSchema,
+  SimulationTextMessageEndEventSchema,
+  SimulationTextMessageStartEventSchema,
+} from "@langwatch/scenario-contract";
+
+const projectionLogger = createLogger("simulationRunState.foldProjection");
+
+/**
+ * Per-message size cap (64 KiB): prevents truncation of verbose replies;
+ * exceeding it indicates SDK shipping binary media; truncation surfaces regression.
+ */
+const MAX_MESSAGE_CONTENT_BYTES = 64 * 1024;
+const MAX_MESSAGE_REST_BYTES = 64 * 1024;
+
+/**
+ * Serialise run metadata without encrypted secrets (queued event carries those).
+ * `secretParameterNames` stays for readback.
+ */
+function storedMetadata(metadata: Record<string, unknown> | undefined): string | null {
+  if (!metadata) return null;
+  const { secretParameters: _secretParameters, ...rest } = metadata;
+  return JSON.stringify(rest);
+}
+
+/** A parsed JSON value that is a plain object, not an array or a scalar. */
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/**
+ * The stored metadata with `fields` merged into its reserved `langwatch`
+ * namespace, written back as one JSON string. The column holds the metadata as
+ * a JSON string, so the object is parsed, the namespace merged and
+ * re-stringified. Metadata that does not parse as an object is replaced by one
+ * holding the merged namespace alone: the run's other metadata was already
+ * unreadable, and these fields are what the event records.
+ */
+function mergeLangwatchNamespace(
+  metadata: string | null,
+  fields: Record<string, unknown>,
+): string {
+  const current = parseMetadataObject(metadata);
+  const langwatch =
+    typeof current.langwatch === "object" &&
+    current.langwatch !== null &&
+    !Array.isArray(current.langwatch)
+      ? (current.langwatch as Record<string, unknown>)
+      : {};
+  return JSON.stringify({
+    ...current,
+    langwatch: { ...langwatch, ...fields },
+  });
+}
+
+/**
+ * The stored metadata with the call-limit cutoff flag written into its
+ * reserved `langwatch` namespace, mirroring {@link withAgentInstance}. The
+ * marker is always `true`: the event's existence is the fact, so folding it a
+ * second time produces byte-identical metadata (idempotent).
+ */
+export function withCutAtLimit(metadata: string | null): string {
+  return mergeLangwatchNamespace(metadata, { isCutAtLimit: true });
+}
+
+function parseMetadataObject(metadata: string | null): Record<string, unknown> {
+  if (!metadata) return {};
+  try {
+    const parsed: unknown = JSON.parse(metadata);
+    return isRecord(parsed) ? parsed : {};
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * Caps an oversized message-content/rest string and emits a structured warn
+ * log so an SDK regression doesn't silently land 90+ MB rows in ClickHouse
+ * — the marker has a stable prefix so monitoring/retroactive scans can find affected rows.
+ */
+function capOversizedString({
+  value,
+  maxBytes,
+  field,
+  ctx,
+}: {
+  value: string;
+  maxBytes: number;
+  field: "Content" | "Rest";
+  ctx: { scenarioRunId: string; messageId?: string; messageRole?: string };
+}): string {
+  // String length is char-count (UTF-16 code units); UTF-8 uses up to 3
+  // bytes per unit, so length*3 <= maxBytes safely bounds byte length —
+  // length <= maxBytes alone would let a ~3x-over multibyte string through.
+  if (value.length * 3 <= maxBytes) return value;
+  const byteLength = Buffer.byteLength(value, "utf8");
+  if (byteLength <= maxBytes) return value;
+  projectionLogger.warn(
+    {
+      scenarioRunId: ctx.scenarioRunId,
+      messageId: ctx.messageId,
+      messageRole: ctx.messageRole,
+      field,
+      byteLength,
+      maxBytes,
+    },
+    `simulation message ${field} exceeds size cap — truncating (probable inline media not externalised)`,
+  );
+  return `[truncated: message ${field.toLowerCase()} was ${byteLength} bytes (cap ${maxBytes}); likely inline media that was not externalised to stored-objects]`;
+}
+
+function buildMessageRestJson(messageFields: Record<string, unknown>): string {
+  // Array `content` is preserved in Rest so the renderer can route each
+  // part through <MediaPart>; flat-string content goes to the top-level
+  // `parts` covered by restFields spread; only `content` needs special handling.
+  const { id: _id, role: _role, content, trace_id: _traceId, ...restFields } = messageFields;
+  const rest: Record<string, unknown> = { ...restFields };
+  if (Array.isArray(content)) {
+    rest.content = content;
+  }
+  return Object.keys(rest).length > 0 ? JSON.stringify(rest) : "";
+}
+
+/**
+ * A single message row stored in the Messages parallel arrays.
+ * Maps to `Messages.*` Nested columns in ClickHouse.
+ */
+export interface SimulationMessageRow {
+  Id: string; // opaque message ID, empty string if absent
+  Role: string; // "user" | "assistant" | "system" | "tool"
+  Content: string; // message content, empty string if null
+  TraceId: string; // span trace ID for correlation, empty string if absent
+  Rest: string; // JSON of any remaining AG-UI message fields, or ""
+}
+
+/**
+ * State data for a simulation run, matching the simulation_runs ClickHouse
+ * schema — fold state and stored data are one type, not two. Handlers do
+ * all computation; the store is a dumb read/write layer.
+ */
+export interface SimulationRunStateData {
+  ScenarioRunId: string;
+  ScenarioId: string;
+  BatchRunId: string;
+  ScenarioSetId: string;
+  Status: string;
+  Name: string | null;
+  Description: string | null;
+  Metadata: string | null;
+  Messages: SimulationMessageRow[];
+  TraceIds: string[];
+  Verdict: string | null;
+  Reasoning: string | null;
+  MetCriteria: string[];
+  UnmetCriteria: string[];
+  Error: string | null;
+  /**
+   * One result per evaluator that ran on the scenario, in the order they
+   * were recorded. Stored as the `Evaluations.*` parallel arrays.
+   */
+  Evaluations: ScenarioEvaluationResult[];
+  DurationMs: number | null;
+  TotalCost: number | null;
+  RoleCosts: Record<string, number[]>;
+  RoleLatencies: Record<string, number[]>;
+  TraceMetrics: Record<
+    string,
+    {
+      totalCost: number;
+      roleCosts: Record<string, number>;
+      roleLatencies: Record<string, number>;
+    }
+  >;
+  StartedAt: number | null;
+  QueuedAt: number | null;
+  CreatedAt: number;
+  UpdatedAt: number;
+  FinishedAt: number | null;
+  ArchivedAt: number | null;
+  CancellationRequestedAt: number | null;
+  LastSnapshotOccurredAt: number;
+  LastEventOccurredAt: number;
+}
+
+export interface SimulationRunState extends Projection<SimulationRunStateData> {
+  data: SimulationRunStateData;
+}
+
+/**
+ * Guard non-terminal Status transition once run finished (prevents out-of-order zombie).
+ * Must run on every non-terminal Status writer.
+ */
+function statusAfter({
+  state,
+  candidate,
+}: {
+  state: SimulationRunStateData;
+  candidate: string;
+}): string {
+  return state.FinishedAt != null ? state.Status : candidate;
+}
+
+/**
+ * Statuses a run may hold once FinishedAt is set. A `finished` event's
+ * explicit status outside this set is discarded for the verdict-derived one
+ * — writing it would strand the run non-terminal-but-finished, unrecoverable.
+ */
+const TERMINAL_STATUSES = new Set([
+  "SUCCESS",
+  "FAILURE",
+  "FAILED",
+  "ERROR",
+  "CANCELLED",
+  "STALLED",
+]);
+
+function isTerminalStatus(status: string): boolean {
+  return TERMINAL_STATUSES.has(status);
+}
+
+/**
+ * Status a finished run reads with: explicit TERMINAL takes priority, else derives
+ * from verdict. Shared with RecordEvaluationsCommand.
+ */
+export function finishedStatusOf({
+  explicitStatus,
+  verdict,
+}: {
+  explicitStatus: string | undefined;
+  verdict: string | null | undefined;
+}): string {
+  const explicit = explicitStatus?.toUpperCase();
+  if (explicit && isTerminalStatus(explicit)) return explicit;
+  if (verdict === "success") return "SUCCESS";
+  return "FAILURE";
+}
+
+/**
+ * Status and verdict a run stores on finish: PENDING_EVALUATION if pending results,
+ * else judge's verdict. Evaluated event first means gate runs on judge's verdict.
+ */
+function settledOnFinish({
+  state,
+  judgeStatus,
+  verdict,
+  hasOwnEvaluations,
+  attachmentCount,
+}: {
+  state: SimulationRunStateData;
+  judgeStatus: string;
+  verdict: GatedVerdict | null;
+  hasOwnEvaluations: boolean;
+  attachmentCount: number;
+}): { status: string; verdict: string | null } {
+  if (!hasOwnEvaluations && state.Evaluations.length > 0) {
+    const gated = gatedVerdict({
+      evaluations: state.Evaluations,
+      judgeVerdict: verdict ?? undefined,
+    });
+    return {
+      status: gatedStatus({ status: judgeStatus, verdict: gated }),
+      verdict: gated ?? verdict,
+    };
+  }
+  const awaitsEvaluations = runAwaitsEvaluations({
+    status: judgeStatus,
+    hasOwnEvaluations,
+    attachmentCount,
+  });
+  return {
+    status: awaitsEvaluations
+      ? ScenarioRunStatus.PENDING_EVALUATION
+      : judgeStatus,
+    verdict,
+  };
+}
+
+/**
+ * Whether fold has seen an event that DEFINES the run (non-empty ScenarioRunId).
+ * Metrics events carry cost only; don't mint rows. Accumulate until lifecycle event.
+ */
+export function hasRunDefiningEvent(state: SimulationRunStateData): boolean {
+  return state.ScenarioRunId.length > 0;
+}
+
+const simulationRunEvents = [
+  SimulationRunQueuedEventSchema,
+  SimulationRunStartedEventSchema,
+  SimulationMessageSnapshotEventSchema,
+  SimulationTextMessageStartEventSchema,
+  SimulationTextMessageEndEventSchema,
+  SimulationRunFinishedEventSchema,
+  SimulationRunEvaluatedEventSchema,
+  SimulationRunMetricsComputedEventSchema,
+  SimulationRunCancelRequestedEventSchema,
+  SimulationRunAgentInstanceRecordedEventSchema,
+  SimulationRunCutAtLimitRecordedEventSchema,
+  SimulationRunDeletedEventSchema,
+] as const;
+
+/**
+ * Type-safe fold projection for simulation run state: `implements
+ * FoldEventHandlers` enforces a handler per event schema, handler names
+ * derive from event type strings, and `UpdatedAt` is auto-managed by the base class.
+ */
+export class SimulationRunStateFoldProjection
+  extends AbstractFoldProjection<SimulationRunStateData, typeof simulationRunEvents>
+  implements FoldEventHandlers<typeof simulationRunEvents, SimulationRunStateData>
+{
+  static create(deps: {
+    store: FoldProjectionStore<SimulationRunStateData>;
+  }): SimulationRunStateFoldProjection {
+    return new SimulationRunStateFoldProjection(deps);
+  }
+
+  /**
+   * The stored metadata with the served instance written into its reserved
+   * `langwatch` namespace. Metadata that does not parse as an object is
+   * replaced by one that holds the instance alone.
+   */
+  static withAgentInstance({
+    metadata,
+    agentInstance,
+  }: {
+    metadata: string | null;
+    agentInstance: { hostname: string; label: string | null };
+  }): string {
+    const current = parseMetadataObject(metadata);
+    const langwatch =
+      typeof current.langwatch === "object" &&
+      current.langwatch !== null &&
+      !Array.isArray(current.langwatch)
+        ? (current.langwatch as Record<string, unknown>)
+        : {};
+    return JSON.stringify({
+      ...current,
+      langwatch: { ...langwatch, agentInstance },
+    });
+  }
+
+  /**
+   * Whether the fold has seen an event that DEFINES the run, and so whether
+   * the state is worth a `simulation_runs` row — every lifecycle event names
+   * its run; metrics event carries cost only, so cost alone must not mint rows.
+   */
+  static hasRunDefiningEvent(state: SimulationRunStateData): boolean {
+    return state.ScenarioRunId.length > 0;
+  }
+
+  readonly name = "simulationRunState";
+  readonly version = SIMULATION_PROJECTION_VERSIONS.RUN_STATE;
+  readonly store: FoldProjectionStore<SimulationRunStateData>;
+
+  protected readonly events = simulationRunEvents;
+
+  private constructor(deps: { store: FoldProjectionStore<SimulationRunStateData> }) {
+    super();
+    this.store = deps.store;
+  }
+
+  protected initState() {
+    return {
+      ScenarioRunId: "",
+      ScenarioId: "",
+      BatchRunId: "",
+      ScenarioSetId: "",
+      Status: "PENDING",
+      Name: null,
+      Description: null,
+      Metadata: null,
+      Messages: [],
+      TraceIds: [],
+      Verdict: null,
+      Reasoning: null,
+      MetCriteria: [],
+      UnmetCriteria: [],
+      Error: null,
+      Evaluations: [],
+      DurationMs: null,
+      TotalCost: null,
+      RoleCosts: {},
+      RoleLatencies: {},
+      TraceMetrics: {},
+      StartedAt: null,
+      QueuedAt: null,
+      FinishedAt: null,
+      ArchivedAt: null,
+      CancellationRequestedAt: null,
+      LastSnapshotOccurredAt: 0,
+    };
+  }
+
+  handleSimulationRunQueued(
+    event: SimulationRunQueuedEvent,
+    state: SimulationRunStateData,
+  ): SimulationRunStateData {
+    return {
+      ...state,
+      ScenarioRunId: event.data.scenarioRunId,
+      ScenarioId: event.data.scenarioId,
+      BatchRunId: event.data.batchRunId,
+      ScenarioSetId: event.data.scenarioSetId,
+      Name: event.data.name ?? null,
+      Status: statusAfter({ state, candidate: "QUEUED" }),
+      Description: event.data.description ?? null,
+      Metadata: storedMetadata(event.data.metadata),
+      QueuedAt: event.occurredAt,
+    };
+  }
+
+  handleSimulationRunStarted(
+    event: SimulationRunStartedEvent,
+    state: SimulationRunStateData,
+  ): SimulationRunStateData {
+    return {
+      ...state,
+      ScenarioRunId: state.ScenarioRunId || event.data.scenarioRunId,
+      ScenarioId: state.ScenarioId || event.data.scenarioId,
+      BatchRunId: state.BatchRunId || event.data.batchRunId,
+      ScenarioSetId: state.ScenarioSetId || event.data.scenarioSetId,
+      Name: state.Name ?? event.data.name ?? null,
+      Description: state.Description ?? event.data.description ?? null,
+      Metadata: state.Metadata ?? storedMetadata(event.data.metadata),
+      Status: statusAfter({ state, candidate: "IN_PROGRESS" }),
+      StartedAt: event.occurredAt,
+    };
+  }
+
+  handleSimulationRunMessageSnapshot(
+    event: SimulationMessageSnapshotEvent,
+    state: SimulationRunStateData,
+  ): SimulationRunStateData {
+    // Out-of-order protection: ignore snapshots older than the latest applied
+    if (event.occurredAt <= state.LastSnapshotOccurredAt) return state;
+
+    return {
+      ...state,
+      ScenarioRunId: state.ScenarioRunId || event.data.scenarioRunId,
+      // Default StartedAt from event.occurredAt if snapshot arrives before started event
+      StartedAt: state.StartedAt ?? event.occurredAt,
+      LastSnapshotOccurredAt: event.occurredAt,
+      Messages: event.data.messages.map((m, i) => {
+        const parsedMessage = simulationMessageSchema.safeParse(m);
+        if (!parsedMessage.success) {
+          throw new ValidationError(
+            `Simulation ${state.ScenarioRunId} failed with invalid message on index ${i}`,
+          );
+        }
+        const message = parsedMessage.data;
+
+        // Content is either a string (legacy, possibly Python-repr), an array of
+        // rich-content parts (canonical AG-UI/OpenAI shape), or null/undefined
+        // (tolerated as ""). Always serialized to a string for the parallel-array
+        // CH column; arrays are JSON.stringify'd, parsed by flattenContent.
+        let content = "";
+        if (typeof message.content === "string") {
+          content = message.content;
+        } else if (Array.isArray(message.content)) {
+          content = JSON.stringify(message.content);
+        }
+
+        const messageId = typeof message.id === "string" ? message.id : "";
+        const messageRole = typeof message.role === "string" ? message.role : "";
+        // Snapshots can arrive BEFORE the run-started event (see
+        // `StartedAt: state.StartedAt ?? event.occurredAt` two lines up); on
+        // that path state.ScenarioRunId is still empty while the event already
+        // carries the id. Fall back so an oversized first snapshot's warn log
+        // is locatable instead of arriving id-less.
+        const scenarioRunId = state.ScenarioRunId || event.data.scenarioRunId;
+        const ctx = { scenarioRunId, messageId, messageRole };
+
+        return {
+          Id: messageId,
+          Role: messageRole,
+          Content: capOversizedString({
+            value: content,
+            maxBytes: MAX_MESSAGE_CONTENT_BYTES,
+            field: "Content",
+            ctx,
+          }),
+          TraceId: typeof message.trace_id === "string" ? message.trace_id : "",
+          Rest: capOversizedString({
+            value: buildMessageRestJson(message),
+            maxBytes: MAX_MESSAGE_REST_BYTES,
+            field: "Rest",
+            ctx,
+          }),
+        };
+      }),
+      TraceIds: Array.isArray(event.data.traceIds) ? event.data.traceIds : [],
+      Status: statusAfter({
+        state,
+        candidate: event.data.status ?? state.Status,
+      }),
+    };
+  }
+
+  handleSimulationRunTextMessageStart(
+    event: SimulationTextMessageStartEvent,
+    state: SimulationRunStateData,
+  ): SimulationRunStateData {
+    // Idempotency: skip if message already exists
+    if (state.Messages.some((m) => m.Id === event.data.messageId)) return state;
+
+    const newRow: SimulationMessageRow = {
+      Id: event.data.messageId,
+      Role: event.data.role,
+      Content: "",
+      TraceId: "",
+      Rest: "",
+    };
+
+    const messages = [...state.Messages];
+    const idx = event.data.messageIndex;
+
+    if (idx != null) {
+      // Pad with placeholder rows if needed
+      while (messages.length < idx) {
+        messages.push({ Id: "", Role: "", Content: "", TraceId: "", Rest: "" });
+      }
+      messages.splice(idx, 0, newRow);
+    } else {
+      messages.push(newRow);
+    }
+
+    return {
+      ...state,
+      ScenarioRunId: state.ScenarioRunId || event.data.scenarioRunId,
+      Status: statusAfter({
+        state,
+        candidate: state.Status === "PENDING" ? "IN_PROGRESS" : state.Status,
+      }),
+      StartedAt: state.StartedAt ?? event.occurredAt,
+      Messages: messages,
+    };
+  }
+
+  handleSimulationRunTextMessageEnd(
+    event: SimulationTextMessageEndEvent,
+    state: SimulationRunStateData,
+  ): SimulationRunStateData {
+    const existingIndex = state.Messages.findIndex((m) => m.Id === event.data.messageId);
+
+    // TextMessageEnd can also fold before the started event (the handler
+    // appends/pads even without a prior START); fall back to the event's
+    // scenarioRunId so the warn log carries the run identifier.
+    const ctx = {
+      scenarioRunId: state.ScenarioRunId || event.data.scenarioRunId,
+      messageId: event.data.messageId,
+      messageRole: event.data.role,
+    };
+    const row: SimulationMessageRow = {
+      Id: event.data.messageId,
+      Role: event.data.role,
+      Content: capOversizedString({
+        value: event.data.content,
+        maxBytes: MAX_MESSAGE_CONTENT_BYTES,
+        field: "Content",
+        ctx,
+      }),
+      TraceId: event.data.traceId ?? "",
+      Rest: capOversizedString({
+        value: buildMessageRestJson((event.data.message ?? {}) as Record<string, unknown>),
+        maxBytes: MAX_MESSAGE_REST_BYTES,
+        field: "Rest",
+        ctx,
+      }),
+    };
+
+    let updatedMessages: SimulationMessageRow[];
+    if (existingIndex >= 0) {
+      updatedMessages = state.Messages.map((m, i) => (i === existingIndex ? row : m));
+    } else if (event.data.messageIndex != null) {
+      updatedMessages = [...state.Messages];
+      while (updatedMessages.length < event.data.messageIndex) {
+        updatedMessages.push({
+          Id: "",
+          Role: "",
+          Content: "",
+          TraceId: "",
+          Rest: "",
+        });
+      }
+      if (updatedMessages.length === event.data.messageIndex) {
+        updatedMessages.push(row);
+      } else {
+        updatedMessages[event.data.messageIndex] = row;
+      }
+    } else {
+      updatedMessages = [...state.Messages, row];
+    }
+
+    // Accumulate traceId if present and not duplicate
+    const traceIds =
+      event.data.traceId && !state.TraceIds.includes(event.data.traceId)
+        ? [...state.TraceIds, event.data.traceId]
+        : state.TraceIds;
+
+    return {
+      ...state,
+      ScenarioRunId: state.ScenarioRunId || event.data.scenarioRunId,
+      StartedAt: state.StartedAt ?? event.occurredAt,
+      Messages: updatedMessages,
+      TraceIds: traceIds,
+    };
+  }
+
+  handleSimulationRunFinished(
+    event: SimulationRunFinishedEvent,
+    state: SimulationRunStateData,
+  ): SimulationRunStateData {
+    // A run finishes exactly once. A second `finished` — a child that outlived
+    // the parent this run's orphan reconciliation already failed — must not
+    // rewrite a terminal record the downstream subscribers have already acted on,
+    // nor split it (an ERROR Status carrying the late child's SUCCESS Verdict).
+    if (state.FinishedAt != null) return state;
+
+    const results = event.data.results;
+    const verdict = results?.verdict ?? null;
+    const judgeStatus = finishedStatusOf({
+      explicitStatus: event.data.status,
+      verdict,
+    });
+    const settled = settledOnFinish({
+      state,
+      judgeStatus,
+      verdict,
+      hasOwnEvaluations: results?.evaluations != null,
+      attachmentCount: event.data.evaluators?.attachments.length ?? 0,
+    });
+
+    return {
+      ...state,
+      ScenarioRunId: state.ScenarioRunId || event.data.scenarioRunId,
+      Status: settled.status,
+      Verdict: settled.verdict,
+      Reasoning: results?.reasoning ?? null,
+      MetCriteria: results?.metCriteria ?? [],
+      UnmetCriteria: results?.unmetCriteria ?? [],
+      Error: results?.error ?? null,
+      // A scenario run from code sends its evaluations with the finished
+      // event. An evaluated event that folded before this one (business time
+      // can land it first) already wrote its results, which stay.
+      Evaluations: results?.evaluations ?? state.Evaluations,
+      // Derived when the event does not carry it, which is every real run:
+      // the SDK ingest path dispatches finishRun with results and status only.
+      // Left underived, DurationMs was null for every run a customer actually
+      // executed, and populated only for runs seeded with a synthetic event.
+      //
+      // The fold already holds both ends, so this needs no new field on the
+      // wire. A supplied value still wins — the runner knows its own elapsed
+      // time better than two projected timestamps do.
+      DurationMs:
+        event.data.durationMs ??
+        (state.StartedAt !== null && event.occurredAt >= state.StartedAt
+          ? event.occurredAt - state.StartedAt
+          : null),
+      FinishedAt: event.occurredAt,
+    };
+  }
+
+  handleSimulationRunEvaluated(
+    event: SimulationRunEvaluatedEvent,
+    state: SimulationRunStateData,
+  ): SimulationRunStateData {
+    // Second record replaces first; keeps status; recompute if PENDING_EVALUATION.
+    const verdict = event.data.verdict;
+    const judgeStatus =
+      state.Status === ScenarioRunStatus.PENDING_EVALUATION
+        ? finishedStatusOf({
+            explicitStatus: undefined,
+            verdict: state.Verdict,
+          })
+        : state.Status;
+    return {
+      ...state,
+      ScenarioRunId: state.ScenarioRunId || event.data.scenarioRunId,
+      Evaluations: event.data.evaluations,
+      Verdict: verdict ?? state.Verdict,
+      Status: gatedStatus({ status: judgeStatus, verdict }),
+    };
+  }
+
+  handleSimulationRunMetricsComputed(
+    event: SimulationRunMetricsComputedEvent,
+    state: SimulationRunStateData,
+  ): SimulationRunStateData {
+    // The event carries a `scenarioRunId` and this handler deliberately does
+    // not write it onto the state. The id is a span attribute the customer's
+    // agent sent, so it names a run only if a run said so, and
+    // hasRunDefiningEvent reads the difference. Copying it here would
+    // let a cost figure alone create a run in the simulations list.
+
+    // Store per-trace breakdown, then recompute aggregates
+    const traceMetrics = {
+      ...state.TraceMetrics,
+      [event.data.traceId]: {
+        totalCost: event.data.totalCost,
+        roleCosts: event.data.roleCosts,
+        roleLatencies: event.data.roleLatencies,
+      },
+    };
+
+    // Aggregate across all traces: collect individual values into arrays
+    let totalCost = 0;
+    const roleCosts: Record<string, number[]> = {};
+    const roleLatencies: Record<string, number[]> = {};
+
+    for (const entry of Object.values(traceMetrics)) {
+      totalCost += entry.totalCost;
+      for (const [role, cost] of Object.entries(entry.roleCosts)) {
+        (roleCosts[role] ??= []).push(cost);
+      }
+      for (const [role, latency] of Object.entries(entry.roleLatencies)) {
+        (roleLatencies[role] ??= []).push(latency);
+      }
+    }
+
+    return {
+      ...state,
+      TraceMetrics: traceMetrics,
+      TotalCost: totalCost > 0 ? Number(totalCost.toFixed(6)) : null,
+      RoleCosts: roleCosts,
+      RoleLatencies: roleLatencies,
+    };
+  }
+
+  handleSimulationRunCancelRequested(
+    _event: SimulationRunCancelRequestedEvent,
+    state: SimulationRunStateData,
+  ): SimulationRunStateData {
+    // Idempotent: keep the original timestamp if already requested
+    if (state.CancellationRequestedAt != null) return state;
+    return {
+      ...state,
+      CancellationRequestedAt: _event.occurredAt,
+    };
+  }
+
+  handleSimulationRunAgentInstanceRecorded(
+    event: SimulationRunAgentInstanceRecordedEvent,
+    state: SimulationRunStateData,
+  ): SimulationRunStateData {
+    return {
+      ...state,
+      ScenarioRunId: state.ScenarioRunId || event.data.scenarioRunId,
+      Metadata: SimulationRunStateFoldProjection.withAgentInstance({
+        metadata: state.Metadata,
+        agentInstance: event.data.agentInstance,
+      }),
+    };
+  }
+
+  handleSimulationRunCutAtLimitRecorded(
+    event: SimulationRunCutAtLimitRecordedEvent,
+    state: SimulationRunStateData,
+  ): SimulationRunStateData {
+    return {
+      ...state,
+      ScenarioRunId: state.ScenarioRunId || event.data.scenarioRunId,
+      Metadata: withCutAtLimit(state.Metadata),
+    };
+  }
+
+  handleSimulationRunDeleted(
+    event: SimulationRunDeletedEvent,
+    state: SimulationRunStateData,
+  ): SimulationRunStateData {
+    return {
+      ...state,
+      ScenarioRunId: state.ScenarioRunId || event.data.scenarioRunId,
+      ArchivedAt: event.occurredAt,
+    };
+  }
+}

@@ -32,10 +32,7 @@ describe("pull_request_target workflow guard", () => {
 
   it("reads safe gates only from a job-level if field", () => {
     const [commentSpoofedJob] = jobBlocks(
-      unsafeCheckoutJob([
-        "    # github.event.label.name == 'approved-ci'",
-        "    if: always()",
-      ]),
+      unsafeCheckoutJob(["    # github.event.label.name == 'approved-ci'", "    if: always()"]),
     );
     assert.ok(commentSpoofedJob);
     assert.equal(hasSafeGate(commentSpoofedJob), false);

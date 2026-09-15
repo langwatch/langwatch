@@ -8,9 +8,7 @@ import {
   type AssociatedPullRequest,
 } from "./pr-token-usage-merged.ts";
 
-const pull = (
-  overrides: Partial<AssociatedPullRequest> = {},
-): AssociatedPullRequest => ({
+const pull = (overrides: Partial<AssociatedPullRequest> = {}): AssociatedPullRequest => ({
   number: 42,
   merged_at: "2026-09-01T10:00:00Z",
   base: { ref: "main" },
@@ -30,11 +28,7 @@ describe("given a push to the default branch that merged a pull request", () => 
 
     /** @scenario "A batch merge refreshes every pull request it carried" */
     it("names every merged pull request once, without repeats", () => {
-      const result = targets([
-        pull({ number: 42 }),
-        pull({ number: 43 }),
-        pull({ number: 42 }),
-      ]);
+      const result = targets([pull({ number: 42 }), pull({ number: 43 }), pull({ number: 42 })]);
       assert.deepEqual(result.refresh, [42, 43]);
     });
   });
@@ -73,24 +67,21 @@ describe("given a push that landed more than one commit", () => {
   describe("when the commits to resolve are chosen", () => {
     /** @scenario "Every commit in the push is resolved, not just the tip" */
     it("resolves every commit in the range, tip included", () => {
-      assert.deepEqual(
-        commitsToResolve({ after: "ccc", compared: ["aaa", "bbb", "ccc"] }),
-        ["aaa", "bbb", "ccc"],
-      );
+      assert.deepEqual(commitsToResolve({ after: "ccc", compared: ["aaa", "bbb", "ccc"] }), [
+        "aaa",
+        "bbb",
+        "ccc",
+      ]);
     });
 
     it("names the tip once when the range already ends there", () => {
-      assert.deepEqual(commitsToResolve({ after: "ccc", compared: ["ccc"] }), [
-        "ccc",
-      ]);
+      assert.deepEqual(commitsToResolve({ after: "ccc", compared: ["ccc"] }), ["ccc"]);
     });
 
     /** @scenario "A push with no comparable range still resolves its tip" */
     it("falls back to the tip alone when there is no range", () => {
       // A branch creation, or a compare that could not be read.
-      assert.deepEqual(commitsToResolve({ after: "ccc", compared: [] }), [
-        "ccc",
-      ]);
+      assert.deepEqual(commitsToResolve({ after: "ccc", compared: [] }), ["ccc"]);
     });
   });
 });

@@ -1,18 +1,15 @@
 /**
  * ExperimentsFacade - Entry point for the experiments API
- *
- * Provides:
- * - `init()` method to create experiment sessions (SDK-defined experiments)
- * - `run()` method to execute platform-configured experiments (Experiments Workbench)
  */
 
 import type { LangwatchApiClient } from "@/internal/api/client";
 import { isLangWatchHandledError } from "@/internal/api/errors";
 import type { Logger } from "@/logger";
 import { Experiment } from "./experiment";
-import {
-  ExperimentsApiService,
-  toRunStartRequest,
+import { ExperimentsApiService, toRunStartRequest } from "./experiments-api.service";
+import type {
+  ExperimentRunStartResponse,
+  ExperimentRunStatusResponse,
 } from "./experiments-api.service";
 import type { ExperimentInitOptions } from "./types";
 import type {
@@ -28,16 +25,23 @@ import {
   ExperimentTimeoutError,
   ExperimentRunFailedError,
 } from "./platformErrors";
-import {
-  pollExperimentRun,
-  rebaseUrlToEndpoint,
-  fetchResultsWithRetry,
-} from "./run-status";
+import { pollExperimentRun, rebaseUrlToEndpoint, fetchResultsWithRetry } from "./run-status";
 import { mapRunResultsToRows } from "./mapResults";
 import { printSummary } from "./printSummary";
 
 const DEFAULT_POLL_INTERVAL = 2000;
 const DEFAULT_TIMEOUT = 600000; // 10 minutes
+
+/**
+ * Asserts the shape of a raw endpoint's body. `data` types as `undefined` on
+ * a `withRawResponse` operation (the document cannot describe it), so a
+ * direct `as` cast has no overlap to check against; the type comes in
+ * through this generic instead, the same trust boundary
+ * `ExperimentsApiService`'s undeclared-endpoint helpers use.
+ */
+function rawResponseData<T>(data: unknown): T {
+  return data as T;
+}
 
 type ExperimentsFacadeConfig = {
   langwatchApiClient: LangwatchApiClient;
@@ -61,26 +65,11 @@ export class ExperimentsFacade {
   }
 
   /**
-   * Initialize a new experiment session (SDK-defined)
-   *
+   * Initialize a new experiment session (SDK-defined).
    * @param name - Name of the experiment (used as slug)
    * @param options - Optional configuration
-   * @returns An initialized Experiment instance
-   *
-   * @example
-   * ```typescript
-   * const experiment = await langwatch.experiments.init('my-experiment');
-   *
-   * await experiment.run(dataset, async ({ item, index }) => {
-   *   const response = await myAgent(item.question);
-   *   experiment.log('accuracy', { index, score: 0.95 });
-   * });
-   * ```
    */
-  async init(
-    name: string,
-    options?: ExperimentInitOptions,
-  ): Promise<Experiment> {
+  async init(name: string, options?: ExperimentInitOptions): Promise<Experiment> {
     return Experiment.init(name, {
       apiClient: this.config.langwatchApiClient,
       endpoint: this.config.endpoint,
@@ -91,30 +80,11 @@ export class ExperimentsFacade {
   }
 
   /**
-   * Run a platform-configured experiment (Experiments Workbench)
-   *
-   * This runs an experiment that was configured in the LangWatch platform.
-   * The method automatically prints a summary and exits with code 1 on failure
-   * (unless `exitOnFailure: false` is passed).
-   *
+   * Run a platform-configured experiment (Experiments Workbench). Prints a
+   * summary and exits with code 1 on failure, unless `exitOnFailure: false`.
    * @param slug - The slug of the experiment (found in the experiment URL)
-   * @param options - Optional configuration
-   * @returns The experiment results including pass rate and summary
-   *
-   * @example
-   * ```typescript
-   * import { LangWatch } from "langwatch";
-   *
-   * const langwatch = new LangWatch();
-   *
-   * const result = await langwatch.experiments.run("my-experiment-slug");
-   * result.printSummary();
-   * ```
    */
-  async run(
-    slug: string,
-    options?: RunExperimentOptions,
-  ): Promise<ExperimentRunResult> {
+  async run(slug: string, options?: RunExperimentOptions): Promise<ExperimentRunResult> {
     this.config.logger.info(`Running platform experiment: ${slug}`);
     const result = await this.runWithPolling(slug, options);
     return result;
@@ -122,35 +92,14 @@ export class ExperimentsFacade {
 
   /**
    * Run a platform experiment and return per-row structured results.
-   *
-   * Starts the run through the unified evaluations-v3 backend (optionally
-   * overriding the configured inputs via `data` / `datasetId` / `parameters` /
-   * `rowIndices`), polls to completion, fetches the per-row results, and maps
-   * them to the same row structure as the python SDK's results DataFrame.
-   *
    * @param slug - The slug of the experiment (found in the experiment URL)
    * @param options - Optional inputs and polling configuration
-   * @returns The run id, results URL, status, summary, and per-row results
-   *
-   * @example
-   * ```typescript
-   * const langwatch = new LangWatch();
-   * const { rows, runUrl } = await langwatch.experiments.runWithResults(
-   *   "my-experiment-slug",
-   *   { data: [{ question: "What is 2 + 2?" }] },
-   * );
-   * for (const row of rows) {
-   *   console.log(row.output, row.evaluations);
-   * }
-   * ```
    */
   async runWithResults(
     slug: string,
     options: RunWithResultsOptions = {},
   ): Promise<ExperimentRunWithResults> {
-    this.config.logger.info(
-      `Running platform experiment with results: ${slug}`,
-    );
+    this.config.logger.info(`Running platform experiment with results: ${slug}`);
 
     const body = toRunStartRequest({
       data: options.data,
@@ -175,8 +124,7 @@ export class ExperimentsFacade {
     // materialize. Retry both cases when the run reported rows, mirroring the
     // python SDK, instead of failing or returning an empty result.
     const results = await fetchResultsWithRetry({
-      getResults: () =>
-        this.apiService.getV3RunResults({ runId, experimentSlug: slug }),
+      getResults: () => this.apiService.getV3RunResults({ runId, experimentSlug: slug }),
       isEmpty: (r) => (r.dataset?.length ?? 0) === 0,
       expectsRows: (summary.totalCells ?? 0) > 0,
       delay: options.pollInterval ?? DEFAULT_POLL_INTERVAL,
@@ -187,9 +135,7 @@ export class ExperimentsFacade {
     // the start response and the summary carry the platform's own URL; whichever
     // is present gets its domain replaced. Mirrors the python SDK.
     const rawRunUrl = startResponse.runUrl ?? summary.runUrl;
-    const runUrl = rawRunUrl
-      ? rebaseUrlToEndpoint(rawRunUrl, this.config.endpoint)
-      : "";
+    const runUrl = rawRunUrl ? rebaseUrlToEndpoint(rawRunUrl, this.config.endpoint) : "";
 
     return {
       runId,
@@ -216,9 +162,7 @@ export class ExperimentsFacade {
 
     // Use the run URL from API but replace domain with configured endpoint
     const apiRunUrl = startResponse.runUrl ?? "";
-    const runUrl = apiRunUrl
-      ? rebaseUrlToEndpoint(apiRunUrl, this.config.endpoint)
-      : "";
+    const runUrl = apiRunUrl ? rebaseUrlToEndpoint(apiRunUrl, this.config.endpoint) : "";
 
     console.log(`Started experiment run: ${runId}`);
     if (runUrl) {
@@ -241,11 +185,7 @@ export class ExperimentsFacade {
       if (Date.now() - startTime > timeout) {
         console.log(); // Newline after progress
         const finalStatus = await this.getRunStatus(runId);
-        throw new ExperimentTimeoutError(
-          runId,
-          finalStatus.progress,
-          finalStatus.total,
-        );
+        throw new ExperimentTimeoutError(runId, finalStatus.progress, finalStatus.total);
       }
 
       await this.sleep(pollInterval);
@@ -256,9 +196,7 @@ export class ExperimentsFacade {
       // Update progress display if changed
       if (progress !== lastProgress && status.total > 0) {
         const percentage = Math.round((progress / status.total) * 100);
-        process.stdout.write(
-          `\rProgress: ${progress}/${status.total} (${percentage}%)`,
-        );
+        process.stdout.write(`\rProgress: ${progress}/${status.total} (${percentage}%)`);
         lastProgress = progress;
       }
 
@@ -272,10 +210,7 @@ export class ExperimentsFacade {
 
       if (status.status === "failed") {
         console.log(); // Newline after progress
-        throw new ExperimentRunFailedError(
-          runId,
-          status.error ?? "Unknown error",
-        );
+        throw new ExperimentRunFailedError(runId, status.error ?? "Unknown error");
       }
 
       if (status.status === "stopped") {
@@ -299,19 +234,14 @@ export class ExperimentsFacade {
   /**
    * Start an experiment run
    */
-  private async startRun(
-    slug: string,
-  ): Promise<{ runId: string; total: number; runUrl?: string }> {
+  private async startRun(slug: string): Promise<ExperimentRunStartResponse> {
     let response;
     try {
-      response = await this.config.langwatchApiClient.POST(
-        "/api/experiments/{slug}/run",
-        {
-          params: {
-            path: { slug },
-          },
+      response = await this.config.langwatchApiClient.POST("/api/v1/experiments/{slug}/run", {
+        params: {
+          path: { slug },
         },
-      );
+      });
     } catch (error) {
       if (isLangWatchHandledError(error)) {
         this.handleStartRunError(slug, error.body, error.httpStatus);
@@ -323,29 +253,25 @@ export class ExperimentsFacade {
       this.handleStartRunError(slug, response.error, response.response.status);
     }
 
-    return response.data as { runId: string; total: number; runUrl?: string };
+    // `/api/v1/experiments/{slug}/run` is declared `withRawResponse`
+    // (`experiment-v3.rest.ts:208`), so the typed client's `data` is
+    // `undefined` here — the document cannot describe a raw response's body.
+    // The real shape is restored from the last document that had it
+    // (`openapi-document.json` at `0a0f549cfd^`).
+    return rawResponseData<ExperimentRunStartResponse>(response.data);
   }
 
   /**
    * Get the status of a run
    */
-  private async getRunStatus(runId: string): Promise<{
-    status: string;
-    progress: number;
-    total: number;
-    summary?: ExperimentRunSummary;
-    error?: string;
-  }> {
+  private async getRunStatus(runId: string): Promise<ExperimentRunStatusResponse> {
     let response;
     try {
-      response = await this.config.langwatchApiClient.GET(
-        "/api/experiments/runs/{runId}",
-        {
-          params: {
-            path: { runId },
-          },
+      response = await this.config.langwatchApiClient.GET("/api/v1/experiments/runs/{runId}", {
+        params: {
+          path: { runId },
         },
-      );
+      });
     } catch (error) {
       if (isLangWatchHandledError(error)) {
         this.handleRunStatusError(runId, error.body, error.httpStatus);
@@ -354,27 +280,14 @@ export class ExperimentsFacade {
     }
 
     if (response.error) {
-      this.handleRunStatusError(
-        runId,
-        response.error,
-        response.response.status,
-      );
+      this.handleRunStatusError(runId, response.error, response.response.status);
     }
 
-    return response.data as {
-      status: string;
-      progress: number;
-      total: number;
-      summary?: ExperimentRunSummary;
-      error?: string;
-    };
+    // Declared `withRawResponse`; see startRun above.
+    return rawResponseData<ExperimentRunStatusResponse>(response.data);
   }
 
-  private handleStartRunError(
-    slug: string,
-    error: unknown,
-    status: number,
-  ): never {
+  private handleStartRunError(slug: string, error: unknown, status: number): never {
     if (status === 404) {
       throw new ExperimentNotFoundError(slug);
     }
@@ -393,11 +306,7 @@ export class ExperimentsFacade {
     throw new ExperimentsApiError(errorMessage, status);
   }
 
-  private handleRunStatusError(
-    runId: string,
-    error: unknown,
-    status: number,
-  ): never {
+  private handleRunStatusError(runId: string, error: unknown, status: number): never {
     if (status === 404) {
       throw new ExperimentsApiError(`Run not found: ${runId}`, 404);
     }
@@ -432,8 +341,7 @@ export class ExperimentsFacade {
     const totalPassed = summary.totalPassed ?? completedCells - failedCells;
     const totalFailed = summary.totalFailed ?? failedCells;
     const passRate =
-      summary.passRate ??
-      (completedCells > 0 ? (totalPassed / completedCells) * 100 : 0);
+      summary.passRate ?? (completedCells > 0 ? (totalPassed / completedCells) * 100 : 0);
 
     const result: ExperimentRunResult = {
       runId,
@@ -465,9 +373,8 @@ export class ExperimentsFacade {
     };
 
     // Custom Node.js inspect for console.log
-    (result as Record<string | symbol, unknown>)[
-      Symbol.for("nodejs.util.inspect.custom")
-    ] = () => result.toString();
+    (result as Record<string | symbol, unknown>)[Symbol.for("nodejs.util.inspect.custom")] = () =>
+      result.toString();
 
     return result;
   }

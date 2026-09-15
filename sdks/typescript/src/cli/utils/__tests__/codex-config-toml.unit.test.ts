@@ -41,15 +41,11 @@ describe("buildCodexOtelBlock", () => {
     expect(out).toContain("# <<< langwatch otel end <<<");
     expect(out).toContain("[otel]");
     expect(out).toContain("[otel.trace_exporter.otlp-http]");
-    expect(out).toContain(
-      `endpoint = "https://app.langwatch.ai/api/otel/v1/traces"`,
-    );
+    expect(out).toContain(`endpoint = "https://app.langwatch.ai/api/otel/v1/traces"`);
     // The EVENTS exporter — codex's tool_result / user_prompt / turn_ttft
     // records, which the session fold reads — posts to /v1/logs.
     expect(out).toContain("[otel.exporter.otlp-http]");
-    expect(out).toContain(
-      `endpoint = "https://app.langwatch.ai/api/otel/v1/logs"`,
-    );
+    expect(out).toContain(`endpoint = "https://app.langwatch.ai/api/otel/v1/logs"`);
     // Traces stay FIRST: codexOtelBlockEndpoint reads the block's first
     // endpoint line, and the login staleness compare expects the trace one.
     expect(out.indexOf("[otel.trace_exporter.otlp-http]")).toBeLessThan(
@@ -216,9 +212,7 @@ describe("writeCodexOtelBlock", () => {
         { filePath, persistAuthHeader: true },
       );
       const contents = fs.readFileSync(filePath, "utf8");
-      expect(contents).toContain(
-        `headers = { "Authorization" = "Bearer sk-lw-PERSIST-ME" }`,
-      );
+      expect(contents).toContain(`headers = { "Authorization" = "Bearer sk-lw-PERSIST-ME" }`);
       expect(codexOtelBlockHasAuthHeader(filePath)).toBe(true);
     });
 
@@ -289,9 +283,7 @@ describe("writeCodexOtelBlock", () => {
       );
       const contents = fs.readFileSync(filePath, "utf8");
       // header survives the rewrite (not stripped)
-      expect(contents).toContain(
-        `headers = { "Authorization" = "Bearer sk-lw-KEEP-ME" }`,
-      );
+      expect(contents).toContain(`headers = { "Authorization" = "Bearer sk-lw-KEEP-ME" }`);
       expect(codexOtelBlockHasAuthHeader(filePath)).toBe(true);
     });
 
@@ -455,10 +447,7 @@ describe("writeCodexGatewayBlock", () => {
   it("does NOT write [profiles.X] into config.toml", () => {
     const filePath = path.join(tmp, "config.toml");
     const profilePath = path.join(tmp, "langwatch-gateway.config.toml");
-    writeCodexGatewayBlock(
-      { gatewayUrl: "http://localhost:5563" },
-      { filePath, profilePath },
-    );
+    writeCodexGatewayBlock({ gatewayUrl: "http://localhost:5563" }, { filePath, profilePath });
     const contents = fs.readFileSync(filePath, "utf8");
     expect(contents).not.toContain("[profiles.langwatch-gateway]");
     expect(contents).not.toContain("[profiles.");
@@ -478,10 +467,7 @@ describe("writeCodexGatewayBlock", () => {
   it("idempotently replaces the bracketed region on re-run", () => {
     const filePath = path.join(tmp, "config.toml");
     const profilePath = path.join(tmp, "langwatch-gateway.config.toml");
-    writeCodexGatewayBlock(
-      { gatewayUrl: "http://localhost:5563" },
-      { filePath, profilePath },
-    );
+    writeCodexGatewayBlock({ gatewayUrl: "http://localhost:5563" }, { filePath, profilePath });
     const result = writeCodexGatewayBlock(
       { gatewayUrl: "http://localhost:5563" },
       { filePath, profilePath },
@@ -496,10 +482,7 @@ describe("writeCodexGatewayBlock", () => {
   it("rewrites the profile file when its content drifts", () => {
     const filePath = path.join(tmp, "config.toml");
     const profilePath = path.join(tmp, "langwatch-gateway.config.toml");
-    writeCodexGatewayBlock(
-      { gatewayUrl: "http://localhost:5563" },
-      { filePath, profilePath },
-    );
+    writeCodexGatewayBlock({ gatewayUrl: "http://localhost:5563" }, { filePath, profilePath });
     fs.writeFileSync(profilePath, "# stale hand-edit\n");
     const result = writeCodexGatewayBlock(
       { gatewayUrl: "http://localhost:5563" },
@@ -541,9 +524,7 @@ describe("codexTraceEndpoint", () => {
 
 describe("codexOtelBlockHasAuthHeader", () => {
   it("returns false when the file is missing", () => {
-    expect(
-      codexOtelBlockHasAuthHeader(path.join(tmp, "nope.toml")),
-    ).toBe(false);
+    expect(codexOtelBlockHasAuthHeader(path.join(tmp, "nope.toml"))).toBe(false);
   });
 
   it("returns false for an endpoint-only block, true once the header lands", () => {
@@ -627,9 +608,9 @@ describe("removeCodexGatewayBlock / removeCodexGatewayProfileFile", () => {
   it("is idempotent when nothing is installed", () => {
     const filePath = path.join(tmp, "config.toml");
     expect(removeCodexGatewayBlock(filePath)).toBe(false);
-    expect(
-      removeCodexGatewayProfileFile(path.join(tmp, "langwatch-gateway.config.toml")),
-    ).toBe(false);
+    expect(removeCodexGatewayProfileFile(path.join(tmp, "langwatch-gateway.config.toml"))).toBe(
+      false,
+    );
   });
 
   it("keeps the [otel] block when only the gateway block is removed", () => {

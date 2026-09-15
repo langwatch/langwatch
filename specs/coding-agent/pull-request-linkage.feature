@@ -1,27 +1,25 @@
 # Pull request linkage, sessions mapped to GitHub pull requests and priced
 #
 # Implementation:
-#   platform/app/src/server/app-layer/github/github-pull-request-mapping.service.ts   (branch-to-PR mapping + negative cache)
-#   platform/app/src/server/app-layer/github/githubPullRequestEvent.ts                 (the pull_request webhook payload, validated)
-#   platform/app/src/server/routes/github.ts                                           (the webhook delivery target)
-#   platform/app/src/server/app-layer/github/github-pull-request-status.service.ts    (live status, Redis-cached, never the queue)
-#   platform/app/src/server/event-sourcing/pipelines/coding-agent-processing/subscribers/pullRequestMapping.subscriber.ts (fold trigger)
-#   platform/app/src/server/app-layer/coding-agent/pull-request-assignment.ts          (session-to-PR tenure rule)
-#   platform/app/src/server/app-layer/coding-agent/pull-request-share.ts                (the proportional rule: one session's cost split across the PRs it drove)
-#   platform/app/src/server/app-layer/coding-agent/pull-request-usage.service.ts       (org-first usage rollup)
-#   platform/app/src/server/app-layer/coding-agent/coding-agent-source-type.ts         (agent id to ingestion source type)
-#   platform/app/src/server/app-layer/coding-agent/repositories/coding-agent-session-events.repository.ts (per-model totals)
-#   platform/app/src/server/organizations/resolveCallerProjectScope.ts                 (the caller's permission cut and how each project is named, shared by both read surfaces)
-#   platform/app/src/app/api/coding-agent/[[...route]]/                                (the usage REST endpoint)
-#   platform/app/src/pages/me/pull-requests.tsx                                        (the personal Pull Requests page)
-#   platform/app/src/components/me/PullRequestsTable.tsx                               (the table)
-#   platform/app/src/components/me/PullRequestDetailDrawer.tsx                          (one pull request in full)
-#   platform/app/src/components/me/PullRequestStatusBadge.tsx                           (a status drawn the way GitHub draws it)
-#   platform/app/src/components/me/usePullRequestSort.ts                                (the table's order, and the way back to it)
-#   platform/app/src/components/me/AgentLabel.tsx                                       (an assistant named like its product)
+#   modules/github/server/src/services/github-pull-request-mapping.service.ts (branch-to-PR mapping + negative cache)
+#   modules/github/server/src/adapters/github-pull-request-event.adapter.ts   (the pull_request webhook payload, validated)
+#   modules/github/contract/src/github.ts                                           (the webhook delivery target)
+#   modules/github/server/src/services/github-pull-request-status.service.ts  (live status, Redis-cached, never the queue)
+#   modules/coding-agent/server/src/subscribers/pull-request-mapping.subscriber.ts (fold trigger)
+#   modules/coding-agent/server/src/services/coding-agent-pull-request-assignment.service.ts (session-to-PR tenure rule)
+#   modules/coding-agent/server/src/services/coding-agent-pull-request-usage.service.ts      (org-first usage rollup)
+#   modules/coding-agent/server/src/repositories/coding-agent-session-event/clickhouse.repository.ts (per-model totals)
+#   [gone] src/server/organizations/resolveCallerProjectScope.ts                 (the caller's permission cut and how each project is named, shared by both read surfaces)
+#   [gone] src/app/api/coding-agent/[[...route]]/                                (the usage REST endpoint)
+#   [gone] src/pages/me/pull-requests.tsx                                        (the personal Pull Requests page)
+#   modules/coding-agent/web/src/pull-requests-table.tsx                               (the table)
+#   modules/coding-agent/web/src/pull-request-detail-drawer.tsx                          (one pull request in full)
+#   modules/coding-agent/web/src/pull-request-status-badge.tsx                           (a status drawn the way GitHub draws it)
+#   [gone] src/components/me/usePullRequestSort.ts                                (the table's order, and the way back to it)
+#   modules/coding-agent/web/src/agent-label.tsx                                       (an assistant named like its product)
 #
 # Related specs:
-#   specs/coding-agent/session-git-context.feature   , where the repo+branch identity comes from
+#   modules/coding-agent/specs/session-git-context.feature, where the repo+branch identity comes from
 #   specs/integrations/github-connection.feature     , the org-level GitHub connection this rides
 #
 # Motivation: the ledger question "what did this pull request cost in assistant
@@ -1000,6 +998,27 @@ Rule: The organization-wide usage read is RBAC-scoped and numbers only
     When the pull request usage is read for that workspace
     Then the refusal carries a named code saying the key is for a different workspace
     And nothing in the refusal says whose workspace it is
+
+  # Whose data this is stays the personal-workspace question above. What the
+  # read REACHES is the credential's own cut: a key bound to fewer projects
+  # than its holder may read must not widen back out to the holder's access.
+  # Only a legacy project key, which carries no bindings of its own, is
+  # answered as the person.
+  @integration
+  Scenario: A narrowed personal-workspace key reads with its own scope, not its holder's
+    Given a personal-workspace key bound to fewer projects than its holder may view
+    When the pull request usage is read with that key
+    Then only the key's own projects are counted
+    And the projects its holder may otherwise view are absent
+
+  # A key created for no person is a service credential, not this workspace's
+  # own key, so it cannot be answered as the person who owns the workspace.
+  @integration
+  Scenario: An ownerless key on the personal rollup is refused rather than answered as the owner
+    Given a key for a personal workspace that belongs to no person
+    When the pull request usage is read with that key
+    Then the refusal carries a named code saying a service key cannot answer for a person
+    And no rollup is read
 
 # The question is organization-wide, so the v1 door authenticates at the
 # organization: an sk-lw organization key alone, with no project named

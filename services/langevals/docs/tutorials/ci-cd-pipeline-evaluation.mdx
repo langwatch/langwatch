@@ -1,12 +1,15 @@
 ---
 title: "Evaluate on CI/CD Pipeline"
 ---
+
 A good AI applicaiton worth a good software. And a good software is built with a reliable CI/CD pipeline. Here we will explain
 how to test your LLM outputs on the level of the deployment pipeline.
 
 ## Prepare the Test Suite
+
 The first step is to create the test suite. You can add as many tests as you want and import required parts of your application.
 In this example application we will create a simple test case with handcrafted examples. However, you can load a prepared dataset and test your application on it.
+
 ```python test_script.py
 import pandas as pd
 import pytest
@@ -47,10 +50,11 @@ def test_extracts_the_right_address(entry):
 ```
 
 ## Run with GitHub Actions
-Second step is to create a GitHub Actions Workflow - specifying the details of your test. You can do that by creating `.github/workflows/` 
-folder and adding a `.yaml` file there. Here is an example script that will automatically run on every new push to the repo: 
 
-```github Actions 
+Second step is to create a GitHub Actions Workflow - specifying the details of your test. You can do that by creating `.github/workflows/`
+folder and adding a `.yaml` file there. Here is an example script that will automatically run on every new push to the repo:
+
+```github Actions
 name: Run LangEvals
 
 on:
@@ -75,7 +79,7 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install pandas pytest "langevals[all]"
-        
+
     - name: Run tests
       env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}

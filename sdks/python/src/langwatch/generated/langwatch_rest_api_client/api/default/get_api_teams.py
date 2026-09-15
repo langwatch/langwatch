@@ -23,7 +23,7 @@ def _get_kwargs(
 
     _kwargs: dict[str, Any] = {
         "method": "get",
-        "url": "/api/teams",
+        "url": "/api/v1/teams",
         "params": params,
     }
 

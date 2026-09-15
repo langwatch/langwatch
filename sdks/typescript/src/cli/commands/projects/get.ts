@@ -9,9 +9,7 @@ import type { CommandResult } from "../../utils/output";
  * Returns the project rather than printing it: the output port renders it in
  * whatever format the caller asked for (utils/output.ts).
  */
-export const getProjectCommand = async (
-  id: string,
-): Promise<CommandResult | void> => {
+export const getProjectCommand = async (id: string): Promise<CommandResult | void> => {
   await resolveCredentials();
 
   const service = new ProjectsApiService();
@@ -33,8 +31,12 @@ export const getProjectCommand = async (
         console.log(`${chalk.bold("Framework:")}       ${project.framework}`);
         console.log(`${chalk.bold("Team ID:")}         ${project.teamId}`);
         console.log(`${chalk.bold("PII Redaction:")}   ${project.piiRedactionLevel}`);
-        console.log(`${chalk.bold("Created:")}         ${new Date(project.createdAt).toLocaleString()}`);
-        console.log(`${chalk.bold("Updated:")}         ${new Date(project.updatedAt).toLocaleString()}`);
+        console.log(
+          `${chalk.bold("Created:")}         ${new Date(project.createdAt).toLocaleString()}`,
+        );
+        console.log(
+          `${chalk.bold("Updated:")}         ${new Date(project.updatedAt).toLocaleString()}`,
+        );
         console.log();
       },
     };

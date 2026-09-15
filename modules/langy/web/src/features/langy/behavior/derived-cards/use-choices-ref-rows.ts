@@ -1,0 +1,140 @@
+/**
+ * Hydrate a choices card's entity refs AS THE VIEWER (ADR-060 §6), through the same hydrator
+ * registry every capability card uses (`CAPABILITY_HYDRATORS`) — so an option row always shows
+ * what the viewer is allowed to see today, never what the model asserted.
+ */
+
+import type { LangyDerivedChoicesCard } from "@langwatch/langy-contract";
+import { useEffect, useMemo, useState } from "react";
+import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
+import { api } from "../../../../behavior/langy-api.ts";
+import { CAPABILITY_HYDRATORS } from "../capabilities/capability-hydrators.ts";
+import type {
+  CapabilityHydrator,
+  CapabilityTrpcUtils,
+} from "../capabilities/capability-hydrators.ts";
+
+export type ChoicesRefRow =
+  | { state: "pending" }
+  | { state: "plain" }
+  | { state: "dead" }
+  | { state: "live"; primary?: string; secondary?: string };
+
+/**
+ * Hydrates one ref type's entries, writing each option's verdict into `next` —
+ * `live`/`dead` from the hydrator's answer, or `plain` for every entry of this type on
+ * a hydrator failure (kept selectable rather than disabled on a transient error).
+ */
+async function hydrateRefType(
+  entries: { optionId: string; refId: string }[],
+  hydrator: NonNullable<CapabilityHydrator["byIds"]>,
+  utils: CapabilityTrpcUtils,
+  projectId: string,
+  next: Map<string, ChoicesRefRow>,
+): Promise<void> {
+  try {
+    const hydration = await hydrator({
+      utils,
+      projectId,
+      ids: entries.map((entry) => entry.refId),
+    });
+    const rowById = new Map(hydration.rows.map((row) => [row.id, row]));
+    for (const entry of entries) {
+      const row = rowById.get(entry.refId);
+      next.set(
+        entry.optionId,
+        row
+          ? {
+              state: "live",
+              ...(row.primary !== undefined ? { primary: row.primary } : {}),
+              ...(row.secondary !== undefined ? { secondary: row.secondary } : {}),
+            }
+          : { state: "dead" },
+      );
+    }
+  } catch {
+    // Couldn't resolve right now: keep the options selectable as
+    // given rather than disabling on a transient failure.
+    for (const entry of entries) {
+      next.set(entry.optionId, { state: "plain" });
+    }
+  }
+}
+
+/** Groups hydratable refs by type so each type resolves in one byIds call. */
+function groupHydratableRefs(
+  options: LangyDerivedChoicesCard["options"],
+): Map<string, { optionId: string; refId: string }[]> {
+  const byType = new Map<string, { optionId: string; refId: string }[]>();
+  for (const option of options) {
+    if (!option.ref) continue;
+    if (!CAPABILITY_HYDRATORS[option.ref.type]?.byIds) continue;
+    const list = byType.get(option.ref.type) ?? [];
+    list.push({ optionId: option.id, refId: option.ref.id });
+    byType.set(option.ref.type, list);
+  }
+  return byType;
+}
+
+async function hydrateAllRefTypes(
+  hydratable: Map<string, { optionId: string; refId: string }[]>,
+  utils: CapabilityTrpcUtils,
+  projectId: string,
+): Promise<Map<string, ChoicesRefRow>> {
+  const next = new Map<string, ChoicesRefRow>();
+  await Promise.all(
+    [...hydratable.entries()].map(async ([type, entries]) => {
+      const hydrator = CAPABILITY_HYDRATORS[type]?.byIds;
+      if (!hydrator) return;
+      await hydrateRefType(entries, hydrator, utils, projectId, next);
+    }),
+  );
+  return next;
+}
+
+/** One row per option: resolved state where hydrated, `plain`/`pending` otherwise. */
+function buildRefRows(
+  options: LangyDerivedChoicesCard["options"],
+  resolved: Map<string, ChoicesRefRow>,
+  projectId: string | null,
+): Map<string, ChoicesRefRow> {
+  const rows = new Map<string, ChoicesRefRow>();
+  for (const option of options) {
+    if (!option.ref || !CAPABILITY_HYDRATORS[option.ref.type]?.byIds) {
+      rows.set(option.id, { state: "plain" });
+      continue;
+    }
+    rows.set(
+      option.id,
+      resolved.get(option.id) ?? (projectId ? { state: "pending" } : { state: "plain" }),
+    );
+  }
+  return rows;
+}
+
+export function useChoicesRefRows(
+  options: LangyDerivedChoicesCard["options"],
+): ReadonlyMap<string, ChoicesRefRow> {
+  const { project } = useOrganizationTeamProject();
+  const utils = api.useUtils();
+  const projectId = project?.id ?? null;
+
+  const hydratable = useMemo(() => groupHydratableRefs(options), [options]);
+
+  const [resolved, setResolved] = useState<Map<string, ChoicesRefRow>>(() => new Map());
+
+  useEffect(() => {
+    if (!projectId || hydratable.size === 0) return;
+    let cancelled = false;
+
+    void hydrateAllRefTypes(hydratable, utils, projectId).then((next) => {
+      if (!cancelled) setResolved(next);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [projectId, hydratable, utils]);
+
+  return useMemo(() => buildRefRows(options, resolved, projectId), [options, resolved, projectId]);
+}

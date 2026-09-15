@@ -34,6 +34,20 @@ Feature: Online Evaluation Drawer
     Given I am logged in to a project
     And I have at least one evaluator created
 
+  Rule: A link that names this drawer opens it
+
+    The monitors REST API answers every monitor with a `platformUrl` that names
+    this drawer and the monitor's id, and that URL leaves the product: it goes
+    into an alert email and into whatever a caller stored from an API response.
+    A name that does not resolve turns all of them into links that land on the
+    Online Evaluations list with nothing open — no error, nothing to report.
+
+    @integration
+    Scenario: A monitor's platform link opens the online evaluation it names
+      Given a monitor link that names the online evaluation drawer and a monitor's id
+      When the recipient follows that link into the application
+      Then the online evaluation drawer opens on that monitor
+
   @unimplemented
   Scenario: Open drawer from menu
     Given I am on the evaluations page

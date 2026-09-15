@@ -39,10 +39,7 @@ export async function listProjects(params?: {
 }
 
 export async function getProject(id: string): Promise<ProjectSummary> {
-  return makeRequest(
-    "GET",
-    `/api/projects/${encodeURIComponent(id)}`,
-  ) as Promise<ProjectSummary>;
+  return makeRequest("GET", `/api/projects/${encodeURIComponent(id)}`) as Promise<ProjectSummary>;
 }
 
 export async function createProject(data: {
@@ -75,8 +72,9 @@ export async function archiveProject(id: string): Promise<{
   name: string;
   archivedAt: string;
 }> {
-  return makeRequest(
-    "DELETE",
-    `/api/projects/${encodeURIComponent(id)}`,
-  ) as Promise<{ id: string; name: string; archivedAt: string }>;
+  return makeRequest("DELETE", `/api/projects/${encodeURIComponent(id)}`) as Promise<{
+    id: string;
+    name: string;
+    archivedAt: string;
+  }>;
 }

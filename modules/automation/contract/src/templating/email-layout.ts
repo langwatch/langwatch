@@ -1,0 +1,53 @@
+const LOGO_URL = "https://app.langwatch.ai/images/logo-icon.png";
+
+/** Escape a value for safe interpolation into an HTML attribute. */
+function escapeHtmlAttribute(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/"/g, "&quot;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+}
+
+export interface EmailFrameFooter {
+  /** Project home — anchor on the "LangWatch" word. */
+  projectUrl: string;
+  /** Deep link back into the automation that produced this email. */
+  editUrl: string;
+}
+
+/**
+ * Wraps email body in LangWatch frame (header/footer/attribution); chrome is
+ * non-template (ADR-036); prefixHtml for backend-injected content like test-fire banner.
+ */
+export function wrapEmailHtml({
+  bodyHtml,
+  prefixHtml = "",
+  footer,
+}: {
+  bodyHtml: string;
+  prefixHtml?: string;
+  footer: EmailFrameFooter;
+}): string {
+  return `<!DOCTYPE html>
+<html lang="en" dir="ltr">
+  <body style="margin:0;padding:0;background-color:#ffffff;">
+    <div style="border:1px solid #F2F4F8;border-radius:10px;padding:24px;padding-bottom:12px;max-width:600px;margin:0 auto;font-family:Helvetica,Arial,sans-serif;color:#1A202C;">
+      <img src="${LOGO_URL}" alt="LangWatch Logo" width="36" />
+      ${prefixHtml}
+      ${bodyHtml}
+      <hr style="border:none;border-top:1px solid #E2E8F0;margin:28px 0 12px 0;"/>
+      <div style="font-size:12px;color:#718096;text-align:center;line-height:1.6;">
+        Sent with <span style="color:#E53E3E;">♥</span> from
+        <a href="${escapeHtmlAttribute(
+          footer.projectUrl,
+        )}" style="color:#DD6B20;text-decoration:none;">LangWatch</a>
+        &nbsp;·&nbsp;
+        <a href="${escapeHtmlAttribute(
+          footer.editUrl,
+        )}" style="color:#DD6B20;text-decoration:none;">Edit automation</a>
+      </div>
+    </div>
+  </body>
+</html>`;
+}

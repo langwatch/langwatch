@@ -1,17 +1,7 @@
-import {
-  describe,
-  it,
-  expect,
-  beforeAll,
-  beforeEach,
-  afterAll,
-  afterEach,
-} from "vitest";
+import { describe, it, expect, beforeAll, beforeEach, afterAll, afterEach } from "vitest";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
-import {
-  ApiKeysApiService,
-} from "../api-keys-api.service";
+import { ApiKeysApiService } from "../api-keys-api.service";
 import { LangWatchHandledError } from "@/internal/api/errors";
 
 const TEST_ENDPOINT = "http://localhost:5560";
@@ -62,11 +52,15 @@ describe("ApiKeysApiService", () => {
     describe("when the API returns keys", () => {
       beforeEach(() => {
         server.use(
-          http.get(`${TEST_ENDPOINT}/api/api-keys`, () => {
+          http.get(`${TEST_ENDPOINT}/api/v1/api-keys`, () => {
             return HttpResponse.json({
               data: [
                 apiKeyFixture({ id: "k1", name: "Key 1" }),
-                apiKeyFixture({ id: "k2", name: "Key 2", revokedAt: "2025-03-01T00:00:00Z" }),
+                apiKeyFixture({
+                  id: "k2",
+                  name: "Key 2",
+                  revokedAt: "2025-03-01T00:00:00Z",
+                }),
               ],
             });
           }),
@@ -86,7 +80,7 @@ describe("ApiKeysApiService", () => {
     describe("when no keys exist", () => {
       beforeEach(() => {
         server.use(
-          http.get(`${TEST_ENDPOINT}/api/api-keys`, () => {
+          http.get(`${TEST_ENDPOINT}/api/v1/api-keys`, () => {
             return HttpResponse.json({ data: [] });
           }),
         );
@@ -101,7 +95,7 @@ describe("ApiKeysApiService", () => {
     describe("when the API returns an error", () => {
       beforeEach(() => {
         server.use(
-          http.get(`${TEST_ENDPOINT}/api/api-keys`, () => {
+          http.get(`${TEST_ENDPOINT}/api/v1/api-keys`, () => {
             return HttpResponse.json(
               { error: "Unauthorized", message: "Invalid API key" },
               { status: 401 },
@@ -120,7 +114,7 @@ describe("ApiKeysApiService", () => {
     describe("when creating a service key", () => {
       beforeEach(() => {
         server.use(
-          http.post(`${TEST_ENDPOINT}/api/api-keys`, async ({ request }) => {
+          http.post(`${TEST_ENDPOINT}/api/v1/api-keys`, async ({ request }) => {
             const body = (await request.json()) as Record<string, unknown>;
             return HttpResponse.json(
               {
@@ -153,12 +147,16 @@ describe("ApiKeysApiService", () => {
       it("sends projectIds in the request body", async () => {
         let capturedBody: Record<string, unknown> = {};
         server.use(
-          http.post(`${TEST_ENDPOINT}/api/api-keys`, async ({ request }) => {
+          http.post(`${TEST_ENDPOINT}/api/v1/api-keys`, async ({ request }) => {
             capturedBody = (await request.json()) as Record<string, unknown>;
             return HttpResponse.json(
               {
                 token: "sk-lw-scoped_key",
-                apiKey: { id: "key_s", name: "Scoped", createdAt: "2025-06-01T00:00:00Z" },
+                apiKey: {
+                  id: "key_s",
+                  name: "Scoped",
+                  createdAt: "2025-06-01T00:00:00Z",
+                },
               },
               { status: 201 },
             );
@@ -178,7 +176,7 @@ describe("ApiKeysApiService", () => {
     describe("when permissions are insufficient", () => {
       beforeEach(() => {
         server.use(
-          http.post(`${TEST_ENDPOINT}/api/api-keys`, () => {
+          http.post(`${TEST_ENDPOINT}/api/v1/api-keys`, () => {
             return HttpResponse.json(
               { error: "Forbidden", message: "Insufficient permissions" },
               { status: 403 },
@@ -188,9 +186,9 @@ describe("ApiKeysApiService", () => {
       });
 
       it("throws LangWatchHandledError", async () => {
-        await expect(
-          service.create({ name: "Nope", keyType: "personal" }),
-        ).rejects.toThrow(LangWatchHandledError);
+        await expect(service.create({ name: "Nope", keyType: "personal" })).rejects.toThrow(
+          LangWatchHandledError,
+        );
       });
     });
   });
@@ -199,7 +197,7 @@ describe("ApiKeysApiService", () => {
     describe("when the key exists", () => {
       beforeEach(() => {
         server.use(
-          http.delete(`${TEST_ENDPOINT}/api/api-keys/key_abc123`, () => {
+          http.delete(`${TEST_ENDPOINT}/api/v1/api-keys/key_abc123`, () => {
             return HttpResponse.json({ success: true });
           }),
         );
@@ -214,7 +212,7 @@ describe("ApiKeysApiService", () => {
     describe("when the key does not exist", () => {
       beforeEach(() => {
         server.use(
-          http.delete(`${TEST_ENDPOINT}/api/api-keys/nonexistent`, () => {
+          http.delete(`${TEST_ENDPOINT}/api/v1/api-keys/nonexistent`, () => {
             return HttpResponse.json(
               { error: "Not Found", message: "API key not found" },
               { status: 404 },
@@ -231,7 +229,7 @@ describe("ApiKeysApiService", () => {
     describe("when the key is already revoked", () => {
       beforeEach(() => {
         server.use(
-          http.delete(`${TEST_ENDPOINT}/api/api-keys/key_revoked`, () => {
+          http.delete(`${TEST_ENDPOINT}/api/v1/api-keys/key_revoked`, () => {
             return HttpResponse.json(
               { error: "Conflict", message: "API key already revoked" },
               { status: 409 },
@@ -250,7 +248,7 @@ describe("ApiKeysApiService", () => {
     it("sends Authorization Bearer header", async () => {
       let capturedAuth = "";
       server.use(
-        http.get(`${TEST_ENDPOINT}/api/api-keys`, ({ request }) => {
+        http.get(`${TEST_ENDPOINT}/api/v1/api-keys`, ({ request }) => {
           capturedAuth = request.headers.get("authorization") ?? "";
           return HttpResponse.json({ data: [] });
         }),

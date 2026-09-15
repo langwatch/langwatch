@@ -1,0 +1,204 @@
+import { z } from "zod";
+
+import { API_KEY_REVOCATION_CAUSES } from "./api-key.revocation-cause.ts";
+
+export const apiKeyRoleSchema = z.enum(["ADMIN", "MEMBER", "VIEWER", "CUSTOM"]);
+export type ApiKeyRole = z.infer<typeof apiKeyRoleSchema>;
+export const apiKeyScopeTypeSchema = z.enum(["ORGANIZATION", "TEAM", "PROJECT"]);
+export type ApiKeyScopeType = z.infer<typeof apiKeyScopeTypeSchema>;
+export const apiKeyPermissionSchema = z.string().regex(/^[a-z][a-zA-Z0-9_-]*:[a-z][a-zA-Z0-9_-]*$/);
+export const apiKeyScopeSchema = z
+  .object({
+    scopeType: apiKeyScopeTypeSchema,
+    scopeId: z.string().min(1),
+    role: apiKeyRoleSchema,
+    customRoleId: z.string().min(1).nullable().optional(),
+  })
+  .strict();
+export type ApiKeyScope = z.infer<typeof apiKeyScopeSchema>;
+export const apiKeyBindingSchema = z
+  .object({ ...apiKeyScopeSchema.shape, id: z.string().min(1) })
+  .strict();
+export type ApiKeyBinding = Omit<z.infer<typeof apiKeyBindingSchema>, "customRoleId"> & {
+  customRoleId: string | null;
+};
+export const apiKeyPermissionModeSchema = z.enum(["all", "readonly", "restricted"]);
+export type ApiKeyPermissionMode = z.infer<typeof apiKeyPermissionModeSchema>;
+
+export const apiKeySchema = z
+  .object({
+    id: z.string().min(1),
+    name: z.string(),
+    description: z.string().nullable(),
+    organizationId: z.string().min(1),
+    userId: z.string().nullable(),
+    createdByUserId: z.string().nullable(),
+    createdByDeviceLabel: z.string().nullable(),
+    /**
+     * The CLI login key of the device session that minted this ingestion
+     * key. Set by the CLI's personal mint, null for every other key.
+     * Revoking the parent (logout, the devices tab, a re-login from the
+     * same device, session expiry) revokes the children with it.
+     */
+    parentApiKeyId: z.string().nullable().optional(),
+    lookupId: z.string().min(1),
+    permissionMode: z.string(),
+    expiresAt: z.date().nullable(),
+    revokedAt: z.date().nullable(),
+    /**
+     * Why the key was revoked; nothing while it is live or for a row revoked
+     * before the cause was recorded. A plain string, because the stored value
+     * is whatever the build that wrote it knew: readers narrow it with
+     * {@link isApiKeyRevocationCause} rather than trusting it.
+     */
+    revocationCause: z.string().nullable().optional(),
+    lastUsedAt: z.date().nullable(),
+    ingestSourceType: z.string().nullable(),
+    ingestionTemplateId: z.string().nullable(),
+    createdAt: z.date(),
+    updatedAt: z.date(),
+    roleBindings: z.array(apiKeyBindingSchema),
+  })
+  .strict();
+export type ApiKey = z.infer<typeof apiKeySchema>;
+
+const apiKeyMutationShape = {
+  name: z.string().min(1),
+  organizationId: z.string().min(1),
+  userId: z.string().min(1).nullable().optional(),
+  createdByUserId: z.string().min(1).nullable().optional(),
+  description: z.string().nullable().optional(),
+  expiresAt: z.date().nullable().optional(),
+  permissionMode: z.string().default("all"),
+  permissions: z.array(apiKeyPermissionSchema).optional(),
+  bindings: z.array(apiKeyScopeSchema),
+  ingestSourceType: z.string().min(1).nullable().optional(),
+  ingestionTemplateId: z.string().min(1).nullable().optional(),
+  createdByDeviceLabel: z.string().nullable().optional(),
+  /**
+   * The CLI login key of the device session minting this ingestion key, so
+   * revoking that session revokes this key with it. Null (the default) for
+   * every key minted outside a CLI session.
+   */
+  parentApiKeyId: z.string().min(1).nullable().optional(),
+  isSystemManaged: z.boolean().optional(),
+};
+export const createApiKeyInputSchema = z.object(apiKeyMutationShape).strict();
+export type CreateApiKeyInput = z.input<typeof createApiKeyInputSchema>;
+export const updateApiKeyInputSchema = z
+  .object({
+    id: z.string().min(1),
+    organizationId: z.string().min(1),
+    callerUserId: z.string().min(1).nullable(),
+    callerIsAdmin: z.boolean(),
+    name: z.string().min(1).optional(),
+    description: z.string().nullable().optional(),
+    permissionMode: z.string().optional(),
+    permissions: z.array(apiKeyPermissionSchema).optional(),
+    bindings: z.array(apiKeyScopeSchema).optional(),
+  })
+  .strict();
+export type UpdateApiKeyInput = z.infer<typeof updateApiKeyInputSchema>;
+export const revokeApiKeyInputSchema = z
+  .object({
+    id: z.string().min(1),
+    organizationId: z.string().min(1),
+    callerUserId: z.string().min(1).nullable(),
+    callerIsAdmin: z.boolean(),
+    awaitProjection: z.boolean().optional(),
+    /**
+     * Why the key dies, recorded on the row. Defaults to a person's decision,
+     * which every user-facing path is; the platform's own revocations name
+     * themselves so the CLI can tell a key it may re-mint from one it must
+     * leave dead.
+     */
+    cause: z.enum(API_KEY_REVOCATION_CAUSES).optional(),
+    /**
+     * Whether to retire the keys minted under this one. On by default, so
+     * every entry point cascades; the cascade itself turns it off for the
+     * children it revokes, since a child has no children of its own and
+     * nothing should recurse further.
+     */
+    cascadeToChildren: z.boolean().optional(),
+  })
+  .strict();
+export type RevokeApiKeyInput = z.infer<typeof revokeApiKeyInputSchema>;
+export const apiKeyVerificationSchema = z
+  .object({ ...apiKeySchema.shape, tokenType: z.literal("apiKey") })
+  .strict();
+export type ApiKeyVerification = z.infer<typeof apiKeyVerificationSchema>;
+export const apiKeyDetailSchema = z
+  .object({ ...apiKeySchema.shape, permissions: z.array(apiKeyPermissionSchema) })
+  .strict();
+export type ApiKeyDetail = z.infer<typeof apiKeyDetailSchema>;
+export type ApiKeyName = { name: string; revoked: boolean };
+export type ApiKeyUser = { id: string; name: string | null; email: string | null };
+export type ApiKeyProject = { id: string; name: string; teamId: string };
+export type ApiKeyTeam = { id: string; name: string };
+export type ApiKeyRoleSummary = {
+  id: string;
+  name: string;
+  permissions: string[];
+};
+export type ApiKeyBindingNames = {
+  orgName: Map<string, string>;
+  teamName: Map<string, string>;
+  activeProjectIds: Set<string>;
+  projectName: Map<string, string>;
+  customRoleName: Map<string, string>;
+  customRoles: ApiKeyRoleSummary[];
+};
+export type ApiKeyListEnrichment = {
+  customRoles: ApiKeyRoleSummary[];
+  users: ApiKeyUser[];
+};
+export type ApiKeyCreatorScope =
+  | { type: "org"; id: string }
+  | { type: "team"; id: string }
+  | { type: "project"; id: string; teamId: string };
+export const cliKeyBindingSelectionSchema = z
+  .object({ scopeType: apiKeyScopeTypeSchema, scopeId: z.string().min(1) })
+  .strict();
+export type CliKeyBindingSelection = z.infer<typeof cliKeyBindingSelectionSchema>;
+export const cliKeySelectionSchema = z
+  .object({
+    bindings: z.array(cliKeyBindingSelectionSchema),
+    permissions: z.array(apiKeyPermissionSchema),
+  })
+  .strict();
+export type CliKeySelection = z.infer<typeof cliKeySelectionSchema>;
+export const cliKeyScopeSummarySchema = z
+  .object({
+    kind: z.enum(["organization", "projects"]),
+    projectIds: z.array(z.string().min(1)),
+    /**
+     * The permissions the key was actually minted with, so `whoami` can print
+     * the grain the exchange handed out rather than the caller having to guess
+     * it from the scope kind.
+     */
+    permissions: z.array(z.string().min(1)),
+  })
+  .strict();
+export type CliKeyScopeSummary = z.infer<typeof cliKeyScopeSummarySchema>;
+
+/** Input shapes of the ApiKeyApi operations. */
+export type ApiKeySelectionInput = {
+  userId: string;
+  organizationId: string;
+  bindings: Array<ApiKeyScope & { role: "CUSTOM" }>;
+  permissions: string[];
+};
+export type ApiKeyListInput = { userId: string; organizationId: string };
+export type ApiKeyListAllInput = { organizationId: string };
+export type ApiKeyVerifyInput = { token: string };
+export type ApiKeyOrgInput = { organizationId: string };
+export type ApiKeyIdInput = { id: string };
+export type ApiKeyOrgIdInput = { id: string; organizationId: string };
+export type ApiKeyMembershipInput = { userId: string; organizationId: string };
+export type ApiKeyAdminKeyInput = { apiKeyId: string; organizationId: string };
+export type ApiKeyCallerReadInput = {
+  id: string;
+  organizationId: string;
+  callerUserId: string | null;
+  callerCanReadAnyKey: boolean;
+};

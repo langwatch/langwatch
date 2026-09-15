@@ -6,13 +6,7 @@ import {
   type RoleBindingFilterFlags,
 } from "../../utils/managementFlags";
 import type { CommandResult } from "../../utils/output";
-import {
-  asDate,
-  counted,
-  printEmpty,
-  runManagement,
-  withParsedFlags,
-} from "../management/_shared";
+import { asDate, counted, printEmpty, runManagement, withParsedFlags } from "../management/_shared";
 
 /**
  * List role bindings, optionally narrowed by principal and scope.

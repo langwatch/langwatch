@@ -44,7 +44,7 @@ func (o *Orchestrator) RunIdPSolo(ctx context.Context, tenants int) error {
 		fmt.Sprintf("SERVER_ADDR=:%d", port),
 		"IDPSIM_BASE_URL=" + baseURL,
 		fmt.Sprintf("IDPSIM_DNS_ADDR=127.0.0.1:%d", dnsPort),
-		"LOG_FORMAT=pretty",
+		"LOG_FORMAT=json",
 	}
 	if tenants > 0 {
 		env = append(env, fmt.Sprintf("IDPSIM_TENANTS=%d", tenants))

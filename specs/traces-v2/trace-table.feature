@@ -1,8 +1,8 @@
 # Trace Table — Gherkin Spec
-# Implementation: platform/app/src/features/traces-v2/components/TraceTable/**
-#                 platform/app/src/features/traces-v2/components/TracesPage/TracesPage.tsx
-#                 platform/app/src/features/traces-v2/stores/{filterStore,viewStore,selectionStore}.ts
-#                 platform/app/src/features/traces-v2/hooks/useTraceListQuery.ts
+# Implementation: [gone] src/features/traces-v2/components/TraceTable/**
+#                 modules/trace/web/src/ui/sections/explorer/traces-page/traces-page.tsx
+#                 modules/trace/web/src/{filter,view,selection}.store.ts
+#                 modules/trace/web/src/ui/sections/explorer/hooks/use-trace-list-query.ts
 # Audited 2026-05-01: scenarios that described unimplemented behaviour have
 # been deleted or tagged @planned. The big movers were
 #   - default columns / column ordering (now sourced from viewStore.builtInLenses)
@@ -26,6 +26,15 @@ Rule: Trace table page layout
   Background:
     Given the user is authenticated with "traces:view" permission
     And the project has traces
+
+  # The lens the table renders is derived from several store slices. Read
+  # through a selector that built a fresh object per call, the snapshot never
+  # settled and the explorer crashed into its error boundary on every load.
+  @unit
+  Scenario: The trace table's lens subscription settles
+    Given the view store has not changed between two renders
+    When the table reads its effective lens
+    Then it receives the same lens object both times
 
   Scenario: Three-panel layout renders on Observe page
     When the Observe page loads

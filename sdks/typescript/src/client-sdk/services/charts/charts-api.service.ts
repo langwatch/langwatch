@@ -1,8 +1,5 @@
 import type { paths } from "@/internal/generated/openapi/api-client";
-import {
-  createLangWatchApiClient,
-  type LangwatchApiClient,
-} from "@/internal/api/client";
+import { createLangWatchApiClient, type LangwatchApiClient } from "@/internal/api/client";
 import { scopedProjectId } from "@/internal/credentialContext";
 import { type InternalConfig } from "@/client-sdk/types";
 import {
@@ -10,6 +7,7 @@ import {
   formatApiErrorForOperation,
 } from "@/client-sdk/services/_shared/format-api-error";
 import { throwIfHandledError } from "@/client-sdk/services/_shared/throw-handled-error";
+import { unwrapApiResult } from "@/client-sdk/services/_shared/unwrap-api-result";
 import {
   QueryApiService,
   type QueryRunParams,
@@ -33,20 +31,14 @@ export interface SavedChartDefinitionInput {
 }
 
 /**
- * The LangWatchQL analytics schema, as `GET /api/v1/query/schema` on the query
- * door answers it — the discovery endpoint this used to derive from
- * (`GET /api/v1/projects/{projectId}/analytics/schema`) was removed in favor
- * of that door (issue #7565). Re-exported under this family's own name so
- * existing imports keep working.
+ * The LangWatchQL analytics schema, as `GET /api/v1/query/schema` on the query door
+ * answers it — the discovery endpoint this used to derive from (`GET
+ * /api/v1/projects/{projectId}/analytics/schema`) was removed in favor of that door (issue
  */
 export type AnalyticsSchema = QuerySchemaResult;
 
 /**
- * The result of running a chart's statement through the LangWatchQL query
- * door. Re-exported from `QueryApiService`, which is what this now delegates
- * to — the dedicated REST endpoint this used to derive from
- * (`POST /api/v1/projects/{projectId}/analytics/query/clickhouse`) was
- * removed in favor of the shared query door (issue #7565).
+ * The result of running a chart's statement through the LangWatchQL query door.
  */
 export type ChartRunResult = QueryRunResult;
 
@@ -70,26 +62,13 @@ export class ChartsApiError extends Error {
 /**
  * Typed client for the saved workbench chart family
  * (`/api/v1/projects/{projectId}/analytics/charts`).
- *
- * The chart routes carry the project id in the path, unlike the older
- * project-implicit families, so the service resolves one once — the CLI's
- * request-scoped project first, then `LANGWATCH_PROJECT_ID` — and refuses
- * loudly when none is known rather than guessing.
  */
 export class ChartsApiService {
   private readonly apiClient: LangwatchApiClient;
   private readonly configuredProjectId: string | undefined;
   /**
-   * `schema()` and `runQuery()` delegate to the shared query door rather
-   * than a dedicated chart-family route (issue #7565). That door is
-   * project-implicit (no path/body slot — see `QueryApiService`'s own doc
-   * comment), so it only learns this family's project from the client it is
-   * given: when the caller supplied their own `langwatchApiClient`, this
-   * reuses it verbatim (that client's auth is the caller's to own);
-   * otherwise a client is built fresh, scoped to the same
-   * `configuredProjectId` CRUD resolves through `projectId()`, so a
-   * `ChartsApiService` configured for one project cannot leak a chart's
-   * query to a different project via ambient scope (issue #7565 follow-up).
+   * `schema()` and `runQuery()` delegate to the shared query door rather than a dedicated
+   * chart-family route (issue #7565).
    */
   private readonly queryApi: QueryApiService;
 
@@ -103,19 +82,11 @@ export class ChartsApiService {
     this.queryApi = new QueryApiService({
       langwatchApiClient:
         config?.langwatchApiClient ??
-        createLangWatchApiClient(
-          undefined,
-          undefined,
-          this.resolvedProjectId(),
-        ),
+        createLangWatchApiClient(undefined, undefined, this.resolvedProjectId()),
     });
   }
 
-  private handleApiError(
-    operation: string,
-    error: unknown,
-    response?: Response,
-  ): never {
+  private handleApiError(operation: string, error: unknown, response?: Response): never {
     const status = response?.status ?? extractStatusFromResponse(error);
     const message = formatApiErrorForOperation({
       operation: operation,
@@ -130,19 +101,12 @@ export class ChartsApiService {
   }
 
   /**
-   * The same `configuredProjectId ?? scopedProjectId() ?? env` chain
-   * `projectId()` throws on, without the throw — for the one caller that
-   * must tolerate "no project" rather than refuse on it: the query-door
-   * client build in the constructor above, which has to keep working for
-   * legacy project-scoped keys that carry no project in any of those three
-   * places (see `QueryApiService`'s own doc comment).
+   * The same `configuredProjectId ?? scopedProjectId() ?? env` chain `projectId()` throws
+   * on, without the throw — for the one caller that must tolerate "no project" rather than
+   * refuse on it: the query-door client build in the constructor above, which has to keep
    */
   private resolvedProjectId(): string | undefined {
-    return (
-      this.configuredProjectId ??
-      scopedProjectId() ??
-      process.env.LANGWATCH_PROJECT_ID
-    );
+    return this.configuredProjectId ?? scopedProjectId() ?? process.env.LANGWATCH_PROJECT_ID;
   }
 
   private projectId(operation: string): string {
@@ -162,8 +126,13 @@ export class ChartsApiService {
       "/api/v1/projects/{projectId}/analytics/charts",
       { params: { path: { projectId } } },
     );
-    if (error) this.handleApiError("list charts", error, response);
-    return data as unknown as { data: SavedChart[] };
+    return unwrapApiResult({
+      operation: "list charts",
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    }) as unknown as { data: SavedChart[] };
   }
 
   async get(id: string): Promise<SavedChart> {
@@ -172,8 +141,13 @@ export class ChartsApiService {
       "/api/v1/projects/{projectId}/analytics/charts/{chartId}",
       { params: { path: { projectId, chartId: id } } },
     );
-    if (error) this.handleApiError(`get chart "${id}"`, error, response);
-    return data as unknown as SavedChart;
+    return unwrapApiResult({
+      operation: `get chart "${id}"`,
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    }) as unknown as SavedChart;
   }
 
   async create(params: {
@@ -185,8 +159,13 @@ export class ChartsApiService {
       "/api/v1/projects/{projectId}/analytics/charts",
       { params: { path: { projectId } }, body: params },
     );
-    if (error) this.handleApiError("create chart", error, response);
-    return data as unknown as SavedChart;
+    return unwrapApiResult({
+      operation: "create chart",
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    }) as unknown as SavedChart;
   }
 
   async update(
@@ -198,18 +177,30 @@ export class ChartsApiService {
       "/api/v1/projects/{projectId}/analytics/charts/{chartId}",
       { params: { path: { projectId, chartId: id } }, body: params },
     );
-    if (error) this.handleApiError(`update chart "${id}"`, error, response);
-    return data as unknown as SavedChart;
+    return unwrapApiResult({
+      operation: `update chart "${id}"`,
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    }) as unknown as SavedChart;
   }
 
   /** Deletes a chart. The route answers `204` with no body, like `unplace`. */
   async delete(id: string): Promise<void> {
     const projectId = this.projectId(`delete chart "${id}"`);
-    const { error, response } = await this.apiClient.DELETE(
+    const { data, error, response } = await this.apiClient.DELETE(
       "/api/v1/projects/{projectId}/analytics/charts/{chartId}",
       { params: { path: { projectId, chartId: id } } },
     );
-    if (error) this.handleApiError(`delete chart "${id}"`, error, response);
+    unwrapApiResult({
+      operation: `delete chart "${id}"`,
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+      allowEmpty: true,
+    });
   }
 
   async place(
@@ -227,44 +218,41 @@ export class ChartsApiService {
       "/api/v1/projects/{projectId}/analytics/charts/{chartId}/placement",
       { params: { path: { projectId, chartId: id } }, body: params },
     );
-    if (error) this.handleApiError(`place chart "${id}"`, error, response);
-    return data as unknown as SavedChart;
+    return unwrapApiResult({
+      operation: `place chart "${id}"`,
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    }) as unknown as SavedChart;
   }
 
   async unplace(id: string): Promise<void> {
     const projectId = this.projectId(`unplace chart "${id}"`);
-    const { error, response } = await this.apiClient.DELETE(
+    const { data, error, response } = await this.apiClient.DELETE(
       "/api/v1/projects/{projectId}/analytics/charts/{chartId}/placement",
       { params: { path: { projectId, chartId: id } } },
     );
-    if (error) this.handleApiError(`unplace chart "${id}"`, error, response);
+    unwrapApiResult({
+      operation: `unplace chart "${id}"`,
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+      allowEmpty: true,
+    });
   }
 
   /**
    * The datasets and columns this key may write chart SQL against.
-   *
-   * Delegates to the shared query door's `GET /api/v1/query/schema` — the
-   * dedicated discovery route this used to call
-   * (`GET /api/v1/projects/{projectId}/analytics/schema`) was removed in
-   * favor of it (issue #7565). That door is project-implicit (the project is
-   * resolved into the underlying api client's auth, not a path segment), so
-   * this family's own `projectId()` resolution does not apply here.
    */
   async schema(): Promise<AnalyticsSchema> {
     return this.queryApi.schema();
   }
 
   /**
-   * Runs a saved chart's statement through the LangWatchQL query door — the
-   * same governed execution path the workbench uses. The caller supplies the
-   * chart's own SQL and stored parameter values (from `get`), plus the
-   * surface's time window and granularity for statements that declare the
-   * reserved `period_*` parameters.
-   *
-   * Delegates to the shared query door's `POST /api/v1/query` — the
-   * dedicated execution route this used to call
-   * (`POST /api/v1/projects/{projectId}/analytics/query/clickhouse`) was
-   * removed in favor of it (issue #7565).
+   * Runs a saved chart's statement through the LangWatchQL query door — the same governed
+   * execution path the workbench uses.
    */
   async runQuery(params: {
     sql: string;

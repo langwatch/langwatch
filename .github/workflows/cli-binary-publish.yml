@@ -205,7 +205,7 @@ jobs:
         run: pnpm install --frozen-lockfile --filter "langwatch..."
 
       - name: Generate the SDK's derived sources
-        # src/internal/generated/* is gitignored and derived from platform/app/
+        # src/internal/generated/* is gitignored and derived from packages/
         # + services/langevals/ sources and skills/, so the Bun compile cannot
         # resolve it until the generators have run. Invoked explicitly rather
         # than left to an install hook: the app depends on the SDK with

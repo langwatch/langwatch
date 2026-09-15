@@ -22,7 +22,7 @@
  *    Refusing immediately is worse for one caller and much better for the rest.
  */
 
-import type { AbortSignalLike } from "./query";
+import type { AbortSignalLike } from "./query.ts";
 
 /** Raised when the wait queue is full. Shed load rather than grow it. */
 export class QueueFullError extends Error {
@@ -73,10 +73,7 @@ export class ConcurrencyLimiter {
     abort: (error: Error) => void;
   }[] = [];
 
-  constructor({
-    maxConcurrent,
-    maxQueued = DEFAULT_MAX_QUEUED,
-  }: ConcurrencyLimiterOptions) {
+  constructor({ maxConcurrent, maxQueued = DEFAULT_MAX_QUEUED }: ConcurrencyLimiterOptions) {
     if (!Number.isInteger(maxConcurrent) || maxConcurrent < 1) {
       throw new RangeError("maxConcurrent must be a positive integer");
     }

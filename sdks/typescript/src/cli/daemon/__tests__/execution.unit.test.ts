@@ -25,13 +25,9 @@ const collectingSink = (): {
   return {
     sink: (stream, data) => chunks.push({ stream, data }),
     stdout: () =>
-      Buffer.concat(
-        chunks.filter((c) => c.stream === "stdout").map((c) => c.data),
-      ).toString(),
+      Buffer.concat(chunks.filter((c) => c.stream === "stdout").map((c) => c.data)).toString(),
     stderr: () =>
-      Buffer.concat(
-        chunks.filter((c) => c.stream === "stderr").map((c) => c.data),
-      ).toString(),
+      Buffer.concat(chunks.filter((c) => c.stream === "stderr").map((c) => c.data)).toString(),
   };
 };
 
@@ -82,15 +78,7 @@ describe("ExecutionContext", () => {
 
 describe("process interceptors", () => {
   let uninstall: () => void;
-  /**
-   * Node's global `console` writes through `process.stdout.write`, which is
-   * exactly the seam the daemon patches. Vitest, however, swaps `globalThis
-   * .console` for its own reporter-bound Console, so calling `console.log` here
-   * would test vitest rather than the daemon. A Console constructed over
-   * process.stdout/stderr is what the CLI actually has at runtime, so that is
-   * what these tests drive. The end-to-end fidelity of the real global console
-   * is covered by daemon-cli.integration.test.ts, which runs the real binary.
-   */
+  /** Uses process.stdout/stderr to test the daemon console, not vitest's. */
   let cliConsole: Console;
 
   beforeEach(() => {
@@ -273,20 +261,14 @@ describe("process interceptors", () => {
 describe("given a write made outside any request", () => {
   describe("when the daemon logs for itself", () => {
     it("passes the write through to the real stream", () => {
-      const underlying = vi
-        .spyOn(process.stdout, "write")
-        .mockImplementation(() => true);
+      const underlying = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
       // Install AFTER spying, so the interceptor captures the spy as the real
       // stream and we can observe the pass-through.
       const uninstall = installProcessInterceptors();
 
       process.stdout.write("daemon's own log line\n");
 
-      expect(underlying).toHaveBeenCalledWith(
-        "daemon's own log line\n",
-        undefined,
-        undefined,
-      );
+      expect(underlying).toHaveBeenCalledWith("daemon's own log line\n", undefined, undefined);
 
       uninstall();
       underlying.mockRestore();
@@ -393,13 +375,17 @@ describe("ExecutionWindow", () => {
       // reused window would otherwise keep the previous caller's level.
       const savedLevel = chalk.level;
       try {
-        const first = await window.acquire({ request: { cwd: dirA, env: {}, colorLevel: 3 } });
+        const first = await window.acquire({
+          request: { cwd: dirA, env: {}, colorLevel: 3 },
+        });
         expect(chalk.level).toBe(3);
 
         chalk.level = 0; // what the just-finished --agent request left behind
         first();
 
-        const second = await window.acquire({ request: { cwd: dirA, env: {}, colorLevel: 3 } });
+        const second = await window.acquire({
+          request: { cwd: dirA, env: {}, colorLevel: 3 },
+        });
         expect(chalk.level).toBe(3);
         second();
       } finally {
@@ -457,7 +443,9 @@ describe("ExecutionWindow", () => {
 
       const pendingB = window.acquire({ request: { cwd: dirB, env: {}, colorLevel: 0 } });
       // Arrives after B, but matches the ACTIVE window. It must not jump B.
-      const pendingA2 = window.acquire({ request: { cwd: dirA, env: {}, colorLevel: 0 } });
+      const pendingA2 = window.acquire({
+        request: { cwd: dirA, env: {}, colorLevel: 0 },
+      });
 
       await Promise.resolve();
       expect(window.queuedCount).toBe(2);
@@ -497,7 +485,9 @@ describe("ExecutionWindow", () => {
 
       // The window still drains correctly for the next caller.
       releaseA();
-      const releaseB = await window.acquire({ request: { cwd: dirB, env: {}, colorLevel: 0 } });
+      const releaseB = await window.acquire({
+        request: { cwd: dirB, env: {}, colorLevel: 0 },
+      });
       expect(fs.realpathSync(process.cwd())).toBe(fs.realpathSync(dirB));
       releaseB();
     });

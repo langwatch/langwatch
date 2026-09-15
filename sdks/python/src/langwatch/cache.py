@@ -159,7 +159,7 @@ class CacheFacade:
             name: Entry name (UPPER_SNAKE_CASE).
             default: What to answer when there is no live entry.
         """
-        response = self._http().get(f"/api/agent-cache/{_quote(name)}")
+        response = self._http().get(f"/api/v1/agent-cache/{_quote(name)}")
         if response.status_code == 404:
             return default
         _raise_for_status(response)
@@ -183,7 +183,7 @@ class CacheFacade:
         if ttl_seconds is not None:
             body["ttl_seconds"] = ttl_seconds
 
-        response = self._http().put(f"/api/agent-cache/{_quote(name)}", json=body)
+        response = self._http().put(f"/api/v1/agent-cache/{_quote(name)}", json=body)
         _raise_for_status(response)
         return response.json()
 
@@ -215,13 +215,13 @@ class CacheFacade:
             body["ttl_seconds"] = ttl_seconds
 
         response = self._http().post(
-            f"/api/agent-cache/{_quote(name)}/claim", json=body
+            f"/api/v1/agent-cache/{_quote(name)}/claim", json=body
         )
         _raise_for_status(response)
         return bool(response.json()["claimed"])
 
     def delete(self, name: str) -> Dict[str, Any]:
         """Remove an entry. A name the project does not hold is not an error."""
-        response = self._http().delete(f"/api/agent-cache/{_quote(name)}")
+        response = self._http().delete(f"/api/v1/agent-cache/{_quote(name)}")
         _raise_for_status(response)
         return response.json()

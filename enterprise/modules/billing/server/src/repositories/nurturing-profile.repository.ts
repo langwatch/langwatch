@@ -1,0 +1,18 @@
+import type { Instant } from "@langwatch/time";
+
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+
+/** The person, organization and usage facts one Customer.io profile carries. */
+export type NurturingProfile = {
+  user: { id: string; email: string | null; name: string | null; createdAt: Instant };
+  organization: { id: string; name: string; signupData: Record<string, unknown> };
+  hasTraces: boolean;
+  hasSubscription: boolean;
+};
+
+/** The row reads the lifecycle signals make on their own. */
+export abstract class NurturingProfileRepository {
+  abstract findProfile(userId: string): Promise<NurturingProfile | null>;
+
+  abstract memberUserIds(organizationId: string): Promise<string[]>;
+}

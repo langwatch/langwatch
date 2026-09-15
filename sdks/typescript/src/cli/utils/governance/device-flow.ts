@@ -116,9 +116,7 @@ export interface ExchangeApiKeyResult {
   endpoint?: string;
 }
 
-export type ExchangeResult =
-  | ExchangeDeviceSessionResult
-  | ExchangeApiKeyResult;
+export type ExchangeResult = ExchangeDeviceSessionResult | ExchangeApiKeyResult;
 
 /**
  * Back-compat alias for the device-session shape. Pre-`f9fcc3927` server
@@ -126,10 +124,9 @@ export type ExchangeResult =
  * below maps that to `{ kind: 'device_session', ... }` so callers can
  * always assume the discriminated form.
  */
-export type LegacyExchangeResult = Omit<
-  ExchangeDeviceSessionResult,
-  "kind"
-> & { kind?: "device_session" };
+export type LegacyExchangeResult = Omit<ExchangeDeviceSessionResult, "kind"> & {
+  kind?: "device_session";
+};
 
 export interface RefreshResult {
   access_token: string;
@@ -138,7 +135,10 @@ export interface RefreshResult {
 }
 
 export class DeviceFlowError extends Error {
-  constructor(public readonly kind: "pending" | "denied" | "expired" | "slow_down" | "unauthorized" | "other", message: string) {
+  constructor(
+    public readonly kind: "pending" | "denied" | "expired" | "slow_down" | "unauthorized" | "other",
+    message: string,
+  ) {
     super(message);
     this.name = "DeviceFlowError";
   }
@@ -177,7 +177,7 @@ export async function startDeviceCode(
  * "Unknown device" — multi-device users need this to revoke
  * individual sessions without nuking every device they're logged in
  * on (Ariana QA finding). See
- * `platform/app/src/server/routes/auth-cli.ts#clientInfoSchema` for the
+ * `modules/auth/server/src/transport/api-rest/auth-cli-device-flow.api.ts#clientInfoSchema` for the
  * server contract.
  */
 function collectClientInfo(): {
@@ -217,13 +217,11 @@ export async function exchange(
   });
   switch (res.status) {
     case 200: {
-      const body = (await res.json()) as
-        | ExchangeResult
-        | LegacyExchangeResult;
+      const body = (await res.json()) as ExchangeResult | LegacyExchangeResult;
       // Pre-f9fcc3927 servers returned the device-session shape without
       // a `kind` field. Normalise so callers can always discriminate.
       if (!("kind" in body) || !body.kind) {
-        return { kind: "device_session", ...(body) };
+        return { kind: "device_session", ...body };
       }
       return body as ExchangeResult;
     }
@@ -418,7 +416,9 @@ export async function refresh(
   opts: DeviceFlowOptions,
   refreshToken: string,
 ): Promise<RefreshResult> {
-  const res = await rawPost(opts, "/api/auth/cli/refresh", { refresh_token: refreshToken });
+  const res = await rawPost(opts, "/api/auth/cli/refresh", {
+    refresh_token: refreshToken,
+  });
   if (res.status === 401) {
     throw new DeviceFlowError("unauthorized", "session revoked — re-authenticate");
   }

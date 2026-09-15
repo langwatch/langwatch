@@ -1,11 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  type Actor,
-  internalActor,
-  ledgerActorFor,
-  SYSTEM_ACTORS,
-  toLedgerActor,
-} from "../index";
+import { type Actor, internalActor, ledgerActorFor, SYSTEM_ACTORS, toLedgerActor } from "../index.ts";
 
 describe("the actor vocabulary", () => {
   describe("given a rich actor headed for the ledger", () => {
@@ -36,9 +30,7 @@ describe("the actor vocabulary", () => {
     });
 
     it("maps every named system surface, with no hand-built strings", () => {
-      for (const name of Object.keys(SYSTEM_ACTORS) as Array<
-        keyof typeof SYSTEM_ACTORS
-      >) {
+      for (const name of Object.keys(SYSTEM_ACTORS) as Array<keyof typeof SYSTEM_ACTORS>) {
         expect(toLedgerActor({ type: "system", name })).toEqual({
           type: "system",
           id: SYSTEM_ACTORS[name],
@@ -65,9 +57,10 @@ describe("the actor vocabulary", () => {
 
   describe("given a boundary holding raw ids", () => {
     it("attributes to the person first, then the credential, then the surface", () => {
-      expect(
-        ledgerActorFor({ userId: "u1", apiKeyId: "k1", fallback: "scim" }),
-      ).toEqual({ type: "user", id: "u1" });
+      expect(ledgerActorFor({ userId: "u1", apiKeyId: "k1", fallback: "scim" })).toEqual({
+        type: "user",
+        id: "u1",
+      });
       expect(ledgerActorFor({ apiKeyId: "k1", fallback: "scim" })).toEqual({
         type: "system",
         id: "apikey:k1",

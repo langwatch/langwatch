@@ -28,7 +28,7 @@ describe("Prompt Tags", () => {
       });
 
       /** @scenario Assign tag to existing version */
-      it("calls PUT /api/prompts/{id}/tags/{tag} with versionId", async () => {
+      it("calls PUT /api/v1/prompts/{id}/tags/{tag} with versionId", async () => {
         mockPut.mockResolvedValue({
           data: {
             configId: "config_abc",
@@ -46,7 +46,7 @@ describe("Prompt Tags", () => {
         });
 
         expect(mockPut).toHaveBeenCalledWith(
-          "/api/prompts/{id}/tags/{tag}",
+          "/api/v1/prompts/{id}/tags/{tag}",
           expect.objectContaining({
             params: expect.objectContaining({
               path: { id: "pizza-prompt", tag: "production" },

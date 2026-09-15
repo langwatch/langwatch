@@ -1,0 +1,36 @@
+import { useCallback, useMemo } from "react";
+import { useTraceFacets } from "./use-trace-facets.ts";
+
+/**
+ * Resolve a facet `field:value` pair to its human label using the same discover payload
+ * the filter sidebar renders from (e.g. evaluator `monitor_0005…` → "Ragas Response
+ * Relevancy").
+ */
+export function useFacetValueLabelResolver(): ({
+  field,
+  value,
+}: {
+  field: string;
+  value: string;
+}) => string | undefined {
+  const { data } = useTraceFacets();
+
+  const labelByFieldValue = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const facet of data ?? []) {
+      if (facet.kind !== "categorical") continue;
+      for (const tv of facet.topValues) {
+        if (tv.label && tv.label !== tv.value) {
+          map.set(`${facet.key}|${tv.value}`, tv.label);
+        }
+      }
+    }
+    return map;
+  }, [data]);
+
+  return useCallback(
+    ({ field, value }: { field: string; value: string }) =>
+      labelByFieldValue.get(`${field}|${value}`),
+    [labelByFieldValue],
+  );
+}

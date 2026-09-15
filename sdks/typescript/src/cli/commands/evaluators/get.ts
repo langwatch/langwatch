@@ -32,7 +32,9 @@ const formatEvaluatorDetails = (evaluator: EvaluatorResponse): void => {
     console.log(chalk.bold("  Input Fields:"));
     evaluator.fields.forEach((field) => {
       const optional = field.optional ? chalk.gray(" (optional)") : "";
-      console.log(`    ${chalk.green("•")} ${field.identifier}: ${chalk.gray(field.type)}${optional}`);
+      console.log(
+        `    ${chalk.green("•")} ${field.identifier}: ${chalk.gray(field.type)}${optional}`,
+      );
     });
   }
 
@@ -41,7 +43,9 @@ const formatEvaluatorDetails = (evaluator: EvaluatorResponse): void => {
     console.log(chalk.bold("  Output Fields:"));
     evaluator.outputFields.forEach((field) => {
       const optional = field.optional ? chalk.gray(" (optional)") : "";
-      console.log(`    ${chalk.green("•")} ${field.identifier}: ${chalk.gray(field.type)}${optional}`);
+      console.log(
+        `    ${chalk.green("•")} ${field.identifier}: ${chalk.gray(field.type)}${optional}`,
+      );
     });
   }
 
@@ -50,9 +54,7 @@ const formatEvaluatorDetails = (evaluator: EvaluatorResponse): void => {
     console.log(chalk.bold("  Settings:"));
     for (const [key, value] of Object.entries(config.settings)) {
       const displayValue =
-        typeof value === "object"
-          ? JSON.stringify(value)
-          : `${value as string | number | boolean}`;
+        typeof value === "object" ? JSON.stringify(value) : `${value as string | number | boolean}`;
       console.log(`    ${chalk.gray(key + ":")} ${displayValue}`);
     }
   }

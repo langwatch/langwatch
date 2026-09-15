@@ -40,9 +40,7 @@ export function defaultOpencodeConfigPath(): string {
  * just a $schema field, so this stays simple — not a full JSONC parser.
  */
 function stripJsoncComments(s: string): string {
-  return s
-    .replace(/\/\*[\s\S]*?\*\//g, "")
-    .replace(/^\s*\/\/.*$/gm, "");
+  return s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
 }
 
 /**
@@ -92,8 +90,7 @@ export function setOpencodeOpenTelemetryFlag(
     parsed = { $schema: "https://opencode.ai/config.json" };
   }
 
-  const experimental =
-    (parsed.experimental as Record<string, unknown> | undefined) ?? {};
+  const experimental = (parsed.experimental as Record<string, unknown> | undefined) ?? {};
   const prior = experimental.openTelemetry;
   if (prior === true) return { action: "unchanged", path: filePath };
   if (prior === false) return { action: "disabled-by-user", path: filePath };

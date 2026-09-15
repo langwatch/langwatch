@@ -24,6 +24,9 @@ type Input struct {
 	MergeBase []string
 	// Touched are the entries the branch modified, renamed or deleted.
 	Touched []string
+	// Misplaced are migration entries present under a forbidden, non-canonical
+	// root at the branch head. Values are repository-relative paths.
+	Misplaced []string
 }
 
 // Finding is one migration that is out of order, and how to fix it.
@@ -45,6 +48,22 @@ type Finding struct {
 // renumbering them is not on the table.
 func Check(in Input) []Finding {
 	var findings []Finding
+
+	for _, misplaced := range slices.Sorted(slices.Values(in.Misplaced)) {
+		entry := misplacedEntry(misplaced, in.Set)
+		fix := fmt.Sprintf("git mv %s %s", shellArg(misplaced), shellArg(in.Set.Directory+"/"+entry))
+		problem := fmt.Sprintf("is outside the canonical migration root %s", in.Set.Directory)
+		if slices.Contains(in.Head, entry) {
+			problem = fmt.Sprintf("duplicates %s under the canonical migration root", entry)
+			fix = fmt.Sprintf("git rm -r %s", shellArg(misplaced))
+		}
+		findings = append(findings, Finding{
+			Set:     in.Set.Name,
+			Entry:   misplaced,
+			Problem: problem,
+			Fix:     fix,
+		})
+	}
 
 	existing := map[string]bool{}
 	for _, entry := range slices.Concat(in.Base, in.MergeBase) {
@@ -134,6 +153,15 @@ func Check(in Input) []Finding {
 	}
 
 	return findings
+}
+
+func misplacedEntry(misplaced string, set Set) string {
+	for _, directory := range set.ForbiddenDirectories {
+		if entry, found := strings.CutPrefix(misplaced, directory+"/"); found {
+			return entry
+		}
+	}
+	return misplaced
 }
 
 type migration struct {

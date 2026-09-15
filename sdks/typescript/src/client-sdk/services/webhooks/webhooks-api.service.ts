@@ -98,8 +98,7 @@ export type WebhookDestinationInput =
   | { destination_kind?: "http"; url: string; sqs?: never }
   | { destination_kind: "sqs"; sqs: WebhookSqsDestinationInput; url?: never };
 
-export type CreateWebhookEndpointInput = CreateWebhookEndpointBase &
-  WebhookDestinationInput;
+export type CreateWebhookEndpointInput = CreateWebhookEndpointBase & WebhookDestinationInput;
 
 /** The PATCH body, exactly as the wire takes it. Omitted fields are left alone. */
 export interface UpdateWebhookEndpointInput {
@@ -333,10 +332,7 @@ export class WebhooksApiService {
     );
   }
 
-  async rollSecret(
-    id: string,
-    options?: MutationOptions,
-  ): Promise<WebhookEndpointWithSecret> {
+  async rollSecret(id: string, options?: MutationOptions): Promise<WebhookEndpointWithSecret> {
     const res = await this.request<{ data: WebhookEndpointWithSecret }>(
       "roll webhook endpoint secret",
       `/api/webhooks/v1/endpoints/${encodeURIComponent(id)}/roll-secret`,
@@ -345,10 +341,7 @@ export class WebhooksApiService {
     return res.data;
   }
 
-  async test(
-    id: string,
-    options?: MutationOptions,
-  ): Promise<WebhookTestResult> {
+  async test(id: string, options?: MutationOptions): Promise<WebhookTestResult> {
     const res = await this.request<{ data: WebhookTestResult }>(
       "test webhook endpoint",
       `/api/webhooks/v1/endpoints/${encodeURIComponent(id)}/test`,
@@ -471,10 +464,7 @@ export class WebhooksApiService {
       startCursor: options.cursor,
       nextCursorOf: (page) => page.next_cursor,
       onEndlessWalk: (reason) =>
-        new WebhooksApiError(
-          `Failed to list emitted events: ${reason}.`,
-          "list emitted events",
-        ),
+        new WebhooksApiError(`Failed to list emitted events: ${reason}.`, "list emitted events"),
       fetchPage: (cursor) =>
         this.eventsPage({
           ...options,

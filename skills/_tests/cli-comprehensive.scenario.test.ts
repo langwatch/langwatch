@@ -24,9 +24,7 @@ describe("LangWatch CLI Comprehensive — Agent Usability", () => {
   it.skipIf(isCI)(
     "agent uses status command to get project overview then drills into details",
     async () => {
-      const tempFolder = fs.mkdtempSync(
-        path.join(os.tmpdir(), "langwatch-cli-status-"),
-      );
+      const tempFolder = fs.mkdtempSync(path.join(os.tmpdir(), "langwatch-cli-status-"));
 
       fs.writeFileSync(
         path.join(tempFolder, ".env"),
@@ -74,13 +72,8 @@ Then run CLI commands:
           ),
           scenario.agent(),
           (state) => {
-
             const allText = state.messages
-              .map((m) =>
-                typeof m.content === "string"
-                  ? m.content
-                  : JSON.stringify(m.content),
-              )
+              .map((m) => (typeof m.content === "string" ? m.content : JSON.stringify(m.content)))
               .join("\n");
 
             expect(allText).toMatch(/langwatch\s+status/);
@@ -97,9 +90,7 @@ Then run CLI commands:
   it.skipIf(isCI)(
     "agent uses CLI to manage prompts with version tracking",
     async () => {
-      const tempFolder = fs.mkdtempSync(
-        path.join(os.tmpdir(), "langwatch-cli-prompts-"),
-      );
+      const tempFolder = fs.mkdtempSync(path.join(os.tmpdir(), "langwatch-cli-prompts-"));
 
       fs.writeFileSync(
         path.join(tempFolder, ".env"),
@@ -124,8 +115,7 @@ Prompt management commands:
       const result = await scenario.run({
         setId: SKILL_TESTS_SET_ID,
         name: "CLI prompt version management",
-        description:
-          "Developer wants to inspect prompt versions and tags using the LangWatch CLI.",
+        description: "Developer wants to inspect prompt versions and tags using the LangWatch CLI.",
         agents: [
           createClaudeCodeAgent({
             workingDirectory: tempFolder,
@@ -146,13 +136,8 @@ Prompt management commands:
           ),
           scenario.agent(),
           (state) => {
-
             const allText = state.messages
-              .map((m) =>
-                typeof m.content === "string"
-                  ? m.content
-                  : JSON.stringify(m.content),
-              )
+              .map((m) => (typeof m.content === "string" ? m.content : JSON.stringify(m.content)))
               .join("\n");
 
             expect(allText).toMatch(/langwatch\s+prompt/);

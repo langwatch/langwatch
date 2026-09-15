@@ -11,21 +11,12 @@ import {
   type LaunchAgentSpec,
 } from "@/cli/utils/governance/copilot-app";
 import { installCopilotAppAgent } from "@/cli/utils/governance/copilot-app-agent";
-import {
-  isLoggedIn,
-  loadConfig,
-  type GovernanceConfig,
-} from "@/cli/utils/governance/config";
+import { isLoggedIn, loadConfig, type GovernanceConfig } from "@/cli/utils/governance/config";
 
 /**
- * `langwatch copilot-app connect` — provisions capture for the standalone
- * GitHub Copilot app (ADR-039 §Extension). The app is a long-running GUI,
- * not a per-invocation CLI, so it is connected once rather than wrapped:
- * resolve a personal ingest key of sourceType "copilot_app" (reusing the
- * cached one while the platform confirms it is live, minting otherwise),
- * then install a login agent that owns the app's launch and injects the
- * direct-OTLP env. Re-running re-points the agent; `langwatch logout`
- * tears it down.
+ * Connect the GitHub Copilot app for telemetry capture. Resolves or mints an
+ * ingest key and installs a login agent.
+ * @see dev/docs/adr/039-extension.md
  */
 
 const SOURCE_TYPE = "copilot_app";
@@ -52,10 +43,7 @@ export interface ConnectCopilotAppDeps {
   env: Record<string, string | undefined>;
   exists: (p: string) => boolean;
   loadConfig: () => GovernanceConfig;
-  mint: (
-    cfg: GovernanceConfig,
-    sourceType: string,
-  ) => Promise<{ token: string; endpoint: string }>;
+  mint: (cfg: GovernanceConfig, sourceType: string) => Promise<{ token: string; endpoint: string }>;
   install: (spec: LaunchAgentSpec) => string;
   captureContent: boolean;
   info: (msg: string) => void;
@@ -87,12 +75,7 @@ export async function connectCopilotApp(
     );
   }
 
-  const execPath = findCopilotApp(
-    deps.platform,
-    deps.home,
-    deps.exists,
-    deps.env,
-  );
+  const execPath = findCopilotApp(deps.platform, deps.home, deps.exists, deps.env);
   if (!execPath) {
     throw new CopilotAppConnectError(
       "not-installed",
@@ -134,8 +117,7 @@ export async function connectCopilotApp(
       "[langwatch] content capture is off for the Copilot app; traces will carry tokens only.",
     );
   }
-  const project =
-    cfg.organization?.slug ?? cfg.organization?.name ?? "your personal project";
+  const project = cfg.organization?.slug ?? cfg.organization?.name ?? "your personal project";
   // Honest lifecycle: the agent starts Copilot with tracking now (darwin
   // bootstrap runs RunAtLoad, linux is an explicit restart, win32 an
   // explicit /Run) and on every login. Two sessions the agent cannot

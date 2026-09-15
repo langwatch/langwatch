@@ -251,3 +251,16 @@ func TestReadLogTailsBoundsWhatItReadsFromAHugeCapture(t *testing.T) {
 		})
 	})
 }
+
+// @scenario "The raw bytes are one flag away"
+func TestRenderModeRawPrintsThePayloadUntouched(t *testing.T) {
+	raw := `{"time":"2026-09-07T11:10:46.108Z","level":"info","msg":"listening"}`
+	line := logLine{ts: time.Now(), service: "api", text: raw}
+
+	if got := formatLogLine(line, renderRaw, true); got != raw {
+		t.Errorf("--raw rendered %q, want the payload byte for byte", got)
+	}
+	if got := formatLogLine(line, renderHuman, true); got == raw {
+		t.Error("the human rendering must not be the raw payload")
+	}
+}

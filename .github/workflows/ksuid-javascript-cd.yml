@@ -1,0 +1,85 @@
+name: ksuid-javascript-cd
+
+on:
+  release:
+    types:
+      - published
+  workflow_dispatch:
+
+# A publish run drains — see publish-docker-app.
+concurrency:
+  group: ksuid-javascript-cd-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  publish-npm:
+    # `ksuid-python@…` tags do not match `ksuid@` — the two components publish
+    # through their own workflows.
+    if: startsWith(github.event.release.tag_name, 'ksuid@') || (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
+
+      - uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
+        with:
+          version: 10.24.0
+
+      - name: Setup Node
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
+        with:
+          node-version: 24
+          cache: pnpm
+          registry-url: "https://registry.npmjs.org"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --filter "@langwatch/ksuid..."
+
+      - name: Build
+        working-directory: ./packages/ksuid
+        run: pnpm build
+
+      - name: Run tests
+        working-directory: ./packages/ksuid
+        run: pnpm test
+
+      # Token auth for now, same convention as npx-server-publish: the npm
+      # package @langwatch/ksuid predates the vendoring and its Trusted
+      # Publisher (if any) points at the old langwatch/ksuid repository.
+      #
+      # Trusted Publishers (npm OIDC, recommended): configure at npmjs.com →
+      # @langwatch/ksuid → settings → Trusted Publishers, add provider
+      # `GitHub Actions` with:
+      #   Repository:        langwatch/langwatch
+      #   Workflow filename: ksuid-javascript-cd.yml
+      #   Environment:       (leave empty — we don't use job environments)
+      # Once configured, drop the NODE_AUTH_TOKEN line; `id-token: write` is
+      # sufficient for npm to mint a short-lived publish token from OIDC.
+      - name: Publish to npm
+        working-directory: ./packages/ksuid
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_API_TOKEN }}
+        run: pnpm publish --provenance --access public --no-git-checks
+
+      - name: Get version from tag or manifest
+        id: get_version
+        run: |
+          if [ "${{ github.event_name }}" = "release" ]; then
+            VERSION=${GITHUB_REF#refs/tags/ksuid@v}
+          else
+            VERSION=$(cat .github/.release-please-manifest.json | jq -r '."packages/ksuid"')
+          fi
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+
+      - name: Notify Slack
+        env:
+          SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL: ${{ secrets.SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL }}
+        run: |
+          bash .github/scripts/notify-slack-release.sh \
+            packages/ksuid/CHANGELOG.md \
+            "KSUID (JavaScript)" \
+            "${{ steps.get_version.outputs.version }}"

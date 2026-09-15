@@ -1,13 +1,11 @@
 import type { paths } from "@/internal/generated/openapi/api-client";
-import {
-  createLangWatchApiClient,
-  type LangwatchApiClient,
-} from "@/internal/api/client";
+import { createLangWatchApiClient, type LangwatchApiClient } from "@/internal/api/client";
 import { type InternalConfig } from "@/client-sdk/types";
 import {
   extractStatusFromResponse,
   formatApiErrorForOperation,
 } from "@/client-sdk/services/_shared/format-api-error";
+import { unwrapApiResult } from "@/client-sdk/services/_shared/unwrap-api-result";
 import { ExperimentsApiService } from "@/client-sdk/services/experiments/experiments-api.service";
 import {
   pollExperimentRun,
@@ -22,14 +20,14 @@ import type {
 import { resolveEndpoint } from "@/internal/endpoint";
 
 export type WorkflowResponse = NonNullable<
-  paths["/api/workflows"]["get"]["responses"]["200"]["content"]["application/json"]
+  paths["/api/v1/workflows"]["get"]["responses"]["200"]["content"]["application/json"]
 >[number];
 
 export type WorkflowDeleteResponse =
-  paths["/api/workflows/{id}"]["delete"]["responses"]["200"]["content"]["application/json"];
+  paths["/api/v1/workflows/{id}"]["delete"]["responses"]["200"]["content"]["application/json"];
 
 /**
- * Body for `POST /api/workflows/{workflowId}/evaluate`. `data` and `dataset_id`
+ * Body for `POST /api/v1/workflows/{workflowId}/evaluate`. `data` and `dataset_id`
  * are mutually exclusive on the server (400 if both are sent).
  */
 interface WorkflowEvaluateRequest {
@@ -41,7 +39,7 @@ interface WorkflowEvaluateRequest {
 }
 
 /**
- * Response from `POST /api/workflows/{workflowId}/evaluate`. Hand-written
+ * Response from `POST /api/v1/workflows/{workflowId}/evaluate`. Hand-written
  * because the route is not yet exposed via the generated OpenAPI types.
  */
 interface WorkflowEvaluateResponse {
@@ -67,25 +65,26 @@ export class WorkflowsApiService {
   private readonly experimentsApiService: ExperimentsApiService;
   private readonly endpoint: string;
 
-  constructor(
-    config?: Pick<InternalConfig, "langwatchApiClient"> & { endpoint?: string },
-  ) {
+  constructor(config?: Pick<InternalConfig, "langwatchApiClient"> & { endpoint?: string }) {
     // The run URLs this service rebases and the requests it issues have to
     // name the same host, so a caller that supplies only an endpoint gets a
     // client built on that endpoint rather than on the environment.
     this.endpoint = resolveEndpoint(config?.endpoint);
     this.apiClient =
-      config?.langwatchApiClient ??
-      createLangWatchApiClient(undefined, this.endpoint);
+      config?.langwatchApiClient ?? createLangWatchApiClient(undefined, this.endpoint);
     this.experimentsApiService = new ExperimentsApiService({
       langwatchApiClient: this.apiClient,
     });
   }
 
-  private handleApiError(operation: string, error: unknown): never {
-    const message = formatApiErrorForOperation({ operation: operation, error: error, options: {
-      status: extractStatusFromResponse(error),
-    } });
+  private handleApiError(operation: string, error: unknown, response?: Response): never {
+    const message = formatApiErrorForOperation({
+      operation: operation,
+      error: error,
+      options: {
+        status: response?.status ?? extractStatusFromResponse(error),
+      },
+    });
     throw new WorkflowsApiError(message, operation, error);
   }
 
@@ -115,53 +114,56 @@ export class WorkflowsApiService {
       this.handleApiError(operation, error);
     }
 
-    if (result.error) this.handleApiError(operation, result.error);
-    return result.data as T;
+    return unwrapApiResult({
+      operation,
+      data: result.data,
+      error: result.error,
+      response: result.response,
+      onError: this.handleApiError.bind(this),
+    }) as T;
   }
 
   async getAll(): Promise<WorkflowResponse[]> {
-    const { data, error } = await this.apiClient.GET("/api/workflows");
-    if (error) this.handleApiError("list workflows", error);
-    return data;
+    const { data, error, response } = await this.apiClient.GET("/api/v1/workflows");
+    return unwrapApiResult({
+      operation: "list workflows",
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    });
   }
 
   async get(id: string): Promise<WorkflowResponse> {
-    const { data, error } = await this.apiClient.GET("/api/workflows/{id}", {
+    const { data, error, response } = await this.apiClient.GET("/api/v1/workflows/{id}", {
       params: { path: { id } },
     });
-    if (error) this.handleApiError(`get workflow "${id}"`, error);
-    return data;
+    return unwrapApiResult({
+      operation: `get workflow "${id}"`,
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    });
   }
 
   async delete(id: string): Promise<WorkflowDeleteResponse> {
-    const { data, error } = await this.apiClient.DELETE("/api/workflows/{id}", {
+    const { data, error, response } = await this.apiClient.DELETE("/api/v1/workflows/{id}", {
       params: { path: { id } },
     });
-    if (error) this.handleApiError(`delete workflow "${id}"`, error);
-    return data;
+    return unwrapApiResult({
+      operation: `delete workflow "${id}"`,
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    });
   }
 
   /**
    * Run a studio workflow evaluation and return per-row structured results.
-   *
-   * Starts the evaluation through the unified evaluations-v3 backend
-   * (`POST /api/workflows/{workflowId}/evaluate`), polls to completion, fetches
-   * the per-row results, and maps them to the same row structure as the python
-   * SDK's results DataFrame.
-   *
    * @param workflowId - The studio workflow id
-   * @param options - Optional inputs, committed version override, and polling
-   *                   configuration. `data` and `datasetId` are mutually
-   *                   exclusive.
-   * @returns The run id, results URL, status, summary, and per-row results
-   *
-   * @example
-   * ```typescript
-   * const langwatch = new LangWatch();
-   * const { rows, runUrl } = await langwatch.workflows.run("workflow_123", {
-   *   data: [{ question: "What is 2 + 2?" }],
-   * });
-   * ```
+   * @param options - Optional inputs and polling configuration
    */
   async run(
     workflowId: string,
@@ -174,13 +176,11 @@ export class WorkflowsApiService {
     if (options.parameters !== undefined) body.parameters = options.parameters;
     if (options.rowIndices !== undefined) body.row_indices = options.rowIndices;
 
-    const startResponse = await this.postUndeclaredEndpoint<WorkflowEvaluateResponse>(
-      {
-        path: `/api/workflows/${encodeURIComponent(workflowId)}/evaluate`,
-        body,
-        operation: `run workflow evaluation for "${workflowId}"`,
-      },
-    );
+    const startResponse = await this.postUndeclaredEndpoint<WorkflowEvaluateResponse>({
+      path: `/api/v1/workflows/${encodeURIComponent(workflowId)}/evaluate`,
+      body,
+      operation: `run workflow evaluation for "${workflowId}"`,
+    });
 
     const runId = startResponse.run_id;
 

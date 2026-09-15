@@ -13,8 +13,7 @@
  */
 
 const LANGWATCH_API_KEY = process.env.LANGWATCH_API_KEY!;
-const LANGWATCH_ENDPOINT =
-  process.env.LANGWATCH_ENDPOINT ?? "https://app.langwatch.ai";
+const LANGWATCH_ENDPOINT = process.env.LANGWATCH_ENDPOINT ?? "https://app.langwatch.ai";
 
 interface TraceMetadata {
   user_id: string;

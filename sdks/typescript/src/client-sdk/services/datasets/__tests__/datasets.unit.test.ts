@@ -1,13 +1,15 @@
 /**
  * Unit tests for Dataset TypeScript SDK
- *
- * Tests facade method exposure, error mapping, pagination forwarding, and defaults.
- * Corresponds to @unit scenarios in specs/features/dataset-typescript-sdk.feature.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { LangWatch } from "@/client-sdk";
 import { DatasetService } from "../dataset.service";
-import { DatasetNotFoundError, DatasetApiError, DatasetValidationError, DatasetPlanLimitError } from "../errors";
+import {
+  DatasetNotFoundError,
+  DatasetApiError,
+  DatasetValidationError,
+  DatasetPlanLimitError,
+} from "../errors";
 import { NoOpLogger } from "@/logger";
 
 const createMockApiClient = () => {
@@ -60,7 +62,10 @@ describe("Feature: Dataset TypeScript SDK", () => {
         it("forwards pagination parameters to the API client", async () => {
           const mockClient = createMockApiClient();
           mockClient.GET.mockResolvedValue({
-            data: { data: [], pagination: { page: 2, limit: 10, total: 0, totalPages: 0 } },
+            data: {
+              data: [],
+              pagination: { page: 2, limit: 10, total: 0, totalPages: 0 },
+            },
             error: null,
             response: { status: 200 },
           });
@@ -75,7 +80,7 @@ describe("Feature: Dataset TypeScript SDK", () => {
           await service.listDatasets({ page: 2, limit: 10 });
 
           expect(mockClient.GET).toHaveBeenCalledWith(
-            "/api/dataset",
+            "/api/v1/dataset",
             expect.objectContaining({
               params: expect.objectContaining({
                 query: { page: 2, limit: 10 },
@@ -114,7 +119,7 @@ describe("Feature: Dataset TypeScript SDK", () => {
           await service.createDataset({ name: "bare-dataset" });
 
           expect(mockClient.POST).toHaveBeenCalledWith(
-            "/api/dataset",
+            "/api/v1/dataset",
             expect.objectContaining({
               body: {
                 name: "bare-dataset",
@@ -156,7 +161,7 @@ describe("Feature: Dataset TypeScript SDK", () => {
           });
 
           expect(mockClient.PATCH).toHaveBeenCalledWith(
-            "/api/dataset/{slugOrId}",
+            "/api/v1/dataset/{slugOrId}",
             expect.objectContaining({
               body: {
                 columnTypes: [{ name: "question", type: "string" }],
@@ -213,7 +218,9 @@ describe("Feature: Dataset TypeScript SDK", () => {
           const error = await service.createDataset({ name: "duplicate" }).catch((e: unknown) => e);
           expect(error).toBeInstanceOf(DatasetApiError);
           expect((error as DatasetApiError).status).toBe(409);
-          expect((error as DatasetApiError).message).toContain("A dataset with this slug already exists");
+          expect((error as DatasetApiError).message).toContain(
+            "A dataset with this slug already exists",
+          );
         });
       });
 
@@ -224,7 +231,8 @@ describe("Feature: Dataset TypeScript SDK", () => {
             data: null,
             error: {
               error: "limit_exceeded",
-              message: "Free plan limit of 5 datasets reached. To increase your limits, upgrade your plan at https://app.langwatch.ai/settings/subscription",
+              message:
+                "Free plan limit of 5 datasets reached. To increase your limits, upgrade your plan at https://app.langwatch.ai/settings/subscription",
               limitType: "datasets",
               current: 5,
               max: 5,
@@ -285,7 +293,9 @@ describe("Feature: Dataset TypeScript SDK", () => {
     describe("when creating records with empty entries", () => {
       /** @scenario "Batch create records with empty entries throws validation error" */
       it("throws a DatasetValidationError indicating entries must not be empty", () => {
-        expect(() => langwatch.datasets.createRecords("my-data", [])).toThrow(DatasetValidationError);
+        expect(() => langwatch.datasets.createRecords("my-data", [])).toThrow(
+          DatasetValidationError,
+        );
       });
     });
   });

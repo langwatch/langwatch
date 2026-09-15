@@ -1,0 +1,60 @@
+{
+  "name": "@langwatch/mail",
+  "version": "0.1.0",
+  "private": true,
+  "description": "The outbound mail gateways LangWatch sends through, and the transactional messages the identity and organization surfaces send.",
+  "files": [
+    "dist",
+    "src"
+  ],
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/typecheck/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/typecheck/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./gateway": {
+      "types": "./dist/typecheck/gateway.d.ts",
+      "import": "./dist/gateway.js",
+      "default": "./dist/gateway.js"
+    }
+  },
+  "scripts": {
+    "build": "rm -rf dist && tsc -p tsconfig.build.json",
+    "dev": "vite --config preview/vite.config.ts",
+    "typecheck": "pnpm -w typecheck:declarations --project . && tsc --noEmit && tsc --noEmit -p preview/tsconfig.json",
+    "test": "vitest run",
+    "test:unit": "vitest run"
+  },
+  "dependencies": {
+    "@aws-sdk/client-ses": "catalog:",
+    "@langwatch/egress": "workspace:*",
+    "@langwatch/observability": "workspace:*",
+    "@langwatch/time": "workspace:*",
+    "@react-email/components": "^1.0.12",
+    "@react-email/render": "^2.0.9",
+    "@sendgrid/mail": "catalog:",
+    "nodemailer": "catalog:",
+    "react": "catalog:",
+    "undici": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@chakra-ui/react": "catalog:",
+    "@emotion/react": "catalog:",
+    "@langwatch/design-system": "workspace:*",
+    "@types/node": "catalog:",
+    "@types/nodemailer": "catalog:",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
+    "@vitejs/plugin-react": "catalog:",
+    "next-themes": "catalog:",
+    "react-dom": "catalog:",
+    "typescript": "catalog:",
+    "vite": "catalog:",
+    "vitest": "catalog:"
+  }
+}

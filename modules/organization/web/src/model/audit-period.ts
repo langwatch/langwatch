@@ -1,0 +1,152 @@
+/**
+ * The window the audit trail is read over, as a value rather than as a
+ * hook. A narrowed family-local copy of the old `PeriodSelector` (which
+ * keeps its other twenty-odd callers): reading is pure over the host's
+ * query, writes answer with the next whole query, and absolute-range
+ * inputs / "All time" did not travel — the audit trail always has a window.
+ */
+
+import {
+  differenceInCalendarDays,
+  fromDate,
+  type Instant,
+  startOfDay,
+  subDays,
+  Temporal,
+  toDate,
+  toEpochMs,
+} from "@langwatch/time";
+
+/** The window a read is taken over. */
+export type AuditPeriod = { startDate: Instant; endDate: Instant };
+
+/**
+ * Relative range presets. The key is what is serialised into the URL as
+ * `?period=<key>`; `minutes` is the lookback from "now" for the sub-day
+ * windows, and `days` the inclusive day count for the rest.
+ */
+export const AUDIT_PERIOD_PRESETS = [
+  { key: "15m", label: "Last 15 minutes", minutes: 15, days: 1 },
+  { key: "1h", label: "Last 1 hour", minutes: 60, days: 1 },
+  { key: "6h", label: "Last 6 hours", minutes: 60 * 6, days: 1 },
+  { key: "24h", label: "Last 24 hours", minutes: 60 * 24, days: 1 },
+  { key: "today", label: "Today", minutes: null, days: 1 },
+  { key: "7d", label: "Last 7 days", minutes: null, days: 7 },
+  { key: "15d", label: "Last 15 days", minutes: null, days: 15 },
+  { key: "30d", label: "Last 30 days", minutes: null, days: 30 },
+  { key: "90d", label: "Last 90 days", minutes: null, days: 90 },
+  { key: "6mo", label: "Last 6 months", minutes: null, days: 180 },
+  { key: "1y", label: "Last 1 year", minutes: null, days: 365 },
+] as const;
+
+export type AuditPeriodPresetKey = (typeof AUDIT_PERIOD_PRESETS)[number]["key"];
+
+const PRESETS_BY_KEY = new Map(AUDIT_PERIOD_PRESETS.map((preset) => [preset.key, preset]));
+
+/** Whether the URL's `?period=` names a window this picker offers. */
+export function isAuditPeriodPresetKey(value: unknown): value is AuditPeriodPresetKey {
+  return typeof value === "string" && PRESETS_BY_KEY.has(value as AuditPeriodPresetKey);
+}
+
+const isReadableDate = (value: string): boolean => !isNaN(toEpochMs(value));
+
+/**
+ * The [start, end] window for a preset, anchored to `now`.
+ *
+ * Day-based presets snap the start to start-of-day, which is what makes
+ * "Last 7 days" mean seven whole days rather than a hundred and sixty-eight
+ * hours ending at an arbitrary minute.
+ */
+export function computeAuditWindow(presetKey: AuditPeriodPresetKey, now: Instant): AuditPeriod {
+  const preset = PRESETS_BY_KEY.get(presetKey);
+  const dayStart = (daysBack: number) => fromDate(startOfDay(subDays(toDate(now), daysBack)));
+  if (!preset) return { startDate: dayStart(29), endDate: now };
+  if (preset.minutes !== null) {
+    return {
+      startDate: now.subtract({ milliseconds: preset.minutes * 60 * 1000 }),
+      endDate: now,
+    };
+  }
+
+  return { startDate: dayStart(preset.days - 1), endDate: now };
+}
+
+/** How the window on screen was arrived at. */
+export type AuditPeriodMode = "relative" | "absolute";
+
+export type AuditPeriodReading = {
+  period: AuditPeriod;
+  mode: AuditPeriodMode;
+};
+
+const DEFAULT_PRESET: AuditPeriodPresetKey = "30d";
+
+/**
+ * The window the address describes.
+ *
+ * An explicit `startDate`/`endDate` pair wins, and a reversed pair is clamped
+ * rather than refused — a hand-edited URL should narrow to nothing visible, not
+ * ask the server for a range that runs backwards. Anything else falls back to
+ * the named preset, and then to thirty days.
+ */
+export function readAuditPeriod(
+  query: Readonly<Record<string, string | undefined>>,
+  now: Instant,
+): AuditPeriodReading {
+  const start = query.startDate;
+  const end = query.endDate;
+  if (start && end && isReadableDate(start) && isReadableDate(end)) {
+    const startDate = Temporal.Instant.fromEpochMilliseconds(toEpochMs(start));
+    const endDate = Temporal.Instant.fromEpochMilliseconds(toEpochMs(end));
+    return {
+      period: {
+        startDate: Temporal.Instant.compare(startDate, endDate) > 0 ? endDate : startDate,
+        endDate,
+      },
+      mode: "absolute",
+    };
+  }
+
+  const presetKey = isAuditPeriodPresetKey(query.period) ? query.period : DEFAULT_PRESET;
+  return { period: computeAuditWindow(presetKey, now), mode: "relative" };
+}
+
+/**
+ * The next whole query for a picked preset. An absolute pair already in the
+ * URL is dropped, since the reading above prefers it and would otherwise
+ * make the picker look like it did nothing. Paging resets too.
+ */
+export function auditPeriodQuery(
+  query: Readonly<Record<string, string | undefined>>,
+  presetKey: AuditPeriodPresetKey,
+): Record<string, string | undefined> {
+  const { startDate: _start, endDate: _end, ...rest } = query;
+  return { ...rest, period: presetKey, pageOffset: "0" };
+}
+
+/**
+ * The label the trigger reads, for a window that matches a preset or not.
+ * Sub-day presets are checked first — a deliberate correction: the old
+ * control matched calendar-day first, so "Last 1 hour" relabelled as "Today".
+ */
+export function auditPeriodLabel(
+  { startDate, endDate }: AuditPeriod,
+  mode: AuditPeriodMode,
+  now: Instant,
+): string {
+  if (mode === "relative") {
+    const minutes = Math.round((endDate.epochMilliseconds - startDate.epochMilliseconds) / 60000);
+    const subDay = AUDIT_PERIOD_PRESETS.find((preset) => preset.minutes === minutes);
+    if (subDay) return subDay.label;
+
+    const days = differenceInCalendarDays(toDate(endDate), toDate(startDate)) + 1;
+    const fromToday = differenceInCalendarDays(toDate(now), toDate(endDate)) + 1;
+    if (fromToday <= 1) {
+      const byDays = AUDIT_PERIOD_PRESETS.find(
+        (preset) => preset.minutes === null && preset.days === days,
+      );
+      if (byDays) return byDays.label;
+    }
+  }
+  return `${toDate(startDate).toLocaleDateString()} - ${toDate(endDate).toLocaleDateString()}`;
+}

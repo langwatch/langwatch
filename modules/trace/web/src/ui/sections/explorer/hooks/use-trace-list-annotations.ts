@@ -1,0 +1,81 @@
+import { useMemo } from "react";
+import {
+  type AnnotationByTrace,
+  useAnnotationsByTraceIds,
+} from "../../use-annotations-by-trace-ids.ts";
+import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
+import { useViewStore } from "../../../../behavior/view.store.ts";
+import type { TraceListItem } from "../types/trace.ts";
+
+/** A row with nothing said about it, and the shape one carries before its
+ *  reviews arrive. */
+const NO_ANNOTATIONS: AnnotationByTrace[] = [];
+
+/**
+ * Attaches what reviewers left on each row, read once per visible page.
+ */
+export function useTraceListAnnotations({
+  rows,
+  isSamplePreview = false,
+}: {
+  rows: TraceListItem[];
+  /** Fixture rows are not traces anyone can have reviewed. */
+  isSamplePreview?: boolean;
+}): TraceListItem[] {
+  const { project, hasPermission } = useOrganizationTeamProject();
+  const needsAnnotations = useViewStore((state) => state.columnOrder.includes("annotations"));
+  const canRead = hasPermission("annotations:view");
+
+  // Sorted so two renders of the same page share a query key regardless of the
+  // sort column, and joined because the key is compared structurally.
+  const traceIdsKey = useMemo(
+    () =>
+      rows
+        .map((row) => row.traceId)
+        .sort()
+        .join(","),
+    [rows],
+  );
+  const traceIds = useMemo(() => (traceIdsKey === "" ? [] : traceIdsKey.split(",")), [traceIdsKey]);
+
+  const asked = needsAnnotations && !isSamplePreview && traceIds.length > 0;
+  const enabled = asked && canRead && !!project?.id;
+  const query = useAnnotationsByTraceIds({
+    projectId: project?.id ?? "",
+    traceIds,
+    enabled,
+    anchor: "all",
+  });
+
+  const byTrace = useMemo(
+    () => (enabled ? groupByTraceId(query.data) : new Map<string, AnnotationByTrace[]>()),
+    [enabled, query.data],
+  );
+
+  const isLoading = enabled && query.isLoading;
+  // A reader who may not see annotations is in the same position as a failed
+  // read: the column cannot say what was left on the trace, so it says that
+  // rather than answering "nothing".
+  const isUnavailable = asked && (!canRead || query.isError);
+
+  return useMemo(() => {
+    if (!asked) return rows;
+    return rows.map((row) => ({
+      ...row,
+      annotations: byTrace.get(row.traceId) ?? NO_ANNOTATIONS,
+      annotationsLoading: isLoading,
+      annotationsUnavailable: isUnavailable,
+    }));
+  }, [asked, rows, byTrace, isLoading, isUnavailable]);
+}
+
+/** The reviews on the page, bucketed by the trace they were left on. */
+function groupByTraceId(annotations: AnnotationByTrace[]): Map<string, AnnotationByTrace[]> {
+  const grouped = new Map<string, AnnotationByTrace[]>();
+  for (const annotation of annotations) {
+    const list = grouped.get(annotation.traceId);
+    if (list) list.push(annotation);
+    else grouped.set(annotation.traceId, [annotation]);
+  }
+  return grouped;
+}

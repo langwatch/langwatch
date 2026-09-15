@@ -1,0 +1,235 @@
+import { Badge, chakra, HoverCard, Icon, Portal, Text, VStack } from "@chakra-ui/react";
+import { CircleHelp } from "lucide-react";
+import type React from "react";
+import {
+  modelProviderIcons,
+  ProviderIconGlyph,
+} from "../../../../../../blocks/model-providers/icons-map.tsx";
+import { useFilterStore } from "../../../../../../../behavior/filter.store.ts";
+import type { TraceListItem } from "../../../../types/trace.ts";
+import { MonoCell } from "../../../../../../elements/explorer/trace-table/mono-cell.tsx";
+import type { CellDef } from "../../types.ts";
+import { FilterChip } from "../../../../../../blocks/explorer/trace-table/registry/cells/filter-chip.tsx";
+
+// When the +N popover would otherwise render a wall of model names,
+// cap the visible list and direct the user to the drawer for the rest.
+// Ten fits in a comfortable column-of-rows without scrolling on a
+// dense table; tune if the trace ecosystem starts producing wider
+// model mixes.
+const EXTRA_MODELS_VISIBLE_CAP = 10;
+
+type Density = "compact" | "comfortable";
+
+type ProviderKey = keyof typeof modelProviderIcons;
+
+/**
+ * Which provider a bare model name belongs to, by the prefix it starts with.
+ * Order matters only in that the first matching entry wins.
+ */
+const PROVIDER_BY_MODEL_PREFIX: ReadonlyArray<{
+  prefixes: readonly string[];
+  provider: ProviderKey;
+}> = [
+  {
+    prefixes: ["gpt-", "o1", "o3", "o4", "text-embedding-", "dall-e", "whisper", "chatgpt-"],
+    provider: "openai",
+  },
+  { prefixes: ["claude-", "claude/"], provider: "anthropic" },
+  { prefixes: ["gemini-", "gemma-", "text-bison"], provider: "gemini" },
+  { prefixes: ["deepseek-"], provider: "deepseek" },
+  { prefixes: ["grok-", "xai"], provider: "xai" },
+  { prefixes: ["groq"], provider: "groq" },
+];
+
+/**
+ * Map a model string to one of the known provider icons. Handles both the prefixed form
+ * ("openai/gpt-5") and bare model names (the trace collector frequently records just
+ * the model id without a provider prefix) via prefix sniffing on the model name itself.
+ */
+function inferProvider(model: string): ProviderKey | null {
+  if (!model) return null;
+  const slash = model.indexOf("/");
+  if (slash > 0) {
+    const candidate = model.slice(0, slash).toLowerCase();
+    const isKnownProvider = candidate in modelProviderIcons;
+    if (isKnownProvider) return candidate as ProviderKey;
+  }
+  const lower = (slash > 0 ? model.slice(slash + 1) : model).toLowerCase();
+  const byPrefix = PROVIDER_BY_MODEL_PREFIX.find(({ prefixes }) =>
+    prefixes.some((prefix) => lower.startsWith(prefix)),
+  );
+  if (byPrefix) return byPrefix.provider;
+  const isBedrock = lower.includes("bedrock") || lower.startsWith("anthropic.claude");
+  if (isBedrock) return "bedrock";
+  return lower.startsWith("cerebras") ? "cerebras" : null;
+}
+
+/**
+ * Tiny provider mark rendered before the model name in the table cell.
+ */
+export function ProviderIcon({ model, size }: { model: string; size: "compact" | "comfortable" }) {
+  const provider = inferProvider(model);
+  if (!provider) return null;
+  const px = size === "comfortable" ? "14px" : "12px";
+  return <ProviderIconGlyph provider={provider} size={px} />;
+}
+
+/**
+ * Rich card listing every model a trace touched — provider-icon + full name rows under
+ * a count header.
+ */
+export function ModelsTooltip({
+  models,
+  children,
+}: {
+  models: string[];
+  children: React.ReactNode;
+}) {
+  const visible = models.slice(0, EXTRA_MODELS_VISIBLE_CAP);
+  const overflow = models.length - visible.length;
+  return (
+    <HoverCard.Root openDelay={150} closeDelay={200} positioning={{ placement: "top" }}>
+      <HoverCard.Trigger asChild>{children}</HoverCard.Trigger>
+      <Portal>
+        <HoverCard.Positioner>
+          <HoverCard.Content
+            background="bg.panel"
+            color="fg"
+            borderRadius="xl"
+            boxShadow="lg"
+            padding={2}
+            maxWidth="320px"
+          >
+            <VStack align="stretch" gap={1}>
+              <Text
+                textStyle="2xs"
+                color="fg.muted"
+                textTransform="uppercase"
+                letterSpacing="0.06em"
+                paddingX={2}
+                paddingTop={1}
+              >
+                {models.length} models · click to filter
+              </Text>
+              <VStack align="stretch" gap={0}>
+                {visible.map((m) => (
+                  <chakra.button
+                    key={m}
+                    type="button"
+                    display="flex"
+                    alignItems="center"
+                    gap={2}
+                    width="full"
+                    minWidth={0}
+                    paddingX={2}
+                    paddingY={1}
+                    borderRadius="md"
+                    cursor="pointer"
+                    textAlign="left"
+                    _hover={{ bg: "bg.muted" }}
+                    onClick={() => useFilterStore.getState().toggleFacet("model", m)}
+                    aria-label={`Filter by model "${m}"`}
+                  >
+                    <ProviderIcon model={m} size="comfortable" />
+                    <Text textStyle="xs" color="fg" truncate>
+                      {m}
+                    </Text>
+                  </chakra.button>
+                ))}
+              </VStack>
+              {overflow > 0 && (
+                <Text
+                  textStyle="2xs"
+                  color="fg.muted"
+                  fontStyle="italic"
+                  paddingX={2}
+                  paddingBottom={1}
+                >
+                  +{overflow} more
+                </Text>
+              )}
+            </VStack>
+          </HoverCard.Content>
+        </HoverCard.Positioner>
+      </Portal>
+    </HoverCard.Root>
+  );
+}
+
+function renderModel(row: TraceListItem, density: Density) {
+  if (row.models.length === 0) {
+    return (
+      <Text textStyle="sm" color="fg.subtle">
+        —
+      </Text>
+    );
+  }
+  const rawPrimary = row.models[0]!;
+  const primary = rawPrimary;
+  const overflow = row.models.length - 1;
+  const compact = density === "compact";
+  // "Known" = the provider was recognised, which is the table's proxy
+  // for "this model resolves to a cost mapping". Unknown models get an
+  // amber chip + a help glyph, and the chip's ↗ points at model settings
+  // so the operator can add a regex mapping; known models' ↗ opens the
+  // same model-provider settings for that provider.
+  const known = inferProvider(rawPrimary) != null;
+
+  // One contained chip: provider (or "unmatched") glyph + primary model
+  // name + a quiet "+N" suffix folded inside the same badge for
+  // multi-model traces. Clicking it filters by the primary model; the
+  // hover ↗ links to model settings; multi-model traces also surface the
+  // full list in a hover popover.
+  const chip = (
+    <FilterChip
+      onFilter={() => useFilterStore.getState().toggleFacet("model", rawPrimary)}
+      filterLabel={`Filter by model "${rawPrimary}"`}
+    >
+      <Badge
+        size="sm"
+        variant="surface"
+        colorPalette={known ? "gray" : "orange"}
+        gap={compact ? 1.5 : 2}
+        paddingX={compact ? 2 : 2.5}
+        fontWeight="medium"
+      >
+        {known ? (
+          <ProviderIcon model={rawPrimary} size={compact ? "compact" : "comfortable"} />
+        ) : (
+          <Icon
+            boxSize={compact ? "12px" : "14px"}
+            color="orange.fg"
+            flexShrink={0}
+            aria-label="No model-cost match"
+          >
+            <CircleHelp />
+          </Icon>
+        )}
+        {compact ? (
+          <MonoCell truncate whiteSpace={undefined}>
+            {primary}
+          </MonoCell>
+        ) : (
+          <Text textStyle="sm" color="fg.muted" truncate>
+            {primary}
+          </Text>
+        )}
+        {overflow > 0 && (
+          <Text as="span" textStyle="2xs" color="fg.subtle" fontWeight="semibold" flexShrink={0}>
+            +{overflow}
+          </Text>
+        )}
+      </Badge>
+    </FilterChip>
+  );
+
+  if (overflow === 0) return chip;
+  return <ModelsTooltip models={row.models}>{chip}</ModelsTooltip>;
+}
+
+export const ModelCell = {
+  id: "model",
+  label: "Model",
+  render: ({ row }) => renderModel(row, "compact"),
+  renderComfortable: ({ row }) => renderModel(row, "comfortable"),
+} as const satisfies CellDef<TraceListItem>;

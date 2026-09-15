@@ -19,9 +19,7 @@ export const experimentGetStateCommand = async (
 
   const service = new ExperimentsApiService();
   const spinner = createSpinner(
-    isVersionOnly
-      ? `Checking version of "${slug}"...`
-      : `Fetching setup for "${slug}"...`,
+    isVersionOnly ? `Checking version of "${slug}"...` : `Fetching setup for "${slug}"...`,
   ).start();
 
   try {

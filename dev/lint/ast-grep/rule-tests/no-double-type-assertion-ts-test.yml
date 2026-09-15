@@ -1,0 +1,10 @@
+id: no-double-type-assertion-ts
+valid:
+  - "const a = value as Widget;"
+  - "const b = raw as unknown;"
+  - "const c = JSON.parse(text) as Config;"
+  - "function f(v: unknown): Widget { return v as Widget; }"
+invalid:
+  - "const a = value as unknown as Widget;"
+  - "const b = (globalThis as unknown as { URL: UrlCtor }).URL;"
+  - "return payload as unknown as Record<string, string>;"

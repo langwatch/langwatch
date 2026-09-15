@@ -3,11 +3,7 @@ import { createSpinner } from "../../utils/spinner";
 import { TracesApiService } from "@/client-sdk/services/traces/traces-api.service";
 import { resolveCredentials } from "../../utils/apiKey";
 import { failSpinner } from "../../utils/spinnerError";
-import {
-  printResult,
-  resolveOutputOptions,
-  type RawOutputFlags,
-} from "../../utils/output";
+import { printResult, resolveOutputOptions, type RawOutputFlags } from "../../utils/output";
 
 export const getTraceCommand = async (
   traceId: string,
@@ -24,8 +20,7 @@ export const getTraceCommand = async (
     // flag (`--format digest|json`). Now the output contract decides: any
     // machine format needs the rich "json" response to render from; the human
     // default keeps the AI-readable "digest" text.
-    const apiFormat =
-      resolveOutputOptions(options).format === "table" ? "digest" : "json";
+    const apiFormat = resolveOutputOptions(options).format === "table" ? "digest" : "json";
     trace = await service.get(traceId, { format: apiFormat });
 
     spinner.succeed(`Found trace "${traceId}"`);

@@ -62,10 +62,7 @@ describe("assertFormatIsSupported", () => {
         const legacy = legacyCommand();
         legacy.setOptionValue("format", "json");
 
-        const effective = await assertFormatIsSupported(
-          legacy,
-          resolveActionOutputOptions(legacy),
-        );
+        const effective = await assertFormatIsSupported(legacy, resolveActionOutputOptions(legacy));
 
         expect(exited).toEqual([]);
         expect(effective.format).toBe("json");
@@ -118,10 +115,7 @@ describe("assertFormatIsSupported", () => {
         const legacy = legacyCommand();
         legacy.setOptionValue("agent", true);
 
-        const effective = await assertFormatIsSupported(
-          legacy,
-          resolveActionOutputOptions(legacy),
-        );
+        const effective = await assertFormatIsSupported(legacy, resolveActionOutputOptions(legacy));
 
         expect(exited).toEqual([]);
         expect(effective.format).toBe("table");
@@ -140,10 +134,7 @@ describe("assertFormatIsSupported", () => {
         registerOutputOptions(program);
         owner.setOptionValue("json", true);
 
-        const effective = await assertFormatIsSupported(
-          owner,
-          resolveActionOutputOptions(owner),
-        );
+        const effective = await assertFormatIsSupported(owner, resolveActionOutputOptions(owner));
 
         expect(exited).toEqual([]);
         expect(effective.format).toBe("json");

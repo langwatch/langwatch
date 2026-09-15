@@ -1,6 +1,8 @@
-import { defineConfig } from "vitest/config";
+import { defineModuleVitestConfig } from "../packages/test-harness/src/vitest-config.ts";
 
-export default defineConfig({
+export default defineModuleVitestConfig({
+  kind: "node",
+  isolate: false,
   test: {
     testTimeout: 60 * 60 * 1000, // 1 hour
     // Sweeps the workspaces the scenarios leave in the system temp folder.

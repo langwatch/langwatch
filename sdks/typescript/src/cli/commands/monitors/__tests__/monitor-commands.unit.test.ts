@@ -1,7 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 vi.mock("../../../utils/apiKey", () => ({
-  resolveCredentials: vi.fn(async () => ({ apiKey: "test-key", source: "env", endpoint: "https://app.langwatch.ai" })),
+  resolveCredentials: vi.fn(async () => ({
+    apiKey: "test-key",
+    source: "env",
+    endpoint: "https://app.langwatch.ai",
+  })),
 }));
 
 vi.mock("ora", () => ({
@@ -72,8 +76,8 @@ describe("listMonitorsCommand()", () => {
 
     await listMonitorsCommand();
     expect(mockFetch).toHaveBeenCalledWith(
-      expect.stringContaining("/api/monitors"),
-      expect.any(Object)
+      expect.stringContaining("/api/v1/monitors"),
+      expect.any(Object),
     );
   });
 
@@ -120,13 +124,17 @@ describe("getMonitorCommand()", () => {
 
     await getMonitorCommand("mon_abc");
     expect(mockFetch).toHaveBeenCalledWith(
-      expect.stringContaining("/api/monitors/mon_abc"),
-      expect.any(Object)
+      expect.stringContaining("/api/v1/monitors/mon_abc"),
+      expect.any(Object),
     );
   });
 
   it("exits when monitor not found", async () => {
-    mockFetch.mockResolvedValue({ ok: false, status: 404, text: async () => "Not found" });
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 404,
+      text: async () => "Not found",
+    });
     await expect(getMonitorCommand("nonexistent")).rejects.toThrow(ProcessExitError);
   });
 });
@@ -154,11 +162,11 @@ describe("createMonitorCommand()", () => {
       evaluatorId: "eval_abc",
     });
     expect(mockFetch).toHaveBeenCalledWith(
-      expect.stringContaining("/api/monitors"),
+      expect.stringContaining("/api/v1/monitors"),
       expect.objectContaining({
         method: "POST",
         body: expect.stringContaining("ragas/toxicity"),
-      })
+      }),
     );
   });
 
@@ -168,7 +176,7 @@ describe("createMonitorCommand()", () => {
         checkType: "ragas/toxicity",
         evaluatorId: "eval_abc",
         executionMode: "INVALID",
-      })
+      }),
     ).rejects.toThrow(ProcessExitError);
   });
 
@@ -177,9 +185,9 @@ describe("createMonitorCommand()", () => {
     it("fails before calling the API and points at evaluator create and list", async () => {
       const errorSpy = vi.spyOn(console, "error").mockImplementation(noop);
 
-      await expect(
-        createMonitorCommand("Test", { checkType: "ragas/toxicity" })
-      ).rejects.toThrow(ProcessExitError);
+      await expect(createMonitorCommand("Test", { checkType: "ragas/toxicity" })).rejects.toThrow(
+        ProcessExitError,
+      );
 
       expect(mockFetch).not.toHaveBeenCalled();
       const output = errorSpy.mock.calls.map((call) => call.join(" ")).join("\n");
@@ -212,16 +220,20 @@ describe("updateMonitorCommand()", () => {
 
     await updateMonitorCommand("mon_abc", { enabled: "false" });
     expect(mockFetch).toHaveBeenCalledWith(
-      expect.stringContaining("/api/monitors/mon_abc"),
-      expect.objectContaining({ method: "PATCH" })
+      expect.stringContaining("/api/v1/monitors/mon_abc"),
+      expect.objectContaining({ method: "PATCH" }),
     );
   });
 
   it("exits when monitor not found", async () => {
-    mockFetch.mockResolvedValue({ ok: false, status: 404, text: async () => "Not found" });
-    await expect(
-      updateMonitorCommand("bad_id", { name: "New Name" })
-    ).rejects.toThrow(ProcessExitError);
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 404,
+      text: async () => "Not found",
+    });
+    await expect(updateMonitorCommand("bad_id", { name: "New Name" })).rejects.toThrow(
+      ProcessExitError,
+    );
   });
 });
 
@@ -245,13 +257,17 @@ describe("deleteMonitorCommand()", () => {
 
     await deleteMonitorCommand("mon_abc");
     expect(mockFetch).toHaveBeenCalledWith(
-      expect.stringContaining("/api/monitors/mon_abc"),
-      expect.objectContaining({ method: "DELETE" })
+      expect.stringContaining("/api/v1/monitors/mon_abc"),
+      expect.objectContaining({ method: "DELETE" }),
     );
   });
 
   it("exits when monitor not found", async () => {
-    mockFetch.mockResolvedValue({ ok: false, status: 404, text: async () => "Not found" });
+    mockFetch.mockResolvedValue({
+      ok: false,
+      status: 404,
+      text: async () => "Not found",
+    });
     await expect(deleteMonitorCommand("bad_id")).rejects.toThrow(ProcessExitError);
   });
 });

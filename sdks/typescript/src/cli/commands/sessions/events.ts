@@ -1,16 +1,13 @@
 import chalk from "chalk";
 import { z } from "zod";
-import { createSpinner } from "../../utils/spinner";
-import { resolveCredentials } from "../../utils/apiKey";
-import { formatFetchError } from "../../utils/formatFetchError";
-import { failSpinner } from "../../utils/spinnerError";
-import { clockTime, dayHeading, localDay } from "../../utils/event-clock";
-import {
-  printResult,
-  type RawOutputFlags,
-} from "../../utils/output";
-import { createCommandEvents } from "../../telemetry/events";
-import { cliAuthHeaders } from "../../utils/authHeaders";
+import { createSpinner } from "../../utils/spinner.ts";
+import { resolveCredentials } from "../../utils/apiKey.ts";
+import { formatFetchError } from "../../utils/formatFetchError.ts";
+import { failSpinner } from "../../utils/spinnerError.ts";
+import { clockTime, dayHeading, localDay } from "../../utils/event-clock.ts";
+import { printResult, type RawOutputFlags } from "../../utils/output.ts";
+import { createCommandEvents } from "../../telemetry/events.ts";
+import { cliAuthHeaders } from "../../utils/authHeaders.ts";
 import { langwatchFetch } from "@/internal/http/langwatchFetch";
 
 /** Bound each page request so a quiet socket cannot hold the CLI open forever. */
@@ -55,35 +52,22 @@ type SessionEvent = z.infer<typeof sessionEventSchema>;
 const parseLimitOption = (raw: string | undefined): number => {
   const limit = raw ? Number(raw) : DEFAULT_LIMIT;
   if (!Number.isSafeInteger(limit) || limit <= 0) {
-    console.error(
-      chalk.red(`Error: --limit must be a positive whole number, got "${raw}"`),
-    );
+    console.error(chalk.red(`Error: --limit must be a positive whole number, got "${raw}"`));
     process.exit(1);
   }
   return limit;
 };
 
 /**
- * `--from`/`--to` as epoch ms. Both spellings the help promises are accepted:
- * an ISO string and a bare epoch-ms integer. Anything else stops the command
- * here, because `new Date(...).getTime()` on unparsable input is NaN and the
- * server would receive the literal string "NaN" as the bound.
+ * `--from`/`--to` as epoch ms. Both spellings the help promises are accepted: an ISO
+ * string and a bare epoch-ms integer.
  */
-const parseTimeOption = (
-  raw: string | undefined,
-  flag: string,
-): number | undefined => {
+const parseTimeOption = (raw: string | undefined, flag: string): number | undefined => {
   if (raw === undefined) return undefined;
   const trimmed = raw.trim();
-  const parsed = /^-?\d+$/.test(trimmed)
-    ? Number(trimmed)
-    : new Date(trimmed).getTime();
+  const parsed = /^-?\d+$/.test(trimmed) ? Number(trimmed) : new Date(trimmed).getTime();
   if (!Number.isFinite(parsed)) {
-    console.error(
-      chalk.red(
-        `Error: ${flag} must be an ISO date or epoch ms, got "${raw}"`,
-      ),
-    );
+    console.error(chalk.red(`Error: ${flag} must be an ISO date or epoch ms, got "${raw}"`));
     process.exit(1);
   }
   return parsed;
@@ -126,7 +110,7 @@ const fetchAllSessionEvents = async ({
     if (cursor) params.set("cursor", cursor);
 
     const response = await langwatchFetch(
-      `${endpoint}/api/coding-agent/sessions/${encodeURIComponent(sessionId)}/events?${params}`,
+      `${endpoint}/api/v1/coding-agent/sessions/${encodeURIComponent(sessionId)}/events?${params}`,
       {
         headers: cliAuthHeaders({ apiKey }),
         signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
@@ -144,11 +128,7 @@ const fetchAllSessionEvents = async ({
     nextCursor = page.nextCursor;
     onProgress(collected.length);
 
-    if (
-      !page.nextCursor ||
-      page.events.length === 0 ||
-      collected.length >= limit
-    ) {
+    if (!page.nextCursor || page.events.length === 0 || collected.length >= limit) {
       break;
     }
     cursor = page.nextCursor;
@@ -250,9 +230,7 @@ const renderEvent = (event: SessionEvent): string => {
   switch (event.eventKind) {
     case "model_call": {
       const context =
-        (event.cacheReadTokens ?? 0) +
-        (event.cacheCreationTokens ?? 0) +
-        (event.inputTokens ?? 0);
+        (event.cacheReadTokens ?? 0) + (event.cacheCreationTokens ?? 0) + (event.inputTokens ?? 0);
       const lane = event.agentType ? ` [${event.agentType}]` : "";
       return `${stamp} model call${lane} ${event.model ?? ""} context=${context.toLocaleString()} output=${(event.outputTokens ?? 0).toLocaleString()}${event.costUsd != null ? ` $${event.costUsd.toFixed(4)}` : ""}`;
     }

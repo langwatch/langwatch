@@ -56,14 +56,10 @@ describe("Prompt fetch policies (real API)", () => {
       prompt: "Hello from default policy",
     });
 
-    const { result: prompt, calls } = await withFetchSpy(() =>
-      runDefaultFetchPolicy(handle),
-    );
+    const { result: prompt, calls } = await withFetchSpy(() => runDefaultFetchPolicy(handle));
     expect(prompt).toBeTruthy();
     expect(prompt?.handle).toContain("default-policy");
-    expect((prompt)?.prompt ?? "").toContain(
-      "Hello from default policy",
-    );
+    expect(prompt?.prompt ?? "").toContain("Hello from default policy");
     expect(calls).toBeGreaterThan(0);
     await langwatch.prompts.delete(handle);
   }, 60_000);
@@ -72,12 +68,10 @@ describe("Prompt fetch policies (real API)", () => {
     const handle = HandleUtil.unique("always-fetch");
     await langwatch.prompts.create({ handle, prompt: "Always fetch from API" });
 
-    const { result: prompt, calls } = await withFetchSpy(() =>
-      runAlwaysFetchPolicy(handle),
-    );
+    const { result: prompt, calls } = await withFetchSpy(() => runAlwaysFetchPolicy(handle));
     expect(prompt).toBeTruthy();
     expect(prompt?.handle).toContain("always-fetch");
-    expect((prompt)?.prompt ?? "").toContain("Always fetch from API");
+    expect(prompt?.prompt ?? "").toContain("Always fetch from API");
     expect(calls).toBeGreaterThan(0);
     await langwatch.prompts.delete(handle);
   }, 60_000);

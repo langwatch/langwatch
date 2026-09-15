@@ -30,9 +30,7 @@ export const deleteScenarioCommand = async (id: string): Promise<CommandResult |
 
   try {
     await service.delete(id);
-    deleteSpinner.succeed(
-      `Archived scenario "${chalk.cyan(scenarioName)}"`,
-    );
+    deleteSpinner.succeed(`Archived scenario "${chalk.cyan(scenarioName)}"`);
   } catch (error) {
     failSpinner({
       spinner: deleteSpinner,

@@ -1,12 +1,6 @@
 /**
- * The fakes the session context hook suites share: a collector that records
- * what it was posted, a git runner that answers from a table, a temporary
- * fingerprint directory, and the stdout/exit capture that both of the hook's
- * promises to a session are asserted against.
- *
- * Not named `*.test.ts` on purpose. Vitest's `include` is `src/**\/*.test.ts`,
- * so this module is imported by the suites rather than collected as one.
- *
+ * Test harness: shared fakes for session context hook suites.
+ * Not a test file (imported by suites, not collected).
  * Feature: specs/ai-governance/cli-wrappers/session-context-hook.feature
  */
 
@@ -21,8 +15,7 @@ import type { GitRunner } from "../git-context";
 
 export const ENDPOINT = "http://app.example.com/api/otel";
 export const SESSION_ID = "0199a1f4-2c5e-7a10-9f61-2d7f0a3b5c11";
-export const TRACEPARENT =
-  "00-16872e6253edb3e8748023ff172703c4-be7ce7c6bf1173f5-01";
+export const TRACEPARENT = "00-16872e6253edb3e8748023ff172703c4-be7ce7c6bf1173f5-01";
 export const NOW = 1_700_000_000_000;
 
 /** A linked worktree of langwatch/langwatch, checked out on a feature branch. */
@@ -75,13 +68,12 @@ export const unreachableCollector: typeof fetch = (async () => {
   throw new Error("connect ECONNREFUSED");
 }) as unknown as typeof fetch;
 
-export const attributesOf = (
-  request: PostedRequest,
-): Record<string, string> =>
+export const attributesOf = (request: PostedRequest): Record<string, string> =>
   Object.fromEntries(
-    request.body.resourceLogs[0]!.scopeLogs[0]!.logRecords[0]!.attributes.map(
-      (attribute) => [attribute.key, attribute.value.stringValue],
-    ),
+    request.body.resourceLogs[0]!.scopeLogs[0]!.logRecords[0]!.attributes.map((attribute) => [
+      attribute.key,
+      attribute.value.stringValue,
+    ]),
   );
 
 export const recordOf = (request: PostedRequest) =>
@@ -146,8 +138,7 @@ export const installHookHarness = (): HookHarness => {
   const exits: number[] = [];
   let stateDir = "";
 
-  const collector =
-    (status = 200): typeof fetch =>
+  const collector = (status = 200): typeof fetch =>
     ((url: string, init: { headers: Record<string, string>; body: string }) => {
       posted.push({
         url,
@@ -204,15 +195,10 @@ export const installHookHarness = (): HookHarness => {
     }: RunHookOptions = {}) =>
       hookCommand({
         tool,
-        env: shouldOmitExporterEnv
-          ? env
-          : { OTEL_EXPORTER_OTLP_ENDPOINT: ENDPOINT, ...env },
+        env: shouldOmitExporterEnv ? env : { OTEL_EXPORTER_OTLP_ENDPOINT: ENDPOINT, ...env },
         readInput:
           readInput ??
-          (() =>
-            Promise.resolve(
-              typeof input === "string" ? input : JSON.stringify(input),
-            )),
+          (() => Promise.resolve(typeof input === "string" ? input : JSON.stringify(input))),
         runGit: runGit ?? gitRunner(git),
         fetchImpl,
         now: () => now,

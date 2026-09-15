@@ -49,6 +49,7 @@ Concretely:
 ## Consequences
 
 **Positive.**
+
 - Setting one model across many scopes is one storage row with N scope attachments. Editing the model id touches one place; renaming a scope or removing a chip is one delete.
 - The merge logic is trivial. Absence of a key means inherit; the resolver walks PROJECT → TEAM → ORGANIZATION → legacy → system. No sentinel strings anywhere on the wire.
 - The settings UI maps one-to-one onto storage. One row in the table = one `ModelDefaultConfig`. One scope chip = one join row.
@@ -56,11 +57,13 @@ Concretely:
 - The principal-style scope pattern is reused, not reinvented. `ScopeChipPicker` is the shared UI primitive; the per-table-enum convention is consistent across `RoleBinding`, `GatewayBudget`, `ModelProvider`, `ModelDefaultConfig`.
 
 **Negative.**
+
 - The JSON config payload has no per-key foreign-key constraints. A typo in a feature key persists silently in the JSON until the resolver tries to read it. The feature registry's `featureByKey` throws on unknown keys at module load on the dev side, but a stale config can still carry an orphan key.
 - Adding a fifth scope tier (a hypothetical "workspace") means touching the resolver's tier walk and the scope picker. Not a current concern but worth flagging.
 - The legacy B2 scalar columns hang around for one release. New code MUST go through `resolveModelForFeature`; the sweep PR enforces this once every reader migrates.
 
 **Neutral.**
+
 - The cascade walk costs at most three Postgres queries per resolution (one per tier), each indexed on `(scopeType, scopeId)` via the join. In practice the resolver loads every attached config in one query and partitions client-side, so the actual cost is `1 query + O(configs)` partitioning, which is cheap.
 - The default-models settings page becomes its own surface below the model-providers list, hidden when zero providers are configured. The onboarding flow seeds the org-scope config in the same submit that enables the first provider, so a fresh organization with one configured provider always has a working default.
 

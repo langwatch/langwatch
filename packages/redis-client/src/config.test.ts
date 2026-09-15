@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { RedisConfigService } from "./config";
+import { RedisConfigService } from "./config.ts";
 
 const config = new RedisConfigService();
 
@@ -29,15 +29,13 @@ describe("RedisConfigService", () => {
     });
 
     it("accepts entries that carry a scheme", () => {
-      expect(
-        config.resolve({ clusterEndpoints: "redis://one:6390" }),
-      ).toMatchObject({ endpoints: [{ host: "one", port: 6390 }] });
+      expect(config.resolve({ clusterEndpoints: "redis://one:6390" })).toMatchObject({
+        endpoints: [{ host: "one", port: 6390 }],
+      });
     });
 
     it("ignores blank entries and surrounding whitespace", () => {
-      expect(
-        config.resolve({ clusterEndpoints: " one:6379 , ,two:6380 " }),
-      ).toMatchObject({
+      expect(config.resolve({ clusterEndpoints: " one:6379 , ,two:6380 " })).toMatchObject({
         endpoints: [
           { host: "one", port: 6379 },
           { host: "two", port: 6380 },
@@ -89,25 +87,25 @@ describe("RedisConfigService", () => {
     });
 
     it("accepts the highest valid database index", () => {
-      expect(
-        config.resolve({ url: "redis://localhost:6379", dbIndex: 15 }),
-      ).toMatchObject({ db: 15 });
+      expect(config.resolve({ url: "redis://localhost:6379", dbIndex: 15 })).toMatchObject({
+        db: 15,
+      });
     });
 
     /** @scenario "A database index outside the valid range falls back to zero" */
     it("falls back to database 0 for an out-of-range index", () => {
       for (const dbIndex of ["16", "99", "-1"]) {
-        expect(
-          config.resolve({ url: "redis://localhost:6379", dbIndex }),
-        ).toMatchObject({ db: 0 });
+        expect(config.resolve({ url: "redis://localhost:6379", dbIndex })).toMatchObject({
+          db: 0,
+        });
       }
     });
 
     it("falls back to database 0 for a malformed or absent index", () => {
       for (const dbIndex of [void 0, "", "two", "1.5"]) {
-        expect(
-          config.resolve({ url: "redis://localhost:6379", dbIndex }),
-        ).toMatchObject({ db: 0 });
+        expect(config.resolve({ url: "redis://localhost:6379", dbIndex })).toMatchObject({
+          db: 0,
+        });
       }
     });
 

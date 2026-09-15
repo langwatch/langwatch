@@ -14,20 +14,25 @@ The SDKs, the CLI and the MCP server list, create, read, update and delete datas
 import langwatch
 
 # Initialize the SDK (or set LANGWATCH_API_KEY environment variable)
+
 langwatch.setup()
-```
+
+````
   </Tab>
   <Tab title="TypeScript">
 ```typescript
 import { LangWatch } from "langwatch";
 
 const langwatch = new LangWatch();
-```
+````
+
   </Tab>
 </Tabs>
 
 <Note>
-  If you are using a **service API key** (e.g. for CI/CD or multi-project setups), you must also set the `LANGWATCH_PROJECT_ID` environment variable so the SDK knows which project to access. You can find the project ID in your project settings.
+  If you are using a **service API key** (e.g. for CI/CD or multi-project setups), you must also set
+  the `LANGWATCH_PROJECT_ID` environment variable so the SDK knows which project to access. You can
+  find the project ID in your project settings.
 </Note>
 
 ## List Datasets
@@ -41,13 +46,15 @@ Retrieve all datasets for your project with pagination support.
 result = langwatch.dataset.list_datasets()
 
 for ds in result.data:
-    print(f"{ds.name} ({ds.slug}) - {len(ds.columnTypes)} columns")
+print(f"{ds.name} ({ds.slug}) - {len(ds.columnTypes)} columns")
 
 print(f"Page {result.pagination.page} of {result.pagination.totalPages}")
 
 # List with explicit pagination
+
 result = langwatch.dataset.list_datasets(page=2, limit=10)
-```
+
+````
   </Tab>
   <Tab title="TypeScript">
 ```typescript
@@ -62,7 +69,8 @@ console.log(`Page ${result.pagination.page} of ${result.pagination.totalPages}`)
 
 // List with explicit pagination
 const page2 = await langwatch.datasets.list({ page: 2, limit: 10 });
-```
+````
+
   </Tab>
 </Tabs>
 
@@ -84,8 +92,10 @@ info = langwatch.dataset.create_dataset(
 print(f"Created: {info.name} (slug: {info.slug})")
 
 # Create with just a name (columns can be added later)
+
 info = langwatch.dataset.create_dataset("Simple Dataset")
-```
+
+````
   </Tab>
   <Tab title="TypeScript">
 ```typescript
@@ -101,7 +111,8 @@ console.log(`Created: ${info.name} (slug: ${info.slug})`);
 
 // Create with just a name
 const simple = await langwatch.datasets.create({ name: "Simple Dataset" });
-```
+````
+
   </Tab>
 </Tabs>
 
@@ -116,13 +127,16 @@ Fetch a dataset by slug or ID, including all its entries.
 dataset = langwatch.dataset.get_dataset("your-dataset-slug")
 
 # Access entries
+
 for entry in dataset.entries:
-    print(entry.id, entry.entry)
+print(entry.id, entry.entry)
 
 # Convert to pandas DataFrame for easy manipulation
+
 df = dataset.to_pandas()
 print(df.head())
-```
+
+````
   </Tab>
   <Tab title="TypeScript">
 ```typescript
@@ -133,7 +147,8 @@ const dataset = await langwatch.datasets.get("your-dataset-slug");
 for (const entry of dataset.entries) {
   console.log(entry.entry);
 }
-```
+````
+
   </Tab>
 </Tabs>
 
@@ -149,11 +164,13 @@ updated = langwatch.dataset.update_dataset("my-dataset", name="New Name")
 print(f"New slug: {updated.slug}")
 
 # Update column types
+
 updated = langwatch.dataset.update_dataset(
-    "my-dataset",
-    columns=[{"name": "question", "type": "string"}, {"name": "answer", "type": "string"}],
+"my-dataset",
+columns=[{"name": "question", "type": "string"}, {"name": "answer", "type": "string"}],
 )
-```
+
+````
   </Tab>
   <Tab title="TypeScript">
 ```typescript
@@ -170,7 +187,8 @@ const withCols = await langwatch.datasets.update("my-dataset", {
     { name: "answer", type: "string" },
   ],
 });
-```
+````
+
   </Tab>
 </Tabs>
 
@@ -179,16 +197,8 @@ const withCols = await langwatch.datasets.update("my-dataset", {
 Archive a dataset by slug or ID.
 
 <Tabs>
-  <Tab title="Python">
-```python
-langwatch.dataset.delete_dataset("my-dataset")
-```
-  </Tab>
-  <Tab title="TypeScript">
-```typescript
-await langwatch.datasets.delete("my-dataset");
-```
-  </Tab>
+  <Tab title="Python">```python langwatch.dataset.delete_dataset("my-dataset") ```</Tab>
+  <Tab title="TypeScript">```typescript await langwatch.datasets.delete("my-dataset"); ```</Tab>
 </Tabs>
 
 ## List Records
@@ -202,13 +212,15 @@ Retrieve records from a dataset with pagination.
 result = langwatch.dataset.list_records("my-dataset")
 
 for record in result.data:
-    print(record.id, record.entry)
+print(record.id, record.entry)
 
 print(f"Total: {result.pagination.total}")
 
 # List with explicit pagination
+
 result = langwatch.dataset.list_records("my-dataset", page=2, limit=20)
-```
+
+````
   </Tab>
   <Tab title="TypeScript">
 ```typescript
@@ -226,7 +238,8 @@ const page2 = await langwatch.datasets.listRecords("my-dataset", {
   page: 2,
   limit: 20,
 });
-```
+````
+
   </Tab>
 </Tabs>
 
@@ -292,19 +305,12 @@ Batch-delete records by their IDs.
 
 <Tabs>
   <Tab title="Python">
-```python
-deleted_count = langwatch.dataset.delete_records(
-    "my-dataset",
-    record_ids=["rec-1", "rec-2"],
-)
-print(f"Deleted {deleted_count} records")
-```
+    ```python deleted_count = langwatch.dataset.delete_records( "my-dataset", record_ids=["rec-1",
+    "rec-2"], ) print(f"Deleted {deleted_count} records") ```
   </Tab>
   <Tab title="TypeScript">
-```typescript
-const result = await langwatch.datasets.deleteRecords("my-dataset", ["rec-1", "rec-2"]);
-console.log(`Deleted ${result.deletedCount} records`);
-```
+    ```typescript const result = await langwatch.datasets.deleteRecords("my-dataset", ["rec-1",
+    "rec-2"]); console.log(`Deleted ${result.deletedCount} records`); ```
   </Tab>
 </Tabs>
 
@@ -320,11 +326,14 @@ result = langwatch.dataset.upload("my-dataset", file_path="data.csv")
 print(f"Created {result.recordsCreated} records")
 
 # Replace all records (delete existing, then upload)
+
 result = langwatch.dataset.upload("my-dataset", file_path="data.csv", if_exists="replace")
 
 # Error if dataset already exists (create-only)
+
 result = langwatch.dataset.upload("my-dataset", file_path="data.csv", if_exists="error")
-```
+
+````
 
 The `if_exists` parameter controls how conflicts are handled:
 
@@ -347,15 +356,15 @@ await langwatch.datasets.upload("my-dataset", file, { ifExists: "replace" });
 
 // Error if dataset already exists (create-only)
 await langwatch.datasets.upload("my-dataset", file, { ifExists: "error" });
-```
+````
 
 The `ifExists` parameter controls how conflicts are handled:
 
-| Value | Behavior |
-|-------|----------|
-| `"append"` (default) | Append rows to the existing dataset, or create it if it doesn't exist |
-| `"replace"` | Delete all existing records first, then upload. Creates the dataset if it doesn't exist |
-| `"error"` | Throw an error if the dataset already exists. Creates it otherwise |
+| Value                | Behavior                                                                                |
+| -------------------- | --------------------------------------------------------------------------------------- |
+| `"append"` (default) | Append rows to the existing dataset, or create it if it doesn't exist                   |
+| `"replace"`          | Delete all existing records first, then upload. Creates the dataset if it doesn't exist |
+| `"error"`            | Throw an error if the dataset already exists. Creates it otherwise                      |
 
   </Tab>
 </Tabs>
@@ -372,18 +381,20 @@ import langwatch
 langwatch.setup()
 
 # Fetch dataset
+
 df = langwatch.dataset.get_dataset("your-dataset-slug").to_pandas()
 
 # Initialize evaluation
+
 evaluation = langwatch.experiment.init("my-evaluation")
 
-for index, row in evaluation.loop(df.iterrows()):
-    # Run your LLM/agent
-    output = my_llm(row["input"])
+for index, row in evaluation.loop(df.iterrows()): # Run your LLM/agent
+output = my_llm(row["input"])
 
     # Log evaluation metrics
     evaluation.log("response_quality", index=index, score=0.9)
-```
+
+````
   </Tab>
   <Tab title="TypeScript">
 ```typescript
@@ -408,7 +419,8 @@ await evaluation.run(
   },
   { concurrency: 4 }
 );
-```
+````
+
   </Tab>
 </Tabs>
 
@@ -416,14 +428,14 @@ await evaluation.run(
 
 Each dataset entry contains:
 
-| Field | Description |
-|-------|-------------|
-| `id` | Unique identifier for the entry |
-| `entry` | The actual data (e.g., `input`, `expected_output`, `contexts`) |
-| `datasetId` | ID of the parent dataset |
-| `projectId` | ID of the project |
-| `createdAt` | Timestamp of creation |
-| `updatedAt` | Timestamp of last update |
+| Field       | Description                                                    |
+| ----------- | -------------------------------------------------------------- |
+| `id`        | Unique identifier for the entry                                |
+| `entry`     | The actual data (e.g., `input`, `expected_output`, `contexts`) |
+| `datasetId` | ID of the parent dataset                                       |
+| `projectId` | ID of the project                                              |
+| `createdAt` | Timestamp of creation                                          |
+| `updatedAt` | Timestamp of last update                                       |
 
 Which fields you get back depends on the operation. `list_records` returns all six. `create_records` returns `id`, `entry` and `createdAt`. In Python, `get_dataset` returns entries with `id` and `entry` only.
 
@@ -442,8 +454,8 @@ const dataset = await langwatch.datasets.get<MyDatasetEntry>("my-dataset");
 
 // Now entry.entry is typed as MyDatasetEntry
 for (const entry of dataset.entries) {
-  console.log(entry.entry.input);  // Typed as string
-  console.log(entry.entry.expected_output);  // Typed as string
+  console.log(entry.entry.input); // Typed as string
+  console.log(entry.entry.expected_output); // Typed as string
 }
 ```
 
@@ -474,17 +486,17 @@ A service API key also needs `LANGWATCH_PROJECT_ID`, so the CLI knows which proj
 
 If you're using an AI coding agent (Claude Code, Cursor, etc.) with the [LangWatch MCP server](/integration/mcp), dataset tools are available directly:
 
-| Tool | Description |
-|------|-------------|
-| `platform_list_datasets` | List all datasets with record counts |
-| `platform_get_dataset` | Get dataset metadata, columns, and record preview |
-| `platform_create_dataset` | Create a new dataset with optional column definitions |
-| `platform_update_dataset` | Update dataset name or column types |
-| `platform_delete_dataset` | Archive a dataset |
-| `platform_list_dataset_records` | List the records of a dataset, one page at a time |
-| `platform_create_dataset_records` | Add records in batch (max 1000) |
-| `platform_update_dataset_record` | Update a single record |
-| `platform_delete_dataset_records` | Delete records by IDs |
+| Tool                              | Description                                           |
+| --------------------------------- | ----------------------------------------------------- |
+| `platform_list_datasets`          | List all datasets with record counts                  |
+| `platform_get_dataset`            | Get dataset metadata, columns, and record preview     |
+| `platform_create_dataset`         | Create a new dataset with optional column definitions |
+| `platform_update_dataset`         | Update dataset name or column types                   |
+| `platform_delete_dataset`         | Archive a dataset                                     |
+| `platform_list_dataset_records`   | List the records of a dataset, one page at a time     |
+| `platform_create_dataset_records` | Add records in batch (max 1000)                       |
+| `platform_update_dataset_record`  | Update a single record                                |
+| `platform_delete_dataset_records` | Delete records by IDs                                 |
 
 The `platform_list_datasets`, `platform_get_dataset` and `platform_list_dataset_records` tools support a `format` parameter, use `"json"` for raw data or `"digest"` (default) for AI-readable markdown.
 

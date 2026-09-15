@@ -18,9 +18,7 @@ import { getOutputFormat } from "../errorOutput";
 let savedAgentEnv: Record<string, string | undefined> = {};
 
 beforeEach(() => {
-  savedAgentEnv = Object.fromEntries(
-    AGENT_MODE_ENV_VARS.map((name) => [name, process.env[name]]),
-  );
+  savedAgentEnv = Object.fromEntries(AGENT_MODE_ENV_VARS.map((name) => [name, process.env[name]]));
   for (const name of AGENT_MODE_ENV_VARS) delete process.env[name];
   vi.spyOn(console, "log").mockImplementation(() => undefined);
 });
@@ -91,13 +89,10 @@ describe("resolveOutputOptions flag normalisation", () => {
 });
 
 describe("agent-mode detection", () => {
-  it.each(AGENT_MODE_ENV_VARS.map((name) => [name]))(
-    "activates on the %s env var",
-    (name) => {
-      expect(isAgentModeEnv({ [name]: "1" })).toBe(true);
-      expect(resolveOutputOptions({}, { [name]: "1" }).format).toBe("agents");
-    },
-  );
+  it.each(AGENT_MODE_ENV_VARS.map((name) => [name]))("activates on the %s env var", (name) => {
+    expect(isAgentModeEnv({ [name]: "1" })).toBe(true);
+    expect(resolveOutputOptions({}, { [name]: "1" }).format).toBe("agents");
+  });
 
   it("ignores env values that mean 'off'", () => {
     for (const value of ["", "0", "false"]) {

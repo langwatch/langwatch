@@ -8,7 +8,7 @@ vi.mock("../../../utils/apiKey", () => ({
   })),
 }));
 
-import { readCliErrorDocument } from "@langwatch/langy/cards/handled-error";
+import { readCliErrorDocument } from "@langwatch/langy-contract/cards/handled-error";
 import { REQUEST_TIMEOUT_MS, uiCallCommand } from "../call";
 
 /**
@@ -46,8 +46,7 @@ describe("the ui call command", () => {
   describe("given the page applies the action", () => {
     it("sends the dispatch with a deadline on it", async () => {
       const fetchMock = vi.fn(
-        async (_url: string, _init?: RequestInit) =>
-          new Response('{"executedVia":"browser"}'),
+        async (_url: string, _init?: RequestInit) => new Response('{"executedVia":"browser"}'),
       );
       vi.stubGlobal("fetch", fetchMock);
 
@@ -89,7 +88,7 @@ describe("the ui call command", () => {
     it("sets a deadline the agent harness cannot outrun", () => {
       // Both numbers belong to other layers, so they are written here as the
       // boundary this test pins. UI_ACTION_MAX_BUDGET_MS lives in
-      // platform/app/src/server/app-layer/langy/ui-actions/ui-action.service.ts.
+      // modules/langy/server/src/services/langy-ui-action.service.ts.
       const SERVER_BUDGET_CEILING_MS = 15_000;
       const AGENT_HARNESS_COMMAND_LIMIT_MS = 30_000;
 
@@ -107,9 +106,7 @@ describe("the ui call command", () => {
         }),
       );
 
-      await expect(uiCallCommand("workbench.getState", {})).rejects.toThrow(
-        "fetch failed",
-      );
+      await expect(uiCallCommand("workbench.getState", {})).rejects.toThrow("fetch failed");
     });
   });
 
@@ -141,8 +138,7 @@ describe("the ui call command", () => {
       await writeFile(file, JSON.stringify(AWKWARD), "utf8");
 
       const fetchMock = vi.fn(
-        async (_url: string, _init?: RequestInit) =>
-          new Response('{"executedVia":"browser"}'),
+        async (_url: string, _init?: RequestInit) => new Response('{"executedVia":"browser"}'),
       );
       vi.stubGlobal("fetch", fetchMock);
 
@@ -161,8 +157,7 @@ describe("the ui call command", () => {
       );
 
       const fetchMock = vi.fn(
-        async (_url: string, _init?: RequestInit) =>
-          new Response('{"executedVia":"browser"}'),
+        async (_url: string, _init?: RequestInit) => new Response('{"executedVia":"browser"}'),
       );
       vi.stubGlobal("fetch", fetchMock);
 
@@ -230,8 +225,7 @@ describe("the ui call command", () => {
       const document = readCliErrorDocument(stdout.join("\n"));
       expect(document).toMatchObject({
         code: "langy_ui_payload_invalid",
-        message:
-          'The payload for "workbench.setTargetPrompt" does not match the action\'s schema.',
+        message: 'The payload for "workbench.setTargetPrompt" does not match the action\'s schema.',
       });
     });
   });

@@ -29,9 +29,7 @@ export async function handleListEvaluators(): Promise<string> {
     lines.push("");
   }
 
-  lines.push(
-    "> Use `platform_get_evaluator` with the ID or slug to see full evaluator details.",
-  );
+  lines.push("> Use `platform_get_evaluator` with the ID or slug to see full evaluator details.");
 
   return lines.join("\n");
 }

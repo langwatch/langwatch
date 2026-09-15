@@ -131,9 +131,7 @@ describe("installAppEnv", () => {
       installAppEnv(target, otelVars);
 
       const written = JSON.parse(fs.readFileSync(target.path, "utf8"));
-      expect(written.env.OTEL_EXPORTER_OTLP_ENDPOINT).toBe(
-        "http://app.example.com/api/otel",
-      );
+      expect(written.env.OTEL_EXPORTER_OTLP_ENDPOINT).toBe("http://app.example.com/api/otel");
     });
   });
 
@@ -144,9 +142,7 @@ describe("installAppEnv", () => {
       fs.mkdirSync(path.dirname(target.path), { recursive: true });
       fs.writeFileSync(target.path, "{not valid json");
 
-      expect(() => installAppEnv(target, otelVars)).toThrow(
-        /is not valid JSON/,
-      );
+      expect(() => installAppEnv(target, otelVars)).toThrow(/is not valid JSON/);
       expect(fs.readFileSync(target.path, "utf8")).toBe("{not valid json");
     });
   });
@@ -221,11 +217,7 @@ describe("appEnvHasAnyVar", () => {
     fs.mkdirSync(path.dirname(target.path), { recursive: true });
     fs.writeFileSync(
       target.path,
-      JSON.stringify(
-        { env: { OTEL_EXPORTER_OTLP_ENDPOINT: "http://x", USER: "keep" } },
-        null,
-        2,
-      ),
+      JSON.stringify({ env: { OTEL_EXPORTER_OTLP_ENDPOINT: "http://x", USER: "keep" } }, null, 2),
     );
     expect(appEnvHasAnyVar(target, Object.keys(otelVars))).toBe(true);
   });
@@ -233,10 +225,7 @@ describe("appEnvHasAnyVar", () => {
   it("returns false when the env has none of the keys", () => {
     const target = appSettingsTargetFor("claude")!;
     fs.mkdirSync(path.dirname(target.path), { recursive: true });
-    fs.writeFileSync(
-      target.path,
-      JSON.stringify({ env: { USER_ONLY: "x" } }, null, 2),
-    );
+    fs.writeFileSync(target.path, JSON.stringify({ env: { USER_ONLY: "x" } }, null, 2));
     expect(appEnvHasAnyVar(target, Object.keys(otelVars))).toBe(false);
   });
 });

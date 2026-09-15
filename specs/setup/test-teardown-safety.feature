@@ -84,3 +84,12 @@ Feature: Test teardown cannot sweep the shared database
       Given a test file calling deleteMany with no filter at all
       When the teardown check runs over it
       Then the file fails the check
+
+    @unit
+    Scenario: A domain method named deleteMany is not a table
+      Given a test file calling deleteMany on the unit under test
+      When the teardown check runs over it
+      Then the file passes the check
+      # A Prisma model is always reached through the client, so a delegate call
+      # has a model segment in front of it. A bare receiver is our own tRPC
+      # procedure or repository method of the same name, driven against a fake.

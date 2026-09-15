@@ -93,3 +93,24 @@ Feature: Scenario API
     When I call scenarios.getRunState with the runId
     Then I receive the current run state
     And the state includes conversation events
+
+  # ============================================================================
+  # Platform links (`platformUrl`)
+  # ============================================================================
+
+  # A scenario resource's `platformUrl` builds under the deployment's own
+  # public origin, sourced through the scenario module's config slice (not a
+  # process member) exactly like suite, dataset and evaluator already do -
+  # see apps/api/src/app/api-production.composition.ts's `apiModuleConfig`.
+
+  @unit
+  Scenario: A scenario's platform link answers when a public base URL is configured
+    Given a deployment that configured a public base URL for the scenario module
+    When a scenario resource asks for its platform link
+    Then it answers a URL built under that public base URL
+
+  @unit
+  Scenario: A scenario's platform link refuses by name without a public base URL
+    Given a deployment that named no public base URL for the scenario module
+    When a scenario resource asks for its platform link
+    Then it refuses by name instead of crashing

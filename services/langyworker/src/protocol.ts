@@ -174,13 +174,7 @@ export function boundJsonValue({
 }
 
 /** Byte-accurate truncation that never splits a code point. */
-export function truncateToBytes({
-  text,
-  maxBytes,
-}: {
-  text: string;
-  maxBytes: number;
-}): string {
+export function truncateToBytes({ text, maxBytes }: { text: string; maxBytes: number }): string {
   if (maxBytes <= 0) return "";
   const buffer = Buffer.from(text, "utf8");
   if (buffer.byteLength <= maxBytes) return text;

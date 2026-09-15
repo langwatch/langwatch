@@ -47,7 +47,7 @@ export interface Harness {
 }
 
 export async function startHarness(
-  options: Parameters<typeof startHttpServer>[0]
+  options: Parameters<typeof startHttpServer>[0],
 ): Promise<Harness> {
   const { server, port, host } = await startHttpServer(options);
   return {

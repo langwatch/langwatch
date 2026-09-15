@@ -54,10 +54,7 @@ const origHome = process.env.HOME;
 const origUserprofile = process.env.USERPROFILE;
 const origShell = process.env.SHELL;
 const origConfig = process.env.LANGWATCH_CLI_CONFIG;
-const origTtyDescriptor = Object.getOwnPropertyDescriptor(
-  process.stdin,
-  "isTTY",
-);
+const origTtyDescriptor = Object.getOwnPropertyDescriptor(process.stdin, "isTTY");
 const origEndpoint = process.env.OTEL_EXPORTER_OTLP_ENDPOINT;
 
 const otelVars: Record<string, string> = {
@@ -74,24 +71,15 @@ const cfg = (overrides: Partial<GovernanceConfig> = {}): GovernanceConfig => ({
   ...overrides,
 });
 
-const settingsPath = (): string =>
-  path.join(tmpHome, ".claude", "settings.json");
+const settingsPath = (): string => path.join(tmpHome, ".claude", "settings.json");
 
-const writeJson = ({
-  segments,
-  value,
-}: {
-  segments: string[];
-  value: unknown;
-}): void => writeClaudeJson({ home: tmpHome, segments, value });
+const writeJson = ({ segments, value }: { segments: string[]; value: unknown }): void =>
+  writeClaudeJson({ home: tmpHome, segments, value });
 
-const seedInstalledPlugin = (): void =>
-  seedInstalledPluginFixture({ home: tmpHome });
+const seedInstalledPlugin = (): void => seedInstalledPluginFixture({ home: tmpHome });
 
 const rawHookEntry = {
-  hooks: [
-    { type: "command", command: "langwatch ingest hook claude-code", timeout: 10 },
-  ],
+  hooks: [{ type: "command", command: "langwatch ingest hook claude-code", timeout: 10 }],
 };
 
 const readSettings = (): Record<string, any> =>
@@ -102,14 +90,10 @@ const rawHooksPresent = (): boolean =>
   fs.readFileSync(settingsPath(), "utf8").includes("langwatch ingest hook");
 
 const commandsRun = (): string[] =>
-  spawnSyncMock.mock.calls.map((call: unknown[]) =>
-    (call[1] as string[]).join(" "),
-  );
+  spawnSyncMock.mock.calls.map((call: unknown[]) => (call[1] as string[]).join(" "));
 
 /** Runs the offer against a fresh module graph, so the CLI probe runs once. */
-const runOffer = async (
-  config: GovernanceConfig = cfg(),
-): Promise<void> => {
+const runOffer = async (config: GovernanceConfig = cfg()): Promise<void> => {
   vi.resetModules();
   const { maybeOfferIngestionShellRcPersist } = await import("../shell-rc.js");
   await maybeOfferIngestionShellRcPersist({
@@ -191,9 +175,7 @@ describe("the claude persist offer", () => {
     it("installs the plugin instead of writing raw hook entries", async () => {
       await runOffer();
 
-      expect(commandsRun()).toContain(
-        "plugin install langwatch@langwatch --scope user",
-      );
+      expect(commandsRun()).toContain("plugin install langwatch@langwatch --scope user");
       expect(readSettings().hooks).toBeUndefined();
       expect(rawHooksPresent()).toBe(false);
     });
@@ -227,10 +209,7 @@ describe("the claude persist offer", () => {
     it("writes the raw hook entries and attempts no install", async () => {
       await runOffer();
 
-      expect(Object.keys(readSettings().hooks)).toEqual([
-        "SessionStart",
-        "Stop",
-      ]);
+      expect(Object.keys(readSettings().hooks)).toEqual(["SessionStart", "Stop"]);
       expect(commandsRun()).toEqual(["plugin --help"]);
     });
   });
@@ -245,10 +224,7 @@ describe("the claude persist offer", () => {
     it("falls back to the raw hook entries", async () => {
       await runOffer();
 
-      expect(Object.keys(readSettings().hooks)).toEqual([
-        "SessionStart",
-        "Stop",
-      ]);
+      expect(Object.keys(readSettings().hooks)).toEqual(["SessionStart", "Stop"]);
     });
 
     /** @scenario "A failed plugin install never fails the session it was offered in" */
@@ -274,10 +250,7 @@ describe("the claude persist offer", () => {
       await runOffer();
 
       expect(commandsRun()).toEqual([]);
-      expect(Object.keys(readSettings().hooks)).toEqual([
-        "SessionStart",
-        "Stop",
-      ]);
+      expect(Object.keys(readSettings().hooks)).toEqual(["SessionStart", "Stop"]);
     });
   });
 
@@ -357,10 +330,7 @@ describe("the silent re-assert of an already-configured device", () => {
     it("asserts the raw hook entries without running a claude subprocess", async () => {
       await runOffer();
 
-      expect(Object.keys(readSettings().hooks)).toEqual([
-        "SessionStart",
-        "Stop",
-      ]);
+      expect(Object.keys(readSettings().hooks)).toEqual(["SessionStart", "Stop"]);
       expect(commandsRun()).toEqual([]);
       expect(lastPrompts).toHaveLength(0);
     });

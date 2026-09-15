@@ -1,0 +1,334 @@
+/**
+ * Single-source preview formatter for the trace explorer's truncated I/O surfaces
+ * (table cell, group preview, conversation-context strip, system prompt banner).
+ */
+
+import { splitLeadingContextBlocks } from "@langwatch/coding-agent-contract";
+import {
+  applyPreviewNewlineTreatment,
+  stripPreviewMarkdownNoise,
+} from "../model/preview-markdown.ts";
+import { pythonReprToJson } from "../model/python-repr.ts";
+import type { PreviewOptions, PreviewResult } from "../model/preview-types.ts";
+
+export { pythonReprToJson } from "../model/python-repr.ts";
+export type { NewlineTreatment, PreviewOptions, PreviewResult } from "../model/preview-types.ts";
+
+const ELLIPSIS = "…";
+
+/**
+ * Single-key JSON envelopes worth unwrapping. Matched against the *only* key of the
+ * object — multi-key objects keep their JSON shape.
+ */
+const UNWRAP_KEY_ALLOWLIST = new Set([
+  "question",
+  "input",
+  "prompt",
+  "query",
+  "text",
+  "content",
+  "message",
+]);
+
+/** ChatMessage shape we recognise in chat-array unwrapping. */
+interface ChatMessageLike {
+  role?: string;
+  content?: unknown;
+  /**
+   * Genkit / AI SDK / Mastra emit a `parts` array (sibling of `content`), where each
+   * part is `{ type: "text" | "blob" | "reasoning" | ..., content? | text? }`.
+   */
+  parts?: unknown;
+  tool_calls?: Array<{ function?: { name?: string } }>;
+}
+
+/**
+ * Format an input/output payload for one-line / short-block preview.
+ * `null` / empty input → `{ text: "" }`.
+ */
+export function formatPreview(
+  raw: string | null | undefined,
+  options: PreviewOptions,
+): PreviewResult {
+  if (!raw) return { text: "" };
+
+  const noiseStrip = options.stripMarkdownNoise ?? true;
+  const newlines = options.newlines ?? "glyph";
+
+  // Pipeline state — each step mutates `text` and may set role/hadCode/hadImage.
+  let text = raw;
+  let role: PreviewResult["role"];
+  let hadCode = false;
+  let hadImage = false;
+
+  // 1. JSON unwrap. Only attempt when the trimmed input *looks* like JSON,
+  //    so we don't waste cycles on every plain-string preview.
+  const trimmed = text.trim();
+  const looksLikeObject = trimmed.startsWith("{") && trimmed.endsWith("}");
+  const looksLikeArray = trimmed.startsWith("[") && trimmed.endsWith("]");
+  if (looksLikeObject || looksLikeArray) {
+    const unwrap = unwrapJson(trimmed);
+    if (unwrap) {
+      text = unwrap.text;
+      role = unwrap.role;
+    }
+  }
+
+  // 1b. Strip leading XML-context blocks (Claude Code prepends
+  //     <system-reminder> / MCP-instruction / skills-list tags above the
+  //     human text). Only strip when real prose follows, so a message that
+  //     is *only* tags stays visible rather than collapsing to empty.
+  const contextSplit = splitLeadingContextBlocks(text);
+  if (contextSplit.context && contextSplit.body.trim()) {
+    text = contextSplit.body;
+  }
+
+  // 2. Markdown noise strip — fences + images. Runs after unwrap so a
+  //    JSON-wrapped fenced code block (rare but real) gets normalised first.
+  if (noiseStrip) {
+    const stripped = stripPreviewMarkdownNoise(text);
+    text = stripped.text;
+    hadCode = stripped.hadCode;
+    hadImage = stripped.hadImage;
+  }
+
+  // 3. Newline treatment.
+  text = applyPreviewNewlineTreatment(text, newlines);
+
+  // 4. Trim, hard-cap.
+  text = text.trim();
+  if (text.length > options.maxChars) {
+    text = text.slice(0, options.maxChars - 1).trimEnd() + ELLIPSIS;
+  }
+
+  return { text, role, hadCode, hadImage };
+}
+
+// ---------------------------------------------------------------------------
+// JSON unwrap: chat arrays, Anthropic typed blocks, single-key envelopes.
+
+interface UnwrapResult {
+  text: string;
+  role?: PreviewResult["role"];
+}
+
+function unwrapJson(trimmed: string): UnwrapResult | null {
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(trimmed);
+  } catch {
+    // Python SDKs sometimes log payloads via repr() — single-quoted
+    // strings, None/True/False — which JSON.parse rejects, leaving the
+    // raw dump in the preview. Convert repr to JSON and retry before
+    // giving up.
+    const converted = pythonReprToJson(trimmed);
+    if (converted === null) return null;
+    try {
+      parsed = JSON.parse(converted);
+    } catch {
+      return null;
+    }
+  }
+
+  if (Array.isArray(parsed)) {
+    return unwrapChatArray(parsed) ?? unwrapContentParts(parsed);
+  }
+  if (parsed && typeof parsed === "object") {
+    return unwrapObject(parsed as Record<string, unknown>);
+  }
+  return null;
+}
+
+/**
+ * Walk a chat-shaped array (most-recent-first) and return the text of the
+ * last message that has any. Tool calls render as `toolName(...)` so the
+ * preview shows what the model did, not just an empty content field.
+ */
+function unwrapChatArray(arr: unknown[]): UnwrapResult | null {
+  for (let i = arr.length - 1; i >= 0; i--) {
+    const msg = arr[i];
+    if (!msg || typeof msg !== "object") continue;
+    const m = msg as ChatMessageLike;
+    const toolName = m.tool_calls?.[0]?.function?.name;
+    if (toolName) {
+      return {
+        text: `${toolName}(...)`,
+        role: normaliseRole(m.role),
+      };
+    }
+    // Try `content` first (OpenAI / Anthropic), then `parts` (Genkit /
+    // AI SDK / Mastra). Either may carry the readable payload, and
+    // some integrations populate both — content wins when present.
+    const content = extractMessageContent(m.content);
+    if (content) {
+      return { text: content, role: normaliseRole(m.role) };
+    }
+    if (Array.isArray(m.parts)) {
+      const fromParts = extractMessagePartsText(m.parts);
+      if (fromParts) {
+        return { text: fromParts, role: normaliseRole(m.role) };
+      }
+    }
+  }
+  return null;
+}
+
+/**
+ * Pull text out of a `parts` array.
+ */
+const RENDERABLE_PART_TYPES = new Set(["text", "reasoning"]);
+
+function extractMessagePartsText(parts: unknown[]): string | null {
+  const texts: string[] = [];
+  for (const part of parts) {
+    if (typeof part === "string") {
+      texts.push(part);
+      continue;
+    }
+    if (!part || typeof part !== "object") continue;
+    const p = part as { type?: unknown; text?: unknown; content?: unknown };
+
+    // Typed part: only renderable types contribute to the preview.
+    if (typeof p.type === "string") {
+      if (!RENDERABLE_PART_TYPES.has(p.type)) continue;
+      if (typeof p.text === "string") {
+        texts.push(p.text);
+      } else if (typeof p.content === "string") {
+        texts.push(p.content);
+      }
+      continue;
+    }
+
+    // Typeless part: accept text or content directly.
+    if (typeof p.text === "string") {
+      texts.push(p.text);
+    } else if (typeof p.content === "string") {
+      texts.push(p.content);
+    }
+  }
+  return texts.length > 0 ? texts.join(" ") : null;
+}
+
+/**
+ * Typed content-part arrays that aren't chat messages — no `role`, just `[{type:
+ * "text", text}, {type: "input_audio", ...}, ...]` (OpenAI multi-modal user content
+ * logged bare).
+ */
+function unwrapContentParts(arr: unknown[]): UnwrapResult | null {
+  const pieces: string[] = [];
+  let hasTypedPart = false;
+  for (const part of arr) {
+    if (typeof part === "string") {
+      pieces.push(part);
+      continue;
+    }
+    if (!part || typeof part !== "object") return null;
+    const p = part as { type?: unknown; text?: unknown };
+    if (typeof p.type !== "string") return null;
+    hasTypedPart = true;
+    if (p.type === "text" && typeof p.text === "string") {
+      pieces.push(p.text);
+    } else if (p.type !== "text") {
+      pieces.push(glyphForPartType(p.type));
+    }
+  }
+  if (!hasTypedPart || pieces.length === 0) return null;
+  return { text: pieces.join(" ") };
+}
+
+function glyphForPartType(type: string): string {
+  if (type.includes("audio")) return "\u{1F399}️"; // 🎙️
+  if (type.includes("image")) return "\u{1F4F7}"; // 📷
+  if (type.includes("video")) return "\u{1F3AC}"; // 🎬
+  const isAttachment = type.includes("file") || type.includes("document");
+  if (isAttachment) return "\u{1F4CE}"; // 📎
+  return `<${type}>`;
+}
+
+/**
+ * Object unwrap: prefer Anthropic-typed blocks, fall back to single-key
+ * envelopes, otherwise stringify so we still produce *something*.
+ */
+function unwrapObject(obj: Record<string, unknown>): UnwrapResult {
+  // Anthropic typed block at the top level.
+  if (obj.type === "text" && typeof obj.text === "string") {
+    return { text: obj.text };
+  }
+  if (typeof obj.type === "string" && obj.type !== "text") {
+    // tool_use, tool_result, thinking, etc. — these rarely make readable
+    // previews on their own. Surface a tag so the user knows there *was*
+    // content but it wasn't text.
+    return { text: `<${obj.type}>` };
+  }
+
+  // Single-key envelope from the allowlist.
+  const keys = Object.keys(obj);
+  if (keys.length === 1) {
+    const key = keys[0]!;
+    const isUnwrappableKey = UNWRAP_KEY_ALLOWLIST.has(key.toLowerCase());
+    if (isUnwrappableKey) {
+      const value = obj[key];
+      if (typeof value === "string") return { text: value };
+      if (typeof value === "number" || typeof value === "boolean") {
+        return { text: String(value) };
+      }
+    }
+  }
+
+  // Fallback: stringify with no indent so it fits a one-liner.
+  try {
+    return { text: JSON.stringify(obj) };
+  } catch {
+    return { text: "" };
+  }
+}
+
+/** Pull a string out of a chat message's `content` field (string | array). */
+function extractMessageContent(content: unknown): string {
+  if (typeof content === "string") {
+    // The string might itself be a typed-block JSON — try one more unwrap.
+    const t = content.trim();
+    if (t.startsWith('{"type":"text"')) {
+      try {
+        const inner = JSON.parse(t) as { text?: string };
+        if (typeof inner.text === "string") return inner.text;
+      } catch {
+        /* fall through */
+      }
+    }
+    const isNonTextTypedBlock = t.startsWith('{"type":"') && !t.startsWith('{"type":"text"');
+    if (isNonTextTypedBlock) {
+      // Non-text typed block — nothing readable.
+      return "";
+    }
+    return content;
+  }
+  if (Array.isArray(content)) {
+    const parts: string[] = [];
+    for (const part of content) {
+      if (typeof part === "string") {
+        parts.push(part);
+      } else if (isTextPart(part)) {
+        parts.push(part.text);
+      }
+    }
+    return parts.join(" ");
+  }
+  return "";
+}
+
+/** An Anthropic-style `{ type: "text", text }` block, as a preview reads it. */
+function isTextPart(part: unknown): part is { text: string } {
+  if (!part || typeof part !== "object") return false;
+  const typed = part as { text?: unknown; type?: unknown };
+  return typed.type === "text" && typeof typed.text === "string";
+}
+
+const PREVIEW_ROLES = new Set(["assistant", "system", "tool", "user"]);
+
+function normaliseRole(role: unknown): PreviewResult["role"] {
+  if (typeof role === "string" && PREVIEW_ROLES.has(role)) {
+    return role as PreviewResult["role"];
+  }
+  return void 0;
+}

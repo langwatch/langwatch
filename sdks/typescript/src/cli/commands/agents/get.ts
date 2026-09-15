@@ -20,10 +20,7 @@ export const describeParameter = (parameter: AgentParameterSpec): string => {
 
 /**
  * Returns the agent rather than printing it: the output port renders it in
- * whatever format the caller asked for (utils/output.ts). The `table` closure
- * is the human form.
- *
- * @see specs/typescript-sdk/cli-agents.feature
+ * whatever format the caller asked for (utils/output.ts).
  */
 export const getAgentCommand = async (id: string): Promise<CommandResult | void> => {
   await resolveCredentials();
@@ -61,10 +58,16 @@ export const getAgentCommand = async (id: string): Promise<CommandResult | void>
           );
         }
         if (agent.lastSeenAt) {
-          console.log(`  ${chalk.gray("Last seen:")}   ${new Date(agent.lastSeenAt).toLocaleString()}`);
+          console.log(
+            `  ${chalk.gray("Last seen:")}   ${new Date(agent.lastSeenAt).toLocaleString()}`,
+          );
         }
-        console.log(`  ${chalk.gray("Created:")}     ${new Date(agent.createdAt).toLocaleString()}`);
-        console.log(`  ${chalk.gray("Updated:")}     ${new Date(agent.updatedAt).toLocaleString()}`);
+        console.log(
+          `  ${chalk.gray("Created:")}     ${new Date(agent.createdAt).toLocaleString()}`,
+        );
+        console.log(
+          `  ${chalk.gray("Updated:")}     ${new Date(agent.updatedAt).toLocaleString()}`,
+        );
 
         if (agent.platformUrl) {
           console.log(`  ${chalk.bold("View:")}        ${chalk.underline(agent.platformUrl)}`);

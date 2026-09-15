@@ -1,19 +1,40 @@
-import type { paths, components } from "@/internal/generated/openapi/api-client";
-import {
-  createLangWatchApiClient,
-  type LangwatchApiClient,
-} from "@/internal/api/client";
+import type { paths } from "@/internal/generated/openapi/api-client";
+import { createLangWatchApiClient, type LangwatchApiClient } from "@/internal/api/client";
 import { type InternalConfig } from "@/client-sdk/types";
 import {
   extractStatusFromResponse,
   formatApiErrorForOperation,
 } from "@/client-sdk/services/_shared/format-api-error";
+import { unwrapApiResult } from "@/client-sdk/services/_shared/unwrap-api-result";
 
-export type AnnotationResponse = components["schemas"]["Annotation"];
+// The generator no longer names this shape as a standalone component (every
+// annotation operation now inlines it), so the type comes from a real
+// operation's response rather than a `components["schemas"]` entry that
+// nothing in the spec defines any more.
+export type AnnotationResponse = NonNullable<
+  paths["/api/v1/annotations/{id}"]["get"]["responses"][200]["content"]
+>["application/json"]["data"];
 
 export type CreateAnnotationBody = NonNullable<
-  paths["/api/annotations/trace/{id}"]["post"]["requestBody"]
+  paths["/api/v1/annotations/trace/{id}"]["post"]["requestBody"]
 >["content"]["application/json"];
+
+export type DeleteAnnotationResponse = { status?: string; message?: string };
+
+/**
+ * The delete endpoint's `application/json` content is `unknown` in the
+ * document (the generator no longer names it as a component schema), so the
+ * shape this service promises callers is verified at runtime rather than
+ * assumed.
+ */
+function isDeleteAnnotationResponse(value: unknown): value is DeleteAnnotationResponse {
+  if (typeof value !== "object" || value === null) return false;
+  const record = value as Record<string, unknown>;
+  return (
+    (record.status === undefined || typeof record.status === "string") &&
+    (record.message === undefined || typeof record.message === "string")
+  );
+}
 
 export class AnnotationsApiError extends Error {
   constructor(
@@ -33,61 +54,83 @@ export class AnnotationsApiService {
     this.apiClient = config?.langwatchApiClient ?? createLangWatchApiClient();
   }
 
-  private handleApiError(operation: string, error: unknown): never {
-    const message = formatApiErrorForOperation({ operation: operation, error: error, options: {
-      status: extractStatusFromResponse(error),
-    } });
+  private handleApiError(operation: string, error: unknown, response?: Response): never {
+    const message = formatApiErrorForOperation({
+      operation: operation,
+      error: error,
+      options: {
+        status: response?.status ?? extractStatusFromResponse(error),
+      },
+    });
     throw new AnnotationsApiError(message, operation, error);
   }
 
   async getAll(): Promise<AnnotationResponse[]> {
-    const { data, error } = await this.apiClient.GET("/api/annotations");
-    if (error) this.handleApiError("fetch all annotations", error);
-    return data.data;
+    const { data, error, response } = await this.apiClient.GET("/api/v1/annotations");
+    return unwrapApiResult({
+      operation: "fetch all annotations",
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    }).data;
   }
 
   async get(id: string): Promise<AnnotationResponse> {
-    const { data, error } = await this.apiClient.GET("/api/annotations/{id}", {
+    const { data, error, response } = await this.apiClient.GET("/api/v1/annotations/{id}", {
       params: { path: { id } },
     });
-    if (error)
-      this.handleApiError(`fetch annotation with ID "${id}"`, error);
-    return data.data;
+    return unwrapApiResult({
+      operation: `fetch annotation with ID "${id}"`,
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    }).data;
   }
 
   async getByTrace(traceId: string): Promise<AnnotationResponse[]> {
-    const { data, error } = await this.apiClient.GET(
-      "/api/annotations/trace/{id}",
-      {
-        params: { path: { id: traceId } },
-      },
-    );
-    if (error)
-      this.handleApiError(`fetch annotations for trace "${traceId}"`, error);
-    return data.data;
+    const { data, error, response } = await this.apiClient.GET("/api/v1/annotations/trace/{id}", {
+      params: { path: { id: traceId } },
+    });
+    return unwrapApiResult({
+      operation: `fetch annotations for trace "${traceId}"`,
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    }).data;
   }
 
   async create(traceId: string, params: CreateAnnotationBody): Promise<AnnotationResponse> {
-    const { data, error } = await this.apiClient.POST(
-      "/api/annotations/trace/{id}",
-      {
-        params: { path: { id: traceId } },
-        body: params,
-      },
-    );
-    if (error) this.handleApiError("create annotation", error);
-    return data.data;
+    const { data, error, response } = await this.apiClient.POST("/api/v1/annotations/trace/{id}", {
+      params: { path: { id: traceId } },
+      body: params,
+    });
+    return unwrapApiResult({
+      operation: "create annotation",
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    }).data;
   }
 
-  async delete(id: string): Promise<{ status?: string; message?: string }> {
-    const { data, error } = await this.apiClient.DELETE(
-      "/api/annotations/{id}",
-      {
-        params: { path: { id } },
-      },
-    );
-    if (error)
-      this.handleApiError(`delete annotation with ID "${id}"`, error);
-    return data;
+  async delete(id: string): Promise<DeleteAnnotationResponse> {
+    const { data, error, response } = await this.apiClient.DELETE("/api/v1/annotations/{id}", {
+      params: { path: { id } },
+    });
+    const operation = `delete annotation with ID "${id}"`;
+    const result = unwrapApiResult({
+      operation,
+      data,
+      error,
+      response,
+      onError: this.handleApiError.bind(this),
+    });
+    if (!isDeleteAnnotationResponse(result)) {
+      this.handleApiError(operation, new Error("Delete annotation response has an unexpected shape"));
+    }
+    return result;
   }
 }

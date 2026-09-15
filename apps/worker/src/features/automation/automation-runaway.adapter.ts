@@ -1,0 +1,264 @@
+import {
+  AutomationHeartbeat,
+  AutomationRunawayMetricsSink,
+  AutomationRunaway,
+  type ClaimLease,
+} from "@langwatch/automation-server";
+import type { AutomationLimitNextStep } from "@langwatch/automation-contract";
+import type { AuthzService } from "@langwatch/authz-contract";
+import { sendAutomationLimitEmail } from "@langwatch/mail";
+import type { EmailDelivery } from "@langwatch/notification-server";
+import { createLogger, type Logger } from "@langwatch/observability";
+import type { ProjectApi } from "@langwatch/project-contract";
+import type { RedisConnection } from "@langwatch/redis-client";
+import { nanoid } from "nanoid";
+import { z } from "zod";
+import { nowInstant } from "@langwatch/time";
+
+/**
+ * Who a limit notice goes to, resolved through this process's own directories.
+ *
+ * Two collaborators rather than one because a project's admins are an
+ * ORGANIZATION's role bindings: the ceiling is breached by a project, the
+ * people who can do something about it are named on its organization, and the
+ * hop between the two is the project directory's answer.
+ */
+export type WorkerAutomationRunawayDirectories = Readonly<{
+  projects: Pick<ProjectApi, "getOrganizationId" | "findById">;
+  authorization: Pick<AuthzService, "listOrganizationBindings">;
+}>;
+
+/** The routed client a project's traces are counted on. */
+export type WorkerRunawayClickHouseResolver = AutomationHeartbeat["findClickHouseClient"];
+
+/** Which addresses this project has already asked not to hear from again. */
+export type WorkerAutomationRunawaySuppression = Readonly<{
+  filterSuppressed(input: {
+    projectId: string;
+    triggerId: string;
+    emails: string[];
+  }): Promise<string[]>;
+}>;
+
+/**
+ * Where a project's organization can go for a higher ceiling. Optional: a
+ * deployment that composed no self-serve catalogue still contains a runaway
+ * automation, it just names no upgrade in the mail.
+ */
+export type WorkerAutomationNextStepResolver = Readonly<{
+  resolve(projectId: string): Promise<AutomationLimitNextStep | undefined>;
+}>;
+
+/**
+ * Infrastructure for Automation's runaway containment, in this process. Owns the
+ * substrates that policy names (trace counts, admin roll, mailer, etc.).
+ */
+export class WorkerAutomationRunawayAdapter extends AutomationRunaway {
+  static create(input: {
+    redis: RedisConnection | null;
+    directories: WorkerAutomationRunawayDirectories;
+    suppression: WorkerAutomationRunawaySuppression;
+    mailer: EmailDelivery;
+    resolveClickHouseClient: WorkerRunawayClickHouseResolver;
+    metrics: AutomationRunawayMetricsSink;
+    baseHost: string;
+    /** Absent on a deployment that composed no self-serve plan catalogue. */
+    nextStep?: WorkerAutomationNextStepResolver | null;
+    logger?: Logger;
+  }): WorkerAutomationRunawayAdapter {
+    return new WorkerAutomationRunawayAdapter(
+      input,
+      input.logger ?? createLogger("langwatch:automation:runaway-containment"),
+    );
+  }
+
+  private constructor(
+    private readonly input: {
+      redis: RedisConnection | null;
+      directories: WorkerAutomationRunawayDirectories;
+      suppression: WorkerAutomationRunawaySuppression;
+      mailer: EmailDelivery;
+      resolveClickHouseClient: WorkerRunawayClickHouseResolver;
+      metrics: AutomationRunawayMetricsSink;
+      baseHost: string;
+      nextStep?: WorkerAutomationNextStepResolver | null;
+    },
+    private readonly logger: Logger,
+  ) {
+    super();
+  }
+
+  async countProjectTraces24h(projectId: string): Promise<number> {
+    const client = await this.input.resolveClickHouseClient(projectId);
+    if (!client) return 0;
+    const result = await client.query({
+      query:
+        "SELECT toString(count(DISTINCT TraceId)) AS Total FROM trace_summaries WHERE TenantId = {tenantId:String} AND OccurredAt >= now() - INTERVAL 24 HOUR",
+      query_params: { tenantId: projectId },
+      format: "JSONEachRow",
+    });
+    const rows = z.array(z.object({ Total: z.string() })).parse(await result.json());
+
+    return Number.parseInt(rows[0]?.Total ?? "0", 10);
+  }
+
+  async notificationRecipients(input: { projectId: string; triggerId: string }): Promise<string[]> {
+    const { projectId, triggerId } = input;
+    const organizationId = await this.input.directories.projects.getOrganizationId(projectId);
+    const bindings = await this.input.directories.authorization.listOrganizationBindings({
+      organizationId,
+    });
+    const emails = [
+      ...new Set(
+        bindings.flatMap((binding) =>
+          binding.role === "ADMIN" && binding.user?.email ? [binding.user.email] : [],
+        ),
+      ),
+    ];
+    if (emails.length === 0) return emails;
+
+    try {
+      return await this.input.suppression.filterSuppressed({ projectId, triggerId, emails });
+    } catch (error) {
+      // Fall OPEN. A suppression list this process cannot read is a reason to
+      // mail an administrator one message they might have muted, not a reason
+      // to leave a runaway automation uncontained and nobody told.
+      this.logger.warn(
+        { projectId, triggerId, error: error instanceof Error ? error.message : String(error) },
+        "Could not read the automation suppression list; notifying every administrator",
+      );
+
+      return emails;
+    }
+  }
+
+  sendLimitEmail(params: {
+    to: string[];
+    kind: "ceiling_reached" | "paused";
+    automationName: string;
+    projectName: string;
+    dailyCeiling: number;
+    skippedToday: number;
+    actionUrl: string;
+    nextStep?: AutomationLimitNextStep;
+  }): Promise<void> {
+    return sendAutomationLimitEmail({ mailer: this.input.mailer, ...params });
+  }
+
+  async findNextStep(projectId: string): Promise<AutomationLimitNextStep | undefined> {
+    return this.input.nextStep?.resolve(projectId);
+  }
+
+  async claimOnce(key: string, ttlSeconds?: number): Promise<ClaimLease | "already-claimed"> {
+    const lease = await claimOnce({ connection: this.input.redis, key, ttlSeconds, logger: this.logger });
+    return lease ?? "already-claimed";
+  }
+
+  releaseClaim(lease: ClaimLease): Promise<void> {
+    return releaseClaim({ connection: this.input.redis, lease, logger: this.logger });
+  }
+
+  async projectName(projectId: string): Promise<string> {
+    return (await this.input.directories.projects.findById(projectId))?.name ?? "your project";
+  }
+
+  async automationUrl(input: { projectId: string; triggerId: string }): Promise<string> {
+    const project = await this.input.directories.projects.findById(input.projectId);
+
+    return `${this.input.baseHost}/${project?.slug ?? ""}/automations?drawer.open=automation&drawer.automationId=${input.triggerId}`;
+  }
+
+  onCeilingBreach(): void {
+    this.input.metrics.onCeilingBreach();
+  }
+
+  onAutoPaused(reason: string): void {
+    this.input.metrics.onAutoPaused(reason);
+  }
+
+  onContainmentFailed(): void {
+    this.input.metrics.onContainmentFailed();
+  }
+
+  error(fields: Record<string, unknown>, message: string): void {
+    this.logger.error(fields, message);
+  }
+
+  info(fields: Record<string, unknown>, message: string): void {
+    this.logger.info(fields, message);
+  }
+}
+
+const CLAIM_EXPIRE_SECONDS = 90_000;
+const CLAIM_SWEEP_INTERVAL_MS = 60_000;
+
+/**
+ * The per-pod fallback when Redis is unreachable. Notifies once per pod rather
+ * than not at all (which would silently leave runaway automations uncontained).
+ */
+const claimMemory = new Map<string, { token: string; expiresAt: number }>();
+let lastClaimSweepAt = 0;
+
+function sweepExpiredClaims(now: number): void {
+  if (now - lastClaimSweepAt < CLAIM_SWEEP_INTERVAL_MS) return;
+  lastClaimSweepAt = now;
+  for (const [key, claim] of claimMemory) {
+    if (claim.expiresAt <= now) claimMemory.delete(key);
+  }
+}
+
+async function claimOnce(input: {
+  connection: RedisConnection | null;
+  key: string;
+  ttlSeconds?: number;
+  logger: Logger;
+}): Promise<ClaimLease | null> {
+  const { connection, key, ttlSeconds = CLAIM_EXPIRE_SECONDS } = input;
+  const token = nanoid();
+  if (connection) {
+    try {
+      const taken = await connection.set(key, token, "EX", ttlSeconds, "NX");
+
+      return taken !== null ? { key, token } : null;
+    } catch (error) {
+      input.logger.warn(
+        { key, error: error instanceof Error ? error.message : String(error) },
+        "Redis error claiming an automation containment notification; falling back to a per-worker claim",
+      );
+    }
+  }
+
+  const now = nowInstant().epochMilliseconds;
+  sweepExpiredClaims(now);
+  const existing = claimMemory.get(key);
+  if (existing !== undefined && existing.expiresAt > now) return null;
+  claimMemory.set(key, { token, expiresAt: now + ttlSeconds * 1000 });
+
+  return { key, token };
+}
+
+const RELEASE_IF_OWNED_SCRIPT = `
+if redis.call('GET', KEYS[1]) == ARGV[1] then
+  return redis.call('DEL', KEYS[1])
+end
+return 0
+`;
+
+async function releaseClaim(input: {
+  connection: RedisConnection | null;
+  lease: ClaimLease;
+  logger: Logger;
+}): Promise<void> {
+  const { connection, lease } = input;
+  if (connection) {
+    try {
+      await connection.eval(RELEASE_IF_OWNED_SCRIPT, 1, lease.key, lease.token);
+    } catch (error) {
+      input.logger.warn(
+        { key: lease.key, error: error instanceof Error ? error.message : String(error) },
+        "Redis error releasing an automation containment claim; the fleet keeps it until expiry",
+      );
+    }
+  }
+  if (claimMemory.get(lease.key)?.token === lease.token) claimMemory.delete(lease.key);
+}

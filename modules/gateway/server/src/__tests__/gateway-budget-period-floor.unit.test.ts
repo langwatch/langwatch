@@ -1,0 +1,98 @@
+import { Temporal } from "@langwatch/time";
+import { describe, expect, it } from "vitest";
+import {
+  budgetPeriodFloorMs,
+  currentPeriodStart,
+  GatewayWindow,
+} from "@langwatch/gateway-contract";
+
+const NOW = Temporal.Instant.from("2026-07-15T12:00:00.000Z");
+
+describe("MANUAL window math", () => {
+  /** @scenario A MANUAL window never resets on its own */
+  it("never resets on its own", () => {
+    const resetsAt = GatewayWindow.nextResetAt("MANUAL", NOW);
+    expect(resetsAt.toZonedDateTimeISO("UTC").year).toBe(9999);
+    expect(GatewayWindow.shouldResetBudget("MANUAL", resetsAt, NOW)).toBe(false);
+    // Sentinel timestamps still answer no: the boundary only moves by an
+    // explicit reset, whatever the clock says.
+    expect(
+      GatewayWindow.shouldResetBudget("MANUAL", Temporal.Instant.from("2000-01-01T00:00:00Z"), NOW),
+    ).toBe(false);
+  });
+
+  it("buckets MANUAL debits under the epoch sentinel like TOTAL", () => {
+    expect(currentPeriodStart("MANUAL", NOW).epochMilliseconds).toBe(0);
+    expect(currentPeriodStart("TOTAL", NOW).epochMilliseconds).toBe(0);
+  });
+});
+
+describe("budgetPeriodFloorMs", () => {
+  const boundary = Temporal.Instant.from("2026-07-10T09:30:00.000Z");
+
+  /** @scenario The period floor follows the stored boundary, not the calendar */
+  it("floors MANUAL always, reset calendars until the edge passes, unreset TOTAL never", () => {
+    expect(
+      budgetPeriodFloorMs(
+        {
+          window: "MANUAL",
+          currentPeriodStartedAt: boundary,
+          lastResetAt: null,
+          cycleAnchorAt: null,
+        },
+        NOW,
+      ),
+    ).toBe(boundary.epochMilliseconds);
+
+    // A MONTH budget reset on the 10th reads from the 10th for the rest
+    // of July (the calendar period start, July 1st, is behind it)...
+    expect(
+      budgetPeriodFloorMs(
+        {
+          window: "MONTH",
+          currentPeriodStartedAt: boundary,
+          lastResetAt: boundary,
+          cycleAnchorAt: null,
+        },
+        NOW,
+      ),
+    ).toBe(boundary.epochMilliseconds);
+    // ...and back on the fast path once August starts.
+    expect(
+      budgetPeriodFloorMs(
+        {
+          window: "MONTH",
+          currentPeriodStartedAt: boundary,
+          lastResetAt: boundary,
+          cycleAnchorAt: null,
+        },
+        Temporal.Instant.from("2026-08-02T00:00:00.000Z"),
+      ),
+    ).toBeUndefined();
+
+    // An unreset budget never floors: TOTAL keeps its lifetime bucket
+    // semantics even though its stored boundary is its creation time.
+    expect(
+      budgetPeriodFloorMs(
+        {
+          window: "TOTAL",
+          currentPeriodStartedAt: boundary,
+          lastResetAt: null,
+          cycleAnchorAt: null,
+        },
+        NOW,
+      ),
+    ).toBeUndefined();
+    expect(
+      budgetPeriodFloorMs(
+        {
+          window: "MONTH",
+          currentPeriodStartedAt: boundary,
+          lastResetAt: null,
+          cycleAnchorAt: null,
+        },
+        NOW,
+      ),
+    ).toBeUndefined();
+  });
+});

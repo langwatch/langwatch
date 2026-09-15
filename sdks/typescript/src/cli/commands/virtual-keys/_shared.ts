@@ -45,15 +45,19 @@ export function parseScopeArg(raw: string): VirtualKeyScope {
   const trimmed = raw.trim();
   const colon = trimmed.indexOf(":");
   if (colon < 1 || colon === trimmed.length - 1) {
-    throw new Error(`--scope value "${raw}" must be in the form TYPE:id (e.g. org:acme, team:platform, project:demo)`);
+    throw new Error(
+      `--scope value "${raw}" must be in the form TYPE:id (e.g. org:acme, team:platform, project:demo)`,
+    );
   }
   // Case-insensitive for the human typing it; the wire value is lowercase.
   const typeRaw = trimmed.slice(0, colon).toLowerCase();
   const scopeId = trimmed.slice(colon + 1).trim();
   const scopeType: VirtualKeyScopeType | null =
-    typeRaw === "org" ? "organization" :
-    (SCOPE_TYPES as readonly string[]).includes(typeRaw) ? (typeRaw as VirtualKeyScopeType) :
-    null;
+    typeRaw === "org"
+      ? "organization"
+      : (SCOPE_TYPES as readonly string[]).includes(typeRaw)
+        ? (typeRaw as VirtualKeyScopeType)
+        : null;
   if (!scopeType) {
     throw new Error(`--scope type "${typeRaw}" must be one of org | organization | team | project`);
   }

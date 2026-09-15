@@ -82,6 +82,12 @@ Feature: Organization provisioning REST API for self-hosted deployments
     When I fetch an organization id that does not exist with the credential
     Then the request is refused with status 404
 
+  @integration
+  Scenario: The roster reads the same at every path the family answers on
+    Given I created an organization with the instance administrator credential
+    When I list the organizations at each path the family answers on
+    Then every path answers the same status and the same roster
+
   # ============================================================================
   # Availability
   # ============================================================================

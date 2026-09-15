@@ -2,7 +2,7 @@
 
 - **Status:** Accepted
 - **Date:** 2026-07-10
-- **Related:** ADR-003 (logging — prod stays on CloudWatch), ADR-004 (docker dev environment), ADR-018 (governance unified observability substrate — the *product* ingest path, distinct from this)
+- **Related:** ADR-003 (logging — prod stays on CloudWatch), ADR-004 (docker dev environment), ADR-018 (governance unified observability substrate — the _product_ ingest path, distinct from this)
 - **Behavioural contract:** [specs/ops/local-observability-stack.feature](../../../specs/ops/local-observability-stack.feature)
 
 ## Context
@@ -14,13 +14,13 @@ into the local LangWatch app. An agent asked to debug a local failure has no
 single, queryable place to correlate "what happened" across the TS app and the
 two Go services (nlpgo, aigateway).
 
-The plumbing to *export* was largely already there: the TS app self-instruments
+The plumbing to _export_ was largely already there: the TS app self-instruments
 with OpenTelemetry and exports traces + logs over OTLP when
 `OTEL_EXPORTER_OTLP_ENDPOINT` / `PINO_OTEL_ENABLED` are set; the Go services
 export traces via `otelsetup`. What was missing: (a) a collector + backends to
-export *to* — there is no OTel Collector or LGTM stack deployed anywhere, and no
+export _to_ — there is no OTel Collector or LGTM stack deployed anywhere, and no
 dev Grafana; (b) TS + Go **metrics**; (c) Go **OTLP logs**; (d) a way for an
-agent to *read* the result.
+agent to _read_ the result.
 
 Production logging deliberately uses AWS CloudWatch (ADR-003), not Loki. This
 stack is strictly a **local-dev debugging aid** and must not touch the prod path.
@@ -49,7 +49,7 @@ it.
 
 3. **Go services** — `otelsetup` gains an **additive** debug-collector pipeline
    gated on `OTEL_DEBUG_COLLECTOR_ENDPOINT`. When set, every span is
-   *dual-exported* (a second BatchSpanProcessor on both the multi-tenant nlpgo
+   _dual-exported_ (a second BatchSpanProcessor on both the multi-tenant nlpgo
    path and the single-tenant aigateway path) — the primary product/ops pipeline
    is untouched — plus net-new OTLP **logs** (zap teed via the official
    `otelzap` bridge, stdout preserved) and OTLP **metrics** (Go runtime metrics).
@@ -59,7 +59,7 @@ it.
 
 4. **Reading it** — `make observability-connect` mints a Grafana service-account
    token and wires two read paths for an agent: the **`gcx` CLI** (`gcx logs/
-   metrics/traces query`) and the **Grafana skills** plugins
+metrics/traces query`) and the **Grafana skills** plugins
    (`grafana-lgtm`/`grafana-core`/`grafana-datasources`).
 
 ## Consequences
@@ -86,7 +86,8 @@ observability{,-connect,-down}` still work; they now front haven.
 
 Because haven already knows when the stack is up, it stops making the developer
 hand-tune `.env` and wires the console/Grafana split itself. When the collector
-is running, the overlay (`.env.portless`) additionally carries:
+is running, the environment haven injects into each process additionally
+carries:
 
 - `LOG_CONSOLE_LEVEL=warn` — the console shows only warnings/errors while
   `info`/`debug` flow to Loki (`LOG_OTEL_LEVEL=debug`, unchanged). This reverses

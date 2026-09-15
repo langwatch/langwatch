@@ -1,0 +1,106 @@
+import type { Event } from "../domain/types.ts";
+import {
+  CUTOFF_KEY_PREFIX,
+  doneMarkerKey,
+  isAtOrBeforeCutoffMarker,
+} from "../replay/replayConstants.ts";
+import { RecoverableError } from "../services/errorHandling.ts";
+
+/**
+ * Thrown when a fold projection event must be deferred because projection-replay
+ * is active for this aggregate. Extends RecoverableError so the GroupQueue's
+ * retry mechanism re-stages the job with exponential backoff.
+ */
+export class ReplayDeferralError extends RecoverableError {
+  constructor(projectionName: string, aggregateKey: string, reason: string) {
+    super(`projection-replay active for ${projectionName}:${aggregateKey}: ${reason}`, {
+      projectionName,
+      aggregateKey,
+    });
+    this.name = "ReplayDeferralError";
+  }
+}
+
+/** Outcome of a replay marker check. */
+export type ReplayMarkerDecision = "process" | "skip";
+
+/**
+ * Interface for checking replay markers. Implementations determine
+ * how markers are stored and looked up.
+ */
+export interface ReplayMarkerChecker {
+  /** Check if replay is active for this event (returns decision or throws ReplayDeferralError). */
+  check(projectionName: string, event: Event): Promise<ReplayMarkerDecision>;
+}
+
+/** Redis-backed replay marker checker using projection-replay cutoff markers. */
+/** Minimal Redis surface: a pipeline that batches the two marker reads. */
+interface ReplayMarkerPipeline {
+  hget(key: string, field: string): ReplayMarkerPipeline;
+  get(key: string): ReplayMarkerPipeline;
+  exec(): Promise<Array<[Error | null, unknown]> | null>;
+}
+interface ReplayMarkerRedis {
+  pipeline(): ReplayMarkerPipeline;
+}
+
+export class RedisReplayMarkerChecker implements ReplayMarkerChecker {
+  constructor(private readonly redis: ReplayMarkerRedis) {}
+
+  async check(projectionName: string, event: Event): Promise<ReplayMarkerDecision> {
+    const aggregateKey = `${String(event.tenantId)}:${event.aggregateType}:${String(event.aggregateId)}`;
+
+    // Read the active cutoff marker (in-flight replay) and the short-TTL
+    // terminal "done" marker (replay finished) in a single round-trip so the
+    // common no-replay case stays one RTT (both absent → "process").
+    const results = await this.redis
+      .pipeline()
+      .hget(`${CUTOFF_KEY_PREFIX}${projectionName}`, aggregateKey)
+      .get(doneMarkerKey(projectionName, aggregateKey))
+      .exec();
+
+    const cutoff = (results?.[0]?.[1] ?? null) as string | null;
+    const done = (results?.[1]?.[1] ?? null) as string | null;
+
+    // Active replay for this aggregate takes precedence over a stale done marker.
+    if (cutoff) {
+      if (cutoff === "pending") {
+        throw new ReplayDeferralError(
+          projectionName,
+          aggregateKey,
+          "cutoff being recorded, deferring",
+        );
+      }
+
+      if (isAtOrBeforeCutoffMarker(event.createdAt, event.id, cutoff)) {
+        return "skip";
+      }
+
+      throw new ReplayDeferralError(
+        projectionName,
+        aggregateKey,
+        "replay in progress, deferring event past cutoff",
+      );
+    }
+
+    // Replay has finished rebuilding this aggregate (terminal marker still
+    // within its TTL). Skip anything at/before the cutoff — replay already
+    // wrote it, so a job staged but never active during the pause must not
+    // re-run and double-write it — but let anything newer process live.
+    if (done) {
+      return isAtOrBeforeCutoffMarker(event.createdAt, event.id, done) ? "skip" : "process";
+    }
+
+    return "process";
+  }
+}
+
+/**
+ * No-op implementation for tests and local development where no replay
+ * coordination is needed. Always allows events through.
+ */
+export class NoopReplayMarkerChecker implements ReplayMarkerChecker {
+  async check(_projectionName: string, _event: Event): Promise<ReplayMarkerDecision> {
+    return "process";
+  }
+}

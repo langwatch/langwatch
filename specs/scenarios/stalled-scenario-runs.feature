@@ -56,6 +56,25 @@ Feature: Detect and display stalled scenario runs
     Then the event carries failure results encoding that reason
 
   # ============================================================================
+  # Backfill Task - closes runs the watchdog missed
+  # ============================================================================
+  # A scheduled task backstops the watchdog: it finds runs stalled before the
+  # watchdog existed or while it was down, and closes them the same way.
+
+  @unit
+  Scenario: Composing the task never resolves its collaborators
+    Given a StalledRunsBackfillTask constructed with its finder and execution factories
+    When the task is constructed
+    Then neither factory is called until the task runs
+
+  @unit
+  Scenario: A run resolves both collaborators exactly once and delegates to the backfill
+    Given a StalledRunsBackfillTask with a finder that reports one stalled run
+    When the task runs
+    Then the finder and execution factories are each resolved exactly once
+    And the stalled run is closed through the resolved execution service
+
+  # ============================================================================
   # End-to-End - User Workflow
   # ============================================================================
   # Full user-visible flow: user sees a stalled run and understands what happened.

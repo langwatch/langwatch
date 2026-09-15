@@ -1,10 +1,6 @@
 import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { EvaluationsFacade } from "../evaluations.facade";
-import {
-  EvaluatorNotFoundError,
-  EvaluationsApiError,
-  EvaluatorCallError,
-} from "../errors";
+import { EvaluatorNotFoundError, EvaluationsApiError, EvaluatorCallError } from "../errors";
 import type { EvaluateResponse } from "../types";
 import { NoOpLogger } from "@/logger";
 
@@ -111,7 +107,7 @@ describe("EvaluationsFacade", () => {
       });
 
       expect(mockFetch).toHaveBeenCalledWith(
-        "https://api.langwatch.ai/api/evaluations/presidio/pii_detection/evaluate",
+        "https://api.langwatch.ai/api/v1/evaluations/presidio/pii_detection/evaluate",
         expect.objectContaining({
           method: "POST",
           headers: expect.objectContaining({
@@ -120,7 +116,7 @@ describe("EvaluationsFacade", () => {
             "x-auth-token": "test-api-key",
           }),
           body: expect.any(String),
-        })
+        }),
       );
 
       // Verify body contents
@@ -139,9 +135,11 @@ describe("EvaluationsFacade", () => {
         text: () => Promise.resolve("Not found"),
       });
 
-      const error = await facade.evaluate("non-existent", {
-        data: { input: "test" },
-      }).catch((e) => e);
+      const error = await facade
+        .evaluate("non-existent", {
+          data: { input: "test" },
+        })
+        .catch((e) => e);
 
       expect(error).toBeInstanceOf(EvaluatorNotFoundError);
       expect(error.message).toBe("Evaluator not found: non-existent");
@@ -157,7 +155,7 @@ describe("EvaluationsFacade", () => {
       await expect(
         facade.evaluate("test-evaluator", {
           data: { input: "test" },
-        })
+        }),
       ).rejects.toThrow(EvaluationsApiError);
     });
 
@@ -220,9 +218,11 @@ describe("EvaluationsFacade", () => {
     it("wraps network errors in EvaluatorCallError", async () => {
       mockFetch.mockRejectedValueOnce(new Error("Network error"));
 
-      const error = await facade.evaluate("test-evaluator", {
-        data: { input: "test" },
-      }).catch((e) => e);
+      const error = await facade
+        .evaluate("test-evaluator", {
+          data: { input: "test" },
+        })
+        .catch((e) => e);
 
       expect(error).toBeInstanceOf(EvaluatorCallError);
       expect(error.message).toContain("Network error");

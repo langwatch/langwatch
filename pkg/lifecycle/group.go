@@ -102,7 +102,7 @@ func (g *Group) Run(ctx context.Context) error {
 	// Start services in registration order.
 	started := 0
 	for _, svc := range g.services {
-		g.logger.Info("lifecycle_start", zap.Stringer("service", svc))
+		g.logger.Info("lifecycle_start", zap.Stringer("lifecycle_service", svc))
 		if err := svc.Start(ctx); err != nil {
 			cancel()
 			_ = g.stopN(context.Background(), started)
@@ -165,7 +165,7 @@ func (g *Group) stopN(ctx context.Context, n int) error {
 	var first error
 	for i := n - 1; i >= 0; i-- {
 		svc := g.services[i]
-		g.logger.Info("lifecycle_stop", zap.Stringer("service", svc))
+		g.logger.Info("lifecycle_stop", zap.Stringer("lifecycle_service", svc))
 		if err := svc.Stop(ctx); err != nil {
 			g.logger.Warn("lifecycle_stop_error",
 				zap.Stringer("lifecycle_service", svc), zap.Error(err))

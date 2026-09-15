@@ -1,18 +1,7 @@
 /**
- * The fixture the cross-project-access suites share: a real HTTP server
- * standing in for the platform, a temporary CLI config, and a runner that
- * spawns the REAL built CLI against both.
- *
- * The server records the exact `Authorization` header of every data request,
- * because that header IS the feature: a user-scoped key carries no project
- * identity, so `Basic base64(projectId:key)` is the only thing that tells the
- * platform which project the command means.
- *
- * Requires `pnpm build` (like the other CLI integration tests in this
- * package). One `installCrossProjectHarness()` call per suite file installs
- * the hooks and returns everything the cases read.
- *
- * Feature: specs/typescript-sdk/cli-cross-project-access.feature
+ * The fixture the cross-project-access suites share: a real HTTP server standing in for
+ * the platform, a temporary CLI config, and a runner that spawns the REAL built CLI
+ * against both.
  */
 import { spawn } from "node:child_process";
 import * as fs from "node:fs";
@@ -80,10 +69,7 @@ export interface CrossProjectHarness {
   /** Write a logged-in CLI config, with any extra keys merged in. */
   writeSession: (extra?: Record<string, unknown>) => void;
   /** Run the built CLI with the harness environment. */
-  run: (args: {
-    args: string[];
-    env?: Record<string, string>;
-  }) => Promise<RunResult>;
+  run: (args: { args: string[]; env?: Record<string, string> }) => Promise<RunResult>;
   /** The header a user-scoped key produces for a named project. */
   basicFor: (args: { projectId: string; apiKey: string }) => string;
   /** What the platform saw during the current case. */
@@ -151,25 +137,25 @@ export function installCrossProjectHarness(): CrossProjectHarness {
           return;
         }
 
-        if (url.startsWith("/api/traces/search")) {
+        if (url.startsWith("/api/v1/traces/search")) {
           recorded.searchAuth = auth;
           json(200, { traces: [], pagination: { totalHits: 0 } });
           return;
         }
 
-        if (url.startsWith("/api/coding-agent/sessions/")) {
+        if (url.startsWith("/api/v1/coding-agent/sessions/")) {
           recorded.sessionEventsAuth = auth;
           json(200, { events: [], nextCursor: null });
           return;
         }
 
-        if (url.startsWith("/api/traces/")) {
+        if (url.startsWith("/api/v1/traces/")) {
           recorded.traceGetAuth = auth;
           json(200, { trace_id: "abc123" });
           return;
         }
 
-        if (url.startsWith("/api/me/project")) {
+        if (url.startsWith("/api/v1/me/project")) {
           json(200, {
             id: PERSONAL_PROJECT.id,
             name: PERSONAL_PROJECT.name,
@@ -182,16 +168,12 @@ export function installCrossProjectHarness(): CrossProjectHarness {
         json(404, { error: "not_found" });
       });
     });
-    await new Promise<void>((resolveListen) =>
-      server.listen(0, "127.0.0.1", resolveListen),
-    );
+    await new Promise<void>((resolveListen) => server.listen(0, "127.0.0.1", resolveListen));
     endpoint = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
   }, 30_000);
 
   afterAll(async () => {
-    await new Promise<void>((resolveClose) =>
-      server.close(() => resolveClose()),
-    );
+    await new Promise<void>((resolveClose) => server.close(() => resolveClose()));
   });
 
   beforeEach(() => {
@@ -237,12 +219,11 @@ export function installCrossProjectHarness(): CrossProjectHarness {
     env?: Record<string, string>;
   }): Promise<RunResult> =>
     new Promise((resolve) => {
-      // The runner's own shell (and the repo .env vitest loads) may carry a
-      // real LANGWATCH_API_KEY; every case here is about a CLI with NO key in
-      // its environment except where the case sets one. The agent-mode
-      // markers are scrubbed too, or an agent running this suite would flip
-      // the CLI into agents format and change which rendering the assertions
-      // see.
+      // The runner's own shell (and the repo .env vitest loads) may carry a real
+      // LANGWATCH_API_KEY; every case here is about a CLI with NO key in its environment except
+      // where the case sets one. The agent-mode markers are scrubbed too, or an agent running
+      // this suite would flip the CLI into agents format and change which rendering the
+      // assertions see.
       const baseEnv: Record<string, string | undefined> = { ...process.env };
       delete baseEnv.LANGWATCH_API_KEY;
       delete baseEnv.LANGWATCH_PROJECT_ID;
@@ -277,13 +258,7 @@ export function installCrossProjectHarness(): CrossProjectHarness {
       child.on("close", (exitCode) => resolve({ stdout, stderr, exitCode }));
     });
 
-  const basicFor = ({
-    projectId,
-    apiKey,
-  }: {
-    projectId: string;
-    apiKey: string;
-  }): string =>
+  const basicFor = ({ projectId, apiKey }: { projectId: string; apiKey: string }): string =>
     `Basic ${Buffer.from(`${projectId}:${apiKey}`, "utf-8").toString("base64")}`;
 
   return { writeSession, run, basicFor, recorded };

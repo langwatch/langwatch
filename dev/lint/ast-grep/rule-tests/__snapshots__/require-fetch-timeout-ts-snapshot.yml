@@ -3,21 +3,21 @@ snapshots:
   ? |
     const res = await fetch(`${base}/session`, { headers: { Authorization: token } });
   : labels:
-    - source: 'fetch(`${base}/session`, { headers: { Authorization: token } })'
-      style: primary
-      start: 18
-      end: 81
+      - source: "fetch(`${base}/session`, { headers: { Authorization: token } })"
+        style: primary
+        start: 18
+        end: 81
   ? |
     const res = await fetch(url);
   : labels:
-    - source: fetch(url)
-      style: primary
-      start: 18
-      end: 28
+      - source: fetch(url)
+        style: primary
+        start: 18
+        end: 28
   ? |
     const res = await fetch(url, { method: "POST", body: JSON.stringify(payload) });
   : labels:
-    - source: 'fetch(url, { method: "POST", body: JSON.stringify(payload) })'
-      style: primary
-      start: 18
-      end: 79
+      - source: 'fetch(url, { method: "POST", body: JSON.stringify(payload) })'
+        style: primary
+        start: 18
+        end: 79

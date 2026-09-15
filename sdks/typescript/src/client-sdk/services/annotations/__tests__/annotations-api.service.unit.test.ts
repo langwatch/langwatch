@@ -8,11 +8,8 @@ import type { LangwatchApiClient } from "@/internal/api/client";
 
 /**
  * The server wraps every annotation read and write in `{ data: ... }`
- * (`platform/app/src/server/routes/annotations.ts` — trace GET :299,
- * list GET :140, single GET :173, POST :378, PATCH :263), and has done so
- * since before the Hono migration. The published SDK returned that envelope
- * unwrapped, so `getByTrace(...).filter(...)` crashed with
- * "res.filter is not a function" (issue #7863).
+ * (`platform/app/src/server/routes/annotations.ts` — trace GET :299, list GET :140, single
+ * GET :173, POST :378, PATCH :263), and has done so since before the Hono migration.
  */
 const annotation: AnnotationResponse = {
   id: "annotation_1",
@@ -25,6 +22,11 @@ const annotation: AnnotationResponse = {
   // rather than optional.
   userId: null,
   email: "reviewer@example.com",
+  scoreOptions: {},
+  expectedOutput: null,
+  anchorKind: null,
+  anchorId: null,
+  anchorPath: null,
   createdAt: "2026-09-01T00:00:00.000Z",
   updatedAt: "2026-09-01T00:00:00.000Z",
 };

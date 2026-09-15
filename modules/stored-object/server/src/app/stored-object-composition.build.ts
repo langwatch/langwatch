@@ -1,0 +1,360 @@
+/**
+ * Builds {@link StoredObjectInfrastructure} from the deleted api composition.
+ * Omits legacy owner lookup (see stored-object-composition-green).
+ */
+import { AwsClientProcessRuntime, OutboundProxyResolver } from "@langwatch/aws-client";
+import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
+import { HandledError } from "@langwatch/handled-error";
+import type { Logger } from "@langwatch/observability";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import type { ResourceOwnership } from "@langwatch/runtime-composition";
+import {
+  mintStoredObjectUri,
+  StoredObjectOwnerResolver,
+  type StoredObjectDeliveryCapability,
+} from "@langwatch/stored-object-contract";
+import { AzureBlobCredentialsAdapter } from "../services/azure-blob-credentials.service.ts";
+import { AzureBlobStoredObjectDriverAdapter } from "../repositories/azure/azure.stored-object-blob.repository.ts";
+import { PrometheusStoredObjectsTelemetryAdapter } from "../services/prometheus.stored-objects-telemetry.service.ts";
+import { StoredObjectBlobFilesystemRepository } from "../repositories/filesystem/filesystem.stored-object-blob.repository.ts";
+import { StoredObjectBlobS3Repository } from "../repositories/s3/s3.stored-object-blob.repository.ts";
+import {
+  StoredObjectDelivery,
+  StoredObjectUploadTokenCodec,
+  type StoredObjectS3Target,
+  type StoredObjectS3TargetResolver,
+  type StoredObjectsClickHouse,
+  type StoredObjectsClickHouseClient,
+} from "./stored-object.members.ts";
+import {
+  StoredObjectDestinationPolicyAdapter,
+  StoredObjectProjectS3Config,
+} from "../services/stored-object-destination-policy.service.ts";
+import { StoredObjectStoragePortAdapter } from "../services/stored-object-storage.service.ts";
+import { StoredObjectStorageRegistryAdapter } from "../services/stored-object-storage-registry.service.ts";
+import { StoredObjectStorageRuntimeAdapter } from "../services/stored-object-storage-runtime.service.ts";
+import type { StoredObjectStorageDriver } from "../repositories/stored-object-blob.repository.ts";
+import { StoredObjectsService, deriveStoredObjectId } from "../services/stored-objects.service.ts";
+import { ClickHouseStoredObjectsRepository } from "../repositories/clickhouse/stored-objects.repository.ts";
+import type { StoredObjectAppConfig } from "./stored-object.app.ts";
+import type { StoredObjectInfrastructure } from "./stored-object.app.ts";
+
+/** What `buildStoredObjectInfrastructure` reads off the process's own members. */
+export type StoredObjectProcessMembers = Readonly<{
+  prisma: PrismaClient;
+  clickhouse: ClickHouseQueryClient;
+  logger: Logger;
+}>;
+
+/**
+ * The byte ceiling and upload window the lifecycle service is built with.
+ * Stated rather than configured, exactly as the deleted composition stated
+ * them: this deployment composes no direct-upload target, so the ceremony
+ * they bound is unreachable.
+ */
+const MAXIMUM_UPLOAD_BYTES = 100 * 1024 * 1024;
+const UPLOAD_EXPIRY_MS = 300_000;
+
+/** The documented single-replica fallback root, when no other is configured. */
+const DEFAULT_LOCAL_FILESYSTEM_ROOT = "/var/lib/langwatch/objects";
+
+/**
+ * A capability this deployment did not compose, refused by name. One class
+ * rather than one per entry: the customer-facing distinction is WHICH
+ * capability is missing, and that is the `capability` the message carries.
+ */
+class StoredObjectUnavailableError extends HandledError {
+  declare readonly code: "service_unavailable";
+
+  constructor(capability: string) {
+    super("service_unavailable", `${capability} is not available on this deployment.`, {
+      httpStatus: 503,
+      fault: "platform",
+    });
+    this.name = "StoredObjectUnavailableError";
+  }
+}
+
+/**
+ * The delivery capability, absent. Minting one signs a URL against a policy
+ * this process composes no signer for, so the operation refuses by name
+ * rather than answering a link nothing honours.
+ */
+class UnavailableStoredObjectDelivery extends StoredObjectDelivery {
+  async mint(): Promise<StoredObjectDeliveryCapability> {
+    throw new StoredObjectUnavailableError("Stored-object delivery");
+  }
+}
+
+/** The upload-token codec, absent for the same reason the delivery policy is. */
+class UnavailableStoredObjectUploadTokens extends StoredObjectUploadTokenCodec {
+  async encode(): Promise<string> {
+    throw new StoredObjectUnavailableError("The stored-object upload ceremony");
+  }
+
+  async decode(): Promise<never> {
+    throw new StoredObjectUnavailableError("The stored-object upload ceremony");
+  }
+}
+
+/**
+ * No outbound proxy for this process's object storage. Stated rather than
+ * read: the api process has no proxy configuration of its own yet, and
+ * inventing one from an unrelated variable would route a tenant's bytes
+ * through a host nobody chose.
+ */
+class NoOutboundProxyResolver extends OutboundProxyResolver {
+  tryResolveForHost(): string | undefined {
+    return undefined;
+  }
+}
+
+/**
+ * Which S3 account a project's objects belong in. THE PROJECT'S ORGANIZATION
+ * IS RE-READ ON EVERY RESOLUTION, deliberately.
+ */
+class StoredObjectS3Targets implements StoredObjectS3TargetResolver {
+  constructor(
+    private readonly prisma: PrismaClient,
+    private readonly storage: StoredObjectAppConfig,
+  ) {}
+
+  /**
+   * The route's values first, then the deployment's, FIELD BY FIELD — a
+   * tenant may be routed to its own endpoint while still reading with the
+   * deployment's credentials for any field its own route leaves unset.
+   */
+  async resolve(projectId: string): Promise<StoredObjectS3Target> {
+    const route = await this.tryRoute(projectId);
+    const { s3 } = this.storage;
+
+    const endpoint = route?.endpoint ?? s3.endpoint;
+    const accessKeyId = route?.accessKeyId ?? s3.accessKeyId;
+    const secretAccessKey = route?.secretAccessKey ?? s3.secretAccessKey;
+    // Credentials only when BOTH halves of an explicit pair are present:
+    // passing a partial pair short-circuits the SDK's own provider chain, which
+    // is what breaks IRSA on a keyless deployment.
+    const hasExplicitKeys = Boolean(accessKeyId && secretAccessKey);
+
+    // An AWS endpoint with no explicit keys leaves the region to the SDK's own
+    // chain — IRSA injects `AWS_REGION` into the pod. Anything else keeps
+    // `"auto"`, which is what every non-AWS operator (R2, MinIO, a custom host)
+    // has been relying on.
+    const isAwsEndpoint = !endpoint || endpoint.endsWith(".amazonaws.com");
+    const region = s3.region ?? (isAwsEndpoint && !hasExplicitKeys ? undefined : "auto");
+
+    return {
+      ...(endpoint ? { endpoint } : {}),
+      ...(region === undefined ? {} : { region }),
+      ...(hasExplicitKeys
+        ? {
+            credentials: {
+              accessKeyId: accessKeyId!,
+              secretAccessKey: secretAccessKey!,
+              ...(s3.sessionToken ? { sessionToken: s3.sessionToken } : {}),
+            },
+          }
+        : {}),
+    };
+  }
+
+  /** The bucket half of the same answer, for the destination policy. */
+  async tryBucket(projectId: string): Promise<string | null> {
+    const route = await this.tryRoute(projectId);
+    return route?.bucket ?? null;
+  }
+
+  private async tryRoute(projectId: string) {
+    if (Object.keys(this.storage.routes).length === 0) return null;
+    const project = await this.prisma.project.findUnique({
+      where: { id: projectId },
+      select: { team: { select: { organizationId: true } } },
+    });
+    const organizationId = project?.team?.organizationId;
+    if (!organizationId) return null;
+    return this.storage.routes[organizationId] ?? null;
+  }
+}
+
+/** The bucket a BYOC project's new objects are minted against. */
+class StoredObjectProjectBuckets extends StoredObjectProjectS3Config {
+  constructor(private readonly targets: StoredObjectS3Targets) {
+    super();
+  }
+
+  async tryGet(projectId: string): Promise<Readonly<{ bucket: string }> | null> {
+    const bucket = await this.targets.tryBucket(projectId);
+    return bucket ? { bucket } : null;
+  }
+}
+
+/**
+ * The routed ClickHouse member, adapted to the low-level driver shape the
+ * stored-objects repository asks for. One tenant per resolution, exactly as
+ * the table's own rule requires (every statement names its tenant).
+ */
+class MemberStoredObjectsClickHouseClient implements StoredObjectsClickHouseClient {
+  constructor(
+    private readonly clickhouse: ClickHouseQueryClient,
+    private readonly tenantId: string,
+  ) {}
+
+  async insert(input: {
+    table: string;
+    values: readonly Record<string, unknown>[];
+    clickhouse_settings?: Record<string, unknown>;
+  }): Promise<unknown> {
+    return this.clickhouse.insert({
+      tenantId: this.tenantId,
+      table: input.table,
+      rows: input.values,
+      ...(input.clickhouse_settings
+        ? { settings: input.clickhouse_settings as Record<string, string | number> }
+        : {}),
+    });
+  }
+
+  async query(input: {
+    query: string;
+    query_params: Record<string, unknown>;
+  }): Promise<{ json<Result>(): Promise<Result[]> }> {
+    const result = await this.clickhouse.query({
+      tenantId: this.tenantId,
+      sql: input.query,
+      params: input.query_params,
+    });
+    return { json: async <Result>() => result.rows as Result[] };
+  }
+
+  async exec(input: {
+    query: string;
+    query_params: Record<string, unknown>;
+    clickhouse_settings?: Record<string, unknown>;
+  }): Promise<unknown> {
+    return this.clickhouse.command({
+      tenantId: this.tenantId,
+      sql: input.query,
+      params: input.query_params,
+      ...(input.clickhouse_settings
+        ? { settings: input.clickhouse_settings as Record<string, string | number> }
+        : {}),
+    });
+  }
+}
+
+/** Resolves the routed ClickHouse client one project's stored-object rows live on. */
+class MemberStoredObjectsClickHouse implements StoredObjectsClickHouse {
+  constructor(private readonly clickhouse: ClickHouseQueryClient) {}
+
+  async resolveClient(projectId: string): Promise<StoredObjectsClickHouseClient> {
+    return new MemberStoredObjectsClickHouseClient(this.clickhouse, projectId);
+  }
+}
+
+/**
+ * The legacy id-only owner lookup, absent. Resolving a project from an object
+ * id alone means scanning every ClickHouse instance the deployment operates;
+ * this process composes no such directory (tracked gap, see the handoff).
+ */
+class StoredObjectOwnerAbsence extends StoredObjectOwnerResolver {
+  constructor(private readonly logger: Pick<Logger, "warn">) {
+    super();
+  }
+
+  async tryResolve(input: { id: string }): Promise<{ projectId: string } | null> {
+    this.logger.warn(
+      { storedObjectId: input.id },
+      "API process composed no stored-object owner directory: an id-only stored-object reference cannot be resolved to a project here.",
+    );
+    return null;
+  }
+}
+
+/** Builds the {@link StoredObjectInfrastructure} `StoredObjectApp.create` composes over. */
+export function buildStoredObjectInfrastructure(input: {
+  members: StoredObjectProcessMembers;
+  config: StoredObjectAppConfig;
+  resources: ResourceOwnership;
+}): StoredObjectInfrastructure {
+  const { members, config: storage } = input;
+
+  const aws = AwsClientProcessRuntime.create({ outboundProxy: new NoOutboundProxyResolver() });
+  input.resources.own("api stored-object aws client runtime", () => aws.close());
+
+  const targets = new StoredObjectS3Targets(members.prisma, storage);
+  const destinations = StoredObjectDestinationPolicyAdapter.create({
+    selection: {
+      // The `azure` selection has a driver behind it, so a write to an Azure
+      // destination reaches Azure Blob rather than refusing at the byte layer.
+      // It is still a SELECTION and not a fallback: a deployment that named
+      // `azure` resolves to Azure, and a misconfigured Azure block refuses by
+      // name rather than landing in the shared S3 bucket.
+      backend: storage.backend === "azure" ? "azure" : "s3",
+      ...(storage.s3.bucket ? { globalS3Bucket: storage.s3.bucket } : {}),
+      localFilesystemRoot: storage.localFilesystemRoot ?? DEFAULT_LOCAL_FILESYSTEM_ROOT,
+    },
+    projects: new StoredObjectProjectBuckets(targets),
+  });
+
+  // ONE set of driver factories, read by both the indexed object store below
+  // and the project-keyed runtime published beside it, so a consumer that
+  // writes bytes without a row lands in the same place a stored object does.
+  const s3ForProject = (projectId: string, awsRuntime: AwsClientProcessRuntime) =>
+    StoredObjectBlobS3Repository.create({
+      projectId,
+      targets,
+      policy: { build: (input) => awsRuntime.build(input) },
+    });
+  const fileForProject = () => StoredObjectBlobFilesystemRepository.create();
+  // A FACTORY rather than a driver, which is the registry's own Azure policy: a
+  // deployment that never reads an `azure-blob://` URI never resolves credentials,
+  // so an install with no Azure block configured is not made to fail at boot over a
+  // backend it does not use. The resolver's `purpose: "read"` is what lets an
+  // operator who migrated OFF Azure keep reading what was written before.
+  const azureForProject = (): StoredObjectStorageDriver =>
+    AzureBlobStoredObjectDriverAdapter.create(
+      AzureBlobCredentialsAdapter.resolveAzureCredentials({
+        config: storage.azure,
+        purpose: "read",
+        identity: storage.azure.identity,
+      }),
+    );
+
+  const storageRuntime = StoredObjectStorageRuntimeAdapter.create({
+    destination: destinations,
+    s3ForProject,
+    fileForProject,
+    azureForProject,
+  });
+
+  const bytes = StoredObjectsService.create({
+    repository: ClickHouseStoredObjectsRepository.create(
+      new MemberStoredObjectsClickHouse(members.clickhouse),
+    ),
+    registry: (projectId: string) =>
+      StoredObjectStorageRegistryAdapter.create({
+        s3: s3ForProject(projectId, aws),
+        file: fileForProject(),
+        "azure-blob": azureForProject,
+      }),
+    mintStorageUri: async ({ projectId, sha256 }) =>
+      mintStoredObjectUri({
+        destination: await destinations.resolve(projectId),
+        objectPath: `${projectId}/${sha256}`,
+      }),
+    telemetry: PrometheusStoredObjectsTelemetryAdapter.create(),
+  });
+
+  return {
+    storage: StoredObjectStoragePortAdapter.create({ runtime: storageRuntime, aws }),
+    delivery: new UnavailableStoredObjectDelivery(),
+    uploadTokens: new UnavailableStoredObjectUploadTokens(),
+    idDeriver: { fromDigest: deriveStoredObjectId },
+    maximumUploadBytes: MAXIMUM_UPLOAD_BYTES,
+    uploadExpiryMs: UPLOAD_EXPIRY_MS,
+    // The byte reads are the content-addressed store's: an avatar written
+    // through it is an avatar this app's `readById` finds.
+    files: bytes,
+    owners: new StoredObjectOwnerAbsence(members.logger),
+  } satisfies StoredObjectInfrastructure;
+}

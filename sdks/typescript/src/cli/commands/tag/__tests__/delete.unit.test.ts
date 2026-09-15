@@ -6,7 +6,11 @@ vi.mock("@/client-sdk/services/prompts", () => ({
 }));
 
 vi.mock("../../../utils/apiKey", () => ({
-  resolveCredentials: vi.fn(async () => ({ apiKey: "test-key", source: "env", endpoint: "https://app.langwatch.ai" })),
+  resolveCredentials: vi.fn(async () => ({
+    apiKey: "test-key",
+    source: "env",
+    endpoint: "https://app.langwatch.ai",
+  })),
 }));
 
 vi.mock("readline", () => ({
@@ -44,8 +48,9 @@ describe("tagDeleteCommand", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockDeleteTag = vi.fn();
-    vi.mocked(PromptsApiService).mockImplementation(
-      function () { return ({ deleteTag: mockDeleteTag }) as unknown as InstanceType<typeof PromptsApiService>; });
+    vi.mocked(PromptsApiService).mockImplementation(function () {
+      return { deleteTag: mockDeleteTag } as unknown as InstanceType<typeof PromptsApiService>;
+    });
     vi.spyOn(process, "exit").mockImplementation((code) => {
       throw new ProcessExitError(code as number);
     });

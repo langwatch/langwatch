@@ -45,9 +45,7 @@ describe("rcPath", () => {
     expect(rcPath("bash")).toBe(path.join(os.homedir(), ".bashrc"));
   });
   it("fish → ~/.config/fish/config.fish", () => {
-    expect(rcPath("fish")).toBe(
-      path.join(os.homedir(), ".config", "fish", "config.fish"),
-    );
+    expect(rcPath("fish")).toBe(path.join(os.homedir(), ".config", "fish", "config.fish"));
   });
 });
 
@@ -64,13 +62,9 @@ describe("buildScopedToolFunction", () => {
       const block = buildScopedToolFunction("gemini", otelVars, "zsh");
       expect(block).toContain("gemini() {");
       expect(block).toContain('command gemini "$@"');
-      expect(block).toContain(
-        "OTEL_EXPORTER_OTLP_ENDPOINT=http://app.example.com/api/otel",
-      );
+      expect(block).toContain("OTEL_EXPORTER_OTLP_ENDPOINT=http://app.example.com/api/otel");
       // header value has a space -> single-quoted
-      expect(block).toContain(
-        "OTEL_EXPORTER_OTLP_HEADERS='Authorization=Bearer sk-lw-token'",
-      );
+      expect(block).toContain("OTEL_EXPORTER_OTLP_HEADERS='Authorization=Bearer sk-lw-token'");
       // scoped, NOT a bare global export
       expect(block).not.toContain("export OTEL");
     });
@@ -193,8 +187,7 @@ describe("persistBlockToRc", () => {
     persistBlockToRc("zsh", "export FOO=bar");
     persistBlockToRc("zsh", "export FOO=baz");
     const content = fs.readFileSync(rcPath("zsh"), "utf8");
-    const beginCount = (content.match(/# >>> langwatch begin >>>/g) ?? [])
-      .length;
+    const beginCount = (content.match(/# >>> langwatch begin >>>/g) ?? []).length;
     expect(beginCount).toBe(1);
     expect(content).toMatch(/export FOO=baz/);
     expect(content).not.toMatch(/export FOO=bar/);
@@ -220,8 +213,7 @@ describe("persistBlockToRc", () => {
     persistBlockToRc("zsh", first);
     persistBlockToRc("zsh", second);
     const content = fs.readFileSync(rcPath("zsh"), "utf8");
-    const beginCount = (content.match(/# >>> langwatch begin >>>/g) ?? [])
-      .length;
+    const beginCount = (content.match(/# >>> langwatch begin >>>/g) ?? []).length;
     expect(beginCount).toBe(1);
     expect(content).toContain("Authorization=Bearer sk-lw-new");
     expect(content).not.toContain("sk-lw-old");
@@ -304,16 +296,12 @@ describe("removeBlockFromRc", () => {
   describe("when removing the global gateway block", () => {
     it("removes it via the default markers", () => {
       persistBlockToRc("zsh", "export ANTHROPIC_BASE_URL=http://gw");
-      expect(
-        fs.readFileSync(rcPath("zsh"), "utf8"),
-      ).toContain("# >>> langwatch begin >>>");
+      expect(fs.readFileSync(rcPath("zsh"), "utf8")).toContain("# >>> langwatch begin >>>");
 
       const removed = removeBlockFromRc("zsh", GATEWAY_RC_MARKERS);
 
       expect(removed).toBe(true);
-      expect(fs.readFileSync(rcPath("zsh"), "utf8")).not.toContain(
-        "langwatch begin",
-      );
+      expect(fs.readFileSync(rcPath("zsh"), "utf8")).not.toContain("langwatch begin");
     });
   });
 

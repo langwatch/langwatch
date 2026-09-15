@@ -4,7 +4,7 @@ import {
   redactReportText,
   redactSessionJsonl,
   truncateJsonlToByteBudget,
-} from "../sessionReport.js";
+} from "../sessionReport.ts";
 
 describe("collectSensitiveEnvValues", () => {
   describe("given an environment with secret-named and ordinary variables", () => {
@@ -95,18 +95,14 @@ describe("redactReportText", () => {
     });
 
     it("redacts punctuated national phone numbers", () => {
-      expect(redactReportText({ text: "tel (415) 555-2671." }).text).toBe(
-        "tel [PHONE_NUMBER].",
-      );
-      expect(redactReportText({ text: "tel 415-555-2671." }).text).toBe(
-        "tel [PHONE_NUMBER].",
-      );
+      expect(redactReportText({ text: "tel (415) 555-2671." }).text).toBe("tel [PHONE_NUMBER].");
+      expect(redactReportText({ text: "tel 415-555-2671." }).text).toBe("tel [PHONE_NUMBER].");
     });
 
     it("redacts Luhn-valid card numbers, formatted or bare", () => {
-      expect(
-        redactReportText({ text: "card 4111 1111 1111 1111 on file" }).text,
-      ).toBe("card [CREDIT_CARD] on file");
+      expect(redactReportText({ text: "card 4111 1111 1111 1111 on file" }).text).toBe(
+        "card [CREDIT_CARD] on file",
+      );
       expect(redactReportText({ text: "card 4111111111111111 ok" }).text).toBe(
         "card [CREDIT_CARD] ok",
       );
@@ -121,8 +117,7 @@ describe("redactReportText", () => {
   describe("when the text contains debugging data that only looks sensitive", () => {
     /** @scenario "Loopback and private network addresses stay readable" */
     it("keeps loopback and private addresses", () => {
-      const text =
-        "listening on 127.0.0.1:5560, lan 192.168.1.5, vpc 10.0.0.3, docker 172.17.0.2";
+      const text = "listening on 127.0.0.1:5560, lan 192.168.1.5, vpc 10.0.0.3, docker 172.17.0.2";
       expect(redactReportText({ text }).text).toBe(text);
     });
 
@@ -147,9 +142,7 @@ describe("redactReportText", () => {
       const filler = "x".repeat(300_000);
       const text = `${filler}\nkey sk-proj-abcdefghijklmnopqrstuvwxyz123456 end`;
       const result = redactReportText({ text });
-      expect(result.text).not.toContain(
-        "sk-proj-abcdefghijklmnopqrstuvwxyz123456",
-      );
+      expect(result.text).not.toContain("sk-proj-abcdefghijklmnopqrstuvwxyz123456");
       expect(result.text).toContain("[SECRET]");
     });
   });
@@ -183,17 +176,14 @@ describe("redactSessionJsonl", () => {
         }),
       ].join("\n");
       const result = redactSessionJsonl({ jsonl });
-      const lines = result.text
-        .split("\n")
-        .map((l) => JSON.parse(l) as { content: string });
+      const lines = result.text.split("\n").map((l) => JSON.parse(l) as { content: string });
       expect(lines[0]?.content).toBe("my key is [SECRET]");
       expect(lines[1]?.content).toBe("ok, email [EMAIL_ADDRESS]");
       expect(result.redactedCount).toBe(2);
     });
 
     it("redacts lines that fail to parse as plain text", () => {
-      const jsonl =
-        "not json but has sk-proj-abcdefghijklmnopqrstuvwxyz123456 inside";
+      const jsonl = "not json but has sk-proj-abcdefghijklmnopqrstuvwxyz123456 inside";
       const result = redactSessionJsonl({ jsonl });
       expect(result.text).toBe("not json but has [SECRET] inside");
     });
@@ -220,10 +210,7 @@ describe("truncateJsonlToByteBudget", () => {
   describe("given a transcript over the budget", () => {
     /** @scenario "Oversized sessions are truncated from the start, keeping the most recent activity" */
     it("keeps only the most recent whole lines and flags truncation", () => {
-      const lines = Array.from(
-        { length: 100 },
-        (_, i) => `line-${i}-${"y".repeat(50)}`,
-      );
+      const lines = Array.from({ length: 100 }, (_, i) => `line-${i}-${"y".repeat(50)}`);
       const result = truncateJsonlToByteBudget({
         jsonl: lines.join("\n"),
         maxBytes: 300,

@@ -11,11 +11,16 @@ keywords:
 The agent-side variables (`LANGY_*` apart from the one below) are set on the `langyagent` pod through the `charts/langyagent` ConfigMap and Secret. The control-plane variables (`LANGY_AGENT_URL`, `GITHUB_LANGY_*`, `CREDENTIALS_SECRET`) are set on the LangWatch app. Defaults shown are the values the chart or the Go service uses out of the box.
 
 <Info>
-**Also check:** [Setup](/self-hosting/langy/setup), [Register the GitHub App](/self-hosting/langy/github-app), [Networking and egress](/self-hosting/langy/networking-and-egress).
+  **Also check:** [Setup](/self-hosting/langy/setup), [Register the GitHub
+  App](/self-hosting/langy/github-app), [Networking and
+  egress](/self-hosting/langy/networking-and-egress).
 </Info>
 
 <Note>
-Many `LANGY_*` names in the `packages/langy` and frontend code are exported TypeScript constants, Zod discriminators, and event-type identifiers, not deploy knobs. The variables below are the runtime configuration. The GitHub PR rate limit `LANGY_GITHUB_PRS_PER_DAY` is 20, hardcoded, not configurable.
+  Many `LANGY_*` names in the `packages/langy` and frontend code are exported TypeScript constants,
+  Zod discriminators, and event-type identifiers, not deploy knobs. The variables below are the
+  runtime configuration. The GitHub PR rate limit `LANGY_GITHUB_PRS_PER_DAY` is 20, hardcoded, not
+  configurable.
 </Note>
 
 ## Core
@@ -27,7 +32,8 @@ Many `LANGY_*` names in the `packages/langy` and frontend code are exported Type
 | `ENVIRONMENT` | Deployment environment. Gates the dev-only isolation bypass, so keep it production-like. | No | `production` |
 
 <Warning>
-`LANGY_INTERNAL_SECRET` is a shared credential between the app and the agent. Store it in a secrets manager and never commit it or log it.
+  `LANGY_INTERNAL_SECRET` is a shared credential between the app and the agent. Store it in a
+  secrets manager and never commit it or log it.
 </Warning>
 
 ## Workers
@@ -43,25 +49,26 @@ Many `LANGY_*` names in the `packages/langy` and frontend code are exported Type
 
 See [Networking and egress](/self-hosting/langy/networking-and-egress) for how these fit together and the limit on enforcement.
 
-| Variable | Description | Required | Default |
-|---|---|---|---|
-| `LANGY_EGRESS_FQDN_FLOOR` | Operator always-allowed FQDNs (the adapter floor). | No | `github.com,api.github.com,codeload.github.com` |
-| `LANGY_EGRESS_REQUIRE_TLS` | Refuse cleartext and non-`:443` forwards. | No | `true` |
-| `LANGY_EGRESS_ENFORCE_FLOOR` | Make the floor a hard ceiling for projects with no allow-list. | No | `false` (monitor-only) |
-| `LANGY_EGRESS_SNI_CROSSCHECK` | Cross-check the TLS SNI against the CONNECT authority (anti-domain-fronting). | No | `true` |
+| Variable                      | Description                                                                   | Required | Default                                         |
+| ----------------------------- | ----------------------------------------------------------------------------- | -------- | ----------------------------------------------- |
+| `LANGY_EGRESS_FQDN_FLOOR`     | Operator always-allowed FQDNs (the adapter floor).                            | No       | `github.com,api.github.com,codeload.github.com` |
+| `LANGY_EGRESS_REQUIRE_TLS`    | Refuse cleartext and non-`:443` forwards.                                     | No       | `true`                                          |
+| `LANGY_EGRESS_ENFORCE_FLOOR`  | Make the floor a hard ceiling for projects with no allow-list.                | No       | `false` (monitor-only)                          |
+| `LANGY_EGRESS_SNI_CROSSCHECK` | Cross-check the TLS SNI against the CONNECT authority (anti-domain-fronting). | No       | `true`                                          |
 
 ## Mirror lane
 
 The mirror lane copies each turn's trace into a LangWatch project you designate, so whoever runs the install can watch Langy work. It stays off until `langyagent.mirror.existingSecretName` names a Secret holding the mirror project's API key; the endpoint resolves to the install's own app automatically. See [Watching Langy work](/self-hosting/langy/setup#watching-langy-work).
 
-| Variable | Description | Required | Default |
-|---|---|---|---|
-| `LANGY_MIRROR_TRACE_ENDPOINT` | LangWatch base URL the mirror ships to. Set via `langyagent.mirror.traceEndpoint` only to mirror into a different deployment. | No | the install's own app |
-| `LANGY_MIRROR_TRACE_KEY` | The mirror project's API key (a normal project key), read from the Secret named by `langyagent.mirror.existingSecretName`. | No | unset (mirror off) |
-| `LANGY_MIRROR_PROJECT_ID` | The mirror project id referenced in the mirror config. | No | unset |
+| Variable                      | Description                                                                                                                   | Required | Default               |
+| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------- | -------- | --------------------- |
+| `LANGY_MIRROR_TRACE_ENDPOINT` | LangWatch base URL the mirror ships to. Set via `langyagent.mirror.traceEndpoint` only to mirror into a different deployment. | No       | the install's own app |
+| `LANGY_MIRROR_TRACE_KEY`      | The mirror project's API key (a normal project key), read from the Secret named by `langyagent.mirror.existingSecretName`.    | No       | unset (mirror off)    |
+| `LANGY_MIRROR_PROJECT_ID`     | The mirror project id referenced in the mirror config.                                                                        | No       | unset                 |
 
 <Warning>
-`LANGY_MIRROR_TRACE_KEY` is a project API key. Store it in a Secret (`mirror.existingSecretName`), not inline in `values.yaml`.
+  `LANGY_MIRROR_TRACE_KEY` is a project API key. Store it in a Secret (`mirror.existingSecretName`),
+  not inline in `values.yaml`.
 </Warning>
 
 ## GitHub
@@ -78,5 +85,6 @@ Set these on the control plane to enable bot-authored pull requests and coding-a
 | `CREDENTIALS_SECRET` | Signs the GitHub install state round-trip and encrypts provider keys at rest. Already required in production, so GitHub adds no new variable. | Yes (prod) | none |
 
 <Warning>
-`GITHUB_LANGY_PRIVATE_KEY` grants write access to installed repositories. Keep it in a secrets manager and never let it reach a worker.
+  `GITHUB_LANGY_PRIVATE_KEY` grants write access to installed repositories. Keep it in a secrets
+  manager and never let it reach a worker.
 </Warning>

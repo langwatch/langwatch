@@ -26,7 +26,7 @@ kubectl -n langwatch run curl --rm -it --image=curlimages/curl --restart=Never \
 Expected:
 
 ```json
-{"status":"ok","version":"local","uptime_s":42.1}
+{ "status": "ok", "version": "local", "uptime_s": 42.1 }
 ```
 
 `version` carries the `ENVIRONMENT` value, `local` unless you set it.
@@ -45,7 +45,7 @@ kubectl -n langwatch run curl --rm -it --image=curlimages/curl --restart=Never \
 Expected:
 
 ```json
-{"status":"ok","checks":{"gateway":"ok","control_plane":"ok"}}
+{ "status": "ok", "checks": { "gateway": "ok", "control_plane": "ok" } }
 ```
 
 A `503` with `"control_plane":"unreachable for Ns"` means one of two things: the gateway cannot reach `LW_GATEWAY_BASE_URL`, or `LW_GATEWAY_INTERNAL_SECRET` differs between the app and the gateway pods. The probe runs every 15 seconds and the verdict flips after 60 seconds without a success, so wait one minute after a fix before you read it again. The log line `statusprobe_control_plane_unreachable` on the gateway pod carries the underlying error.
@@ -76,7 +76,13 @@ curl -si https://gateway.acme.com/v1/models
 Expected: `HTTP/2 401`, an `X-LangWatch-Gateway-Version` header, and this body:
 
 ```json
-{"error":{"type":"invalid_api_key","code":"invalid_api_key","message":"missing API key; supply Authorization: Bearer <key>, x-api-key, x-goog-api-key, or xi-api-key header"}}
+{
+  "error": {
+    "type": "invalid_api_key",
+    "code": "invalid_api_key",
+    "message": "missing API key; supply Authorization: Bearer <key>, x-api-key, x-goog-api-key, or xi-api-key header"
+  }
+}
 ```
 
 ## 6. A virtual key lists models

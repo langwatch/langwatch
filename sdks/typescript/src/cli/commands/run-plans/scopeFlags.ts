@@ -1,17 +1,8 @@
 import chalk from "chalk";
-import type {
-  RunPlanScope,
-  RunPlanTarget,
-} from "@/client-sdk/services/run-plans";
+import type { RunPlanScope, RunPlanTarget } from "@/client-sdk/services/run-plans";
 import type { TestSuitesApiService } from "@/client-sdk/services/test-suites";
-import {
-  coerceParameterValue,
-  type RunParameterValue,
-} from "../../utils/keyValueFlags";
-import {
-  resolveSuiteReference,
-  SuiteReferenceError,
-} from "../test-suites/resolveSuite";
+import { coerceParameterValue, type RunParameterValue } from "../../utils/keyValueFlags";
+import { resolveSuiteReference, SuiteReferenceError } from "../test-suites/resolveSuite";
 
 /** The four scope flags a run takes. They answer one question, so only one may be given. */
 export interface ScopeOptions {
@@ -28,14 +19,8 @@ export interface ResolvedScope {
 }
 
 /**
- * Reads the scope flags into the value the API takes.
- *
- * The four flags answer the same question, so naming more than one is a
- * refusal rather than a merge: a run covers one rule. Naming none is a refusal
- * too, because the alternative is running the whole project by accident. A
- * `--test-suite` value is resolved through the test suite list, so a name
- * reads as well as an id.
- *
+ * Reads the scope flags into the value the API takes. The four flags answer
+ * the same question, so naming more than one — or none — is a refusal.
  * @see specs/features/run-plan-cli.feature
  */
 export async function buildScope(
@@ -51,9 +36,7 @@ export async function buildScope(
 
   if (chosen.length === 0) {
     console.error(
-      chalk.red(
-        "Error: say what to run with one of --all, --test-suite, --label or --scenario.",
-      ),
+      chalk.red("Error: say what to run with one of --all, --test-suite, --label or --scenario."),
     );
     process.exit(1);
   }
@@ -112,9 +95,8 @@ export function describeScope(scope: RunPlanScope | null | undefined): string {
 
 /**
  * The target types a run may go against. A `connected` target names an
- * agent by `<name>` (the agent in development, or the one other environment
- * it is online in), by `<name>@<environment>`, or by id; the platform
- * resolves the names, so they are passed through as the reference id.
+ * agent by `<name>`, `<name>@<environment>`, or id; the platform resolves
+ * the name.
  */
 const TARGET_TYPES = [
   "prompt",
@@ -129,11 +111,8 @@ const isTargetType = (value: string): value is RunPlanTarget["type"] =>
 
 /**
  * A target as the command line writes it: what to run against, plus the
- * parameter values that target alone runs with.
- *
- * The overrides are typed here rather than taken from the generated REST types
- * so the parser states its own contract; the platform merges them over the
- * run-level `--param` values, and the target wins.
+ * parameter values that target alone runs with. Typed here rather than from
+ * the generated REST types so the parser states its own contract.
  */
 export type ParsedRunTarget = RunPlanTarget & {
   runParameters?: Record<string, RunParameterValue>;
@@ -145,13 +124,7 @@ const rejectTarget = (message: string): never => {
 };
 
 /** Percent-decode one half of a query pair, naming the target when it cannot be read. */
-function decodeQueryPart({
-  part,
-  target,
-}: {
-  part: string;
-  target: string;
-}): string {
+function decodeQueryPart({ part, target }: { part: string; target: string }): string {
   try {
     return decodeURIComponent(part);
   } catch {
@@ -162,12 +135,9 @@ function decodeQueryPart({
 }
 
 /**
- * Reads the `?k=v&k2=v2` suffix of one target into the values that target runs
- * with.
- *
- * The grammar is a query string, so `&` separates pairs and both halves are
- * percent-decoded. A value is read as the type it looks like, the same rule
- * `--param` uses, and a name repeated inside one suffix keeps the last value.
+ * Reads the `?k=v&k2=v2` suffix of one target into the values that target
+ * runs with, using the same value-typing rule `--param` uses. A name
+ * repeated inside one suffix keeps the last value.
  */
 function parseTargetParameters({
   query,
@@ -200,22 +170,11 @@ function parseTargetParameters({
 }
 
 /**
- * Reads the repeatable `--target <type>:<referenceId>[?k=v&k2=v2]` flag.
- *
- * A run with no target has nothing to run against, so an empty list is a
- * refusal rather than a request the platform answers with a 422.
- *
- * The suffix is what makes a comparison run possible: the same agent named
- * twice with different parameters is two targets, and the results show one
- * column for each. The question mark is the separator, so a reference id or a
- * value that holds one is refused by name rather than split in the wrong
- * place.
- *
+ * Reads the repeatable `--target <type>:<referenceId>[?k=v&k2=v2]` flag. An
+ * empty list is a refusal, not a request the platform answers with a 422.
  * @see specs/features/run-plan-cli.feature
  */
-export function parseTargets(
-  targetStrings: string[] | undefined,
-): ParsedRunTarget[] {
+export function parseTargets(targetStrings: string[] | undefined): ParsedRunTarget[] {
   if (!targetStrings || targetStrings.length === 0) {
     console.error(
       chalk.red(
@@ -285,18 +244,11 @@ export interface WaitOptions {
 }
 
 /**
- * Reads the `--wait [minutes]` flag.
- *
- * A bare `--wait` polls for 45 minutes, which covers a suite of slow agents
- * with repeats; a number of minutes replaces that limit. Anything else is
- * refused before the run is scheduled, so a typo does not start a batch the
- * command then never waits for.
- *
+ * Reads the `--wait [minutes]` flag. A bare `--wait` polls for 45 minutes; a
+ * number replaces that limit. Anything else is refused before scheduling.
  * @see specs/features/run-plan-cli.feature
  */
-export function parseWait(
-  value: boolean | string | undefined,
-): WaitOptions | undefined {
+export function parseWait(value: boolean | string | undefined): WaitOptions | undefined {
   if (value === undefined || value === false) return undefined;
   if (value === true) return { timeoutMs: DEFAULT_WAIT_MINUTES * 60 * 1000 };
   const minutes = Number(value);
@@ -308,9 +260,7 @@ export function parseWait(
     !Number.isFinite(timeoutMs)
   ) {
     console.error(
-      chalk.red(
-        `Error: --wait takes a number of minutes, such as --wait 90, not "${value}".`,
-      ),
+      chalk.red(`Error: --wait takes a number of minutes, such as --wait 90, not "${value}".`),
     );
     process.exit(1);
   }
@@ -318,18 +268,14 @@ export function parseWait(
 }
 
 /**
- * Reads the `--repeat <n>` flag.
- *
- * The platform takes 1 to 5, so a value outside that ends the command before
- * anything is scheduled.
+ * Reads the `--repeat <n>` flag. The platform takes 1 to 5; anything else
+ * ends the command before scheduling.
  */
 export function parseRepeat(value: string | undefined): number | undefined {
   if (value === undefined) return undefined;
   const repeat = Number.parseInt(value, 10);
   if (!Number.isInteger(repeat) || repeat < 1 || repeat > 5) {
-    console.error(
-      chalk.red(`Error: --repeat takes a whole number from 1 to 5, not "${value}".`),
-    );
+    console.error(chalk.red(`Error: --repeat takes a whole number from 1 to 5, not "${value}".`));
     process.exit(1);
   }
   return repeat;

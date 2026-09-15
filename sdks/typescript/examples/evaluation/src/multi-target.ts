@@ -119,7 +119,7 @@ const main = async () => {
       console.log(`  GPT-3.5: ${gpt35Result.duration}ms`);
       console.log(`  Claude: ${claudeResult.duration}ms`);
     },
-    { concurrency: 2 } // Process 2 dataset items at a time
+    { concurrency: 2 }, // Process 2 dataset items at a time
   );
 
   console.log("\n✅ Comparison complete! Check LangWatch to see charts comparing the models.");

@@ -8,12 +8,14 @@ describe("parseSkillFrontmatter", () => {
   describe("when a SKILL.md with frontmatter", () => {
     it("reads name and description", () => {
       expect(
-        parseSkillFrontmatter("---\nname: agent-performance\ndescription: Traces and stats\n---\n# Body"),
+        parseSkillFrontmatter(
+          "---\nname: agent-performance\ndescription: Traces and stats\n---\n# Body",
+        ),
       ).toEqual({ name: "agent-performance", description: "Traces and stats" });
     });
 
     it("strips surrounding quotes", () => {
-      expect(parseSkillFrontmatter('---\nname: "quoted"\ndescription: \'also\'\n---\n')).toEqual({
+      expect(parseSkillFrontmatter("---\nname: \"quoted\"\ndescription: 'also'\n---\n")).toEqual({
         name: "quoted",
         description: "also",
       });
@@ -65,7 +67,10 @@ describe("listSkills", () => {
       mkdirSync(join(skillsDir, "gamma"));
       writeFileSync(join(skillsDir, "gamma", "SKILL.md"), '---\nname: ""\ndescription: G\n---\n');
       mkdirSync(join(skillsDir, "delta"));
-      writeFileSync(join(skillsDir, "delta", "SKILL.md"), "---\nname: '   '\ndescription: D\n---\n");
+      writeFileSync(
+        join(skillsDir, "delta", "SKILL.md"),
+        "---\nname: '   '\ndescription: D\n---\n",
+      );
 
       expect(listSkills(skillsDir).map((s) => s.name)).toEqual(["delta", "gamma"]);
     });
@@ -82,9 +87,7 @@ describe("listSkills", () => {
 describe("renderSkillInventory", () => {
   it("lists names with descriptions", () => {
     expect(
-      renderSkillInventory([
-        { name: "a", description: "does a", filePath: "/x", baseDir: "/" },
-      ]),
+      renderSkillInventory([{ name: "a", description: "does a", filePath: "/x", baseDir: "/" }]),
     ).toBe("Installed skills:\n- a: does a");
   });
 

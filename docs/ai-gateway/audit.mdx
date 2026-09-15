@@ -8,6 +8,13 @@ sidebarTitle: Audit log
 
 Gateway mutations write to the same `AuditLog` table as the rest of the platform. Open **Settings, Audit Log** to read them. Gateway rows carry a purple **Gateway** badge; platform rows, such as a member change or a project edit, carry a grey **Platform** badge.
 
+<Note>
+  **One audit log, two write shapes.** Gateway-shape rows carry `targetKind`, `targetId`, `before`,
+  `after`. Platform-shape rows carry `args`, `metadata`, `error`. The viewer renders both with the
+  same row template, computes `source` from the presence of `targetKind`, and offers a target-kind
+  filter for narrowing to gateway events only.
+</Note>
+
 A gateway row records the actor, the action code, the target kind, the target id, and the `before` and `after` state of the row that changed. On a virtual-key row, both halves leave the hashed secret out.
 
 The actor is the user who made the change. A write that arrives on a legacy project API key, which carries no user, records the machine actor `svc_<projectId>`.
@@ -69,6 +76,12 @@ Every virtual key and every budget detail page has an **Audit history** button. 
 | `Error` | Error text, on platform rows |
 | `Args` | Call arguments, on platform rows |
 | `Before`, `After` | The gateway row's state on each side of the change |
+
+You can reach the same data three ways:
+
+1. **One-off, human review**: open `/settings/audit-log`, set the filters you want (Source, Action, Target), then hit **Export CSV** to download the filtered rows.
+2. **Scripted, scheduled SIEM export**: query the Postgres `AuditLog` table directly from your SIEM ingestion pipeline. Filter on `targetKind IN ('virtual_key', 'budget', 'provider_binding', 'cache_rule')` to scope to gateway rows; join `User` on `userId` for actor enrichment.
+3. **In-app integrations**: call the tRPC procedure from a TypeScript client that already has a session: `await trpc.organization.getAuditLogs.query({ organizationId, targetKind, targetId, since, limit })`. Mirrors what the UI does. Not intended for cross-network REST consumers.
 
 `Args`, `Before` and `After` are JSON, capped at 4096 characters per cell. A capped cell ends with a `…[truncated N chars]` marker.
 

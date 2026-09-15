@@ -1,12 +1,7 @@
 /**
- * Security primitives for the standalone MCP HTTP server.
- *
- * The standalone server runs on developer machines and inside clusters with no
- * database of its own, so it cannot look an API key up locally the way the
- * in-app handler does. These helpers give it the same guarantees over HTTP:
- * an origin allowlist, API key verification against the LangWatch API with a
- * short-lived cache, per-IP rate limiting of failed authentication, and a
- * session store that expires idle sessions and caps concurrency per key.
+ * Security primitives for the standalone MCP HTTP server. The standalone server runs on
+ * developer machines and inside clusters with no database of its own, so it cannot look an API
+ * key up locally the way the in-app handler does.
  */
 
 import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
@@ -38,25 +33,18 @@ export function isLoopbackHost(host: string): boolean {
 // ---------------------------------------------------------------------------
 
 /**
- * Origins accepted without configuration.
- *
- * A DNS rebinding attack reaches the server through an attacker-controlled
- * hostname that resolves to a loopback address, so the browser sends that
- * attacker hostname in the Origin header. It can never send a loopback origin
- * for a page it did not actually load from this machine, which is the case the
- * server exists to serve.
+ * Origins accepted without configuration. A DNS rebinding attack reaches the server through an
+ * attacker-controlled hostname that resolves to a loopback address, so the browser sends that
+ * attacker hostname in the Origin header.
  */
 const ALWAYS_ALLOWED_ORIGIN_HOSTS = new Set(["localhost", "127.0.0.1", "::1"]);
 
 /**
- * Reduces an origin to `scheme://host[:port]` so comparisons ignore trailing
- * slashes, paths, and case differences. Returns null for anything that is not
- * a usable origin, including the opaque `null` origin sent by sandboxed frames
- * and `file://` pages.
+ * Reduces an origin to `scheme://host[:port]` so comparisons ignore trailing slashes, paths,
+ * and case differences. Returns null for anything that is not a usable origin, including the
+ * opaque `null` origin sent by sandboxed frames and `file://` pages.
  */
-function normalizeOrigin(
-  origin: string
-): { origin: string; hostname: string } | null {
+function normalizeOrigin(origin: string): { origin: string; hostname: string } | null {
   let parsed: URL;
   try {
     parsed = new URL(origin.trim());
@@ -105,21 +93,15 @@ export function isOriginAllowed({
 // ---------------------------------------------------------------------------
 
 /**
- * Per-process key for deriving identifiers from API keys.
- *
- * Regenerated on every start. The derived values only index in-memory maps and
- * are only compared within one process, so they never need to be reproducible
- * across restarts. Keying the digest means that anything which exposes those
- * maps, a heap dump or debug output, still does not let a list of candidate
- * keys be confirmed offline the way a bare digest would.
+ * Per-process key for deriving identifiers from API keys. Regenerated on every start. The
+ * derived values only index in-memory maps and are only compared within one process, so they
+ * never need to be reproducible across restarts.
  */
 const KEY_DERIVATION_SECRET = randomBytes(32);
 
 /** Derives an opaque identifier from an API key, for use as a map key. */
 export function hashApiKey(apiKey: string): string {
-  return createHmac("sha256", KEY_DERIVATION_SECRET)
-    .update(apiKey)
-    .digest("hex");
+  return createHmac("sha256", KEY_DERIVATION_SECRET).update(apiKey).digest("hex");
 }
 
 /** Constant-time API key comparison over fixed-length digests. */
@@ -130,20 +112,14 @@ export function apiKeysMatch({
   presentedKey: string;
   expectedKey: string;
 }): boolean {
-  const presented = createHmac("sha256", KEY_DERIVATION_SECRET)
-    .update(presentedKey)
-    .digest();
-  const expected = createHmac("sha256", KEY_DERIVATION_SECRET)
-    .update(expectedKey)
-    .digest();
+  const presented = createHmac("sha256", KEY_DERIVATION_SECRET).update(presentedKey).digest();
+  const expected = createHmac("sha256", KEY_DERIVATION_SECRET).update(expectedKey).digest();
   return timingSafeEqual(presented, expected);
 }
 
-// ---------------------------------------------------------------------------
-// Rate limiter (fixed window per client address)
-//
-// Counts reset in whole windows rather than sliding, so a burst straddling a
-// window boundary can reach twice maxRequests. That is acceptable for the
+// --------------------------------------------------------------------------- Rate limiter
+// (fixed window per client address) Counts reset in whole windows rather than sliding, so a
+// burst straddling a window boundary can reach twice maxRequests. That is acceptable for the
 // failed-authentication and OAuth limits this backs.
 // ---------------------------------------------------------------------------
 
@@ -203,7 +179,7 @@ export function createRateLimiter({
  * project API key and returns only the identity of the project behind it, so
  * it answers "is this key real" without granting or costing anything else.
  */
-const VERIFY_PATH = "/api/me/project";
+const VERIFY_PATH = "/api/v1/me/project";
 
 export interface ApiKeyVerifier {
   /** True when the LangWatch API recognises this key. */
@@ -454,13 +430,8 @@ export interface OAuthTokenEntry {
 }
 
 /**
- * Makes room for one more token before it is issued.
- *
- * Tokens outlive the requests that created them, so a key asking for them in a
- * loop would otherwise retain entries until each expired. The per-address rate
- * limit does not bound this on its own, because one key can be presented from
- * many addresses. Expired entries anywhere in the map are dropped on the way
- * past.
+ * Makes room for one more token before it is issued. Tokens outlive the requests that created
+ * them, so a key asking for them in a loop would otherwise retain entries until each expired.
  */
 export function admitOAuthToken({
   apiKey,

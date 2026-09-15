@@ -35,7 +35,7 @@ def _get_kwargs(
 
     _kwargs: dict[str, Any] = {
         "method": "patch",
-        "url": "/api/governance/ingestion-templates/{id}/ottl-rules".format(
+        "url": "/api/v1/governance/ingestion-templates/{id}/ottl-rules".format(
             id=quote(str(id), safe=""),
         ),
     }

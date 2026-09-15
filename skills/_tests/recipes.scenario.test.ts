@@ -36,11 +36,7 @@ function findTestFiles(dir: string, pattern: RegExp): string[] {
 
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     const fullPath = path.join(dir, entry.name);
-    if (
-      entry.isDirectory() &&
-      entry.name !== "node_modules" &&
-      entry.name !== ".venv"
-    ) {
+    if (entry.isDirectory() && entry.name !== "node_modules" && entry.name !== ".venv") {
       results.push(...findTestFiles(fullPath, pattern));
     } else if (entry.isFile() && pattern.test(entry.name)) {
       results.push(fullPath);
@@ -49,10 +45,7 @@ function findTestFiles(dir: string, pattern: RegExp): string[] {
   return results;
 }
 
-function findNewPythonFiles(
-  dir: string,
-  excludeNames: string[] = ["main.py"]
-): string[] {
+function findNewPythonFiles(dir: string, excludeNames: string[] = ["main.py"]): string[] {
   const results: string[] = [];
   if (!fs.existsSync(dir)) return results;
 
@@ -80,9 +73,7 @@ describe("Recipes", () => {
   it.skipIf(isCI)(
     "generates a RAG evaluation dataset from the TerraVerde knowledge base",
     async () => {
-      const tempFolder = fs.mkdtempSync(
-        path.join(os.tmpdir(), "langwatch-recipe-rag-dataset-")
-      );
+      const tempFolder = fs.mkdtempSync(path.join(os.tmpdir(), "langwatch-recipe-rag-dataset-"));
 
       copyFixtureToWorkDir({
         fixtureSubpath: "python-rag-agent",
@@ -108,9 +99,7 @@ describe("Recipes", () => {
           }),
         ],
         script: [
-          scenario.user(
-            "generate an evaluation dataset from my RAG knowledge base"
-          ),
+          scenario.user("generate an evaluation dataset from my RAG knowledge base"),
           scenario.agent(),
           (state) => {
             assertSkillWasRead(state, "generate-rag-dataset");
@@ -121,7 +110,7 @@ describe("Recipes", () => {
 
             expect(
               csvFiles.length + pyFiles.length,
-              `Expected at least one CSV or Python file with dataset in ${tempFolder}`
+              `Expected at least one CSV or Python file with dataset in ${tempFolder}`,
             ).toBeGreaterThan(0);
 
             // Read all generated content
@@ -141,10 +130,9 @@ describe("Recipes", () => {
               allContent.includes("crop") ||
               allContent.includes("apple") ||
               allContent.includes("harvest");
-            expect(
-              hasDomainTerms,
-              "Expected dataset to contain agricultural domain terms"
-            ).toBe(true);
+            expect(hasDomainTerms, "Expected dataset to contain agricultural domain terms").toBe(
+              true,
+            );
 
             // Verify diverse question types
             const hasQuestionTypes =
@@ -154,18 +142,13 @@ describe("Recipes", () => {
               allContent.includes("edge") ||
               allContent.includes("negative") ||
               allContent.includes("question_type");
-            expect(
-              hasQuestionTypes,
-              "Expected dataset to include diverse question types"
-            ).toBe(true);
+            expect(hasQuestionTypes, "Expected dataset to include diverse question types").toBe(
+              true,
+            );
 
             // Verify context column is present
-            const hasContext =
-              allContent.includes("context");
-            expect(
-              hasContext,
-              "Expected dataset to include context column or field"
-            ).toBe(true);
+            const hasContext = allContent.includes("context");
+            expect(hasContext, "Expected dataset to include context column or field").toBe(true);
           },
           scenario.judge(),
         ],
@@ -173,15 +156,13 @@ describe("Recipes", () => {
 
       expect(result.success).toBe(true);
     },
-    900_000
+    900_000,
   );
 
   it.skipIf(isCI)(
     "creates compliance scenario tests for the health agent",
     async () => {
-      const tempFolder = fs.mkdtempSync(
-        path.join(os.tmpdir(), "langwatch-recipe-compliance-")
-      );
+      const tempFolder = fs.mkdtempSync(path.join(os.tmpdir(), "langwatch-recipe-compliance-"));
 
       copyFixtureToWorkDir({
         fixtureSubpath: "python-health-agent",
@@ -208,7 +189,7 @@ describe("Recipes", () => {
         ],
         script: [
           scenario.user(
-            "test that my health agent doesn't give prescriptive medical advice. Create scenario tests with boundary enforcement and red teaming."
+            "test that my health agent doesn't give prescriptive medical advice. Create scenario tests with boundary enforcement and red teaming.",
           ),
           scenario.agent(),
           (state) => {
@@ -220,7 +201,7 @@ describe("Recipes", () => {
 
             expect(
               pyTestFiles.length + tsTestFiles.length,
-              `Expected at least one test file in ${tempFolder}`
+              `Expected at least one test file in ${tempFolder}`,
             ).toBeGreaterThan(0);
 
             const testContent = [
@@ -233,7 +214,7 @@ describe("Recipes", () => {
             // Verify scenario framework usage
             expect(
               testContent.includes("scenario"),
-              "Expected test files to use the scenario framework"
+              "Expected test files to use the scenario framework",
             ).toBe(true);
 
             // Verify compliance-related criteria
@@ -246,7 +227,7 @@ describe("Recipes", () => {
               testContent.includes("does not");
             expect(
               hasComplianceCriteria,
-              "Expected test files to contain compliance criteria (disclaim, NOT diagnose, NOT prescribe)"
+              "Expected test files to contain compliance criteria (disclaim, NOT diagnose, NOT prescribe)",
             ).toBe(true);
 
             // Verify red team or adversarial testing
@@ -257,7 +238,7 @@ describe("Recipes", () => {
               testContent.includes("adversarial");
             expect(
               hasRedTeam,
-              "Expected test files to include RedTeamAgent or adversarial testing"
+              "Expected test files to include RedTeamAgent or adversarial testing",
             ).toBe(true);
           },
           scenario.judge(),
@@ -266,14 +247,14 @@ describe("Recipes", () => {
 
       expect(result.success).toBe(true);
     },
-    900_000
+    900_000,
   );
 
   it.skipIf(isCI)(
     "uses the langwatch CLI to debug instrumentation traces",
     async () => {
       const tempFolder = fs.mkdtempSync(
-        path.join(os.tmpdir(), "langwatch-recipe-debug-instrumentation-")
+        path.join(os.tmpdir(), "langwatch-recipe-debug-instrumentation-"),
       );
 
       copyFixtureToWorkDir({
@@ -285,7 +266,7 @@ describe("Recipes", () => {
       // Provide an .env so the CLI is authenticated
       fs.writeFileSync(
         path.join(tempFolder, ".env"),
-        `LANGWATCH_API_KEY=${process.env.LANGWATCH_API_KEY}\n`
+        `LANGWATCH_API_KEY=${process.env.LANGWATCH_API_KEY}\n`,
       );
 
       const result = await scenario.run({
@@ -305,26 +286,20 @@ describe("Recipes", () => {
           }),
         ],
         script: [
-          scenario.user(
-            "check my langwatch traces and see if there's anything to improve"
-          ),
+          scenario.user("check my langwatch traces and see if there's anything to improve"),
           scenario.agent(),
           (state) => {
             assertSkillWasRead(state, "debug-instrumentation");
 
             // Verify the agent used the langwatch CLI for trace inspection
             const allContent = state.messages
-              .map((m) =>
-                typeof m.content === "string"
-                  ? m.content
-                  : JSON.stringify(m.content)
-              )
+              .map((m) => (typeof m.content === "string" ? m.content : JSON.stringify(m.content)))
               .join("\n");
 
             expect(
               allContent.includes("langwatch trace search") ||
                 allContent.includes("langwatch trace get"),
-              "Expected agent to invoke `langwatch trace search` or `langwatch trace get` via the CLI"
+              "Expected agent to invoke `langwatch trace search` or `langwatch trace get` via the CLI",
             ).toBe(true);
           },
           scenario.judge(),
@@ -333,6 +308,6 @@ describe("Recipes", () => {
 
       expect(result.success).toBe(true);
     },
-    900_000
+    900_000,
   );
 });

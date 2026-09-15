@@ -3,7 +3,7 @@
  * Machine-wide queue for the whole-repo checks: typecheck and lint.
  *
  * Both saturate the machine on purpose. A tsgo run peaks around 3 to 4 GiB and
- * uses every core; a biome run over 6,800 files spends 38 CPU-seconds in 4
+ * uses every core; a whole-tree lint over 6,800 files spends 38 CPU-seconds in 4
  * seconds of wall clock. That is the right trade for one run. The three or four
  * that a laptop driving several worktrees and agents produces are what make the
  * machine unusable, and neither command knew another was already running.
@@ -136,8 +136,7 @@ function resolvePressure(env) {
   const swap = probe("sysctl", ["-n", "vm.swapusage"]);
   const total = /total = ([\d.]+)([MG])/.exec(swap);
   const used = /used = ([\d.]+)([MG])/.exec(swap);
-  const inBytes = (m) =>
-    Number.parseFloat(m[1]) * (m[2] === "G" ? 2 ** 30 : 2 ** 20);
+  const inBytes = (m) => Number.parseFloat(m[1]) * (m[2] === "G" ? 2 ** 30 : 2 ** 20);
   if (total && used && inBytes(total) > 0) {
     swapFraction = inBytes(used) / inBytes(total);
   }
@@ -152,8 +151,7 @@ function resolvePressure(env) {
   const occupied = /Pages occupied by compressor:\s+(\d+)/.exec(vmstat);
   if (pageSize && occupied && os.totalmem() > 0) {
     compFraction =
-      (Number.parseInt(occupied[1], 10) * Number.parseInt(pageSize[1], 10)) /
-      os.totalmem();
+      (Number.parseInt(occupied[1], 10) * Number.parseInt(pageSize[1], 10)) / os.totalmem();
   }
 
   if (swapFraction > 0.75 || compFraction > 0.2) return "red";
@@ -268,9 +266,7 @@ function resolveSlots(env, pressure = "green") {
         `${PREFIX} CHECK_SLOTS=${raw} is ignored in an agent shell; the machine policy applies. Only a person may turn the queue off.\n`,
       );
     } else if (Number.isNaN(parsed) || parsed < 0) {
-      stderr(
-        `${PREFIX} ignoring CHECK_SLOTS=${raw}, expected a non-negative integer\n`,
-      );
+      stderr(`${PREFIX} ignoring CHECK_SLOTS=${raw}, expected a non-negative integer\n`);
     } else {
       return { slots: parsed, source: "CHECK_SLOTS" };
     }
@@ -286,9 +282,7 @@ function resolveSlots(env, pressure = "green") {
 
   const byMemory = Math.floor(os.totalmem() / RAM_BUDGET_BYTES);
   const cpus =
-    typeof os.availableParallelism === "function"
-      ? os.availableParallelism()
-      : os.cpus().length;
+    typeof os.availableParallelism === "function" ? os.availableParallelism() : os.cpus().length;
   const byCpu = Math.floor(cpus / CPUS_PER_RUN);
   return { slots: Math.max(1, Math.min(byMemory, byCpu)), source: "machine" };
 }
@@ -392,9 +386,7 @@ function readEntries(dir) {
     if (!name.endsWith(".json")) {
       // A .tmp left behind by a process that died mid-write. Entries are only
       // ever written under the lock, so anything this old is abandoned.
-      const staleTmp =
-        name.endsWith(".tmp") &&
-        now - (statMtimeMs(file) ?? now) > LOCK_STALE_MS;
+      const staleTmp = name.endsWith(".tmp") && now - (statMtimeMs(file) ?? now) > LOCK_STALE_MS;
       if (staleTmp) fs.rmSync(file, { force: true });
       continue;
     }
@@ -455,14 +447,7 @@ function describeActive(entries, now) {
  * Blocks until this run may proceed. Returns how long it waited, whether it
  * announced itself, and whether it gave up on the queue and started anyway.
  */
-async function waitForTurn({
-  dir,
-  ticket,
-  slots,
-  pollMs,
-  maxWaitMs,
-  heartbeatMs,
-}) {
+async function waitForTurn({ dir, ticket, slots, pollMs, maxWaitMs, heartbeatMs }) {
   const queuedAt = Date.now();
   let announced = false;
   let lastBeat = 0;
@@ -474,12 +459,8 @@ async function waitForTurn({
         writeEntry(ticket);
         entries.push(ticket);
       }
-      const running = entries.filter(
-        (e) => e.state === "running" && e.token !== ticket.token,
-      );
-      const waiting = entries
-        .filter((e) => e.state === "waiting")
-        .sort(byArrival);
+      const running = entries.filter((e) => e.state === "running" && e.token !== ticket.token);
+      const waiting = entries.filter((e) => e.state === "waiting").sort(byArrival);
       const position = waiting.findIndex((e) => e.token === ticket.token);
       if (position >= 0 && position < slots - running.length) {
         ticket.state = "running";
@@ -544,14 +525,7 @@ function delegateToHaven(commandArgv, env) {
     return Promise.resolve(null);
   }
   const bin = env.HAVEN_BIN || "haven";
-  const argv = [
-    "slot",
-    "run",
-    "--label",
-    resolveLabel(env, commandArgv),
-    "--",
-    ...commandArgv,
-  ];
+  const argv = ["slot", "run", "--label", resolveLabel(env, commandArgv), "--", ...commandArgv];
   return new Promise((resolve) => {
     const child = spawn(bin, argv, { stdio: "inherit" });
     // Only a spawn that never happened (no haven on PATH) may fall back to
@@ -607,9 +581,7 @@ function goMaxProcs(pressure = "green") {
   if (process.env.GOMAXPROCS) return process.env.GOMAXPROCS;
   if (pressure === "green") return null;
   const cpus =
-    typeof os.availableParallelism === "function"
-      ? os.availableParallelism()
-      : os.cpus().length;
+    typeof os.availableParallelism === "function" ? os.availableParallelism() : os.cpus().length;
   return String(Math.max(2, Math.floor(cpus / 2)));
 }
 
@@ -793,14 +765,10 @@ async function main(argv, env) {
       heartbeatMs: positiveInt(env.CHECK_QUEUE_HEARTBEAT_MS, HEARTBEAT_MS),
     });
     if (announced && !forced) {
-      stderr(
-        `${PREFIX} slot free after ${formatDuration(waited)} in the queue, starting now.\n`,
-      );
+      stderr(`${PREFIX} slot free after ${formatDuration(waited)} in the queue, starting now.\n`);
     }
   } catch (err) {
-    stderr(
-      `${PREFIX} queue unavailable (${err.message}), running without a slot\n`,
-    );
+    stderr(`${PREFIX} queue unavailable (${err.message}), running without a slot\n`);
   }
 
   try {

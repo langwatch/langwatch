@@ -1,0 +1,34 @@
+import { useCallback } from "react";
+import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
+import { api } from "../../../../behavior/langy-api.ts";
+
+export interface LangyFeedbackInput {
+  conversationId?: string;
+  messageId?: string;
+  /** Trace id of the turn, so the feedback can attach to the LangWatch trace. */
+  traceId?: string;
+  rating: "up" | "down";
+  sentiment?: "frustrated" | "delighted" | "neutral";
+  comment?: string;
+  /** The user granted permission to inspect the full conversation for debugging. */
+  shareConversationConsent?: boolean;
+}
+
+/**
+ * Thin wrapper over the backend feedback capture (`langy.recordFeedback`).
+ */
+export function useLangyFeedback() {
+  const { project } = useOrganizationTeamProject();
+  const mutation = api.langy.recordFeedback.useMutation();
+
+  const submit = useCallback(
+    (input: LangyFeedbackInput) => {
+      const projectId = project?.id;
+      if (!projectId) return;
+      mutation.mutate({ projectId, ...input });
+    },
+    [project?.id, mutation],
+  );
+
+  return { submit, isSubmitting: mutation.isPending };
+}

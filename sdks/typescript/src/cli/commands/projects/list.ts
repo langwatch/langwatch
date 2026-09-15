@@ -24,7 +24,9 @@ export const listProjectsCommand = async (options?: {
   try {
     const result = await service.list({ page: options?.page, limit: options?.limit });
 
-    spinner.succeed(`Found ${result.data.length} project${result.data.length !== 1 ? "s" : ""} (page ${result.pagination.page}/${result.pagination.totalPages})`);
+    spinner.succeed(
+      `Found ${result.data.length} project${result.data.length !== 1 ? "s" : ""} (page ${result.pagination.page}/${result.pagination.totalPages})`,
+    );
 
     return {
       data: result,
@@ -33,7 +35,11 @@ export const listProjectsCommand = async (options?: {
           console.log();
           console.log(chalk.gray("No projects yet."));
           console.log(chalk.gray("Create one with:"));
-          console.log(chalk.cyan('  langwatch projects create --name "my-project" --language python --framework langchain --new-team-name "my-team"'));
+          console.log(
+            chalk.cyan(
+              '  langwatch projects create --name "my-project" --language python --framework langchain --new-team-name "my-team"',
+            ),
+          );
           return;
         }
 

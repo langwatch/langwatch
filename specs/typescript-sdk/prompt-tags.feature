@@ -115,7 +115,7 @@ Feature: SDK Prompt Tag Support
     And custom tags have type "custom"
 
   @unit @unimplemented
-  Scenario: List tags calls GET /api/prompts/tags
+  Scenario: List tags calls GET /api/v1/prompts/tags
     When I call prompts.tags.list()
     Then the SDK sends GET /api/prompts/tags
 
