@@ -130,6 +130,13 @@ Two consequences worth stating, because both were bugs in the first draft:
   files into errors with no legal fix — the title is quoted verbatim from its
   spec, so rewrapping it unbinds the test from the scenario it proves. An
   error the reader cannot fix teaches them to ignore the rule.
+- Structural JSDoc tags are not commentary and are not counted. One `@param`
+  per parameter plus a `@returns` puts a three-argument method at six lines
+  before a word of prose, so the house rule requiring those tags on an exported
+  symbol and this rule forbidding the length contradicted each other. 281
+  blocks across 221 files were caught in that contradiction; 190 others stay
+  over the limit on prose alone, which is the part worth cutting. `@deprecated`
+  and `@example` are excluded from the discount: those carry prose.
 - A `// oxlint-disable-next-line` comment is **not** a way to silence either
   tier. It is contiguous with the block, so it merges into it and makes it one
   line longer, it does not suppress a report anchored at the block's first

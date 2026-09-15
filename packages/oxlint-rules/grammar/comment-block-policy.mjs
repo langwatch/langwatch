@@ -88,6 +88,19 @@ const DIRECTIVE_LINE = /^(?:\/\/|\/\*\*?|\*\/?|\*)?\s*(?:eslint-|oxlint-|@ts-)/;
 const SCENARIO_ANNOTATION = /@scenario\b/;
 
 /**
+ * The JSDoc tags whose line count is set by the signature rather than by the
+ * author: one per parameter, one per thrown type. `@deprecated` and `@example`
+ * are not here - those carry prose, and prose is what the limit measures.
+ */
+const STRUCTURAL_TAG_LINE =
+  /^\s*(?:\/\*\*)?\s*\*?\s*@(?:param|returns?|throws|template|typeParam|defaultValue|see)\b/;
+
+/** How many of a block's lines are structural JSDoc tags rather than commentary. */
+export function structuralTagLines(text) {
+  return text.split(/\r?\n/).filter((line) => STRUCTURAL_TAG_LINE.test(line)).length;
+}
+
+/**
  * Whether a line binds a test to a spec scenario. The title is quoted verbatim
  * on one line, so rewrapping it unbinds the test: such a line is measured by
  * neither the block limit nor the column limit.

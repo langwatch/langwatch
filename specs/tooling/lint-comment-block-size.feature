@@ -53,3 +53,15 @@ Feature: The comment-block-size lint rule
     Given a comment line past 100 columns carrying a @scenario annotation
     When the comment-block-size rule runs over it
     Then it reports nothing, because rewrapping the title would unbind the test
+
+  @unit
+  Scenario: Structural JSDoc tags are not counted as commentary
+    Given a comment block whose length is its @param and @returns tags
+    When the comment-block-size rule runs over it
+    Then it reports nothing, because the tag count comes from the signature
+
+  @unit
+  Scenario: Prose past the limit is still reported alongside tags
+    Given a comment block carrying nine lines of narrative beside one @param tag
+    When the comment-block-size rule runs over it
+    Then it reports the block, counting only the commentary

@@ -13,6 +13,7 @@ import {
   lineIndex,
   marksGeneratedHeader,
   marksScenarioBinding,
+  structuralTagLines,
   marksLicenseHeader,
   mayContainReviewBlock,
   rootCovers,
@@ -138,12 +139,17 @@ function commentRangesOf(program) {
     .sort((left, right) => left.pos - right.pos || left.end - right.end);
 }
 
-/** One block, with its `@lint-keep` resolved and the annotation's own lines discounted. */
+/**
+ * One block, measured in commentary. Structural JSDoc tags and the `@lint-keep`
+ * annotation are discounted: their count comes from the signature or the
+ * annotation, so counting them would report a length the author cannot cut.
+ */
 function describeBlock(block, lines) {
   const text = lines.slice(block.line - 1, block.line - 1 + block.lines).join("\n");
   const keep = inspectLintKeep(text);
+  const structural = keep.annotationLines + structuralTagLines(text);
 
-  return { ...block, exempt: isExemptBlock(text), keep, lines: block.lines - keep.annotationLines };
+  return { ...block, exempt: isExemptBlock(text), keep, lines: block.lines - structural };
 }
 
 /** Every comment line past the column limit, each reported once however many ranges cover it. */

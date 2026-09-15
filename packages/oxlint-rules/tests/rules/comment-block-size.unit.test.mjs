@@ -79,6 +79,37 @@ describe("given a source file outside the burn-down allowlist", () => {
     });
   });
 
+  describe("when a block's length is its @param tags rather than prose", () => {
+    /** @scenario "Structural JSDoc tags are not counted as commentary" */
+    it("reports nothing, because the tag count comes from the signature", () => {
+      const code = [
+        "/**",
+        " * Sends the batch.",
+        " * @param one the first",
+        " * @param two the second",
+        " * @param three the third",
+        " * @param four the fourth",
+        " * @returns the receipt",
+        " */",
+        "export const x = 1;",
+      ].join("\n");
+
+      expect(report(code)).toEqual([]);
+    });
+  });
+
+  describe("when a block has prose bulk beyond its tags", () => {
+    /** @scenario "Prose past the limit is still reported alongside tags" */
+    it("reports the block, counting only the commentary", () => {
+      const prose = Array.from({ length: 9 }, (_, i) => ` * narrative line ${i}`).join("\n");
+      const code = `/**\n${prose}\n * @param one the first\n */\nexport const x = 1;`;
+      const found = report(code);
+
+      expect(found).toHaveLength(1);
+      expect(found[0].data.lines).toBe(11);
+    });
+  });
+
   describe("when the block sits under the warn threshold", () => {
     /** @scenario "A comment block under the size thresholds is left alone" */
     it("reports nothing", () => {
