@@ -2,7 +2,7 @@
  * The full derived half of the LangWatchQL catalog: every ClickHouse table
  * that is neither hand-written (a `LangWatchQLViewDefinition` authored
  * directly in `./lwqlViews.ts`) nor skipped (`./skippedTables.ts`), turned
- * into a dataset by {@link deriveDefaultCatalog}, refined by every table's
+ * into a view by {@link deriveDefaultCatalog}, refined by every table's
  * override.
  *
  * This is the single place the manifest, the skip map and every domain
@@ -74,8 +74,8 @@ export const LWQL_ALL_OVERRIDES: Record<string, Partial<DatasetOverride>> = {
 };
 
 /**
- * Every manifest table neither hand-written nor skipped, as a dataset —
- * ordered by exposed dataset name so the merge into `LWQL_VIEW_CATALOG` (and
+ * Every manifest table neither hand-written nor skipped, as a view —
+ * ordered by exposed view name so the merge into `LWQL_VIEW_CATALOG` (and
  * the manifest lists it feeds) is deterministic regardless of physical table
  * name or override iteration order.
  */

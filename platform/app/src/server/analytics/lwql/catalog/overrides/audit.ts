@@ -1,5 +1,5 @@
 /**
- * Overrides for audit and test suite datasets.
+ * Overrides for audit and test suite views.
  *
  * Automation audit tracks trigger executions and actions. Suite runs track test
  * execution results. Both are operational metadata with no content or cost gating.

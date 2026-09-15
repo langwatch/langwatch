@@ -1,8 +1,8 @@
 /**
- * The tables the derived-dataset catalog deliberately leaves off.
+ * The tables the derived-view catalog deliberately leaves off.
  *
  * The catalog is opt-*out*: {@link ./defineDatasetFromTable#deriveDefaultCatalog}
- * turns every ClickHouse table into a dataset unless it is hand-written or named
+ * turns every ClickHouse table into a view unless it is hand-written or named
  * here. That way a new customer-facing table cannot silently stay off the
  * catalog — the coverage guard fails until it is either catalogued or given a
  * reason to be skipped. A reason is required for every skip, so "not exposed" is

@@ -1,5 +1,5 @@
 /**
- * Overrides for AI Gateway spend and budget tracking datasets.
+ * Overrides for AI Gateway spend and budget tracking views.
  *
  * All tables track spend in USD (decimal and nano-USD formats) and are costs-gated
  * where applicable. Billable events are metadata events without cost gating.

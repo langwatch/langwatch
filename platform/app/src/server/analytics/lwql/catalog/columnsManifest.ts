@@ -1,7 +1,7 @@
 /**
- * The ClickHouse column manifest the derived-dataset builder reads.
+ * The ClickHouse column manifest the derived-view builder reads.
  *
- * A dataset built by {@link ./defineDatasetFromTable} does not restate its
+ * A view built by {@link ./defineDatasetFromTable} does not restate its
  * source table's column list — it takes the columns, their exact ClickHouse
  * types and their comments from here, so the published schema cannot drift from
  * what the table actually is. The manifest is *generated*, never hand-edited:
@@ -33,7 +33,7 @@ export interface ColumnsManifestColumn {
   readonly comment: string;
 }
 
-/** One table of the manifest, with the facts a dataset def is built from. */
+/** One table of the manifest, with the facts a view def is built from. */
 export interface ColumnsManifestTable {
   /** Table name within the database. */
   readonly name: string;
@@ -56,7 +56,7 @@ export const LWQL_COLUMNS_MANIFEST = manifestJson as ColumnsManifest;
 /**
  * The manifest entry for one table, or a throw naming how to fix its absence.
  *
- * A dataset that names a table the manifest does not carry is a catalog bug the
+ * A view that names a table the manifest does not carry is a catalog bug the
  * builder catches at construction rather than a view that renders against a
  * column list from nowhere.
  */

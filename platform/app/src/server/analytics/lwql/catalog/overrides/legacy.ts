@@ -10,7 +10,7 @@
  * they are exposed rather than skipped. Only `stored_log_records` actually
  * collides under {@link defaultDatasetName} — stripping its `stored_` prefix
  * yields `log_records`, the name the canonical `log_records` table's own
- * derived dataset already takes. `stored_metric_records` would default to
+ * derived view already takes. `stored_metric_records` would default to
  * `metric_records`, which nothing else claims, but it is named the same way
  * here for symmetry with its twin and so a reader sees at a glance that both
  * are the same generation of table.

@@ -175,14 +175,14 @@ export interface LangWatchQLViewColumn {
 }
 
 /**
- * A second physical table a view joins, so one dataset can be rendered from two
+ * A second physical table a view joins, so one view can be rendered from two
  * sources.
  *
  * Absent on every shipped view but the ones that genuinely span two tables. The
  * tenant boundary covers both sides: {@link LangWatchQLViewJoin.table} is listed
  * as a source table alongside the primary, so a row policy is created on it too
  * (`lwqlSourceTables` in `../provisioning/catalogStatements.ts`). Only a
- * ClickHouse-resident view may declare a join — a PostgreSQL-resident dataset
+ * ClickHouse-resident view may declare a join — a PostgreSQL-resident view
  * reaches ClickHouse through its own engine table and cannot.
  */
 export interface LangWatchQLViewJoin {
@@ -229,9 +229,9 @@ export interface LangWatchQLViewDedup {
   /**
    * The source table's `ORDER BY` — the key its engine collapses on.
    *
-   * A statement about the *table*, not about the dataset: `FINAL` merges by this
+   * A statement about the *table*, not about the view: `FINAL` merges by this
    * key and nothing else, so it is what the `final` strategy can promise. What
-   * one row of the dataset *is* — the grain a join has to match to avoid
+   * one row of the view *is* — the grain a join has to match to avoid
    * multiplying rows — is {@link LangWatchQLViewDefinition.grainColumns}, which is
    * the same list on every source whose sort key holds still and a narrower one
    * where it does not.
@@ -242,7 +242,7 @@ export interface LangWatchQLViewDedup {
    */
   readonly keyColumns: readonly string[];
   /**
-   * The strategy this dataset needs, when the shipped default is wrong for it.
+   * The strategy this view needs, when the shipped default is wrong for it.
    *
    * Absent on almost every entry: the default is measured and applies to every
    * source whose sort key is stable. Present where a source's sort key carries a
@@ -261,7 +261,7 @@ export interface LangWatchQLViewDedup {
    * The engine's version column: `argMax`/`max` over this picks the survivor.
    *
    * Absent when the source keeps exactly one row per key and there is nothing
-   * to collapse — every PostgreSQL-resident dataset, where the row *is* the
+   * to collapse — every PostgreSQL-resident view, where the row *is* the
    * current state. Omitted rather than defaulted, so that a `ReplacingMergeTree`
    * whose version column was forgotten is a missing field rather than a view
    * that silently double-counts.
@@ -273,7 +273,7 @@ export interface LangWatchQLViewDedup {
    *
    * The third answer to "which row survives", and it has to be declared because
    * it cannot be inferred from the other two. An absent `versionColumn` already
-   * means "nothing to collapse" (the PostgreSQL-resident datasets), and reading
+   * means "nothing to collapse" (the PostgreSQL-resident views), and reading
    * this engine that way would expose every unmerged partial row as its own
    * result row — a caller's `SELECT CostSum` would see a fraction of the
    * bucket's cost, which looks like a real number rather than like an error.
@@ -291,9 +291,9 @@ export interface LangWatchQLViewDedup {
 }
 
 /**
- * How a PostgreSQL-resident dataset reaches the LangWatchQL ClickHouse schema.
+ * How a PostgreSQL-resident view reaches the LangWatchQL ClickHouse schema.
  *
- * Its presence on an entry is what makes that dataset PostgreSQL-resident —
+ * Its presence on an entry is what makes that view PostgreSQL-resident —
  * there is no separate residence flag to disagree with it. The chain is:
  *
  *  1. `baseRelation` — the application's own table, which the analytics reader
@@ -335,31 +335,31 @@ export interface LangWatchQLViewDefinition {
   /**
    * Table the view reads.
    *
-   * For a ClickHouse-resident dataset, the fact table in the application's
+   * For a ClickHouse-resident view, the fact table in the application's
    * database. For a PostgreSQL-resident one, the PostgreSQL-engine table in the
    * LangWatchQL database — see {@link LangWatchQLViewDefinition.postgres}.
    */
   readonly sourceTable: string;
   /**
-   * How this dataset reaches ClickHouse, when it does not live there.
+   * How this view reaches ClickHouse, when it does not live there.
    *
-   * Absent for a ClickHouse-resident dataset, which is most of them.
+   * Absent for a ClickHouse-resident view, which is most of them.
    */
   readonly postgres?: LangWatchQLPostgresMapping;
   /** One line for the schema endpoint. */
   readonly description: string;
   /**
-   * Permissions a caller must hold to reach the dataset at all.
+   * Permissions a caller must hold to reach the view at all.
    *
    * Every column inherits them ({@link lwqlColumnGates}), which is what
-   * makes a dataset the caller may not reach *absent* from the published
+   * makes a view the caller may not reach *absent* from the published
    * schema and refused by the validator, rather than merely awkward to use.
-   * Declared explicitly rather than defaulted, so that adding a dataset means
+   * Declared explicitly rather than defaulted, so that adding a view means
    * answering the question.
    *
-   * Empty for every dataset shipped today: none of them is content in its
+   * Empty for every view shipped today: none of them is content in its
    * entirety — a caller with no content permission can still count runs, read
-   * verdicts and group by model. A dataset that *is* content end to end — a raw
+   * verdicts and group by model. A view that *is* content end to end — a raw
    * conversation store — is what this exists for.
    */
   readonly gates: readonly FieldProtection[];
@@ -371,8 +371,8 @@ export interface LangWatchQLViewDefinition {
    *
    * Three consumers read it, and they are the reason it is separate from
    * {@link LangWatchQLViewDedup.keyColumns}. The fanout diagnostic asks whether a
-   * join matched enough of a dataset's identity for one row to meet one row —
-   * a question about the *dataset*, where the engine's sort key can be wider
+   * join matched enough of a view's identity for one row to meet one row —
+   * a question about the *view*, where the engine's sort key can be wider
    * and reporting the surplus as unmatched is a false alarm on the join the
    * schema endpoint itself advertises. The `in-tuple` strategy groups by it, so
    * what the view collapses on and what the diagnostic calls a row are one
@@ -382,7 +382,7 @@ export interface LangWatchQLViewDefinition {
    *
    * Declaring it is therefore a claim the strategy has to be able to honour:
    * under plain `FINAL` the engine collapses to its own sort key and nothing
-   * narrower, so a `FINAL` dataset whose declared grain is narrower than the
+   * narrower, so a `FINAL` view whose declared grain is narrower than the
    * key would publish a grain the view cannot deliver. The catalog guard
    * enforces this.
    *
@@ -390,7 +390,7 @@ export interface LangWatchQLViewDefinition {
    * wherever the two are the same list, which is most of the catalog.
    *
    * Always a subset of the sort key: a grain *wider* than the key the engine
-   * collapses on would mean the engine merges rows the dataset considers
+   * collapses on would mean the engine merges rows the view considers
    * distinct, which is lost data rather than a duplicate.
    */
   readonly grainColumns?: readonly string[];
@@ -416,11 +416,11 @@ export interface LangWatchQLViewDefinition {
    * uses that literal; a source that spells it differently (`stored_objects`
    * carries `project_id`) declares it here so its policy filters the right
    * column. Absent means the default. Read by the row-policy generator; a
-   * derived dataset ({@link ./defineDatasetFromTable}) passes it through.
+   * derived view ({@link ./defineDatasetFromTable}) passes it through.
    */
   readonly tenantColumn?: string;
   /**
-   * A second physical table this view joins, so the dataset spans two sources.
+   * A second physical table this view joins, so the view spans two sources.
    *
    * Absent on a single-table view, which is all of them today. Present, its
    * table is tenant-policed alongside {@link sourceTable} and its columns are
@@ -451,8 +451,8 @@ export interface LangWatchQLViewDefinition {
  * Whether a column carries captured customer content.
  *
  * Reads the column's own gates only. The view generator uses this to decide
- * what a view's SQL must filter out, and a dataset-level gate says who may read
- * the dataset rather than what the values are — a distinction that matters,
+ * what a view's SQL must filter out, and a view-level gate says who may read
+ * the view rather than what the values are — a distinction that matters,
  * because a view has no viewer and cannot filter by permission.
  */
 export function isContentGated(column: LangWatchQLViewColumn): boolean {
@@ -460,11 +460,11 @@ export function isContentGated(column: LangWatchQLViewColumn): boolean {
 }
 
 /**
- * Every permission a caller needs to reference one column: the dataset's, then
+ * Every permission a caller needs to reference one column: the view's, then
  * the column's own.
  *
  * The union rather than either half, because both are real. A column of a
- * gated dataset is unreadable for two independent reasons and the schema
+ * gated view is unreadable for two independent reasons and the schema
  * endpoint publishes both, so a caller told what to ask for is told all of it.
  */
 export function lwqlColumnGates({
@@ -489,11 +489,11 @@ export function lwqlColumnGates({
 const SUMMED_COLUMN_TYPE = /^(?:U?Int(?:8|16|32|64|128|256)|Float(?:32|64))$/;
 
 /**
- * The columns identifying one logical row of a dataset.
+ * The columns identifying one logical row of a view.
  *
  * The declared grain where an entry has one, and the source's sort key
  * otherwise — which is the same list wherever the engine collapses on exactly
- * what the dataset calls a row. Read by the fanout diagnostic and by the
+ * what the view calls a row. Read by the fanout diagnostic and by the
  * `in-tuple` view body, so both mean the same thing by construction.
  */
 export function lwqlGrainColumns(
@@ -611,7 +611,7 @@ export function lwqlViewSourceColumns(
 }
 
 /**
- * Whether a dataset's rows live in PostgreSQL and reach ClickHouse through the
+ * Whether a view's rows live in PostgreSQL and reach ClickHouse through the
  * named-collection mapping.
  *
  * Reads the mapping's presence rather than a flag beside it, so there is
@@ -625,7 +625,7 @@ export function isPostgresResident(
   return view.postgres !== undefined;
 }
 
-/** The PostgreSQL-resident datasets of a catalog, in catalog order. */
+/** The PostgreSQL-resident views of a catalog, in catalog order. */
 export function lwqlPostgresViews(
   views: readonly LangWatchQLViewDefinition[],
 ): readonly (LangWatchQLViewDefinition & {
@@ -695,16 +695,16 @@ function heldPermissions(
 }
 
 /**
- * The datasets a caller can reach, in catalog order.
+ * The views a caller can reach, in catalog order.
  *
- * A dataset drops out when the caller may read nothing in it — either because
- * the dataset itself is gated on a permission they lack, or because every one
+ * A view drops out when the caller may read nothing in it — either because
+ * the view itself is gated on a permission they lack, or because every one
  * of its columns is. Those are the same fact from two directions, so they are
- * one rule rather than two: what makes a dataset absent is that there is
+ * one rule rather than two: what makes a view absent is that there is
  * nothing in it for this caller, however that came about.
  *
  * The schema endpoint publishes exactly these. The validator needs no separate
- * arrangement — every column of an absent dataset is in
+ * arrangement — every column of an absent view is in
  * {@link lwqlGatedColumns}, so referencing one is refused.
  */
 export function lwqlVisibleViews({

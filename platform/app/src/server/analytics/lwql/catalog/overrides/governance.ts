@@ -1,5 +1,5 @@
 /**
- * Overrides for the governance/OCSF datasets (#8085 / #8116 Part B, user
+ * Overrides for the governance/OCSF views (#8085 / #8116 Part B, user
  * decision: visibility is decided by the row policy, not by omission — see the
  * coordinator scope addition dropping `governance_*` from
  * {@link ../skippedTables#matchesSkipPattern}).

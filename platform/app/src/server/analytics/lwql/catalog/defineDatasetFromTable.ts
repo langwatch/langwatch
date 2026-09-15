@@ -4,14 +4,14 @@
  *
  * Two entry points, one construction path:
  *
- *  - {@link defineDatasetFromTable} builds one dataset from one table, reading
+ *  - {@link defineDatasetFromTable} builds one view from one table, reading
  *    the exposed columns and their exact ClickHouse types from
  *    {@link ./columnsManifest} so the published schema cannot drift from what
  *    the table actually is. The caller declares only what the manifest cannot
  *    know — the exposed name, the grain, the join and time columns, which
  *    columns are gated, and any renames.
  *  - {@link deriveDefaultCatalog} makes the catalog opt-*out*: it yields a
- *    dataset for every manifest table that is neither hand-written nor skipped,
+ *    view for every manifest table that is neither hand-written nor skipped,
  *    with safe defaults (content columns gated `output`, cost columns gated
  *    `costs`) that an override can refine or lift. A new table is therefore
  *    catalogued and content-gated by default, rather than silently omitted.
@@ -39,7 +39,7 @@ import type {
   LangWatchQLViewDefinition,
 } from "./types";
 
-/** How a derived dataset deduplicates, mirroring {@link LangWatchQLViewDedup}. */
+/** How a derived view deduplicates, mirroring {@link LangWatchQLViewDedup}. */
 export interface DerivedDatasetDedup {
   /**
    * The source's `ORDER BY`. Defaults to the manifest's sorting key, split on
@@ -55,7 +55,7 @@ export interface DerivedDatasetDedup {
 export interface DefineDatasetFromTableInput {
   /** Physical source table. Must be a table the manifest carries. */
   readonly table: string;
-  /** Name the dataset is exposed under: the `analytics.<name>` a caller writes. */
+  /** Name the view is exposed under: the `analytics.<name>` a caller writes. */
   readonly name: string;
   /** One line for the schema endpoint. */
   readonly description: string;
@@ -63,13 +63,13 @@ export interface DefineDatasetFromTableInput {
   readonly grain: string;
   /** The identity of one logical row, when it is narrower than the sort key. */
   readonly grainColumns?: readonly string[];
-  /** Columns another dataset can be joined to this one on. */
+  /** Columns another view can be joined to this one on. */
   readonly joinKeys: readonly string[];
   /** The column a caller filters to prune partitions. */
   readonly timeColumn: string;
   /** How far behind the write path the view can be. */
   readonly freshness: string;
-  /** Permissions a caller must hold to reach the dataset at all. Defaults to none. */
+  /** Permissions a caller must hold to reach the view at all. Defaults to none. */
   readonly gates?: readonly FieldProtection[];
   readonly dedup: DerivedDatasetDedup;
   /**
@@ -112,7 +112,7 @@ export interface DefineDatasetFromTableInput {
   readonly manifest: ColumnsManifest;
 }
 
-/** One column a dataset exposes, and the source column it reads. */
+/** One column a view exposes, and the source column it reads. */
 interface ExposedColumn {
   readonly exposedName: string;
   readonly sourceColumn: string;
@@ -280,8 +280,8 @@ function projectColumn({
   if (state) {
     if (!aggregating) {
       throw new Error(
-        `lwql dataset over "${tableName}": column "${sourceColumn}" is an ` +
-          `aggregate-function state (${type}) but the dataset is not marked ` +
+        `lwql view over "${tableName}": column "${sourceColumn}" is an ` +
+          `aggregate-function state (${type}) but the view is not marked ` +
           `aggregating, so its state cannot be finalised`,
       );
     }
@@ -312,7 +312,7 @@ function projectColumn({
 }
 
 /**
- * The columns a dataset exposes: every source column not skipped or aliased
+ * The columns a view exposes: every source column not skipped or aliased
  * away, under its own name, then the renames.
  *
  * The one place the exposed set is computed, so the builder and the default-gate
@@ -334,7 +334,7 @@ function exposedColumns({
   for (const skipped of Object.keys(skipColumns)) {
     if (!columnByName.has(skipped)) {
       throw new Error(
-        `lwql dataset over "${manifestTable.name}": skipColumns names ` +
+        `lwql view over "${manifestTable.name}": skipColumns names ` +
           `"${skipped}", which is not a column of the table`,
       );
     }
@@ -357,7 +357,7 @@ function exposedColumns({
       const column = columnByName.get(sourceColumn);
       if (!column) {
         throw new Error(
-          `lwql dataset over "${manifestTable.name}": alias "${exposedName}" ` +
+          `lwql view over "${manifestTable.name}": alias "${exposedName}" ` +
             `reads "${sourceColumn}", which is not a column of the table`,
         );
       }
@@ -380,7 +380,7 @@ function exposedColumns({
  * is the manifest's, its `sourceColumns` is the single column it reads.
  * Aliases rename; `skipColumns` drops; `columnGates`, `columnUnits` and
  * `descriptions` annotate. Nothing here builds an `expression` or a `summed`
- * measure: a dataset that needs either is hand-written, because those are the
+ * measure: a view that needs either is hand-written, because those are the
  * two places a column's meaning can be restated and drift.
  */
 export function defineDatasetFromTable(
@@ -479,7 +479,7 @@ export function defineDatasetFromTable(
 /** The default the derived catalog uses when a table declares no override. */
 const DEFAULT_TENANT_COLUMN = "TenantId";
 
-/** Matches existing hand-written datasets' freshness. */
+/** Matches existing hand-written views' freshness. */
 const DEFAULT_FRESHNESS = "seconds behind ingestion";
 
 /**
@@ -492,7 +492,7 @@ const DEFAULT_FRESHNESS = "seconds behind ingestion";
  * hand-written `evaluations`/`model_usage_by_minute` views expose them. A missed
  * identifier is not merely a cosmetic mislabel: the validator gates by
  * lowercased leaf name across the whole catalog, so a bare `id` wrongly gated on
- * one dataset withholds `Id` on every other — which is exactly the collision
+ * one view withholds `Id` on every other — which is exactly the collision
  * this widening removes.
  */
 const NON_CONTENT_NAME =
@@ -630,7 +630,7 @@ function defaultTimeColumn(manifestTable: ColumnsManifestTable): string {
 /**
  * The join keys a table gets by default: its `*Id` columns that also appear on
  * another catalogued table, so a join key is one that can actually match
- * another dataset.
+ * another view.
  */
 function defaultJoinKeys({
   manifestTable,
@@ -646,7 +646,7 @@ function defaultJoinKeys({
 
 /**
  * The names that appear on more than one catalogued table — the candidates for
- * a join key that can match another dataset.
+ * a join key that can match another view.
  */
 function columnsSharedAcrossTables(
   tables: readonly ColumnsManifestTable[],
@@ -699,9 +699,9 @@ function defaultDedup({
 
 /**
  * Every manifest table that is neither hand-written nor skipped, as a derived
- * dataset definition.
+ * view definition.
  *
- * The catalog's opt-out half: a table earns a dataset by existing, and stays
+ * The catalog's opt-out half: a table earns a view by existing, and stays
  * off only by being in {@link ./skippedTables} with a reason. Defaults are safe
  * — content columns gated `output`, cost columns gated `costs`, a partition
  * column and grain chosen from the schema — and an override refines any of them,
@@ -772,10 +772,10 @@ export function deriveDefaultCatalog({
         : sortKey.filter((column) => column !== tenantColumn).map(exposedOf));
     const timeColumn = override.timeColumn ?? defaultTimeColumn(manifestTable);
     const name = override.name ?? defaultDatasetName(manifestTable.name);
-    // An aggregating dataset must advertise its whole bucket key as its join
+    // An aggregating view must advertise its whole bucket key as its join
     // keys: every measure is a merge, so a join on a prefix would add several
     // buckets' measures under one row rather than repeat it. A superseding
-    // dataset advertises TenantId (every dataset is narrowable on it — see the
+    // view advertises TenantId (every view is narrowable on it — see the
     // schema-catalog guard "lists an ungated, joinable TenantId column") plus
     // its shared `*Id` foreign keys.
     const joinKeys = aggregating
@@ -831,7 +831,7 @@ function assertKeysAreExposed({
   for (const key of Object.keys(map)) {
     if (!exposedNames.has(key)) {
       throw new Error(
-        `lwql dataset "${name}": ${kind} names "${key}", which is not an ` +
+        `lwql view "${name}": ${kind} names "${key}", which is not an ` +
           `exposed column; it would annotate nothing`,
       );
     }

@@ -22,7 +22,7 @@
  * describes how a row got written or how long it is kept, which is not
  * something the API promises to keep stable.
  *
- * ## Two datasets over one trace, and why that is not two answers
+ * ## Two views over one trace, and why that is not two answers
  *
  * `traces` and `trace_metrics` are both one row per trace, and `evaluations`
  * and `evaluation_metrics` are both one row per evaluation, because the write
@@ -53,7 +53,7 @@
  * of a row until merges catch up, so each view deduplicates and each entry
  * states two things about its rows. `dedup.keyColumns` is the source's whole
  * `ORDER BY` — the key the *engine* collapses on, which is what `FINAL` can
- * promise and nothing more. `grainColumns` is what one row of the *dataset* is,
+ * promise and nothing more. `grainColumns` is what one row of the *view* is,
  * declared only where the two differ, which is where the sort key leads with a
  * business time so that range scans are monotonic. Both analytics projections
  * are sorted that way, and they answer it differently: `trace_analytics` freezes
@@ -252,7 +252,7 @@ const TRACES: LangWatchQLViewDefinition = {
     // `HasAnnotation` is deliberately not exposed, and it is the one absence
     // here that is about agreement rather than about sensitivity. It is folded
     // from `trace_summaries.AnnotationIds`, a *best-effort* dual-write of the
-    // annotation ids, while the `annotations` dataset reads PostgreSQL
+    // annotation ids, while the `annotations` view reads PostgreSQL
     // directly. Publishing both would let one caller ask "how many traces were
     // annotated" two ways and get two answers, with nothing in the schema
     // saying which is authoritative. The authoritative one is `annotations`:
@@ -1342,7 +1342,7 @@ const MODEL_USAGE_BY_MINUTE: LangWatchQLViewDefinition = {
  * straight into `OccurredAt`, so an evaluation that received a second lifecycle
  * event carries two sort keys. `FINAL` merges by the sort key and nothing else,
  * so it would keep both rows: not a visible duplicate, but every `count`, `sum`
- * and `avg` a caller writes over this dataset silently counting that evaluation
+ * and `avg` a caller writes over this view silently counting that evaluation
  * twice. The owning repository refuses `FINAL` on this table for the same
  * reason, and deduplicates the way this entry does — `max(UpdatedAt)` per
  * evaluation, whatever `OccurredAt` each version carries.
@@ -2714,7 +2714,7 @@ const CODING_AGENT_SESSION_EVENTS: LangWatchQLViewDefinition = {
  * the ClickHouse-resident facts, then the PostgreSQL-resident entities and
  * dimensions that name them.
  *
- * One catalog rather than two, because residence is a property of a dataset and
+ * One catalog rather than two, because residence is a property of a view and
  * not a property of the schema. Every consumer — the schema endpoint, the
  * validator, the diagnostics — reads this list and needs no idea which half an
  * entry came from; only the provisioning generators in `../provisioning/catalogStatements.ts` and

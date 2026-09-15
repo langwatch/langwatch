@@ -3,10 +3,10 @@
  * #8116 Part B, step 5).
  *
  * Exposed as `logs` — `log_records` collides with nothing else in the catalog,
- * but the shorter caller-facing name matches every other dataset's convention
+ * but the shorter caller-facing name matches every other view's convention
  * of naming the thing, not the storage shape. The three aliases translate the
  * wire's OTel-correlation naming into the same `TraceId`/`SpanId`/`SessionId`
- * vocabulary every other dataset uses, so a caller can join `logs` to `spans`
+ * vocabulary every other view uses, so a caller can join `logs` to `spans`
  * or `coding_tool_results` without knowing the physical column names.
  */
 
@@ -16,7 +16,7 @@ import type { DatasetOverride } from "../defineDatasetFromTable";
  * The five body/attribute columns carry either request or response content —
  * `EventName` (`api_request_body` vs `api_response_body`, etc.), not a
  * dedicated column, says which. Since one column can hold what another
- * dataset would call `input` on one row and `output` on the next, each is
+ * view would call `input` on one row and `output` on the next, each is
  * gated as both: the derived classifier already lands `output` on every one
  * of them (each is untyped `String`/`Nullable(String)` content with no
  * identifier-like name), and the override widens that to `["input", "output"]`

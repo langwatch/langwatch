@@ -1,18 +1,18 @@
 /**
  * Overrides and the one hand-written joined view for the coding-agent
- * datasets that are not `coding_agent_sessions` /
+ * views that are not `coding_agent_sessions` /
  * `coding_agent_session_events` (#8085 / #8116 Part B, step 5).
  *
  * - `coding_agent_trace_sessions`: the trace<->session correlation table.
  *   Derived defaults are safe as-is; the only refinement is naming the join
- *   keys another dataset can match on.
+ *   keys another view can match on.
  * - `stored_objects`: keyed by the physical column `project_id`, not the
  *   catalog's default `TenantId` — the `tenantColumn` override (unblocked by
  *   #8085/#8116 step 4's per-table row-policy column) is what lets the
  *   generic row policy machinery police it correctly. Exposed as `objects`
  *   with the physical column surfaced under the catalog's usual `TenantId`
  *   name via an alias, so a caller never has to know the storage detail.
- * - `coding_tool_results`: NOT derived — a dataset spanning two physical
+ * - `coding_tool_results`: NOT derived — a view spanning two physical
  *   tables needs the join extension (`LangWatchQLViewJoin`), which
  *   `deriveDefaultCatalog` does not build. Hand-written and exported for the
  *   merge step (#8085/#8116 step 6) to add to `LWQL_VIEW_CATALOG` alongside
@@ -64,7 +64,7 @@ export const CODING_OVERRIDES: Record<string, Partial<DatasetOverride>> = {
  * export never ran, or the log has since expired under its own TTL — is a
  * normal case (langwatch-saas#811), not an absent row. Every `claude_code.tool`
  * span keeps its row with `OutputText = ''` rather than disappearing from the
- * dataset, which is what an `INNER` join would do.
+ * view, which is what an `INNER` join would do.
  *
  * `OutputText` reads the joined side's `AttributesJson.body` (itself a
  * JSON-encoded string, per the OTel wire shape — hence the nested

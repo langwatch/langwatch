@@ -1,5 +1,5 @@
 /**
- * Overrides for experiment-related datasets.
+ * Overrides for experiment-related views.
  *
  * - experiment_runs: free table of run results per experiment
  * - experiment_run_items: per-item evaluation results with input/output gating

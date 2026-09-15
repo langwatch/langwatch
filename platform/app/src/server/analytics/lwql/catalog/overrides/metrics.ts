@@ -1,5 +1,5 @@
 /**
- * Overrides for metrics-related datasets.
+ * Overrides for metrics-related views.
  *
  * Most metric tables are typed-scalar: timestamps, numeric measures, and
  * low-cardinality enums. Their `Map` columns (`session_metrics.Attributes`,
