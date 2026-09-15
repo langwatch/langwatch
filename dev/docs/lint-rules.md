@@ -220,8 +220,11 @@ Messages:
 Messages:
 
 - `tooComplex`
-  - what: `{{name}}` has cognitive complexity {{complexity}} (max {{max}}); the heaviest contributor is the {{construct}} at line {{atLine}}.
+  - what: `{{name}}` has cognitive complexity {{complexity}} (max {{max}}); the {{construct}} at line {{atLine}} carries {{share}} of it.
   - fix: Extract that {{construct}} into its own named function so the rest of `{{name}}` stays flat.
+- `tooComplexSpread`
+  - what: `{{name}}` has cognitive complexity {{complexity}} (max {{max}}), spread across {{blocks}} nested blocks with no single one carrying a third of it -- the depth is the cost, not any one branch.
+  - fix: Flatten it: take the nesting down with early returns, or lift a whole stage of the work -- the {{construct}} at line {{atLine}} is the largest single block at {{share}} -- into its own named function.
 
 ## `langwatch/comment-block-size`
 

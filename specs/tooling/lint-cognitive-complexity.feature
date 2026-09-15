@@ -20,3 +20,30 @@ Feature: The cognitive-complexity lint rule
     Given a function with a single if statement
     When the cognitive-complexity rule runs with max set to zero
     Then it reports tooComplex
+
+  @unit
+  Scenario: A baselined file reports nothing
+    Given a file listed in the baseline for cognitive-complexity
+    When the cognitive-complexity rule runs over a function past the maximum
+    Then it reports nothing
+
+  # Attribution is by the weight of a whole block, not by the single node with
+  # the largest delta. The two answers differ whenever nesting is spread thin,
+  # and the second one named leaves nobody should extract.
+  @unit
+  Scenario: The block carrying the most of the score is named, not a leaf that ties on its own delta
+    Given a function whose score is spread over many nested constructs
+    When the cognitive-complexity rule runs over it
+    Then it names the block carrying the largest share and reports that share
+
+  @unit
+  Scenario: A block accounting for the whole score is never the named target
+    Given a function whose entire body sits inside one loop
+    When the cognitive-complexity rule runs over it
+    Then it names a block inside the loop rather than the loop itself
+
+  @unit
+  Scenario: A score with no dominant block is reported as spread rather than given a target
+    Given a function whose largest block carries less than a third of its score
+    When the cognitive-complexity rule runs over it
+    Then it reports tooComplexSpread and asks for the nesting to come down

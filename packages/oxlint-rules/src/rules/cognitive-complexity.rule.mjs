@@ -55,8 +55,8 @@ function isRecursiveCall(node, name) {
   );
 }
 
-// Human label for the single construct the message points at, so the fix
-// names a concrete extraction target instead of just the function.
+// Human label for the block the message points at, so the fix names a
+// concrete extraction target instead of just the function.
 const CONSTRUCT_LABELS = {
   IfStatement: "if statement",
   ConditionalExpression: "ternary expression",
@@ -74,31 +74,57 @@ const CONSTRUCT_LABELS = {
 };
 
 function describeConstruct(node) {
+  if (node.type === "IfStatement" && node.alternate) return "if/else chain";
   return CONSTRUCT_LABELS[node.type] ?? "construct";
 }
 
 export function cognitiveComplexity(functionNode) {
   let score = 0;
-  // The single construct that added the most to the score, so the report can
-  // point at one concrete extraction target instead of just the function.
-  let heaviest;
+  // Attribution is by the weight of a whole BLOCK, not by the single node
+  // with the largest delta. Those are different questions, and the second
+  // one answers badly: a function whose score is nesting spread over a
+  // dozen constructs has many nodes tied at the top, so "heaviest" became
+  // whichever the walk reached first. That named leaves no one should
+  // extract -- a `spent ? null : approval` ternary carrying 3 of 25 was
+  // reported as the reason for the whole score, while the catch block
+  // carrying 11 went unmentioned. A block is the thing a reader can lift
+  // out, so a block is what gets measured and named.
+  const blocks = [];
+  const open = [];
   const note = (node, delta) => {
     score += delta;
-    if (!heaviest || delta > heaviest.delta) heaviest = { delta, node };
+    for (const block of open) block.subtotal += delta;
   };
+  // Every nesting construct opens a block that accumulates what its subtree
+  // scores, itself included -- so `enter` wraps the construct's own `note`.
+  const enter = (node) => {
+    const block = { node, subtotal: 0 };
+    blocks.push(block);
+    open.push(block);
+    return block;
+  };
+  const leave = () => open.pop();
 
+  // An `else if` continues the chain its head opened rather than opening one
+  // of its own: the reader extracts the whole chain or none of it.
   const walkIf = (node, nesting, isElseIf, owner) => {
+    if (!isElseIf) enter(node);
     note(node, isElseIf ? 1 : 1 + nesting);
     walk(node.test, nesting, owner);
     walk(node.consequent, nesting + 1, owner);
     const alternate = node.alternate;
-    if (!alternate) return;
+    if (!alternate) {
+      if (!isElseIf) leave();
+      return;
+    }
     if (alternate.type === "IfStatement") {
       walkIf(alternate, nesting, true, owner);
+      if (!isElseIf) leave();
       return;
     }
     note(node, 1);
     walk(alternate, nesting + 1, owner);
+    if (!isElseIf) leave();
   };
 
   const walkChildren = (node, nesting, owner) => {
@@ -118,27 +144,35 @@ export function cognitiveComplexity(functionNode) {
         walkIf(node, nesting, false, owner);
         return;
       case "ConditionalExpression":
+        enter(node);
         note(node, 1 + nesting);
         walk(node.test, nesting, owner);
         walk(node.consequent, nesting + 1, owner);
         walk(node.alternate, nesting + 1, owner);
+        leave();
         return;
       case "SwitchStatement":
+        enter(node);
         note(node, 1 + nesting);
         walk(node.discriminant, nesting, owner);
         for (const switchCase of node.cases) walk(switchCase, nesting + 1, owner);
+        leave();
         return;
       case "ForStatement":
       case "ForInStatement":
       case "ForOfStatement":
       case "WhileStatement":
       case "DoWhileStatement":
+        enter(node);
         note(node, 1 + nesting);
         walkNested(node, nesting, owner, nesting + 1);
+        leave();
         return;
       case "CatchClause":
+        enter(node);
         note(node, 1 + nesting);
         walkNested(node, nesting, owner, nesting + 1);
+        leave();
         return;
       case "LogicalExpression": {
         if (!isLogicalSequence(node)) break;
@@ -181,7 +215,19 @@ export function cognitiveComplexity(functionNode) {
   }
 
   walkNested(functionNode, 0, functionName(functionNode), 0);
-  return { heaviest, score };
+
+  // A block that accounts for the entire score has nothing outside it, so
+  // extracting it is just renaming the function -- never useful advice.
+  // Among the rest the largest wins; ties go to the one a reader meets
+  // first. When even the winner carries less than a third, the score is
+  // genuinely spread and the report says so instead of inventing a target.
+  const extractable = blocks.filter((block) => block.subtotal < score);
+  let heaviest;
+  for (const block of extractable) {
+    if (!heaviest || block.subtotal > heaviest.subtotal) heaviest = block;
+  }
+  const concentrated = Boolean(heaviest) && heaviest.subtotal * 3 >= score;
+  return { blocks, concentrated, heaviest, score };
 }
 
 export const cognitiveComplexityRule = defineRule({
@@ -192,8 +238,16 @@ export const cognitiveComplexityRule = defineRule({
   },
   messages: {
     tooComplex: {
-      what: "`{{name}}` has cognitive complexity {{complexity}} (max {{max}}); the heaviest contributor is the {{construct}} at line {{atLine}}.",
+      what: "`{{name}}` has cognitive complexity {{complexity}} (max {{max}}); the {{construct}} at line {{atLine}} carries {{share}} of it.",
       fix: "Extract that {{construct}} into its own named function so the rest of `{{name}}` stays flat.",
+    },
+    // The score is nesting spread thin rather than one heavy block. Naming a
+    // block here would prescribe an extraction that removes a few points and
+    // leaves the shape untouched, so the report asks for the thing that
+    // actually pays: fewer levels.
+    tooComplexSpread: {
+      what: "`{{name}}` has cognitive complexity {{complexity}} (max {{max}}), spread across {{blocks}} nested blocks with no single one carrying a third of it -- the depth is the cost, not any one branch.",
+      fix: "Flatten it: take the nesting down with early returns, or lift a whole stage of the work -- the {{construct}} at line {{atLine}} is the largest single block at {{share}} -- into its own named function.",
     },
   },
   create(context, file, { max }) {
@@ -204,17 +258,19 @@ export const cognitiveComplexityRule = defineRule({
       ) {
         return;
       }
-      const { heaviest, score: complexity } = cognitiveComplexity(node);
+      const { blocks, concentrated, heaviest, score: complexity } = cognitiveComplexity(node);
       if (complexity <= max) return;
       context.report({
         node,
-        messageId: "tooComplex",
+        messageId: concentrated ? "tooComplex" : "tooComplexSpread",
         data: {
           atLine: heaviest?.node?.loc?.start?.line ?? "?",
+          blocks: blocks.length,
           complexity,
           construct: heaviest ? describeConstruct(heaviest.node) : "construct",
           max,
           name: functionName(node) ?? "This function",
+          share: heaviest ? `${heaviest.subtotal} of ${complexity}` : "an unclear share",
         },
       });
     };
