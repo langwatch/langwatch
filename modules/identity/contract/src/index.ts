@@ -514,3 +514,4 @@ export {
 } from "./sso-connection-events.ts";
 export * from "./signin-callback.errors.ts";
 export * from "./identity.api.ts";
+export * from "./identity-lookup.ts";

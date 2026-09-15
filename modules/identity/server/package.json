@@ -35,6 +35,7 @@
   },
   "dependencies": {
     "@langwatch/actor": "workspace:*",
+    "@langwatch/audit-log-contract": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
     "@langwatch/eventing": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
