@@ -152,8 +152,13 @@ apps/api/src/app-trpc/app-trpc.features.ts
 apps/api/src/app-trpc/app-trpc.namespaces.ts
 apps/worker/src/app/worker-tenancy*.composition.ts
 apps/ui/src/features/catalogue.json
+apps/ui/src/model/ui-route-table.ts
 packages/architecture-enforcer/src/*-baseline.json
 ```
+
+`ui-route-table.ts` joined the list on 2026-09-16: three lanes wanted an entry in
+it within the same hour. A lane may be granted it exclusively for one slice, and
+the roster row says so when it is; otherwise the lines come through section 10.
 
 Keep this list current - it is the copy the manifests point at. A file joins it
 the moment two lanes could plausibly need it in the same hour.

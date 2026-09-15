@@ -746,106 +746,106 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
           },
         ],
       },
-    ],
-  },
 
-  // Ops
-  { path: "/ops", page: "pages/ops/index" },
-  {
-    // Queue health reads on the dashboard now; the retired page forwarded
-    // there and nothing else.
-    path: "/ops/queues",
-    redirect: { from: "/ops/queues", to: "/ops" },
-  },
-  { path: "/ops/dejaview", page: "pages/ops/dejaview" },
-  {
-    // Schedules are a section of the event-sourcing workspace; old links
-    // follow.
-    path: "/ops/scheduler",
-    redirect: { from: "/ops/scheduler", to: "/ops/event-sourcing/schedules" },
-  },
-  {
-    path: "/ops/event-sourcing",
-    page: "pages/ops/event-sourcing/index",
-  },
-  {
-    path: "/ops/event-sourcing/dead-letters",
-    page: "pages/ops/event-sourcing/dead-letters",
-  },
-  {
-    path: "/ops/event-sourcing/processes",
-    page: "pages/ops/event-sourcing/processes",
-  },
-  {
-    path: "/ops/event-sourcing/projections",
-    page: "pages/ops/event-sourcing/projections",
-  },
-  {
-    path: "/ops/event-sourcing/subscribers",
-    page: "pages/ops/event-sourcing/subscribers",
-  },
-  {
-    path: "/ops/event-sourcing/schedules",
-    page: "pages/ops/event-sourcing/schedules",
-  },
-  { path: "/ops/blobs", page: "pages/ops/blobs" },
-  {
-    path: "/ops/feature-flags",
-    page: "pages/ops/feature-flags",
-  },
-  { path: "/ops/foundry", page: "pages/ops/foundry" },
-  {
-    path: "/ops/migrations",
-    page: "pages/ops/migrations",
-  },
-  {
-    // Projection replay is a drawer on the event-sourcing page now, so the
-    // old address has to open the drawer as well as land on the page. Per-run
-    // progress keeps its own page at /ops/projections/:runId below.
-    path: "/ops/projections",
-    redirect: {
-      from: "/ops/projections",
-      to: "/ops/event-sourcing/projections",
-      // The replay wizard is a drawer the projections screen addresses with
-      // its OWN query key now — the application drawer registry is a
-      // composition `@langwatch/ops-web` may not carry — so the retired
-      // address pins that key instead. Same page, same drawer open.
-      pinParams: { replay: "open" },
-    },
-  },
-  {
-    path: "/ops/projections/:runId",
-    page: "pages/ops/projections/[runId]",
-  },
-  {
-    // The Backoffice entry has no surface of its own: Users is the default
-    // resource, and the per-resource pages below are the real surfaces.
-    path: "/ops/backoffice",
-    redirect: { from: "/ops/backoffice", to: "/ops/backoffice/users" },
-  },
-  {
-    path: "/ops/backoffice/bug-reports",
-    page: "pages/ops/backoffice/bug-reports",
-  },
-  {
-    path: "/ops/backoffice/users",
-    page: "pages/ops/backoffice/users",
-  },
-  {
-    path: "/ops/backoffice/organizations",
-    page: "pages/ops/backoffice/organizations",
-  },
-  {
-    path: "/ops/backoffice/projects",
-    page: "pages/ops/backoffice/projects",
-  },
-  {
-    path: "/ops/backoffice/subscriptions",
-    page: "pages/ops/backoffice/subscriptions",
-  },
-  {
-    path: "/ops/backoffice/sso-connections",
-    page: "pages/ops/backoffice/sso-connections",
+      // Ops
+      { path: "/ops", page: "pages/ops/index" },
+      {
+        // Queue health reads on the dashboard now; the retired page forwarded
+        // there and nothing else.
+        path: "/ops/queues",
+        redirect: { from: "/ops/queues", to: "/ops" },
+      },
+      { path: "/ops/dejaview", page: "pages/ops/dejaview" },
+      {
+        // Schedules are a section of the event-sourcing workspace; old links
+        // follow.
+        path: "/ops/scheduler",
+        redirect: { from: "/ops/scheduler", to: "/ops/event-sourcing/schedules" },
+      },
+      {
+        path: "/ops/event-sourcing",
+        page: "pages/ops/event-sourcing/index",
+      },
+      {
+        path: "/ops/event-sourcing/dead-letters",
+        page: "pages/ops/event-sourcing/dead-letters",
+      },
+      {
+        path: "/ops/event-sourcing/processes",
+        page: "pages/ops/event-sourcing/processes",
+      },
+      {
+        path: "/ops/event-sourcing/projections",
+        page: "pages/ops/event-sourcing/projections",
+      },
+      {
+        path: "/ops/event-sourcing/subscribers",
+        page: "pages/ops/event-sourcing/subscribers",
+      },
+      {
+        path: "/ops/event-sourcing/schedules",
+        page: "pages/ops/event-sourcing/schedules",
+      },
+      { path: "/ops/blobs", page: "pages/ops/blobs" },
+      {
+        path: "/ops/feature-flags",
+        page: "pages/ops/feature-flags",
+      },
+      { path: "/ops/foundry", page: "pages/ops/foundry" },
+      {
+        path: "/ops/migrations",
+        page: "pages/ops/migrations",
+      },
+      {
+        // Projection replay is a drawer on the event-sourcing page now, so the
+        // old address has to open the drawer as well as land on the page. Per-run
+        // progress keeps its own page at /ops/projections/:runId below.
+        path: "/ops/projections",
+        redirect: {
+          from: "/ops/projections",
+          to: "/ops/event-sourcing/projections",
+          // The replay wizard is a drawer the projections screen addresses with
+          // its OWN query key now — the application drawer registry is a
+          // composition `@langwatch/ops-web` may not carry — so the retired
+          // address pins that key instead. Same page, same drawer open.
+          pinParams: { replay: "open" },
+        },
+      },
+      {
+        path: "/ops/projections/:runId",
+        page: "pages/ops/projections/[runId]",
+      },
+      {
+        // The Backoffice entry has no surface of its own: Users is the default
+        // resource, and the per-resource pages below are the real surfaces.
+        path: "/ops/backoffice",
+        redirect: { from: "/ops/backoffice", to: "/ops/backoffice/users" },
+      },
+      {
+        path: "/ops/backoffice/bug-reports",
+        page: "pages/ops/backoffice/bug-reports",
+      },
+      {
+        path: "/ops/backoffice/users",
+        page: "pages/ops/backoffice/users",
+      },
+      {
+        path: "/ops/backoffice/organizations",
+        page: "pages/ops/backoffice/organizations",
+      },
+      {
+        path: "/ops/backoffice/projects",
+        page: "pages/ops/backoffice/projects",
+      },
+      {
+        path: "/ops/backoffice/subscriptions",
+        page: "pages/ops/backoffice/subscriptions",
+      },
+      {
+        path: "/ops/backoffice/sso-connections",
+        page: "pages/ops/backoffice/sso-connections",
+      },
+    ],
   },
 
   // @project redirect - Next.js parallel route that redirects /@project/path to /:project/path

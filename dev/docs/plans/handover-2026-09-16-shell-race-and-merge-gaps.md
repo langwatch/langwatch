@@ -9,6 +9,69 @@ acting on anything I said in conversation.
 
 ---
 
+## 0. State, rewritten 2026-09-16 01:0x
+
+This section is the snapshot. Where it contradicts a section below it, it wins.
+
+**Committed since this document was written.** `52814ec2d8` - the
+`belongsToNoOrganization` port that section 2 described as applied-but-uncommitted,
+plus this document. Its doc comment was cut first: `comment-block-size` now errors
+at 6 lines **including** the `/**` and `*/` delimiters, so the budget is 5 and
+nothing suppresses it. Verified before committing: the new unit test 4/4,
+`typecheck:one @langwatch/navigation-web` clean, oxlint clean on both new files,
+no merge or rebase marker, zero unmerged entries. The two remaining
+`comment-block-size` errors in `use-landing-redirect.ts` are pre-existing in HEAD
+and were left alone.
+
+**The dirty count is not this drive's.** 128 files, belonging to at least three
+other live sessions in this shared checkout: a lint-to-zero coordinator with five
+comment-sweep lanes (`sdks/typescript`, `modules/{analytics,trace,scenario,gateway}`),
+a haven TUI and simulators drive (`tools/thuishaven`, `services/{mailsim,idpsim}`,
+`specs/setup/haven-*.feature`), and the request-bounds config work. Commit by
+explicit pathspec only, and never `git stash` - the stash stack is global and
+`stash@{0}` currently holds another session's mail-sink work.
+
+**The gap to origin/main: 4 commits behind, 2920 ahead**, merge-base
+`c5999477f1`. The four are `c2f6eebe1d` (voice) and three identity PRs -
+`c87c46d17f` #8143, `118929d09c` #8148, `51577b8e19` #8149 - which land in exactly
+the area section 3b says the merge never re-homed. Deliberately not merged while
+six lanes and three sessions are live in this checkout; it waits until they are
+collected.
+
+**Lanes.** Roster is `.claude/coordinator/LANES.md`; read it, do not trust this
+line. At the time of writing: `ui-route-surface-repair` (sonnet) and
+`settings-profile-port` (sonnet) active. `.claude/manifests/settings-security-port.md`
+is written and waiting - spawn it once the profile lane is collected, not
+alongside it: the two share the api seam, the host port and the export surface,
+and sequencing them is cheaper than four shared files.
+
+**`apps/ui/src/model/ui-route-table.ts` is now a coordinator-shared file**
+(`COORDINATOR.md` section 6). Three lanes wanted an entry in it within one hour.
+A lane may hold it exclusively for one slice, and the roster row says so when it
+does; otherwise the lines come through handoff section 10.
+
+**A hole nothing else in this document names.**
+`apps/ui/src/model/__tests__/navigation-destinations-are-routed.unit.test.ts:66`
+reads `Object.values(projectNavItems)` and nothing else. That is why four dead
+governance links passed 107 green tests. `governanceNavItems` and
+`gatewayNavItems` are both already exported from `@langwatch/navigation-web/chrome`
+beside it. The route-surface lane is widening it to those two families and proving
+the widening bites; **settings is the next family to add**, and it is deliberately
+not in that change because `/settings/profile` and `/settings/security` are
+genuinely absent and would turn the suite red for a gap that lane is not fixing.
+
+**Parity numbers for the section 3b work, measured rather than estimated:**
+
+    specs/settings/profile.feature                  0/29 scenarios bound
+    specs/identity/authentication-settings.feature  3/27
+    specs/settings/change-password-auth0.feature    19/19  (done - leave it)
+
+53 unbound scenarios, which is why section 3b is two lanes and not an afternoon.
+Whole-repository parity is FAIL at 1723 unbound; that is not this drive's number.
+Filter the tool to one file and read its `N/M` line.
+
+---
+
 ## 1. Shipped: PR #8155, the full-page 404 on refresh
 
 **Branch** `fix/shell-project-not-found-race`, cut from `origin/main` at
@@ -80,11 +143,8 @@ will chase phantom failures: `pnpm --filter @langwatch/web prisma:generate:types
 
 Uncommitted, alongside the ~47 files that were already dirty.
 
-**Applied.** The same org-less fix, ported to the new tree:
-`modules/navigation/web/src/model/belongs-to-no-organization.ts` + 4 unit
-tests, wired into `use-landing-redirect.ts`. Package test failures are
-identical with and without it (4 files / 11 tests, all pre-existing);
-`pnpm typecheck:one @langwatch/navigation-web` clean.
+**Committed as `52814ec2d8`** - see section 0. Package test failures are
+identical with and without it (4 files / 11 tests, all pre-existing).
 
 **Attempted and reverted — do not redo it blindly.** Gating
 `useUiOrganizations` on the session having answered (`apps/ui/src/behavior/ui-session.ts`)
@@ -117,15 +177,27 @@ days ago and its §A still stands. What follows is the delta.
     /governance/insights    …/governance/insights.tsx
     /governance/signals     …/governance/signals.tsx
 
-All four render the catch-all 404 today. All four are named by
-`modules/navigation/web/src/model/section-nav-items.ts` and by the bouncer
-exemption list in `modules/auth/web/src/behavior/use-required-session.ts`, so
-the product links at them. **The screens were ported; the route-table entries
-and page loaders were not.** Fix is four entries in
-`apps/ui/src/model/ui-route-table.ts` plus four loaders — unless the answer is
-that they were retired on purpose, in which case they want redirects, the way
-`/ops/queues` got one. The 2026-09-12 doc asked this same question and nobody
-has answered it; it is still the blocking unknown, not the work itself.
+All four render the catch-all 404 today. **The screens were ported; the
+route-table entries and page loaders were not.**
+
+**ANSWERED 2026-09-16: dropped by the merge, not retired.** They want route
+entries, not redirects. Do not reopen this. The evidence:
+
+- `origin/main:platform/app/src/routes.tsx` serves all four - `agents` at line
+  258, `insights` 275, `analytics` 279, `signals` 283.
+- `modules/navigation/web/src/model/section-nav-items.ts:105` links at all four
+  from `governanceNavItems`, and the bouncer exemption list in
+  `modules/auth/web/src/behavior/use-required-session.ts` names them.
+- `specs/governance/governance-platform-placeholders.feature` describes
+  insights, analytics and signals as deliberate Preview placeholders behind
+  `release_ui_governance_billed_cost_enabled`, and its `@integration` scenarios
+  are already bound in
+  `enterprise/modules/governance/web/src/ui/sections/governance/__tests__/platformPlaceholders.integration.test.tsx`.
+  A retired page does not keep a bound spec and three nav entries.
+
+`agents` is not flag-gated; the other three are, on the same flag `costs` and
+`billed` use, and the spec insists the guard is on the page and not only on the
+nav item. In `.claude/manifests/ui-route-surface-repair.md`, lane running.
 
 ### 3b. Three addresses the merge never re-homed
 
@@ -148,7 +220,32 @@ built from, only `passkeys-section`, `sign-in-methods-section` and
 `TwoFactorSection`, `EmailAndLinkedAccountsSection`, `BrowserSessionsSection`.
 `modules/user/web/src/ui/sections/devices-panel.tsx` looks adjacent but is the
 personal-workspace devices panel on a different API, not the browser-sessions
-port. `identity-lookup` has no screen and is not in `BACKOFFICE_RESOURCES`.
+port. **`identity-lookup` is far bigger than "needs a screen", and that was my
+mistake.** Checked 2026-09-16: the string `identity-lookup` / `identityLookup` /
+`IdentityLookup` appears **nowhere** in `modules`, `enterprise`, `apps` or
+`packages` on this branch, outside stale `dist/`. The merge did not drop a page;
+it dropped the whole vertical slice. On main:
+
+    platform/app/src/server/app-layer/identity/identity-lookup.service.ts                485 lines
+    platform/app/src/server/app-layer/identity/repositories/identity-lookup.prisma.repository.ts   346
+    platform/app/src/server/api/routers/identityLookup.ts                                305   (rate-limited)
+    platform/app/src/server/app-layer/identity/identity-lookup-adapters.ts               164
+    platform/app/src/pages/ops/backoffice/identity-lookup.tsx                             10   (the page is thin; the screen is a component)
+
+It is also **not** a `BACKOFFICE_RESOURCES` entry on main - it is its own
+top-level route at `/ops/backoffice/identity-lookup`, listed by
+`useSettingsMenu.ts:368`. So adding it to `BACKOFFICE_RESOURCES` here would be a
+wire difference, not a port.
+
+Its spec is already on this branch and reports **0 of 32 scenarios bound**
+(`specs/identity/platform-ops-identity-lookup.feature`). Beside it,
+`specs/identity/org-admin-identity-surface.feature` is 0 of 20 *enforced* -
+every scenario is `@unimplemented`, so it is exempt and not a gap.
+
+That makes the section 3b family 85 unbound scenarios, not two pages and a
+screen: 29 profile, 24 authentication-settings, 32 identity-lookup. It wants its
+own module lane with a server half, and it is the largest single thing this
+handover names.
 
 There is a second-order effect worth knowing: main's #7631 **renamed**
 `/settings/authentication` into `/settings/security` and left the old address
@@ -249,20 +346,60 @@ Ranked, if someone takes this on:
 
 ---
 
-## 6. Next actions, in the order I would take them
+## 6. Next actions
 
-1. **Answer the governance question** (§3a): retired on purpose, or dropped? It
-   has been open since 2026-09-12 and it gates four lines of work either way.
-2. **Move the ops block inside `UiAppChrome`** (§4). Small, visible, low risk.
-3. **Port `/settings/profile` and `/settings/security`** (§3b), reconciling
-   with the `/settings/authentication` page the branch still carries.
-4. **`/ops/backoffice/identity-lookup`** (§3b) — needs a screen and a
-   `BACKOFFICE_RESOURCES` entry.
-5. Round trips (§5), starting with the 401 retry policy so hop 1 can go.
+Items 1 to 3 of the original list are in flight or decided; what is left:
+
+1. **Collect `ui-route-surface-repair`** - the four governance routes, the ops
+   block moved inside `UiAppChrome`, and the destinations test widened. Its
+   completion criterion includes proving the widened test fails when a route
+   entry is removed, so check that claim rather than the green tick.
+2. **Collect `settings-profile-port`**, apply its section-10 route-table line,
+   then spawn `.claude/manifests/settings-security-port.md` from its handoff.
+   Not alongside it: they share the api seam, the host port and the export
+   surface.
+3. **`/ops/backoffice/identity-lookup`** (§3b) - the whole feature is absent,
+   server and all, with 32 unbound scenarios. Re-read §3b: this is the largest
+   item here, not the smallest, and it needs its own lane with a server half.
+   Do not fold it into anything.
+4. **Widen the destinations test to the settings nav family**, once
+   `/settings/profile` and `/settings/security` answer. Until then it would be
+   red for a gap nobody is fixing, which is worse than narrow.
+5. **Merge the 4 commits from origin/main**, once this checkout is quiet. Three
+   of them are identity and land in the section 3b area, so the settings lanes
+   are worth finishing first - otherwise they port against a tree the merge is
+   about to move.
+6. **Round trips** (§5), starting with the 401 retry policy so hop 1 can go.
+   Unchanged and still unaddressed.
+
+**The decision taken on 2026-09-16, so no later session re-asks it:** the
+`/settings/security` port follows main's arrangement including the
+`/settings/authentication` redirect shim, rather than keeping the branch's
+pre-rename page. Reason: the branch's standing invariant is wire-compatibility
+with main, and every future main merge would otherwise reopen the same
+collision. Recorded in `.claude/manifests/settings-security-port.md`.
 
 ## 7. Loose ends
 
-- PR #8155 is open and unreviewed.
+- **PR #8155 is open, unreviewed, and its e2e lane is red on one test** -
+  `tests/agentic-e2e/tests/front-door/passkeys.test.ts:46`, "adding a passkey in
+  settings, the post-password offer, and the relying party", failed all three
+  attempts (57.1s, 1.0m, 58.2s) while 25 others passed. This is **not** a
+  timeout: the CI whole-test budget is 120s
+  (`tests/agentic-e2e/playwright.config.ts:131`, `IS_CI ? 120000 : 60000`), so
+  the test failed an assertion and took 57s doing it. The assertions in the
+  failure context are lines 71-74, starting with
+  `expect(page.getByTestId("passkeys-settings-section")).toBeVisible()`.
+  `e2e-ci` was green on main at 2026-09-15T16:02, which is the PR's own base
+  (`51577b8e19`), so this is not inherited.
+  Worth taking seriously rather than retrying: #8155 changes exactly when the
+  organization graph counts as answered, and a settings page that now waits for
+  it would show a loading state where that test expects the section. The PR's
+  verification was 6291 component tests and a typecheck - none of which drives a
+  real browser to `/settings`. Read the job's trace before re-running it.
+  The check named "breaking change stays in one component" shows FAILURE in the
+  PR's rollup but PASSES on the newest run; `gh pr checks` deduplicates by name,
+  which is why it looks red.
 - `.claude/worktrees/shell-notfound-race` still exists, with node_modules and
   generated files. Remove it once the PR merges.
 - An untracked `.env.example` sits in that worktree, copied in by the
