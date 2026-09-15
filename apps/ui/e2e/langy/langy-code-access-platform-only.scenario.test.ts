@@ -1,14 +1,9 @@
 /**
- * The decision table's other side: work that changes nothing in the
- * customer's program never asks for the code (ADR-129, skills/code-changes).
- *
- * Creating a scenario is platform work, so the code access card must never
- * appear. The proof is structural: `code_access` is not among the tools the
- * turn ran, and the conversation recorded no control request. A judge asked
- * "did it ask for the code" would be reading prose for a negative.
- *
- * RUN (one file per vitest run, see README):
- *   cd platform/app/e2e/langy && npx vitest run langy-code-access-platform-only.scenario.test.ts --reporter=verbose
+ * The decision table's other side: work that changes nothing in the customer's program never
+ * asks for the code (ADR-129, skills/code-changes). Creating a scenario is platform work, so the
+ * code access card must never appear — proven structurally: `code_access` is not among the tools
+ * the turn ran, and the conversation recorded no control request.
+ * RUN: cd apps/ui/e2e/langy && npx vitest run langy-code-access-platform-only.scenario.test.ts
  */
 
 import { openai } from "@ai-sdk/openai";

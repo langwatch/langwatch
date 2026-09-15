@@ -28,15 +28,10 @@ const TAPROOT =
 const HEX_ID_SHAPED_LIKE_AN_ADDRESS = "13f895f8877e4bc5edc85c397fbd3668";
 
 /**
- * One constructed payload written at three version bytes, so the checksums are
- * built the same way and only the version differs. The hash160 is the first
- * twenty bytes of a digest of a fixed phrase, not an observed address, and the
- * two accepted members are what prove the rejected one is turned away for its
- * version rather than for a checksum that was never going to line up.
- *
- * Version six is the member that matters: base58 renders it with a leading "3",
- * so it satisfies the legacy pattern, and its checksum is as valid as the other
- * two. Bitcoin mints no such address.
+ * One constructed payload at three version bytes, so the checksums are built the same way and
+ * only the version differs — the hash160 is a fixed-phrase digest, not an observed address.
+ * Version six is what matters: base58 renders it with a leading "3", so it satisfies the legacy
+ * pattern with a checksum as valid as the other two, yet Bitcoin mints no such address.
  */
 const PAYLOAD_AT_V0 = "1F6gFLr6VjazEQvMSV5prBd3agThutz9S8";
 const PAYLOAD_AT_V5 = "3FnhAtLY3duNKacnZakRGoyyjCkRWLW4rY";
@@ -136,14 +131,10 @@ describe("given a bech32 address", () => {
   });
 
   /**
-   * A checksum is only as narrow as the grammar behind it. The witness version
-   * is read from a thirty-two character alphabet, and BIP-141 defines sixteen
-   * of those values; the other fifteen decode to no segwit program at all.
-   *
-   * The pair below is one payload written at two versions, so the checksums are
-   * built the same way and only the version differs. The version one member
-   * validating is what proves the version seventeen member is rejected for its
-   * version and not for a checksum that was never going to line up.
+   * A checksum is only as narrow as the grammar behind it. The witness version is read from a
+   * 32-character alphabet, and BIP-141 defines sixteen of those values — the other fifteen decode
+   * to no segwit program at all. The pair below is one payload at two versions, so the version-one
+   * member validating is what proves the version-seventeen member is rejected for its version.
    */
   describe("when the witness version is one bitcoin does not define", () => {
     const PAYLOAD_AT_V1 = "bc1pr23clxd5mzfsh79vn6pg0kaytjeq8w4u8x8jd8";
@@ -159,15 +150,10 @@ describe("given a bech32 address", () => {
   });
 
   /**
-   * The checksum covers the characters, not what they mean, so a string can
-   * clear it and still encode no output anyone could pay to. Every vector below
-   * is checksum-valid and rejected for its program; the two controls are the
-   * same construction at a length bitcoin allows, which is what makes each
-   * rejection attributable to the program rule rather than to the checksum.
-   *
-   * The version zero, sixteen-byte case is BIP-173's own invalid vector. The
-   * rest are constructed, because the published list has no checksum-valid
-   * member for the other shapes.
+   * The checksum covers the characters, not what they mean, so a string can clear it and still
+   * encode no output anyone could pay to. Controls use the same construction at an allowed length,
+   * so each rejection is attributable to the program rule, not the checksum. The version
+   * zero/sixteen-byte case is BIP-173's own invalid vector; the rest are constructed.
    */
   describe("when the witness program is not one bitcoin allows", () => {
     it.each([

@@ -1,12 +1,7 @@
 /**
- * API keys' event sourcing: the two hourly sweeps that retire credentials
- * nothing else revokes — the sandbox key a code agent run left behind, and
- * the CLI login key a device session stopped refreshing (and, through the
- * ordinary revoke cascade, the ingest keys parented to it). Built against
- * the process store of the graph that installs it, because the outbox rows
- * each reap writes have to be the ones that graph prunes, and against the
- * installing graph's own app, so the login-key sweep revokes through the
- * same bindings/cascade logic every other revoke path uses.
+ * Two hourly sweeps retire credentials nothing else revokes: an abandoned
+ * sandbox key, and a stale CLI login key with its cascaded ingest keys. Built
+ * against the installing graph's own store and app, so each reap prunes and revokes through it.
  */
 import { defineEventingModule, type EventingSetup } from "@langwatch/eventing";
 import type { ApiKeyApp } from "../app/api-key.app.ts";

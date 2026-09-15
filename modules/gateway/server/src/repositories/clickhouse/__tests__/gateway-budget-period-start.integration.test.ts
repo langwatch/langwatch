@@ -1,31 +1,10 @@
 /**
  * @vitest-environment node
  *
- * Spend written against a budget must be readable on that budget, for every
- * window a budget can be created with.
- *
- * Real ClickHouse, no mocks. A debit goes in through the same repository the
- * debits process uses, and comes back out through the same repository the
- * budgets UI, the gateway config bundle, and the per-end-user bucket poll
- * all read from.
- *
- * This is the regression guard for issue #6141. The rollup only returns a row
- * when the period the reader asks for is exactly the period the materialised
- * view bucketed the debit into. Those two lived in different files and drifted:
- * four of the six windows wrote into a bucket nothing ever read, so budgets on
- * them accrued nothing forever, never warned, and never blocked, while showing
- * a confident $0.00 spent. Any future drift fails here instead of in a
- * customer's gateway.
- *
- * The migration-replay regression (an older deployment's history surviving the
- * UTC-boundary rollup rebuild) is NOT ported here: it drove
- * `replayGooseMigrationUp` / `replayRollupRebuild` against a scratch
- * testcontainers ClickHouse, replaying goose migration files by hand. That
- * harness went with platform/app and has no equivalent against a shared,
- * already-migrated test ClickHouse — replaying an old migration file into it
- * would downgrade the live materialised view out from under every other
- * suite reading it concurrently. See the batch report for the scenario this
- * drops.
+ * Regression guard for issue #6141: the rollup only returns a row when the
+ * period asked for is exactly the period the materialised view bucketed the
+ * debit into. Those two drifted before — four of six windows wrote into a
+ * bucket nothing read, so budgets accrued nothing forever, silently.
  */
 
 import { nowInstant } from "@langwatch/time";
@@ -143,17 +122,10 @@ describe.skipIf(!chUrl)("given a debit recorded against a budget in ClickHouse",
   });
 
   describe("when the ClickHouse server does not run in UTC", () => {
-    // The ledger's OccurredAt carries no timezone, so the view's period
-    // truncation follows the server timezone unless the view pins one,
-    // while currentPeriodStart always computes UTC boundaries. Setting
-    // session_timezone on the insert evaluates the materialised view's
-    // SELECT exactly as a server whose default timezone is
-    // America/Sao_Paulo would, without needing a second ClickHouse.
-    // Sao Paulo midnight is 03:00 UTC, so an unpinned toStartOfDay /
-    // toStartOfWeek / toStartOfMonth lands three hours away from every
-    // period the reader asks for. MINUTE and HOUR stay aligned on any
-    // whole-hour offset, so only the three date-boundary windows can
-    // discriminate.
+    // Simulates a non-UTC ClickHouse (e.g. America/Sao_Paulo) without a second
+    // instance: session_timezone on the insert evaluates the view's SELECT as
+    // that server would. Only DAY/WEEK/MONTH can discriminate the drift — an
+    // unpinned toStartOf* lands hours away from the UTC boundary the reader uses.
     const TZ_WINDOWS: GatewayBudgetWindow[] = ["DAY", "WEEK", "MONTH"];
     // Distinct scope ids: the rollup groups by (TenantId, Scope, ScopeId,
     // Window, PeriodStart), so sharing the outer fixture's scope id would

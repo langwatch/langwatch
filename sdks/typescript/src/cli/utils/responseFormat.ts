@@ -1,21 +1,8 @@
 /**
- * Bidirectional mapping between the platform's `outputs` array and the
- * local YAML `response_format` block.
- *
- * The platform is the single source of truth and stores structured output as
- * an `outputs` array. The local `.prompt.yaml` follows the GitHub Prompts
- * convention and carries a `response_format` block. Push and pull must be
- * exact inverses, so both directions live here and share one definition of
- * what "flat structured fields" vs. "an opaque JSON schema" means.
- *
- * Two shapes round-trip losslessly:
- *
- *  - Flat platform fields (e.g. l1, l2, l3, reasoning) ⇆ a single-level
- *    JSON-schema object whose properties are those fields. The platform keeps
- *    showing them as individual fields after a pull → edit → push cycle.
- *
- *  - A rich JSON schema (enums, nested objects, arrays, descriptions, …) ⇆ a
- *    single `json_schema` output that preserves the schema verbatim.
+ * Bidirectional mapping between the platform's `outputs` array and the local
+ * YAML `response_format` block; push and pull must be exact inverses. Flat
+ * platform fields ⇆ a flat JSON-schema object round-trip losslessly, and a
+ * rich JSON schema ⇆ a single `json_schema` output preserves it verbatim.
  */
 
 export type CliOutputType = "str" | "float" | "bool" | "json_schema";

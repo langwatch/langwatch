@@ -1,17 +1,9 @@
 /**
  * Resolve the spend filters that name Postgres records into the ids
- * ClickHouse actually stores.
- *
- * A project filter is a tenant filter, a team filter is the set of projects
- * that team owns, and an external id is whatever the customer called a
- * virtual key on their side. None of those three reach a query as themselves:
- * gateway_spend stores tenant ids and virtual key ids and nothing else, so
- * the translation happens here, once, against the caller's own organization.
- *
- * A filter that resolves to nothing resolves to an EMPTY list, never to
- * "unfiltered". A team with no projects, or an external id nobody minted,
- * must answer with no spend rather than with the organization's entire
- * spend under a narrowing the caller asked for.
+ * ClickHouse actually stores (gateway_spend holds only tenant and virtual
+ * key ids). A filter that resolves to nothing resolves to an EMPTY list,
+ * never "unfiltered" — a team with no projects must answer with no spend,
+ * not the organization's entire spend.
  */
 
 import type { PrismaClient } from "@langwatch/prisma-client/generated";

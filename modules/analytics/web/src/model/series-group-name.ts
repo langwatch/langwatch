@@ -10,21 +10,11 @@ import { uppercaseFirstLetter } from "./string-casing.ts";
  */
 
 /**
- * `evaluations.evaluation_passed` buckets rows by verdict, and the bucket
- * names are query values rather than display copy.
- *
- * `unknown` is the one that reads wrong. ClickHouse puts every processed
- * evaluation with no boolean verdict there: a score-only evaluator that
- * reports a number and never a pass/fail, an evaluation still processing,
- * and one that errored. Rendered literally the chart said "Evaluation passed
- * unknown", which reads as an evaluation that broke rather than one that
- * never had a verdict to give.
- *
- * The label stays deliberately vague because the bucket is genuinely those
- * three populations at once. Naming it "score-only" would be false for the
- * processing and error rows. Splitting the bucket into its three real
- * populations is the correctness fix and is a separate, backend change; this
- * is the display-layer half. See #5080.
+ * `evaluations.evaluation_passed` buckets rows by verdict, and the names are query values, not
+ * display copy. `unknown` reads wrong rendered literally ("Evaluation passed unknown"): it holds
+ * three populations at once — score-only evaluators, still-processing, and errored — so the label
+ * stays deliberately vague rather than naming just one. Splitting the bucket into its three real
+ * populations is a separate backend fix (#5080); this is only the display-layer half.
  */
 const VERDICT_LABELS: Record<string, string> = {
   passed: "Evaluation Passed",

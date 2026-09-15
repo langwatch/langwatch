@@ -1,22 +1,9 @@
 /**
  * @vitest-environment node
- *
- * Which process registers the four identity pipelines, and what the other one
- * does instead.
- *
- * Identity has two registration shapes over the same four names: the
- * producer-only definitions a process that merely stages commands composes,
- * and the complete Postgres definitions - real heads, real projection stores,
- * the join and teardown process managers - a process that DRAINS the ledgers
- * installs. One runtime holds one registration per name, so a process composes
- * exactly one of them.
- *
- * The draining process composes Identity's read graph before its install phase
- * runs, so it registers nothing here and resolves its senders off its own
- * registration at the first send. Registering the producer definitions there
- * as well is what killed the combined backend boot on
- * `Pipeline "identity" is already registered`.
- *
+ * Which process registers the four identity pipelines. Two registration shapes share the same
+ * four names; one runtime holds one per name. The draining process composes Identity's read
+ * graph before install, so it registers nothing here — registering the producer set too is what
+ * killed the combined backend boot on `Pipeline "identity" is already registered`.
  * Spec: modules/identity/specs/identity-pipeline-registration-ownership.feature
  */
 import type { EventSourcing } from "@langwatch/eventing";

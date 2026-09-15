@@ -1,19 +1,7 @@
 /**
- * The stored structured filters of a legacy automation, read back.
- *
- * THE SECOND PACKAGE COPY, and the one that closed the platform original.
- * `@langwatch/automation-web` took the first when the automations family moved,
- * and recorded that `platform/app`'s `components/automations/FilterDisplay` had
- * to stay because the analytics report grid's `GraphFilterIndicator` still
- * rendered it. That indicator is this family's, it left with this move, and the
- * platform module it named had no other importer — so the original is deleted
- * here rather than left as a file nothing reaches. Two package copies of forty
- * lines remain, one per family, because a web package may not import another.
- *
- * The one substitution is the clamped cell: the application's version reached
- * for `HoverableBigText`, which was refused promotion, so this renders the
- * package's `ClampedText` instead. The behaviour a reader sees is the same —
- * one line, the whole value on hover.
+ * The stored structured filters of a legacy automation, read back. A
+ * second package copy of this component, since a web package may not
+ * import another — renders `ClampedText`, `HoverableBigText` refused promotion.
  */
 
 import { Box, HStack } from "@chakra-ui/react";

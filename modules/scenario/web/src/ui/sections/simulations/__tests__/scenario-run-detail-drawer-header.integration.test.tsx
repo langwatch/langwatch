@@ -1,5 +1,5 @@
 /**
- * The run detail drawer's identity band and its criteria summary: who ran, against which target, how it ended and how long it took, and how many of the judge's criteria the run met.
+ * The run detail drawer's identity band and its criteria summary.
  * @vitest-environment jsdom
  * @see specs/features/scenarios/run-view-side-by-side-layout.feature
  */

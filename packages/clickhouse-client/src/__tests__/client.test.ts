@@ -7,14 +7,9 @@ import { TenantGuard, TenantScopeError } from "../tenantGuard.ts";
 import { QueryTracer } from "../tracing.ts";
 
 /**
- * The order the client runs its policies in.
- *
- * This is the whole reason the class exists rather than a bag of helpers, and
- * every step of it is a decision someone made after an incident — so each is
- * pinned here rather than left to the prose on the class. The nesting is not
- * visible from any single collaborator's own tests: only running them together
- * can show that a retry keeps its concurrency slot, or that a refused statement
- * never reached the driver.
+ * The order the client runs its policies in: why the class exists rather
+ * than a bag of helpers — the nesting isn't visible from any one test alone.
+ * Only running them together shows a retry keeps its slot, or a refusal never reached the driver.
  */
 
 const request = (overrides: Partial<QueryRequest> = {}): QueryRequest => ({
@@ -73,17 +68,9 @@ describe("ClickHouseQueryClient", () => {
   describe("given both a concurrency limiter and a retry policy", () => {
     describe("when an attempt fails and is retried", () => {
       /**
-       * The slot is held across retries, not taken per attempt. Inside the
-       * retry loop, a retrying statement would release its slot, rejoin the
-       * back of the queue and compete with fresh work — which is how a queue
-       * turns a small overload into a persistent one (2026-07-31).
-       *
-       * Proven by contention rather than by a count. Sampling `inFlight` from
-       * inside the driver cannot tell the two arrangements apart: a limiter
-       * *inside* retry reacquires before each attempt and reads 1 just the
-       * same. The only observable difference is whether other work can take
-       * the slot mid-retry, so a second statement is offered the single slot
-       * while the first is between attempts, and must not get it.
+       * The slot is held across retries, not taken per attempt — releasing it
+       * mid-retry would rejoin the queue and compete with fresh work, turning a
+       * small overload into a persistent one (proven by contention, not a count).
        */
       it("holds its slot across a retry, so waiting work cannot start between attempts", async () => {
         const limiter = new ConcurrencyLimiter({ maxConcurrent: 1 });

@@ -1,11 +1,7 @@
 /**
- * The one dialog that names a new test suite, opened from the rail, from the
- * day-zero empty state and from a project with no suite yet.
- *
- * Editing a suite that exists is the suite editor's job, which asks for more
- * than a name.
- *
- * @see specs/features/agent-testing/suites-rail.feature
+ * The one dialog that names a new test suite, opened from the rail, the
+ * day-zero empty state, or a project with no suite yet. Editing an existing
+ * suite is the suite editor's job, which asks for more than a name.
  */
 
 import { useCallback, useState } from "react";

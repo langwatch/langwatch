@@ -1,5 +1,7 @@
 /**
- * One pipeline definition, two registrations: the worker mounts the process managers and drains every routing key; a producer takes only the four command dispatchers and no consumer loop. Passing none of the (optional) process managers is load-bearing — mounting either would drain the worker's queue rather than produce onto it — and a stand-in ledger refuses by name if ever called, rather than silently no-op'ing a fold that was never meant to happen.
+ * One pipeline definition, two registrations. A producer takes only the command
+ * dispatchers — passing no process managers here is load-bearing: mounting any
+ * would drain the worker's shared queue instead of producing onto it.
  */
 import { EventingGatewaySpendAdapter } from "./eventing.gateway-spend.adapter.ts";
 import { GatewaySpendEvents } from "../ports/gateway-spend-events.port.ts";
@@ -12,7 +14,9 @@ function producerOnly(processName: string, capability: string): Error {
 }
 
 /**
- * The spend ledger a process that never folds holds. Every member refuses — a real read here means the graph wired the reconciliation door (which composes the REAL ledger) to the producer's stand-in instead, worth failing loudly.
+ * The spend ledger a process that never folds holds. Every member refuses —
+ * a real read here means the graph wired the reconciliation door to this
+ * stand-in instead of the real ledger, worth failing loudly.
  */
 class ProducerOnlyGatewaySpendEvents extends GatewaySpendEvents {
   constructor(private readonly processName: string) {
@@ -53,7 +57,8 @@ export class GatewaySpendProducerAdapter {
   private constructor() {}
 
   /**
-   * processName names the refusal, so a stand-in reached by accident says which process reached it rather than reporting an anonymous failure.
+   * processName names the refusal, so a stand-in reached by accident says
+   * which process reached it, not an anonymous failure.
    */
   createGatewaySpendProducerPipeline(input: { processName: string }) {
     return EventingGatewaySpendAdapter.create({

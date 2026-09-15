@@ -3,13 +3,10 @@ import type { UseFormReturn } from "react-hook-form";
 import type { PromptConfigFormValues } from "@langwatch/prompt-contract";
 
 /**
- * Picks the most relevant user-facing message to surface in the
- * "Validation error" toast when a prompt save is blocked client-side.
- *
- * The system-prompt-required refinement (#3196) writes its error on
- * `version.configData.messages`, so that path takes precedence — it
- * carries the rule the user is most likely to see. Anything else falls
- * back to a generic copy.
+ * Picks the most relevant user-facing message for the "Validation error"
+ * toast when a prompt save is blocked client-side. The system-prompt-required
+ * refinement writes its error on `version.configData.messages`, so that path
+ * takes precedence; anything else falls back to generic copy.
  */
 export const getSaveBlockerMessage = (methods: UseFormReturn<PromptConfigFormValues>): string => {
   const messagesError = methods.formState.errors.version?.configData?.messages as

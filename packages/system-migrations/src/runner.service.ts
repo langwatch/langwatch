@@ -23,15 +23,10 @@ const DEFAULT_LEASE_RENEW_INTERVAL_MS = 20_000;
 const DEFAULT_TENANT_CONCURRENCY = 25;
 
 /**
- * Which (tenant, migration) pairs a pass may touch. The app composes this:
- * self-hosted installations answer true for every tenant (migration just
- * happens, in the background, no configuration); cloud answers from the
- * migration's own `enrolledAutomatically` declaration, and for a migration
- * that has not made it, from the per-migration enrollments operators have
- * written, read fresh each pass. A pair outside the cohort is skipped
- * without even a state record - "not started" and "not in the cohort yet"
- * are the same pending state, which is what lets a rollout widen later, and
- * what lets each migration pace independently of the others.
+ * Which (tenant, migration) pairs a pass may touch, read fresh each pass. A
+ * pair outside the cohort is skipped without even a state record — "not
+ * started" and "not in the cohort yet" are the same pending state, which is
+ * what lets a rollout widen later and each migration pace independently.
  */
 export type MigrationCohort = (args: {
   tenantId: string;
@@ -53,20 +48,11 @@ export type SystemMigrationRunnerDeps = {
 };
 
 /**
- * Drives every registered migration over every cohort tenant, several
- * tenants at a time. Coordination is per ORGANIZATION, not per process:
- * each tenant is claimed under its own lease before any work, so any number
- * of processes (booting workers, an operator's targeted run) share the fleet
- * instead of standing down behind one fleet-wide driver - a tenant already
- * claimed elsewhere is simply left to its claim holder.
- *
- * Level-triggered: every pass re-attempts held and parked tenants, so a
- * tenant whose blocker was fixed heals itself with no manual state change,
- * and a pass that dies anywhere simply happens again. One `runPass` is one
- * sweep and nothing more - a tenant generally needs several, because a pass
- * cannot observe its own events. Driving passes until the fleet stops moving
- * is the CALLER's job, and `MigrationPassSummary.advanced` is the field that
- * tells it when to stop.
+ * Drives every registered migration over every cohort tenant. Coordination
+ * is per organization, not per process: each tenant is claimed under its
+ * own lease, so any number of processes share the fleet instead of standing
+ * down behind one driver. Level-triggered — every pass re-attempts held and
+ * parked tenants, so the caller drives passes until `MigrationPassSummary.advanced` stops.
  */
 export class SystemMigrationRunnerService {
   constructor(private readonly deps: SystemMigrationRunnerDeps) {}

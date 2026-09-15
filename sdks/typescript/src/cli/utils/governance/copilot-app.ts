@@ -1,27 +1,7 @@
 /**
- * GitHub Copilot **app** capture (sourceType `copilot_app`, ADR-039
- * §Extension).
- *
- * The standalone GitHub Copilot app is a long-running GUI, not a
- * per-invocation CLI, so there is nothing to wrap. It embeds the same
- * OpenTelemetry runtime as the Copilot CLI and, given the standard
- * OTLP-endpoint env vars, pushes one `gen_ai.*` OTLP record per LLM call
- * straight to LangWatch's `/api/otel` — the exact transport already
- * shipped for `copilot_cli` (§Decision, Path B). There is no file to
- * read, no SQLite, no pairing.
- *
- * Two facts force the delivery shape (both spike-verified against the
- * shipped app, build 1.0.71):
- *   1. Copilot enables OTLP export only through environment variables,
- *      and the ingest key travels in an env-only auth header — no config
- *      file can supply it.
- *   2. A GUI launched from the Dock inherits no shell, but the app DOES
- *      inherit env into its spawned runtime engine when launched with it.
- * So a user-level login agent owns the app's launch and sets the capture
- * env on the app process. This module holds the pure, OS-agnostic core:
- * the env block, app detection, and the per-OS login-agent descriptors.
- * The imperative install/remove (writing the descriptor + registering it
- * with the OS) lives in `copilot-app-agent.ts`.
+ * GitHub Copilot **app** capture (ADR-039 §Extension). The GUI app only
+ * enables OTLP via env vars and inherits no shell from the Dock, so a login
+ * agent owns its launch and sets the capture env (install in `copilot-app-agent.ts`).
  */
 
 import * as path from "node:path";
@@ -156,15 +136,9 @@ function windowsAgentDir(home: string): string {
 /**
  * Render the OS-native login-agent files that launch the Copilot app with
  * the capture env at login. Pure: returns exact paths + content, fully
- * assertable without touching disk.
- *
- * Per-platform env-injection mechanism:
- *   - macOS   — launchd `EnvironmentVariables` dict on the plist.
- *   - Linux   — systemd `Environment=` directives (ExecStart is quoted so
- *               an app path with spaces is not word-split).
- *   - Windows — Task Scheduler XML has NO way to set process env, so the
- *               task runs a generated `.cmd` wrapper that `set`s the vars
- *               and then `start`s the app.
+ * assertable without touching disk. Windows Task Scheduler XML has no way
+ * to set process env, so its task runs a generated `.cmd` wrapper that
+ * `set`s the vars and then `start`s the app.
  */
 export function renderLaunchAgent(spec: LaunchAgentSpec): LaunchAgentDescriptor {
   const entries = Object.entries(spec.env);

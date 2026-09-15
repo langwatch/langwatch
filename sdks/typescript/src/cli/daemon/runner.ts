@@ -35,16 +35,12 @@ export interface CommandExecution {
   /** Resolves with the command's exit code once it has finished. */
   completed: Promise<number>;
   /**
-   * Abandon the command: stop emitting its output and settle at `code`.
-   *
-   * The underlying work cannot be killed — it is a promise chain inside this
-   * process, and node has no way to unwind one from the outside. What we CAN
-   * guarantee is what the caller observes: no further output, an immediate exit
-   * code, and a released connection. The abandoned work finishes on its own
-   * (it is a single HTTP call) and its output is discarded.
-   *
-   * What we must NOT do is hand its execution window to somebody else while it
-   * is still running — see the note on `abort` in createCommandExecutor.
+   * Abandon the command: stop emitting its output and settle at `code`. The
+   * underlying work can't be killed (a promise chain node can't unwind), so this
+   * only guarantees the caller's observable behavior — no further output, an
+   * immediate exit code — while the call finishes silently in the background.
+   * Its execution window must not be handed to another caller until then; see
+   * `abort` in createCommandExecutor.
    */
   cancel(code: number): void;
 }
@@ -99,16 +95,10 @@ function positiveIntFromEnv(value: string | undefined, fallback: number): number
 export type WedgedHandler = (details: { requestId: string; graceMs: number }) => void;
 
 /**
- * The default: stop being a daemon.
- *
- * There is no third option here. Releasing the window would let the next
- * caller's `applyWindow` chdir and rewrite `process.env` underneath work that
- * is still running. Holding it forever would wedge the daemon into refusing
- * every caller whose window differs, silently, until its idle timeout — which
- * never fires, because the request is still in flight. Exiting is the only
- * outcome that cannot corrupt anybody: the socket goes away, the next
- * invocation finds nothing, and every command runs in-process exactly as it
- * does with no daemon installed.
+ * The default: stop being a daemon. Releasing the window lets the next
+ * caller's `applyWindow` chdir and rewrite `process.env` under work still in
+ * flight; holding it forever wedges every other caller until an idle timeout
+ * that never fires. Exiting is the only option that can't corrupt anything.
  */
 const exitWhenWedged: WedgedHandler = ({ requestId, graceMs }) => {
   process.stderr.write(
@@ -182,23 +172,10 @@ export function createCommandExecutor({
      * for nobody, and turns "forever" into "the daemon goes away".
      */
     const armAbandonGrace = (): void => {
-      // No window is held YET, so there is nothing to bound. Two situations
-      // reach here, and NEITHER can wedge — but only because of the
-      // post-acquire `cancelled` check below, which is load-bearing:
-      //
-      //   - Cancelled while still queued. `abortController.abort()` removes the
-      //     waiter, acquire rejects, no window is ever taken.
-      //   - Cancelled in the gap between admission and the assignment of
-      //     `releaseWindow` — i.e. `drain()` already called `resolve()`, so the
-      //     abort listener sees an admitted waiter and does nothing. A window
-      //     IS held here, and nothing has armed a timer for it. What saves it is
-      //     that the continuation re-reads `cancelled` the moment it resumes and
-      //     calls `releaseOnce()` without ever starting the work: the window
-      //     goes back immediately, which is safe precisely because no command
-      //     ever ran under it.
-      //
-      // Delete that check and this early return becomes the permanent-wedge bug
-      // it looks like. `runner.unit.test.ts` drives the interleaving directly.
+      // Safe only because the post-acquire `cancelled` check re-reads before
+      // starting work, releasing any window taken in the gap between admission
+      // and cancellation; delete it and this early return becomes a permanent
+      // wedge (see runner.unit.test.ts).
       if (releaseWindow === undefined || abandonTimer) return;
       abandonTimer = setTimeout(() => {
         abandonTimer = undefined;
@@ -218,19 +195,11 @@ export function createCommandExecutor({
       context.finalize(code);
       // Wakes a request still QUEUED for its window; a no-op otherwise.
       abortController.abort();
-      // The caller is settled NOW — a timeout or a Ctrl-C must never make
-      // anybody wait. The WINDOW, though, is deliberately NOT released here.
-      //
-      // Node cannot unwind the abandoned promise chain, so the command is
-      // still running: when it resumes it will resolve relative paths against
-      // `process.cwd()` and read credentials out of `process.env` as they are
-      // AT THAT MOMENT. Releasing the window admits the next request, whose
-      // `applyWindow` (execution.ts) chdirs and rewrites the whole
-      // environment — so an abandoned `workflows run --output results.json`
-      // would write its file into ANOTHER caller's directory, under another
-      // caller's credentials. The window is released by the `finally` below,
-      // i.e. when the abandoned work genuinely settles; `armAbandonGrace`
-      // bounds the case where it never does.
+      // The caller settles now, but the WINDOW stays held: node can't unwind
+      // the abandoned promise chain, so it's still running and will later read
+      // `process.cwd()`/`process.env` — releasing early would let the next
+      // caller's `applyWindow` rewrite those out from under it. `finally`
+      // releases it once work truly settles; `armAbandonGrace` bounds the rest.
       settle?.(code);
       armAbandonGrace();
     };

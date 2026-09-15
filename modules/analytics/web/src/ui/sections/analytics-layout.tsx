@@ -1,17 +1,9 @@
 /**
- * The rail and the header every analytics page sits in.
- *
- * `platform/app`'s `GraphsLayout`, minus its outermost wrapper.
- * `DashboardLayout` was the application's chrome — the sidebar, the top bar and
- * the drawer mount — and chrome belongs to the route tree, not to a screen:
- * these pages are children of a layout route the composing application still
- * serves. Every family since governance has dropped the same wrapper.
- *
- * WHICH ENTRY IS SELECTED ARRIVES AS A PROP. The platform rail matched the
- * pathname inside each `MenuLink`; a governed screen may not read the address
- * for what the router already knows, so the screen names its own page and the
- * rail marks it. That is the same reason the screens take their page as a prop
- * rather than reading it back.
+ * The rail and the header every analytics page sits in. Chrome (sidebar, top
+ * bar, drawer mount) belongs to the route tree, not a screen, so this drops
+ * the outermost wrapper — these pages are children of a layout route the
+ * composing app still serves. Which entry is selected ARRIVES AS A PROP: a
+ * governed screen may not read the address for what the router already knows.
  */
 
 import { Container, HStack, VStack } from "@chakra-ui/react";

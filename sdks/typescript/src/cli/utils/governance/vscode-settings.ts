@@ -1,28 +1,8 @@
 /**
- * Harden the VS Code integrated-terminal environment against the
- * `copilot_vscode` bearer-token leak (ADR-039 §Extension #2).
- *
- * The scoped `code()` shell function injects OTEL_* + COPILOT_OTEL_* into the
- * VS Code process so the Copilot Chat extension exports telemetry. VS Code is
- * long-lived and its integrated terminals are child processes, so they inherit
- * that env — including the ingest token — for the whole editor session. An
- * un-wrapped OTLP-aware tool run in such a terminal would otherwise POST to
- * LangWatch tagged `copilot_vscode`.
- *
- * `terminal.integrated.env.<os>` is VS Code's per-terminal env override; a
- * `null` value means "unset this variable in integrated terminals". We set the
- * telemetry keys to null so the extension host keeps them (read at process
- * launch) while terminals do NOT inherit them. This is a NARROW settings write
- * (terminal env only) — distinct from the "settings.json carries the capture
- * config" approach the ADR rejected; the token is still delivered via env.
- *
- * settings.json is JSONC — comments and trailing commas are legal, VS Code
- * preserves them, and the file VS Code ships out of the box contains nothing
- * but a comment. All edits therefore go through `jsonc-parser` (VS Code's own
- * library): `modify` + `applyEdits` produce minimal text edits that keep the
- * user's comments and formatting byte-for-byte. A file that does not parse
- * even as JSONC is NEVER written — refusing the hardening beats destroying a
- * user's settings.
+ * Hardens VS Code's integrated terminal against the `copilot_vscode`
+ * bearer-token leak (ADR-039 §Extension #2): terminals inherit the extension
+ * host's OTEL_* env unless `terminal.integrated.env.<os>` nulls those keys,
+ * unsetting them for terminals while the extension host keeps them.
  */
 
 import * as fs from "node:fs";
@@ -134,13 +114,10 @@ function atomicWrite(filePath: string, content: string): void {
 }
 
 /**
- * Set each of `keys` to null under `terminal.integrated.env.<os>` so VS Code
- * unsets them in integrated terminals. Creates the file/dir when missing.
- * Comment/format-preserving: edits are minimal JSONC text edits, every other
- * user-authored byte survives verbatim. Returns the settings path written, or
- * null when the platform is unsupported, `keys` is empty, or the existing
- * file does not parse as JSONC (refused rather than clobbered — the caller
- * must surface that the hardening is NOT in place).
+ * Sets each of `keys` to null under `terminal.integrated.env.<os>` via
+ * minimal, comment-preserving JSONC edits. Returns null when unsupported,
+ * empty, or unparseable — refused rather than clobbered, so the caller can
+ * surface that the hardening is NOT in place.
  */
 export function clearVscodeTerminalOtelEnv(args: VscodeSettingsArgs): string | null {
   const filePath = vscodeUserSettingsPath(args.platform, args.home, args.appData);

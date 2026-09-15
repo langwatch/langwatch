@@ -21,7 +21,8 @@ export const resetRuntimeCache = (): void => {
 
 /**
  * Detects the JavaScript runtime environment.
- * @param globals - (Test only) Optionally override the global object for environment simulation. Only used if NODE_ENV === 'test'.
+ * @param globals - (Test only) Override the global object for environment simulation;
+ *   only used if NODE_ENV === 'test'.
  */
 export function detectRuntime(globals?: any): JsRuntime {
   let g = globalThis;

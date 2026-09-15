@@ -13,7 +13,7 @@ export type JoinRequestNotifierPlans = {
   }): Promise<{ maxMembers: number; planSource?: string; overrideAddingLimitations?: boolean }>;
 };
 
-/** How many full members an organization holds, for the same seat census the plan is checked against. */
+/** How many full members an organization holds, for the same seat census as the plan check. */
 export type JoinRequestNotifierMemberships = {
   getMemberCount(organizationId: string): Promise<number>;
 };

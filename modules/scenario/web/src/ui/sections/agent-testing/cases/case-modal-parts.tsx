@@ -1,5 +1,5 @@
 /**
- * The parts of the scenario dialog: its heading, the four questions it asks, the blocks its chips open, and the line of actions at its foot.
+ * The scenario dialog's parts: heading, its four questions, chip-opened blocks, footer actions.
  * @see specs/features/agent-testing/cases-table.feature
  * @see specs/features/agent-testing/case-version-history.feature
  */

@@ -1,11 +1,8 @@
 /**
  * @vitest-environment jsdom
- *
- * Exercises real spans through a real provider and reads what came out the
- * other end: parentage is the whole point here, and a mock of the tracer would
- * assert the calls we made rather than the trace we produced.
- *
- * See ADR-058 and specs/observability/browser-rum-trace-correlation.feature.
+ * Exercises real spans through a real provider: parentage is the point here,
+ * and a mock of the tracer would assert the calls we made, not the trace we
+ * produced. See ADR-058 and browser-rum-trace-correlation.feature.
  */
 import { context, ROOT_CONTEXT, trace } from "@opentelemetry/api";
 import {

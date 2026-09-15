@@ -1,6 +1,9 @@
 /**
  * @vitest-environment node
- * Real Postgres. The cap bounding concurrent voice calls per key, the lock making it a cap under concurrency, the expiry freeing an unreported session's slot, and the match refusing to guess. Spec: specs/ai-gateway/realtime-sessions.feature
+ * Real Postgres. The cap bounding concurrent voice calls per key, the lock
+ * making it a cap under concurrency, the expiry freeing an unreported
+ * session's slot, and the match refusing to guess.
+ * Spec: specs/ai-gateway/realtime-sessions.feature
  */
 import { fromDate, nowInstant, toDate } from "@langwatch/time";
 

@@ -1,13 +1,8 @@
 /**
- * Reading shape out of the vendor's untyped statement values.
- *
- * The resilience layer in ./vendorClient.ts never imports `@clickhouse/client`,
- * so the params object it is handed and the rows it streams back are `unknown`
- * to it. These are the total, defensive readers that turn those values into the
- * few facts the policy needs — a metric label, a table name, a log preview, an
- * in-band exception line — and every one of them answers for a value of the
- * wrong shape rather than throwing. Kept apart from the policy because they are
- * pure functions of a vendor value and testable as such.
+ * Reading shape out of the vendor's untyped statement values. The resilience
+ * layer in ./vendorClient.ts never imports `@clickhouse/client`, so these
+ * total, defensive readers turn `unknown` params/rows into the few facts the
+ * policy needs, answering for a value of the wrong shape rather than throwing.
  */
 
 /** The statement categories the outcome metric is labelled by. */

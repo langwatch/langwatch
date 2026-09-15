@@ -149,15 +149,10 @@ function ReportsContent() {
     );
   };
 
-  // The datapoint step each workbench widget runs at, keyed by chart id, held
-  // in URL state beside the period.
-  //
-  // Not a stored column: `CustomGraph` has no `granularitySeconds` field, and
-  // adding one is a migration this slice does not own. Not component state
-  // either — that would lose the pick on reload and leave it out of a shared
-  // link, so a member who coarsened a card to read it would send a colleague a
-  // different chart from the one they were describing. Persisting per member
-  // is the follow-up that adds the column.
+  // Datapoint step per workbench widget, keyed by chart id, held in URL state.
+  // Not a stored column (no migration owns `granularitySeconds` yet); not
+  // component state either, since that would drop on reload and be missing
+  // from a shared link — a coarsened card would show a colleague a different chart.
   const { granularityByGraphId, setGranularity } = useWidgetGranularity();
 
   const handleGraphGranularityChange = ({
@@ -286,12 +281,8 @@ function ReportsContent() {
 }
 
 /**
- * The page guard is the routes section's, not this module's.
- *
- * `platform/app` wrapped this in `withPermissionGuard("analytics:view")`. That
- * policy is stated once in
- * `apps/ui/src/features/analytics/ui/sections/analytics-routes.tsx`, in front of
- * the same loader registry, and the chrome belongs to the route tree this
- * screen is a child of.
+ * The page guard is the routes section's, not this module's: stated once via
+ * `withPermissionGuard("analytics:view")` in
+ * `apps/ui/src/features/analytics/ui/sections/analytics-routes.tsx`.
  */
 export default ReportsContent;

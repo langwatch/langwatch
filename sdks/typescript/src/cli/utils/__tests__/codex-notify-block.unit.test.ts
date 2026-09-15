@@ -1,17 +1,7 @@
 /**
- * The `notify` block is what makes a plain `codex` (no langwatch wrapper in
- * front) record its conversation: codex runs the configured program after every
- * completed turn, and our harvest turns that into trace content.
- *
- * Two properties here are load-bearing in a way that is easy to get wrong and
- * silent when wrong, so they are pinned hard:
- *
- *  1. `notify` is a TOML top-level key. Written after the `[otel]` block the
- *     way our other blocks are, TOML binds it to that table as `otel.notify`,
- *     which codex ignores without a word of complaint.
- *  2. TOML forbids a duplicate key. Leaving a user's own `notify` in place
- *     next to ours does not merely lose their program, it stops codex from
- *     parsing its config at all.
+ * The `notify` block makes `codex` record its conversation via its
+ * turn-completion hook. It must stay a TOML top-level key — nested under
+ * `[otel]` it silently becomes `otel.notify` — and never duplicate the user's.
  */
 import * as fs from "node:fs";
 import * as os from "node:os";

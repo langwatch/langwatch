@@ -1,6 +1,6 @@
 /**
- * Everything the Scenarios tab reads: the test suites, the scenarios, the sets that run from code, the last
- * result of every scenario, and the names of the people who wrote them.
+ * Everything the Scenarios tab reads: the test suites, the scenarios, the sets that run from
+ * code, the last result of every scenario, and the names of the people who wrote them.
  * @see specs/features/agent-testing/cases-table.feature
  */
 

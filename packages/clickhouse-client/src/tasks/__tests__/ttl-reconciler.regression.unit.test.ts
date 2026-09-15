@@ -194,13 +194,9 @@ describe("reconcileTTL()", () => {
 
   describe("when CLICKHOUSE_CLUSTER is set (Replicated database)", () => {
     /**
-     * Regression: the reconciler appended `ON CLUSTER <name>` whenever a cluster
-     * was configured. But a configured cluster always means the database uses the
-     * Replicated engine (enforced in goose.ts), which auto-replicates DDL to every
-     * replica via Keeper. ClickHouse rejects ON CLUSTER on a table inside a
-     * Replicated DB with "It's not initial query. ON CLUSTER is not allowed for
-     * Replicated database (INCORRECT_QUERY)", crashing clickhouseMigrate on every
-     * run against the cluster. The emitted ALTER must therefore carry no ON CLUSTER.
+     * A Replicated database (enforced in goose.ts) auto-replicates DDL via
+     * Keeper, so ClickHouse rejects `ON CLUSTER` on its tables outright
+     * ("INCORRECT_QUERY"). The emitted ALTER must therefore carry no ON CLUSTER.
      */
     it("issues the ALTER without an ON CLUSTER clause", async () => {
       const originalCluster = process.env.CLICKHOUSE_CLUSTER;

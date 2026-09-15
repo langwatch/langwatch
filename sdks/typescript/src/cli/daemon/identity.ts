@@ -1,50 +1,7 @@
 /**
- * Identity keying for the daemon — the security boundary of this feature.
- *
- * A daemon is a long-lived process holding resolved credentials and warm
- * per-identity state. The one thing that must be impossible is identity A's
- * warm state (or credentials) serving identity B's request.
- *
- * DECISION: one socket per identity, where identity = (endpoint, apiKey, uid).
- * The socket FILENAME is derived from a sha256 over those three values.
- *
- * WHY this is safe, rather than passing the identity per-request and having
- * one daemon isolate state internally:
- *
- *   1. A daemon process only ever holds ONE identity's credentials. There is
- *      no in-memory table to key incorrectly, no cache to poison, and no
- *      "oops, this code path read the daemon's env instead of the request's"
- *      class of bug. Cross-identity leakage is structurally impossible rather
- *      than defended against.
- *   2. A client cannot even ADDRESS another identity's daemon: the path is a
- *      one-way hash of the other identity's API key, which it does not have.
- *   3. Filesystem permissions defend the cross-*user* case: the socket is 0600
- *      inside a 0700 directory owned by the calling uid, so another user on a
- *      shared box cannot connect at all. The uid is in the hash too, so two
- *      users with the same API key still never share a socket.
- *   4. Defence in depth: the daemon re-checks the FULL fingerprint presented in
- *      the handshake against its own and refuses on mismatch, so even a stale
- *      socket file or a (astronomically unlikely) truncated-hash collision
- *      cannot cause a wrong-identity serve.
- *
- * The cost of this decision is more daemons when a user juggles many projects.
- * That is bounded by the idle timeout, and is the right trade: a leaked
- * credential is unrecoverable, a spare 40MB process is not.
- *
- * THE LOGGED-IN SINGLE-IDENTITY BOUNDARY.
- *
- * A user who authenticated via `langwatch login` (device flow) has NO
- * LANGWATCH_API_KEY in their environment — the key input to the hash is "" —
- * so every logged-in invocation on one (endpoint, uid, config path) collapses
- * to ONE daemon identity, shared across all of that user's projects. That is
- * safe only because auth is resolved PER REQUEST from config.json on disk
- * (`loadConfig` re-reads the file on every call — see
- * utils/governance/config.ts), so a logout/login between two requests takes
- * effect immediately. It follows that persisted credentials must NEVER be
- * cached in this process: an in-process auth cache would keep serving a
- * logged-out (or switched) user's requests with the previous session,
- * silently, until the idle timeout. If you are about to add such a cache,
- * don't — or key it on the config file's content hash at the very least.
+ * Security boundary: each socket is keyed by sha256(endpoint, apiKey, uid), so
+ * a daemon holds only one identity's credentials. Auth is re-read from
+ * config.json per request rather than cached, so a logout/login takes effect at once.
  */
 
 import * as crypto from "node:crypto";
@@ -69,18 +26,10 @@ const MAX_SOCKET_PATH_BYTES = 100;
 const SOCKET_FILE_BYTES = 1 + 16 + ".sock".length;
 
 /**
- * How much LONGER the name a daemon actually binds can be than the shared one.
- *
- * A daemon never binds the shared path: it binds a pid-scoped staging name in
- * the same directory and publishes the result (server.ts `stagingSocketPath`,
- * `publishSocket`). That name replaces `.sock` with `.<pid>`, and the widest
- * pid any supported platform issues is 7 digits — three bytes more than the
- * suffix it stands in for.
- *
- * Budgeting only the shared path therefore approves paths no daemon can ever
- * exist on. A socket directory of 76-78 bytes yields a shared path of 98-100:
- * inside the limit, so the client kept judging the daemon viable and spawning
- * one every second miss, and every one of them died at `bind()`.
+ * A daemon binds a pid-scoped staging name, not the shared path — up to 3
+ * bytes longer than the shared name (a 7-digit pid replacing the ".sock"
+ * suffix). Budgeting only the shared path underestimates, letting a directory
+ * that "fits" still fail at `bind()`.
  */
 export const MAX_STAGING_OVERHEAD_BYTES = 3;
 
@@ -107,24 +56,9 @@ export function isDaemonSupported(): boolean {
 }
 
 /**
- * Base directory for daemon sockets.
- *
- * `$XDG_RUNTIME_DIR` when set (Linux; already per-user and 0700, and cleaned
- * on logout), otherwise `$HOME/.langwatch/run` — the same dot-directory the
- * CLI already keeps its config in.
- *
- * `os.tmpdir()` is the LAST resort, and deliberately so. On Linux without
- * `$XDG_RUNTIME_DIR` it is `/tmp`, mode 1777: any local user can PRE-CREATE
- * `/tmp/langwatch-<uid>`, own it, and leave it 0777. Our `ensureSocketDir`
- * then cannot chmod a directory it does not own, so the real daemon can never
- * bind — and the squatter is free to bind the socket itself and be handed the
- * caller's args, cwd and forwarded `LANGWATCH_*` env. A directory under `$HOME`
- * cannot be pre-created by another user, which removes the squat for the LEAF
- * rather than merely detecting it — on a correctly-permissioned `$HOME`. It does
- * NOT remove it for the path's ancestors, which nothing here checks; see the
- * boundary note on `inspectSocketTrust`. (`inspectSocketTrust` remains the only
- * defence for `$XDG_RUNTIME_DIR`, `LANGWATCH_DAEMON_DIR` and the temp-dir
- * fallback, where pre-creation IS possible.)
+ * Base directory for daemon sockets: `$XDG_RUNTIME_DIR`, else
+ * `$HOME/.langwatch/run`. `os.tmpdir()` is a last resort — on Linux, `/tmp` is
+ * world-writable and squattable; `$HOME` closes that (see `inspectSocketTrust`).
  */
 export function daemonSocketDir(): string {
   const override = process.env.LANGWATCH_DAEMON_DIR;
@@ -192,19 +126,9 @@ export function resolveIdentity(env: NodeJS.ProcessEnv = process.env): DaemonIde
 }
 
 /**
- * What the client and the daemon must AGREE they are running.
- *
- * The obvious check is the CLI's semver, and it is not enough. A daemon holds a
- * module graph it loaded once; the code on disk can change underneath it without
- * the version changing at all — `npm install` of the same version, a local `npm
- * link`, and above all a developer rebuilding the bundle between two runs. In
- * every one of those the daemon keeps serving the OLD behaviour to a NEW client,
- * which is the nastiest failure this feature can have: silent, and it looks like
- * your change did not work.
- *
- * So the identity of the code is the version PLUS the size and mtime of the
- * entrypoint the process actually loaded. Any rebuild or reinstall moves it, the
- * handshake refuses, and the stale daemon is evicted.
+ * Build identity is version PLUS the entrypoint's size and mtime, not semver
+ * alone — a same-version rebuild or reinstall would otherwise let a daemon
+ * keep serving OLD behaviour to a NEW client silently; any rebuild evicts it.
  */
 export function resolveBuildId(cliVersion: string, cliPath: string): string {
   try {
@@ -219,17 +143,9 @@ export function resolveBuildId(cliVersion: string, cliPath: string): string {
 }
 
 /**
- * The environment a spawned daemon must boot with in order to resolve the SAME
- * identity as the client that spawned it.
- *
- * The daemon boots in `$HOME`. Its own boot skips the dotenv load precisely so
- * a ~/.env cannot reach it (see index.ts), and this pinning is the second
- * layer of that defence: even if a ~/.env value ever did get in, a
- * `LANGWATCH_ENDPOINT` or `LANGWATCH_API_KEY` the CALLER does not have would
- * give the daemon a different identity, a different socket, and therefore a
- * daemon nobody ever connects to. Pinning the three identity inputs
- * explicitly (dotenv never overwrites a variable that is already set, even to
- * an empty string) makes that impossible.
+ * The daemon skips dotenv on boot so a stray `~/.env` cannot give it different
+ * identity inputs than its spawning client; pinning the three vars here is the
+ * second layer of that defence (dotenv never overwrites an already-set var).
  */
 export function identityEnv(
   env: NodeJS.ProcessEnv,
@@ -248,13 +164,9 @@ export function isSocketPathUsable(socketPath: string): boolean {
 }
 
 /**
- * Whether a daemon could actually be RUN on this shared socket path.
- *
- * The stricter question, and the one every caller deciding whether the daemon
- * is worth reaching for must ask: a daemon binds the pid-scoped staging name
- * beside the shared one, so the shared path has to leave room for that too.
- * `isSocketPathUsable` answers the narrower question about a concrete path, and
- * is what `listen()` applies to the two real paths it is about to use.
+ * Whether a daemon could actually be RUN on this shared path — stricter than
+ * `isSocketPathUsable`, because a daemon also binds a pid-scoped staging name
+ * beside the shared one, which must fit too.
  */
 export function isDaemonSocketPathUsable(socketPath: string): boolean {
   return (
@@ -263,14 +175,9 @@ export function isDaemonSocketPathUsable(socketPath: string): boolean {
 }
 
 /**
- * Why a socket path must not be connected to. `null` means it is safe.
- *
- * These are the CLIENT-side half of the trust model. `ensureSocketDir` and
- * `secureSocketFile` make the socket private when WE create it; they say
- * nothing about a socket somebody else created first. Without this check a
- * squatted socket is indistinguishable from our own daemon, and the client
- * pipelines `exec` — args, cwd and the forwarded `LANGWATCH_*` env, API key
- * included — before it has seen a single byte back.
+ * Why a socket must not be connected to; `null` means safe. This is the
+ * CLIENT-side half of the trust model — without it a squatted socket looks
+ * like ours, and the client pipelines `exec` (args, cwd, env, API key) blind.
  */
 export type SocketTrustProblem =
   | "socket-dir-missing"
@@ -288,35 +195,9 @@ function hasLooseMode(mode: number): boolean {
 }
 
 /**
- * Decide whether this socket path may be connected to.
- *
- * Both the socket AND its parent directory must be owned by us and carry no
- * group/other bits: a private socket inside a directory somebody else can
- * write is not private, because they can unlink it and bind their own.
- *
- * `lstat`, never `stat`: a symlink standing in for the socket (or for the
- * directory) must be REJECTED, not followed to whatever it points at.
- *
- * Every problem is soft — the caller falls back to running the command
- * in-process. A squatted socket must degrade the CLI to its pre-daemon
- * behaviour, never break it.
- *
- * THE BOUNDARY, precisely. This checks the socket and its IMMEDIATE parent, and
- * nothing above that: `~/.langwatch`, `~/.langwatch/run`'s own ancestors and
- * `$HOME` itself are not stat'd. So preferring `$HOME` over `/tmp` removes the
- * squat for the LEAF — an attacker cannot create or replace the socket or its
- * directory — but it does not remove it for the CHAIN. On a misconfigured
- * group-writable `$HOME`, a peer can rename an ancestor and point the whole path
- * somewhere they control.
- *
- * That residual case is deliberately left to fail the checks above rather than
- * be pre-empted by an ancestor walk. The outcome is refuse-and-degrade, not
- * disclosure: the substituted directory is theirs, so `socket-dir-foreign-owner`
- * fires and no bytes are ever sent. A full walk to the filesystem root would add
- * a stat per level to the hot path of every invocation and still not close the
- * race (any ancestor can be renamed between our stat and our connect); a
- * group-writable `$HOME` is a broken machine, and one this CLI degrades safely
- * on rather than pretends to fix.
+ * Socket and parent must be owned by us with no group/other bits (`lstat`, so
+ * a symlink can't stand in for either). Failures degrade to in-process rather
+ * than leak — including an unchecked ancestor rename under a group-writable `$HOME`.
  */
 export function inspectSocketTrust(socketPath: string): SocketTrustProblem | null {
   // No POSIX ownership to check (and the daemon is disabled there anyway).
@@ -359,17 +240,10 @@ export class UntrustedSocketDirError extends Error {
 }
 
 /**
- * Create the socket directory with 0700. Also repairs the mode if the
- * directory already exists with looser permissions — a world-readable
- * directory would let another user stat (though not connect to) the socket.
- *
- * Fails CLOSED when the directory is not ours. `mkdirSync`'s `mode` is subject
- * to umask and ignored outright when the directory already exists, and
- * `chmodSync` cannot repair a directory owned by somebody else — so a
- * pre-created, attacker-owned directory (the classic 1777 `/tmp` squat) leaves
- * us with a socket we can never make private. Callers must treat that as "no
- * daemon", not as a warning: a daemon whose socket cannot be made private must
- * not exist.
+ * Creates the directory 0700, repairing looser permissions if it already
+ * exists. Fails CLOSED when the directory is owned by someone else:
+ * `chmodSync` cannot repair another owner's directory, so a pre-created,
+ * attacker-owned directory must be treated as "no daemon", never a warning.
  */
 export function ensureSocketDir(socketDir: string): void {
   fs.mkdirSync(socketDir, { recursive: true, mode: 0o700 });

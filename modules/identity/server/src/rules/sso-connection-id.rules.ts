@@ -1,15 +1,9 @@
 import { generate } from "@langwatch/ksuid";
 
 /**
- * SSO connection identity (D04) — the analogue of `identity-command-id.ts`
- * one aggregate over. Every form a connection id or a connection command id
- * takes lives here, so the string that decides whether a second migration
- * pass is the same command is never a template literal three modules apart
- * from the one it has to agree with.
- *
- * These strings are a persisted contract: changing one makes every prior
- * command a different command, so a pass would restate history that is
- * already in the log. Add a form; never edit one.
+ * SSO connection identity (D04), the analogue of `identity-command-id.ts`.
+ * A persisted contract — changing a form makes every prior command a
+ * different one, restating history already in the log. Add; never edit.
  */
 
 /** A connection a human registered — random, minted once. */

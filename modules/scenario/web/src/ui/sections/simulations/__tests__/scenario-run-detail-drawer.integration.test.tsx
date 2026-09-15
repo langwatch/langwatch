@@ -1,6 +1,7 @@
 /**
  * @vitest-environment jsdom
- * @see specs/features/agent-testing/side-by-side-run-drawer.feature, specs/scenarios/scenario-version-on-runs.feature,
+ * @see specs/features/agent-testing/side-by-side-run-drawer.feature,
+ *   specs/scenarios/scenario-version-on-runs.feature,
  *   specs/features/agent-testing/case-version-history.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

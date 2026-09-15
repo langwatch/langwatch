@@ -1,13 +1,8 @@
 /**
  * The settlement sweeper's read side: admissions whose confirmation never
- * arrived, found by asking the spend record rather than by keeping a durable
- * timer per request.
- *
- * The fold already joins admission to outcome — that is what the projection
- * is — so the open admissions are simply the rows still sitting at
- * `admitted`. Reading them through a port is what lets settlement cost one
- * process instance for the whole install instead of one per gateway request,
- * and it is what keeps the settlement process free of a ClickHouse client.
+ * arrived, found by asking the spend record rather than keeping a durable
+ * timer per request. Reading through a port keeps settlement to one process
+ * instance for the whole install, free of a ClickHouse client.
  */
 
 /**

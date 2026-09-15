@@ -1,6 +1,8 @@
 /**
  * @vitest-environment node
- * Real ClickHouse: a sweeper-settled admission records unknown cost (never zero) with NeedsReconciliation set, and a late confirmation supersedes it (replace, never sum). Sweeper itself covered by gateway-spend-settlement.process.unit.test.ts (no datastore). Spec: specs/ai-gateway/billing-spend-events.feature
+ * Real ClickHouse: a sweeper-settled admission records unknown cost (never zero) with
+ * NeedsReconciliation set, and a late confirmation supersedes it (replace, never sum).
+ * Spec: specs/ai-gateway/billing-spend-events.feature
  */
 
 import { createTenantId, EventUtils } from "@langwatch/eventing";

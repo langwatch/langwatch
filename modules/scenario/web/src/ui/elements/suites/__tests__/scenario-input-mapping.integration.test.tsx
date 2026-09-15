@@ -249,8 +249,8 @@ describe("ScenarioInputMappingSection", () => {
 
         renderSection({ mappings });
 
-        // Static value mappings render read-only below; they are not part of the inverted display mappings.
-        // (Only type:"source" mappings flow through invertMappings; value mappings bypass that transform.)
+        // Static value mappings render read-only and bypass invertMappings — only
+        // type:"source" mappings flow through that transform.
         expect(screen.getByText("Use the KB")).toBeInTheDocument();
       });
     });

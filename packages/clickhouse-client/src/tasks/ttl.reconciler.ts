@@ -12,25 +12,19 @@ const INDEFINITE_RETENTION_SENTINEL_DATE = "2106-01-01";
 export interface TableTTLEntry {
   table: string;
   ttlColumn: string;
-  /** Override the `toDateTime(ttlColumn)` expression for non-DateTime columns (e.g. UInt64 epoch ms). */
+  /** Override the `toDateTime(ttlColumn)` expression for non-DateTime columns (e.g. epoch ms). */
   ttlColumnExpression?: string;
   envVar: string;
   hardcodedDefault: number;
-  /** Immutable business-timestamp column for retention TTL (may differ from cold-storage anchor). */
+  /** Immutable timestamp column for retention TTL (may differ from the cold-storage anchor). */
   retentionTTLColumn?: string;
   /** Override for the retention TTL column expression (e.g. for UInt64 epoch ms). */
   retentionTTLColumnExpression?: string;
 }
 
 /**
- * Single source of truth for table TTL configuration.
- *
- * Each entry maps a ClickHouse table to:
- * - ttlColumn: the DateTime column used for TTL expiry
- * - envVar: per-table env var override (e.g. CLICKHOUSE_COLD_STORAGE_SPANS_TTL_DAYS=7)
- * - hardcodedDefault: fallback when no env vars are set
- *
- * Resolution order: per-table env var > CLICKHOUSE_COLD_STORAGE_DEFAULT_TTL_DAYS > hardcodedDefault
+ * Single source of truth for table TTL configuration. Resolution order: per-table
+ * env var > CLICKHOUSE_COLD_STORAGE_DEFAULT_TTL_DAYS > hardcodedDefault.
  */
 export const TABLE_TTL_CONFIG: readonly TableTTLEntry[] = [
   {
@@ -194,29 +188,12 @@ export const TABLE_TTL_CONFIG: readonly TableTTLEntry[] = [
     envVar: "CLICKHOUSE_COLD_STORAGE_EVALUATION_ANALYTICS_ROLLUP_TTL_DAYS",
     hardcodedDefault: 49,
   },
-  // ADR-128: the governance cost tables. They anchor on `Day` (a Date, and the
-  // partition leaf on the rollup) and reached the reconciler by a different
-  // route from everything above: they are NOT in the customer retention
-  // cascade, they are in INDEFINITE_DEFAULT_RETENTION_TABLES, so their
-  // `_retention_days` column defaults to 0 and nothing expires unless a day
-  // count is deliberately stamped. Entries here are what installs and maintains
-  // the TTL clause that reads that column (migration 00095 installs it first);
-  // the cold-storage MOVE half follows the same 49-day default as every other
-  // table, since it only relocates parts and deletes nothing.
-  //
-  // The two `...ColumnExpression` overrides below spell out `toDateTime(Day)`,
-  // which is byte-for-byte what the default would build anyway. They are
-  // written out because `Day` is a `Date`, not a DateTime, and the wrap is the
-  // thing that makes the interval arithmetic legal — not because the default
-  // would produce anything different.
-  //
-  // Migration 00095 stopped the 13-month hard delete on both of these tables,
-  // and its header says nothing else moves them. That is wrong about this
-  // file: the two entries below keep rendering the 49-day
-  // `MOVE ... TO VOLUME 'cold'` clause on any cluster with cold storage
-  // enabled and the tiered policy. The MOVE relocates parts and deletes
-  // nothing, so a row whose `_retention_days` is 0 still lives forever — it
-  // just lives on cheaper disk once it is 49 days old.
+  // ADR-128: governance cost tables reach the reconciler via
+  // INDEFINITE_DEFAULT_RETENTION_TABLES, not the customer retention cascade, so
+  // `_retention_days` defaults to 0 and nothing expires unless a day count is
+  // deliberately stamped. Despite migration 00095's header saying nothing else
+  // moves these tables, the entries below still render the 49-day cold-storage
+  // `MOVE` clause — safe, since MOVE only relocates parts and deletes nothing.
   {
     table: "governance_cost_rollup_1d",
     ttlColumn: "Day",
@@ -359,13 +336,10 @@ interface TableEngineInfo {
 export const TIERED_STORAGE_POLICY = "local_primary";
 
 /**
- * Reconciles TTL settings for all managed ClickHouse tables.
- *
- * Compares current TTL (from system.tables metadata) against desired values
- * (from env vars / defaults), and issues ALTER TABLE MODIFY TTL only when they differ.
- * Handles tables with no TTL set (fresh installs) by applying the desired TTL.
- *
- * Uses SET materialize_ttl_after_modify = 0 to make changes metadata-only (cheap).
+ * Reconciles TTL settings for all managed ClickHouse tables: compares current TTL
+ * (system.tables metadata) against desired values (env vars / defaults) and issues
+ * `ALTER TABLE MODIFY TTL` only when they differ, using
+ * `SET materialize_ttl_after_modify = 0` to keep changes metadata-only (cheap).
  */
 export async function reconcileTTL(options: ReconcileOptions = {}): Promise<void> {
   const connectionUrl = options.connectionUrl ?? process.env.CLICKHOUSE_URL;

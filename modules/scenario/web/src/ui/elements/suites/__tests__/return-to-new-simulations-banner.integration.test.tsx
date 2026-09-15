@@ -1,5 +1,6 @@
 /**
- * The previous simulations screens carry a banner back to the new ones for the browser that recorded the previous-screens preference.
+ * A banner on the old simulations screens links back to the new ones, for a
+ * browser with the old-screens preference recorded.
  * @vitest-environment jsdom
  * @see specs/suites/new-simulations-callout.feature
  */

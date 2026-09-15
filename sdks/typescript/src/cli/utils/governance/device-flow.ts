@@ -1,11 +1,7 @@
 /**
- * RFC 8628 device-code OAuth client for the `langwatch login --device`
- * flow. Targets the control plane's `/api/auth/cli/*` endpoints —
- * the same wire surface a custom CLI client would hit (documented in
+ * RFC 8628 device-code OAuth client for `langwatch login --device`, hitting the control plane's
+ * `/api/auth/cli/*` endpoints (documented in
  * `docs/ai-gateway/governance/admin-setup.mdx#cli-device-flow-rest-api`).
- *
- * Pure stdlib `fetch`, no axios — matches the rest of the typescript
- * CLI's HTTP style.
  */
 
 import * as os from "node:os";
@@ -74,17 +70,10 @@ export interface ExchangeCliApiKeyScope {
 }
 
 /**
- * The CLI device-code flow can mint two distinct credential types:
- *   - "device_session" — the user-scoped OAuth-style access+refresh
- *     token pair used by `langwatch claude/codex/...` wrappers.
- *   - "project_api_key" — the project-scoped SDK key
- *     (`Project.apiKey`) returned verbatim, used by SDK consumers
- *     and `langwatch sync/eval/prompt/...` commands.
- *
- * Caller selects via `startDeviceCode({ credentialType })`. Server
- * stamps the choice on the device-code record + flips the response
- * shape on /exchange. Same browser approval ceremony for both — only
- * the persist target differs (`~/.langwatch/config.json` vs `.env`).
+ * Mints two credential types: "device_session" (user-scoped OAuth token pair, for the
+ * `claude`/`codex` wrappers) and "project_api_key" (the project-scoped SDK key verbatim, for
+ * SDK/CLI data commands). Same approval ceremony for both; only the persist target differs
+ * (`~/.langwatch/config.json` vs `.env`).
  */
 export type CredentialType = "device_session" | "project_api_key";
 
@@ -171,14 +160,10 @@ export async function startDeviceCode(
 }
 
 /**
- * Device fingerprint stamped onto the CLI session at /exchange time.
- * The control plane persists it on the access + refresh token records
- * so /me/devices can render "Mac (rchaves.local)" instead of
- * "Unknown device" — multi-device users need this to revoke
- * individual sessions without nuking every device they're logged in
- * on (Ariana QA finding). See
- * `modules/auth/server/src/transport/api-rest/auth-cli-device-flow.api.ts#clientInfoSchema` for the
- * server contract.
+ * Device fingerprint stamped onto the CLI session at /exchange time, so /me/devices can render
+ * "Mac (rchaves.local)" instead of "Unknown device" — needed to revoke one session without
+ * nuking every device a user is logged into. Server contract:
+ * `modules/auth/server/src/transport/api-rest/auth-cli-device-flow.api.ts#clientInfoSchema`.
  */
 function collectClientInfo(): {
   hostname: string;
@@ -241,14 +226,10 @@ export async function exchange(
 }
 
 /**
- * `GET /api/auth/cli/device-approval` — a stream that emits one frame the
- * moment the browser approves or denies the code. It carries no credential;
- * it only says "poll now", which is what turns the wait from "up to the poll
- * interval" into "as fast as the round trip".
- *
- * Resolves when a frame arrives, and never otherwise: a server that predates
- * the route, a proxy that buffers the body, or a dropped connection all leave
- * the poll timer in charge rather than making it fire early.
+ * `GET /api/auth/cli/device-approval` — a stream that emits one frame the moment the browser
+ * approves or denies, carrying no credential (it only says "poll now"). Resolves when a frame
+ * arrives and never otherwise, so a server that predates the route, a buffering proxy, or a
+ * dropped connection all leave the poll timer in charge rather than firing early.
  */
 function watchDeviceApproval({
   opts,
@@ -340,16 +321,11 @@ async function waitForNextPoll({
 }
 
 /**
- * Poll `exchange` until the user approves, denies, or the device-code
- * expires. Honours RFC 8628 §3.5 by doubling the polling interval on
- * `slow_down` responses.
- *
- * Two things keep the wait short. The first poll goes out immediately, since
- * a login approved while the browser was still opening should not cost a
- * whole interval; and the approval stream cuts every later wait short the
- * moment the browser settles the code. Both are accelerators over the same
- * timer, so a server or network that supports neither still logs in at the
- * cadence the server asked for.
+ * Poll `exchange` until the user approves, denies, or the device-code expires. Honours RFC 8628
+ * §3.5 by doubling the interval on `slow_down`. Two accelerators keep the wait short — the first
+ * poll fires immediately, and the approval stream cuts later waits short the moment the browser
+ * settles the code — both layered over the same timer, so a server or network supporting neither
+ * still logs in at the cadence the server asked for.
  */
 export async function pollUntilDone(
   opts: DeviceFlowOptions,

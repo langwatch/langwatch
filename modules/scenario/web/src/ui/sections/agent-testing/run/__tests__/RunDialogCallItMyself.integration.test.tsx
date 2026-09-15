@@ -1,10 +1,8 @@
 /**
  * @vitest-environment jsdom
- *
- * The run dialog's footer offers a second action, "Call it myself", beside Run
- * only when the target is a voice agent, and shows the lone Run action for
- * every other target (AC23, AC25).
- *
+ * The run dialog's footer offers a second action, "Call it myself", beside
+ * Run only when the target is a voice agent, and shows the lone Run action
+ * for every other target (AC23, AC25).
  * @see specs/features/agents/voice-agents-v1.feature
  */
 

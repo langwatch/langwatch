@@ -1,17 +1,8 @@
 /**
- * Save and Open, in the query card's header.
- *
- * Two controls with two different jobs. Open picks a chart to work on. The
- * chart menu manages the one that is open — and it only exists once a chart is
- * open, because rename and delete are questions about a specific chart rather
- * than about the workbench. Delete asks before it acts: nothing here is
- * recoverable, and it sits one item below Rename.
- *
- * Save says which it will do: with a chart open it reads "Save", writes back to
- * that chart, and creates nothing; with none open it reads "Save chart" and
- * asks for a name first. A member should never have to guess whether pressing
- * it will leave them with one chart or two.
- *
+ * Save and Open, in the query card's header. The chart menu manages the one that's open
+ * (rename/delete only make sense for a specific chart) and asks before deleting, since
+ * nothing here is recoverable. Save reads "Save" when a chart is open, or "Save chart" and
+ * asks for a name first when none is.
  * @see dev/docs/best_practices/row-actions-overflow-menu.md
  * @see specs/analytics/lwql-saved-charts.feature
  */
@@ -42,16 +33,11 @@ export interface SavedChartsToolbarProps {
 }
 
 /**
- * Asks for a name.
- *
- * One field and one action: the destructive-looking alternative — a Cancel
- * button beside Save — is left out deliberately, because the dialog's own
- * dismissal already means "not now" and two ways to back out is one too many.
- *
- * The field is seeded once, at mount, and never re-seeded — so the caller must
- * mount a fresh one per opening (see the `key` where it is rendered). Anything
- * that re-seeded on `open` would have to be told the dialog opened, and a
- * controlled `open` never says so.
+ * Asks for a name. One field and one action: a Cancel button beside Save is left out
+ * deliberately, since the dialog's own dismissal already means "not now" and two ways to back
+ * out is one too many. The field is seeded once, at mount, never re-seeded — so the caller
+ * must mount a fresh one per opening (see the `key` where it's rendered); a controlled `open`
+ * never says when it opened, so re-seeding on it isn't possible.
  */
 function NameDialog({
   title,

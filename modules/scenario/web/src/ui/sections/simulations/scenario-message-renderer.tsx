@@ -24,14 +24,10 @@ export interface ScenarioMessageRendererProps {
 }
 
 /**
- * A scenario run's transcript.
- *
- * The flattening and the rendering both live in the shared conversation
- * renderer now — this component's remaining job is to say which of them a
- * scenario is: roles are swapped (the `user` turns come from a simulated user,
- * the `assistant` turns from the agent under test), a grid cell is a preview
- * rather than a transcript, and the media, turn separators and audio playback
- * are the ones this surface owns.
+ * A scenario run's transcript. Flattening and rendering both live in the
+ * shared conversation renderer now — this component's remaining job is roles
+ * being swapped (`user` turns come from the simulated user, `assistant` from
+ * the agent under test) and owning media, turn separators and audio playback.
  */
 export function ScenarioMessageRenderer({
   messages,

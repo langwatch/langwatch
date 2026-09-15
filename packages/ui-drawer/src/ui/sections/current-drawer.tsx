@@ -1,20 +1,9 @@
 /**
- * The one place a URL-addressed drawer is mounted.
- *
- * Moved out of `platform/app/src/components/CurrentDrawer.tsx`. It reads
- * `?drawer.open=<name>` off the address, resolves the component through the
- * registry the host composed, and hands it the three sources of props the
- * navigator keeps: the `drawer.<key>` query parameters, the in-memory complex
- * props, and the flow callbacks registered for that drawer.
- *
- * TWO PLATFORM READS BECAME ONE PROP. The application's own copy asked
- * `useOrganizationTeamProject` for the reader's organization role and drove
- * `platform/app`'s upgrade-modal store when an EXTERNAL member addressed a
- * restricted drawer. Neither module has a package export, and both are the
- * HOST's policy rather than the drawer framework's, so the whole rule arrives
- * as one optional `restriction` prop: the host says which drawer a reader may
- * not open and what to do instead. Nothing passed means nothing is restricted,
- * which is what a host with no membership tiers wants.
+ * The one place a URL-addressed drawer is mounted, resolved through the
+ * host's registry with the drawer's props (query params, in-memory complex
+ * props, flow callbacks). The reader's restriction check collapses into one
+ * optional `restriction` prop from the host — neither policy module has a
+ * package export, and both are the HOST's policy, not the framework's.
  */
 
 import { Center, Spinner } from "@chakra-ui/react";

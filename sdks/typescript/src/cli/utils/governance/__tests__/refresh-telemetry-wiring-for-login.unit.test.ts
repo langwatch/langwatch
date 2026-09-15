@@ -238,16 +238,11 @@ describe("refreshTelemetryWiringForLogin", () => {
   describe("given a cached ingest key minted on a previous instance (#6202 regression)", () => {
     describe("when listIngestionKeys rejects during the login-time refresh", () => {
       it("mints a fresh key rather than reusing the cached one on the new endpoint", async () => {
-        // A cache-liveness check that can't reach the server must NEVER
-        // fall back to reusing this secret here: it was minted on the
-        // OLD instance, and pairing it with the NEW endpoint would
-        // silently corrupt working wiring into a broken combination
-        // (new endpoint, token that was never valid there) -
-        // reintroducing the exact hijack this PR fixes. The per-run
-        // wrapper path (resolveWrapperMode) intentionally keeps the
-        // opposite, offline-first behavior for a disconnected device
-        // that already has a working key for ITS current instance;
-        // only this login-refresh caller must refuse the fallback.
+        // A cache-liveness check that can't reach the server must NEVER fall
+        // back to reusing this secret — it was minted on the OLD instance,
+        // and pairing it with the NEW endpoint would silently corrupt wiring
+        // (the exact hijack this PR fixes). The per-run wrapper path
+        // intentionally keeps the opposite, offline-first behavior instead.
         const cfg = baseCfg({
           default_personal_ingest_keys: {
             claude_code: { secret: STALE_TOKEN, prefix: "ik-lw-stal" },

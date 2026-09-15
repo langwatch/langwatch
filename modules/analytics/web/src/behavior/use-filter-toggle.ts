@@ -1,14 +1,9 @@
 /**
- * Whether the filter rail is open, and the count on its trigger.
- *
- * The `?show_filters=` half of `platform/app/src/components/filters/FilterToggle.tsx`.
- * The platform module stays: `components/checks/TryItOut.tsx` renders it too,
- * and deletes-only forbids repointing that one.
- *
- * A page whose rail is open BY DEFAULT writes `show_filters=false` to close it
- * and removes the key to open it, and a page whose rail is closed by default
- * does the opposite. That asymmetry is what keeps the default page address free
- * of a parameter that says what it already means.
+ * Whether the filter rail is open, and the count on its trigger, via
+ * `?show_filters=`. A page whose rail is open by default writes
+ * `show_filters=false` to close it and removes the key to open it, and a page
+ * closed by default does the opposite — keeping the default page address
+ * free of a parameter that says what it already means.
  */
 
 import { useCallback } from "react";

@@ -8,27 +8,11 @@ import * as os from "node:os";
 import { identityEnv, type DaemonIdentity } from "./identity";
 
 /**
- * The environment a spawned daemon is allowed to inherit from its spawner.
- *
- * The daemon's boot env becomes the BASELINE that every request resets to
- * (execution.ts applyWindow), so handing it the spawning project's full shell
- * env would leak one project's variables into every other caller's requests —
- * the exact cross-project contamination the per-request allowlist
- * (eligibility.ts collectForwardedEnv) exists to prevent. The daemon therefore
- * inherits only:
- *
- *   - the identity triple + LANGWATCH_NO_DAEMON, pinned below;
- *   - the caller's allowlisted overlay (the `env` argument, already filtered);
- *   - the process essentials a node child genuinely needs: PATH (for
- *     subprocesses commands spawn), HOME (config lookup; also the daemon's
- *     cwd), the login identity variables, locale (LANG/LC_*), temp dirs, and
- *     XDG_RUNTIME_DIR — socket placement MUST resolve identically on both
- *     sides or the client and daemon would look for the socket in different
- *     directories (identity.ts daemonSocketDir);
- *   - the TLS trust-store variables (NODE_EXTRA_CA_CERTS, SSL_CERT_FILE,
- *     SSL_CERT_DIR): they point at FILES, not project state, so forwarding
- *     them leaks nothing — and without them the daemon's HTTPS calls fail
- *     behind a private CA while the same command works in-process.
+ * The environment a spawned daemon may inherit from its spawner. The
+ * daemon's boot env becomes the baseline every request resets to, so handing
+ * it the spawner's full shell env would leak one project's variables into
+ * every other caller's requests. It inherits only the identity triple, the
+ * caller's already-filtered allowlisted overlay, and the vars listed below.
  */
 const BASELINE_ENV_VARS = [
   "PATH",
@@ -60,17 +44,11 @@ function baselineEnv(env: NodeJS.ProcessEnv): Record<string, string> {
 }
 
 /**
- * Start a daemon in the background and return immediately.
- *
- * The command that triggered the spawn does NOT wait for it and does NOT try to
- * use it: it runs in-process, exactly as it would have anyway, and the daemon
- * is there for the NEXT invocation. Racing the spawn against in-process
- * execution would buy a few milliseconds on one command in exchange for two
- * code paths that can both be half-done when the process exits — not a trade
- * worth making for a cold start we are about to amortise away regardless.
- *
- * The child is detached with its stdio pointed at /dev/null, so it survives the
- * caller exiting and can never write into the caller's terminal.
+ * Starts a daemon in the background and returns immediately. The triggering
+ * command runs in-process regardless; racing the spawn against it would only
+ * shave a cold start we're about to amortise away, at the cost of two code
+ * paths that can each be half-done on exit. Detached with stdio to
+ * /dev/null, so it survives the caller exiting and never writes to its terminal.
  */
 export function spawnDaemon({
   cliPath,

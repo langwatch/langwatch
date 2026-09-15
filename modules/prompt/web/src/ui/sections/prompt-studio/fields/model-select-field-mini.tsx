@@ -21,15 +21,9 @@ type ModelSelectFieldMiniProps = {
 };
 
 /**
- * Model Select Field Mini
- *
- * Renders a compact LLM model selector field integrated with react-hook-form
- * that displays the current model and opens a configuration popover on click.
- *
- * Uses Popover.Anchor instead of Popover.Trigger to avoid Zag.js's internal
- * onClick handler that conflicts with the Drawer's dismissable layer.
- * The onClick toggle is handled manually via controlled state.
- * See: https://github.com/langwatch/langwatch/issues/2390
+ * Uses `Popover.Anchor` instead of `Popover.Trigger` to avoid Zag.js's internal onClick handler
+ * conflicting with the Drawer's dismissable layer; the onClick toggle is handled manually via
+ * controlled state. See https://github.com/langwatch/langwatch/issues/2390
  */
 export const ModelSelectFieldMini = React.memo(function ModelSelectFieldMini({
   showStructuredOutputs = true,
@@ -86,16 +80,10 @@ export const ModelSelectFieldMini = React.memo(function ModelSelectFieldMini({
   }
 
   if (isEmpty) {
-    // Skip the popover trigger entirely when the project has zero
-    // enabled providers - clicking the chip would just open a dropdown
-    // with no items. Honest empty-state callout instead.
-    //
-    // The prompt-playground surface gets an open-by-default tooltip
-    // ('Set up a model to get started') because the playground tries
-    // to actually run the prompt the moment the user hits Send, so
-    // the empty model picker is a far higher-stakes blocker here
-    // than in the workflow / evaluator drawers. Chakra's tooltip
-    // closes naturally on mouseout and re-opens on mouseover.
+    // No enabled providers: skip the popover trigger (there'd be nothing to pick from) for an
+    // honest empty-state callout instead. The prompt-playground surface additionally opens the
+    // tooltip by default, because it runs the prompt the moment the user hits Send, making the
+    // empty picker a higher-stakes blocker there than in the workflow/evaluator drawers.
     return (
       <Tooltip
         content="Set up a model to get started"

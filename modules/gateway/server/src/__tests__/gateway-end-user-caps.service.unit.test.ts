@@ -1,5 +1,7 @@
 /**
- * One end user's spending allowance, read from two stores that must agree: allowance + period boundary from Postgres, spend from the ledger. The join is the bucket scope id — get it wrong and you show someone else's spend, or quietly zero.
+ * One end user's spending allowance, read from two stores that must agree: allowance + period
+ * boundary from Postgres, spend from the ledger. The join is the bucket scope id — get it wrong
+ * and you show someone else's spend, or quietly zero.
  */
 
 import { type Instant, Temporal, toDate } from "@langwatch/time";

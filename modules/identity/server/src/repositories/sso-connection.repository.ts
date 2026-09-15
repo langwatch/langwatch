@@ -1,14 +1,9 @@
 import type { SsoConnectionState } from "@langwatch/identity-contract";
 
 /**
- * How the connection guards see current state (D04, ADR-117 §5): reads over
- * the `SsoConnection` projection. The app implements this with Prisma
- * (platform/app/src/server/app-layer/identity/repositories/sso-connection-reads.prisma.repository.ts).
- *
- * On the calling-path dispatch these reads are read-your-writes against
- * Postgres; on the staged path they run under the queue's per-connection
- * FIFO, which serializes them against the fold. Either way a guard reads the
- * folded state first and refuses on what it says.
+ * How the connection guards see current state (D04, ADR-117 §5), reading the `SsoConnection`
+ * projection: read-your-writes on the calling path, or serialized against the fold under the
+ * queue's per-connection FIFO on the staged path. Either way a guard reads folded state first.
  */
 export abstract class SsoConnectionReadRepository {
   /** One connection's folded state, or null when it has no history yet. */
@@ -27,29 +22,20 @@ export abstract class SsoConnectionReadRepository {
 }
 
 /**
- * Whether an organization holds a live break-glass binding right now — the
- * second half of activation's precondition (ADR-117 §5).
- *
- * D05 owns break-glass BINDINGS; they do not exist yet. This port is how the
- * requirement exists before they do: activation asks, and pre-D05 the
- * composed implementation answers from what the deployment can actually
- * prove — a local method the instance still mounts. When D05 lands, the
- * bindings become this port's answer and every activation is already asking.
+ * Whether an organization holds a live break-glass binding right now — the second half of
+ * activation's precondition (ADR-117 §5). D05 owns break-glass bindings, which don't exist yet;
+ * this port is how the requirement exists before they do, answering from what the deployment can
+ * prove today. When D05 lands, its bindings become this port's answer.
  */
 export abstract class SsoBreakGlassBindingRepository {
   abstract hasLiveBinding(args: { organizationId: string }): Promise<boolean>;
 }
 
 /**
- * Whether an actor is a LangWatch PLATFORM operator — not an administrator of
- * the organization whose connection is being changed, however many
- * permissions that organization can grant them (D05 amendment).
- *
- * A port rather than a field on the command, because a boolean on the wire
- * saying "I am an operator" is the caller authorizing itself. It is also a
- * port rather than a deployment branch: a self-hosted installation has
- * platform operators too, so the guard asks the same question everywhere and
- * the deployment answers it.
+ * Whether an actor is a LangWatch PLATFORM operator, not an administrator of the organization
+ * whose connection is being changed (D05 amendment). A port rather than a command field, because
+ * a wire boolean saying "I am an operator" would be the caller authorizing itself; a port rather
+ * than a deployment branch, because self-hosted installations have platform operators too.
  */
 export abstract class SsoPlatformOperatorRepository {
   abstract isPlatformOperator(args: { actorId: string }): Promise<boolean>;

@@ -1,16 +1,8 @@
 /**
- * Naming a new dashboard.
- *
- * `platform/app`'s `DashboardNameDrawer`, mounted INLINE by the section that
- * offers it rather than through the drawer registry. That registry is
- * application chrome a packaged screen has nothing above it to supply, and this
- * overlay had exactly one opener, so it travels as a dialog and its registry
- * entry is deleted with it — the gateway family's routing-policy shape.
- *
- * A drawer became a dialog: the sheet slid in from the edge to ask for one
- * word, which is what a dialog is for. Nothing else about it changed — the
- * default name still counts the existing dashboards, Enter still confirms, and
- * creating still lands the reader on the new dashboard.
+ * Naming a new dashboard: mounted inline by the section that offers it,
+ * rather than through the drawer registry — that registry is application
+ * chrome a packaged screen has nothing above it to supply, and this dialog
+ * has exactly one opener.
  */
 
 import { Button, HStack, Input, Spacer, Text, VStack } from "@chakra-ui/react";

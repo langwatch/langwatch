@@ -1,23 +1,7 @@
 /**
- * The per-tenant state machine for one in-place migration
- * (specs/migration/system-migrations-runner.feature):
- *
- *   pending ──► migrated ──► finalized ──► rolled_back
- *     │             ▲                          (operator only)
- *     │             │ proof failed - work done, held on the legacy path
- *     └──► parked ──┘ errored - retried on a later pass
- *
- * "Pending" is the absence of a record. Every stored status is re-entrant
- * except `finalized`, which is the one-way latch consumers key behaviour
- * changes on: a migration's legacy path may only be switched off for a
- * tenant whose record says finalized.
- *
- * `rolled_back` is the operator's undo, and the only status the runner will
- * not act on. Blanking a finalized row, or moving it back to `migrated`,
- * does NOT roll a tenant back: the next pass re-runs a migration whose proof
- * still passes and re-finalizes it within minutes. Writing `rolled_back`
- * both returns the tenant to its legacy path (no consumer reads it as
- * finalized) and pins it there until a human moves it again.
+ * The per-tenant migration state: `finalized` is a one-way latch consumers
+ * key legacy-path removal on. Blanking a finalized row does NOT roll it
+ * back — re-proving just re-finalizes it; only `rolled_back` pins it on legacy.
  */
 export type TenantMigrationStatus = "migrated" | "finalized" | "parked" | "rolled_back";
 
@@ -42,13 +26,9 @@ export type TenantMigrationRecord = {
 };
 
 /**
- * What one pass over one tenant concluded.
- *
- * `migrated` is the held state: the work is done (and idempotent to redo)
- * but the migration's own proof found disagreements, so the tenant must
- * stay on its legacy path. The runner stores the report and re-runs the
- * tenant on later passes - a held tenant heals itself once whatever the
- * report names is fixed.
+ * What one pass over one tenant concluded. `migrated` is the held state:
+ * work is done but the migration's own proof found disagreements, so the
+ * tenant stays on its legacy path until a later pass's proof passes.
  */
 export type TenantMigrationOutcome =
   | { status: "finalized"; report?: unknown }
@@ -77,18 +57,9 @@ export type MigrationPassSummary = {
   /** Claimed by another process's pass, so left to that process. */
   claimed: number;
   /**
-   * State TRANSITIONS this pass made: a (tenant, migration) whose stored
-   * status is not the one it carried when the pass read it, first record
-   * included. The ONLY field that means the fleet moved.
-   *
-   * None of the others can carry that meaning, which is why this exists.
-   * `held` counts a `migrated` write, and a held tenant is re-proved and
-   * re-written `migrated` on every pass forever - so a caller that read
-   * `held > 0` as progress would drive passes until something else stopped
-   * it. `parked` has the same shape for a tenant that keeps failing the
-   * same way. `tenantsSeen` counts visits, not outcomes. Zero here is the
-   * honest "this pass changed nothing, and running another identical one
-   * will change nothing either".
+   * State TRANSITIONS this pass made — the ONLY field that means the fleet
+   * moved. `held`/`parked` re-count every pass forever, so reading `held > 0`
+   * as progress loops forever. Zero here honestly means nothing changed, and won't.
    */
   advanced: number;
 };

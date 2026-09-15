@@ -1,26 +1,10 @@
 /**
- * The one HTTP client every request to the LangWatch API goes through.
- *
- * A LangWatch endpoint configured as `http://app.langwatch.ai` answers with a
- * redirect to https. The global `fetch` follows it on its own and, for a 301
- * or 302, turns the POST into a GET and drops the body, so the event is lost
- * without an error. This client sends with `redirect: "manual"` and applies a
- * rule per method to the 3xx it gets back.
- *
- * GET and HEAD follow a 301, 302, 303, 307 or 308 with the same method, up to
- * five hops. A hop that keeps the origin, or only upgrades http to https on
- * the same host and port, keeps every header; any other hop drops the
- * credential headers first. A hop from https to http and a hop without a
- * Location are refused.
- *
- * Every other method follows exactly one redirect, and only when the target is
- * the same URL with the scheme changed from http to https (same host, port,
- * path and query). The replay uses the same method, headers and body bytes.
- *
- * Every refused redirect throws `LangWatchRedirectError`.
- *
- * This module depends on the SDK logger only, so the CLI boot graph and the
- * `agent` entry can import it without pulling anything else in.
+ * The one HTTP client every request to the LangWatch API goes through. It sends
+ * with `redirect: "manual"` because the global `fetch` turns a POST into a GET and
+ * drops its body on a 301/302, silently losing the event. GET/HEAD follow up to
+ * `MAX_FOLLOW_HOPS` same-method redirects, dropping credential headers unless a hop
+ * only upgrades http to https on the same host/port; every other method follows one
+ * such redirect, replaying the method/headers/body. Refusal throws `LangWatchRedirectError`.
  */
 import { ConsoleLogger, type Logger } from "../../logger";
 
@@ -102,15 +86,11 @@ const abortError = (signal: AbortSignal): Error => {
 };
 
 /**
- * Releases the unread copy of a request body.
- *
- * `Request.clone` tees the body stream, and a branch nobody reads holds every
- * chunk the other branch consumes in memory. Cancelling the copy the replay
- * never needs keeps a streamed upload from being buffered whole.
- *
- * The cancellation is never awaited: a tee only settles the promise its
- * `cancel` returns once both branches are cancelled, so waiting on the copy
- * while the sent branch is still live would never return.
+ * Releases the unread copy of a request body. `Request.clone` tees the body
+ * stream, and a branch nobody reads holds every chunk the other branch consumes
+ * in memory, so the replay's unused copy is cancelled to avoid buffering a
+ * streamed upload whole. Never awaited: a tee's `cancel` promise only settles
+ * once both branches are cancelled, and the sent branch is still live.
  */
 const discard = (spare: Request | null): void => {
   void spare?.body?.cancel().catch(() => undefined);
@@ -217,7 +197,7 @@ export const followTarget = ({
   return to.href;
 };
 
-/** A hop keeps its credential headers on the same origin and on an https upgrade of the same host. */
+/** A hop keeps credential headers on the same origin, or an https upgrade of the same host. */
 const keepsCredentials = ({ from, to }: { from: URL; to: URL }): boolean =>
   from.origin === to.origin || isSchemeUpgrade({ from, to });
 

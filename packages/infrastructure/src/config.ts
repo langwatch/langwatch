@@ -1,14 +1,7 @@
 /**
- * What a process states about itself, and nothing more. Every value here is
- * data a boot seam has already parsed: a connection string, a bucket name, a
- * key. No member arrives pre-built, because a process that can hand one in is
- * a process that decides how it is built, and that decision is what this
- * package exists to hold.
- *
- * Two slices carry a collaborator rather than a string, and each is a seam the
- * process genuinely owns: eventing's event store and queue factory (which
- * datastore an event log lives in is the role's decision, not this package's),
- * and the process store a role that runs process managers supplies.
+ * What a process states about itself: every value here is data a boot seam
+ * already parsed, never a pre-built collaborator. Two exceptions carry one:
+ * eventing's store/queue factory and the process store a process-manager role supplies.
  */
 import type { EventStore, ExecutionTarget, KillSwitch, ProcessStore } from "@langwatch/eventing";
 import type { EventSourcingOptions } from "@langwatch/eventing";
@@ -22,14 +15,9 @@ export interface DatabaseConfig {
 }
 
 /**
- * One organization whose data lives on its own ClickHouse server.
- *
- * The whole family is one variable, `CLICKHOUSE_PRIVATE_ROUTES`, holding this
- * array as JSON. It used to be a `CLICKHOUSE_URL__<label>__<organizationId>`
- * variable per customer, which no classifier could name in advance: every one
- * of them carried `user:password@host` past `packages/secrets/keys.json`, so
- * `haven env` printed it and the vault could not resolve it. One key is one
- * classified composite secret.
+ * One organization on its own ClickHouse server. The whole family is one
+ * variable, `CLICKHOUSE_PRIVATE_ROUTES` (JSON array) — it used to be a
+ * per-customer var no classifier could name, leaking it past `haven env`.
  */
 export interface ClickHousePrivateRoute {
   readonly organizationId: string;
@@ -124,14 +112,9 @@ export interface OutboundProxyConfig {
 export type MailProvider = "smtp" | "ses" | "resend" | "off";
 
 /**
- * Which gateway this process sends through, with that gateway's own leaves
- * required and no other gateway's readable.
- *
- * The discriminant is the whole config: a deployment on SES cannot half-declare
- * SMTP, and one on SMTP with no host does not compile here and is refused at
- * parse by the boot seam's `Config.group`, rather than at the first send weeks
- * later. `off` carries no leaves at all, and reading the `mail` member on an
- * `off` process refuses by name at boot rather than dropping messages quietly.
+ * Which gateway this process sends through, with only that gateway's own
+ * fields present. A bad shape is refused at parse by the boot seam, not at
+ * the first send weeks later, and `off` refuses reading `mail` by name at boot.
  */
 export type MailConfig =
   | Readonly<{ readonly provider: "off" }>

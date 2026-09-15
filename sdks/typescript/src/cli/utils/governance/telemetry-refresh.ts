@@ -1,42 +1,7 @@
 /**
- * Latest login wins (#6202).
- *
- * `langwatch <tool>` persists telemetry wiring so a plain `<tool>` keeps
- * capturing: claude's env block in `~/.claude/settings.json`, codex's
- * `[otel]` block in `~/.codex/config.toml`, scoped shell functions for
- * gemini / opencode. Those persisted blocks hard-code the endpoint and
- * the ingest key of the login that wrote them, and some of them are
- * applied ON TOP of the process environment (Claude Code layers the
- * settings.json `env` block over the child env), so after logging into
- * a DIFFERENT instance a stale block silently reroutes telemetry to the
- * previous one - the wrapper's own env can't win.
- *
- * This module enforces the rule that the LATEST login wins:
- *
- *   - On login, any langwatch-authored block that points at a different
- *     endpoint than the new login is refreshed in place to the new
- *     login's endpoint + a live ingest key
- *     (`refreshTelemetryWiringForLogin`).
- *   - On every ingestion-mode wrapper run, the tool's own persisted
- *     block is re-synced value-exactly (endpoint AND key) with what the
- *     run resolved (`refreshClaudeUserTelemetryEnv`,
- *     `refreshScopedShellFunctions`; codex re-writes its [otel] block
- *     unconditionally in wrapper-mode already).
- *   - For claude the wrapper additionally maintains a project-level pin
- *     at `$CWD/.claude/settings.local.json` - the documented settings
- *     layer that outranks user-level settings - so the wrapped run can
- *     never be rerouted by user-level config at all
- *     (`ensureClaudeProjectTelemetryPin` / gateway-mode removal via
- *     `removeClaudeProjectTelemetryPin`).
- *
- * Authorship rule: refresh and removal only ever touch wiring langwatch
- * wrote. Marker-bracketed regions (codex toml, shell rc) carry explicit
- * authorship; the claude settings env block has no markers, so on top
- * of the known key set (same detection as `langwatch logout`) the
- * refresh requires the persisted values to look langwatch-shaped - a
- * `Bearer ik-lw-*` / `Bearer sk-lw-*` header or a `/api/otel` endpoint
- * (`otelWiringLooksLangwatchAuthored`). A user's own OTLP wiring (e.g.
- * a third-party collector) never matches and is never modified.
+ * Latest login wins (#6202): persisted telemetry wiring hard-codes the prior
+ * login's endpoint and key, so a stale block can silently reroute telemetry
+ * after switching logins. This module refreshes only wiring langwatch authored.
  */
 
 import { spawnSync } from "node:child_process";
@@ -103,12 +68,9 @@ export function otlpEndpointFor(controlPlaneUrl: string): string {
 
 /**
  * Whether an unmarked env map (claude settings `env` block) carries
- * langwatch-shaped OTLP wiring, i.e. wiring this CLI could have
- * written: a langwatch ingest-key bearer (`ik-lw-*` / `sk-lw-*`) or a
- * `/api/otel` endpoint. An env with NEITHER identity-bearing key
- * present is refreshable (nothing to misattribute); an env whose
- * endpoint/headers point at some other system is not ours and must
- * never be modified.
+ * langwatch-shaped OTLP wiring this CLI could have written. An env whose
+ * endpoint/headers point at some other system is not ours and must never
+ * be modified.
  */
 export function otelWiringLooksLangwatchAuthored(env: Record<string, string>): boolean {
   const endpoint = env.OTEL_EXPORTER_OTLP_ENDPOINT;
@@ -128,33 +90,18 @@ export interface IngestionKeyResolution {
   minted: boolean;
   /**
    * True when the platform rejected this device's session, so the cached
-   * key was reused without anything confirming it is still live.
-   *
-   * A device that cannot authenticate can neither check its key nor mint a
-   * replacement, and the key it holds may have been revoked weeks ago. The
-   * resolution still carries that key, because wiring the tool with a key
-   * that may work beats wiring it with nothing, but the caller must say so
-   * instead of reporting a working setup.
+   * key was reused without anything confirming it is still live — wiring
+   * the tool with a key that may work beats wiring it with nothing, but the
+   * caller must say so instead of reporting a working setup.
    */
   sessionExpired?: boolean;
 }
 
 /**
- * Resolve a live personal ingest key for `sourceType`: reuse the cached
- * key when the platform confirms it is still live, otherwise mint a
- * fresh one.
- *
- * Stale-cache check (#4755): before reusing a cached key, confirm it is
- * still live on the platform. Token format: `ik-lw-{16-char lookupId}_{secret}`.
- * If the server resolves and the lookupId is absent → the key was revoked
- * (hard-cut rotation also invalidates the cache) → mint fresh. If the
- * request rejects (offline / older server without this endpoint) →
- * offline-first fallback: reuse the cache so air-gapped / degraded
- * environments still work, UNLESS the caller opted out via
- * `allowOfflineFallback: false` (see the parameter doc below).
- *
- * Pure resolution - callers persist the minted key to the config cache
- * themselves.
+ * Resolve a live personal ingest key for `sourceType`: reuse the cached key
+ * only when the platform confirms it is still live, otherwise mint a fresh
+ * one (#4755); a rejected confirmation falls back to the cache unless the
+ * caller opts out via `allowOfflineFallback: false`.
  */
 export async function resolveLiveIngestionKey({
   cfg,
@@ -164,19 +111,9 @@ export async function resolveLiveIngestionKey({
   cfg: GovernanceConfig;
   sourceType: string;
   /**
-   * Whether a `listIngestionKeys()` failure falls back to reusing the
-   * cached secret. Defaults to true: the per-run wrapper path wants a
-   * disconnected device to keep working against the instance it already
-   * has a key for (the #4755 offline-first behavior).
-   *
-   * The login-time wiring refresh (`refreshTelemetryWiringForLogin`) sets
-   * this to false. It only reaches this resolver because the persisted
-   * wiring's endpoint already differs from the login that just
-   * completed, so the cached secret is presumptively bound to a
-   * DIFFERENT instance. Falling back to it on a network hiccup would
-   * pair the NEW endpoint with a token that was never valid there,
-   * corrupting working wiring instead of leaving it alone - minting
-   * fresh is the only outcome that can't reintroduce the #6202 hijack.
+   * Whether a `listIngestionKeys()` failure falls back to the cached secret.
+   * Defaults true (#4755); the login-time refresh sets it false since the
+   * cached secret there may be bound to a different instance (#6202).
    */
   allowOfflineFallback?: boolean;
 }): Promise<IngestionKeyResolution> {
@@ -210,15 +147,10 @@ export async function resolveLiveIngestionKey({
         cacheIsLive = false;
       }
     } catch (error) {
-      // Network error / older server without the endpoint: reuse cache
-      // as-is (offline-first fallback - a device that is merely offline
-      // keeps exporting with the key it has) - unless the caller
-      // disabled that fallback.
-      //
-      // A session the platform rejected is not that case. Nothing about
-      // the cached key was confirmed and nothing can replace it, so the
-      // fallback still hands the key back but marks the resolution: the
-      // key may have been dead for weeks and only the caller can say so.
+      // Network error / older server: offline-first fallback reuses the cache
+      // unless disabled. A rejected session confirms nothing about the key, so
+      // the fallback still hands it back but marks sessionExpired so the
+      // caller can say the key may be dead rather than reporting it live.
       sessionExpired = isExpiredSession(error);
       cacheIsLive = allowOfflineFallback;
     }
@@ -249,14 +181,10 @@ export interface IngestionCredentialResolution extends IngestionKeyResolution {
 }
 
 /**
- * Resolve the ingest credential for a tool: the project pin when one
- * exists (`tool_project_keys[tool]`, written by `--project` / `instrument`),
- * else the personal path via `resolveLiveIngestionKey`.
- *
- * A pinned credential is used verbatim with no server round trip: it may
- * belong to a project the device session cannot list (or the device may
- * have no session at all), and revocation surfaces on the ingest side.
- * Re-running `langwatch instrument <tool> --project ...` replaces it.
+ * Resolve the ingest credential for a tool: the project pin when one exists
+ * (`tool_project_keys[tool]`), else the personal path via
+ * `resolveLiveIngestionKey`. A pin is used verbatim with no server round
+ * trip — it may belong to a project the device session cannot list at all.
  */
 export async function resolveIngestionCredential({
   cfg,
@@ -288,23 +216,10 @@ export async function resolveIngestionCredential({
 }
 
 /**
- * Re-sync the langwatch-authored env block in `~/.claude/settings.json`
- * with the current run's values. Only fires when a langwatch-shaped
- * block is already present (presence = the user opted into persistence
- * on some earlier run) and its values differ. Returns the refreshed
- * target's label, or null when nothing was touched.
- *
- * Every run also re-asserts the session context seam in the same file, not only
- * the runs that rewrite the env. It is part of the wiring the persisted block
- * stands for, and the block outlived the CLI version that started writing it, so
- * a device that persisted earlier has the env and none of the seam. The seam
- * names no endpoint, so asserting it refreshes nothing to point at this login
- * and the label stays null when it was the only change.
- *
- * A device carrying the LangWatch Claude Code plugin already has those hooks
- * from the plugin, so the entries here are removed rather than asserted: wiring
- * both runs the same two hooks twice per session. This path never installs the
- * plugin, because nobody is being asked anything on a refresh.
+ * Re-sync the langwatch-authored env block in `~/.claude/settings.json`,
+ * firing only when a langwatch-shaped block is already present. Also
+ * removes (never asserts) the session-context seam when the LangWatch
+ * plugin is present, since the plugin's own hooks would otherwise run twice.
  */
 export function refreshClaudeUserTelemetryEnv({
   vars,
@@ -397,17 +312,10 @@ export interface ClaudeProjectPinResult {
 }
 
 /**
- * Write (or re-sync) the langwatch telemetry env into the working
- * directory's `.claude/settings.local.json`. Claude Code applies local
- * project settings ABOVE user-level `~/.claude/settings.json`, so this
- * pin guarantees a wrapped run emits to the login that spawned it even
- * when user-level config carries wiring we may not touch. `skipped`
- * means the project file already carries OTLP wiring that is not
- * langwatch-shaped - explicit project config the user owns wins.
- *
- * On first creation the file is also added to the repo's
- * `.git/info/exclude` (best-effort): it carries a write-only ingest key
- * and must not get committed.
+ * Write (or re-sync) telemetry env into `.claude/settings.local.json`, which
+ * Claude Code applies above user-level settings so a wrapped run always
+ * emits to the login that spawned it. `skipped` means the file already
+ * carries non-langwatch OTLP wiring the user owns.
  */
 export function ensureClaudeProjectTelemetryPin({
   vars,
@@ -431,13 +339,10 @@ export function ensureClaudeProjectTelemetryPin({
 }
 
 /**
- * Strip the langwatch telemetry env from the working directory's
- * `.claude/settings.local.json`, when present and langwatch-shaped.
- * Used by gateway-mode wrapper runs (gateway capture + a live OTel
- * exporter would double-trace) and by `langwatch logout` for the
- * current directory. Deletes the file (and an empty `.claude` dir)
- * when stripping leaves it empty. Returns true when something was
- * removed.
+ * Strip the langwatch telemetry env from `.claude/settings.local.json`, when
+ * present and langwatch-shaped. Used by gateway-mode wrapper runs (gateway
+ * capture plus a live OTel exporter would double-trace) and by `langwatch
+ * logout`. Deletes the file (and an empty `.claude` dir) when left empty.
  */
 export function removeClaudeProjectTelemetryPin({ cwd }: { cwd: string }): boolean {
   const target = claudeProjectSettingsTarget(cwd);
@@ -545,17 +450,10 @@ export interface LoginTelemetryRefreshResult {
 }
 
 /**
- * Login-time half of latest-login-wins: walk every tool's persisted
- * wiring and refresh any langwatch-authored block whose ENDPOINT
- * differs from the login's control plane, minting (or reusing) a live
- * ingest key on the new instance for each. A block already pointing at
- * this instance is left alone here - key-level drift is re-synced
- * value-exactly by the next wrapper run, which resolves a key anyway.
- *
- * Wholly best-effort: per-tool failures (no personal workspace yet,
- * network) skip that tool; the login itself never fails on refresh.
- * Mutates `cfg.default_personal_ingest_keys` for minted keys; the
- * caller persists.
+ * Login-time half of latest-login-wins: refresh any langwatch-authored
+ * block whose endpoint differs from the new control plane; a block already
+ * pointing here is left for the next wrapper run to re-sync. Best-effort —
+ * per-tool failures skip that tool and never fail the login itself.
  */
 export async function refreshTelemetryWiringForLogin(
   cfg: GovernanceConfig,

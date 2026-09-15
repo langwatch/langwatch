@@ -1,12 +1,9 @@
 /**
- * Connected agents in the run dialog: the presence mark, the environment in the label, the disabled card of another person's development agent, and the warning about an agent no process is holding.
+ * Connected agents in the run dialog: the presence mark, the environment in the label, the
+ * disabled card of another person's development agent, the disabled card of an agent no
+ * process is holding, and the warning about such an agent when a stored plan already points
+ * at it.
  * @vitest-environment jsdom
- *
- * Connected agents in the run dialog: the presence mark, the environment in
- * the label, the disabled card of another person's development agent, the
- * disabled card of an agent no process is holding, and the warning about
- * such an agent when a stored plan already points at it.
- *
  * @see specs/features/agents/connected-agents-ui.feature
  */
 

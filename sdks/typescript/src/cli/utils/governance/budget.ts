@@ -1,12 +1,7 @@
 /**
- * Pre-exec budget probe + Screen-8 ASCII renderer for the langwatch
- * wrappers (`langwatch claude` / `codex` / `cursor` / `gemini`).
- *
- * Per `specs/ai-gateway/governance/budget-exceeded.feature`: before
- * any wrapped command exec's the underlying tool, the CLI hits
- * `GET /api/auth/cli/budget/status`. On 402, render the spec
- * canonical box and exit 2 (configuration / quota error) without
- * spawning the tool.
+ * Pre-exec budget probe + Screen-8 ASCII renderer for the langwatch wrappers.
+ * Per `specs/ai-gateway/governance/budget-exceeded.feature`: on a 402 from
+ * `GET /api/auth/cli/budget/status`, render the box and exit 2, no spawn.
  */
 
 import { normalizeEndpoint } from "../../../internal/endpoint";
@@ -68,16 +63,13 @@ export async function checkBudget(
 }
 
 /**
- * Spec-canonical Screen-8 box. ASCII only — no ANSI codes — so
- * piping `langwatch claude | tee log` doesn't litter the log with
- * escape sequences. Lines match the budget-exceeded.feature
- * scenario character-for-character.
+ * Spec-canonical Screen-8 box: ASCII only (no ANSI) so piping doesn't corrupt
+ * logs; lines match the budget-exceeded.feature scenario verbatim.
  */
-// Gateway emits root-form periods from the `GatewayBudgetWindow` Prisma
-// enum lowercased ("month", "week", "day", "hour", "minute", "total").
-// Naive `${period}ly` produces "dayly" / "totally" / "minutely" — map
-// explicitly. Unknown periods (e.g. older server adds "rolling_24h")
-// fall through to the raw value rather than render gibberish.
+
+// Naive `${period}ly` produces "dayly"/"totally"; the gateway's lowercase
+// enum periods are mapped explicitly instead. Unknown periods fall through
+// to the raw value rather than render gibberish.
 const PERIOD_LABEL: Record<string, string> = {
   minute: "per-minute",
   hour: "hourly",

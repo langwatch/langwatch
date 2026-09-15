@@ -1,15 +1,10 @@
 /**
- * The in-memory event store's own contract.
- *
- * Every suite here that drives a ceremony runs on this double, and what it
- * has to reproduce is the ONE property of the real store those suites depend
- * on: a fact is keyed `<commandId>:<index>`, and a key already taken absorbs
- * the append rather than writing a second row. Without it a retried ceremony
- * appears to duplicate — which it does not, in production — and suites start
- * failing on the wall clock instead of on behaviour.
- *
- * Pinned directly, because a double whose fidelity is only ever exercised
- * indirectly is a double that quietly loses it.
+ * The in-memory event store's own contract. Every suite here that drives a ceremony runs on
+ * this double, and what it must reproduce is the ONE property the real store guarantees: a
+ * fact keyed `<commandId>:<index>` absorbs a re-append at an already-taken key rather than
+ * writing a second row — without it a retried ceremony appears to duplicate (it does not, in
+ * production) and suites fail on the wall clock instead of on behaviour. Pinned directly,
+ * since a double whose fidelity is only ever exercised indirectly quietly loses it.
  */
 import {
   IDENTIFIER_ATTACHED_EVENT_TYPE,

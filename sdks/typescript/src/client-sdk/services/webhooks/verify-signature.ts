@@ -56,13 +56,9 @@ export class WebhookSignatureVerificationError extends Error {
 
 export interface VerifyWebhookSignatureOptions {
   /**
-   * The EXACT bytes of the request body, as received.
-   *
-   * Not a parsed object, and not the result of re-serializing one: the digest
-   * is over the bytes the sender hashed, and `JSON.parse` followed by
-   * `JSON.stringify` reorders keys, drops insignificant whitespace and
-   * re-escapes non-ASCII, any of which changes the digest. Read the raw body
-   * before your framework's JSON middleware does.
+   * The EXACT bytes of the request body, as received — not a parsed or
+   * re-serialized object: `JSON.stringify` reorders keys and re-escapes
+   * text, changing the digest. Read the raw body before your JSON middleware.
    */
   body: string | Uint8Array;
   /** The `X-LangWatch-Signature` header value, verbatim. */
@@ -120,37 +116,9 @@ function signedPayload(timestamp: number, body: string | Uint8Array): Buffer {
 }
 
 /**
- * Verify a webhook delivery, or throw explaining which check failed.
- *
- * ```ts
- * app.post("/langwatch", express.raw({ type: "application/json" }), (req, res) => {
- *   try {
- *     verifyWebhookSignature({
- *       body: req.body, // the raw Buffer, before JSON parsing
- *       header: req.header("X-LangWatch-Signature") ?? "",
- *       secret: [process.env.WEBHOOK_SECRET_NEW, process.env.WEBHOOK_SECRET_OLD],
- *     });
- *   } catch (error) {
- *     return res.status(400).send((error as WebhookSignatureVerificationError).code);
- *   }
- *   // Trusted from here.
- * });
- * ```
- *
- * Throws rather than returning false so that a delivery cannot be trusted by
- * forgetting to check a return value. The thrown
- * {@link WebhookSignatureVerificationError} carries a
- * {@link WebhookSignatureFailureCode} saying which check failed.
- *
- * Checks run in a fixed order, so a delivery that is both stale and wrongly
- * signed reports the staleness: a header that did not parse has no
- * trustworthy timestamp to judge, and a timestamp outside the window makes
- * the digest moot.
- *
- * A missing or empty secret is a configuration mistake rather than a bad
- * delivery, and raises `TypeError`. Reporting it as a failed verification
- * would let a receiver that lost its secret quietly refuse every delivery as
- * if the sender were at fault.
+ * Verify a webhook delivery, throwing (not returning false) so a check can't
+ * be skipped by accident. A missing/empty secret throws a plain `TypeError`
+ * instead of a verification failure, so it's never mistaken for sender fault.
  */
 export function verifyWebhookSignature(options: VerifyWebhookSignatureOptions): void {
   const secrets = (typeof options.secret === "string" ? [options.secret] : options.secret).filter(

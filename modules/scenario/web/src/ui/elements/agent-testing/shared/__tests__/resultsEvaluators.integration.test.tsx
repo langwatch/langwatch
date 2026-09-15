@@ -1,12 +1,9 @@
 /**
  * @vitest-environment jsdom
- *
- * The evaluator results of a run, on every surface that reads them: the pills
- * of the run header, the pills of a result row, the verdict label of a row,
- * and the Evaluators section of the run drawer's verdict panel.
- *
+ * The evaluator results of a run, on every surface that reads them: run
+ * header pills, result row pills, a row's verdict label, and the run
+ * drawer's Evaluators panel.
  * @see specs/features/agent-testing/results-tabs.feature
- * @see specs/features/agent-testing/side-by-side-run-drawer.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, within } from "@testing-library/react";

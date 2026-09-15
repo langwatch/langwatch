@@ -1,13 +1,10 @@
 /**
- * Configuration resolution for the Redis client.
- *
- * `RedisConfigService` is the pure core of this package, in the same sense as
- * `AuthzEngine` in `@langwatch/authz`: every method is a function of its
- * arguments alone, so one instance serves any number of callers and tests
- * construct it freely. It never reads `process.env` — the composition root
- * already validates env once, and a package that reaches for ambient state is
- * exactly what made the old module-level connection impossible to load in a
- * build, a test, or a browser bundle. See ADR-093.
+ * Configuration resolution for the Redis client. `RedisConfigService` is the pure core of this
+ * package, in the same sense as `AuthzEngine` in `@langwatch/authz`: every method is a function
+ * of its arguments alone, so one instance serves any number of callers and tests construct it
+ * freely. It never reads `process.env` — the composition root already validates env once, and
+ * ambient state is what made the old module-level connection unloadable in a build, a test, or
+ * a browser bundle. See ADR-093.
  */
 
 /** The raw, unparsed environment values this package understands. */
@@ -111,13 +108,10 @@ function resolveTls(url: string): RedisTlsSetting {
  */
 export class RedisConfigService {
   /**
-   * Resolves the environment into a connection plan.
-   *
-   * Cluster endpoints win over a plain URL when both are set. A clustered
-   * deployment normally sets only `REDIS_CLUSTER_ENDPOINTS`, so "both" is the
-   * ambiguous case rather than the usual one — and there the endpoint list is
-   * the more specific statement of intent, while the leftover URL may well name
-   * a different server.
+   * Resolves the environment into a connection plan. Cluster endpoints win over a plain URL when
+   * both are set: a clustered deployment normally sets only `REDIS_CLUSTER_ENDPOINTS`, so "both"
+   * is the ambiguous case, and there the endpoint list is the more specific statement of intent
+   * while the leftover URL may well name a different server.
    */
   resolve(env: RedisEnvironment): RedisConfigResolution {
     const warnings: string[] = [];

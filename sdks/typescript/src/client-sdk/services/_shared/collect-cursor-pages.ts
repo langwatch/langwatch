@@ -1,28 +1,8 @@
 /**
  * The walk that turns a cursor-paginated endpoint back into a whole listing.
- *
- * The gateway platform lists serve one page plus a `next_cursor` that is null
- * exactly when the walk is exhausted. Two things about that contract are easy
- * to get wrong in a hand-rolled loop, and both lose rows silently:
- *
- * - A FULL page does not mean there is more, and a SHORT page does not mean
- *   there is no more. `/virtual-keys` filters each page for visibility after
- *   reading it, so a page of 3 can still be followed by a page of 200. The
- *   null cursor is the only end-of-walk signal.
- * - A cursor the endpoint did not issue answers 400 `invalid_cursor` rather
- *   than restarting the walk, so cursors must be passed back verbatim.
- *
- * THE PAGINATION VOCABULARY every cursor-paged service on this SDK uses, so a
- * method name tells you how much it reads before it answers:
- *
- * - `listPage()` / `<noun>Page()` returns EXACTLY ONE page plus `next_cursor`.
- * - `list()` returns the COMPLETE collection, walking internally. Offered only
- *   for collections that are bounded in practice.
- * - `iterate()` / `iter<Noun>()` is a lazy async iterator over every row.
- *   Offered for every cursor-paged collection.
- *
- * A service with one listable collection names its iterator `iterate()`; a
- * service with more than one names each after the rows it yields.
+ * A full page doesn't mean there's more, nor a short page that there isn't:
+ * only a null `next_cursor` ends it, and served cursors must be replayed
+ * verbatim — a cursor the endpoint did not issue answers 400 `invalid_cursor`.
  */
 
 /**

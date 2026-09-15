@@ -102,7 +102,10 @@ function toCacheRuleDto(r: GatewayCacheRuleResource) {
   };
 }
 
-/** The adapter's own return type is a plain `string` for `scope_reach`; narrowed here to the two values it ever writes, matching the wire schema. */
+/**
+ * The adapter's own return type is a plain `string` for `scope_reach`;
+ * narrowed here to the two values it ever writes, matching the wire schema.
+ */
 const toBudgetDto = (
   ...args: Parameters<typeof budgetDtos.toBudgetDto>
 ): z.infer<typeof gatewayPlatformBudgetDtoSchema> =>

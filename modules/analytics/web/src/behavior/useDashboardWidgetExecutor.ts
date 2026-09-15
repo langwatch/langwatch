@@ -1,23 +1,7 @@
 /**
  * Runs a dashboard widget's queries against the real LangWatchQL endpoint.
- *
- * Two entry points, one validation gate (`validateDashboardWidgetQueryParams`) and
- * one underlying `execute` call, so a query can never validate or run
- * differently depending on which one invoked it:
- *
- *  - `executeQuery` — the bridge-facing `({ queryName, params, signal })` the live
- *    Chart view calls on `LW.query`. Resolves `queryName` against whatever
- *    `queries` the card passes in — the card's own debounced preview of the
- *    drawer's draft, so a query edit reaches the running chart the same
- *    "settles, then re-mounts" way a code edit does, never mid-keystroke.
- *  - `runStandalone` — the drawer's Queries tab "Run" button. Takes whatever
- *    query object the caller hands it (the tab's current, un-debounced draft
- *    row, so a SQL edit can be tried the instant it's typed) and runs it
- *    without touching the chart at all.
- *
- * Every run — live or standalone, success or validation/execution failure —
- * is recorded into `lastRuns` keyed by query name, which is what lets the
- * Queries tab show "the last result" regardless of which path produced it.
+ * `executeQuery` (the live chart) and `runStandalone` (the drawer's Run
+ * button) share one validation gate, so a query runs identically either way.
  */
 
 import { useCallback, useMemo, useState } from "react";
@@ -69,7 +53,7 @@ export interface DashboardWidgetExecutorOverrides {
   readonly granularitySeconds?: LangWatchQLGranularityStep;
 }
 
-// biome-ignore lint/complexity/noExcessiveLinesPerFunction: one hook assembling the query executor, standalone runner, and their shared last-run state; splitting it would scatter closured state.
+// biome-ignore lint/complexity/noExcessiveLinesPerFunction: splits would scatter closured state.
 export function useDashboardWidgetExecutor(
   projectId: string,
   queries: DashboardWidgetQuery[],

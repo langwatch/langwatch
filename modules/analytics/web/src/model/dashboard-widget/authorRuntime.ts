@@ -1,17 +1,7 @@
 /**
- * The frame-side author runtime, as a string of plain JavaScript.
- *
- * Executes once, from the shim's `window.__lwActivateAuthor` hook — i.e. only
- * after `lw:init` has delivered params/theme, the same invariant every
- * activation path has always enforced (see `shimSource.ts`). It compiles the
- * widget's React/TSX source with Babel standalone (loaded from CDN alongside
- * the React, ReactDOM and Recharts UMD builds — see `buildSrcdoc`), resolves
- * the handful of module specifiers a widget may `import` through a tiny
- * `require` shim, and mounts the file's default export into `#lw-root`.
- *
- * A compile, load or render failure shows a readable panel in the frame
- * itself (`#lw-compile-error`) rather than a silent blank iframe, and is also
- * forwarded through `LW.error` so it reaches the parent's log panel too.
+ * The frame-side author runtime, as a string of plain JavaScript. Runs once,
+ * only after `lw:init` delivered params/theme (see `shimSource.ts`). A
+ * compile/render failure shows an in-frame panel, forwarded via `LW.error`.
  */
 
 export function buildAuthorRuntimeScript(): string {

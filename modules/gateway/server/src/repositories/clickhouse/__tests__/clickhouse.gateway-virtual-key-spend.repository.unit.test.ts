@@ -1,14 +1,7 @@
 /**
- * The spend read behind a virtual key's usage figures.
- *
- * Everything asserted here is a ClickHouse rule this repo already writes down:
- * every query filters `TenantId` first, every range names the partition column
- * so a read prunes instead of scanning cold storage, and a deduped table is
- * read through `argMax(..., UpdatedAt)` rather than `max()`. None of them are
- * visible from the caller, and all of them are one edit away from a query that
- * still returns numbers — wrong ones, or every tenant's.
- *
- * The client is a fake that keeps the statement it was handed.
+ * The spend read behind a virtual key's usage figures. Asserts this repo's
+ * ClickHouse rules: `TenantId` filtered first, range on the partition column
+ * for pruning, and deduped reads via `argMax(..., UpdatedAt)` not `max()`.
  */
 
 import { Temporal } from "@langwatch/time";

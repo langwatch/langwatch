@@ -1,31 +1,10 @@
 /**
- * The CLI's live event channel: a running commentary on a command while it runs,
- * so the Langy panel can show a status line, a rolling stat card and a progress
- * bar instead of a spinner.
- *
- * Three rules shape everything in here, in this order:
- *
- * 1. OFF BY DEFAULT, AT ZERO COST. The CLI is a user-facing product. With no
- *    transport configured, `createCommandEvents` hands back a frozen no-op: no
- *    exporter, no socket, no timer, no extra byte on stdout. The OTLP path is
- *    loaded through a deferred `import()` rather than a top-level one, because
- *    pulling `@opentelemetry/sdk-logs` and the exporter into the module graph
- *    costs ~60ms of parse+init on EVERY `langwatch` invocation — measured, 28ms
- *    to 90ms — and a user who never asked for telemetry must not pay it. (The IPC
- *    sink needs no such trick: it imports node builtins only.)
- *
- * 2. TELEMETRY IS NEVER THE USER'S PROBLEM. Every emit is fire-and-forget onto a
- *    serial chain: call sites never await, never see a rejection, never slow down.
- *    A collector that 500s, hangs, or does not exist can only ever cost the
- *    bounded flush at the end of the command.
- *
- * 3. NO CREDENTIALS, EVER. Failure messages are scrubbed — of anything shaped
- *    like a secret, and of the literal values of this process's own secrets —
- *    before they leave.
- *
- * The wire itself is deliberately not this module's business; see `sink.ts`.
- *
- * Spec: sdks/typescript/specs/telemetry/langy-live-events.feature
+ * The CLI's live event channel: a running commentary on a command, so the
+ * Langy panel can show a status line, a stat card and a progress bar instead
+ * of a spinner. Off by default at zero cost (no-op with no transport; OTLP
+ * loads via deferred `import()`, saving ~60ms per invocation). Every emit is
+ * fire-and-forget, and failure messages are always scrubbed of secrets.
+ * Spec: telemetry/langy-live-events.feature
  */
 
 // The zod-free subpath, deliberately: this module is on the hot path of every
@@ -180,17 +159,11 @@ const createOtlpSink = async (endpoint: string): Promise<EventSink> => {
       import("@opentelemetry/resources"),
     ]);
 
-  // `defaultResource()` does NOT read OTEL_RESOURCE_ATTRIBUTES — it only stamps
-  // service.name + telemetry.sdk.*. Only `envDetector` reads it, so it is wired in
-  // explicitly. This matters: Langy's worker passes `langy.conversation_id` /
-  // `langy.turn_id` that way, and without the detector every event would arrive
-  // uncorrelated and the panel would have nothing to attach it to.
-  //
-  // The detector reads `process.env` directly, per the OTEL spec — which is what we
-  // want in production, where it and the injected `env` are the same object.
-  //
-  // Merge order is precedence order: the environment is the operator's word, and
-  // wins over our defaults.
+  // `defaultResource()` doesn't read OTEL_RESOURCE_ATTRIBUTES — only
+  // `envDetector` does, so it's wired in explicitly: Langy's worker passes
+  // `langy.conversation_id`/`langy.turn_id` that way, and without it every
+  // event would arrive uncorrelated. Merge order is precedence order: the
+  // environment is the operator's word and wins over our defaults.
   const resource = resources
     .defaultResource()
     .merge(

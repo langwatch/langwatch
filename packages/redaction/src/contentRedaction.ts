@@ -1,23 +1,10 @@
 /**
- * The NATIVE (in-process) redaction passes, composed for one resolved policy.
- *
- * This module was harvested byte-for-byte from the application's ingestion
- * path while both graphs redacted. That second copy is gone: this package is
- * now the only declaration of these passes, and every process that scrubs a
- * span imports it, so the two cannot drift into storing what the other
- * removed.
- *
- * TWO SHAPE CONSTRAINTS SURVIVE THE HARVEST, both mechanical:
- *
- *  - The policy is read structurally rather than by importing
- *    `ResolvedDataPrivacy`. This package cannot name it:
- *    `@langwatch/data-privacy-contract` already depends on
- *    `@langwatch/redaction` for `REDACTION_MARKER_ENTITIES`, so importing it
- *    back would close a cycle. {@link RedactionPolicy} is the read-only slice
- *    these functions actually touch, and a `ResolvedDataPrivacy` satisfies it
- *    structurally — no cast at any call site.
- *  - Nothing here references `PROVENANCE_ATTR_API_KEY_ID`, and naming it would
- *    drag an ingest route into a dependency-light package.
+ * The NATIVE (in-process) redaction passes for one resolved policy — now the
+ * only declaration of them, so every scrubbing process imports this one.
+ * The policy is read structurally via {@link RedactionPolicy}, not
+ * `ResolvedDataPrivacy`, since importing it would close a dependency cycle
+ * through `@langwatch/data-privacy-contract`; and nothing here names
+ * `PROVENANCE_ATTR_API_KEY_ID`, which would drag in an ingest route.
  */
 
 import {
@@ -72,34 +59,12 @@ export function nativePiiEntitiesForPolicy(policy: RedactionPolicy): "all" | str
 }
 
 /**
- * Compose the NATIVE (in-process) redaction passes for a resolved policy: the
- * secrets scrubber (when enabled, including the policy's custom patterns) then
- * essential PII (for every non-disabled level). Essential PII is the native
- * floor even at the `strict` level: strict additionally sends the span to the
- * external analysis service for names/locations, but the regex/checksum
- * entities are scrubbed here first so they never leak when that service is
- * unreachable (or simply unconfigured in dev). Disabled PII skips the PII pass
- * entirely; secrets still run when enabled (they are an independent concern).
- *
- * Pure and synchronous so it can run per string in the hot ingestion path.
- *
- * `isAttributeValue` marks the text as one attribute value, which lets the PII
- * pass hold identifier-shaped values back from the recognizers that have only a
- * shape to go on. Free text (bodies, status messages) leaves it off.
- *
- * `skipSecretRuleIds` names built-in secret rules to leave out of this one
- * string while the policy stays on, for the attribute names
- * {@link isIdentifierAttributeName} accepts. Custom patterns and the PII pass
- * are out of its reach.
- *
- * `shouldTreatAsIdentifier` says this attribute value is an identifier even though its
- * shape does not say so, which is the case the reserved trace and span names
- * exist for: a decimal trace id carries no letter, so no shape rule holds it
- * back. It buys the SAME exemption a hex id gets — the shape-only recognizers
- * stand down, the self-proving ones still run — rather than turning the
- * personal-data pass off. A reserved name is a claim about where the value came
- * from, and the sender writes that name, so it must not be able to keep a card
- * number out of a check that can prove what it is looking at.
+ * Runs the secrets scrubber then essential PII, which is the floor even at
+ * `strict` — scrubbed here before the external service handles names/locations,
+ * so nothing leaks while unreachable. `shouldTreatAsIdentifier` marks a value
+ * (e.g. a decimal trace id) as an identifier despite its shape, the same
+ * exemption a hex id gets, since a reserved name is only a claim the sender
+ * made and joins depend on it surviving redaction.
  */
 export function redactStringNative({
   text,
@@ -148,57 +113,12 @@ export function redactStringNative({
 }
 
 /**
- * Does this attribute NAME say the value is an identifier?
- *
- * True for a key that is `id`, or that ends in `_id` or `.id`, in any case.
- * That covers `scenario.run_id`, `langwatch.prompt.id`, `gen_ai.conversation.id`,
- * `metadata.user_id`, `langwatch.gateway_request_id` and every other spelling
- * the ingestion pipeline reads, without a list anyone has to keep current.
- *
- * WHY THE NAME DECIDES. The shape rules ask whether a value looks random. A
- * record id is `prefix_<random body>`, which is exactly as random as a key, so
- * a rule tuned for keys takes ids too, and that is what replaced every
- * `scenario.run_id` with `[SECRET]` at ingestion. The value under an
- * identifier name is an address rather than content: the pipeline compares it
- * to the same value on another record to attach a trace to its run, its
- * prompt, its conversation and its customer. Writing a marker over it hides no
- * credential from anyone and breaks the link for good, because redaction runs
- * at ingestion and the original is never stored.
- *
- * WHAT IT TURNS OFF. Only {@link SHAPE_ONLY_SECRET_RULE_IDS}, the two rules
- * that read a token and nothing else. Every rule that reads a vendor namespace,
- * armour, a URL password, an authorization scheme or a credential keyword still
- * runs, so do the customer's own custom patterns, and so does the whole
- * personal-data pass. A real `sk-ant-…` parked under `scenario.run_id` is still
- * replaced.
- *
- * It also turns off the sensitive-NAME deny-list, because `api_key.id` and
- * `something.token_id` name the identifier OF a credential rather than the
- * credential. The value rules above still read those values by shape and by
- * vendor, so key material pasted under such a name is scrubbed anyway.
- *
- * WHAT IT COSTS, STATED PLAINLY. This reads the NAME and never the value, so
- * the exemption holds whatever the attribute carries. A credential that only a
- * shape heuristic can match — no vendor namespace, no armour, no credential
- * word anywhere near it — is therefore stored verbatim under any key ending
- * `_id` or `.id`. That residual is bounded by the skip list rather than by
- * judgement: exactly two rules are turned off, so every other rule still reads
- * the value.
- *
- * It is knowingly not fixed. Requiring an identifier shape here would take the
- * exemption off `scenario.run_id`, `langwatch.prompt.id`,
- * `gen_ai.conversation.id`, `metadata.user_id` and the rest of the ingestion
- * vocabulary, because a record id minted as `prefix_<random body>` is exactly
- * what the shape rules are tuned to take — which is the defect this hold-out
- * exists to fix, reintroduced. The reserved trace and span names in
- * {@link reservesTraceAddress} do gate on the value, because that list is new
- * and nothing depends on it being name-only.
- *
- * WHAT IT MUST NOT BECOME. Do not widen this to a namespace, and specifically
- * not to `langwatch.*`: `langwatch.input` and `langwatch.output` are span
- * attributes that carry the chat content itself, so a namespace rule would take
- * the shape rules off the largest customer text in the product. The name has to
- * say "identifier" on its own.
+ * True for a key that is `id`/ends `_id`/`.id` (any case). The NAME decides,
+ * not the value: a record id (`prefix_<random body>`) is as random as a key,
+ * so shape rules would otherwise redact it. Only turns off
+ * {@link SHAPE_ONLY_SECRET_RULE_IDS} (2 rules) and the sensitive-name
+ * deny-list — every other rule and the whole PII pass still run. Deliberately
+ * not widened to a namespace: `langwatch.input`/`.output` carry chat content.
  */
 export function isIdentifierAttributeName(key: string): boolean {
   const lower = key.toLowerCase();
@@ -206,17 +126,9 @@ export function isIdentifierAttributeName(key: string): boolean {
 }
 
 /**
- * Redact one attribute (key + value). When secrets redaction is on and the
- * attribute NAME is obviously sensitive (authorization, api_key, cookie, ...),
- * the whole value is replaced regardless of its shape — the Sentry-style
- * field-name deny-list. Otherwise the value runs through the normal native
- * passes (secrets value-scan + essential PII), marked as an attribute value so
- * the PII pass can hold an identifier-shaped value back from the recognizers
- * that go on shape alone.
- *
- * A name {@link isIdentifierAttributeName} accepts skips both the deny-list and
- * the shape-only value rules. Every other rule runs as it does on any other
- * attribute.
+ * Redact one attribute. A NAME the deny-list recognizes as sensitive replaces
+ * the whole value regardless of shape; otherwise it runs the normal native
+ * passes. An identifier-named key ({@link isIdentifierAttributeName}) skips both.
  */
 export function redactAttributeNative({
   key,

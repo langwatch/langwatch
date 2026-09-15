@@ -1,16 +1,9 @@
 /**
- * What the query cost, from the server's own accounting.
- *
- * Rendered under the result in every mode, because the number of rows and the
- * bytes behind them are how a member tells an answer that is cheap to keep
- * running from one that needs narrowing — and that is as true of a chart as of
- * a table.
- *
- * Labels are spelled out ("rows returned", not "rows"), per
- * `dev/docs/best_practices/copywriting.md`; `ms`, `KB` and `MB` stay as symbols
- * because they are the standard ones.
- *
- * @see modules/analytics/specs/analytics-lwql-workbench.feature
+ * What the query cost, from the server's own accounting. Rendered under the result in every
+ * mode, because the number of rows and the bytes behind them are how a member tells an answer
+ * that is cheap to keep running from one that needs narrowing. Labels are spelled out ("rows
+ * returned", not "rows"), per `dev/docs/best_practices/copywriting.md`; `ms`, `KB` and `MB` stay
+ * as symbols because they are the standard ones.
  */
 
 import { HStack, Text } from "@chakra-ui/react";

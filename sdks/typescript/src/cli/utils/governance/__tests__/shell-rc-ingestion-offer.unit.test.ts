@@ -1,24 +1,7 @@
 /**
- * Tests for the Path B (ingestion) persist OFFER driven from the
- * `langwatch <tool>` wrapper. Two target paths are covered:
- *
- *   - `claude` writes to `~/.claude/settings.json`'s top-level `env`
- *     block (native Claude Code env loader; doesn't leak vars into
- *     unrelated shell children)
- *   - `codex` never prompts here: wrapper-mode's per-run [otel] write
- *     already persists the Authorization header inline, so the offer
- *     only asserts the turn harvest
- *   - any other tool without an app-scoped target (cursor, gemini,
- *     opencode) falls back to appending a marker-bracketed export block
- *     to the detected shell rc file
- *
- * Drives the Y / n / never branches by mocking readline (the stdin
- * prompt) and saveConfig (the persistence).
- *
- * `claude` here is one without plugin support, which is what keeps these
- * scenarios about the file each tool's exports land in. What consent does for a
- * `claude` that CAN take the LangWatch plugin lives in
- * claude-plugin-persist.unit.test.ts.
+ * Tests for the Path B (ingestion) persist OFFER: `claude` writes to
+ * settings.json's `env` block, `codex` never prompts (its per-run write
+ * already persists inline), others fall back to a shell rc export block.
  */
 import type * as ChildProcessModule from "node:child_process";
 import * as fs from "node:fs";

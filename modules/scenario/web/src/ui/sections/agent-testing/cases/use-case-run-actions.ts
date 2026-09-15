@@ -35,14 +35,9 @@ function runSubjectForSuite({
 }
 
 /**
- * What happens the moment a run is queued. Shared by the table, the scenario
- * editor and the Results tab, so a run started from any of them opens the
- * same way.
- *
- * The run set is always the one of the plan the run joined, so the drawer and
- * the runs rail read the run back under that plan. A run of several scenarios
- * opens the Results tab on that plan and that run; a run of one scenario opens
- * in the drawer instead.
+ * What happens when a run is queued, shared by the table, scenario editor
+ * and Results tab. Opens under the run's own plan; a multi-scenario run
+ * opens the Results tab, a single-scenario run opens in the drawer instead.
  */
 export function useRunStartedHandler(): (info: RunStartedInfo) => void {
   const { openLiveRun } = useOpenLiveRun();

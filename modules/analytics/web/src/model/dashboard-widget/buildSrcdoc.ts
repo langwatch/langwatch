@@ -1,13 +1,9 @@
 /**
- * Composes the sandboxed frame's document.
- *
- * The frame loads React, ReactDOM, Recharts and Babel standalone from a CDN
- * as plain UMD `<script>` tags — render-blocking, so by the time the shim and
- * author runtime run, the globals they read (`window.React`, and so on) are
- * already there. The widget's own source is embedded as a JS string constant
- * rather than markup: it is a React/TSX file, not HTML, and the shim's
- * `window.__lwActivateAuthor` hook (wired up by `bridge/authorRuntime.ts`)
- * is what compiles and mounts it, only after `lw:init`.
+ * Composes the sandboxed frame's document. React, ReactDOM, Recharts and
+ * Babel load standalone from a CDN as render-blocking UMD `<script>` tags,
+ * so their globals are already there by the time the shim and author
+ * runtime run. The widget's source is embedded as a JS string, not markup —
+ * it's a React/TSX file, compiled and mounted by the shim after `lw:init`.
  */
 
 import { buildAuthorRuntimeScript } from "./authorRuntime";
@@ -15,24 +11,10 @@ import { buildChartsLibScript } from "./chartsLibSource";
 import { buildShimScript } from "./shimSource";
 
 /**
- * Pinned versions so a CDN release never silently changes what a saved
- * widget compiles against. Exact versions (not major-only ranges), so UNPKG
- * can never resolve a newer release out from under a saved widget.
- *
- * These majors are pinned lower than this app's own React/Recharts
- * dependency on purpose: React 19 dropped the UMD build these `<script>`
- * tags need (no `umd/` directory in the published package), so the sandbox
- * stays on the last UMD-shipping majors — react/react-dom 18, recharts 2 —
- * independent of what the app itself resolves. React 18's UMD build is the
- * one that added `ReactDOM.createRoot`, and Recharts' UMD reads
- * `window.PropTypes` as a plain global rather than requiring it — hence
- * prop-types loading first.
- *
- * Split around the `@langwatch/charts` library script: it needs
- * `window.React`/`window.Recharts` already loaded (hence after Recharts) but
- * itself needs nothing from Babel, so it lands ahead of that CDN script too —
- * still satisfying "after Recharts, before the author runtime" with room to
- * spare.
+ * Pinned to exact versions (not ranges) so UNPKG can never resolve a newer
+ * release out from under a saved widget, and lower than the app's own
+ * React/Recharts: React 19 dropped the UMD build these `<script>` tags need,
+ * so the sandbox stays on the last UMD-shipping majors — 18 and recharts 2.
  */
 const CDN_SCRIPTS_BEFORE_CHARTS_LIB = [
   "https://unpkg.com/react@18.3.1/umd/react.production.min.js",

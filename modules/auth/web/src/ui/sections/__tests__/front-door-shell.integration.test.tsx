@@ -2,11 +2,8 @@
  * @vitest-environment jsdom
  *
  * The shell around the card: one room, whoever runs the installation. The
- * ground and the value panel used to be hosted-only; now the deployment flag
- * changes nothing about the shell, and these tests hold both flag values to
- * the same rendering.
- *
- * Spec: specs/identity/signin-signup-screens.feature
+ * deployment flag changes nothing about the shell, and these tests hold both
+ * flag values to the same rendering. Spec: specs/identity/signin-signup-screens.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";

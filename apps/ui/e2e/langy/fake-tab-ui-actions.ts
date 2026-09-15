@@ -1,11 +1,7 @@
 /**
- * The fake workbench tab's browser leg: hearing a `ui` entry on the turn stream,
- * claiming it, running it through the handler table and completing it.
- *
- * `executeUiAction` is the app's own, so the claim window, the seen-key guard
- * and the outcome vocabulary are the page's. What this adds is the record every
- * assertion reads afterwards: what was seen, what was claimed, what was dropped
- * and how long each took.
+ * The fake workbench tab's browser leg: hears, claims and runs a `ui` turn
+ * entry. `executeUiAction` is the app's own; this adds the record every
+ * assertion reads afterwards — what was seen, claimed, dropped, and how long it took.
  */
 import type { UiActionExecution } from "@langwatch/langy-web/surfaces/langy-ui-actions";
 import { executeUiAction } from "@langwatch/langy-web/surfaces/langy-ui-actions";

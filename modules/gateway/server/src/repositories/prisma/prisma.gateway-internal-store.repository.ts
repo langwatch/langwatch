@@ -12,7 +12,9 @@ import { gatewayRoutingPolicySelect } from "../../ports/gateway-virtual-key.port
 const logger = createLogger("langwatch:gateway:internal-store");
 
 /**
- * Every query below is transcribed from the route handler it replaced, include/select clauses intact — those clauses ARE the contract (e.g. the config read's routingPolicy selection carries model aliases and deny rules; losing it would serve a bundle with neither).
+ * Every query here is transcribed from the route handler it replaced,
+ * include/select clauses intact — those clauses ARE the contract (e.g. the
+ * routingPolicy selection carries model aliases and deny rules).
  */
 export class PrismaGatewayInternalStoreRepository extends GatewayInternalStore {
   static create(options: { database: PrismaClient }): PrismaGatewayInternalStoreRepository {

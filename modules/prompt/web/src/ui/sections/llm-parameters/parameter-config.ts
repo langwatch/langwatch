@@ -1,15 +1,8 @@
 /**
- * LLM Parameter Configuration
+ * Re-exports from `parameter-registry.ts` for backward compatibility; new
+ * code should use that module directly for the single source of truth.
  *
- * Defines the configuration for rendering LLM parameters dynamically based on
- * what each model supports. Parameters are rendered as sliders or selects
- * depending on their type.
- *
- * NOTE: This file re-exports from parameterRegistry for backward compatibility.
- * New code should use parameterRegistry directly for better type safety and
- * to benefit from the single-source-of-truth pattern.
- *
- * @see parameterRegistry.ts for the canonical parameter definitions
+ * @see parameter-registry.ts for the canonical parameter definitions
  */
 
 import type { LucideIcon } from "lucide-react";
@@ -144,13 +137,9 @@ export function getParameterConfig(paramName: string): ParameterDefinition | und
 }
 
 /**
- * Maps provider-specific parameter names to display labels.
- * Used for showing provider-appropriate labels in the UI.
- *
- * Note: Keys match the exact parameter names from each provider's API:
- * - reasoning_effort: OpenAI
- * - thinkingLevel: Gemini (camelCase is the actual Gemini API format)
- * - effort: Anthropic
+ * Maps provider-specific parameter names to display labels. Keys match each
+ * provider's own API name: `reasoning_effort` (OpenAI), `thinkingLevel`
+ * (Gemini, camelCase is the actual API format), `effort` (Anthropic).
  */
 const REASONING_PARAMETER_LABELS: Record<string, string> = {
   reasoning_effort: "Reasoning Effort",

@@ -62,9 +62,15 @@ export type VariablesSectionProps = {
 
   /** Set of variable identifiers that are missing required mappings (for highlighting) */
   missingMappingIds?: Set<string>;
-  /** Whether to show the validation error message for missing mappings (defaults to true when missingMappingIds is provided) */
+  /**
+   * Whether to show the validation error message for missing mappings (defaults to true when
+   * missingMappingIds is provided)
+   */
   showMissingMappingsError?: boolean;
-  /** When true, highlighted fields show the missing-highlight background but not the "Required" placeholder (for "at least one" validation) */
+  /**
+   * When true, highlighted fields show the missing-highlight background but not the
+   * "Required" placeholder (for "at least one" validation)
+   */
   optionalHighlighting?: boolean;
 
   /** Set of variable identifiers that cannot be removed (locked variables) */

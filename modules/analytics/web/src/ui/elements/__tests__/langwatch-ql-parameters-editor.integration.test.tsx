@@ -1,15 +1,9 @@
 /**
  * @vitest-environment jsdom
- *
  * Parameters are sent as a record keyed by name, so two rows sharing a name
- * collapse to one entry and the later row wins. Nothing about that is visible:
- * both rows look filled in, and the member reads two parameters where one
- * travelled.
- *
- * This test holds the form to reporting the collision and refusing to call
- * itself sendable, which is the only thing standing between a silent collapse
- * and a query run against a value the member never chose.
- *
+ * silently collapse to one entry (the later row wins) — nothing about that
+ * is visible in the form. This test holds the form to reporting the
+ * collision and refusing to call itself sendable.
  * Spec: modules/analytics/specs/analytics-lwql-workbench.feature
  */
 

@@ -1,19 +1,7 @@
 /**
  * @vitest-environment jsdom
- *
- * Every coded refusal gets its own presentation, and the words always come from
- * the code-keyed registry rather than from the wire message (which, since
- * #5984, IS the code).
- *
- * WHAT CHANGED WHEN THIS FILE MOVED: the registry is `platform/app`'s, and a
- * package may not reach it. The pane never owned the words either way — it
- * takes a `renderError` from whoever mounts it — so the assertions now pin the
- * seam instead of the sentence: which CODE reached the renderer, what the pane
- * asked it to fall back to, and that the code slug itself never reaches the
- * screen. That is stronger than the copy comparison it replaces, because a pane
- * that started writing its own words would stop calling the renderer at all.
- *
- * Spec: modules/analytics/specs/analytics-lwql-workbench.feature
+ * Every coded refusal gets its presentation from the code-keyed registry, never the wire message;
+ * the pane takes a `renderError` from its mounter, so assertions pin which CODE reached it.
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
@@ -102,19 +90,10 @@ function renderPane(state: LangWatchQLRequestState, chartSlot?: ReactNode) {
 }
 
 /**
- * Switches result mode the way a member does, and refuses to continue if the
- * mode did not actually change.
- *
- * The guard is the point. The tab selects on focus rather than on a bare click
- * event, so a `fireEvent.click` leaves the mode where it was — and every
- * "still visible in the other mode" assertion downstream would then be true
- * because nothing had moved, which is the quietest way this suite could stop
- * testing anything.
- *
- * It throws instead of asserting because the guard runs outside any one case:
- * a thrown error fails the case that asked for the switch and says which mode
- * never arrived, while an assertion out here is credited to whichever case
- * vitest happens to be inside.
+ * Switches result mode the way a member does, and refuses to continue if it didn't. The guard
+ * is the point: the tab selects on focus rather than click, so an unguarded switch could silently
+ * no-op and every downstream "still visible" assertion would pass for the wrong reason. It throws
+ * rather than asserts so the failure is credited to the case that asked for the switch.
  */
 async function selectResultMode(mode: "Table" | "Chart") {
   await userEvent.click(screen.getByRole("tab", { name: mode }));

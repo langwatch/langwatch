@@ -1,10 +1,6 @@
 /**
- * The `--note` flag every run command reads.
- *
- * A note is one short line saying why a batch was run: a hypothesis, a commit
- * message, what changed. It travels with the batch and every run in it carries
- * the same note.
- *
+ * The `--note` flag every run command reads: a short line — hypothesis,
+ * commit message, what changed — shared by every run in the batch.
  * @see specs/suites/run-notes.feature
  */
 

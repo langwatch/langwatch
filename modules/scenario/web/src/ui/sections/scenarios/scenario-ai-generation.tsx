@@ -380,7 +380,7 @@ export function ScenarioAIGeneration({ form }: ScenarioAIGenerationProps) {
             </HStack>
           )}
 
-          {/* Keep refinement context useful without turning the narrow sidebar into a transcript. */}
+          {/* Keep refinement context without turning the sidebar into a full transcript. */}
           {hasHistory && (
             <Box
               borderWidth="1px"

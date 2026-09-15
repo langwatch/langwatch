@@ -1,21 +1,11 @@
 import { nowInstant } from "@langwatch/time";
 /**
- * How far back a read of a time-partitioned table has to look.
- *
- * Every retention-managed table is partitioned on its time column, so a query
- * with no lower bound prunes nothing and walks every partition — including the
- * cold ones on object storage. That is the difference between a keyed seek and
- * a scan of the entire history, and in production it was the single largest
- * source of cold-scan queries: 208 of 300 in one sampled window.
- *
- * A floor is safe where an unbounded scan is merely expensive: rows older than
- * the tenant's retention are TTL'd away, so a bounded query cannot hide a row
- * the unbounded one would have found.
- *
- * The retention POLICY lives with whoever owns it — this package knows only
- * that some provider can answer "how many days for this tenant and table".
- * That keeps the mechanism here, dependency-free, and reusable by any caller
- * that can answer the question.
+ * How far back a read of a time-partitioned table has to look. Every retention-managed table is
+ * partitioned on its time column, so an unbounded query scans every partition, including cold
+ * ones on object storage — the single largest source of production cold-scan queries. A floor is
+ * safe here because rows older than retention are TTL'd away, so a bounded query can never miss
+ * a row the unbounded one would have found. The retention POLICY lives with whoever owns it —
+ * this package only knows that some provider can answer "how many days for this tenant/table".
  */
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -51,13 +41,10 @@ export interface RetentionFloorServiceOptions {
   logger?: RetentionFloorLogger;
   marginMs?: number;
   /**
-   * How long a resolved retention is reused for.
-   *
-   * The provider walks a policy cascade, so an uncached lookup would put a
-   * database round trip in front of every read this bounds — which is the
-   * opposite of the point. Retention changes on human timescales; minutes of
-   * staleness only ever shifts a partition bound slightly, and never below
-   * `minLookbackMs`.
+   * How long a resolved retention is reused for. The provider walks a policy cascade, so an
+   * uncached lookup would put a database round trip in front of every read this bounds — the
+   * opposite of the point. Retention changes on human timescales, so minutes of staleness only
+   * ever shifts a partition bound slightly, never below `minLookbackMs`.
    */
   cacheTtlMs?: number;
   /**
@@ -96,14 +83,11 @@ export class RetentionFloorService {
   private readonly cache = new Map<string, { days: number; expiresAtMs: number }>();
 
   /**
-   * One provider call per key at a time; later arrivals await the first.
-   *
-   * The resolved-value cache is only written once the provider answers, so on a
-   * cold key it does nothing for the reads that arrive while that first lookup
-   * is still in flight — each of them misses and issues its own cascade query.
-   * That is the exact shape of the failure this file exists to bound: the
-   * worker fleet runs the same sweep at the same moment, so the first burst per
-   * tenant fans out to one cascade query per read rather than one in total.
+   * One provider call per key at a time; later arrivals await the first. The resolved-value
+   * cache is only written once the provider answers, so a cold key does nothing for reads that
+   * arrive while that lookup is in flight — each would otherwise issue its own cascade query.
+   * That's the exact failure this file bounds: a worker fleet running the same sweep at the same
+   * moment fans out to one cascade query per read instead of one in total.
    */
   private readonly inFlight = new Map<string, Promise<number>>();
 

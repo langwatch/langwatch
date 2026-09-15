@@ -1,12 +1,7 @@
 /**
- * The `--jq` subset, pinned to fail LOUDLY.
- *
- * This is an allowlist, not a denylist, and the distinction is the whole point:
- * an expression the subset does not implement used to walk as a literal key,
- * miss, and return `null` at exit 0 — a fabricated answer the caller then
- * builds on. Every unsupported spelling below must throw instead.
- *
- * Split out of `output-port.unit.test.ts`, which pins the port itself.
+ * The `--jq` subset, pinned to fail LOUDLY: an allowlist, not a denylist, so
+ * an unimplemented expression can't walk as a literal key and return a
+ * fabricated `null` at exit 0. Split out of `output-port.unit.test.ts`.
  */
 import { describe, it, expect } from "vitest";
 import { applyJq } from "../output";

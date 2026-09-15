@@ -4,15 +4,11 @@
  */
 
 /**
- * A value as exactly one Bash word.
- *
- * The paths these tests interpolate come from `mkdtemp` and `process.execPath`,
- * so a TMPDIR or a node install with a space in it would otherwise split one
- * argument into two. The command then fails to start and the test reads as
- * flaky rather than as wrong.
- *
- * Single quotes take everything literally, so the only case to handle is a
- * single quote itself: close the string, emit an escaped quote, reopen it.
+ * A value as exactly one Bash word. Paths from `mkdtemp`/`process.execPath`
+ * can contain spaces, which would otherwise split into two arguments and
+ * fail as a flaky-looking test rather than a wrong one. Single quotes take
+ * everything literally, so the only escape needed is for a quote itself:
+ * close, emit an escaped quote, reopen.
  */
 export function asBashWord(value: string): string {
   return `'${value.split("'").join(`'\\''`)}'`;

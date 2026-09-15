@@ -1,11 +1,9 @@
 /**
- * The `/api/internal/gateway` family on a runtime that stands in for the
- * process: no framework credential at all, the family's own HMAC gate under its
- * paths, and the error envelope the Go data plane parses.
- *
- * A test supplies only the members its routes reach. Anything else is a throw
- * naming what was asked for, so a route that quietly grew a second dependency
- * fails here instead of passing on an undefined.
+ * The `/api/internal/gateway` family on a runtime standing in for the
+ * process: no framework credential, the family's own HMAC gate, and the
+ * error envelope the Go data plane parses. A test supplies only the
+ * members its routes reach — anything else throws, naming what was asked
+ * for, so a route that grew a second dependency fails here, not silently.
  */
 import { createRestRuntime } from "@langwatch/api/rest";
 import type { ErrorHandler } from "hono";

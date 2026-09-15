@@ -1,36 +1,7 @@
 /**
- * One saved LangWatchQL chart, rendered as a dashboard widget.
- *
- * The widget references its chart by id and reads the definition live, rather
- * than drawing a copy snapshotted when the chart was placed. A member who fixes
- * a chart's SQL expects every dashboard showing it to be fixed too; a snapshot
- * would leave the old answer on the grid with nothing on screen admitting it
- * was stale.
- *
- * Three things decide what it draws, and they come from three different places
- * on purpose:
- *
- *  - **The statement and its parameters** come from the saved chart. The saved
- *    parameter values are run as-is: a widget offers no overrides, because a
- *    dashboard is a shared surface and a per-viewer override would mean two
- *    members discussing the same card were looking at different numbers.
- *  - **The period** comes from the dashboard's own period control, read from
- *    URL state through `usePeriodSelector` exactly as every builder chart on
- *    the grid reads it. One control moves every card, which is what makes the
- *    cards comparable.
- *  - **The datapoint step** is the widget's own, chosen per card, because the
- *    right bucket size is a property of the question the chart asks and not of
- *    the period it happens to be showing.
- *
- * That last split is why this surface coarsens rather than refuses. The saved
- * step meets a period the widget does not own and cannot predict: a member can
- * drag the dashboard to a year with a one-second chart on it. Refusing would
- * blank a card whose owner changed nothing, so the run asks for `"coarsen"` and
- * says what it got.
- *
- * @see ./LazyLangWatchQLWidgetChart — the Vega boundary this mounts
- * @see ../hooks/useLangWatchQLWidgetRun — when to run, and which response wins
- * @see specs/analytics/lwql-saved-charts.feature
+ * One saved LangWatchQL chart, rendered as a dashboard widget. Reads the
+ * chart's definition live, never a snapshot, so a SQL fix propagates to
+ * every dashboard showing it; a too-fine step asks to coarsen, not refuse.
  */
 
 import { Box, HStack, Spinner, Text, VStack } from "@chakra-ui/react";

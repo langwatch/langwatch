@@ -168,21 +168,11 @@ export class VerificationCeremonyService {
     });
 
     // What this person is told is what was RECORDED, never what this thread
-    // decided (ADR-135).
-    //
-    // This used to read the returned facts for a dead-end event. Those facts
-    // are the guard's decision on THIS thread; the same guard runs again on
-    // the queue, and only the second run's events are stored. Both directions
-    // of that divergence lie to somebody, and this is the sentence they read:
-    // decide "lost" here while the queue verifies, and a person is told their
-    // own address belongs to a stranger; decide "won" here while the queue
-    // dead-ends, and they are told an address is theirs when it is not — the
-    // exact harm the branch below was written to prevent.
-    //
-    // So the identifier is read back and the answer comes from its recorded
-    // state. `uniqueness_race_lost` is the only reason anything is ever
-    // dead-ended (`identity-guards.service.ts`), which is what makes the state
-    // alone conclusive rather than needing the event's reason.
+    // decided (ADR-135): this guard also runs again on the queue, and only
+    // the second run's events are stored, so trusting this thread's own
+    // verdict can tell someone their address belongs to a stranger, or that a
+    // dead-ended address is theirs. `uniqueness_race_lost` is the only reason
+    // anything is ever dead-ended, so the recorded state alone is conclusive.
     const recorded = await this.heads.tryFindIdentifier({ userId, identifierId });
 
     if (recorded?.state === "DEAD_END") {

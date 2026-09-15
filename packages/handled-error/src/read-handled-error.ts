@@ -12,13 +12,8 @@ import { APP_ERROR_CODES } from "./app-codes.ts";
 
 /**
  * The client-side view of a handled error, lifted off whatever transport
- * carried it.
- *
- * Deliberately NOT a re-export of `SerializedHandledError`: this is the shape
- * after validation of untrusted input, so every optional field is narrowed to
- * something the UI can render without further checks. A malformed payload
- * yields `null` from {@link readHandledError} rather than a partially-trusted
- * object.
+ * carried it. Deliberately NOT a re-export of `SerializedHandledError`: it
+ * is the validated shape, safe for the UI to render without further checks.
  */
 export interface HandledErrorShape {
   code: string;
@@ -35,27 +30,9 @@ export interface HandledErrorShape {
 const FAULTS = new Set<string>(["customer", "platform", "provider"]);
 
 /**
- * Lifts the handled-error payload off whichever transport carried it,
- * returning `null` when the failure was not handled (an infrastructure fault,
- * a bug) and therefore has nothing structured to say.
- *
- * Four shapes, because the platform has four boundaries:
- *   - tRPC nests it under `data.error`;
- *   - the CANONICAL envelope nests an OBJECT under `error`, lower_snake_case,
- *     answered by both planes (the TypeScript REST boundary and Go's `pkg/herr`);
- *   - a Hono REST route sends it FLAT (the code in `error`, `meta` spread at
- *     the top level, the trace hung off `trace`);
- *   - an event stream sends the SERIALISED payload with no envelope at all —
- *     a workflow node's `domainError`, an evaluator's, a `target_result`'s.
- *     Without that last reader the studio's coded failures reached the
- *     feedback port and resolved to the generic unknown line, even though the
- *     engine had named the failure and the registry had copy for it.
- *
- * `null` is the signal to fall back to the generic unknown treatment. It is a
- * correct, expected outcome — see ADR-045.
- *
- * Trusts nothing: the input is `unknown` and a misconfigured or older server
- * must not be able to crash a render by omitting a field.
+ * Lifts the handled-error payload off whichever transport carried it, tried
+ * in order — tRPC, the canonical envelope, a flat REST body, then the
+ * loosest shape last — and returns `null` when unhandled (ADR-045).
  */
 export function readHandledError(err: unknown): HandledErrorShape | null {
   return (
@@ -67,14 +44,9 @@ export function readHandledError(err: unknown): HandledErrorShape | null {
 }
 
 /**
- * The envelope-less shape: `HandledError.serialize()` exactly as it left the
- * server, riding on an event payload rather than on a transport error.
- *
- * Read LAST, because it is the loosest of the three: `code` plus a numeric
- * `httpStatus` is all there is to recognise it by. Both are required together
- * for that reason — a bare `{ code }` is any tagged object in the app, and a
- * bare `{ httpStatus }` is a response. `kind` is accepted alongside `code` for
- * the same back-compat reason the tRPC reader accepts it.
+ * The envelope-less shape: `HandledError.serialize()` riding an event
+ * payload. Read LAST — the loosest shape, so `code` and a numeric
+ * `httpStatus` are required together to avoid matching any tagged object.
  */
 function fromSerializedPayload(err: unknown): HandledErrorShape | null {
   if (!isRecord(err)) return null;
@@ -99,30 +71,9 @@ function fromSerializedPayload(err: unknown): HandledErrorShape | null {
 }
 
 /**
- * The CANONICAL envelope, nested under `error` as an object:
- *
- * ```json
- * { "error": { "type": "provider_credential_invalid",
- *              "code": "provider_credential_invalid",
- *              "message": "...", "meta": { "provider": "vertex" },
- *              "tips": ["..."], "docs_url": "https://docs.langwatch.ai/...",
- *              "fault": "customer", "trace_id": "..." } }
- * ```
- *
- * Both planes answer with it — `app/api/shared/schemas.ts` on the TypeScript
- * side, `pkg/herr` on the Go side — and the Go plane is the only one that also
- * carries `tips`, `docs_url` and `fault`.
- *
- * Without this reading, none of it arrived. `fromRestBody` requires `error` to
- * be a STRING code, so a nested envelope failed its guard and fell through to
- * `null`: the AI gateway's failures, and every canonical-envelope route's,
- * reached the UI as unhandled — generic "Something went wrong" copy, no
- * remediation tips, no docs link, no trace id — while the server had said
- * precisely what was wrong and how to fix it.
- *
- * Field names are lower_snake_case here, matching the wire on both planes,
- * which is the other half of why they were lost: the flat reading looked for
- * `docsUrl` and the envelope spells it `docs_url`.
+ * The CANONICAL envelope: `{ error: { code, message, meta, tips, docs_url,
+ * fault, trace_id } }`, answered by both planes. Without this reading, a
+ * nested envelope fell through `fromRestBody`'s guard and reached the UI unhandled.
  */
 function fromCanonicalEnvelope(err: unknown): HandledErrorShape | null {
   if (!isRecord(err)) return null;
@@ -153,15 +104,9 @@ function fromCanonicalEnvelope(err: unknown): HandledErrorShape | null {
 }
 
 /**
- * The envelope's discriminant: `code` is the field to branch on, `type` the
- * status-class alias, read as a fallback so an envelope carrying only the alias
- * still resolves.
- *
- * Returns null unless the value is slug-shaped, the same guard the flat reading
- * applies: a payload whose `code` slot holds prose must not pass itself off as
- * ours. Shape alone is not provenance, though — a provider's own slug clears
- * it too, which is why `fromCanonicalEnvelope` reads the remediation fields
- * only for codes in KNOWN_CODES.
+ * The envelope's discriminant: `code`, falling back to `type`. Returns null
+ * unless slug-shaped — shape alone is not provenance, which is why
+ * `fromCanonicalEnvelope` reads remediation fields only for KNOWN_CODES.
  */
 function envelopeCode(envelope: Record<string, unknown>): string | null {
   const code = str(envelope.code) ?? str(envelope.type);
@@ -232,18 +177,9 @@ function fromTrpcEnvelope(err: unknown): HandledErrorShape | null {
 }
 
 /**
- * The REST shape: `{ error: "<code>", message, ...meta, tips, docsUrl, fault }`
- * with the trace ids under `trace`.
- *
- * Without this, every handled error raised by a Hono route reached the UI as an
- * unhandled one — no registry copy, no docs link, no trace id — even though the
- * server had said exactly what went wrong. The routes are the surface the CLI
- * and agents use, so this is not a rare path.
- *
- * The code is the discriminant AND the guard: an unhandled REST failure sends
- * `{ error: "Internal server error" }` (and a Prisma conflict `"Conflict"`),
- * so requiring a slug keeps prose out of the code slot rather than presenting
- * "Internal server error" as though it were a registered code.
+ * The REST shape: `{ error: "<code>", message, ...meta, tips, docsUrl,
+ * fault }`, trace ids under `trace`. The code doubles as the guard: requiring
+ * a slug keeps prose like "Internal server error" out of the code slot.
  */
 function fromRestBody(err: unknown): HandledErrorShape | null {
   if (!isRecord(err)) return null;
@@ -378,22 +314,9 @@ function safeReasons(value: unknown): readonly SerializedReason[] {
 }
 
 /**
- * Server prose, clamped to something that can only ever be a sentence.
- *
- * Every caller passes text LangWatch wrote: a Zod validator's message about
- * the customer's own input, our template parser's syntax position, the
- * sentence `explainSlackPostError` picked for a Slack code it recognises. This
- * is a length clamp, not a safety boundary — a paragraph does not belong in an
- * error's chrome, and a diagnostic that lands here should be truncated rather
- * than recited at full length.
- *
- * It is NOT a way to make an upstream's sentence safe to show, and there is no
- * variant of it that is. Prose from outside LangWatch is not rendered at all;
- * see the note below. That matters because `goHandledError.ts` forwards a Go
- * service's `message` and the whole of `meta` verbatim, so `meta.message` CAN
- * carry text this client did not author — the protection is that the only
- * entries reading it are the two whose servers author it, and an unrecognised
- * code renders no description at all.
+ * Server prose, clamped to something that can only ever be a sentence — a
+ * length clamp, not a safety boundary. It does NOT make an upstream's
+ * sentence safe: only servers that author `meta.message` render it at all.
  */
 export function safeProse(value: string): string {
   const collapsed = value.replace(/\s+/g, " ").trim();
@@ -408,27 +331,9 @@ export function safeProse(value: string): string {
 const MAX_PROSE_LENGTH = 200;
 
 /*
- * There is deliberately no `redactSecrets` here, and no "relayed prose" variant
- * of `safeProse`.
- *
- * An earlier version of this file masked credential-shaped runs out of a third
- * party's sentence before showing it. That is unsafe by construction: it
- * matches on SHAPE, so it can only mask the shapes someone thought of, and the
- * credential that leaks is by definition the one whose shape was not
- * enumerated. A scrubber that is wrong once is worse than none, because the
- * surfaces downstream of it were written believing the string was clean.
- *
- * The contract already had the right answer (ADR-045): when we know the cause
- * and the caller can act on it, we mint a `HandledError` with a stable `code`
- * and the customer reads OUR words, chosen from the code-keyed registry in
- * `presentation.ts`. When we do not know it, they read the generic line and a
- * trace id. Neither branch needs a third party's sentence, so no surface here
- * renders one and nothing has to be scrubbed.
- *
- * Structured facts lifted off a payload — an HTTP status, a provider key, a
- * model id, a provider's own error-type discriminant — are fine and are used
- * freely. They are values from small, known sets, not free text, so they cannot
- * smuggle a key.
+ * Deliberately no `redactSecrets` here: shape-based masking only catches
+ * shapes someone thought of, so a scrubber that misses one is worse than
+ * none. The real fix is ADR-045 — mint a `HandledError` when we know the cause.
  */
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -436,48 +341,18 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 /**
- * The origins a docs link may point at, for the runtime asking.
- *
- * Derived from the same module that BUILDS them (`@langwatch/config/docs-url`),
- * so the allowlist cannot drift from what the server actually sends: the
- * canonical docs site, plus whatever THIS runtime would link to — which is the
- * local Mintlify on :3000 only for a development deployment served from a local
- * host, and only once a composition root has said so.
- *
- * The local origin is deliberately not a constant member. Pinning both branches
- * unconditionally put `http://localhost:3000` in the allowlist of every
- * production bundle, and `docsUrl` is attacker-reachable: it is parsed off an
- * upstream body with a bare `z.string()` (see `safeDocsUrl` below), so a
- * customer-configured endpoint could hand a production browser a "Read the
- * docs" link pointing at a service on the viewer's own machine. A developer
- * needs their local docs to resolve; nobody else does, and the two runtimes can
- * be told apart, so they are.
- *
- * Computed per call rather than once at module load: it is a two-element Set
- * built beside a `new URL()` parse that already dominates it, and a value
- * captured at import time would be pinned to whenever the bundle first
- * evaluated this module.
+ * The origins a docs link may resolve to — computed per call, not pinned as
+ * a module constant, because the local origin is attacker-reachable through
+ * `docsUrl` and must not leak `localhost:3000` into a production allowlist.
  */
 function docsOrigins(): Set<string> {
   return new Set([canonicalDocsBaseUrl(), docsBaseUrl()].map((base) => new URL(base).origin));
 }
 
 /**
- * A docs link, or nothing.
- *
- * `docsUrl` ends up in an `href` (see `components/ErrorActions.tsx`), and
- * neither React nor Chakra sanitises one — so `javascript:…` here would run in
- * the app's own origin the moment a customer clicked "Read the docs". A
- * `typeof === "string"` check is not enough for a field that becomes a link.
- *
- * The value is server-authored today (this package's remediation registry builds
- * it from a static registry), but it does not stay that way: a handled error
- * relayed from a Go service arrives via `nlpgo/goHandledError.ts`, which parses
- * `docs_url` out of an upstream response body with a plain `z.string()`, and a
- * Langy relay frame does the same. That body comes from whatever endpoint the
- * customer configured, so "any https URL" would let an upstream put its own
- * link behind our "Read the docs" — a phishing surface wearing our chrome.
- * Only our docs origins are accepted.
+ * A docs link, or nothing. `docsUrl` lands in an unsanitised `href` (a bare
+ * type check isn't enough — `javascript:…` would run in our origin), and only
+ * our own docs origins are accepted since an upstream can inject its own link.
  */
 function safeDocsUrl(value: unknown): string | undefined {
   if (typeof value !== "string" || value.length === 0) return undefined;
@@ -492,19 +367,9 @@ function safeDocsUrl(value: unknown): string | undefined {
 }
 
 /**
- * Narrows a `SerializedHandledError` — the shape carried on an event payload
- * (e.g. a `target_result.domainError`) rather than under `data.error` — to the
- * client-side `HandledErrorShape` the presentation layer reads.
- *
- * Use this when the handled error already arrived structured on the event; for
- * a raw transport error, use {@link readHandledError} instead.
- *
- * The type says these fields are present, and the type is a promise about our
- * own code, not about the bytes on the wire: this is the path a relayed Go
- * error takes, and every field on it was parsed out of an upstream body. So
- * the same narrowing runs here — an absent `fault` indexed `FAULT_TITLES` with
- * `undefined` and rendered the literal "undefined" as a headline, and an
- * absent `meta` made every `meta` read in the registry throw.
+ * Narrows a `SerializedHandledError` — the event-payload shape — to the
+ * client-side `HandledErrorShape`. Use for an already-structured payload;
+ * for a raw transport error use {@link readHandledError} instead.
  */
 export function handledShapeFromSerialized(serialized: SerializedHandledError): HandledErrorShape {
   return {
@@ -542,23 +407,9 @@ const KNOWN_CODES = new Set<string>([
 const SLUG_SHAPED = /^[a-z0-9]+(_[a-z0-9]+)*$/;
 
 /**
- * Prose a procedure deliberately authored for the user, on an error that isn't
- * a HandledError.
- *
- * #5984 collapsed the wire message to the code for *handled* errors, and to a
- * generic string for unhandled 5xx — but it deliberately left a plain non-5xx
- * `TRPCError`'s message alone, because that is copy the procedure wrote to be
- * read ("User already exists", "Too many signup attempts"). Several hundred
- * such throw sites exist, and dropping their message in favour of "we've been
- * notified" is worse than the slug problem this module set out to fix: it
- * tells a user to wait for something that will never change.
- *
- * The server decides what counts as authored — it needs `cause`, which never
- * crosses the wire — and says so with `data.authored`. This function trusts
- * that flag and then applies a second, independent layer: a message that
- * somehow arrives marked authored but reads like a machine wrote it is still
- * refused. Belt and braces, because the cost of being wrong here is a Prisma
- * string in front of a customer.
+ * Prose a procedure deliberately authored for the user — a plain non-5xx
+ * `TRPCError` message (e.g. "User already exists") that #5984 left alone
+ * rather than collapsing to a code or a generic line. Trusts `data.authored`.
  */
 export function readAuthoredMessage(err: unknown): string | undefined {
   if (readHandledError(err)) return undefined;
@@ -610,19 +461,10 @@ const MAX_AUTHORED_LENGTH = 200;
 const SCREAMING_CASE = /^[A-Z][A-Z0-9_]*$/;
 
 /**
- * Shapes that mean a machine wrote this string, not a person.
- *
- * The second layer behind `data.authored`, and deliberately conservative in
- * the other direction: every pattern here has to be something no product
- * person would ever type, because a false positive silently replaces good
- * copy with "we've been notified".
- *
- * That is why this is case-SENSITIVE. An earlier version matched SQL keywords
- * case-insensitively and would have eaten "Select a template from the list
- * before running this." — real copy, killed by a guard nobody would think to
- * look at. Likewise the stack-frame pattern is anchored to a line start, and
- * the address pattern requires a port, so "The IP 10.0.0.1 is not allowed as a
- * webhook destination" survives.
+ * Shapes that mean a machine wrote this string, not a person — the second,
+ * conservative layer behind `data.authored`. Deliberately case-SENSITIVE: a
+ * case-insensitive SQL match would reject real copy like "Select a template
+ * from the list before running this."
  */
 const MACHINE_PROSE = new RegExp(
   [

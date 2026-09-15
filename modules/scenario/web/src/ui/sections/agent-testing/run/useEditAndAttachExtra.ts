@@ -1,11 +1,8 @@
 /**
- * Editing one of the plan's own attachments, and what a pick from the
- * evaluator list does with it: an evaluator a suite in scope already
- * carries is edited there instead of being attached twice, one the plan
- * already has opens its editor, and a new one is attached with the
- * conversation and the trace inferred.
- *
- * @see specs/features/agent-testing/run-dialog.feature
+ * Editing one of the plan's own attachments, and what a pick from the evaluator list does with
+ * it: an evaluator a suite in scope already carries is edited there instead of being attached
+ * twice, one the plan already has opens its editor, and a new one is attached with the
+ * conversation and the trace inferred. @see specs/features/agent-testing/run-dialog.feature
  */
 
 import { useCallback } from "react";

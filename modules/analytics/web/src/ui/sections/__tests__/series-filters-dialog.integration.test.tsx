@@ -1,21 +1,9 @@
 /**
  * @vitest-environment jsdom
- *
- * What the series filter editor does when it is handed nothing.
- *
- * The regression this file was written for is `platform/app`'s:
- * `SeriesFiltersDrawer` was opened through the drawer REGISTRY, and the
- * registry could not carry a function or an object across a reload — so a
- * refresh with `?drawer.open=seriesFilters` on the address re-mounted it with
- * `filters` and `onChange` both `undefined`, the field editor read
- * `filters["traces.origin"]` off undefined, and the crash took the whole drawer
- * mount down with it.
- *
- * MOUNTED INLINE, THAT ADDRESS CANNOT HAPPEN — a dialog rendered by the builder
- * always has the builder's props. The scenarios are kept anyway, because
- * "renders with no filters" is still true of a series nobody has narrowed yet,
- * and because a defensive default that stops being exercised is a defensive
- * default that quietly stops working.
+ * Regression for `platform/app`: reloading re-mounted `SeriesFiltersDrawer`
+ * via the registry with `filters`/`onChange` undefined, crashing the
+ * drawer. Mounted inline that can't happen, but the scenarios stay — a
+ * defensive default that stops being exercised quietly stops working.
  */
 
 import { cleanup, render, screen } from "@testing-library/react";

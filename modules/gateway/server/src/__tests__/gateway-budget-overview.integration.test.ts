@@ -1,6 +1,8 @@
 /**
  * @vitest-environment node
- * Real Postgres + real ClickHouse. What a member sees about budgets binding their key, via the one service the /me page, CLI epilogue and REST mirror share. Spec: specs/ai-gateway/budget-overview.feature
+ * Real Postgres + real ClickHouse. What a member sees about budgets binding their key, via the
+ * one service the /me page, CLI epilogue and REST mirror share. Spec:
+ * specs/ai-gateway/budget-overview.feature
  */
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 

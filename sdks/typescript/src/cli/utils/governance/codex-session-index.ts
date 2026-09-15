@@ -1,15 +1,9 @@
 /**
- * Codex's own session names. Codex keeps one `session_index.jsonl` beside its
- * `sessions/` tree (under `$CODEX_HOME`, `~/.codex` by default): one JSON
- * line per update, `{id, thread_name, updated_at}`, appended as sessions are
- * created and renamed, so the LAST line for an id carries its current name.
- * This is the same index `codex resume <name>` and `codex archive <name>`
- * resolve against — the harvest mirrors it rather than inventing a name.
- *
- * Best-effort by construction: a missing index (older codex), an unreadable
- * file, an oversized one or a line that does not parse all read as "no
- * names". The prompt-derived title stays the fallback for those sessions.
- *
+ * Codex's own session names, from `session_index.jsonl` beside its `sessions/`
+ * tree (`$CODEX_HOME`, `~/.codex` by default): one JSON line per rename, so the
+ * LAST line for an id wins — the same index `codex resume`/`archive` use, so
+ * this harvest mirrors it rather than inventing a name. Best-effort: a missing,
+ * unreadable, oversized or unparseable index falls back to the prompt-derived title.
  * Spec: specs/ai-governance/cli-wrappers/codex-rollout-io.feature
  */
 import { readFile, stat } from "node:fs/promises";

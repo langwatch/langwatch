@@ -1,23 +1,8 @@
 /**
  * The PII vocabulary: which identifiers each redaction level covers.
- *
- * DEPENDENCY-FREE ON PURPOSE, and exported from the package root for the same
- * reason `markers.ts` is: the settings screen renders one checkbox per
- * identifier and has to know which side of the split each falls on, and a
- * browser bundle must not pull in `libphonenumber-js` and the recognizer
- * tables to find that out. The engines that USE these lists live behind
- * `@langwatch/redaction/pii`.
- *
- * There used to be a second copy of each list in the application's ingestion
- * path. Both are gone: these are the only declarations, and the consumers
- * import them —
- * `apps/worker/src/platform/infrastructure/worker-pii-analysis.adapter.ts`
- * takes `PRESIDIO_STRICT_ENTITIES` from here rather than restating it, and the
- * strict-only difference is derived in
- * `modules/data-privacy/server/src/services/otlp-span-pii-redaction.service.ts`.
- * They stay pinned here by literal all the same: an identifier that quietly
- * leaves a list stops being detected, and a span that was never scanned for it
- * looks exactly like a span that was scanned and found clean.
+ * Dependency-free and pinned by literal, not derived, so the settings
+ * screen can list them without a browser bundle pulling in the recognizer
+ * tables, and a dropped identifier can't silently stop being detected.
  */
 
 /** Identifiers the native, in-process engine detects (pattern + checksum based). */

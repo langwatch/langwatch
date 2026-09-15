@@ -1,19 +1,7 @@
 /**
- * What `langwatch <tool>` does when setting up the direct-OTLP path
- * fails.
- *
- * The two wrapper paths are not interchangeable. Direct OTLP runs the
- * tool on the user's own subscription and sends LangWatch nothing but
- * telemetry; the gateway routes the model calls themselves through
- * LangWatch-held provider credentials and bills them. Switching from
- * the first to the second spends money the user never agreed to spend,
- * so the wrapper never does it on its own: the gateway is entered only
- * from the path prompt, a pinned `tool_mode`, or `--tool-mode=gateway`.
- *
- * That leaves the failure to handle honestly. An expired device session
- * is recoverable, so on a TTY the wrapper says so and offers the login
- * inline, then continues down the OTLP path the user picked. Anywhere
- * without a TTY it stops and names the command to run.
+ * What `langwatch <tool>` does when direct-OTLP setup fails: it never falls back to the gateway
+ * on its own — that would spend LangWatch-held provider credit the user never agreed to — so the
+ * gateway is entered only via the path prompt, a pinned `tool_mode`, or `--tool-mode=gateway`.
  */
 
 import prompts from "prompts";
@@ -25,14 +13,9 @@ import { isLoggedIn } from "./config";
 import { runDeviceFlowLogin } from "./login-flow";
 
 /**
- * Why direct-OTLP setup failed, to the resolution this file cares about.
- *
- *   - `expired_session`: the control plane rejected the device session.
- *     A fresh login fixes it.
- *   - `tool_disabled`: the org admin turned both paths off for this
- *     tool. No login helps; the user needs their admin.
- *   - `other`: anything else (control plane unreachable, no personal
- *     workspace yet, mint refused).
+ * Why direct-OTLP setup failed: `expired_session` (a fresh login fixes it), `tool_disabled`
+ * (the org admin turned both paths off — no login helps, the user needs their admin), or
+ * `other` (control plane unreachable, no personal workspace yet, mint refused).
  */
 export type IngestionSetupFailureKind = "expired_session" | "tool_disabled" | "other";
 

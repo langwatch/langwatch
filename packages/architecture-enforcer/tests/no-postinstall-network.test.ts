@@ -1,17 +1,10 @@
 /**
  * Regression test for issue #3903 AC 5: no new postinstall network calls.
- *
- * pnpm install must not trigger automatic binary downloads. Any `postinstall`,
- * `prepare`, or other install-lifecycle script that shells out to curl/wget/
- * fetch/download or hits an HTTP(S) URL introduces a network dependency that
- * blocks fresh-clone setups in air-gapped or restricted environments, and
- * degrades DX by making `pnpm install` non-deterministic.
- *
- * It scans EVERY tracked package.json rather than one. The platform copy read
- * only `platform/app/package.json`, so the guard said nothing about the rest of
- * the workspace; with that manifest gone, reading one file would have left it
- * vacuous. `git ls-files` is the file list on purpose — an untracked manifest
- * runs no lifecycle script during a clone.
+ * pnpm install must not trigger automatic binary downloads — a lifecycle
+ * script that shells out to curl/wget/fetch or hits an HTTP(S) URL blocks
+ * air-gapped setups and makes installs non-deterministic. Scans every
+ * tracked package.json (`git ls-files`, not a glob) since an untracked
+ * manifest runs no lifecycle script during a clone.
  */
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";

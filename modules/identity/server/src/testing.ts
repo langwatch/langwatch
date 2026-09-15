@@ -5,13 +5,9 @@ import type {
 import type { IdentityUsersRepository } from "./repositories/identity-users.repository.ts";
 
 /**
- * The `User` reads the identity guards take, in memory.
- *
- * Shared rather than re-declared per suite because the guards need it
- * everywhere they are constructed — the pipeline's staged re-run included —
- * and a suite that quietly stubbed `tryFindUserIdByEmail` to something looser
- * than the real repository would be proving the guard against a population
- * that cannot collide (ADR-116 §6).
+ * The `User` reads the identity guards take, in memory. Shared rather than
+ * re-declared per suite, or a looser stub of `tryFindUserIdByEmail` would
+ * prove the guard against a population that cannot collide (ADR-116 §6).
  */
 export function inMemoryIdentityUsers({
   emails = {},

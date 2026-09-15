@@ -1,15 +1,7 @@
 /**
- * Turn separator for the playground's conversation: a hairline with "TURN N"
- * centred.
- *
- * When the turn's trace has landed the separator grows a "View trace"
- * affordance - clicking it opens the trace drawer. Until then it stays a plain
- * rule, because advertising a trace that 404s is worse than waiting a beat for
- * one that opens.
- *
- * The hover-peek popover the trace drawer's own separator carries does not
- * travel: it is application internals a feature package may not reach. Same
- * recorded gap the deleted `trace-message.tsx` carried.
+ * Turn separator for the playground: a hairline with "TURN N" centred. Once
+ * the turn's trace has landed it grows a "View trace" affordance — until
+ * then a plain rule, since a trace that 404s is worse than a beat's wait.
  */
 
 import { Box, Flex, HStack, Icon, Text } from "@chakra-ui/react";

@@ -967,13 +967,9 @@ describe("detachIdentifier strands guard", () => {
 });
 
 /**
- * The strands guard, asked about an account that also holds a second factor.
- *
- * The enrollment here is REAL — stated by the two-step guards and folded the
- * way the projection folds them, with codes the consume guard will still spend
- * — because the invariant is only worth pinning against an account that
- * genuinely has some. A guard that counted them would read this account as
- * holding two credentials, and it holds one way in and one extra step past it.
+ * The strands guard, tested against an account holding a second factor. The
+ * enrollment is REAL, folded like the projection folds it, because the
+ * invariant only matters against an account that genuinely holds one.
  */
 describe("detachIdentifier strands guard, given a second factor with unspent backup codes", () => {
   const ENROLLMENT = "mfaenr_backup";

@@ -26,7 +26,7 @@ export const getDefaultEditingMode = (
     return "prompt";
   }
 
-  // If exactly one non-system message that is a user message with {{input}} or empty, default to prompt mode
+  // A single user message that is just {{input}} or empty defaults to prompt mode
   if (nonSystemMessages.length === 1) {
     const userMessage = nonSystemMessages[0];
     if (userMessage?.role === "user") {

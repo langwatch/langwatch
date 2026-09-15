@@ -1,15 +1,8 @@
 /**
  * The output PORT, pinned: a command returns data, the port picks the format.
- *
- * Every test here covers a way the CLI could answer a machine caller with
- * human text — or with a fabricated value — at exit 0. That class of bug is
- * invisible to the caller by construction, so it has to be invisible to the
- * test suite too or it comes straight back.
- *
- * The gate that REFUSES a format a command cannot serve is a separate concern
- * and lives in `output-format-gate.unit.test.ts`; the `--jq` subset lives in
- * `output-jq.unit.test.ts`; the wiring into the real tree lives in
- * `output-command-tree.unit.test.ts`.
+ * Every test guards against answering a machine caller with human text — or a
+ * fabricated value — at exit 0: invisible by construction, so it must not be
+ * invisible to the suite either.
  */
 import { describe, it, expect } from "vitest";
 import { Command } from "commander";

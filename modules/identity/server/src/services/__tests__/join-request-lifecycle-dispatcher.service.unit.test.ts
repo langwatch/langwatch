@@ -1,13 +1,9 @@
 /**
  * The expiry wake's one decision: whether to tell the requester their request
- * lapsed.
- *
- * ADR-135 — what gets announced is what was RECORDED, never what this thread
- * decided. The guard runs twice (once on the calling path, once on the queue)
- * and only the queue's run is stored, so the facts this thread got back are a
- * prediction. The divergence that matters is an administrator approving inside
- * the expiry window: gating the email on the returned facts told that person
- * their request had lapsed moments after it was in fact granted.
+ * lapsed. ADR-135 — what gets announced is what was RECORDED, never what this
+ * thread decided, since the guard runs twice (once on the calling path, once on
+ * the queue) and only the queue's run is stored; gating on this thread's own
+ * facts could tell someone "lapsed" moments after an admin actually approved.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 

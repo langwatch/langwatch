@@ -1,6 +1,9 @@
 /**
  * @vitest-environment node
- * Real Postgres + real signed internal route. The gateway knows the key and project; team and principal live on control-plane rows it never reads. Pins the ingest seam's join and its two failure modes: a MISSING row degrades one record and says so; an unreadable database fails the whole batch so the drainer retries. Spec: specs/ai-gateway/billing-spend-events.feature
+ * Real Postgres + real signed internal route. Pins the ingest seam's join and
+ * its two failure modes: a MISSING row degrades one record and says so; an
+ * unreadable database fails the whole batch so the drainer retries.
+ * Spec: specs/ai-gateway/billing-spend-events.feature
  */
 import { nanoid } from "nanoid";
 import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";

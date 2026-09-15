@@ -1,12 +1,7 @@
 /**
- * The one question the error surface answers BEFORE the code-keyed registry:
- * did we get an answer at all?
- *
- * `resolveUiFailureCopy` is the single seam both the toaster and the shell's
- * failure state resolve their words through, so the check has to live there or
- * it protects neither. These pin the ordering rather than the wording: a
- * failure that never reached the server must not be told "we've been notified",
- * and a failure that DID reach it must keep the registry's own copy.
+ * The one question answered BEFORE the code-keyed registry: did we get an
+ * answer at all? `resolveUiFailureCopy` is the single seam both surfaces
+ * resolve through, so the check lives there — pinning order, not wording.
  */
 import { describe, expect, it } from "vitest";
 

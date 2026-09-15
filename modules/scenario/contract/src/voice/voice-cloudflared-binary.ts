@@ -1,36 +1,10 @@
 /**
- * Puts the `cloudflared` binary on PATH before the vendored `@langwatch/scenario`
- * SDK spawns it.
- *
- * WHY this exists. The SDK's own `openTwilioTunnel` (cloudflared provider) opens
- * its quick tunnel with a BARE-command spawn — `spawn("cloudflared", ["tunnel",
- * "--url", ..., "--no-autoupdate"])` — a plain PATH lookup. It does NOT use the
- * npm `cloudflared` package's `Tunnel` class, does NOT read a `CLOUDFLARED_BIN`
- * env, and does NOT call the package's `install()`. So even though
- * `onlyBuiltDependencies: [cloudflared]` in `pnpm-workspace.yaml` correctly
- * downloads the binary into the npm package's own `bin/` at image-build time,
- * nothing puts that directory on PATH for the child the SDK spawns, and the dial
- * fails with `spawn cloudflared ENOENT`. The `voice-triage-survey` dev worktree
- * only "worked" because it has an unrelated system `/usr/local/bin/cloudflared`
- * on PATH — CI and prod have neither that nor a system cloudflared in
- * `Dockerfile.runtime`.
- *
- * This module bridges that gap: it locates the npm package's binary (installing
- * it as a fallback only if the build-time download did not run) and prepends its
- * directory to PATH, so the SDK's later bare spawn resolves it. The common case
- * is cheap — the binary is already on disk from the build-time postinstall, so
- * this only reads a path and prepends it; the `install()` call is a fallback for
- * an image that shipped without the binary.
- *
- * WHERE the `cloudflared` npm package lives. It is a prod dependency of the
- * workspace `langwatch` SDK package (`sdks/typescript/package.json`), NOT of
- * `@langwatch/scenario`. `@langwatch/web` depends on `langwatch: workspace:*`,
- * so that edge survives the prod-filtered install (`--prod --filter
- * "@langwatch/web..."`), and under pnpm's strict `node_modules` layout the
- * binary is only resolvable by scoping the require to where `langwatch`
- * resolved. So the resolution below searches scopes in order — the `langwatch`
- * SDK scope first (the real dependency edge), then `@langwatch/scenario` as a
- * secondary fallback in case packaging changes, then the app's own scope.
+ * Puts the `cloudflared` binary on PATH before the vendored SDK spawns it:
+ * `openTwilioTunnel` does a bare PATH-lookup spawn, never reading
+ * `CLOUDFLARED_BIN` or calling the npm package's `install()`, so the
+ * build-time-downloaded binary is never on the child's PATH and the dial
+ * fails with `ENOENT`. This bridges the gap, searching scopes in
+ * dependency-edge order since `cloudflared` is a prod dep of `langwatch`, not of scenario.
  */
 
 import { spawnSync } from "node:child_process";
@@ -80,15 +54,11 @@ export interface EnsureCloudflaredOnPathDeps {
 }
 
 /**
- * Thrown when `cloudflared` is neither on PATH nor installable: the package
- * could not be resolved, the fallback download failed or timed out, or it
- * reported success yet left no binary. A plain {@link Error} (not a
- * `HandledError`): the remedy is an OPERATOR action (ship the binary in the
- * image, fix egress to the GitHub release), not one a customer can take, so per
- * ADR-045 it degrades to a generic "unknown" plus a trace id at the API
- * boundary — matching `VoicePublicBaseUrlMissingError`. The message carries the
- * full cause chain (the underlying ENOENT/EACCES/HTTP text) so the eventual
- * run error names the real failure rather than "tunnel binary unavailable".
+ * Thrown when `cloudflared` is neither on PATH nor installable. A plain
+ * {@link Error}, not `HandledError`: per ADR-045, the remedy (ship the binary,
+ * fix GitHub egress) is an OPERATOR action, not a customer one, so it degrades
+ * to "unknown" at the API boundary, keeping the full cause chain so the run
+ * error names the real failure.
  */
 export class VoiceTunnelBinaryError extends Error {
   constructor(summary: string, cause?: unknown) {

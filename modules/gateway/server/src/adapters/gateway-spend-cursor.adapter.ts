@@ -29,14 +29,18 @@ export class GatewaySpendCursorAdapter {
   }
 
   /**
-   * Opaque page cursor for the summaries rollup: base64url JSON array of group-key parts, one per dimension, same conventions as {@link encodeSpendEventsCursor}. Kept as an array since a group key is caller data and any separator is one some data already carries.
+   * Opaque page cursor for the summaries rollup: base64url JSON array of
+   * group-key parts, same conventions as {@link encodeSpendEventsCursor}.
+   * Kept as an array since a group key is caller data that may contain any separator.
    */
   encodeSpendSummariesCursor(groupKey: string[]): string {
     return Buffer.from(JSON.stringify(groupKey), "utf8").toString("base64url");
   }
 
   /**
-   * Group-key parts a summaries cursor names, or null if not one this service minted. Decided by parsing, never the first character — group keys are caller data and may legitimately open with `[`.
+   * Group-key parts a summaries cursor names, or null if not one this service
+   * minted. Decided by parsing, never the first character — group keys are
+   * caller data and may legitimately open with `[`.
    */
   decodeSpendSummariesCursor(encoded: string): string[] | null {
     try {

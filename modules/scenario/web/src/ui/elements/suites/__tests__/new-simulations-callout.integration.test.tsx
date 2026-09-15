@@ -1,5 +1,6 @@
 /**
- * The Agent Testing sidebars pin an announcement that offers the way back to the previous simulations screens.
+ * The Agent Testing sidebars pin an announcement that offers the way back to the previous
+ * simulations screens.
  * @vitest-environment jsdom
  * @see specs/suites/new-simulations-callout.feature
  */

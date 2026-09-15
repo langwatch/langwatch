@@ -1,32 +1,10 @@
 /**
- * Copilot pre-spawn checks — mode-independent warnings for the two
- * conditions that make copilot telemetry silently incomplete (ADR-039
- * Decisions 8 + 9). Both are warn-and-continue: the user keeps working,
- * support keeps an explanation for "copilot shows nothing".
- *
- *   1. Enterprise-managed settings can pin an OTel collector org-wide;
- *      managed values WIN over the env vars the wrapper injects, so the
- *      user's telemetry flows to the enterprise collector instead of
- *      LangWatch. Device-level managed settings live at fixed paths
- *      (verified against the copilot 1.0.69 native runtime):
- *        macOS:  /Library/Application Support/GitHubCopilot/managed-settings.json
- *                (plus MDM profiles under the com.github.copilot domain,
- *                not file-detectable)
- *        linux:  /etc/github-copilot/policy.d/*.json
- *      There is ALSO a server layer fetched from GitHub's
- *      /copilot_internal/managed_settings with the user's auth at run
- *      time — that one cannot be preflighted from disk, so this check
- *      covers the device layer only (documented in ADR-039).
- *
- *   2. Copilot CLI below 1.0.41 exports a different, incomplete OTel
- *      attribute set — warn to upgrade, never block (copilot
- *      auto-updates; a hard gate would be stricter than any other
- *      wrapped tool).
- *
- * These checks live OUTSIDE preflightWrapper on purpose: preflight only
- * runs on the gateway branch, and copilot's default path is ingestion
- * (wrapper-path-choice.ts), so gateway-only placement would skip the
- * warnings on the majority of runs.
+ * Copilot pre-spawn checks: mode-independent, warn-and-continue warnings for the two conditions
+ * that make copilot telemetry silently incomplete (ADR-039 Decisions 8 + 9) — an org-wide managed
+ * OTel collector overriding the wrapper's env vars (device layer only; the server layer needs
+ * live auth and can't be preflighted from disk), and an old Copilot CLI exporting an incomplete
+ * OTel set. Live outside preflightWrapper because preflight only runs on the gateway branch,
+ * while copilot's default path is ingestion — gateway-only placement would skip most runs.
  */
 
 import { spawnSync } from "node:child_process";
@@ -167,13 +145,11 @@ export function copilotPrespawnWarnings(opts: CopilotPrespawnOptions = {}): stri
 }
 
 /**
- * Gateway mode routes copilot through its BYOK provider env
- * (COPILOT_PROVIDER_*), and GitHub documents COPILOT_MODEL as REQUIRED for
- * BYOK — without a model, copilot fails with an opaque error before any
- * traffic reaches the gateway. Returns an actionable message when no model
- * is resolvable from the args or environment, else null. Gateway-only:
- * the ingestion (direct-OTLP) path runs copilot on its seat with its own
- * model selection and needs no model here.
+ * Gateway mode routes copilot through its BYOK provider env (COPILOT_PROVIDER_*), and GitHub
+ * documents COPILOT_MODEL as REQUIRED for BYOK — without a model, copilot fails with an opaque
+ * error before any traffic reaches the gateway. Returns an actionable message when no model is
+ * resolvable from the args or environment, else null. Gateway-only: the ingestion (direct-OTLP)
+ * path runs copilot on its seat with its own model selection and needs no model here.
  */
 export function copilotGatewayModelPreflight(opts: {
   args: string[];

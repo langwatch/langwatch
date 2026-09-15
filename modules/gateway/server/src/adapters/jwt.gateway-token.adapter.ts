@@ -1,20 +1,8 @@
 import { type Instant, nowInstant } from "@langwatch/time";
 /**
- * Short-lived JWT that the control-plane issues after resolving a VK and
- * the Go gateway verifies on every public request.
- *
- * Claims (per contract §4.1):
- *   { vk_id, project_id, team_id, org_id, principal_id, revision,
- *     vk_expires_at, exp, iat, iss, aud }
- *
- * `project_id` + `team_id` are nullable post-collapse: a VK can be scoped
- * at ORGANIZATION or TEAM, in which case the gateway falls back to the
- * org's `internal_governance` project (if any) for span export. When even
- * that fallback is unavailable (older self-hosted deploys), both fields
- * are null and the gateway skips span export.
- *
- * TTL: 15 minutes, or the key's own expiration date when that comes first.
- * Gateway refreshes at T+10 min asynchronously.
+ * Short-lived JWT (contract §4.1) the control-plane issues after resolving a
+ * VK; TTL is 15 minutes or the key's own expiration, whichever comes first.
+ * `project_id`/`team_id` are nullable post-collapse, falling back to span-export skip.
  */
 import jwt from "jsonwebtoken";
 
@@ -59,15 +47,10 @@ export class GatewayJwtAdapter {
 
   private constructor(private readonly secret: string) {}
 
-  /** Mints the gateway token. The token ends at the 15 minute TTL or at the
-   *  key's expiration date, whichever comes first, so no token can authorize a
-   *  request after the key it was minted for has run out.
-   *
-   *  A date already in the past never reaches here: resolve-key refuses an
-   *  expired key before it mints anything. If a caller skips that check the
-   *  token still gets a positive lifetime, the one second floor below, because a
-   *  token with `exp <= iat` is rejected by some verifiers as malformed rather
-   *  than as expired, and "expired" is the answer the customer needs. */
+  /** Mints the gateway token, ending at the 15 minute TTL or the key's
+   *  expiration, whichever comes first. A caller skipping the resolve-key
+   *  expiry check still gets a one-second floor rather than `exp <= iat`,
+   *  since some verifiers reject that as malformed rather than expired. */
   sign({ notAfter, ...identity }: GatewayJwtSubject): {
     jwt: string;
     expiresAt: number;

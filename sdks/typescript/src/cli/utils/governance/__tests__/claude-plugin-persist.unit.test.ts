@@ -1,17 +1,7 @@
 /**
- * The `langwatch claude` persist offer, once the Claude Code plugin carries the
- * session context hooks.
- *
- * Two paths run through the same function and must behave very differently. The
- * run where the user just answered "yes" may install the plugin, because there
- * is somebody at the terminal to answer a trust prompt. Every later run only
- * re-verifies an already-configured device, and must touch neither the network
- * nor a subprocess.
- *
- * readline, `node:child_process` and saveConfig are mocked; the settings file
- * and the plugin state files are real files under a temp HOME.
- *
- * Feature: specs/ai-governance/cli-wrappers/claude-plugin-install.feature
+ * The `langwatch claude` persist offer, once the plugin carries the session
+ * context hooks: only the run where the user just answered "yes" may
+ * install it — every later run must touch neither the network nor a subprocess.
  */
 
 import * as fs from "node:fs";

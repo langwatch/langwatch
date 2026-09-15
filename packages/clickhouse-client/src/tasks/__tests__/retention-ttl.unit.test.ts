@@ -163,27 +163,13 @@ describe("gateway_spend retention exemption", () => {
 });
 
 describe("governance cost tables keep data indefinitely by default", () => {
-  // These two tables used to be exempt from retention the way `gateway_spend`
-  // still is: a fixed 13-month DELETE hardcoded in their own migration and no
-  // entry in either reconciler map. That reasoning was "a customer policy must
-  // never hard-delete a cost record" — true, and the fixed timer was a blunt
-  // way to guarantee it, because it also hard-deleted the record itself after
-  // thirteen months with no way to keep it, shorten it, or ask the question
-  // per tenant.
-  //
-  // Migration 00095 replaces the timer with the `_retention_days` column,
-  // DEFAULTING TO 0. Zero is the indefinite sentinel, so the default answer is
-  // now "keep forever" and a row is deleted only if a day count is deliberately
-  // stamped on it. The original guarantee survives by a different route: these
-  // tables stay OUT of RETENTION_TABLE_CATEGORY_MAP, so no customer-facing
-  // retention policy can reach them (and they stay out of the storage meter,
-  // which the same map drives). They are in the separate
-  // INDEFINITE_DEFAULT_RETENTION_TABLES list, and the reconciler gates on the
-  // union of the two.
-  //
-  // If the "not in RETENTION_MANAGED_TABLES" assertions below fail, someone has
-  // wired money records into the customer retention cascade, where
-  // `resolveRetention` would floor them to 49 days and start deleting.
+  // Zero (`_retention_days`'s default) is the indefinite sentinel: a row is
+  // deleted only if a day count is deliberately stamped on it. These tables
+  // stay OUT of RETENTION_TABLE_CATEGORY_MAP (so no customer policy or the
+  // storage meter it drives can reach them) and IN the separate
+  // INDEFINITE_DEFAULT_RETENTION_TABLES list; the reconciler gates on the
+  // union of both. If the assertions below fail, someone has wired money
+  // records into the customer retention cascade.
   const GOVERNANCE_COST_TABLES = [
     "governance_cost_rollup_1d",
     "governance_cost_rollup_restatement_index",

@@ -3,18 +3,9 @@ import { IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME } from "../../rules/identit
 import { IdentityLatchRepository } from "../identity-latch.repository.ts";
 
 /**
- * Whether a user's identifier history is in the log and proven — the one fact
- * that forks identity's reads and writes (ADR-110's rule, re-tenanted to
- * users: finishing the migration IS the switch).
- *
- * Only `finalized` opens it. `migrated` is the HELD state — the history landed
- * but the proof found the projection behind or disagreeing — and everything
- * else (absent, parked, rolled back) is closed. A rollback is therefore an ops
- * action rather than a deploy: pinning the row `rolled_back` closes the latch
- * for that user everywhere.
- *
- * Reads only, and deliberately narrow: the runner's state machine and its
- * compare-and-set live with the runner. This is the two questions a gate asks.
+ * Whether a user's identifier history is proven (ADR-110, re-tenanted to
+ * users). Only `finalized` opens it; `migrated` is HELD (landed but unproven),
+ * and rollback pins `rolled_back` as an ops action. Reads only, no writes.
  */
 export class PrismaIdentityLatchRepository extends IdentityLatchRepository {
   static create(database: PrismaClient): PrismaIdentityLatchRepository {

@@ -1,17 +1,10 @@
 /**
- * The fourteen members a process hands its modules, and the vocabulary of each.
- *
- * The list is closed on purpose: an open one is the optional collaborator
- * production forgets to supply. A module that wants something new argues for a
- * member, derives it inside its own App, or takes a peer Api — a peer never
- * travels through here, which is why `audit` is not on the list: the real sink
- * is the audit-log module's App, resolved as a peer by the transport runtime
- * that declares `withAudit`.
- *
- * Nothing in this file opens a socket or names a vendor SDK, so a module that
- * imports `reads` to say what it reads pulls in no client library. A module
- * imports it from `@langwatch/infrastructure/members`, which is this file and
- * nothing else; the root export carries the construction and its clients.
+ * The fourteen members a process hands its modules, and the vocabulary of
+ * each. The list is closed on purpose: an open one is the optional
+ * collaborator production forgets to supply. A peer never travels through
+ * here, which is why `audit` is not on it — the real sink is resolved as a
+ * peer via `withAudit`. This file names no vendor SDK, so importing it for
+ * types pulls in no client library; the root export carries the clients.
  */
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import type { EventSourcing } from "@langwatch/eventing";
@@ -162,15 +155,10 @@ export const MEMBER_NAMES = [
 ] as const satisfies readonly MemberName[];
 
 /**
- * What a module says it reads, in one line, on its App:
- *
- * ```ts
- * static readonly reads = reads("clock", "logger");
- * ```
- *
- * The tuple is the type's source as well as boot's, so there is no interface
- * to keep in agreement with a list, and a wrong name fails as
- * `'"clcok"' is not assignable to 'MemberName'` on the line the author wrote.
+ * What a module says it reads, in one line: `static readonly reads =
+ * reads("clock", "logger")`. The tuple is the type's source as well as
+ * boot's, so a wrong name fails as `'"clcok"' is not assignable to
+ * 'MemberName'` on the line the author wrote.
  */
 export function reads<const Names extends readonly MemberName[]>(...names: Names): Names {
   return names;

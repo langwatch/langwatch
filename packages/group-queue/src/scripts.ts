@@ -447,26 +447,10 @@ end
 `;
 
 /**
- * Set of groups that may hold a pending job, written atomically with every
- * insert into a `group:<id>:jobs` zset.
- *
- * The reconcile counts jobs by asking which groups to look at. Asking the
- * lifecycle indexes (`ready`, `blocked`, `parked:<tenant>`) cannot answer that
- * safely: they have to be read one after another, and a group moving between
- * them mid-read — from one not yet visited into one already visited — is in none
- * of the reads even though it never stopped holding jobs. Transitions go both
- * ways, so no scan order avoids it.
- *
- * This index is keyed on the property actually being counted, "has jobs", which
- * no lifecycle transition changes. A group is added in the same atomic script
- * that adds its job, so any group holding a job for the whole of a pass is in
- * the index for the whole of that pass, whatever it does between states.
- *
- * Membership is deliberately a SUPERSET. Over-inclusion is free — a group that
- * has since drained contributes ZCARD 0 — so removal can be lazy, which is what
- * lets the `:jobs` safety-net TTL expire a group without corrupting the index.
- * The reconcile prunes what it observes empty, under a check that re-reads the
- * zset atomically so a group that gained a job in the meantime is never dropped.
+ * Set of groups that may hold a pending job, updated atomically with each
+ * insert. Deliberately a SUPERSET: scanning lifecycle indexes one at a time
+ * can miss a group mid-transition, but over-inclusion is harmless here, so
+ * reconcile can safely prune what it observes empty.
  */
 export const PENDING_INDEX_HELPER_LUA = `
 local function gqMarkPending(keyPrefix, groupId)
@@ -1046,32 +1030,12 @@ return {results, overrideDispatched}
 `;
 
 /**
- * Pop up to maxJobs additional DUE jobs from a single group's pending queue,
- * WITHOUT touching the group's active/ready/blocked/signal state.
- *
- * Safe to call only while the caller already holds the group's active slot
- * (dispatch sets group:<id>:active and excludes active groups from dispatch),
- * so no other worker can concurrently dequeue from this group. Used to coalesce
- * a backed-up group's queued events into a single fold load/apply/store cycle.
- *
- * Two bounds, whichever binds first (ADR-066 pillar 2):
- *   - count: at most maxJobs candidates are considered.
- *   - bytes: the drain stops BEFORE taking a job that would push
- *     initialBytes + (sum of taken jobs' stored sizes) past maxBytes, so a
- *     coalesced batch stays inside the downstream append/flush budget. A job
- *     too large to fit is LEFT in staging (it becomes its own later dispatch),
- *     never dropped. maxBytes <= 0 disables the byte bound (count bound only,
- *     the pre-ADR-066 behaviour). Sizes are the envelope header's recorded
- *     payload size (`s`), falling back to the stored `#value` for values that
- *     carry none — see `gqPayloadSize`. `#value` alone is NOT the append-shaped
- *     quantity: a compressed or offloaded body stores a fraction of what the
- *     batch then holds in memory, which let a 256-wide batch of megabyte
- *     payloads pass a 4 MiB budget untouched.
- *
- * Mirrors the per-job bookkeeping DISPATCH does for the jobs it removes:
- * ZREM from the jobs zset, HDEL the job data, and DECR total-pending. It does
- * NOT mark anything active and does NOT re-score ready — the caller's active
- * job remains the one that frees the group on COMPLETE.
+ * Pop up to maxJobs additional DUE jobs from a group's queue without touching
+ * active/ready/blocked/signal state. Safe only while the caller holds the
+ * group's active slot. Stops at whichever of two bounds binds first (ADR-066
+ * pillar 2): a job-count cap, or a byte cap where an oversized job is left in
+ * staging, never dropped — bytes are the envelope's recorded size, not raw
+ * `#value`, since a compressed body understates what a batch holds in memory.
  */
 const DRAIN_GROUP_LUA =
   PAYLOAD_SIZE_HELPER_LUA +
@@ -1362,61 +1326,12 @@ return 1
 `;
 
 /**
- * Poison guard, claim side (specs/poison-group-park-guard.feature).
- *
- * Records this worker's ownership of a group's claim and returns the number of
- * CONFIRMED worker deaths the group has caused.
- *
- * The guard this replaced counted claims and subtracted a delete: a strike was
- * written before decode and deleted on every path where the process survived,
- * so a surviving strike WAS the death signal. That inference is only sound if
- * the delete is guaranteed, and it is not — it is issued fire-and-forget, and
- * `process.exit(0)` discards whatever Redis has not yet read. Prod ran ~10
- * groups a day into the blocked set that way, every one of them healthy: the
- * park logs sat hours from the nearest deploy, on pods with zero restarts,
- * for jobs whose p99 is 25ms and which had never once retried.
- *
- * So the evidence is positive here. The marker names the process that holds
- * the claim; that process publishes `alive` on a heartbeat and overwrites it
- * with `retired` when it shuts down gracefully. A leftover marker resolves to:
- *
- *   owner is this worker  -> our own lapsed lease under a slow job. Not a death.
- *   owner is `alive`      -> still running; its clear is late or its lease
- *                            lapsed while it works. Not a death.
- *   owner is `retired`    -> shut down on purpose. Not a death.
- *   owner has no beacon   -> was claiming, never retired, no longer heartbeats.
- *                            THAT is a death, and the only thing counted.
- *
- * A dropped clear, a torn-down connection and an abandoned drain all land in
- * the middle three branches, so none of them can park a healthy group; a pod
- * the job actually killed lands in the fourth, and a crash-looping group parks
- * in the same number of laps as before.
- *
- * Two honest limits on those two claims:
- *
- *  - "Nothing healthy parks" holds against every failure of OUR writes, not
- *    against Redis itself being gone. An outage longer than
- *    WORKER_LIVENESS_TTL_SECONDS expires every healthy beacon, and a handoff
- *    claimed in the window after recovery but before the previous owner's next
- *    refresh reads as a death. Reaching a park still needs the threshold met
- *    with no completed job in between (a release resets the marker), so this is
- *    strictly better than the guard it replaces rather than impossible. The
- *    same shape applies if `retireWorker` times out during a shutdown. The park
- *    log carries the observed state so an operator can tell the two apart.
- *
- *  - "The same number of laps" is about crash-loops specifically. A job that
- *    hangs with the event loop free is NOT counted when a routine SIGTERM
- *    overlaps it: the tombstone is written before the platform's SIGKILL, so
- *    that kill reads as a planned exit. That is deliberate — hangs are the
- *    exhausted-retries path's problem, not this guard's
- *    (specs/poison-group-park-guard.feature).
- *
- * Detection also rests on an inequality between constants that live apart:
- * a dead worker's beacon must expire BEFORE its group is redispatched, i.e.
- * WORKER_LIVENESS_TTL_SECONDS must stay under the redispatch floor
- * (`activeTtlSec` minus one heartbeat interval). Pinned by
- * groupQueue.workerLiveness.unit.test.ts so a future retune of either side
- * cannot silently invert it.
+ * Records a claim and returns confirmed deaths, evidence-based rather than
+ * inferred: a leftover marker counts as a death only when its owner publishes
+ * neither `alive` (heartbeat) nor `retired` (graceful exit) — only a beaconless
+ * owner is one. A hang that is SIGTERM'd cleanly is not counted: the retirement
+ * tombstone lands before the platform's SIGKILL. Requires WORKER_LIVENESS_TTL_SECONDS
+ * to expire before redispatch — pinned by groupQueue.workerLiveness.unit.test.ts.
  */
 const CLAIM_GUARD_LUA = `
 local claimKey = KEYS[1]
@@ -1462,17 +1377,9 @@ return { deaths, observed }
 `;
 
 /**
- * Release a claim marker, but only if this worker still owns it.
- *
- * The unconditional DEL this replaced assumed the releasing worker was still
- * the owner. It is not always: heartbeat failures are warn-and-continue, so a
- * worker paused or partitioned past the active-key TTL keeps running while its
- * group is redispatched to someone else. When its job finally returned, its
- * release deleted the NEW owner's marker — erasing both the owner and the
- * accrued death count, so a genuinely poisoned group silently lost its
- * progress toward the threshold and parked later than it should.
- *
- * Same shape as a Redlock release, and the same fix: compare-and-delete.
+ * Release a claim marker only if this worker still owns it — a plain DEL
+ * risks a paused worker deleting a new owner's marker after redispatch,
+ * erasing that group's accrued death count. Same fix as a Redlock release.
  */
 const RELEASE_CLAIM_LUA = `
 local claimKey = KEYS[1]
@@ -1607,37 +1514,16 @@ export interface DrainedJob {
 }
 
 /**
- * Default tenant soft-cap.
- *
- * Chosen as half a worker pod's default concurrency (GLOBAL_QUEUE_CONCURRENCY,
- * 100 — see groupQueue.ts), so no tenant can hold more than half of one pod's
- * in-flight slots. Sizing rationale:
- *
- *   - On a multi-pod cluster (e.g. 4 pods × 100 concurrency = 400
- *     total slots), a single tenant is capped at 12.5% of cluster
- *     capacity. Strong protection against noisy-neighbour starvation
- *     like the 2026-05-11 incident, while leaving ample headroom for
- *     legitimate single-tenant bursts at observed peak loads.
- *
- *   - On a 1-pod self-hosted install, the cap is half of total
- *     capacity → generous for normal use, but still bounds a
- *     pathological runaway loop below catastrophic.
- *
- * Callers can supply a different non-negative value in GroupQueuePolicy.
+ * Default tenant soft-cap: half a worker pod's default concurrency
+ * (GLOBAL_QUEUE_CONCURRENCY, 100), protecting against noisy-neighbour
+ * starvation while still bounding a runaway on a single-pod install.
  */
 export const DEFAULT_TENANT_CAP = 50;
 
 /**
- * Poison guard (specs/poison-group-park-guard.feature): a group
- * is parked once this many claims found their predecessor's worker dead.
- * Deaths tolerated = threshold; the claim that observes the last one parks.
- * Kept small: every extra death is another fleet-wide worker crash.
- *
- * A death is CONFIRMED, never inferred. See {@link CLAIM_GUARD_LUA}: the claim
- * marker names the process that owns it, and that process publishes its own
- * liveness (`alive`, heartbeated) and its own exit (`retired`, written by the
- * graceful shutdown). A leftover marker is only booked as a death when its
- * owner is in neither state.
+ * Poison guard: a group parks once this many claims found their predecessor's
+ * worker dead. A death is CONFIRMED, never inferred — see {@link CLAIM_GUARD_LUA}:
+ * a leftover marker counts only when its owner is neither alive nor retired.
  */
 export const DEFAULT_CONFIRMED_DEATH_THRESHOLD = 3;
 
@@ -1668,16 +1554,9 @@ export const WORKER_LIVENESS_REFRESH_MS = 30_000;
 export const WORKER_RETIRED_TTL_SECONDS = CLAIM_MARKER_TTL_SECONDS * 2;
 
 /**
- * Default consecutive-failure count that quarantines (blocks) a group.
- *
- * Deliberately high: a single group failing this many times inside the TTL
- * window with ZERO interleaved successes is unambiguously a runaway — a producer
- * minting fresh jobs for one group faster than they drain — not a healthy group
- * riding out a transient downstream blip. Prod incident 2026-07-20: one trace's
- * span-sync group churned ~5 fresh jobs/min for 14h against an unmet
- * precondition, taking ~a quarter of the shared queue, yet never tripped the
- * per-JOB `maxAttempts` cap because every failure was a NEW attempt-1 job. This
- * breaker counts failures ACROSS a group's jobs so the group itself terminates.
+ * Deliberately high: only a group failing this many times with zero
+ * interleaved successes is unambiguously a runaway. Counts failures ACROSS
+ * jobs, since per-job `maxAttempts` misses a producer outpacing drain.
  */
 export const DEFAULT_GROUP_QUARANTINE_THRESHOLD = 500;
 
@@ -1690,13 +1569,9 @@ export const DEFAULT_GROUP_QUARANTINE_THRESHOLD = 500;
 export const GROUP_QUARANTINE_TTL_SECONDS = 15 * 60;
 
 /**
- * Splits one dispatch may perform before bisection gives up and hands the
- * remainder to the normal retry/backoff path.
- *
- * Sized to cover every useful descent (isolating one unprocessable payload in a
- * 256 batch costs 8 splits; converging to sub-batches of 8 costs 31) while
- * cutting off the pathological singleton-degradation walk (~2N calls) that
- * would otherwise run under the group lock for the whole tree.
+ * Splits one dispatch may perform before bisection hands the remainder to
+ * retry/backoff. Sized to cover every useful descent (8 splits isolates one
+ * bad payload in a 256 batch) while cutting off the pathological ~2N-call walk.
  */
 export const DEFAULT_BISECTION_SPLITS_PER_DISPATCH = 32;
 
@@ -1720,12 +1595,11 @@ export const DEFAULT_GLOBAL_BUDGET = 0;
 export const GROUP_QUEUE_REGISTRY_KEY = "{gq-registry}:names";
 
 /**
- * TypeScript wrapper for the group queue Lua scripts.
- * All Redis keys use the `{queueName}` hash tag for Redis Cluster compatibility.
- * Lua scripts derive per-group keys dynamically (e.g. keyPrefix .. "group:" .. groupId)
- * instead of passing them via KEYS[]; this is safe because keyPrefix includes the hash
- * tag, so all derived keys hash to the same Redis Cluster slot.
+ * All Redis keys share the `{queueName}` hash tag; Lua derives per-group keys
+ * dynamically instead of passing them via KEYS[], safe because they inherit
+ * the same hash tag and so land in the same Cluster slot.
  */
+
 // EVALSHA-cached forms of the scripts above: the source is sent to Redis
 // once per node, every later call ships a 40-byte sha instead of the full
 // 11-23 KB script body (see CachedLuaScript).
@@ -1815,22 +1689,9 @@ export class GroupStagingScripts {
   }
 
   /**
-   * Stage a job into a group's pending queue.
-   *
-   * When dedup is active and the old job is still in staging, squashes in place
-   * (reuses the existing stagedJobId, conditionally updates score/data per
-   * shouldExtend/shouldReplace). When the old job was already dispatched, the
-   * stale dedup key is cleaned up and the new job is staged as genuinely new.
-   *
-   * A squash drops one payload (the replaced old value, or the discarded new
-   * value when `replace` is off). Blob leases move INSIDE the eval, atomic with
-   * the displacement (a post-eval transfer can reorder against a concurrent
-   * squash and leave a phantom entry — the 2026-07-09 leak). `orphanedValue`
-   * reports the displaced value ("" for a genuine new stage). Lease
-   * transitions never delete blobs eagerly.
-   *
-   * @returns `isNew` (true if staged fresh, false if deduped) and the displaced
-   *   `orphanedValue`.
+   * Stage a job into a group's pending queue, squashing in place when dedup is
+   * active; blob leases move INSIDE the eval so a concurrent squash can't leak one.
+   * @returns `isNew` and the displaced `orphanedValue` ("" if none).
    */
   async stage({
     stagedJobId,
@@ -1977,14 +1838,8 @@ export class GroupStagingScripts {
   }
 
   /**
-   * Pick the next eligible group and pop its oldest due job.
-   *
-   * Thin wrapper over {@link dispatchBatch} with maxJobs=1. A dedicated
-   * single-dispatch Lua script used to live here as a near-duplicate of the
-   * batch body; no production caller used it (the dispatcher loop only
-   * batches) and the duplication invited drift between the two scan paths,
-   * so it was removed. One script, one behavior.
-   *
+   * Pick the next eligible group and pop its oldest due job. Thin wrapper over
+   * {@link dispatchBatch} with maxJobs=1.
    * @returns dispatch result or null if nothing to dispatch
    */
   async dispatch({
@@ -2141,16 +1996,9 @@ export class GroupStagingScripts {
   }
 
   /**
-   * Drain up to maxJobs additional DUE jobs from a group's pending queue without
-   * altering the group's active/ready state. Only safe while the caller holds
-   * the group's active slot. Returns the drained jobs (may be empty).
-   *
-   * `maxBytes` caps the coalesced batch by the summed stored size of the jobs
-   * taken, counting `initialBytes` (the dispatched job's own stored size) toward
-   * the budget; the drain stops before a job that would overflow it, leaving that
-   * job in staging for its own later dispatch (ADR-066 pillar 2). `maxBytes <= 0`
-   * (the default) disables the byte bound, so callers that only want the count
-   * bound are unchanged.
+   * Drain up to maxJobs additional DUE jobs without altering active/ready
+   * state; only safe while the caller holds the group's active slot. `maxBytes`
+   * caps the batch by summed stored size including `initialBytes`; `<= 0` (default) disables it.
    */
   async drainGroupReady({
     groupId,
@@ -2284,14 +2132,8 @@ export class GroupStagingScripts {
   }
 
   /**
-   * Re-stage a job with a future dispatch score (backoff delay) while keeping
-   * the active key alive to preserve per-group FIFO ordering. The fastq worker
-   * slot is freed immediately.
-   *
-   * The active key TTL is set to match the backoff period so the key expires
-   * naturally. On the next dispatcher poll (≤5s) the retry job is dispatched.
-   * This is fully Redis-driven — no Node.js timers, survives restarts.
-   *
+   * Re-stage a job with a future dispatch score, keeping the active key alive
+   * for FIFO ordering; TTL matches the backoff, so it decays naturally — fully Redis-driven.
    * @returns true if re-staged, false if stale (active key doesn't match)
    */
   async retryRestage({
@@ -2387,14 +2229,9 @@ export class GroupStagingScripts {
   }
 
   /**
-   * Replace this worker's beacon with a retirement tombstone. A planned exit is
-   * not a worker death, and the tombstone is what says so to whoever inherits
-   * the claim markers this process leaves behind. Outlives the marker itself
-   * (see {@link WORKER_RETIRED_TTL_SECONDS}), so the answer cannot decay from
-   * "retired" into "died" while a marker still refers to it.
-   *
-   * The caller MUST stop the liveness heartbeat first, or a refresh landing
-   * after this write would restore a short-lived `alive` that then expires.
+   * Replace this worker's beacon with a retirement tombstone (planned exit, not
+   * a death) that outlives the claim marker so it can't decay to "died". Caller
+   * MUST stop the heartbeat first, or a late refresh restores `alive` briefly.
    */
   async retireWorker(workerId: string): Promise<void> {
     await this.redis.set(
@@ -2406,17 +2243,10 @@ export class GroupStagingScripts {
   }
 
   /**
-   * Take ownership of a group's claim and report how many worker deaths this
-   * group has now confirmably caused. See {@link CLAIM_GUARD_LUA} for why the
-   * count is derived from the previous owner's beacon rather than from the
-   * absence of a delete.
-   *
-   * @returns the confirmed-death count for the group including any death this
-   *   claim just observed, and what this claim found the previous owner to be —
-   *   `none` (no marker), `self`, `alive`, `retired`, or `gone` (the state that
-   *   books a death). The state is diagnostic only: it is what lets a park line
-   *   distinguish a real crash-loop from a Redis outage that expired healthy
-   *   beacons, which otherwise read identically.
+   * Take ownership of a group's claim; see {@link CLAIM_GUARD_LUA} for why death
+   * counts derive from the previous owner's beacon, not the absence of a delete.
+   * @returns the confirmed-death count and previous-owner state (`none`, `self`,
+   *   `alive`, `retired`, or `gone` — the state that books a death); diagnostic only.
    */
   async recordClaim({
     groupId,
@@ -2448,29 +2278,18 @@ export class GroupStagingScripts {
   }
 
   /**
-   * Release this worker's claim marker, if it is still the owner.
-   *
-   * Losing this write is harmless: the marker it would have removed still names
-   * a live (or cleanly retired) owner, so the next claim reads it as ordinary
-   * rather than as a death.
-   *
-   * Deleting it when we are NOT the owner is not harmless, which is why this is
-   * a compare-and-delete — see {@link RELEASE_CLAIM_LUA}.
+   * Release this worker's claim marker, if it is still the owner. Deleting it
+   * when we are NOT the owner is not harmless, which is why this is a
+   * compare-and-delete — see {@link RELEASE_CLAIM_LUA}.
    */
   async releaseClaim({ groupId, workerId }: { groupId: string; workerId: string }): Promise<void> {
     await releaseClaimScript.run(this.redis, 1, this.claimMarkerKey(groupId), workerId);
   }
 
   /**
-   * Drop the claim marker whoever owns it.
-   *
-   * Only for parking, where the group leaves the dispatch path entirely and the
-   * marker must not survive to re-park the group on the operator's next
-   * unblock. An ownership check here would reintroduce exactly that: the park
-   * can run on a claim this worker never recorded (the guard stands down when
-   * its beacon is unconfirmed, and the oversized-payload park does not consult
-   * the guard at all), and the marker would then be left sitting at the
-   * threshold.
+   * Drop the claim marker whoever owns it. Only for parking: the group leaves
+   * dispatch entirely, so the marker must not survive to re-park later, and an
+   * ownership check here would let it survive when the guard doesn't apply.
    */
   async discardClaim(groupId: string): Promise<void> {
     await this.redis.del(this.claimMarkerKey(groupId));
@@ -2488,13 +2307,8 @@ export class GroupStagingScripts {
   }
 
   /**
-   * Group-quarantine failure streak (specs/poison-group-park-guard.feature).
-   * INCR'd on every RETRYABLE job failure in a group and cleared on the group's
-   * next success (see {@link clearGroupFailures}), so it counts consecutive
-   * failures ACROSS a group's jobs — the runaway signal the per-job `maxAttempts`
-   * cap misses when each failure is a fresh attempt-1 job. The TTL keeps a
-   * sparsely-failing group from accumulating a count from blips hours apart.
-   *
+   * Group-quarantine failure streak: INCR'd on every RETRYABLE failure, cleared
+   * on success; counts consecutive failures across jobs, which per-job `maxAttempts` misses.
    * @returns the streak count including this failure
    */
   async recordGroupFailure(groupId: string): Promise<number> {

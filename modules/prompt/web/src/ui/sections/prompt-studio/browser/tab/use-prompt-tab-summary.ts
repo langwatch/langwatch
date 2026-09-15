@@ -23,13 +23,9 @@ export interface PromptTabSummary {
 }
 
 /**
- * usePromptTabSummary
- *
- * Single Responsibility: Derive everything a prompt tab displays about itself - 
- * title, unsaved state, and version - from the tab store and the prompt queries.
- *
- * Owned here rather than in the tab component so the tab strip and the tab
- * switcher render the same facts from the same source, and cannot drift.
+ * Derives everything a prompt tab displays about itself — title, unsaved
+ * state, and version. Owned here rather than in the tab component so the tab
+ * strip and the tab switcher render the same facts and cannot drift.
  */
 export function usePromptTabSummary(tabId: string): PromptTabSummary {
   const tab = useTabById(tabId);

@@ -78,7 +78,6 @@ export type Window = z.infer<typeof WindowSchema>;
 
 /**
  * State interface for the draggable tabs browser store.
- * Single Responsibility: Defines the complete state and actions for managing a multi-tabbedWindow, multi-tab browser interface.
  */
 export interface DraggableTabsBrowserState {
   /** Array of all windows in the browser */
@@ -86,7 +85,7 @@ export interface DraggableTabsBrowserState {
   /** ID of the currently active tabbedWindow, null if no windows */
   activeWindowId: string | null;
 
-  /** Add a new tab to the active tabbedWindow (or create a new tabbedWindow if none exists). Returns the new tab's ID. */
+  /** Add a new tab to the active tabbedWindow, creating one if none exists; returns its ID. */
   addTab: (params: { data: TabData }) => string;
   /** Remove a tab by its ID, cleaning up empty windows */
   removeTab: (params: { tabId: string }) => void;
@@ -306,11 +305,11 @@ function createTabAwarePersistStorage(
           activeTabId: w.activeTabId,
           tabs: w.tabs.map((t) => {
             currentTabIds.add(t.id);
-            // Reference equality is sufficient (not deep-equal) only because this store is wrapped in
-            // Immer: `produce` structurally shares untouched branches, so an unedited tab's `data`
-            // object keeps the exact same reference across `set()` calls. If this store is ever
-            // updated outside Immer's `set()`, this check silently degrades to "always write" for
-            // every tab.
+            // Reference equality is sufficient (not deep-equal) only because this store is
+            // wrapped in Immer: `produce` structurally shares untouched branches, so an
+            // unedited tab's `data` object keeps the same reference across `set()` calls. If
+            // this store is ever updated outside Immer's `set()`, this check silently
+            // degrades to "always write" for every tab.
             if (lastPersistedDataRefs.get(t.id) !== t.data) {
               storage.setItem(
                 getTabStorageKey(projectId, t.id),
@@ -407,7 +406,6 @@ function createDraggableTabsBrowserStore(projectId: string, capabilities: Prompt
 
         /**
          * Remove a tab by its ID and clean up empty windows.
-         * Single Responsibility: Removes a tab and handles cleanup of empty windows and active state.
          */
         removeTab: ({ tabId }) => {
           set((state) => {
@@ -433,13 +431,15 @@ function createDraggableTabsBrowserStore(projectId: string, capabilities: Prompt
             if (tabbedWindow.tabs.length === 0) {
               state.windows.splice(windowIndex, 1);
 
-              // If we removed the active window, activate the window at same index (next window shifts into position) or previous window if it was last
+              // Activate the window that shifted into this index, or the previous one if
+              // this was last.
               if (state.activeWindowId === tabbedWindow.id) {
                 const nextWindow = state.windows[windowIndex] ?? state.windows[windowIndex - 1];
                 state.activeWindowId = nextWindow?.id ?? null;
               }
             } else if (tabbedWindow.activeTabId === tabId) {
-              // If the removed tab was the active tab, activate tab at same index (next tab shifts into position) or previous tab if it was last
+              // Activate the tab that shifted into this index, or the previous one if this
+              // was last.
               const targetTab = tabbedWindow.tabs[tabIndex] ?? tabbedWindow.tabs[tabIndex - 1];
 
               if (!targetTab) {
@@ -614,7 +614,6 @@ function createDraggableTabsBrowserStore(projectId: string, capabilities: Prompt
 
         /**
          * Check if a tab ID is currently active.
-         * Single Responsibility: Determines if the given tab is the active tab in the active tabbedWindow.
          */
         isTabIdActive: (tabId) => {
           const state = get();

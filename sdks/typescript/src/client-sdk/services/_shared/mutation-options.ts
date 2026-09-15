@@ -1,15 +1,9 @@
 /**
  * The per-call options every mutating call on the billing surfaces takes.
- *
- * WHERE THEY GO. A call whose arguments already ride in an options bag
- * (`disable(id, { reason })`, `reset(id, { endUserId })`) gains these fields in
- * that same bag: one bag per call is what a caller expects. A call that takes a
- * request BODY (`create(input)`, `update(id, input)`) gets a separate trailing
- * parameter instead, because those body types mirror the wire verbatim and must
- * not grow keys the wire has never heard of.
- *
- * They are an interface rather than a bare `signal` so that the next thing a
- * call needs per invocation is an added field rather than an added parameter.
+ * A call with an options bag (`disable(id, { reason })`) gains these fields
+ * there; a call with a request BODY (`create(input)`) gets them as a
+ * separate trailing param, since body types mirror the wire verbatim. An
+ * interface, not a bare `signal`, so a new field never needs a new param.
  */
 
 /** The request header the control plane deduplicates creates on. */
@@ -32,29 +26,19 @@ export interface MutationOptions {
 
 export interface IdempotentCreateOptions extends MutationOptions {
   /**
-   * Makes the create safe to retry. A dropped connection after the write but
-   * before the response looks exactly like a dropped request, and sending it
-   * again without a key mints a SECOND resource. Send the same key on the
-   * retry and the server answers with the first response instead, byte for
-   * byte, including the one-time secret a create hands back.
-   *
-   * Any string of 8 to 255 characters; a UUID minted per logical create is the
-   * usual choice. Receipts answer for 24 hours, and only successful creates
-   * leave one, so a create that failed is safe to run again either way.
-   *
-   * Reusing a key with a DIFFERENT body is refused with `idempotency_error`
-   * rather than quietly answering for the wrong request.
+   * Makes the create safe to retry: resending without a key after a dropped
+   * response would mint a second resource, but the same key replays the
+   * first response verbatim (including its one-time secret). Any 8-255 char
+   * string; a UUID per logical create is typical. Reusing a key with a
+   * DIFFERENT body is refused with `idempotency_error` rather than answering
+   * for the wrong request.
    */
   idempotencyKey?: string;
   /**
-   * Called when the response came from a receipt rather than a fresh write,
-   * i.e. this exact create had already succeeded.
-   *
-   * A hook rather than a field on the returned resource: the resource is
-   * identical either way, so nothing about handling it changes, and the
-   * distinction is something a caller logs rather than branches on. Keeping it
-   * off the return type also keeps the wire-shaped entities free of fields the
-   * wire does not have.
+   * Called when the response came from a receipt, not a fresh write. A hook
+   * rather than a field on the resource: the resource is identical either
+   * way (callers log this, not branch on it), and it keeps wire-shaped
+   * entities free of fields the wire does not have.
    */
   onIdempotentReplay?: () => void;
 }

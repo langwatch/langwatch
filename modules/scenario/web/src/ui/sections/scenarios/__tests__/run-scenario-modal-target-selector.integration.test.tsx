@@ -1,7 +1,11 @@
 /**
  * @vitest-environment jsdom
- * @see specs/features/suites/run-scenario-target-selector-modal-stability.feature,
- *   specs/features/scenarios/unified-agent-target-section.feature, specs/agents/agent-dev-tunnel.feature
+ */
+
+/**
+ * @see specs/features/suites/run-scenario-target-selector-modal-stability.feature
+ * @see specs/features/scenarios/unified-agent-target-section.feature
+ * @see specs/agents/agent-dev-tunnel.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";

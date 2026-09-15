@@ -8,13 +8,9 @@ import * as semconv from "../../../semconv";
 import { SpanStatusCode, trace } from "@opentelemetry/api";
 
 /**
- * Integration tests for LangWatch spans with real OpenTelemetry setup.
- *
- * These tests verify:
- * - Real span data serialization and export
- * - Data format consistency across different input types
- * - Event recording and attribute setting
- * - Integration with OpenTelemetry span lifecycle
+ * Integration tests for LangWatch spans with real OpenTelemetry setup:
+ * serialization, format consistency, event/attribute recording, and span
+ * lifecycle integration.
  */
 
 // Test data constants for consistency

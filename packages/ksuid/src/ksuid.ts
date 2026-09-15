@@ -5,20 +5,9 @@ import { encode, decode } from "./base62.ts";
 import type { ParsedKsuid } from "./types.ts";
 
 /**
- * Represents a K-Sortable Unique IDentifier (KSUID)
- *
- * KSUIDs are globally unique, k-sortable identifiers that include:
- * - Environment prefix (optional, defaults to 'prod')
- * - Resource type (e.g., 'user', 'order')
- * - Timestamp (48-bit Unix timestamp)
- * - Instance identifier (8 bytes)
- * - Sequence number (32-bit counter)
- *
- * @example
- * ```typescript
- * const ksuid = new Ksuid('prod', 'user', 1234567890, instance, 0);
- * console.log(ksuid.toString()); // 'user_0001q4bXFY4siSyoTTkaIIabGiMZo'
- * ```
+ * A K-Sortable Unique IDentifier (KSUID): globally unique, k-sortable, with an
+ * environment prefix, resource type, 48-bit Unix timestamp, 8-byte instance
+ * identifier and 32-bit sequence number.
  */
 export class Ksuid {
   private readonly _environment: string;
@@ -90,11 +79,6 @@ export class Ksuid {
   /**
    * Converts the KSUID to its string representation
    * @returns The KSUID as a string (e.g., 'user_0001q4bXFY4siSyoTTkaIIabGiMZo')
-   * @example
-   * ```typescript
-   * const ksuid = generate('user');
-   * console.log(ksuid.toString()); // 'user_0001q4bXFY4siSyoTTkaIIabGiMZo'
-   * ```
    */
   toString(): string {
     // Cache the string since it's immutable
@@ -137,15 +121,9 @@ export class Ksuid {
   }
 
   /**
-   * Parses a KSUID string and returns a Ksuid instance
    * @param input - The KSUID string to parse
    * @returns A new Ksuid instance
    * @throws {Error} If the input is invalid or malformed
-   * @example
-   * ```typescript
-   * const ksuid = Ksuid.parse('user_0001q4bXFY4siSyoTTkaIIabGiMZo');
-   * console.log(ksuid.resource); // 'user'
-   * ```
    */
   static parse(input: string): Ksuid {
     if (typeof input !== "string") {
@@ -187,15 +165,8 @@ export class Ksuid {
   }
 
   /**
-   * Compares this KSUID with another for equality
    * @param other - The KSUID to compare with
    * @returns True if both KSUIDs are equal, false otherwise
-   * @example
-   * ```typescript
-   * const ksuid1 = generate('user');
-   * const ksuid2 = generate('user');
-   * console.log(ksuid1.equals(ksuid2)); // false (different timestamps)
-   * ```
    */
   equals(other: Ksuid): boolean {
     if (!(other instanceof Ksuid)) {
@@ -212,22 +183,7 @@ export class Ksuid {
   }
 
   /**
-   * Converts the KSUID to a JSON object representation
    * @returns An object containing all KSUID components
-   * @example
-   * ```typescript
-   * const ksuid = generate('user');
-   * console.log(ksuid.toJSON());
-   * // {
-   * //   environment: 'prod',
-   * //   resource: 'user',
-   * //   timestamp: 1234567890,
-   * //   date: '2009-02-13T23:31:30.000Z',
-   * //   instance: { scheme: 82, identifier: [1,2,3,4,5,6,7,8] },
-   * //   sequenceId: 0,
-   * //   string: 'user_0001q4bXFY4siSyoTTkaIIabGiMZo'
-   * // }
-   * ```
    */
   toJSON(): object {
     return {

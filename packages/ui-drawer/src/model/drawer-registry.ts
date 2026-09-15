@@ -1,27 +1,17 @@
 /**
- * The drawer registry MECHANISM, without a single drawer in it.
- *
- * `platform/app/src/components/drawerRegistry.ts` was one file that did two
- * jobs: it held the lazy-loading machinery, and it named forty-five components
- * by module path. The machinery is framework-level and lives here; the names
- * are composition and live where the application composes its features, exactly
- * as `installed-ui-features.ts` composes screens. A feature package publishes
- * its own `{ key: LazyComponent }` map and the host spreads them together.
- *
- * All drawers stay lazy so their transitive dependencies (monaco-editor, shiki,
- * the OTel SDK) stay out of the initial bundle. `CurrentDrawer` wraps rendering
- * in `<Suspense>`, so this just works.
+ * The drawer registry MECHANISM, without a single drawer in it. A feature
+ * package publishes its own `{ key: LazyComponent }` map and the host spreads
+ * them together, so this stays framework-level while drawer names live where
+ * features are composed. All drawers stay lazy so their transitive
+ * dependencies (monaco-editor, shiki, the OTel SDK) stay out of the bundle.
  */
 
 import { type ComponentProps, type ComponentType, lazy } from "react";
 
 /**
- * One drawer, as the registry holds it.
- *
- * `ComponentType` rather than `FC`, and the width is load-bearing: a drawer is
- * mounted by the application's own feature wrapper (`withEvaluatorHost` and its
- * siblings), whose return type is `ComponentType`. Narrowing to `FC` would make
- * every host-wrapped drawer unregisterable.
+ * `ComponentType` rather than `FC`: a drawer is mounted by the host's feature
+ * wrapper (`withEvaluatorHost` and siblings), whose return type is
+ * `ComponentType`, so narrowing to `FC` would make it unregisterable.
  */
 // oxlint-disable-next-line no-explicit-any
 export type UiDrawerComponent = ComponentType<any>;
@@ -57,20 +47,11 @@ export const lazyDrawer = <K extends string, T extends { [P in K]: UiDrawerCompo
 };
 
 /**
- * Fetch a drawer's code before something opens it.
- *
- * Each drawer is its own download, so the first open of one waits on the
- * network with only the Suspense spinner on screen. A screen that knows which
- * drawer its rows open warms it while the person is still reading, and the
- * click then opens the drawer straight away. The bundler keeps the module, so a
- * repeat call costs nothing, and a drawer whose shell is mounted by its page
- * has no chunk of its own to warm.
- *
- * `warm` IS A PARAMETER RATHER THAN AN IMPORT. The application's own warm-up
- * (`@langwatch/ui`'s `warmChunk`) records a failed fetch so the global
- * `vite:preloadError` listener does not force a page reload for a warm-up
- * nobody was waiting on. A package may not import the application, so the host
- * passes its warmer in and the plain load is the default.
+ * Fetch a drawer's code before something opens it, so a screen that knows
+ * which drawer its rows open can warm it while the person is still reading.
+ * `warm` is a parameter rather than an import because a package may not
+ * import the application, and the host's own warm-up (`@langwatch/ui`'s
+ * `warmChunk`) records failed fetches so a lost warm-up never forces a reload.
  */
 export function preloadDrawer({
   registry,
@@ -97,19 +78,11 @@ export function preloadDrawer({
 }
 
 /**
- * Tell a `lazy()` wrapper that its module is already here.
- *
- * The wrapper keeps its own loaded state, apart from the module cache, so a
- * warmed drawer still suspends on its first render and paints the spinner for a
- * moment. Reading the wrapper once outside render settles that state, and the
- * drawer then renders on the first try. The read throws the promise the wrapper
- * is waiting on, which is how a `lazy()` reports that it is not ready yet, so
- * the throw is the expected path and not a failure. Waiting on that promise is
- * what makes the drawer ready by the time this resolves.
- *
- * Called only once the module is in memory: a wrapper that is told to load and
- * fails remembers the failure for the life of the page, which would turn a
- * warm-up that lost the network into a drawer that can never open.
+ * Tell a `lazy()` wrapper that its module is already here, so a warmed
+ * drawer doesn't still suspend and paint a spinner on its first render.
+ * Call only once the module is in memory: a wrapper told to load that fails
+ * remembers the failure for the life of the page, turning a warm-up that
+ * lost the network into a drawer that can never open.
  */
 export function primeLazyComponent(component: object): Promise<void> {
   const wrapper = component as {
@@ -122,21 +95,11 @@ export function primeLazyComponent(component: object): Promise<void> {
     wrapper._init(wrapper._payload);
     return Promise.resolve();
   } catch (pending) {
-    // Duck-typed rather than `pending instanceof Promise`. A promise carries
-    // the identity of the realm that created it, and `instanceof` compares
-    // against the `Promise` of the realm running this line — so the moment the
-    // two differ, the check is false for a perfectly good promise and this
-    // returns WITHOUT waiting for the chunk. The drawer is then reported as
-    // primed while still pending, and renders its spinner after all.
-    //
-    // A browser has one realm, so this was invisible in production and stayed
-    // invisible in tests until the suite moved to a pool that runs each file in
-    // a VM context. `then` is what React itself looks for, and what the promise
-    // contract actually specifies; realm identity was never the question being
-    // asked. `Promise.resolve()` adopts the foreign thenable into a real promise
-    // of THIS realm, which is both what the signature asks for and the right
-    // semantics: a bare PromiseLike carries no `catch`/`finally`, and callers
-    // await this like any other promise.
+    // Duck-typed rather than `pending instanceof Promise`: a promise carries
+    // the identity of the realm that created it, so `instanceof` goes false
+    // across realms (as under a VM-context test pool) for a perfectly good
+    // promise, wrongly reporting the drawer primed while still pending.
+    // `Promise.resolve()` adopts the foreign thenable into this realm's own.
     return isThenable(pending)
       ? Promise.resolve(pending).then(
           () => undefined,
@@ -156,13 +119,10 @@ function isThenable(value: unknown): value is PromiseLike<unknown> {
 }
 
 /**
- * A drawer name, as the address bar spells it.
- *
- * `platform/app` derived this from `keyof typeof drawers`, which only worked
- * while ONE module named every drawer in the product. The registry is composed
- * now, so the navigator is generic over it: `useDrawer<typeof installedDrawers>()`
- * gets the same per-drawer prop checking at the call site, and a caller that
- * does not name a registry gets strings.
+ * A drawer name, as the address bar spells it. The navigator is generic over
+ * the registry (`useDrawer<typeof installedDrawers>()`) so per-drawer prop
+ * checking works at the call site even though drawers are composed rather
+ * than named by one module; a caller that names no registry gets strings.
  */
 export type DrawerTypeOf<R extends UiDrawerRegistry> = keyof R & string;
 

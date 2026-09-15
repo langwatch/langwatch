@@ -81,19 +81,15 @@ export const SERVER_ONLY_CONTRACT_ARTIFACT =
   /\.(?:adapter|api|mapper|migration|port|projection|repository|store)\.ts$/;
 export const CONTRACT_ARTIFACT_SUFFIX = /\.(?:app|commands|errors|events|queries|service)\.ts$/;
 
-// This list is closed. A server source file is one of these shapes or it is not
-// allowed: there is no folder for a name that states a technique rather than a
-// role. Owned state is a repository, messages to something the module does not
-// own are a channel, behaviour is a service, a client the process supplies is a
-// member of the module's Infrastructure beside the app.
+// This list is closed: a server source file must be one of these shapes, named
+// by role, not technique — repository (owned state), channel (messages to
+// something the module doesn't own), service (behaviour), or an Infrastructure
+// member beside the app (a client the process supplies).
+
 /**
- * The closed list, in prose, for the message a refused file prints.
- *
- * The grammar does not say what is forbidden. It says what is allowed, and
- * this sentence is that list read aloud, so an agent that is refused is told
- * the shape to move to rather than being left to guess. It sits beside
- * `SERVER_PATTERNS` because a message that drifts from the patterns coaches
- * the reader into the shape the patterns refuse; a test pins the two together.
+ * The closed list, in prose, for the message a refused file prints — telling
+ * the reader the shape to move to instead of leaving them to guess. Sits beside
+ * `SERVER_PATTERNS`; a test pins the two together so the message can't drift.
  */
 export const SERVER_HOMES =
   "index.ts, <feature>.server.ts, app/<feature>.app.ts, app/<feature>.members.ts, " +

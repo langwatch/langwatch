@@ -1,12 +1,7 @@
 /**
- * The device label a CLI device session is known by on its ApiKey rows.
- *
- * One derivation serves the CLI login key and every ingest key minted under
- * it, so the two carry the same label and a devices listing can show a key
- * beside the session that minted it. Pure and dependency-free so both the
- * api-key module and whichever transport terminates the device flow can
- * derive the same label from the same `client_info` without importing one
- * another.
+ * The device label a CLI device session is known by on its ApiKey rows. One
+ * derivation serves the login key and every ingest key minted under it, kept
+ * pure and dependency-free so two consumers derive the same label without a cyclic import.
  */
 
 /** The device label stamped when an older CLI sends no client_info. */

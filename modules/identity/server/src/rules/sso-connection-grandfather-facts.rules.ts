@@ -10,13 +10,10 @@ import {
 } from "@langwatch/identity-contract";
 
 /**
- * The history a legacy connection would have had, stated in one go: the
- * registration, then a claim/approval/verification for each configured
- * domain, then the activation those years of sign-ins already earned.
- *
- * Pure on purpose — the guard decides WHETHER to grandfather; this only says
- * what grandfathering LOOKS like, which is what makes the shape reviewable
- * beside the lifecycle it replays.
+ * The history a legacy connection would have had, stated in one go:
+ * registration, then claim/approval/verification per domain, then
+ * activation. Pure on purpose — the guard decides WHETHER to grandfather;
+ * this only says what it LOOKS like, reviewable beside the lifecycle it replays.
  */
 export function grandfatheredConnectionFacts(
   data: GrandfatherConnectionCommandData,

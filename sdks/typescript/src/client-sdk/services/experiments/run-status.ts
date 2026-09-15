@@ -53,15 +53,10 @@ export interface PollExperimentRunResult {
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
- * Poll a run to completion.
- *
- * Calls `getStatus(runId)` every `pollInterval` ms until the run reports a
- * terminal status, mirroring the python SDK poll loop. Resolves on `completed`
- * or `stopped`, throws `ExperimentRunFailedError` on `failed`, and throws
- * `ExperimentTimeoutError` if `timeout` ms elapse first.
- *
- * The status fetcher is injected so both the experiment and workflow paths can
- * reuse the same loop.
+ * Polls a run to completion via `getStatus`, mirroring the python SDK poll
+ * loop. Resolves on `completed`/`stopped`, throws on `failed` or on timeout.
+ * The status fetcher is injected so the experiment and workflow paths share
+ * this one loop.
  */
 export const pollExperimentRun = async ({
   runId,
@@ -134,15 +129,11 @@ export const rebaseUrlToEndpoint = (url: string, newBase: string): string => {
 };
 
 /**
- * Fetch a run's per-row results, retrying through the brief post-completion
- * window where the results endpoint 404s ("not yet available") or returns an
- * empty dataset because the ClickHouse projection has not caught up yet.
- *
- * Generic over the result shape: `getResults` performs one fetch and `isEmpty`
- * reports whether it came back without rows. When the run reported rows
- * (`expectsRows`), an empty or failed read is retried up to `maxAttempts` with a
- * fixed `delay`; otherwise the first read is returned. The same loop backs both
- * the experiment and workflow SDK paths and mirrors the python SDK.
+ * Fetches a run's per-row results, retrying through the brief post-completion
+ * window where results 404 or come back empty because the ClickHouse
+ * projection has not caught up. Retries up to `maxAttempts` only when the run
+ * reported rows (`expectsRows`); otherwise the first read is returned. Shared
+ * by the experiment and workflow SDK paths, mirroring the python SDK.
  */
 export const fetchResultsWithRetry = async <T>({
   getResults,

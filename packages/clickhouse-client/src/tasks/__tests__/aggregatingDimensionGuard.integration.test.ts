@@ -1,13 +1,10 @@
 /**
  * @vitest-environment node
  * @integration
- *
- * The static guard (aggregatingDimensionGuard.unit.test.ts) reads the migration
- * files. This one reads the server, so a schema that drifts from the files —
- * a column added by an ALTER, a table an older install still carries — is
- * caught as well. ClickHouse 26 and newer reject a rollup column without a
- * merge rule at CREATE TABLE time, so a database that satisfies this test can
- * also be recreated from scratch on those versions.
+ * Reads the real server (the static `aggregatingDimensionGuard.unit.test.ts` reads migration
+ * files only), catching schema drift the files don't show — an ALTER-added column, a table an
+ * older install still carries. ClickHouse 26+ rejects a rollup column without a merge rule at
+ * CREATE TABLE time, so a database passing this test can also be recreated from scratch there.
  */
 import { type ClickHouseClient, createClient } from "@clickhouse/client";
 import { migrateTestClickHouseOnce, startTestClickHouseEndpoints } from "@langwatch/test-harness";

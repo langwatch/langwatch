@@ -1,16 +1,7 @@
 /**
- * Transient-failure classification and backoff.
- *
- * Two things live here that were previously decided inline at the retry site.
- *
- * Classification is a policy, not a detail: whether a failure is worth
- * retrying has to match the outer queue's classifier, or the two layers
- * disagree and a permanent failure burns a 25-attempt budget. The caller
- * supplies the shared message fragments rather than this package owning a
- * second copy of the list.
- *
- * Backoff takes an injectable `random` so a test can pin the jitter. That is
- * the only reason it is a parameter.
+ * Transient-failure classification must match the outer queue's classifier —
+ * disagreement lets a permanent failure burn its 25-attempt retry budget.
+ * Backoff takes an injectable `random` only so a test can pin the jitter.
  */
 
 /** Socket-level codes worth another attempt. */
@@ -42,21 +33,9 @@ function statusOf(error: object): number | undefined {
 }
 
 /**
- * The driver's own socket timeout, which carries neither a code nor a status —
- * its message is the only signal it gives, so this one condition has to be
- * recognised by text.
- *
- * Anchored to the WHOLE message, and that is the entire point. The previous
- * form tested `/timeout/i` anywhere in the message, and ClickHouse echoes the
- * failing statement back inside its error text: a query naming a `timeout`
- * column, or setting `max_execution_time` with "timeout" anywhere in a SETTINGS
- * clause, made a permanent failure — a syntax error, a missing table — read as
- * transient and burn the full retry budget against a server that was never
- * going to succeed.
- *
- * Every other timeout ClickHouse itself reports (`TIMEOUT_EXCEEDED`,
- * `SOCKET_TIMEOUT`, `connect ETIMEDOUT`) arrives as a code, a status, or one of
- * the caller's message fragments, and is matched on those instead.
+ * Anchored to the WHOLE message: matching `/timeout/i` anywhere let a query
+ * merely naming a `timeout` column or setting read as transient, burning the
+ * retry budget on a permanent failure that could never succeed.
  */
 const DRIVER_TIMEOUT_MESSAGE = /^timeout error\.?$/i;
 

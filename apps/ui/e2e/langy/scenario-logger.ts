@@ -39,9 +39,10 @@ export async function runScenarioAndLog({
   beforeRetry,
   ...browserQAOptions
 }: { config: RunConfig } & RunOptions): Promise<Result> {
-  // Two transients get one retry, both infrastructure rather than agent behaviour: langy_worker_stopped (the worker died mid-reply,
-  // server-side recovery already exhausted — the panel offers the user a retry too), and a turn that never settled because the
-  // conversation lock was still held or the machine was too loaded to answer inside the adapter's retry budget.
+  // Two transients get one retry, both infrastructure rather than agent behaviour:
+  // `langy_worker_stopped` (the worker died mid-reply, server-side recovery already exhausted)
+  // and a turn that never settled because the conversation lock was held or the machine was too
+  // loaded to answer inside the adapter's retry budget.
   let result: Result;
   try {
     result = await scenario.run(config);
@@ -90,13 +91,10 @@ export async function runScenarioAndLog({
 const writtenSlugs = new Set<string>();
 
 /**
- * The file one transcript lands in.
- *
- * A test that runs several scenarios wrote them all to the same name, so the
- * closing run stood for the whole test: a passing test could leave a FAIL
- * transcript on disk, because that closing run is graded on criteria the
- * asserted one never carried. The first run of a test keeps the plain name,
- * and the ones after it carry the run's own name.
+ * The file one transcript lands in. A test running several scenarios once wrote them all to
+ * the same name, so a passing test could leave a FAIL transcript on disk — the closing run was
+ * graded on criteria the asserted one never carried. The first run keeps the plain name; later
+ * ones carry the run's own name.
  */
 function uniqueSlug({
   testName,

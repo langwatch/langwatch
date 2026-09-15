@@ -1,19 +1,7 @@
 /**
- * Whether an ingest endpoint will carry the ingest key in the clear, and what
- * to say about it.
- *
- * The endpoint a tool is wired with is the one every wire that carries the key
- * uses: the agent's own OTel exporter posts the same bearer to it on every span
- * batch, and the session context hook posts its record beside them. So the
- * scheme is decided once, where the endpoint is chosen, rather than at each
- * caller. Nothing here refuses an endpoint: a self-hosted deployment on a
- * private network is a real setup, and a check that dropped its telemetry would
- * protect nothing while breaking attribution. It warns, and the run continues.
- *
- * Loopback is exempt. A key that never leaves the machine is not exposed by the
- * scheme, and local development is the reason plain http is reachable at all.
- *
- * Spec: specs/ai-governance/cli-wrappers/instrument-command.feature
+ * Whether an ingest endpoint will carry the key in the clear — decided once,
+ * where the endpoint is chosen, since every wire reuses it. Warns rather
+ * than refuses (a private network is real); loopback is exempt entirely.
  */
 
 /** The IPv6 loopback address, in the two spellings a URL can carry. */

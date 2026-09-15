@@ -1,20 +1,10 @@
 /**
  * @vitest-environment jsdom
- *
- * The render seam that keeps a relative window still.
- *
- * `model/analytics-period.ts` is pure and takes `now`, which is what makes the
- * reading testable — and is also a loaded gun. A relative window ends at the
- * instant it is read, so a hook that called the reader straight out of the
- * render body would hand back a NEW `endDate` on every render, to the
- * millisecond. Every analytics read keys on `{ startDate, endDate }`, so the
- * page would refetch forever: in a browser a render loop and a tRPC round trip
- * per frame, and in a test worker a stall that walks to its memory ceiling with
- * every assertion still green.
- *
- * The annotations family paid three hours to find that the hard way. This file
- * is the regression pin so nobody pays again: the window a render sees must be
- * REFERENTIALLY the one the previous render saw, unless the address changed.
+ * The render seam that keeps a relative window still. `analytics-period.ts`
+ * takes `now`, which is testable but a loaded gun: reading it straight out of
+ * render would hand a NEW `endDate` every render, keying `{ startDate,
+ * endDate }` reads into an endless refetch loop. Regression pin: the window
+ * a render sees must be REFERENTIALLY the one before it, unless it changed.
  */
 
 import { renderHook } from "@testing-library/react";

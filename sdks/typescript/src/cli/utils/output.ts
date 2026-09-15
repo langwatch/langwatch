@@ -1,47 +1,7 @@
 /**
- * The one place a command SAYS its successful result — the output contract.
- *
- * Success output used to be hand-rolled per command: some read
- * `--format json`, some a boolean `--json`, some only ever print a table. An
- * agent driving this CLI had to learn each spelling, and flags like `--jq`
- * or `--yaml` did not exist at all. This module replaces that with a single
- * helper and a single resolution function:
- *
- *   await printResult(data, { ...commandOptions, table: renderHumanTable })
- *
- * Formats:
- *
- *   table   the human default — the command's own chalk rendering, passed in
- *           as the `table` callback so it stays visually identical.
- *   json    pretty 2-space JSON.
- *   agents  compact single-line JSON, for LLM context windows. The default
- *           when agent mode is active and nothing more specific was asked for.
- *   yaml    YAML via js-yaml (already a CLI dependency). js-yaml is loaded
- *           lazily — a dynamic import only when YAML output is actually
- *           requested — so the ~8ms it costs to load is not paid by every
- *           invocation. This is why `printResult` is async.
- *
- * Flags (registered on every command by `registerOutputOptions`):
- *
- *   -o, --output <format>   the explicit format. Always wins.
- *   --json <fields>         comma-separated field selection; implies json.
- *   --jq <expr>             a TINY built-in subset — dot paths (`.a.b`), array
- *                           iteration (`.items[]`), an optional field after it
- *                           (`.items[].name`), indexing (`.items[0]`, `.items[-1]`)
- *                           and `length`, with or without a pipe in front. No
- *                           jq dependency.
- *   --limit <n>             keep at most n rows of the result. A projection,
- *                           like `--jq`, so it applies to the machine formats
- *                           only; a command with its own paging `--limit` keeps
- *                           that one instead.
- *   --agent                 agent mode (also auto-detected from env, see
- *                           AGENT_MODE_ENV_VARS): agents format by default,
- *                           colour off, spinners off.
- *
- * Legacy flags keep working: `-f/--format json` and the bare boolean `--json`
- * (the ingest/governance/daemon spelling) are normalised onto the same
- * contract by `resolveOutputOptions` — one central preprocessor, no
- * per-command edits, no breaking change.
+ * The one place a command SAYS its successful result — the output contract:
+ * `await printResult(data, { ...commandOptions, table: renderHumanTable })`.
+ * Legacy flags normalise onto it via `resolveOutputOptions` — no breaking change.
  */
 import type * as yaml from "js-yaml";
 import { Option, type Command } from "commander";
@@ -131,20 +91,9 @@ export const isAgentModeEnv = (env: NodeJS.ProcessEnv = process.env): boolean =>
   AGENT_MODE_ENV_VARS.some((name) => isTruthyEnvValue(env[name]));
 
 /**
- * THE central option preprocessor: maps every spelling a caller can use —
- * new or legacy — onto one resolved format. Pure, so tests (and commands
- * that need to know the format before rendering, like trace search's
- * progress events) can resolve without printing.
- *
- * Precedence:
- *
- *   1. `-o/--output <format>` — explicit always wins (even over agent mode).
- *   2. `--json <fields>` / bare `--json` / `--jq` — explicit machine intent.
- *   3. Legacy `-f/--format json` — the only legacy value that means machine.
- *      ("table"/"digest"/"jsonl" are human spellings, and also the commander
- *      DEFAULTS of those commands, so they must not beat agent mode below.)
- *   4. Agent mode — `agents` when nothing more specific was asked for.
- *   5. `table` — the human default.
+ * THE central option preprocessor: maps every spelling onto one resolved
+ * format. Order matters: explicit flag, explicit json/jq, legacy `-f json`
+ * only (not table/digest/jsonl, commander defaults), agent mode, then table.
  */
 export const resolveOutputOptions = (
   raw: RawOutputFlags,
@@ -187,44 +136,22 @@ export const resolveOutputOptions = (
 };
 
 /**
- * The preAction view of the running command's output context: the command's
- * merged options (its own plus the globals), resolved.
- *
- * One spelling needs disambiguating here rather than in `resolveOutputOptions`:
- * `dataset records add/update` carry their own `--json <json>` PAYLOAD option
- * (a JSON document, required even), which is not the contract's `--json
- * <fields>`. A string there is DATA, not machine-output intent — without this
- * rule a plain human caller adding records would get JSON errors and silenced
- * spinners. The contract's copy is `hideHelp()`'d on every command that does
- * not define its own, so a NON-hidden `--json` on the action command means
- * "this command owns the flag".
+ * The preAction view of the command's output context, resolved. One spelling
+ * needs disambiguating: `dataset records add/update` owns its own `--json
+ * <json>` PAYLOAD option, not the contract's fields spelling — DATA, not intent.
  */
+
 /**
- * Whether the command declares its OWN `--json`, as opposed to the contract's
- * injected copy.
- *
- * `registerOutputOptions` `hideHelp()`s every copy it injects, so a NON-hidden
- * `--json` means the command declared it. Two callers ask this question and
- * want different things from the answer — the payload-vs-fields
- * disambiguation below, and `assertFormatIsSupported`'s narrow bypass — so it
- * lives here once rather than being hand-rolled at each site with its own
- * subtly different meaning.
+ * Whether the command declares its OWN `--json`, not the contract's hidden
+ * injected copy — needed both for the payload-vs-fields check above and
+ * `assertFormatIsSupported`'s bypass, so it lives here once.
  */
 const ownsOwnJsonFlag = (command: Command): boolean => ownsOwnOptionFlag(command, "--json");
 
 /**
- * Does the command define this long flag ITSELF, for its own purposes?
- *
- * `registerOutputOptions` puts the contract's flags on every command, but it
- * refuses to overwrite one a command already owns — `trace export -o <file>`
- * keeps meaning a file path. The reading side has to make the same distinction,
- * or an owned flag gets read as output intent: `trace export -o traces.jsonl`
- * would resolve `traces.jsonl` as a FORMAT, and under an agent env var the
- * format gate then refuses the command outright for asking.
- *
- * Hidden options don't count: the contract's own flags are registered hidden on
- * commands that already own the spelling, so counting them would make every
- * command look like the owner.
+ * Does the command define this long flag ITSELF? `trace export -o <file>`
+ * owns `-o`, so its value must not resolve as output intent. Hidden copies
+ * don't count: the contract registers its own flags hidden.
  */
 const ownsOwnOptionFlag = (command: Command, long: string): boolean =>
   command.options.some((option) => option.long === long && !option.hidden);
@@ -255,26 +182,13 @@ const descend = (value: unknown, key: string): unknown => {
 };
 
 /**
- * What a path segment may look like: a key, then any number of accessors.
- *
- * An ALLOWLIST, deliberately. Anything not matching is REJECTED rather than
- * walked as a literal key, because `descend` answers `null` for any key it
- * cannot resolve: `.traces(x)` would otherwise look up a property literally
- * named `traces(x)`, miss, and print `null` at exit 0, a fabricated answer an
- * agent then builds on.
- *
- * A denylist was tried first and leaked: it caught brackets and quotes but not
- * operators, so `.n - 1` and `.n,.s` still answered `null` silently. Since the
- * grammar here is tiny and closed, the safe default is to name what IS legal
- * and reject the rest.
- *
- * The accessor part is `[]` (iterate) or `[n]` (index, negative counts from the
- * end), repeatable: `.traces[0]`, `.traces[].spans[0]`, `.matrix[0][1]`. The key
- * is optional so root accessors parse too (`.[]`, `.[0]`).
+ * A path segment: a key, then repeatable `[]`/`[n]` accessors — ALLOWLIST,
+ * deliberately. A denylist leaked (missed operators like `.n - 1`), so
+ * unmatched input is REJECTED rather than nulled as a literal key.
  */
-// An accessor is `[]` or `[<n>]`, and a minus needs digits after it: `[-]`
-// would otherwise parse as an index of NaN and traverse to null instead of
-// failing the way an unsupported expression has to.
+
+// A minus needs digits after it: `[-]` would otherwise parse as an index of
+// NaN and traverse to null instead of failing like an unsupported expression.
 const SUPPORTED_SEGMENT_RE = /^([A-Za-z_][A-Za-z0-9_-]*)?((?:\[(?:-?\d+)?\])*)$/;
 
 /**
@@ -338,15 +252,9 @@ const parsePathSteps = (expression: string): PathStep[] => {
 };
 
 /**
- * The built-in jq subset: `.`, `.a.b`, `.items[]`, `.items[].name`, `.items[0]`
- * (negative indexes count from the end), and a terminal `| length` on arrays,
- * strings and objects, and bare `length` too, which is how jq itself spells the
- * count of the whole document. Iteration collects into an array, the way
- * `jq '[ .items[].name ]'` reads.
- *
- * Everything else throws. A wrong expression must fail loudly, not silently
- * print `null` into a pipeline, and an out-of-range index is not a wrong
- * expression: jq answers `null` there and so does this.
+ * The built-in jq subset: dot paths, `[]` iteration, `[n]` indexing, `length`.
+ * Everything else throws rather than silently printing `null`; an
+ * out-of-range index still answers `null`, matching real jq.
  */
 export const applyJq = (expression: string, data: unknown): unknown => {
   const trimmed = expression.trim();
@@ -425,13 +333,9 @@ export const applyJq = (expression: string, data: unknown): unknown => {
 };
 
 /**
- * `--json <fields>`: pick fields, per item when data is an array.
- *
- * Fields may be dotted paths (`config.evaluatorType`). A flat property lookup
- * would treat that as a literal key, miss, and null-fill — reporting "this
- * record has no such field" for a field it does have, which is a lie a machine
- * caller cannot detect. The resulting key keeps the dotted spelling the caller
- * asked for, so the projection round-trips.
+ * `--json <fields>`: pick fields, per item when data is an array. Dotted
+ * paths (`config.evaluatorType`) work too — a flat lookup would miss and
+ * null-fill, falsely reporting "no such field"; the key stays dotted.
  */
 const selectFields = (data: unknown, fields: string[]): unknown => {
   const valueAt = (item: unknown, field: string): unknown => {
@@ -460,12 +364,8 @@ const serialize = async (data: unknown, format: OutputFormat): Promise<string> =
 
 /**
  * The rows in a payload: a top-level array, or the one array a list envelope
- * holds (`{ experiments: [...], pagination }`).
- *
- * Structural, not a key list, and deliberately narrow: an object with two arrays
- * in it, or an array beside fields the caller may be reading, is NOT a list to
- * cut. Answering "there is nothing here to cut" leaves the payload whole, which
- * is always a safe answer; guessing wrong would drop data silently.
+ * holds. Structural, not a key list — ambiguous shapes answer "nothing to
+ * cut" (payload stays whole) rather than guess wrong and drop data.
  */
 const collectionKeyOf = (data: unknown): string | null => {
   if (!data || typeof data !== "object" || Array.isArray(data)) return null;
@@ -476,15 +376,9 @@ const collectionKeyOf = (data: unknown): string | null => {
 };
 
 /**
- * `--limit <n>`: keep at most n rows of the payload.
- *
- * A projection, like `--jq`: the command still fetched what it fetched; this
- * decides how much of it is printed. It exists because "unknown option
- * '--limit'" is where an agent's first read of an unfamiliar list command ends:
- * about twenty commands page server-side with a `--limit` of their own, so the
- * flag reads as universal, and the ones without it answered with an error and a
- * usage dump. Those keep their own flag (it pages, which is better); everything
- * else now takes the cap here.
+ * `--limit <n>`: keep at most n rows — a projection, not a fetch limit. ~20
+ * commands already page server-side with their own `--limit` (better, kept);
+ * this covers the rest, so the flag reads as universal, not "unknown option".
  */
 const applyLimit = (data: unknown, limit: number): unknown => {
   if (Array.isArray(data)) return data.slice(0, limit);
@@ -504,13 +398,9 @@ const applyLimit = (data: unknown, limit: number): unknown => {
 const TOTAL_ALIASES = ["totalHits"] as const;
 
 /**
- * One spelling of the total on every paginated envelope.
- *
- * Asked how many of something there are, a caller reads `.pagination.total`.
- * On a search-backed list that answered null, and the count then came from
- * guessing: `length` over a page that was already capped, or a second tool.
- * The field the API sent is kept as well, so anything reading `totalHits` is
- * unaffected; this only adds the name every other list already uses.
+ * One spelling of the total on every paginated envelope: search-backed lists
+ * answered null on `.pagination.total`, so callers guessed from a capped
+ * page length. The original field (`totalHits`) stays too, alongside this one.
  */
 const withNormalizedTotal = (data: unknown): unknown => {
   if (!data || typeof data !== "object" || Array.isArray(data)) return data;
@@ -557,14 +447,9 @@ export interface PrintResultOptions extends RawOutputFlags {
 }
 
 /**
- * Print a command's successful result in the format the caller asked for.
- *
- * The `table` callback keeps each command's human output exactly as it was;
- * every machine format (json/agents/yaml, `--json` fields, `--jq`) is
- * rendered here, once, instead of per command.
- *
- * Async solely so the yaml format can lazy-load js-yaml (see `loadYaml`);
- * callers must await it so output ordering is preserved.
+ * Print a command's result in the format asked for. `table` keeps each
+ * command's human output as-is; every machine format renders here once,
+ * async only so yaml can lazy-load `js-yaml` (callers must await it).
  */
 export const printResult = async (data: unknown, options: PrintResultOptions): Promise<void> => {
   const { table, ...raw } = options;
@@ -583,15 +468,9 @@ export const printResult = async (data: unknown, options: PrintResultOptions): P
 };
 
 /**
- * What a command SAYS, as opposed to what it PRINTS.
- *
- * A command action returns this instead of writing to stdout itself: `data` is
- * the raw payload — the single source of truth every machine format projects
- * from — and `table` renders the human form. The command never learns which
- * format was asked for; the port below decides. That is the whole point: when
- * format resolution lives in 150 command files, 129 of them get it wrong and
- * nothing detects it, because a chalk table on stdout at exit 0 looks exactly
- * like success.
+ * What a command SAYS, not what it PRINTS: `data` is the one payload every
+ * format projects from, and the command never learns which was asked for.
+ * Resolving it per-command instead fails silently, looking like success.
  */
 export interface CommandResult {
   /** The payload. `-o json|yaml|agents`, `--json <fields>` and `--jq` all project from this. */
@@ -611,34 +490,16 @@ export interface CommandResult {
 const OUTPUT_AWARE_COMMANDS = new WeakSet<Command>();
 
 /**
- * Commands whose `--limit` is the shared cap rather than their own paging flag.
- *
- * About twenty commands page server-side with a `--limit` of their own, and
- * theirs means different things: how many to fetch, how many rows to print, how
- * big a page of a walk that covers the whole window either way. Capping the
- * printed payload on top of those would cut results the caller asked for, so the
- * cap runs only where this module registered the flag itself.
+ * Commands whose `--limit` is the shared cap, not their own paging flag.
+ * ~20 commands page server-side with a `--limit` meaning something else
+ * (rows fetched); capping on top would cut results the caller asked for.
  */
 const CAPPED_COMMANDS = new WeakSet<Command>();
 
 /**
- * The output PORT: register a command's action so whatever it RETURNS is
- * rendered in the caller's format, once, here.
- *
- *     emitsResult(
- *       program.command("list").description("…"),
- *       async (options) => ({ data: agents, table: () => { … } }),
- *     );
- *
- * Resolution reads `optsWithGlobals()` off the running command, so a
- * root-position flag (`lw --output json monitor list` — the spelling the help
- * text teaches, since the root's copies are what render under "Global
- * Options:") resolves the same as a trailing one. Commander only puts
- * root-position globals on the ROOT command, so anything reading the leaf's
- * `opts()` silently drops them.
- *
- * A handler returning nothing is fine — commands that legitimately own their
- * own output (interactive login, the gateway wrappers) just return void.
+ * The output PORT: a command's RETURN renders in the caller's format, once.
+ * Reads `optsWithGlobals()`, not `opts()`: a root-position flag only lands
+ * on the ROOT command, so a leaf's `opts()` silently drops it.
  */
 export const emitsResult = <Args extends unknown[]>(
   command: Command,
@@ -664,28 +525,9 @@ export const emitsResult = <Args extends unknown[]>(
 };
 
 /**
- * The other half of the port: mark a command whose action renders the resolved
- * format ITSELF, through `printResult`, instead of returning a `CommandResult`
- * for `emitsResult` to render.
- *
- * These honour the entire contract — every format, `--json` fields, `--jq` —
- * because `printResult` is the same renderer the port uses. They keep the
- * rendering inside the action only because they have work that must follow the
- * output: `trace search` reports telemetry completion and flushes it, and a
- * `--jq` rejection there has to stay a rendering failure rather than a search
- * one. Returning early would reorder both.
- *
- * Registering them here is what makes the format gate honest. The gate asks
- * "can this command honour the format the caller asked for", and for these the
- * answer has always been yes — but the WeakSet only knew about `emitsResult`,
- * so `lw trace search -o json`, `lw commands -o json` and the whole `skills`
- * group were refused with "does not emit structured output yet" while the code
- * underneath demonstrably did. That refusal even pointed the caller at
- * `lw commands`, which was refused for the same reason.
- *
- * Prefer `emitsResult` for anything new — it owns the rendering, so a command
- * cannot get it wrong. This exists for the handful that genuinely cannot return
- * before their output lands.
+ * The other half of the port: marks a command that renders itself via
+ * `printResult` instead of returning a `CommandResult` — needed only when
+ * work must follow the output without reordering it (prefer `emitsResult`).
  */
 export const rendersOwnResult = (command: Command): Command => {
   OUTPUT_AWARE_COMMANDS.add(command);
@@ -696,22 +538,9 @@ export const rendersOwnResult = (command: Command): Command => {
 export const isOutputAware = (command: Command): boolean => OUTPUT_AWARE_COMMANDS.has(command);
 
 /**
- * Refuse to answer a machine format we cannot actually produce.
- *
- * `registerOutputOptions` puts `-o/--output` on EVERY command, and `choices()`
- * makes a typo fail loudly at parse time. Until a command is migrated to
- * `emitsResult`, a VALID value is the more dangerous case: the flag validates,
- * the command prints its chalk table anyway, and the caller gets human text at
- * exit 0 having explicitly asked for JSON. `--jq` is worse still — the
- * expression is never parsed, so a malformed one also exits 0.
- *
- * So: an EXPLICIT machine format on an unmigrated command is an error, not a
- * table. Agent mode merely detected from the environment is not explicit — the
- * caller asked for nothing, and erroring there would break every unmigrated
- * command the moment it runs under Claude Code — so that case keeps the table
- * and warns on stderr that the output is not machine-readable.
- *
- * Returns the format the request should actually run as.
+ * Refuse an EXPLICIT machine format an unmigrated command can't produce —
+ * it would print its chalk table at exit 0, lying to a JSON-asking caller.
+ * Agent mode merely detected from env is NOT explicit, so it only warns.
  */
 export const assertFormatIsSupported = async (
   actionCommand: Command,
@@ -719,18 +548,11 @@ export const assertFormatIsSupported = async (
 ): Promise<ResolvedOutput> => {
   if (resolved.format === "table" || isOutputAware(actionCommand)) return resolved;
 
-  // A command that defines its OWN non-hidden `--json` (daemon status, the
-  // ingest and governance groups) already emits machine output through that
-  // flag — it just predates the port. Refusing it would break a working
-  // spelling, so bare `--json` passes through.
-  //
-  // Narrowly, though: owning `--json` proves the command can emit ITS json, not
-  // that it can honour every format. `-o yaml` and `--jq` are still beyond it —
-  // `daemon status -o yaml` would print JSON, and a `--jq` expression would
-  // never be parsed — so those stay refusable. Without this narrowing the
-  // bypass also swallows `dataset records add --json '{payload}' -o yaml`,
-  // where `--json` is a PAYLOAD flag and nothing about it implies output
-  // capability at all.
+  // A command with its own non-hidden `--json` (daemon status, ingest/
+  // governance) already emits machine output through it — bare `--json`
+  // passes through. Narrowly, though: `-o yaml` and `--jq` are still beyond
+  // it, so those stay refusable (owning `--json` proves ITS json, not every
+  // format).
   if (
     ownsOwnJsonFlag(actionCommand) &&
     actionCommand.optsWithGlobals().output === undefined &&
@@ -742,27 +564,11 @@ export const assertFormatIsSupported = async (
   const raw: RawOutputFlags = actionCommand.optsWithGlobals();
   const name = actionCommand.name();
 
-  // Only the NEW contract flags are refusable. Legacy `-f/--format json` is
-  // NOT: unmigrated commands implement it themselves (`if (options.format ===
-  // "json")`), so refusing it would break a spelling that has always worked —
-  // which is why `hasExplicitFormatRequest` (which counts it) is the wrong
-  // predicate here. `-o` and `--jq` never existed before this contract, so a
-  // command that cannot honour them has nothing to break.
-  //
-  // `raw.agent` is deliberately NOT in this list. `--agent` is a MODE, not a
-  // format demand — it also means no colour and no spinners, which every
-  // command honours whether migrated or not — so it degrades with a warning
-  // rather than failing. Adding it here would harden `--agent` into a refusal
-  // and break every unmigrated command for the callers most likely to pass it.
-  // Pinned by a test; do not "fix" this into the list.
-  //
-  // A flag the COMMAND owns is not a format demand either. `trace export`
-  // defines its own `-o, --output <file>`, so `-o traces.jsonl` is a file path,
-  // and reading it here refused that command's own primary spelling under
-  // exactly the environment the CLI advertises for agents. Only `--output` is
-  // carved out: `--json` keeps the narrower treatment above deliberately —
-  // owning it proves the command can emit ITS json, not that it can honour
-  // every format, and widening it here would undo that.
+  // Only NEW flags are refusable: legacy `-f/--format json` isn't (unmigrated
+  // commands handle it themselves). `raw.agent` isn't either — a MODE, not a
+  // format demand, so it degrades with a warning (pinned by a test, don't
+  // "fix" this in). A command-owned flag isn't either: `trace export -o` is a
+  // file path, not a format demand — only `--output` is carved out this way.
   const requestedNewContractFlag =
     (raw.output !== undefined && !ownsOwnOptionFlag(actionCommand, "--output")) ||
     raw.jq !== undefined ||
@@ -798,22 +604,9 @@ export const assertFormatIsSupported = async (
 };
 
 /**
- * Apply the resolved output context to the request's output machinery:
- * the error/spinner path (machine formats fail as structured documents and
- * keep spinners silent — see utils/errorOutput.ts and utils/spinner.ts) and
- * colour (agent mode turns it off). Called once per action from the
- * program's `preAction` hook, so a warm daemon serving one command after
- * another cannot leak one caller's format into the next.
- *
- * Under the daemon these land in the request's AsyncLocalStorage scope, so
- * two concurrent requests in one execution window cannot clobber each other's
- * format or colour (see utils/outputScope.ts).
- *
- * Async because the colour half needs chalk, and chalk is kept off the
- * cold-start path: `disableOutputColor` lives in errorOutput.ts and is
- * imported lazily, only when agent mode actually asks for colour-off. The
- * `preAction` hook awaits this, so the disabler has run before the command's
- * action (and its own chalk imports) executes.
+ * Applies the resolved output context once per action, from `preAction`.
+ * Under the daemon this lands in the request's AsyncLocalStorage scope, so
+ * concurrent requests can't clobber each other's format or colour.
  */
 export const applyOutputContext = async (resolved: ResolvedOutput): Promise<void> => {
   // Machine formats fail as structured documents; agent mode's document is the
@@ -828,16 +621,9 @@ export const applyOutputContext = async (resolved: ResolvedOutput): Promise<void
 };
 
 /**
- * The global output flags, added to the root program and to every command
- * that does not already define a conflicting one:
- *
- * - commands with their own boolean `--json` (ingest/governance/daemon) keep
- *   it — the bare flag still normalises to json output;
- * - `trace export` keeps its `-o, --output <file>` (a file path, not the
- *   output contract);
- * - the gateway wrappers (claude/codex/cursor/gemini/opencode) are skipped
- *   entirely: they pass unknown options through to the wrapped binary, and
- *   swallowing `--json` there would steal the wrapped tool's own flag.
+ * The global output flags, skipped only for conflicts: commands with their
+ * own boolean `--json` keep it, `trace export` keeps `-o/--output <file>`,
+ * and the gateway wrappers (pass-through to a wrapped binary) get neither.
  */
 export const registerOutputOptions = (program: Command): void => {
   const globals: {

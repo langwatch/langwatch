@@ -1,12 +1,6 @@
 /**
  * @vitest-environment jsdom
- *
  * Integration tests for creating an experiment from the prompt playground.
- * Tests that:
- * 1. The Experiment button appears next to Compare
- * 2. Dialog shows correct message for single/multiple prompts
- * 3. Experiment is created with prompts as targets
- * 4. Unsaved changes result in localPromptConfig on targets
  */
 
 import { cleanup, render, screen, waitFor } from "@testing-library/react";

@@ -1,5 +1,7 @@
 /**
- * The world every budget-overview assertion reads against: an org, a retired project, a member's personal workspace, a shared department, and five budgets spent across three tenants. Lives beside the test so a second suite can reuse it.
+ * The world every budget-overview assertion reads against: an org, a
+ * retired project, a member's personal workspace, a shared department, and
+ * five budgets spent across three tenants. Lives beside the test for reuse.
  */
 import { nowInstant, toDate } from "@langwatch/time";
 import type { ClickHouseClient } from "@clickhouse/client";

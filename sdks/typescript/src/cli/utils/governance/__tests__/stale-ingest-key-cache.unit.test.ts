@@ -1,18 +1,9 @@
 /**
- * Regression tests for issue #4755: revoking an ingestion key on the
- * platform silently bricks CLI Path B telemetry because the wrapper
- * reuses a locally cached key forever.
- *
- * Contract under test:
- *   1. wrapper-mode: before reusing a cached key, call listIngestionKeys;
- *      derive the cached token's lookupId (format `ik-lw-{16-char lookupId}_{secret}`);
- *      if the server list resolves and the lookupId is not found for that
- *      sourceType → mint a fresh key and persist it.
- *   2. wrapper-mode: if listIngestionKeys rejects → reuse the cache as-is
- *      (offline fallback).
- *   3. login-flow: after a successful device_session login, reconcile
- *      default_personal_ingest_keys — drop entries whose lookupId is not
- *      in the live list, keep ones that are.
+ * Regression for #4755: revoking an ingestion key silently bricks CLI Path B
+ * telemetry because the wrapper reused a cached key forever. Contract: (1)
+ * before reuse, call listIngestionKeys and mint fresh if the cached
+ * lookupId is gone; (2) on a rejected call, reuse the cache (offline
+ * fallback); (3) after login, reconcile cached keys against the live list.
  */
 import * as fs from "node:fs";
 

@@ -1,6 +1,7 @@
 /**
  * @vitest-environment node
- * Real Postgres + real ClickHouse. Debits used to be rounded to micro-USD before summing rather than summed then rounded, so totals drifted with request count. Spec: specs/ai-gateway/budgets.feature
+ * Real Postgres + real ClickHouse: debits were rounded to micro-USD before
+ * summing (not summed-then-rounded), which drifted totals with request count.
  */
 import { fromDate, nowInstant, toDate } from "@langwatch/time";
 

@@ -2,22 +2,11 @@ import { TaskInfrastructureUnavailableError } from "./task.errors.ts";
 
 /**
  * What a task may reach: infrastructure handles the composing process built
- * for real, or left absent because this environment doesn't have it (no
- * `DATABASE_URL`, no `CLICKHOUSE_URL`, ...). A missing handle is a named
- * absence, logged once at boot by the composition root — never a stub that
- * quietly does nothing. A task that needs a handle calls the matching
- * `require*` helper and gets a `TaskInfrastructureUnavailableError` naming
- * the handle, not a null-pointer stack trace three calls deep.
- *
- * Concrete hosts fill in the type parameters with their real handle types
- * (a `PrismaClient`, a ClickHouse client, ...) so `require*` returns a typed
- * value rather than `unknown`. `config` is always present — every process
- * has *some* configuration, even if most of its leaves are unset — so it has
- * no `require*` counterpart.
- *
- * The type parameters default to `unknown` so a plugin can implement `Task`
- * without the generated Prisma client. See
- * `dev/docs/adr/102-runtime-composition-roots.md`, amendment 2026-09-06, for the rest.
+ * for real, or left absent when this environment doesn't have it. A missing
+ * handle is a named absence, logged once at boot — never a silent stub — and
+ * `require*` throws `TaskInfrastructureUnavailableError` naming the handle
+ * rather than a null-pointer trace three calls deep. See
+ * `dev/docs/adr/102-runtime-composition-roots.md` for the rest.
  */
 export abstract class TaskHost<
   Config = unknown,

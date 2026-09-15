@@ -1,5 +1,6 @@
 /**
- * One run plan: its runs in a rail on the left, the results of the selected run filling the rest of the page.
+ * One run plan: its runs in a rail on the left, the results of the selected
+ * run filling the rest of the page.
  * @see specs/features/agent-testing/results-tabs.feature
  * @see specs/suites/run-notes.feature
  */

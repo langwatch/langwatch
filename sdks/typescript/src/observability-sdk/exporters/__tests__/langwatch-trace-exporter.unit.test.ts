@@ -267,8 +267,8 @@ describe("LangWatchExporter", () => {
       const endpoint = "https://subdomain.example.com:8080/path";
       const exporter = new LangWatchTraceExporter({ endpoint });
 
-      // URL constructor behavior: new URL("/api/otel/v1/traces", "https://subdomain.example.com:8080/path")
-      // results in "https://subdomain.example.com:8080/api/otel/v1/traces" (path gets replaced, not appended)
+      // `new URL(path, base)` replaces the base's path rather than appending —
+      // the base's `/path` segment is dropped, not kept as a prefix.
       expect((exporter as any).url).toBe("https://subdomain.example.com:8080/api/otel/v1/traces");
     });
   });

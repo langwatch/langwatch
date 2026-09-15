@@ -1,15 +1,8 @@
 /**
- * The SQL editor, with assistance drawn from the live schema response.
- *
- * Every suggestion and every hover comes from `../logic/lwql-schema-model`,
- * which is a projection of what the schema endpoint returned for this member.
- * Nothing about ClickHouse beyond that is offered: no database list, no system
- * tables, no dataset the response did not carry.
- *
- * The editor never rewrites what is typed. It marks the positions a refusal
- * named and otherwise leaves the buffer alone, because the statement that runs
- * has to be the statement that was written.
- *
+ * The SQL editor, with assistance drawn from the live schema response —
+ * every suggestion comes from a projection of what the schema endpoint
+ * returned, nothing more. Never rewrites what is typed, only marks
+ * refusal positions: the statement that runs must be the one written.
  * @see modules/analytics/specs/analytics-lwql-workbench.feature
  */
 

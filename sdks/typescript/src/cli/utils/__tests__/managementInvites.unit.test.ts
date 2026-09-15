@@ -1,11 +1,7 @@
 /**
- * The invite grammar: the batch repeated flags describe, the batch a JSON
- * document describes, and what a malformed one of either is refused with.
- *
- * Parsed directly rather than through the command, because both spellings must
- * land on the same request and a refusal must say which invite was wrong.
- *
- * @see specs/typescript-sdk/cli-management-apis.feature
+ * The invite grammar, parsed directly rather than through the command since
+ * both spellings must land on the same request and a refusal must say which
+ * invite was wrong. See specs/typescript-sdk/cli-management-apis.feature.
  */
 import { describe, expect, it } from "vitest";
 import { ManagementFlagError } from "../managementFlags";

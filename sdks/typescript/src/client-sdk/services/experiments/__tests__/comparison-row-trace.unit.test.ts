@@ -1,11 +1,10 @@
 /**
  * Which trace a comparison is attributed to when rows are judged concurrently.
- *
  * Spec: specs/experiments/comparison-sdk.feature
  *
- * A real tracer is installed here, unlike the sibling comparison suites: under
- * the no-op tracer every row reports the same all-zero trace, so a verdict
- * pinned to another row's trace would be indistinguishable from a correct one.
+ * A real tracer is installed here, unlike the sibling comparison suites: under the no-op tracer
+ * every row reports the same all-zero trace, so a verdict pinned to another row's trace would be
+ * indistinguishable from a correct one.
  */
 
 import { trace } from "@opentelemetry/api";

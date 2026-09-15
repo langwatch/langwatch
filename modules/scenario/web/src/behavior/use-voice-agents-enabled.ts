@@ -1,13 +1,7 @@
 /**
- * Whether voice agents are turned on for the reader's project.
- *
- * Wraps the one release flag with the ids from `useOrganizationTeamProject`,
- * so every voice surface reads it the same way instead of re-deriving the
- * project and organization at each call site. False while the ids or the flag
- * are still arriving, so a voice surface never flashes on before the flag
- * resolves.
- *
- * @see specs/features/agents/voice-agents-v1.feature
+ * Whether voice agents are turned on for the reader's project. Wraps the
+ * release flag with `useOrganizationTeamProject`'s ids; false while either
+ * is still arriving, so nothing flashes on before the flag resolves.
  */
 
 import { NOT_TARGETED } from "@langwatch/feature-flag-contract";

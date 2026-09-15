@@ -1,27 +1,7 @@
 /**
- * The datapoint step each dashboard widget runs at, held in URL state.
- *
- * Where it lives is the whole point. `CustomGraph` has no `granularitySeconds`
- * column, and adding one is a migration this slice does not own — but the
- * alternative that reaches for component state loses the pick on reload and,
- * worse, drops it out of a shared link: a member who coarsens a card to make it
- * readable and pastes the URL into a thread sends their colleague a different
- * chart from the one they are describing. The dashboard's period already lives
- * in the URL for exactly that reason (`usePeriodSelector`), so the step goes
- * beside it and travels the same way.
- *
- * Encoded as one `widgetGranularity` parameter holding `id:seconds` pairs —
- * `?widgetGranularity=chart_a:3600,chart_b:1` — rather than a parameter per
- * card, so a dashboard of twenty widgets cannot turn the query string into
- * twenty keys, and so the whole picker state is one thing to read, write and
- * clear.
- *
- * Only offered steps are accepted on the way in. A URL is user-editable, and a
- * hand-typed `chart_a:7200` would otherwise reach the run as a step the
- * contract refuses — an error on a shared link, in place of a chart.
- *
- * @see ./use-analytics-period — the period half of the same URL state
- * @see specs/analytics/lwql-saved-charts.feature
+ * The datapoint step each dashboard widget runs at, held in URL state (like
+ * `usePeriodSelector`) so a shared link reproduces the same chart. Only
+ * offered steps are accepted on input, or a hand-typed URL could error.
  */
 
 import { useCallback, useMemo } from "react";

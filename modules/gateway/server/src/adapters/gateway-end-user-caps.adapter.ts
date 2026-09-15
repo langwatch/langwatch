@@ -3,18 +3,12 @@ import { PrismaGatewayBudgetRepository } from "../repositories/prisma/prisma.gat
 import { GatewayEndUserCapsService } from "../services/gateway-end-user-caps.service.ts";
 
 /**
- * The composition seam for end-user caps.
- *
- * A process has a PrismaClient and a spend port; the service wants a budget
- * repository. Wiring one to the other is composition, so it happens here
- * rather than in the service — and the Prisma repository stays private to the
- * package, which is what `private-runtime-export` asks for.
- */
-/**
- * Whatever the budget repository accepts as its database handle. Taken from
- * that factory rather than imported, because generated Prisma belongs below
- * `repositories/prisma` and an adapter naming it would be a second place the
- * containment rule has to be argued about.
+ * The composition seam for end-user caps: wires the process's PrismaClient
+ * and spend port to what the service needs, here rather than in the service
+ * — keeping the Prisma repository private, per `private-runtime-export`.
+ * `BudgetDatabase` is taken from the repository's own factory rather than
+ * imported, so an adapter never names generated Prisma directly — a second
+ * place the containment rule would have to be argued.
  */
 type BudgetDatabase = Parameters<typeof PrismaGatewayBudgetRepository.create>[0];
 

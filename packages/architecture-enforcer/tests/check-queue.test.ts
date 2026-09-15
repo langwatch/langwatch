@@ -1,16 +1,7 @@
 /**
  * @vitest-environment node
- *
- * Tests for dev/scripts/check-queue.mjs, the machine-wide slot the whole-repo
- * checks (typecheck, lint, format) run under so parallel tsgo and oxlint runs
- * across worktrees and agents cannot take the machine down.
- *
- * The wrapper is a concurrency mechanism, so it is driven as a real process:
- * every test spawns the actual script against a scratch queue directory and a
- * fake command that timestamps its own start and end into a shared log. Max
- * observed overlap in that log is what "the limit is honored" means.
- *
- * Corresponds to specs/setup/check-slots.feature.
+ * Tests dev/scripts/check-queue.mjs as a real process (each test spawns it
+ * and a fake command that logs overlap) — see specs/setup/check-slots.feature.
  */
 
 import { type ChildProcess, spawn, spawnSync } from "node:child_process";
@@ -29,13 +20,9 @@ const REPO_ROOT = path.resolve(HERE, "../../..");
 const QUEUE_SCRIPT = path.join(REPO_ROOT, "dev/scripts/check-queue.mjs");
 
 /**
- * The command the wrapper runs. Appends `start` on boot and `end` after
- * `holdMs`, so the log is enough to reconstruct who ran when and how many ran
- * at once.
- *
- * A test that kills the wrapper mid-hold cannot signal this process, which the
- * kernel hands to init instead. Watching for that reparenting is what stops a
- * long hold from outliving the suite as a sleeping process.
+ * The command the wrapper runs: appends `start`/`end` events to a shared log.
+ * A killed wrapper can't signal this process (the kernel reparents it to
+ * init), so it watches for that reparenting to avoid outliving the suite.
  */
 const FAKE_COMMAND = `
 const fs = require("node:fs");
@@ -296,15 +283,10 @@ describe("check queue", () => {
       expect(startOrder(readEvents())).toEqual(["typecheck", "lint"]);
       expect(maxOverlap(readEvents())).toBe(1);
 
-      // One counter only covers both if every whole-repo check actually routes
-      // through it. The scripts live in the workspace-root manifest now, and
-      // they invoke their tools directly rather than through a wrapper — so
-      // what makes the accounting complete is the BIN SHIM: every tool named
-      // below has its `node_modules/.bin` entry replaced by one that hands a
-      // whole-tree invocation to the queue (dev/scripts/install-check-shims.mjs).
-      //
-      // Asserted both ways round. A script that reaches a tool nothing shims
-      // runs uncounted; a shimmed tool no script reaches is a shim for nothing.
+      // One counter only covers every check if the BIN SHIM replaces each tool's
+      // `node_modules/.bin` entry (dev/scripts/install-check-shims.mjs), since the
+      // scripts invoke tools directly. Asserted both ways: unshimmed-but-reached
+      // runs uncounted, shimmed-but-unreached is a shim for nothing.
       const scripts = (
         JSON.parse(readFileSync(path.join(REPO_ROOT, "package.json"), "utf8")) as {
           scripts: Record<string, string>;
@@ -849,13 +831,9 @@ describe("check queue", () => {
     });
 
     /**
-     * A copy of the queue that stops for `stallMs` at one exact point: the
-     * moment the child exists.
-     *
-     * The interrupt this pins is a scheduling race, so no arrangement of real
-     * timing reproduces it on demand. A delay is the one edit that cannot
-     * change what a program does, only when it does it, so injecting one is
-     * what turns the race into a decision the test can make.
+     * A copy of the queue that stalls for `stallMs` right as the child exists —
+     * pins a scheduling race that no real timing can reproduce on demand. A delay
+     * changes only timing, not behavior, turning the race into a decision.
      */
     function queueStalledAsCommandAppears(stallMs: number): string {
       const source = readFileSync(QUEUE_SCRIPT, "utf8");

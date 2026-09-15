@@ -1,16 +1,7 @@
 /**
  * @vitest-environment jsdom
- *
- * The shared chart grid: cards move by their header and resize by their
- * corner, snapping to whole cells; a card can't shrink below one cell; a
- * resize into a neighbour pushes the neighbour down rather than covering it;
- * and a committed placement renders back at the same size.
- *
- * Pointer gestures are driven the way the grid library listens for them:
- * mousedown on the handle, mousemove and mouseup on the document. The grid is
- * given a fixed width so cell geometry is known: 8 columns of 86px with 16px
- * gaps in an 800px grid, 100px rows.
- *
+ * Cards move by header, resize by corner, snapped to whole cells; gestures
+ * fire mousedown on the handle, mousemove/mouseup on document.
  * @see specs/analytics/chart-grid-resize.feature
  */
 

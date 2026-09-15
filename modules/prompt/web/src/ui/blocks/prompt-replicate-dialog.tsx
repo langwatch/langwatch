@@ -1,17 +1,7 @@
 /**
- * Replicating one prompt into another project.
- *
- * A family-local copy of
- * `platform/app/src/components/ui/ReplicateToProjectDialog.tsx` (three other
- * callers, un-repointable), narrowed to the one entity it copies here — the
- * agents family's `agent-replicate-dialog`, second use.
- *
- * WHAT DID NOT TRAVEL is the toast and the log line. Both were the
- * application's to make — a feature-web package may reach neither a toaster
- * singleton nor a logger — so the outcome is handed back to the caller, which
- * is the screen, and the screen tells the host. The refusal to select a project
- * the reader cannot create in is unchanged: the option renders greyed with
- * "(no permission)" and selecting it leaves the button disabled.
+ * Replicates one prompt into another project. The toast and log line do NOT
+ * travel: a feature-web package may reach neither a toaster nor a logger, so
+ * the outcome is handed back to the caller, which tells the host.
  */
 
 import { Button, createListCollection, Field, Text, VStack } from "@chakra-ui/react";

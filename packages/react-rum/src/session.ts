@@ -1,18 +1,8 @@
 import { nowInstant } from "@langwatch/time";
 /**
- * The RUM session: the window of activity a visit represents.
- *
- * Trace ids answer "what happened in this one call"; a session id answers
- * "what else was this person doing around it", which is the question worth
- * asking when a report arrives as "it broke when I was editing the prompt".
- * The web SDK has no session concept, so this supplies one.
- *
- * Kept in `sessionStorage` rather than `localStorage` so it dies with the tab
- * rather than following someone across days, and rotated after a gap in
- * activity so an abandoned tab reopened tomorrow is a new visit rather than a
- * twenty-hour one.
- *
- * See ADR-058 and the OpenTelemetry session semantic conventions.
+ * The RUM session: the window of activity a visit represents (ADR-058).
+ * Kept in `sessionStorage` so it dies with the tab, and rotated after an
+ * inactivity gap so a reopened tab starts a new visit rather than one long one.
  */
 
 const SESSION_ID_KEY = "langwatch.rum.session.id";

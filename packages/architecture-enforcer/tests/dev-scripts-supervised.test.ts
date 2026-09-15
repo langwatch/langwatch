@@ -2,11 +2,8 @@
  * @vitest-environment node
  *
  * dev/scripts/dev-supervisor.mjs is only worth anything to the scripts that
- * run through it. It shipped written and tested with nothing routed to it: the
- * workspace `dev`, `dev:ui`, `dev:api` and `dev:worker` scripts started their
- * commands directly, so a Ctrl-C or a closed terminal left the stack running
- * and printing exactly as it had before.
- *
+ * actually route through it, so this checks `dev`, `dev:ui`, `dev:api` and
+ * `dev:worker` all do rather than starting commands directly.
  * Corresponds to specs/setup/dev-stack-lifecycle.feature.
  */
 

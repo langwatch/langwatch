@@ -1,22 +1,7 @@
 /**
  * Chart and Specification: the chart the specification describes, and the
- * editor for the specification itself.
- *
- * This is the whole of what the result pane mounts for both views. It renders
- * the specification text and reports every edit upward; the text itself is the
- * workbench's, because this component is unmounted by a refused query and
- * anything it held would be lost with it. It holds no query hook and cannot
- * cause a request: switching views or editing a chart never re-runs SQL.
- *
- * The query result is registered as a dataset named `query_result`, which is
- * the only name a specification may read here. It is registered by name rather
- * than pasted into the specification so a Reload can push new rows into the
- * running chart instead of rebuilding it.
- *
- * The default export is the lazy-loading boundary's target: everything Vega is
- * reached from here, so no other route loads any of it.
- *
- * @see modules/analytics/specs/analytics-lwql-workbench.feature
+ * editor for it. Holds no query hook (view switches never re-run SQL) and
+ * registers the result as dataset `query_result` so Reload can push new rows.
  */
 
 import { Badge, Box, Button, HStack, Stack, Text, VStack } from "@chakra-ui/react";
@@ -62,14 +47,9 @@ export interface LangWatchQLChartModeProps {
   /** Switches the result pane to the Specification view. */
   readonly onOpenSpecification?: () => void;
   /**
-   * What the member wrote, or `null` while the specification still follows the
-   * starter for the result on screen.
-   *
-   * Held by the owner rather than here, because this component is unmounted by
-   * things that have nothing to do with the chart: a refused query takes the
-   * whole result body off the page, and a specification stored here would go
-   * with it — the member would fix the SQL, run again, and find their chart
-   * silently replaced by the example.
+   * What the member wrote, or `null` while following the starter spec. Held
+   * by the owner, not here — an unrelated refused-query unmount would else
+   * silently lose it and replace their chart with the example on retry.
    */
   readonly editedSpecText: string | null;
   /** Receives what they wrote, or `null` when they ask for the example back. */
@@ -79,16 +59,9 @@ export interface LangWatchQLChartModeProps {
   readonly pinnedConfig: LangWatchQLVegaConfig;
   readonly colorMode: LangWatchQLVegaColorMode;
   /**
-   * Hands the owner a way to read the specification on screen, so Save can
-   * store it. The same shape the workbench already uses to reach into Monaco:
-   * a registration rather than a parse in the caller, because parsing is what
-   * keeps the Vega-Lite modules behind the lazy boundary — a workbench that
-   * imported the parser would put the whole runtime in the entry chunk
-   * (`vegaLazyBoundary.unit.test.ts` is what would notice).
-   *
-   * Answers the *parsed* specification rather than its text, and `undefined`
-   * while the text is not valid JSON. Called with `null` on unmount so nothing
-   * keeps reading a dead view.
+   * Hands the owner a way to read the on-screen spec for Save — a
+   * registration, not a parse, since parsing here would break the lazy Vega
+   * bundle boundary. Returns `undefined` for invalid JSON; `null` on unmount.
    */
   readonly registerSpecReader?: (read: (() => Record<string, unknown> | undefined) | null) => void;
 }
@@ -100,14 +73,10 @@ const starterFor = (result: LangWatchQLChartResult): string =>
   });
 
 /**
- * What a member can rely on the policy accepting, said next to where they type.
- *
- * A reference, not the rulebook: the validator's refusals each name their own
- * rule and JSON pointer, so this list only has to orient. Every line states a
- * fact the policy modules enforce — marks in `vegaLitePolicy.ts` (image is the
- * one refusal), the dataset name in this file — and the transforms are read
- * straight off the allowlist, which is the only way a member's copy of it
- * cannot fall behind what the policy accepts.
+ * What a member can rely on the policy accepting, said next to where they
+ * type. A reference, not the rulebook — the validator's refusals name their
+ * own rule; transforms are read straight off the allowlist so this copy
+ * cannot fall behind what the policy actually accepts.
  */
 function SpecPolicyPanel({
   errors,

@@ -1,7 +1,8 @@
 /**
  * @vitest-environment jsdom
- * @see specs/features/agent-testing/cases-table.feature, specs/features/agent-testing/suites-rail.feature,
- *   specs/scenarios/scenario-test-suite-assignment.feature
+ * @see specs/features/agent-testing/cases-table.feature
+ * @see specs/features/agent-testing/suites-rail.feature
+ * @see specs/scenarios/scenario-test-suite-assignment.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, renderHook, screen, within } from "@testing-library/react";

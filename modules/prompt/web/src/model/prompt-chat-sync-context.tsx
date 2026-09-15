@@ -13,13 +13,8 @@ interface SubmitTrigger {
 }
 
 /**
- * Context for syncing chat input and submit actions across all open tabs in Prompt Studio.
- * Single Responsibility: Manages shared input state, sync toggle, and submit broadcasts.
- *
- * Architecture:
- * - When sync is enabled, all chat inputs share the same text value
- * - Submit actions broadcast to all synced chats via timestamp-based trigger
- * - Each chat tracks last processed timestamp to prevent duplicate sends
+ * Chat input and submit-action sync state shared across all open Prompt
+ * Studio tabs. Each chat tracks the last processed submit timestamp to avoid double-sends.
  */
 interface PromptPlaygroundChatContextType {
   /** Current synced input value (shared across all tabs when sync enabled) */
@@ -53,21 +48,9 @@ interface PromptPlaygroundChatProviderProps {
 }
 
 /**
- * Provider for synced chat state across tabs.
- * Single Responsibility: Provides context for chat input synchronization and submit broadcasts.
- *
- * Usage:
- * 1. Wrap your component tree with this provider
- * 2. Use `usePromptPlaygroundChatSync()` in child components to access sync state
- * 3. When sync is enabled, input and submit actions are shared across all chat instances
- *
- * How Submit Broadcasting Works:
- * 1. User submits message in any synced chat
- * 2. `triggerSubmit()` creates a new trigger with current timestamp
- * 3. All synced chats receive the trigger via React context
- * 4. Each chat checks if it's already processed this timestamp
- * 5. Unprocessed chats submit the message and mark timestamp as processed
- * 6. This ensures each chat submits exactly once per broadcast
+ * Provider for synced chat state across Prompt Studio tabs. `triggerSubmit`
+ * broadcasts a timestamp-keyed trigger via context; each chat submits only
+ * if it has not already processed that timestamp, so a broadcast fires once per chat.
  */
 export function PromptPlaygroundChatProvider({ children }: PromptPlaygroundChatProviderProps) {
   const [syncedInput, setSyncedInput] = useState("");

@@ -1,34 +1,9 @@
 /**
- * Render the "You're in!" ceremony emitted by `langwatch login` after a
- * successful device-flow exchange.
- *
- * Two clearly-separated lists, sourced from the org's AI Tools catalog:
- *
- *   ✓ Logged in as jane@acme.com @ Acme
- *
- *   Your AI tools (run any of these):
- *     $ langwatch claude   # Claude Code
- *     $ langwatch codex    # Codex
- *
- *   Model providers you can issue a virtual key for:
- *     • anthropic   Claude
- *     • openai      (not configured yet)
- *
- *   Budgets that apply to your key:
- *     $2.43 used of $100.00 this month (whole organization budget), resets Aug 1
- *     $0.00 used of $25.00 this month (personal budget), resets Aug 1
- *
- *   Or open the app in your browser:
- *     $ langwatch open
- *
- * The two sections answer two different questions: which coding assistants
- * can I run right now (`tools`), and which model providers can I mint my own
- * virtual key for (`providers`). They are NOT the same thing — conflating
- * them was the bug this rewrite fixes.
- *
- * Pure function: takes the data, returns an array of lines. Caller applies
- * any chalk colouring + writes to stdout. Lets unit tests assert on the
- * literal output without colour/escape noise.
+ * Renders the "You're in!" ceremony lines emitted by `langwatch login` after
+ * a successful device-flow exchange: identity, available tools, model
+ * providers eligible for a virtual key, and applicable budgets. Tools and
+ * providers answer different questions and must not be conflated. Pure
+ * function — returns lines; the caller applies color and writes to stdout.
  */
 
 export interface LoginCeremonyTool {

@@ -1,6 +1,7 @@
 /**
  * @vitest-environment node
- * Real Postgres + real ClickHouse. Regression for #6934: the wire dropped the character count, so tts calls rated at zero and the ledger recorded nothing.
+ * Real Postgres + real ClickHouse. Regression for #6934: the wire dropped
+ * the character count, so tts calls rated at zero and the ledger recorded nothing.
  */
 import { fromDate, nowInstant, toDate } from "@langwatch/time";
 

@@ -1,21 +1,10 @@
 /**
- * What an analytics test mounts instead of an application.
- *
- * Every screen and section in this package reads its project, the reader's
- * grants, the address and the two notices off `AnalyticsHostApi`. A test that
- * renders one therefore needs a host, and building a real one means building a
- * browser application; this is the double, plus the Chakra provider the
- * components need to render at all.
- *
- * The notices, the navigations and the query writes are RECORDED rather than
- * performed, so a test asserts on what the screen SAID — which is the point of
- * the port, and the only way to assert on an address whose overlay the
- * application chrome has not mounted yet.
- *
- * `testing.tsx` sits at the package root by the same rule `index.ts` does: it is
- * a package entry, not private implementation, and the governed layout names
- * both as root exceptions. It is deliberately not a package export — nothing
- * outside this package's own suites should mount a fake host.
+ * What an analytics test mounts instead of an application: every screen and section here
+ * reads its project, the reader's grants, the address and the two notices off
+ * `AnalyticsHostApi`, so a test needs a host — this double, plus the Chakra provider.
+ * Notices, navigations and query writes are RECORDED rather than performed, so a test asserts
+ * on what the screen SAID. Sits at the package root like `index.ts` (a governed root-exception
+ * entry point), and is deliberately not a package export — only this package's own suites use it.
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

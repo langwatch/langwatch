@@ -1,26 +1,8 @@
 /**
- * Experiments API
- *
- * Run batch experiments over datasets with automatic tracing,
- * parallel execution, and built-in evaluator support.
- *
- * @example SDK-defined experiment
- * ```typescript
- * const langwatch = new LangWatch({ apiKey: process.env.LANGWATCH_API_KEY });
- * const experiment = await langwatch.experiments.init('my-experiment');
- *
- * await experiment.run(dataset, async ({ item, index, span }) => {
- *   const response = await myAgent(item.question);
- *   experiment.log('accuracy', { index, score: 0.95 });
- * });
- * ```
- *
- * @example Platform-configured experiment (Experiments Workbench)
- * ```typescript
- * const langwatch = new LangWatch();
- * const result = await langwatch.experiments.run("my-experiment-slug");
- * result.printSummary();
- * ```
+ * Experiments API: run batch experiments over datasets with automatic tracing, parallel
+ * execution, and built-in evaluator support. SDK-defined: `langwatch.experiments.init(name)`
+ * then `experiment.run(dataset, fn)`. Platform-configured (Experiments Workbench):
+ * `langwatch.experiments.run("slug")` then `result.printSummary()`.
  */
 
 export { Experiment } from "./experiment";

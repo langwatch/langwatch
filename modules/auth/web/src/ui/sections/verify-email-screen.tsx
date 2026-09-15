@@ -4,19 +4,10 @@ import { useSearchParams } from "../../behavior/use-route.ts";
 
 /**
  * Email verification magic-link landing page; renders only, no request; proof stays in URL.
- *
- * ── Why there is no expired-link state here ─────────────────────────────
- *
- * Because this page never spends the link, it can never learn that the link is
- * dead. Whether a token is expired, already used or invented is the answer to
- * a request, and making one here is exactly what the design above forbids — a
- * scanner would spend somebody's verification for them. The expired-link
- * screen therefore lives where the token is actually spent: the initiating
- * window, and the sign-up landing at `/auth/signup?verify=`.
- *
- * What this page CAN know without asking anybody is whether the link carried a
- * token at all, and it says so, because a link with nothing in it is the one
- * dead end where "go back to your other window" is useless advice.
+ * There's no expired-link state here on purpose: this page never spends the link, so it can
+ * never learn whether the token is expired, used or invented — making that request here is
+ * exactly what a scanner spending someone else's verification would exploit. That state lives
+ * where the token is actually spent instead (the initiating window, and the sign-up page).
  */
 export default function VerifyEmail() {
   const query = useSearchParams();

@@ -24,64 +24,25 @@ const NOOP_LOGGER_PROVIDER: LoggerProvider = {
  */
 let currentLoggerProvider: LoggerProvider = NOOP_LOGGER_PROVIDER;
 
-/**
- * @module observability/logger
- * @description
- * Provides LangWatch logger integration with OpenTelemetry, including logger provider
- * management and logger creation utilities.
- *
- * @remarks
- * This module allows you to set a global logger provider, retrieve LangWatch loggers,
- * and wrap OpenTelemetry loggers with LangWatch-specific functionality.
- *
- * @see {@link setLangWatchLoggerProvider}
- * @see {@link getLangWatchLogger}
- * @see {@link getLangWatchLoggerFromProvider}
- * @see {@link createLangWatchLogger}
- */
+/** Sets the global logger provider that {@link getLangWatchLogger} will use. */
 export function setLangWatchLoggerProvider(loggerProvider: LoggerProvider): void {
   currentLoggerProvider = loggerProvider;
 }
 
 /**
- * Retrieves a LangWatch logger with the specified name and optional version.
- *
- * @param name - The name of the logger (typically your service or module name).
- * @param version - (Optional) The version of the logger.
- * @returns A {@link LangWatchLogger} instance.
- *
- * @remarks
- * Uses the logger provider set during observability setup. If no provider is set, returns
- * a NoOp logger.
- *
- * @example
- * ```ts
- * const logger = getLangWatchLogger("my-service");
- * logger.info("Service started");
- * ```
- *
- * @see {@link setLangWatchLoggerProvider}
+ * @param name - The logger name (typically your service or module name).
+ * @param version - Optional logger version.
+ * @returns A {@link LangWatchLogger} instance, or a no-op logger if no provider was set.
  */
 export function getLangWatchLogger(name: string, version?: string): LangWatchLogger {
   return getLangWatchLoggerFromProvider(currentLoggerProvider, name, version);
 }
 
 /**
- * Retrieves a LangWatch logger from a specific OpenTelemetry logger provider.
- *
  * @param loggerProvider - The OpenTelemetry logger provider to use.
  * @param name - The name of the logger.
- * @param version - (Optional) The version of the logger.
+ * @param version - Optional logger version.
  * @returns A {@link LangWatchLogger} instance.
- *
- * @remarks
- * Use this function if you want to use a custom logger provider instead of the global one.
- *
- * @example
- * ```ts
- * const customProvider = new LoggerProvider();
- * const logger = getLangWatchLoggerFromProvider(customProvider, "custom-service");
- * ```
  */
 export function getLangWatchLoggerFromProvider(
   loggerProvider: LoggerProvider,
@@ -93,17 +54,8 @@ export function getLangWatchLoggerFromProvider(
 
 /**
  * Wraps an OpenTelemetry logger as a LangWatch logger.
- *
  * @param logger - The OpenTelemetry logger to wrap.
  * @returns A {@link LangWatchLogger} instance.
- *
- * @example
- * ```ts
- * import { Logger } from "@opentelemetry/api-logs";
- * const otelLogger = new Logger();
- * const lwLogger = createLangWatchLogger(otelLogger);
- * lwLogger.info("Wrapped logger");
- * ```
  */
 export function createLangWatchLogger(logger: Logger): LangWatchLogger {
   return new LangWatchLoggerInternal(logger);

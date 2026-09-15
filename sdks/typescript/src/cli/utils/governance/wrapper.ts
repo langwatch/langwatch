@@ -1,17 +1,7 @@
 /**
- * exec wrapper helper for `langwatch claude` / `codex` / `cursor` /
- * `gemini`. Loads the persisted device-flow config, optionally
- * pre-checks the budget (Screen-8 box + exit 2 if exceeded),
- * computes the right env-var pair for the tool, and spawns the
- * underlying binary inheriting stdio so the user keeps their
- * familiar UX.
- *
- * On Unix we use spawn() with stdio:'inherit'; signals (Ctrl-C,
- * SIGTERM) propagate via the child process group. We do NOT use
- * execve replacement - Node's child_process never replaces the
- * current process, but this is functionally equivalent for the
- * end-user (same exit code, same terminal handling) and works on
- * Windows where execve doesn't exist.
+ * exec wrapper for `langwatch claude`/`codex`/`cursor`/`gemini`. Uses spawn()
+ * rather than execve replacement (Node has none) — functionally equivalent
+ * for the end user, and unlike execve, it works on Windows too.
  */
 
 import { spawn } from "node:child_process";
@@ -119,32 +109,11 @@ function renderContactFooter(adminEmail: string | null | undefined): string {
 }
 
 /**
- * Pre-exec probe for `langwatch <tool>` wrappers. Three layered checks,
- * each gracefully degrading rather than blocking on transient hiccups:
- *
- *   1. `cfg.default_personal_vk?.secret` present - without it the
- *      wrapper would silently inject no env vars and the underlying
- *      tool would call the upstream provider directly (api.anthropic.com
- *      etc.), surfacing as the wrong error or - when there's stale
- *      env from a prior session - a confusing ConnectionRefused
- *      against a stale base URL.
- *   2. `GET <gateway_url>/healthz` reachable. Catches "data plane not
- *      running" and bad `LANGWATCH_GATEWAY_URL` overrides. Fatal: if
- *      the gateway isn't reachable the tool will spin in a retry loop
- *      and there's no recovery. We don't name a specific run command
- *      (`make`, helm chart, docker compose, `npx @langwatch/server`,
- *      etc.) because deployments vary; point the user at the admin
- *      contact instead.
- *   3. `getCliBootstrap()` providers cover the tool's family. Catches
- *      the shape where login succeeds but the org has no AI provider
- *      configured yet, so the gateway has nothing to route to. 404 /
- *      missing-providers data passes through (older self-hosted
- *      servers without the endpoint).
- *
- * Bootstrap is fetched up-front (it lives on the control plane,
- * independent of the gateway data plane) so every failure message can
- * embed the org admin's email as a real contact path. A bootstrap
- * error is non-fatal; we just lose the admin mailto and continue.
+ * Pre-exec probe for `langwatch <tool>`: three layered checks, each degrading
+ * gracefully rather than blocking on a transient hiccup — (1) a personal
+ * virtual-key secret is set, else the tool would silently call the upstream
+ * provider directly; (2) the gateway's /healthz is reachable (fatal: no
+ * recovery from a spin-retry loop); (3) bootstrap's providers cover the tool.
  */
 export async function preflightWrapper(
   cfg: GovernanceConfig,
@@ -264,22 +233,11 @@ function shouldAutoLogin(): boolean {
 }
 
 /**
- * The env re-application prefix for the interactive-shell spawn. Runs
- * INSIDE `$SHELL -i -c` after the rc has been sourced, so the wrapper's
- * mode vars win over anything the rc exported.
- *
- * For scoped-function tools (gemini / opencode / copilot) the prefix
- * additionally `unset -f`s the tool in EVERY mode: a previously
- * persisted Path-B rc function re-applies its frozen env AT INVOCATION
- * TIME — after these exports — so leaving it in place lets stale state
- * win over this run's resolution. Concretely: on gateway runs the
- * function re-injects OTel exporter env on top of gateway capture
- * (double trace, double cost); on ingestion runs it overrides a
- * freshly-minted token with a stale one (silent 401s) and re-enables
- * content capture the user explicitly opted out of. `unset -f` removes
- * only the function FROM THIS SHELL SESSION — user aliases survive
- * (the whole reason for the interactive shell) and the rc file is
- * never touched, so bare `<tool>` runs keep capturing.
+ * Env re-application prefix run inside `$SHELL -i -c` after the rc is
+ * sourced, so the wrapper's vars win over anything the rc exported. For
+ * scoped-function tools it also `unset -f`s the tool: a persisted rc
+ * function would otherwise reapply its frozen env at invocation and win
+ * instead — session-only, so aliases and the rc file stay untouched.
  */
 export function buildShellReapply(args: {
   tool: string;
@@ -296,15 +254,11 @@ export function buildShellReapply(args: {
 }
 
 /**
- * Run one telemetry setup step behind a spinner. Setting a tool up can
- * reach the control plane (confirming the cached ingest key is live, minting
- * a fresh one after a logout), and that used to happen in silence long
- * enough to read as a hang. The spinner is stopped before the result, or the
- * error, reaches the caller, so everything printed after it lands on a clean
- * line.
- *
- * discardStdin:false for the same reason login-flow sets it: ora's default
- * flips stdin to raw mode and swallows Ctrl+C, making the wait unkillable.
+ * Runs one telemetry setup step behind a spinner: reaching the control plane
+ * to confirm or mint an ingest key used to happen in silence long enough to
+ * read as a hang. The spinner stops before the result/error reaches the
+ * caller, so later output lands on a clean line. `discardStdin:false` for
+ * the same reason login-flow sets it — ora's raw-mode default swallows Ctrl+C.
  */
 export async function withTelemetrySetupSpinner<T>({
   tool,

@@ -30,17 +30,11 @@ export interface SignInMethodPolicyResolver {
 }
 
 /**
- * What the submitted address's account holds (ADR-117, revision 2026-08-25).
- *
- * The one per-user read the router makes, and the reason the revision needed
- * an ADR rather than a patch: this port is the account-existence answer the
- * engine was originally built not to have. It answers KINDS — a password, a
- * passkey, which connections — and never a credential, so what crosses this
- * seam is the same information the method screen is about to draw anyway.
- *
- * `null` means no account holds the address, which is a routing answer rather
- * than an absence: it is what sends somebody to sign-up instead of to a
- * password box they cannot pass.
+ * What the submitted address's account holds (ADR-117, revision 2026-08-25). The one per-user
+ * read the router makes: it answers KINDS — a password, a passkey, which connections — and
+ * never a credential, so what crosses this seam is the same information the method screen is
+ * about to draw anyway. `null` means no account holds the address, a routing answer rather than
+ * an absence: it is what sends somebody to sign-up instead of a password box they cannot pass.
  */
 export interface SignInAccountLookup {
   findAccountMethods(input: {
@@ -78,17 +72,12 @@ export interface SignInRoutingRecord {
   breakGlass: boolean;
   breakGlassRateLimited: boolean;
   /**
-   * WHO walked through the local door — the address as it was submitted —
-   * and null on every other sign-in.
-   *
-   * The deliberate exception to the rule above, and the reason is that the
-   * rule's reason does not apply here. `domain` is the org-level fact every
-   * ordinary sign-in is decided on, and putting the person in a line written
-   * on every attempt is how a log becomes a mailing list. A granted
-   * break-glass is not an ordinary attempt: it is rare, it is deliberate, it
-   * bypasses the identity provider the organization chose, and ADR-117 §2
-   * says it is audited. An audit record that cannot say who used the door is
-   * not one.
+   * WHO walked through the local door — the address as submitted — and null on every other
+   * sign-in. The deliberate exception to the rule above: `domain` is the org-level fact every
+   * ordinary sign-in is decided on, and naming the person on every attempt turns a log into a
+   * mailing list. A granted break-glass is rare, deliberate, bypasses the org's chosen identity
+   * provider, and ADR-117 §2 requires it audited — an audit record that can't say who used the
+   * door is not one.
    */
   breakGlassIdentifier: string | null;
 }
@@ -175,24 +164,12 @@ export class SignInRouterService {
   }
 
   /**
-   * What the address's account holds, or `undefined` for the cases where the
-   * question does not arise.
-   *
-   * Three of them, and each skip is a decision the engine has already made by
-   * the time the account would matter:
-   *
-   *   - a granted break-glass reads nothing at all, for the same reason it
-   *     reads no connections: the door exists for the days the stores are the
-   *     broken thing.
-   *   - no address means no account to look one up by.
-   *   - a domain that a connection owns routes on the domain, live or
-   *     suspended, and never reaches the account branch. Asking anyway would
-   *     put a second Postgres read on the hot path of exactly the deployments
-   *     that route the most sign-ins.
-   *
-   * So the extra read lands only on an address whose domain nothing owns —
-   * which is the only case whose answer it changes. Sign-in was one Postgres
-   * read before this and is at most two now (epic R12/R13).
+   * What the address's account holds, or `undefined` when the question does not arise: a
+   * granted break-glass reads nothing (the door is for when the stores are broken), no address
+   * means no account to look up, and a domain a connection owns routes on the domain without
+   * reaching the account branch — asking anyway would add a Postgres read to the hot path of the
+   * busiest deployments. So the extra read lands only where nothing owns the domain, the one
+   * case whose answer changes it: sign-in is at most two Postgres reads now (was one; R12/R13).
    */
   private async accountMethods({
     granted,

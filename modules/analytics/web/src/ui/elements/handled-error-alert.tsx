@@ -1,20 +1,9 @@
 /**
- * A failure that is still true, said in place.
- *
- * The inline counterpart to the host's `failed` notice: a toast is for
- * something that just happened, an alert for a panel that is still broken.
- *
- * Harvested from `platform/app/src/features/errors/components/HandledErrorAlert.tsx`
- * with the same prop shape and the same restrained hairline, minus the two
- * things that could not travel: the code-keyed presentation registry, which
- * supplies the specific title, the remediation tips and the docs link, and
- * `ErrorActions`, which renders the copyable trace id. Both are `platform/app`
- * modules and both are a later slice. Until then a named failure reads as the
- * action that failed plus the generic line — which is exactly what the registry
- * itself answers for a code it does not list.
- *
- * The governance and ops families carry the same element, for the same reason
- * and with the same gap. They converge when the registry moves.
+ * A failure that is still true, said in place — the inline counterpart to a
+ * toast (which is for something that just happened). A stripped port,
+ * missing the code-keyed presentation registry and the copyable-trace-id
+ * `ErrorActions` (both later `platform/app` slices), so a named failure
+ * reads as the action plus the generic line until the registry moves.
  */
 
 import { Box, HStack, Stack, Text } from "@chakra-ui/react";

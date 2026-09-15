@@ -1,32 +1,10 @@
 /**
  * @vitest-environment jsdom
- *
- * What the dashboard widget asks for, and which answer it draws.
- *
- * Three claims a member would be hurt by getting wrong, and none of them is
- * visible from the component's props.
- *
- * The **coarsen request** is the one that keeps a card from blanking: the
- * widget does not own the period, so a saved one-second chart meets a
- * year-wide dashboard sooner or later. `onBudgetOverflow: "coarsen"` has to
- * reach the wire — a widget that sent the workbench's `"refuse"` would show an
- * error on a card whose owner changed nothing, and every prop-level assertion
- * would still pass.
- *
- * The **notice** is what stops the coarsening being a silent substitution, and
- * it must appear only when one happened: a notice on an uncoarsened card tells
- * a member their numbers were changed when they were not.
- *
- * The **stale answer** is the one that is invisible by construction. A period
- * drag fires a run per intermediate window and nothing orders the responses, so
- * without a sequence guard the card can settle on the answer for a period the
- * dashboard already left, with no spinner and nothing on screen admitting it.
- *
- * The tRPC client is mocked at `~/utils/api` rather than driven through a real
- * one, so that a mutation's resolution can be held open and released out of
- * order — which is the whole shape of the race being pinned.
- *
- * @see specs/analytics/lwql-saved-charts.feature
+ * What the dashboard widget asks for, and which answer it draws — none of it is visible from
+ * the component's props alone, so these assertions pin the wire-level request and the response
+ * ordering. The tRPC client is mocked at `~/utils/api` (not driven through a real one) so a
+ * mutation's resolution can be held open and released out of order, which is the whole shape of
+ * the race being pinned. @see specs/analytics/lwql-saved-charts.feature
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

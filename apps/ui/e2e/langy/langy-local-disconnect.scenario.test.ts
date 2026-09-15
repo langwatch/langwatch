@@ -1,13 +1,7 @@
 /**
- * The folder goes away while Langy is working (ADR-129).
- *
- * The developer presses Ctrl-C in the middle of a turn. Langy's next tool call
- * reads the offline pushback, so the turn has to end in words that say the
- * folder is gone, and the next code ask has to record a fresh control request
- * rather than carrying on as if the machine were still there.
- *
- * RUN (one file per vitest run, see README):
- *   cd platform/app/e2e/langy && npx vitest run langy-local-disconnect.scenario.test.ts --reporter=verbose
+ * The folder goes away while Langy is working (ADR-129): the next tool call
+ * must read the offline pushback, end the turn saying so, and treat the next
+ * code ask as a fresh control request rather than assume the machine is still there.
  */
 
 import { openai } from "@ai-sdk/openai";

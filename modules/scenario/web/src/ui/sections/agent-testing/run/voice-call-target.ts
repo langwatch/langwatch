@@ -1,17 +1,9 @@
 /**
  * Resolving the voice-call the run dialog's "Call it myself" action opens.
- *
- * A pure module so the detection — voice target alone, transport from the
- * agent's config, scenario id only when exactly one scenario is in scope — is
- * unit-tested without mounting the dialog or pulling the call panel's transport
- * clients into the test.
- *
- * A voice call is offered only when exactly one scenario is in scope: a single
- * case, or a suite holding exactly one scenario. A `plan` subject (many
- * scenarios) or an empty scope has no single scenario to score the call under,
- * so no target is resolved (null) and the dialog gates the action off (#8019
+ * Offered only when exactly one scenario is in scope: a `plan` subject (many
+ * scenarios) or an empty scope has no single scenario to score the call
+ * under, so no target is resolved and the dialog gates the action off (#8019
  * AC9) — a resolved target always names the scenario it is scored under.
- *
  * @see specs/features/agents/voice-agents-v1.feature
  */
 

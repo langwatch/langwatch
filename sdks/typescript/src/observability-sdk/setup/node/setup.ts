@@ -84,7 +84,7 @@ const warnIfMisconfigured = (
   logger: Logger,
 ) => {
   // Check if LangWatch is disabled but no alternative export mechanisms are provided
-  // Note: If we reach this function, we know advanced.disabled and advanced.skipOpenTelemetrySetup are false
+  // Note: reaching here means advanced.disabled/skipOpenTelemetrySetup are already false,
   // because those are handled as early exits in setupObservability()
   if (langwatch.disabled) {
     const hasAlternativeExport =
@@ -117,28 +117,11 @@ const warnIfMisconfigured = (
 type TerminationSignal = "SIGINT" | "SIGTERM";
 
 /**
- * Registers the flush-on-exit handlers that back `advanced.disableAutoShutdown`.
- *
- * Observability tooling must never terminate its host. Node runs *every* listener
- * registered for a termination signal, so an SDK that calls `process.exit()` when its
- * own flush finishes ends the process out from under everybody else's: a host draining
- * a queue, finishing in-flight database writes or closing connections loses the rest of
- * its shutdown a second or two in. So the handlers below flush and then hand the
- * decision about the process back to whoever else is listening.
- *
- * That leaves one case to protect. A signal that has at least one listener no longer
- * performs Node's default action, so a bare "flush and do nothing" would silently
- * neuter Ctrl+C for a one-shot script whose only listener is ours. The two candidate
- * fixes were (a) keep exiting but only when we installed the sole listener, and (b) drop
- * the exit entirely and accept that such a script hangs. Neither is quite right: (a)
- * still reports a success status for a process that was signalled, and (b) regresses
- * every CLI that uses the SDK. So we do neither literally — after flushing we remove our
- * own listeners and, if that leaves the signal with no listeners at all, re-raise the
- * same signal at ourselves. Node then applies the default action and the process ends
- * exactly as it would have without the SDK loaded, reporting the signal (128+n) instead
- * of the `process.exit(0)` this code used to fake. Removing our listeners first is also
- * what makes the count trustworthy when several SDK instances are registered: each one
- * drops out as it finishes, and only the last one out re-raises.
+ * Registers flush-on-exit handlers backing `advanced.disableAutoShutdown`.
+ * Never calls `process.exit()` directly — Node runs every listener for a
+ * signal, so exiting early would cut off other listeners' shutdown work.
+ * Instead: flush, remove our own listeners, and if none remain, re-raise the
+ * signal so Node's default action still applies (correct 128+n exit code).
  */
 const registerAutoShutdownHandlers = ({
   sdk,
@@ -630,26 +613,11 @@ export function createAndStartNodeSdk(
 }
 
 /**
- * Ensure observability is set up, but only if not already configured.
- *
- * This is an idempotent function that:
- * - Does nothing if OpenTelemetry is already configured (by you or another library)
- * - Sets up LangWatch observability if no tracer provider exists
- * - Does nothing if LANGWATCH_API_KEY is not set
- *
- * This is useful for libraries/SDKs that want to ensure tracing is available
- * without conflicting with user's existing observability setup.
- *
- * @example
- * ```typescript
- * import { ensureSetup } from "langwatch/observability/node";
- *
- * // Safe to call - won't conflict with existing setup
- * ensureSetup();
- *
- * // Now you can use tracing
- * const tracer = trace.getTracer("my-app");
- * ```
+ * Ensures observability is set up, but only if not already configured:
+ * idempotent — does nothing if OpenTelemetry (or LangWatch) is already
+ * configured, sets it up if no tracer provider exists, and does nothing if
+ * LANGWATCH_API_KEY is unset. For libraries that want tracing available
+ * without conflicting with the host app's own observability setup.
  */
 export const ensureSetup = (): ObservabilityHandle => {
   const globalProvider = trace.getTracerProvider();

@@ -1,13 +1,9 @@
 /**
- * How a submission reaches the LangWatchQL endpoint.
- *
- * The vanilla tRPC client rather than `useMutation`, for one reason: the
- * request has to be abortable. Leaving the workbench mid-query must cancel the
- * HTTP request, not merely ignore its answer, and the mutation hook exposes no
- * signal. This is the same seam and the same unwrapping `spanTreePagedQuery`
- * uses for the span tree.
- *
- * @see ~/features/traces-v2/hooks/spanTreePagedQuery — the pattern this follows
+ * How a submission reaches the LangWatchQL endpoint: the vanilla tRPC
+ * client, not `useMutation` — the request must be abortable (leaving the
+ * workbench mid-query cancels the HTTP request, not just ignores the
+ * answer), and the mutation hook exposes no such signal. Same seam
+ * `spanTreePagedQuery` uses for the span tree.
  */
 
 import type { LangWatchQLQueryResult } from "@langwatch/analytics-contract";

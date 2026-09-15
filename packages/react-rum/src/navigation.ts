@@ -1,17 +1,7 @@
 /**
- * Navigation spans: an in-app route change as a unit of work.
- *
- * Document load is one span at the start of a visit; everything after it is a
- * client-side navigation the browser never tells anyone about. Without this,
- * the calls a page makes on arrival are orphan traces with no statement of what
- * the user was doing, and "opening the traces page is slow" has nothing to
- * measure it against.
- *
- * Router-agnostic on purpose: the router lives in the application, so the
- * application drives this — begin when the router starts navigating, name the
- * route once it commits, settle when the new page has had its chance to fetch.
- *
- * See ADR-058 and specs/observability/browser-rum-trace-correlation.feature.
+ * Navigation spans: an in-app route change as a unit of work, without which a page's post-load
+ * calls are orphan traces with nothing to measure "the traces page is slow" against. Router-
+ * agnostic on purpose. See ADR-058 and specs/observability/browser-rum-trace-correlation.feature.
  */
 
 import {
@@ -42,17 +32,11 @@ export type NavigationType = "resolved" | "instant";
 
 export interface NavigationSpanHandle {
   /**
-   * Marks the moment the new route is on screen, naming the span for it.
-   *
-   * Separate from {@link NavigationSpanHandle.end} because the two answer
-   * different questions. The span's *duration* should be what the user waited
-   * — click to page — so it is measured to here. Its life as the ambient
-   * parent has to run a little longer, because the page dispatches its first
-   * fetches immediately after this.
-   *
-   * The route pattern arrives here rather than at the start because it is only
-   * knowable once the router has matched it: while the navigation is in flight
-   * the application still holds the previous route's params.
+   * Marks the moment the new route is on screen, naming the span for it. Separate from
+   * {@link NavigationSpanHandle.end} because the span's *duration* is what the user waited
+   * (click to page, measured to here), while its life as the ambient parent runs a little
+   * longer since the page dispatches its first fetches right after this. The route pattern
+   * arrives here, not at the start, because it is only knowable once the router has matched it.
    */
   commit({ route }: { route?: string }): void;
   /** Records that the navigation failed rather than completed. */

@@ -3,16 +3,9 @@ import type { WebhookDispatchRateLimiter } from "../ports/webhook-dispatch-rate-
 import { nowInstant } from "@langwatch/time";
 
 /**
- * Per-scope hourly cap on real webhook dispatches — a backstop against an
- * immediate-cadence automation firing per match and turning the worker fleet
- * into an outbound flood. A safety limit, not a billing knob.
- *
- * THE implementation, since 2026-09-02: the platform copy it was frozen
- * against was deleted with the webhook lane. The number, the window and the key
- * it counts under stay pinned as literals, because every process that dispatches
- * counts into ONE Redis keyspace: a second one counting under a different key
- * spends a budget the first was protecting, and a different ceiling lets the
- * higher one through.
+ * Per-scope hourly cap on real webhook dispatches — a safety backstop, not
+ * a billing knob. The number, window and key stay pinned as literals, since
+ * every dispatching process must count into the same one Redis keyspace.
  */
 export const WEBHOOK_DISPATCH_HOURLY_CAP = 1000;
 
@@ -25,20 +18,9 @@ export function webhookDispatchBudgetKey(scopeId: string): string {
 }
 
 /**
- * The cap every dispatch boundary shares.
- *
- * It lives outside the HTTP sender because the platform has two boundaries: an
- * endpoint delivering to a queue would otherwise be uncapped, since it never
- * touches the HTTP sender the cap used to sit in. Each boundary calls this
- * exactly once per attempt, so an attempt is counted once no matter which one it
- * took.
- *
- * The scope is whatever owns the budget: a project for the automations channel,
- * an organization for the webhook endpoints platform.
- *
- * Over the cap this throws RETRYABLE with a Retry-After to the window reset: a
- * legitimate burst backs off and drains, a sustained flood dead-letters after the
- * outbox's max attempts.
+ * The cap every dispatch boundary shares, so a queue-delivering endpoint is
+ * capped too (not just the HTTP sender). Over the cap it throws RETRYABLE
+ * with a Retry-After: a burst backs off, a sustained flood dead-letters.
  */
 export async function assertDispatchBudget({
   rateLimiter,

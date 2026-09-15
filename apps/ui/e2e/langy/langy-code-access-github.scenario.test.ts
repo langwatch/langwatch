@@ -1,14 +1,8 @@
 /**
  * The other half of the code access card: the developer picks GitHub and asks
  * to be remembered, so the next conversation never sees the card again, and
- * clearing the choice brings it back (ADR-129).
- *
- * The facts are the conversation's own local-control state: whether a control
- * request was recorded, and what the remembered preference reads as. No
- * command line runs here, because GitHub is the path that needs none.
- *
- * RUN (one file per vitest run, see README):
- *   cd platform/app/e2e/langy && npx vitest run langy-code-access-github.scenario.test.ts --reporter=verbose
+ * clearing the choice brings it back (ADR-129). No command line runs here,
+ * because GitHub is the path that needs none.
  */
 
 import { openai } from "@ai-sdk/openai";

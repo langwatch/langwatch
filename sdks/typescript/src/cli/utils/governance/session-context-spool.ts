@@ -1,32 +1,10 @@
 /**
- * Declarations that could not be delivered, held for a seam that can.
- *
- * `langwatch ingest context` runs inside the agent's shell, and under codex's
- * default sandbox that shell has no network at all. The command's own retry
- * is worthless there, because every retry runs in the same sandbox. What does
- * get out is the session report: codex spawns its notify program from its own
- * process, outside the sandbox, and the claude hooks run outside it too.
- *
- * So a declaration that cannot be sent is written here instead, and the next
- * seam that reports for any session sends it. One entry per agent and session
- * id: the newest declaration replaces the pending one, since an older one is a
- * checkout the agent has already left. An entry older than an hour is dropped
- * unsent, for the same reason.
- *
- * The drain runs AFTER the seam posts its own directory-derived context, so
- * the declared context is the last record written and becomes the session's
- * current branch. It posts without consulting the fingerprint, because the
- * fingerprint describes what the seam just posted, and it writes the declared
- * fingerprint afterwards so the next turn stays quiet.
- *
- * The queue lives beside the fingerprints, except that codex's sandbox denies
- * every write under the home directory, including into a directory that
- * already exists. It does allow the temp directory, so that is the fallback
- * and a drain reads both. The temp queue is trusted only when its directory
- * belongs to this user and no one else can write to it, since an entry there
- * decides which checkout a session is credited with.
- *
- * Spec: specs/ai-governance/cli-wrappers/session-context-declare.feature
+ * Declarations that could not be delivered, held for a seam that can. Codex's
+ * sandboxed shell has no network, but its notify program (and claude's hooks)
+ * run outside it, so a declaration is queued here and drained by the next
+ * seam that reports for the session. Newest replaces pending per
+ * agent+session; entries older than an hour are dropped unsent. Falls back
+ * to the temp directory, trusted only when it belongs to this user alone.
  */
 
 import * as fs from "node:fs";

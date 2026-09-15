@@ -1,40 +1,10 @@
 /**
- * Runtime path-selection UX for the `langwatch <tool>` wrapper.
- *
- * Before env injection + spawn, the wrapper has to decide which routing
- * shape to apply for this run:
- *
- *   - Path A "gateway"   - LLM calls route through the LangWatch gateway
- *                          via the user's personal virtual key. LLM usage
- *                          is billed to the gateway.
- *   - Path B "ingestion" - the tool calls its own provider with the
- *                          user's own plan/auth; only OTLP telemetry is
- *                          sent to LangWatch via the personal ingest key.
- *
- * Historically the wrapper silently picked the gateway whenever a VK was
- * present and never asked, even when the org policy allowed BOTH paths.
- * This module fixes that: when both paths are allowed, on a TTY, with no
- * remembered answer, it shows an interactive select and remembers the
- * choice in cfg.tool_mode[tool] (the existing per-tool routing field, so
- * the rest of the wrapper reads it the same way it always has).
- *
- * Precedence (highest first):
- *   1. explicit override - `--tool-mode=gateway|otlp` flag, then
- *      `LANGWATCH_TOOL_MODE=gateway|otlp` env. Never prompts, never persists.
- *   2. remembered answer - cfg.tool_mode[tool] pinned to gateway/ingestion.
- *   3. exactly one allowed path (policy gate) - used silently.
- *   4. both allowed + TTY + not forced-auto-login - PROMPT, persist the
- *      answer, print a one-line tip.
- *   5. both allowed + non-TTY / CI / LANGWATCH_AUTO_LOGIN - direct OTLP,
- *      no prompt, no persist. Nobody is there to consent to the gateway
- *      billing model usage to the org, so it is never chosen implicitly.
- *
- * Cancelling the prompt in case 4 cancels the run rather than picking a
- * path on the user's behalf.
- *
- * The `--tool-mode` flag is a WRAPPER flag: it is stripped from the args
- * before they are forwarded to the real tool. Every other arg is
- * forwarded verbatim and in order.
+ * Runtime path-selection UX for the `langwatch <tool>` wrapper: gateway
+ * (billed via the org's virtual key) vs ingestion (tool's own provider,
+ * OTLP-only). Precedence: explicit override > remembered per-tool choice >
+ * the one path policy allows > interactive prompt when both are allowed on a
+ * TTY > silent ingestion otherwise, since nobody is present to consent to
+ * gateway billing on a non-interactive run.
  */
 
 import prompts from "prompts";
@@ -68,14 +38,10 @@ export interface ParsedToolMode {
 }
 
 /**
- * Strip the wrapper-only `--tool-mode` flag from the forwarded args and
- * resolve any explicit override. Supports both `--tool-mode=gateway` and
- * the space-separated `--tool-mode gateway` form. Falls back to the
- * `LANGWATCH_TOOL_MODE` env var when the flag is absent (the flag wins).
- *
- * CRITICAL: only `--tool-mode` is consumed. Every other arg (including
- * flags like `--dangerously-skip-permissions` and quoted positional
- * values) is forwarded untouched and in order.
+ * Strips the wrapper-only `--tool-mode` flag (`=value` or space-separated)
+ * from the forwarded args, falling back to `LANGWATCH_TOOL_MODE` when absent.
+ * CRITICAL: only `--tool-mode` is consumed — every other arg is forwarded
+ * untouched and in order.
  */
 export function parseToolModeFlag(
   args: string[],
@@ -215,13 +181,10 @@ export interface ResolveWrapperPathResult {
 }
 
 /**
- * Human-readable copy for the interactive select. Kept as exported
- * helpers so tests can assert it and the wording stays in one place.
- *
- * The OTLP (ingestion) option is listed first and is the default: most
- * users reaching this prompt already pay for the tool's own subscription
- * and want LangWatch to observe their usage, not re-bill it. The gateway
- * (API key) path is the explicit opt-in.
+ * Human-readable copy for the interactive select (exported so tests can
+ * assert it). OTLP is listed first and is the default: most users already
+ * pay for the tool's own subscription and want observability, not
+ * re-billing; the gateway path is the explicit opt-in.
  */
 export function pathChoiceMessage(tool: string): string {
   return `How should \`langwatch ${tool}\` run?`;

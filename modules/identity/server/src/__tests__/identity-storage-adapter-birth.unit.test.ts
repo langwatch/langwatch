@@ -1,22 +1,7 @@
 /**
- * Born finalized: the entrance a flagged sign-up takes (ADR-116 §3), driven
- * by the real `betterAuth()`.
- *
- * The claim under test is not "the entrance writes rows" — it is that the
- * WHOLE request routes. better-auth creates the user and then, in the same
- * request, the credential account; the write gate cannot see the newborn's
- * state row on either write, because it reads on another connection behind a
- * TTL cache that answered before the user existed. So the marker set at the
- * auth route boundary is the only thing standing between a newborn and a
- * legacy `Account` row, and a suite that only checked the `user` create
- * would miss exactly that.
- *
- * The other half is failure. A flagged sign-up that cannot reach the engine
- * must FAIL rather than quietly land on the legacy branch — a test user born
- * on the old path would poison the rollout the flag exists to run.
- *
- * Hermetic: the ledger folds in memory and better-auth's own `memoryAdapter`
- * stands in for Prisma on the legacy branch.
+ * Born finalized (ADR-116 §3): the write gate can't see a newborn's state
+ * via its TTL-cached read, so the auth-route marker is the only thing
+ * standing between it and a legacy `Account` row — must FAIL, not fall back.
  */
 import {
   ATTACH_IDENTIFIER_COMMAND_TYPE,

@@ -1,18 +1,8 @@
 /**
- * Single source of truth for resolving the LangWatch control-plane URL
- * across the CLI. Replaces the previous three drifted readers
- * (`endpoint.ts:getEndpoint`, `governance/config.ts:defaults`, and the
- * inline `process.env.LANGWATCH_ENDPOINT ?? ...` literal in
- * `commands/status.ts`) so every command sees the same value for the
- * same inputs.
- *
- * Priority (highest wins):
- *   1. opts.flag           — per-command override (e.g. `langwatch login --endpoint <url>`)
- *   2. LANGWATCH_ENDPOINT  — env var (CI / scripts)
- *   3. persisted config    — `~/.langwatch/config.json:control_plane_url` (daily driver)
- *   4. DEFAULT_ENDPOINT    — `https://app.langwatch.ai` (cloud default)
- *
- * Spec: specs/ai-governance/cli-onboarding/login-unified.feature
+ * Single source of truth for the control-plane URL, replacing three previously drifted readers.
+ * Priority (highest wins): 1. `opts.flag` (per-command override) 2. `LANGWATCH_ENDPOINT` (env)
+ * 3. persisted config (`~/.langwatch/config.json:control_plane_url`) 4. `DEFAULT_ENDPOINT`
+ * (`https://app.langwatch.ai`). Spec: specs/ai-governance/cli-onboarding/login-unified.feature
  */
 
 import { DEFAULT_ENDPOINT } from "@/internal/constants";

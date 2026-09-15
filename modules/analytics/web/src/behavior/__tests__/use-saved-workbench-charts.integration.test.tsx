@@ -1,17 +1,9 @@
 /**
  * @vitest-environment jsdom
- *
- * Which of the two things Save does.
- *
- * The hook holds one piece of state — which chart is open — and that state is
- * the whole difference between a member pressing Save twice and having one
- * chart, or having two and no way to tell which the dashboard is showing. The
- * toolbar suite proves the button says which it will do; this proves the hook
- * then does it.
- *
- * Only the tRPC client is faked, at its module boundary, so the branch under
- * test is the real one.
- *
+ * Which of the two things Save does: the hook holds one piece of state —
+ * which chart is open — the whole difference between pressing Save twice
+ * and having one chart vs two with no way to tell which is shown. Only the
+ * tRPC client is faked, at its module boundary, so the real branch is tested.
  * @see specs/analytics/lwql-saved-charts.feature
  */
 

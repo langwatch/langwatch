@@ -1,6 +1,8 @@
 /**
  * @vitest-environment node
- * Real Postgres, no mocks: reachability depends on virtual key scopes and the project a key's traces land in — exactly what a stub would fake. Spec: specs/ai-gateway/gateway-budget-targeting.feature
+ * Real Postgres, no mocks: reachability depends on virtual key scopes and the project a key's
+ * traces land in — exactly what a stub would fake.
+ * Spec: specs/ai-gateway/gateway-budget-targeting.feature
  */
 import {
   PrismaConfigService,

@@ -1,14 +1,8 @@
 /**
- * One evaluator's reading, as a pill: its name, then what it said.
- *
- * A pass or fail evaluator on one scenario reads Pass or Fail, with a dot in
- * the colour of that verdict. Over a whole run the same evaluator reads a pass
- * rate, on the same colour scale as the pass block beside it. A score reads
- * its number in the plain text colour and carries no dot: which direction of
- * a score is the good one is not known here, so colouring it would say
- * something that cannot be known. An evaluator that had nothing to read is
- * muted and says so.
- *
+ * One evaluator's reading, as a pill: name, then verdict. Pass/fail reads Pass
+ * or Fail with a colored dot; over a run, the same pass rate on the same scale.
+ * A score reads its number with no dot, since which direction is good is not
+ * known here. An evaluator with nothing to read is muted and says so.
  * @see specs/features/agent-testing/results-tabs.feature
  */
 

@@ -21,17 +21,9 @@ export interface GatewayClickHouseInstance {
 export type GatewayClickHouseInstanceResolver = () => Promise<GatewayClickHouseInstance[]>;
 
 /**
- * The settlement sweeper's read side across EVERY configured ClickHouse
- * instance, shared and private alike: one sweeper settles the whole install,
- * so it cannot hold a single client.
- *
- * Settled per instance, never all-or-nothing. `Promise.all` is fail-fast, so
- * one unreachable private ClickHouse would reject the whole read, fail the
- * sweep intent, burn its attempts and keep failing every wake while that
- * instance was down — taking the SHARED instance's open admissions with it.
- * That contradicts the rule the sweep already states for a single tenant's
- * failure, so it applies at the instance level too: the reachable instances
- * settle, the unreachable one is reported and retried next sweep.
+ * Settled per instance, never all-or-nothing: `Promise.all` would let one
+ * unreachable private ClickHouse fail the whole sweep, burning the SHARED
+ * instance's admissions too. Reachable instances settle; the rest retry next sweep.
  */
 export class ClickHouseGatewayOpenAdmissionsAdapter extends GatewayOpenAdmissions {
   static create(
@@ -67,16 +59,11 @@ export class ClickHouseGatewayOpenAdmissionsAdapter extends GatewayOpenAdmission
       );
     });
 
-    // The cap bounds ONE SWEEP, and each instance applies it to its own
-    // query — so N instances would hand the sweeper N times the cap.
-    // Re-applying it here is what makes the documented bound true of
-    // the number the sweeper actually settles.
-    //
-    // Oldest first, across instances, so the cap sheds the newest rows
-    // rather than whichever instance happened to answer last. Each
-    // query already returns its own rows oldest-first; this is what
-    // extends that ordering to the merge, and it keeps the sweep
-    // draining a backlog from the end that has waited longest.
+    // The cap bounds ONE SWEEP; each instance already applies it to its own
+    // query, so re-applying it here keeps the merged total, not N times it,
+    // true to the documented bound. Sorting oldest-first before the cap sheds
+    // the newest rows rather than whichever instance answered last, draining
+    // the longest-waiting backlog first.
     open.sort((a, b) => a.admittedAtMs - b.admittedAtMs);
     return open.slice(0, MAX_OPEN_ADMISSIONS_PER_SWEEP);
   }

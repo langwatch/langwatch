@@ -14,13 +14,8 @@ interface PromptTabStripProps {
 }
 
 /**
- * PromptTabStrip
- *
- * Single Responsibility: Render one pane's scrolling row of prompt tabs,
- * alongside the switcher that reaches the tabs scrolled out of it.
- *
- * A component rather than inline JSX because each pane needs its own ref to
- * its own scroller, and a ref cannot be created inside the loop over panes.
+ * A component rather than inline JSX because each pane needs its own ref to its own scroller,
+ * and a ref cannot be created inside the loop over panes.
  */
 export function PromptTabStrip({
   tabs,

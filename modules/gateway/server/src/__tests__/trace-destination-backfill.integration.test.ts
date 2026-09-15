@@ -1,6 +1,9 @@
 /**
  * @vitest-environment node
- * Real Postgres, replaying the shipped migration: the resolution chain's per-read answer gets backfilled once into the column, including the deleted-project and cross-org pointer edge cases. Spec: specs/ai-gateway/virtual-key-creation.feature
+ * Real Postgres, replaying the shipped migration: the resolution chain's
+ * per-read answer gets backfilled once into the column, including the
+ * deleted-project and cross-org pointer edge cases.
+ * Spec: specs/ai-gateway/virtual-key-creation.feature
  */
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";

@@ -497,15 +497,10 @@ describe("<ScenarioMessageRenderer/>", () => {
     });
   });
 
-  // ---------------------------------------------------------------------
-  // scenario#994 — callee (phone agent under test) turns show their transcript.
-  //
-  // A phone run captures the callee's audio with the transcription the judge
-  // was given as a sibling text part; the renderer must show it as an audio
-  // player with that transcript beside it, exactly the way it shows the
-  // simulator's own voice turns. The agent under test renders as the
-  // assistant role, the simulator as the user role.
-  // ---------------------------------------------------------------------
+  // scenario#994 — callee (phone agent under test) turns show their transcript,
+  // the same way the simulator's own voice turns do: audio player with the
+  // judge-given transcript beside it. The agent under test is the assistant
+  // role; the simulator is the user role.
   describe("when a phone run's conversation shows callee and simulator voice turns", () => {
     /** @scenario "Callee turns show their transcript in the run conversation" */
     it("shows each callee turn's audio player with its transcript beside it, like the simulator's", () => {

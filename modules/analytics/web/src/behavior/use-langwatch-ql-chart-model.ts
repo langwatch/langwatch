@@ -1,12 +1,8 @@
 /**
- * Everything the LangWatchQL chart decides before it draws anything.
- *
- * Validation, the value scan, the running Vega view, and the refusals and
- * warnings they produce are one chain: each step reads the last one's answer,
- * and none of them renders. Keeping the chain here leaves the component with
- * the part that is actually markup, and puts the hooks in a `.ts` module where
- * the repository expects them.
- *
+ * Everything the LangWatchQL chart decides before it draws anything: validation,
+ * the value scan, the running Vega view, and the refusals/warnings they produce
+ * form one chain where each step reads the last one's answer and none renders,
+ * leaving the component with only the actual markup.
  * @see ../components/LangWatchQLVegaLiteChart.tsx — the only consumer
  */
 

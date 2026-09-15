@@ -1,18 +1,10 @@
 /**
- * The daemon runs concurrent requests in one process; device-mode requests
- * carry no caller API key, so the resolved per-user key must NOT live in the
- * shared `process.env` where an interleaved request could read it. It lives in
- * a per-request holder scope instead. These tests pin the two properties the
- * fix depends on:
- *
- *   1. two interleaved holder scopes each observe only their own credential,
- *      even when the key is set AFTER an await inside the scope (exactly how
- *      the resolver fills it mid-command): the isolation the daemon requires,
- *      and
- *   2. the API-client factory reads the scoped key, with no scope falling back
- *      to the environment exactly as a plain SDK embed does.
- *
- * Feature: specs/ai-governance/cli-onboarding/me-credentials.feature
+ * The daemon runs concurrent requests in one process, so a resolved per-user
+ * key must NOT live in shared `process.env` where an interleaved request
+ * could read it — it lives in a per-request holder scope instead. Pins that
+ * interleaved scopes observe only their own credential, and that the
+ * API-client factory reads the scoped key, falling back to the environment
+ * only when unscoped.
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 

@@ -1,13 +1,8 @@
 /**
- * The evaluators of an open run dialog: the ones inherited from the suites
- * in scope, the plan's own extras, the editors both open, and the guard
- * that sends Run to an evaluator whose input still reads nothing.
- *
- * The extras live in the plan fields, so they reset with the subject and
- * travel with the run. The inherited ones are read off the suites in scope
- * and edited in the suite editor, never here.
- *
- * @see specs/features/agent-testing/run-dialog.feature
+ * The evaluators of an open run dialog: inherited from suites in scope, the
+ * plan's own extras, the editors both open, and the guard blocking Run when
+ * an evaluator's input still reads nothing. Extras live in the plan fields so
+ * they reset with the subject; inherited ones are read-only here.
  */
 
 import { useCallback } from "react";

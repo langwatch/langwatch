@@ -62,7 +62,12 @@ export interface GatewaySpendState {
 }
 
 /**
- * One aggregate per gateway REQUEST; absolute writes only (each handler SETs from the event's own content, so a redelivered event is a no-op). Status lattice, deterministic in any order: "" -> admitted -> (confirmed|failed|settled), settled -> confirmed (late confirmation resolves unknown), confirmed never downgrades. Money is copied from the outcome's own nano-USD + rate identity, never recomputed, so ledger/debits/webhook always agree. Attribution: admission is the authority and wins wherever it holds a value; when the outcome folds first (e.g. a brokered voice session, confirmed by a different emitter before its admission), the outcome's attribution fills the row so it isn't priced with no owner.
+ * One aggregate per gateway REQUEST; absolute writes only, so a redelivered event is a no-op.
+ * Status lattice: "" -> admitted -> (confirmed|failed|settled), settled -> confirmed (late
+ * confirmation resolves unknown), confirmed never downgrades. Money is copied from the
+ * outcome's own nano-USD + rate identity, never recomputed, so ledger/debits/webhook agree.
+ * Attribution: admission is the authority, but if the outcome folds first (e.g. a brokered
+ * voice session), its attribution fills the row so it isn't priced with no owner.
  */
 interface AttributionWire {
   organization_id: string;
@@ -103,7 +108,10 @@ function attributionFromOutcome(state: GatewaySpendState, d: AttributionWire): A
 }
 
 /**
- * Attribution the admission states, for a row an outcome may have already named — mirrors attributionFromOutcome: admission is the authority so its value wins where it states one, but must not blank a field it never carries (e.g. traceId, only known once the span opens, after admission) that the outcome already recorded.
+ * Attribution the admission states, for a row an outcome may have already named — mirrors
+ * attributionFromOutcome: admission is the authority so its value wins where it states one,
+ * but must not blank a field it never carries (e.g. traceId, only known once the span opens)
+ * that the outcome already recorded.
  */
 function attributionFromAdmission(state: GatewaySpendState, d: AttributionWire): AttributionFields {
   return {

@@ -1,7 +1,16 @@
 /**
  * @vitest-environment node
- * Real Postgres + real ClickHouse. Covers which budgets apply to a key, ledger spend separation, gateway bundle contents, and key create/revoke invariants.
- * Spec: specs/ai-gateway/gateway-budget-targeting.feature, budgets.feature, virtual-key-creation.feature, provider-routing.feature, fallback.feature, governance/vk-provider-access.feature
+ */
+
+/**
+ * Real Postgres + real ClickHouse: budget targeting, ledger spend
+ * separation, bundle contents, and key create/revoke invariants.
+ */
+
+/**
+ * Spec: specs/ai-gateway/gateway-budget-targeting.feature,
+ * budgets.feature, virtual-key-creation.feature, provider-routing.feature,
+ * fallback.feature, governance/vk-provider-access.feature
  */
 import { fromDate, nowInstant, toDate } from "@langwatch/time";
 
@@ -83,7 +92,9 @@ const connection = databaseUrl
 const prisma = connection?.client as PrismaClient;
 
 /**
- * The three Project reads this suite makes (new key's landing, existing key's landing, scope reachability) — all answered from rows the suite itself writes.
+ * The three Project reads this suite makes (new key's landing, existing
+ * key's landing, scope reachability) — all answered from rows the suite
+ * itself writes.
  */
 class SuiteProjectService extends TestProjectApi {
   override async findTraceDestination(

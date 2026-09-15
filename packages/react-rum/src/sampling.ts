@@ -1,31 +1,10 @@
 /**
- * Head sampling for browser telemetry — the volume lever.
- *
- * Frontend telemetry is larger and spikier than backend telemetry: it scales
- * with tabs open rather than with requests served, and it is paid for in Tempo
- * storage and collector CPU. Always-on is the right default for a small
- * internal population and the wrong one at scale, so the ratio is
- * configuration, not a constant.
- *
- * **Sampling is per session, not per trace.** The obvious sampler
- * (`TraceIdRatioBasedSampler`) decides independently for every trace, which at
- * 10% gives a tenth of the traces from every visit — enough to bill for and
- * never enough to read. The question RUM answers is "what was this person
- * doing when it broke", and answering it needs whole visits. So the ratio is a
- * ratio of *sessions*: a sampled session is complete, and an unsampled one
- * costs nothing at all.
- *
- * **A browser decision is final for the whole stack.** Head sampling
- * propagates: an unsampled browser trace arrives at the server with the sampled
- * flag clear and the server's `ParentBasedSampler` drops its spans too. That is
- * the intended behaviour — a half trace is worse than none — but it means the
- * ratio here reduces *backend* trace volume for browser-initiated work as well.
- * Server work with no browser parent (workers, webhooks, the API) is untouched.
- *
- * Retention biased toward sessions that errored or were slow is a better answer
- * than a flat ratio, and it is tail sampling: it needs the collector to hold a
- * trace until it is complete, which the collector is not configured to do.
- * Until it is, this is the lever. See ADR-058.
+ * Head sampling for browser telemetry — the volume lever, configuration rather than a constant
+ * (frontend telemetry scales with tabs open, not requests served). Sampling is per SESSION, not
+ * per trace: a per-trace sampler gives a fraction of every visit, while RUM needs whole visits to
+ * answer "what was this person doing when it broke". A browser decision is final for the whole
+ * stack — an unsampled browser trace makes the server's `ParentBasedSampler` drop its spans too
+ * (server work with no browser parent is untouched). See ADR-058.
  */
 
 import type { Attributes, Context, Link, SpanKind } from "@opentelemetry/api";

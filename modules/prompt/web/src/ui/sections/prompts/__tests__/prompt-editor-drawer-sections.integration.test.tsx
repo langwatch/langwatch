@@ -1,13 +1,7 @@
 /**
  * @vitest-environment jsdom
- *
- * The two editing sections of the prompt editor, as the person shaping a
- * prompt meets them: the inputs they can add to, and the outputs below.
- *
- * Rendered headless — the drawer chrome is not what these are about — with
+ * The two editing sections of the prompt editor, rendered headless with
  * only the host seams stubbed, so the composition under test is the real one.
- *
- * @see specs/prompts/prompt-editor-outputs.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";

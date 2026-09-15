@@ -1,14 +1,8 @@
 /**
- * Some recognizers are skipped on text that cannot contain their pattern —
- * the email pattern never runs on text without an "@", and so on. The saving
- * is real (that one pattern measured 2.6% of the worker's wall time), and so
- * is the failure mode: a literal claimed by a pattern that does not actually
- * require it stops redacting real personal data, silently, forever.
- *
- * These cases exist to make that failure loud. The rest of the redaction
- * behaviour is covered by `essentialPii.unit.test.ts`; what is here is
- * specifically the interaction between the skip and the entities it must not
- * touch.
+ * Some recognizers are skipped on text that cannot contain their pattern (the
+ * email pattern never runs without an "@"). The saving is real, and so is the
+ * failure mode: a literal wrongly exempted stops redacting real personal data,
+ * silently, forever — these cases exist to make that failure loud.
  */
 
 import { findPhoneNumbersInText, getCountries, getExampleNumber } from "libphonenumber-js";
@@ -78,16 +72,10 @@ describe("given a recognizer that is skipped unless the text holds its literal",
 });
 
 /**
- * The phone detector is skipped on text whose longest digit window is too short
- * to hold a number. It is the one detector where the saving is measured in
- * hundreds of milliseconds instead of single ones: 200 KB of JSON with numeric
- * fields cost 240 ms and found nothing.
- *
- * The floor must stay below the shortest number the detector will return, and
- * the detector itself is the only honest reference for that. These cases run
- * every country's own example number through the public redaction path and
- * require that anything the library finds is still marked. Raise the floor too
- * far and the small territories fail here first.
+ * The phone detector is skipped when the longest digit window is too short to
+ * hold a number — the floor must stay below the shortest number the detector
+ * will return, and the detector itself is the only honest reference for that.
+ * These run every country's own example number through the real redaction path.
  */
 describe("given the phone detector's digit gate", () => {
   const shapesOf = ({ formatted, plain }: { formatted: string; plain: string }) => [

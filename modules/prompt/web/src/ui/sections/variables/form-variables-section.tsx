@@ -55,18 +55,8 @@ type FormVariablesSectionProps = {
 // ============================================================================
 
 /**
- * Form-connected wrapper around VariablesSection.
- *
- * This component bridges the new VariablesSection UI with react-hook-form,
- * allowing it to be used as a drop-in replacement for InputsFieldGroup
- * in places that already use FormProvider.
- *
- * Usage:
- * ```tsx
- * <FormProvider {...methods}>
- *   <FormVariablesSection />
- * </FormProvider>
- * ```
+ * Form-connected wrapper around VariablesSection — a drop-in replacement for
+ * InputsFieldGroup wherever a `FormProvider` already wraps the tree.
  */
 export const FormVariablesSection = ({
   title = "Variables",

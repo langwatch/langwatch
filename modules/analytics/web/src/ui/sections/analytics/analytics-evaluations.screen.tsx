@@ -356,16 +356,14 @@ function EvaluationsContent() {
       // Build filter parameters using dot notation with evaluator ID as key
       // Format: evaluation_passed.{evaluatorId}=0|1 and evaluation_run.{evaluatorId}=processed
       const filterParams: Record<string, string | string[]> = {
-        [`evaluation_run.${params.evaluatorId}`]: ["processed"], // Only show processed evaluations (excludes error, scheduled, etc.)
+        [`evaluation_run.${params.evaluatorId}`]: ["processed"], // Excludes error/scheduled
       };
 
-      // Add appropriate filter based on evaluator type
-      // Note: We filter by status="processed" first to exclude error/scheduled,
-      // then add the specific filter (passed/label) which should only apply to processed evaluations
+      // Add appropriate filter based on evaluator type. status="processed" is filtered
+      // first to exclude error/scheduled, then the specific filter (passed/label) is added.
       if (params.isGuardrail && params.groupKey) {
-        // For guardrail evaluators, filter by passed/failed
-        // The groupKey comes from the graph which only shows processed evaluations with passed=true/false
-        // groupKey can be "passed", "failed", "1", "0", "true", "false", "positive", "negative"
+        // For guardrail evaluators, filter by passed/failed. groupKey comes from the graph
+        // and can be "passed", "failed", "1", "0", "true", "false", "positive", "negative"
         const passed =
           params.groupKey === "passed" ||
           params.groupKey === "true" ||
@@ -489,13 +487,9 @@ function EvaluationsContent() {
 }
 
 /**
- * The page guard is the routes section's, not this module's.
- *
- * `platform/app` wrapped each of these in `withPermissionGuard("analytics:view")`
- * — and, on two of them, in `DashboardLayout` as well. Both are the composing
- * application's: the policy is stated once in
- * `apps/ui/src/features/analytics/ui/sections/analytics-routes.tsx`, in front of
- * the same loader registry, and the chrome belongs to the route tree these
- * screens are children of.
+ * The page guard is the routes section's, not this module's: permission
+ * gating and layout chrome are stated once in
+ * `apps/ui/src/features/analytics/ui/sections/analytics-routes.tsx`, in
+ * front of the loader registry these screens are children of.
  */
 export default EvaluationsContent;

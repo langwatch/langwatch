@@ -223,9 +223,9 @@ export async function listWorkflows(): Promise<Array<{ id: string; name?: string
 }
 
 /**
- * A real, currently-existing trace id, for scenarios that need to give Langy something concrete to act on (e.g.
- * annotate a trace) without depending on Langy's own trace-search tool finding it first — see the "Langy's own
- * trace search returns 0 hits" follow-up finding for why that isn't reliable yet.
+ * A real, currently-existing trace id, for scenarios that need to give Langy something concrete
+ * to act on (e.g. annotate a trace) without depending on Langy's own trace-search tool finding
+ * it first — that tool is not yet reliable enough to depend on here.
  */
 export async function mostRecentTraceId(): Promise<string | null> {
   const result = await lwPost({

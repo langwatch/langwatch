@@ -1,21 +1,8 @@
 /**
- * Every specification in the corpus, put through the real chart surface in a
- * real browser while the browser's own network activity is recorded.
- *
- * The unit suites prove each adversarial fixture is refused by the rule that
- * names it. What they cannot prove is the thing the refusals exist for: that
- * nothing left the browser. This runs the whole corpus — adversarial, merely
- * invalid, and valid — through `validateVegaLiteSpec` *and* through a real
- * mount of `LangWatchQLVegaLiteChart`, and watches four channels at once:
- * `fetch`, `XMLHttpRequest`, `navigator.sendBeacon`, and the browser's own
- * Resource Timing buffer, which records loads no wrapper can see (an `<img>`
- * source, a stylesheet, a font).
- *
- * The recorders are proven to work at the end of the test rather than assumed:
- * one deliberate same-origin call through each channel has to show up in its
- * recorder, because an absence assertion that cannot fail is worth nothing.
- *
- * Spec: modules/analytics/specs/analytics-lwql-workbench.feature
+ * Proves nothing leaves the browser while rendering the whole spec corpus:
+ * watches `fetch`, XHR, `sendBeacon` and Resource Timing (catches `<img>`/
+ * stylesheet loads no wrapper sees); each recorder is canary-tested first.
+ * @see modules/analytics/specs/analytics-lwql-workbench.feature
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

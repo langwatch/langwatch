@@ -2,13 +2,9 @@ import { describe, expect, it } from "vitest";
 import { parseRouteKey } from "../privateRouteKey.ts";
 
 /**
- * Reading a cluster's name out of `CLICKHOUSE_URL__<label>__<orgId>`.
- *
- * The label was parsed and discarded for as long as private instances have
- * existed, documented as "ignored by code". It is the only human-readable name
- * the platform has for a customer's dedicated ClickHouse, and its absence had a
- * cost: a private instance rejected ~5.6k statements in three hours on
- * 2026-08-13 and no log line said which cluster refused them.
+ * Reading a cluster's name out of `CLICKHOUSE_URL__<label>__<orgId>`. It's
+ * the only human-readable name the platform has for a customer's dedicated
+ * ClickHouse, so losing it means no log line can say which cluster refused a statement.
  */
 
 const prefix = "CLICKHOUSE_URL__";

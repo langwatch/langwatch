@@ -1,15 +1,7 @@
 /**
- * Outbound proxy resolution for calls we make to a vendor over HTTPS.
- *
- * Many self-hosted deployments can only reach the public internet through a
- * corporate HTTP proxy. The AWS SDK does not honour `HTTPS_PROXY` on its own,
- * so anything that talks HTTPS to a vendor consults these helpers and wires
- * the proxy into its own transport: the email gateways, and every AWS client
- * built through the platform AWS client composition.
- *
- * Only vendor HTTPS calls opt in. An SMTP relay is usually an internal host
- * that is reachable directly, so applying a globally-set proxy to it would
- * break working deployments; the SMTP gateway deliberately does not.
+ * Outbound proxy resolution for vendor HTTPS calls: the AWS SDK doesn't honour `HTTPS_PROXY`
+ * on its own, so self-hosted deployments behind a corporate proxy need it wired in explicitly.
+ * SMTP is excluded — an SMTP relay is usually reachable directly, so a global proxy would break it.
  */
 
 export interface OutboundProxyConfig {

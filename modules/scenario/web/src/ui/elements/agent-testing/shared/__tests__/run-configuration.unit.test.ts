@@ -1,5 +1,6 @@
 /**
- * The identity of a run configuration, and the words that tell two of them apart in the run name dropdown.
+ * The identity of a run configuration, and the words that tell two apart in the run
+ * name dropdown.
  * @see specs/features/agent-testing/run-dialog.feature
  * @see specs/features/agent-testing/comparison-mode.feature
  */

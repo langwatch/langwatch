@@ -1,13 +1,7 @@
 /**
- * Regression test for issue #3903 friction #2: gateway secret keys in
- * .env.example are empty and lack a nearby generation command.
- *
- * A developer doing a fresh clone who follows the .env.example verbatim
- * will end up with empty secrets, causing 503 errors at the first VK
- * request. The fix is twofold:
- *   1. Each key must carry a non-empty sentinel placeholder.
- *   2. The generation command (`openssl rand -hex 32`) must appear in the
- *      5 lines immediately above each key so it's impossible to miss.
+ * Regression: gateway secret keys in .env.example must carry a non-empty sentinel placeholder
+ * and the generation command (`openssl rand -hex 32`) within 5 lines above each key — a
+ * verbatim fresh clone otherwise ships empty secrets and 503s on the first VK request.
  */
 import { readFileSync } from "node:fs";
 import path from "node:path";

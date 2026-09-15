@@ -1,14 +1,7 @@
 /**
- * Monaco IntelliSense for the `LW` global authors use inside the
- * dashboard-widget code editor. Registered as an "extra lib" (see
- * `DashboardWidgetCodeEditor.tsx`'s `configureTypeScriptDefaults`) so the
- * TypeScript worker offers completions and hover docs for `LW.*` even though
- * `noSemanticValidation` is on and this file never actually runs — the real
- * `LW` object is built at runtime by `bridge/shimSource.ts`.
- *
- * Keep this in sync with `bridge/shimSource.ts`'s `LW` object (search that
- * file for "keep in sync with bridge/lwGlobalTypes.ts") and with the wire
- * shapes in `bridge/bridgeProtocol.ts`, which this file mirrors structurally.
+ * Monaco IntelliSense for the dashboard-widget editor's `LW` global — this
+ * file never runs; the real object is built by `bridge/shimSource.ts`. Keep
+ * this in sync with that file's `LW` object and with `bridge/bridgeProtocol.ts`.
  */
 
 export const LW_GLOBAL_DTS = `

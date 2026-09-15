@@ -1,11 +1,8 @@
 /**
- * The port wired into the REAL command tree. The unit suites alongside this one
- * prove the mechanism; this proves it is actually connected — a migration that
- * converts an implementation but forgets its `emitsResult` registration would
- * leave the command silently unmigrated, which is precisely the state this work
- * exists to end.
- *
- * Split out of `output-port.unit.test.ts`, which pins the port itself.
+ * The port wired into the REAL command tree: proves it is actually connected,
+ * since a migration that converts an implementation but forgets its `emitsResult`
+ * registration would leave the command silently unmigrated. Split out of
+ * `output-port.unit.test.ts`, which pins the mechanism itself.
  */
 import { describe, it, expect } from "vitest";
 import { Command } from "commander";
@@ -102,30 +99,17 @@ describe("the real command tree", () => {
   });
 
   /**
-   * The exhaustive counterpart to the per-command lists above: EVERY leaf in
-   * the real tree is either wired to the port or named here as a deliberate
-   * holdout.
-   *
-   * This is the check that was missing, and the per-command lists could not
-   * have replaced it — the broken commands were simply absent from them.
-   * `commands`, `help-tree`, `status`, `trace search|get` and the entire
-   * `skills` group each rendered every format correctly through `printResult`,
-   * but the gate only recognised `emitsResult`, so it refused `-o json` on all
-   * of them with "does not emit structured output yet". `lw commands` — whose
-   * own description is "Machine-readable catalog of every CLI command" — had no
-   * working machine-readable path at all, and the refusal message pointed the
-   * caller at it.
-   *
-   * Adding a command now forces a decision: wire it to the port, or say here
-   * why it cannot be.
+   * The exhaustive counterpart to the per-command lists above: every leaf in
+   * the real tree must be either wired to the port or named here as a
+   * deliberate holdout, so a new command forces that decision rather than
+   * silently missing both.
    */
+
   /**
-   * `-o json` is the current spelling, but `-f/--format json` is the one the
-   * skills put in front of the agent, and 186 commands accept it. The three
-   * commands that drive the open page did not, so an agent that followed its
-   * own instructions got `error: unknown option '--format'` and had to guess
-   * again. Commander rejects an undeclared option before the output
-   * preprocessor ever runs, so the flag has to be declared per command.
+   * `-o json` is the current spelling, but `-f/--format json` is what the
+   * skills put in front of the agent; Commander rejects an undeclared option
+   * before the output preprocessor ever runs, so the flag must be declared per
+   * command or the agent gets `error: unknown option '--format'`.
    */
   describe("when inspecting the commands an agent drives the open page with", () => {
     const agentDriven = [

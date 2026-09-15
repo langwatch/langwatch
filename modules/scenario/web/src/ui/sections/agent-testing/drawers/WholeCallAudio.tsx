@@ -1,17 +1,9 @@
 /**
- * The whole-call audio player in the run drawer.
- *
- * A headless voice run — phone or ElevenLabs — records the whole call, streamed
- * back through `/api/voice/run/:scenarioRunId/audio` (which resolves the vendor
- * handle from the run's own trace spans). Shown only for a voice run, because
- * only a voice run has a call to play.
- *
- * The recording lands with the provider shortly after the call ends, so the
- * first load can fail: rather than a player parked at zero seconds, the failed
- * element is replaced by a stated "not ready yet" line with a Retry that
- * re-requests the recording.
- *
- * @see specs/features/agents/voice-phone.feature
+ * The whole-call audio player in the run drawer, streamed back through
+ * `/api/voice/run/:scenarioRunId/audio`. The recording lands with the
+ * provider shortly after the call ends, so the first load can fail: rather
+ * than a player parked at zero seconds, a "not ready yet" line with a Retry
+ * replaces it. @see specs/features/agents/voice-phone.feature
  */
 
 import { Button, HStack, Text, VStack } from "@chakra-ui/react";

@@ -1,12 +1,9 @@
 /**
- * Custom query — the LangWatchQL workbench.
- *
- * Two gates, both server-answered. The permission guard decides whether this
- * member may be here at all; the availability query decides whether the
- * deployment can run a LangWatchQL query. Neither can be flipped from the browser,
- * which is what keeps the surface off a deployment that has no restricted
- * identity to run a customer's SQL as.
- *
+ * Custom query — the LangWatchQL workbench. Two gates, both server-answered:
+ * a permission guard for membership, and an availability query for whether
+ * the deployment can run LangWatchQL at all. Neither can be flipped from the
+ * browser, keeping the surface off a deployment with no restricted identity
+ * to run a customer's SQL as.
  * @see modules/analytics/specs/analytics-lwql-workbench.feature
  */
 
@@ -108,13 +105,9 @@ export function CustomQueryPage() {
 }
 
 /**
- * The page guard is the routes section's, not this module's.
- *
- * `platform/app` wrapped each of these in `withPermissionGuard("analytics:view")`
- * — and, on two of them, in `DashboardLayout` as well. Both are the composing
- * application's: the policy is stated once in
- * `apps/ui/src/features/analytics/ui/sections/analytics-routes.tsx`, in front of
- * the same loader registry, and the chrome belongs to the route tree these
- * screens are children of.
+ * The page guard is the routes section's, not this module's:
+ * `apps/ui/src/features/analytics/ui/sections/analytics-routes.tsx` wraps
+ * these in `withPermissionGuard("analytics:view")` (and `DashboardLayout`
+ * on two of them) — stated once, in front of the same loader registry.
  */
 export default CustomQueryPage;

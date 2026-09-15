@@ -1,12 +1,7 @@
 /**
- * Parameter Registry
- *
- * Single source of truth for LLM parameter configuration.
- * Consolidates parameter config, icons, display order, and naming conventions
- * into a single registration per parameter.
- *
- * This addresses the OCP violation where adding a new parameter required
- * modifying 4+ different constants.
+ * Single source of truth for LLM parameter configuration: one registration
+ * per parameter, instead of adding a new parameter requiring 4+ different
+ * constants to be kept in sync.
  */
 
 import type { LucideIcon } from "lucide-react";
@@ -185,13 +180,10 @@ export class ParameterRegistry {
   }
 
   /**
-   * Filter and sort parameters for display.
-   *
-   * `max_tokens` is always included regardless of whether the model entry
-   * declares it: every chat model accepts a per-invocation token ceiling,
-   * and the popover is chat-only. Treating it as opt-in caused the slider
-   * to flicker-then-disappear for legacy custom models (notably managed
-   * Bedrock entries registered with `["temperature"]` only).
+   * Filter and sort parameters for display. `max_tokens` is always included
+   * regardless of whether the model entry declares it: treating it as
+   * opt-in caused the slider to flicker-then-disappear for legacy custom
+   * models (notably managed Bedrock entries registered with `["temperature"]` only).
    */
   getDisplayParameters(supportedParameters: string[]): string[] {
     const displayOrder = this.getDisplayOrder();

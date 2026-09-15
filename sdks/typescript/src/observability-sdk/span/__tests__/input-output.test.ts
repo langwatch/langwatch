@@ -192,7 +192,7 @@ describe("processSpanInputOutput", () => {
       const result = processSpanInputOutput("raw", complexObj);
 
       expect(result.type).toBe("raw");
-      expect(result.value).toBe(JSON.stringify(complexObj)); // Objects are JSON stringified for raw type
+      expect(result.value).toBe(JSON.stringify(complexObj));
     });
   });
 

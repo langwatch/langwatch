@@ -244,18 +244,9 @@ function SidebarItem({
 }
 
 /**
- * Compound component for building sidebar navigation interfaces
- *
- * @example
- * ```tsx
- * <Sidebar.Root>
- *   <Sidebar.Header>My App</Sidebar.Header>
- *   <Sidebar.List title="Navigation" collapsible>
- *     <Sidebar.Item active icon={<HomeIcon />}>Home</Sidebar.Item>
- *     <Sidebar.Item onClick={() => navigate('/settings')}>Settings</Sidebar.Item>
- *   </Sidebar.List>
- * </Sidebar.Root>
- * ```
+ * Compound component for building sidebar navigation interfaces: `Sidebar.Root` wraps a
+ * `Sidebar.Header` and one or more `Sidebar.List`s (each optionally `collapsible`), which in
+ * turn hold `Sidebar.Item`s (each optionally `active`, with an `icon` and an `onClick`).
  */
 export const Sidebar = {
   Root: SidebarRoot,

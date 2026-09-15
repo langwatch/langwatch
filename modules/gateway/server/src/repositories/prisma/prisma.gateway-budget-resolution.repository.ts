@@ -1,5 +1,7 @@
 /**
- * The one resolver for which gateway budgets constrain a request, key or draft key — read by the config materialiser, the debits process, pre-request budget.check, and the VK drawer, which used to hand-mirror the same OR list in three places (exactly how a scope silently stops being enforced on one path while the UI still promises it on another). GROUP budgets resolve to one bucket per (budget, member), keyed <groupId>:<userId>, membership read live. A providerKey filter still applies to the key but only constrains spend to that provider, so dispatch-aware callers must narrow with budgetAppliesToProvider. Spec: specs/ai-gateway/gateway-budget-targeting.feature, specs/ai-gateway/budgets-principal-cascade.feature
+ * Resolves which budgets apply to a request/key/draft-key, shared by the
+ * config materialiser, debits, budget.check and the VK drawer. providerKey
+ * only narrows spend to that provider; narrow further with budgetAppliesToProvider.
  */
 import type { GatewayBudget, Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
 import {
@@ -26,7 +28,9 @@ export type BudgetResolutionTarget = {
   virtualKeyId?: string | null;
   principalUserId?: string | null;
   /**
-   * External end-user id, when supplied. ATTRIBUTED_USER templates resolve to a per-user bucket only when this is set; without it the template resolves as itself (enforcement fetches buckets on demand).
+   * External end-user id, when supplied. ATTRIBUTED_USER templates resolve
+   * to a per-user bucket only when this is set; without it the template
+   * resolves as itself.
    */
   endUserId?: string | null;
 };
@@ -58,7 +62,11 @@ export type ResolvedBudget = {
 type PrismaLike = Pick<PrismaClient, "gatewayBudget" | "groupMembership" | "virtualKeyScope">;
 
 /**
- * Which budgets a request is subject to: a budget names a SCOPE, not requests, so this expands every scope kind a request could sit under (key, project, team, principal, groups) and unions them — one kind wrong silently stops enforcing a budget somebody set. Ordered, so a caller stopping at the first blocking budget stops at the same one every time.
+ * Which budgets a request is subject to: a budget names a SCOPE, not
+ * requests, so this expands every scope kind a request could sit under and
+ * unions them — one kind wrong silently stops enforcing a budget somebody
+ * set. Ordered, so a caller stopping at the first blocking budget stops at
+ * the same one every time.
  */
 export class PrismaGatewayBudgetResolutionRepository {
   private constructor() {}
@@ -68,7 +76,9 @@ export class PrismaGatewayBudgetResolutionRepository {
   }
 
   /**
-   * Which budget scopes this request could match, as one OR list — a scope missing here is a budget that silently never fires, so each arm says what it covers.
+   * Which budget scopes this request could match, as one OR list — a scope
+   * missing here is a budget that silently never fires, so each arm says
+   * what it covers.
    */
   private async scopePredicatesFor({
     client,
@@ -141,7 +151,9 @@ export class PrismaGatewayBudgetResolutionRepository {
   }
 
   /**
-   * Teams a key is scoped to. Empty when there's no key in context (the draft path); that caller passes scopedTeamIds instead so the drawer previews the same set the key will resolve once saved.
+   * Teams a key is scoped to. Empty when there's no key in context (the
+   * draft path); that caller passes scopedTeamIds instead so the drawer
+   * previews the same set the key will resolve once saved.
    */
   private async keyTeamScopeIds({
     client,

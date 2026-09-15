@@ -1,26 +1,10 @@
 /**
- * What a persisted dashboard widget's `CustomGraph.graph`
- * column actually stores.
- *
- * One React/TSX file (`code`) plus the named LangWatchQL statements it may
- * run (`queries`) — the file's own `LW.query(name, params)` calls reference a
- * query by `name`. `parameters` on a query is a *declaration*, not bound
- * values: the names and JS types the query accepts, so the parent can check
- * a frame's `params` argument against it before ever forwarding anything to
- * `analytics.lwql.query` as a real bind parameter. The reserved
- * `{dashboard_context_period_start}`/`{dashboard_context_period_end}`/`{dashboard_context_granularity_seconds}` placeholders
- * are supplied by the executor regardless of what a query declares here —
- * they are the page window, not an author-declared parameter.
- *
- * Same reasoning as `saved-workbench-charts/workbenchChartDefinition.ts` for
- * being versioned: a `Json` column promises nothing about its contents, so a
- * row is read only through this schema, and a shape written by a
- * disagreeing build is refused by name instead of half-understood.
- *
- * Both the dashboard-widgets router and the client (`DashboardWidgetFrame.tsx`,
- * which parses `row.graph` with this same schema) import from here, so the
- * two sides cannot drift. Safe for the client to import: this module pulls in
- * nothing but `zod` and a constant, never Prisma or any server-only code.
+ * What a persisted dashboard widget's `CustomGraph.graph` column stores: TSX `code` plus named
+ * LWQL `queries`. A query's `parameters` are a declaration, not bound values, checked against a
+ * frame's `params` before forwarding to `analytics.lwql.query`; the reserved dashboard-context
+ * placeholders are supplied by the executor, not author-declared. Versioned like
+ * `workbenchChartDefinition.ts` since a `Json` column promises nothing; safe for the client to
+ * import — only `zod` and a constant, never Prisma or server-only code.
  */
 
 import { z } from "zod";
@@ -63,16 +47,11 @@ const FORBIDDEN_PARAMETER_NAMES = new Set([
 ]);
 
 /**
- * Bound automatically by the executor from the page's window/granularity —
- * never an author-declared parameter. A query names one of these the same way
- * the `lwql-charts` skill's SQL does; declaring a parameter under one of
- * these names would silently never receive the value a caller passes, since
- * the executor's own binding always wins.
- *
- * Exported (not just the name set below) so the client-side parameters editor
- * can list these as built-in rows without hand-duplicating the names, types,
- * or ClickHouse binding, and without importing anything server-only — this
- * module is already safe for the client (zod + constants only).
+ * Bound automatically by the executor from the page's window/granularity — never an
+ * author-declared parameter; declaring one under these names would silently never receive the
+ * value, since the executor's own binding always wins. Exported so the client-side parameters
+ * editor can list these as built-in rows without hand-duplicating names/types or importing
+ * server-only code (this module is zod + constants only).
  */
 export const RESERVED_PARAMETERS = [
   {
@@ -229,17 +208,12 @@ export type DashboardWidgetQueryParamValidation =
   | { readonly ok: false; readonly error: DashboardWidgetQueryParamError };
 
 /**
- * The validation gate `LW.query(name, params)` runs through before anything
- * reaches `analytics.lwql.query`: every key the frame passed must be a
- * declared parameter of the right JS type, and every declared parameter with
- * no default must have been passed. Declaring zero parameters (`parameters`
- * omitted) means a call may pass no params at all — an empty object is
- * required, not merely allowed, so a typo'd key is caught immediately rather
- * than binding nothing and failing later inside ClickHouse.
- *
- * Framework-free and synchronous on purpose: this same function backs both
- * the live `LW.query` dispatch and the Queries tab's standalone "Run" button,
- * so a query can never validate differently in one path than the other.
+ * The validation gate `LW.query(name, params)` runs through before reaching
+ * `analytics.lwql.query`: every passed key must be a declared parameter of the right type, and
+ * every declared parameter with no default must be passed — an empty object is required, not
+ * merely allowed, catching a typo'd key immediately rather than failing later in ClickHouse.
+ * Framework-free and synchronous: shared by the live `LW.query` dispatch and the Queries tab's
+ * "Run" button, so validation never differs between the two.
  */
 export function validateDashboardWidgetQueryParams({
   query,

@@ -1,15 +1,8 @@
 /**
- * A syntax-highlighted code block with a copy button.
- *
- * A family-local copy of `platform/app/src/components/code/RenderCode.tsx`,
- * which four other surfaces still render. Two changes:
- *
- * - The highlighter comes straight from `@langwatch/design-system/shiki`. The
- *   application reached it through `@langwatch/trace-web`, which was
- *   re-exporting it — the same substitution the ops family made for
- *   `useShikiAdapter`.
- * - The copy outcome is handed back rather than toasted. A feature-web package
- *   may not reach a toaster singleton, so the caller tells the host.
+ * A syntax-highlighted code block with a copy button. A family-local copy of
+ * `platform/app/src/components/code/RenderCode.tsx`, differing in that the
+ * copy outcome is handed back rather than toasted — a feature-web package may
+ * not reach a toaster singleton, so the caller tells the host.
  */
 
 import { Box, IconButton } from "@chakra-ui/react";

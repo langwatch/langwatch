@@ -1,22 +1,15 @@
 /**
  * @vitest-environment node
- *
- * @see specs/setup/typescript-7.feature — "Every package tsconfig extends the
- * shared root base", "Every package sets incremental with its own build info
- * file" and "Checking one package does not invalidate another's cache"
- *
- * One fact from three sides: the options every package shares are written once
- * at the root, and the one option that must NOT be shared — where a package
- * caches what it checked — is written per package and never twice.
- *
- * A shared build-info path is the failure worth a test. It is invisible: both
- * packages typecheck, both report clean, and each discards the other's cache,
- * so every check after the first starts cold. Nothing goes red; the whole repo
- * just gets slower.
- *
- * Only workspace members are subjects. `sdks/typescript/examples/*` and
- * `dev/dogfood/*` are standalone projects a reader copies out of the repo, and
- * a tsconfig of theirs naming a file at this root would compile nowhere else.
+ * @see specs/setup/typescript-7.feature
+ */
+
+/**
+ * Options every package shares are written once at the root; the one option
+ * that must NOT be shared — where a package caches what it checked — is written
+ * per package. A shared build-info path is invisible: both packages typecheck
+ * clean while discarding each other's cache, so checks silently get slower.
+ * Only workspace members are subjects; `sdks/typescript/examples/*` and
+ * `dev/dogfood/*` are standalone copies a tsconfig here wouldn't compile elsewhere.
  */
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";

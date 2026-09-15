@@ -1,21 +1,10 @@
 /**
  * The gateway control plane, composed from what the process hands the module.
- *
- * This is the filling `apps/api/src/app/api-gateway.composition.ts` used to
- * carry (deleted in b383462d96), moved whole into the module that owns every
- * service it names. Nothing here is a process decision any more: the four
- * capabilities that genuinely belong to other features arrive as declared
- * peers, the two datastores arrive as declared members, and everything else —
- * the repositories, the adapters, the DTO projections — is this package's own.
- *
- * Two members of the deleted composition are deliberately not here:
- *
- *  - `idempotency`. The receipt ledger is no longer an application member: a
- *    keyed create declares `.withIdempotency(...)` on its route and the REST
- *    host threads the process's one ledger to every mount (febccfe138), so an
- *    application-level runner would be a second, unread one.
- *  - `agentCache` / `elevenLabsWebhook`. Those are the two REST-only families,
- *    kept on {@link GatewayRestInfrastructure} and composed separately.
+ * Two members other composition roots carry are deliberately not here:
+ * `idempotency` (a keyed create declares `.withIdempotency(...)` on its route
+ * instead, so a composed runner here would be a second, unread one), and
+ * `agentCache`/`elevenLabsWebhook` (REST-only, kept on
+ * {@link GatewayRestInfrastructure} and composed separately).
  */
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import type { AuthzApi, ApiKeyPermissionScope } from "@langwatch/authz-contract";
@@ -63,13 +52,10 @@ const virtualKeyDtos = GatewayVirtualKeyDtoAdapter.create();
 
 /**
  * Adapts the process's ONE routing `clickhouse` member to the per-tenant
- * client shape the gateway ledger repositories were written against — the
- * same calling convention `@clickhouse/client` exposes, which is why they
- * were written that way. The member already routes, guards, traces, limits
- * and retries every statement internally, so this session is a thin
- * translation bound to one tenant and NOT a second client: no second pool, no
- * second retry, no second limiter. The same seam analytics uses for the same
- * reason (`ClickHouseMemberSession` in `modules/analytics`).
+ * client shape the gateway ledger repositories were written against. The
+ * member already routes, guards, traces, limits and retries every statement
+ * internally, so this session is a thin translation bound to one tenant and
+ * NOT a second client — no second pool, retry, or limiter.
  */
 class GatewayClickHouseSession implements GatewayClickHouseClient {
   constructor(

@@ -1,13 +1,7 @@
 /**
- * The image-token quantities (input_image_tokens/output_image_tokens/image_count)
- * on the summary and end-user read paths. The ingest side already writes
- * TokensInputImage/TokensOutputImage/ImageCount on every gateway_spend row
- * (migration 00089); this pins that the two rollup reads select and map them
- * too, rather than silently reporting every image call at a fraction of its
- * real usage.
- *
- * The client is a fake that keeps the statement it was handed, following the
- * pattern already used for this package's other ClickHouse repositories.
+ * The image-token quantities on the summary and end-user read paths: this
+ * pins that the rollup reads select and map them too, rather than silently
+ * reporting every image call at a fraction of its real usage.
  */
 import { describe, expect, it } from "vitest";
 import { GatewaySpendEventsRepository } from "../clickhouse.gateway-spend-events.repository.ts";

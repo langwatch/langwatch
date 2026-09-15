@@ -32,23 +32,11 @@ import type { IdentityReservationRepository } from "../repositories/identity-res
 import type { IdentityUsersRepository } from "../repositories/identity-users.repository.ts";
 
 /**
- * Why removing this identifier would strand the person, or null.
- *
- * Pure over the heads, and exported, because two callers need the SAME
- * answer and only one of them is about to write: the detach guard refuses
- * with it, and the settings surface stands its Remove control down with it
- * before anybody clicks (`specs/identity/authentication-settings.feature`).
- * A screen that predicted the refusal with a rule of its own would be a
- * second implementation of the invariant, and the two would drift — the
- * screen would either offer a click that always fails or hide one that would
- * have worked.
- *
- * Scoped to identifiers that are actually usable, which is what makes an
- * unconfirmed address removable: nobody could have signed in with it, so
- * losing it strands nobody. The subject's own state is deliberately NOT read
- * here — the question is what is LEFT — so it answers the same for a VERIFIED
- * identifier and for the PRIMARY one, which is what lets the surface reason
- * about a removal that demotes first.
+ * Why removing this identifier would strand the person, or null. Pure and
+ * exported because two callers need the SAME answer (the detach guard, and
+ * the settings surface's Remove control) — a screen with its own rule would
+ * drift from this one. Doesn't read the subject's own state, only what
+ * would be LEFT, so it answers the same for VERIFIED and PRIMARY.
  */
 export function detachStrandsUser({
   heads,
@@ -200,16 +188,11 @@ export class IdentityGuardsService {
       normalizedValue,
       occurredAtMs,
     });
-    // A fact the heads already carry is not stated again: the staged re-run
-    // of a ceremony and every backfill pass after the first both arrive here
-    // with the identifier already folded, and must cost no event_log row.
-    //
-    // "Carry" means FOLDED. A newborn's heads may hold a provisional row the
-    // ledger wrote before staging, so the front door can route the address
-    // before the fold lands; the cursor says whether the projection has ever
-    // folded, and until it has, a head is an anticipation of the fact, not
-    // the fact. Deduping against it would leave the log without the event,
-    // the cursor unmoved and the address lock held forever.
+    // A fact the heads already carry (i.e. FOLDED, not merely provisional) is
+    // not restated: a staged re-run or backfill pass after the first must cost
+    // no event_log row. A newborn's heads may hold a provisional row the
+    // ledger wrote before staging, so deduping against it — before the fold
+    // lands — would leave the log without the event and the address lock held forever.
     const heads = await this.heads.findHeads({ userId });
     if (heads.identifiers[identifierId] && (await this.heads.hasFolded({ userId }))) {
       return [];

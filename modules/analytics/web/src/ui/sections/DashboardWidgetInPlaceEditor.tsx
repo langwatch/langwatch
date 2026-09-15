@@ -1,19 +1,7 @@
 /**
- * The edit drawer for a dashboard widget that already sits on a dashboard
- * grid: the same `DashboardWidgetEditDrawer` the create flow uses, owning the
- * draft (name, code, queries) for one persisted row and handing the parent a
- * single `onSave` with the final draft.
- *
- * The chart previews the draft LIVE. The frame's `code` and the executor's
- * queries are fed from a DEBOUNCED copy of the draft rather than the draft
- * itself: the frame is a full remount (fresh CDN scripts, a fresh Babel
- * compile) on every identity change, and doing that on every keystroke would
- * be exactly as janky as it sounds.
- *
- * Closing (Cancel, the drawer's own close trigger, or clicking outside)
- * reverts the draft, so a discarded edit can never sit around for the next
- * open to reveal. All of that state lives in
- * `useDashboardWidgetInPlaceEditor`; this component only assembles the drawer.
+ * The edit drawer for a widget already on a dashboard grid, reusing
+ * `DashboardWidgetEditDrawer`. The preview is fed a DEBOUNCED draft copy,
+ * since the frame fully remounts (fresh CDN/Babel) on identity change, not on every keystroke.
  */
 
 import type { DashboardWidgetDraft } from "../../model/dashboardWidgetDefinition.ts";

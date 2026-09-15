@@ -1,23 +1,9 @@
 /**
- * The native result table.
- *
- * A real `<table>` — not a grid of divs — because the thing on screen *is*
- * tabular data, and a member reading it with a screen reader needs the row and
- * column relationships the element already carries. Virtualization is done with
- * spacer rows rather than absolute positioning for the same reason: the
- * document keeps one `<tr>` per visible row inside a normal `<tbody>`, so the
- * table stays a table while only a window of it exists.
- *
- * The result ceiling is 10,000 rows
- * (`DEFAULT_LWQL_RESULT_LIMITS.maxRows`), so the window is what keeps
- * the surface usable at the ceiling.
- *
- * `ListTable` is deliberately not reused here: it is the shared look for
- * *index pages that list resources*, and its container clips overflow, which is
- * exactly what a wide result must not do.
- *
- * @see dev/docs/best_practices/list-table.md
- * @see modules/analytics/specs/analytics-lwql-workbench.feature
+ * The native result table — a real `<table>`, not a grid of divs, so a
+ * screen reader gets real row/column relationships; virtualization uses
+ * spacer rows (not absolute positioning) to keep one `<tr>` per visible row.
+ * `ListTable` isn't reused: its container clips overflow, which a wide
+ * result must not do. See dev/docs/best_practices/list-table.md.
  */
 
 import { Alert, Box, Table, Text, VStack } from "@chakra-ui/react";

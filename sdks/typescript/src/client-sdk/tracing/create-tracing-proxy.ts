@@ -15,8 +15,6 @@ type DecoratorClass<T> = new (target: T) => Partial<{
 
 /**
  * Creates a proxy that always creates spans for public methods.
- * Decorators can access the span as the first parameter to add additional attributes.
- *
  * @param target - The target to wrap
  * @param tracer - The tracer instance to use
  * @param DecoratorClass - Optional decorator class for custom logic

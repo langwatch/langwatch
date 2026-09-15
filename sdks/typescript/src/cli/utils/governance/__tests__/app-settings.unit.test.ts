@@ -1,12 +1,7 @@
 /**
- * Unit tests for the per-tool app-settings persist target — currently
- * only ~/.claude/settings.json for the `claude` wrapper. Covers the
- * three interesting shapes for the merge:
- *   - target file missing entirely (created from scratch)
- *   - target file exists with unrelated user settings (merged, other
- *     top-level keys preserved verbatim)
- *   - target file's env already carries every required key (detected as
- *     installed → no re-prompt)
+ * Unit tests for the per-tool app-settings persist target (currently
+ * ~/.claude/settings.json for `claude`): missing file, existing file with
+ * unrelated keys, and a file whose env already carries every required key.
  */
 
 import * as fs from "node:fs";

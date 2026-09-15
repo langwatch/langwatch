@@ -1,21 +1,7 @@
 /**
- * The identity branch of the storage adapter (ADR-116 §6), driven by the
- * real `betterAuth()`.
- *
- * The gate is open, so every routed read and write for this user is served
- * from `Identifier` ⋈ `AccountCredential` instead of the `Account` table.
- * What the suite watches for is the split the ADR draws: LINKAGE becomes a
- * fact the ceremonies state and the fold projects, SECRETS become a
- * credential row that no event ever carries, and the id better-auth hands
- * back is the identifier's pinned account id in both directions.
- *
- * No `databaseHooks` are wired. The application still binds them during the
- * bridge phase, but the adapter has to state its own facts, and a suite that
- * wired the hooks could not tell which of the two did it.
- *
- * Hermetic (no database, no network): the ledger folds in memory and
- * better-auth's own `memoryAdapter` stands in for Prisma on the legacy
- * branch and for the `Account` rows the bridge mirror writes.
+ * The identity branch of the storage adapter (ADR-116 §6), driven by real
+ * `betterAuth()` with no `databaseHooks` wired, so the adapter must state
+ * its own facts. Hermetic: the ledger folds in memory.
  */
 import { IDENTIFIER_ATTACHED_EVENT_TYPE } from "@langwatch/identity-contract";
 import { handleOAuthUserInfo } from "better-auth/oauth2";
@@ -29,15 +15,10 @@ const EMAIL = "member@acme.com";
 type Stack = IdentityStack;
 
 /**
- * The issuer better-auth 1.7 keys an account by, for a provider that declares
- * none of its own.
- *
- * 1.7 re-keyed the account identity from `(providerId, accountId)` to
- * `(issuer, accountId)`, and synthesises this value for every social provider
- * that does not name an issuer. Inlined rather than imported: the builder is
- * exported only from `@better-auth/core/db`, and this package peer-depends on
- * `better-auth` alone — taking the core package as a dependency to reach two
- * lines of string construction would widen the seam for a test's convenience.
+ * The issuer better-auth 1.7 keys an account by, for a provider with none of
+ * its own. Inlined rather than imported: the builder lives only in
+ * `@better-auth/core/db`, and taking that dependency for two lines of string
+ * construction would widen the seam just for a test.
  */
 const oauthIssuer = (providerId: string): string => `local:oauth:${encodeURIComponent(providerId)}`;
 
@@ -58,16 +39,10 @@ const statedIdentifiers = (stack: Stack) =>
 const accountRow = (stack: Stack, id: string) => stack.db.account?.find((row) => row.id === id);
 
 /**
- * The `Account` row the fold maintains during the bridge phase. The memory
- * engine has no fold behind it, so a suite that wants to watch the mirror
- * puts the row there itself.
- *
- * The issuer is not decoration. better-auth 1.7 finds a credential account by
- * `(providerId, issuer, accountId)` and nothing else, so a bridge row without
- * it is invisible to the legacy branch — which reads to the customer as a
- * wrong password. This row carries what the fold's `upsertLiveAccount`
- * writes, because the whole point of the row is to be what the fold left
- * behind.
+ * The `Account` row the fold maintains during the bridge phase, since the
+ * memory engine has no fold of its own. The issuer is not decoration:
+ * better-auth 1.7 finds a credential account by `(providerId, issuer,
+ * accountId)`, so a row missing it reads to the customer as a wrong password.
  */
 function seedBridgeRow(stack: Stack, accountId: string): void {
   stack.db.account?.push({
@@ -1117,16 +1092,11 @@ describe("better-auth over the identity storage adapter", () => {
   });
 
   /**
-   * Enterprise SSO, which is the population D02 moves across and the one
-   * shape the end-to-end suites never drove: a latched user whose sign-in
-   * method arrived from a generic-OAuth / OIDC provider, signing in through
-   * the IdP callback with no legacy `Account` row behind them.
-   *
-   * The vocabulary is the hazard. `Identifier.provider` folds every
-   * enterprise IdP into `oidc` (`identifierProviderFor`), while
-   * `Identifier.providerId` keeps better-auth's own id verbatim. What comes
-   * back out has to be the verbatim one, or no configured provider would
-   * match the row again.
+   * Enterprise SSO: a latched user signing in through an IdP callback with
+   * no legacy `Account` row behind them. The hazard: `Identifier.provider`
+   * folds every enterprise IdP into `oidc`, while `Identifier.providerId`
+   * keeps better-auth's own id verbatim — and the verbatim one must come
+   * back out, or no configured provider would match the row again.
    */
   describe("given a latched user who signs in through an enterprise IdP", () => {
     let stack: Stack;
@@ -1204,13 +1174,10 @@ describe("better-auth over the identity storage adapter", () => {
       });
 
       /**
-       * The cross-tenant sign-in this branch found and fixed. The lookup
-       * used to fold `auth0` and `okta` into `oidc` and match on THAT, so
-       * two IdPs minting the same subject collapsed onto one identifier and
-       * production's `ORDER BY attachedAt ASC LIMIT 1` signed the second
-       * customer in as the first. Keyed on the verbatim `providerId` now,
-       * the same pair `Account` is unique by, with a partial unique index
-       * behind it.
+       * The cross-tenant sign-in this branch found and fixed: the lookup used
+       * to fold `auth0` and `okta` into `oidc` and match on that, so two IdPs
+       * minting the same subject collapsed onto one identifier and signed the
+       * second customer in as the first. Keyed on the verbatim `providerId` now.
        */
       it("resolves each IdP's subject to its own user when the subject strings collide", async () => {
         // One subject string, two different enterprise IdPs, two different

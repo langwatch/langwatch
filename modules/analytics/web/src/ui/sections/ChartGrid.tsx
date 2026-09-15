@@ -1,28 +1,7 @@
 /**
- * The one chart grid both the analytics dashboard (`ReportGrid`) and the
- * widget-authoring page (`DashboardWidgetGrid`) lay their cards out on: a
- * `react-grid-layout` grid in the unit `server/analytics/chartGrid.ts`
- * defines — eight fluid columns, fixed 100px rows — where a card is dragged by
- * its header and resized by its bottom-right corner, snapping to whole cells.
- *
- * Cards never overlap: the default vertical compactor pushes a neighbour down
- * when a card grows or moves into its space, and pulls everything up into any
- * gap that opens.
- *
- * A change is committed once, on drop or resize-end, as the full placement of
- * every card — a move often shifts neighbours too, and the server writes the
- * batch in one transaction. `onLayoutChange` is deliberately not used: it
- * fires on mount and on every prop change, and would write the grid back
- * each time a page opened.
- *
- * Cards are rendered per placement through `renderCard`, inside the grid
- * item element this component owns — the library matches an item to its
- * placement by the element's key, and only an element created here carries
- * the plain `graphId` as its key (`Children.map` would prefix it). A card
- * component therefore stays a plain component with no ref or grid class to
- * forward.
- *
- * @see specs/analytics/chart-grid-resize.feature
+ * The chart grid both the analytics dashboard and the widget-authoring page
+ * lay cards on. `onLayoutChange` is deliberately unused — it fires on mount
+ * and every prop change — so a placement change commits once, on drop or resize-end.
  */
 
 import "react-grid-layout/css/styles.css";

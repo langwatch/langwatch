@@ -5,14 +5,9 @@ import {
 } from "../ports/webhook-dispatch-rate-limiter.port.ts";
 
 /**
- * The dispatch counter a process keeps when it shares none.
- *
- * FROZEN TWIN of the in-memory branch of `platform/app/src/server/rateLimit.ts`,
- * including its fixed-window approximation and its opportunistic sweep. This is
- * the degraded mode, not the intended one: a ceiling enforced per process rather
- * than per fleet lets a burst through that is larger than intended, but still
- * bounded — which is the application's own behaviour when its Redis is down, and
- * is why the fallback exists at all rather than the cap failing open.
+ * A frozen twin of `rateLimit.ts`'s in-memory fixed-window fallback:
+ * per-process rather than per-fleet, so a larger-than-intended burst gets
+ * through but stays bounded — the app's own degraded mode when Redis is down.
  */
 
 /** Above this many live keys the map is swept, so a stream of distinct keys cannot leak. */

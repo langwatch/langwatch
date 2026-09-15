@@ -1,31 +1,10 @@
 /**
- * The composition core: one class that owns its policies and runs them in a
- * fixed, stated order.
- *
- * This replaces a middleware `compose()`. The behaviours are the same and so is
- * their order; what changed is that the order is now written out as nesting in
- * one method instead of being implied by a list's index. A reader asking "does
- * a retry keep its concurrency slot?" reads {@link ClickHouseQueryClient.query}
- * and sees the answer, rather than inferring it from the position of two
- * entries in an array.
- *
- * The order is load-bearing, and each step is here for a recorded reason:
- *
- *  1. **Tenant guard** — outermost, so a statement that cannot name its tenant
- *     is refused before it costs a span, a slot, or a socket.
- *  2. **Tracing** — outside the limiter, so queue time is inside the span. Time
- *     spent waiting for a slot is latency the caller experienced; a span that
- *     started after the wait would report a fast query on a slow request.
- *  3. **Concurrency limit** — outside retry, NOT inside. A slot is held across
- *     retries. Inside, a retrying statement would release its slot, rejoin the
- *     back of the queue and compete with fresh work, which is how a queue turns
- *     a small overload into a persistent one.
- *  4. **Retry** — innermost, wrapping the driver, so it retries the statement
- *     and nothing else.
- *
- * Every collaborator is injected and every one is optional. A client with no
- * policies is a thin pass-through to the driver, which is what makes the class
- * usable in a test without standing up four dependencies to assert on one.
+ * The composition core: one class running its policies in a fixed, load-
+ * bearing order (tenant guard, tracing, concurrency limit, retry), written
+ * as nesting in {@link ClickHouseQueryClient.query} rather than an array's
+ * index. Concurrency sits outside retry deliberately — a slot must survive
+ * a retry, or a retrying statement rejoins the queue and turns a small
+ * overload into a persistent one.
  */
 
 import type { ConcurrencyLimiter } from "./rateLimit.ts";

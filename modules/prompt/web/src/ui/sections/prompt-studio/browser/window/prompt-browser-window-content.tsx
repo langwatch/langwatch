@@ -19,8 +19,8 @@ const MIN_CHAT_AREA = 200;
 export { useTabId } from "../../studio-internals.ts";
 
 /**
- * Window content for a prompt tab.
- * Single Responsibility: Initialize form for the active tab and render header, messages, and tabbed sections.
+ * Window content for a prompt tab. Initializes the active tab's form and
+ * renders header, messages, and tabbed sections.
  * @returns JSX element or null when no initial values.
  */
 export function PromptBrowserWindowContent() {

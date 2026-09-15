@@ -17,20 +17,11 @@ describe("ClickHouse migrations", () => {
 
   /** @scenario The pulled-cost exclusion changes the budget rollup in place */
   it("changes the budget rollup view without dropping its trigger", () => {
-    // A materialised view is an insert trigger. Between a DROP and the
-    // following CREATE there is no trigger, ClickHouse does not replay the
-    // inserts made in that window, and this migration has no delta replay —
-    // so a successful debit landing in the gap is absent from
-    // gateway_budget_scope_totals permanently. Enforcement sums that rollup
-    // (getSpendForBudgets* reads sumMerge(SpendNanoUSD)), so the missing money
-    // reads as headroom and a budget authorises a request it should refuse.
-    // MODIFY QUERY swaps the SELECT with the trigger never absent.
-    //
-    // This is a static read of the migration text and nothing more: it does not
-    // run the migration, write a debit, or consult an enforcement decision. It
-    // pins the mechanism the reasoning above depends on. Proving that a debit
-    // written mid-rollout still reaches a budget needs a live ClickHouse, next
-    // to "Pulled cost never blocks spending" in pulledUsageLedger.integration.
+    // A materialised view is an insert trigger: a DROP-then-CREATE leaves a
+    // gap where a debit is silently dropped, reading as headroom and letting
+    // a budget authorise a request it should refuse. MODIFY QUERY swaps the
+    // SELECT with the trigger never absent. Static read of the migration
+    // text only — see pulledUsageLedger.integration for the live proof.
     const sql = readFileSync(
       resolve(
         import.meta.dirname,

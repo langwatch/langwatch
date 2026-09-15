@@ -1,28 +1,7 @@
 /**
- * Wrapper mode selection - Path A (gateway) vs Path B (ingestion).
- *
- * Decides, before each `langwatch <tool>` invocation, which routing
- * shape to apply:
- *
- *   - Path A (gateway): VK present + provider configured + user
- *     hasn't opted out -> inject the base-URL swap envs from
- *     envForTool(). Gateway captures I/O server-side; no OTel
- *     emission from the child.
- *   - Path B (ingestion): no VK (Claude Max-style subscription,
- *     user explicitly opted in) -> resolve the tool's ingest credential
- *     (a project pin when one exists, else the cached or freshly minted
- *     personal `ik-lw-` key), write the [otel] activation block to
- *     ~/.codex/config.toml (codex only), return the OTel exporter env
- *     block for the child.
- *
- * The two modes are mutually exclusive per the no-double-trace
- * rule - gateway capture + OTel emission of the same call would
- * double-count both traces and cost.
- *
- * Persisted preference lives at cfg.tool_mode[tool]; an unset
- * entry resolves at runtime as "gateway if VK present else
- * ingestion" with no prompt. Future iterations can layer a
- * first-run prompt similar to shell-rc.ts on top.
+ * Wrapper mode selection: gateway mode (VK present) captures I/O server-side;
+ * ingestion mode (no VK) emits OTel from the child instead. The two are
+ * mutually exclusive — both would double-count the same call's traces and cost.
  */
 
 import * as os from "node:os";
@@ -82,16 +61,10 @@ function isCaptureOptOut(raw: string | undefined): boolean {
 }
 
 /**
- * Run a synchronous telemetry-wiring refresh or removal, catching any
- * error so a housekeeping failure can never crash the wrapped tool launch.
- * `refreshClaudeUserTelemetryEnv`, `ensureClaudeProjectTelemetryPin`,
- * `refreshScopedShellFunctions`, and `removeClaudeProjectTelemetryPin` all
- * do unguarded synchronous fs writes; an EACCES/EROFS (a read-only home
- * dir, a locked-down project directory, …) must not exit the whole
- * `langwatch <tool>` invocation over what is meant to be best-effort
- * telemetry housekeeping, same guarantee the login-time refresh already
- * gives (`refreshTelemetryWiringForLogin` never fails the login on this).
- * Warns to stderr and returns `fallback` on failure.
+ * Catches any error so a housekeeping failure (an EACCES/EROFS from an
+ * unguarded fs write) can never crash the wrapped tool launch — the same
+ * best-effort guarantee the login-time refresh gives. Warns to stderr and
+ * returns `fallback` on failure.
  */
 function tryRefresh<T>(label: string, fn: () => T, fallback: T): T {
   try {
@@ -128,13 +101,10 @@ export interface WrapperModeResult {
    */
   extraArgs?: string[];
   /**
-   * Env-var names to STRIP from the inherited parent environment
-   * before merging the wrapper's vars in. Propagated from the
-   * per-tool ToolEnv.clears so the resolver can pass legacy-twin
-   * scrubs through to the spawn step (e.g. claude clears
-   * ANTHROPIC_API_KEY so claude-code 2.x doesn't warn "Both
-   * ANTHROPIC_AUTH_TOKEN and ANTHROPIC_API_KEY set, auth may not
-   * work as expected").
+   * Env-var names to strip from the inherited environment before merging the
+   * wrapper's vars in — propagated from the per-tool `ToolEnv.clears` so a
+   * legacy-twin var (e.g. claude's `ANTHROPIC_API_KEY`) doesn't collide with
+   * the one this wrapper sets.
    */
   clears?: string[];
   /** True when the wrapper minted a fresh ingest key (vs reused a cached one). */
@@ -178,20 +148,11 @@ export interface WrapperModeResult {
 }
 
 /**
- * Resolve mode for a single tool invocation. Returns the env block
- * the wrapper should hand to the child process. May persist a
- * refreshed ingestion token cache to ~/.langwatch/config.json as a
- * side effect.
- *
- * Does NOT prompt the user. The path-selection UX (interactive select
- * when both paths are allowed) lives upstream in `resolveWrapperPath`,
- * which passes its decision in via `forcedMode`. When `forcedMode` is
- * omitted the resolver falls back to the legacy state-only derivation
- * (persisted tool_mode, else VK-present-implies-gateway).
- *
- * The platform policy still GATES the resolved mode here (downgrade /
- * throw) regardless of how the mode was chosen, so a forced mode the
- * org admin disabled is handled the same as before.
+ * Resolve mode for a single tool invocation. Does NOT prompt the user — the
+ * path-selection UX lives upstream in `resolveWrapperPath`, which passes its
+ * decision in via `forcedMode`. Platform policy still GATES the resolved mode
+ * here regardless of how it was chosen, so a forced mode the org admin
+ * disabled is downgraded the same as an unforced one.
  */
 export async function resolveWrapperMode(
   cfg: GovernanceConfig,
@@ -223,22 +184,10 @@ export async function resolveWrapperMode(
 
   let notice: string | undefined;
 
-  // EFFECTIVE mode rules:
-  //   forcedMode set        -> use it (the path-selection UX upstream
-  //                            already applied flag / pref / prompt /
-  //                            single-allowed-path; we just honor it).
-  //   persisted="gateway"   -> gateway (even if VK absent; preflight surfaces the gap)
-  //   persisted="ingestion" -> ingestion
-  //   persisted="ask" / unset:
-  //     hasVk -> gateway (no surprise: VK users keep current behavior)
-  //     no VK -> ingestion (auto-install Path B; closes the "$5 VPS" scenario)
-  //
-  // Platform policy then GATES the resolved mode (the both-disabled case
-  // already threw above, so exactly one path is available when a swap is
-  // needed):
-  //   - mode=gateway + !allowVk          -> downgrade to ingestion
-  //   - mode=ingestion + !allowOtelDirect -> route through the gateway
-  //     (never minting an ingestion key the admin disabled)
+  // Effective mode: forcedMode wins, else a project pin means ingestion, else
+  // the persisted tool_mode, else VK-present means gateway (keeps current
+  // behavior) else ingestion (auto-installs Path B, closing the "$5 VPS"
+  // scenario). Platform policy then gates the result below.
   let mode: WrapperMode =
     forcedMode ??
     (hasProjectPin
@@ -251,16 +200,10 @@ export async function resolveWrapperMode(
             ? "gateway"
             : "ingestion");
 
-  // Symmetric fall-back: when the resolved mode is disabled but the
-  // OTHER mode is allowed, swap into it rather than throwing. Lets
-  // cursor (allowVk=true, allowOtelDirect=false) keep working via
-  // gateway when no VK is yet configured (preflight surfaces the
-  // missing VK separately, same as before this gate existed).
-  //
-  // The direct-OTLP gate sits ABOVE the ingestion-key mint below: when
-  // the admin disabled direct OTLP for this tool, the wrapper never
-  // reaches mintIngestionKey; it routes through the gateway (allowVk is
-  // guaranteed true here, since the both-disabled case threw above).
+  // Symmetric fallback: when the resolved mode is disabled but the other mode
+  // is allowed, swap into it instead of throwing (e.g. cursor keeps working via
+  // gateway with no VK yet). This gate sits above the ingestion-key mint below,
+  // so a tool with direct OTLP disabled never mints one.
   if (mode === "gateway" && !policy.allowVk) {
     mode = "ingestion";
     // Blame accurately: a hardcoded platform policy (no org row — e.g.
@@ -516,16 +459,11 @@ export async function resolveWrapperMode(
 
   let codexConfigPath: string | undefined;
   if (tool === "codex") {
-    // codex's OTLP/HTTP exporters send each signal to the configured
-    // endpoint verbatim - they do NOT append `/v1/traces` / `/v1/logs`
-    // the way the OTel SDKs in Node/Python/Go do, so the block writer
-    // spells both signal suffixes out (spans and events exporters).
-    //
-    // The Authorization header is persisted inline: config.toml is the
-    // only wiring codex reads on a plain (unwrapped) run, and it is a
-    // 0600 marker-managed file, so a plain `codex` captures exactly like
-    // a plain `claude` does through its settings files. `langwatch
-    // logout` removes the block.
+    // codex's OTLP/HTTP exporters send each signal to the endpoint verbatim
+    // (no `/v1/traces` suffix like the Node/Python/Go SDKs add), so the block
+    // writer spells both signal suffixes out. The Authorization header is
+    // persisted inline since config.toml is the only wiring a plain
+    // (unwrapped) `codex` run reads; `langwatch logout` removes the block.
     const result = writeCodexOtelBlock(
       {
         baseEndpoint: endpoint,
@@ -551,15 +489,10 @@ export async function resolveWrapperMode(
     setOpencodeOpenTelemetryFlag();
   }
 
-  // Persist (when freshly minted) the ingest key so the next invocation
-  // reuses the cached key instead of minting again. The tool_mode PIN is
-  // written only on the legacy state-only derivation (no forcedMode):
-  // when the path-selection UX upstream forced the mode, IT owns
-  // persistence — the interactive prompt saves an explicit answer, and
-  // silent defaults (non-TTY, prompt abort, copilot ingestion-first)
-  // deliberately do NOT persist so the user is asked again next run.
-  // Pinning here unconditionally turned one aborted prompt / CI run
-  // into a permanent silent pin that suppressed the prompt forever.
+  // The tool_mode pin is written only when nothing forced the mode: a forced
+  // mode already owns its own persistence, and a silent default (non-TTY,
+  // aborted prompt) deliberately does not persist, so the user is asked again
+  // next run instead of getting silently pinned forever.
   const next: GovernanceConfig = { ...cfg };
   if (forcedMode === undefined) {
     next.tool_mode = { ...(cfg.tool_mode ?? {}), [tool]: "ingestion" };
@@ -594,14 +527,10 @@ export async function resolveWrapperMode(
 }
 
 /**
- * Env vars to scrub from the child in ingestion (Path B) mode. Copilot's
- * BYOK provider vars — if the user hand-exported them in their shell —
- * would otherwise survive into the child and keep BYOK active, routing LLM
- * traffic OFF the Copilot seat (defeating seat-preserving ingestion) and,
- * when the inherited base URL is itself a LangWatch gateway, double-capturing
- * against the OTLP lane. Gateway mode already scrubs its conflicting twins;
- * this is the ingestion-side counterpart. Non-copilot tools have no such
- * activation var, so the set is empty.
+ * Scrubs copilot's BYOK provider vars in ingestion mode: if hand-exported,
+ * they'd keep BYOK active (routing traffic off the Copilot seat) and
+ * double-capture against the OTLP lane. Gateway mode scrubs its own
+ * conflicting twins; this is the ingestion-side counterpart.
  */
 function ingestionClears(tool: string): string[] {
   if (tool === "copilot") {

@@ -1,26 +1,10 @@
 /**
- * `@langwatch/charts` — the chart component library a playground widget
- * imports. Bundled by `scripts/build-charts-lib.mjs` into
- * `bridge/chartsLibSource.ts`'s `buildChartsLibScript()`, injected into the
- * sandboxed frame as `window.LWCharts` (see `buildSrcdoc.ts`), and resolved
- * by `bridge/authorRuntime.ts`'s require shim for the `"@langwatch/charts"`
- * specifier.
- *
- * Deliberately reads `window.React` / `window.Recharts` directly instead of
- * `import`-ing "react"/"recharts" as modules: the frame already loaded both
- * as CDN UMD globals (see `buildSrcdoc.ts`) before this script runs, and
- * every hook call here needs to land on that SAME React instance the
- * author's own component tree uses — a bundled second copy would violate
- * the rules of hooks the moment author code and this library render
- * together. No JSX either, for the same reason `authorRuntime.ts` needs no
- * jsx-transform config: `React.createElement` calls need nothing from
- * esbuild but `bundle: true`.
- *
- * All ten components consume `Row[]` — the `data` an `LW.useChartQuery`
- * result resolves to, i.e. `result.rows` — and default their color from
- * `window.LW.theme`, read lazily inside each render rather than at
- * script-load time (the shim sets `LW.theme` only after `lw:init`, which is
- * after this script has already executed once as an IIFE).
+ * `@langwatch/charts` — the chart library a playground widget imports,
+ * bundled into the sandboxed frame as `window.LWCharts` (see
+ * `buildSrcdoc.ts`). Reads `window.React`/`window.Recharts` directly instead
+ * of importing them, so every hook here lands on the SAME React instance the
+ * author's component tree uses — a bundled second copy would violate the
+ * rules of hooks. No JSX either, for the same build-free reason.
  */
 
 type Row = Record<string, unknown>;

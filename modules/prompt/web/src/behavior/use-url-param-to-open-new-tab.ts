@@ -25,10 +25,6 @@ export function useUrlParamToOpenNewTab() {
   const resolvedDefaultModel = resolvedDefault.data?.model;
 
   useEffect(() => {
-    /**
-     * openNewTab
-     * Single Responsibility: Fetches prompt data and creates a new tab with the prompt configuration.
-     */
     async function openNewTab() {
       if (!selectedPromptId) return;
       if (!project?.id) return;

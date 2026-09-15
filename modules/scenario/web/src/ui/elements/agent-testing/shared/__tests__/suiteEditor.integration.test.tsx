@@ -1,10 +1,7 @@
 /**
  * @vitest-environment jsdom
- *
- * The suite editor drawer: the name, the fields and the evaluators a test
- * suite declares, the chips that open them, and what a save sends and hears
- * back.
- *
+ * The suite editor drawer: name, fields and evaluators a test suite
+ * declares, the chips that open them, and what a save sends and hears back.
  * @see specs/features/agent-testing/suite-editor.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

@@ -6,15 +6,7 @@ import { createIntegrationObservability } from "../../../setup/node/__tests__/cr
 import * as semconv from "../../../semconv";
 import type { setupObservability } from "../../../setup/node";
 
-/**
- * Integration tests for LangWatch tracer with real OpenTelemetry setup.
- *
- * These tests verify:
- * - Real OpenTelemetry SDK initialization
- * - Actual span creation and data flow
- * - Integration between tracer and setup components
- * - Data format consistency in exported spans
- */
+/** Integration tests for LangWatch tracer with real OpenTelemetry setup. */
 
 // Test data constants for consistency
 const TEST_COMPLEX_INPUT = {

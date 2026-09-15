@@ -1,14 +1,8 @@
 /**
  * @vitest-environment jsdom
- *
- * The editor's assistance is the schema response and nothing else: this test
- * passes refusal markers in and verifies they map to the Monaco markers the
- * editor registers.
- *
- * Monaco is replaced by a stub at the module boundary: the assertions are about
- * what the workbench registers and hands to it, which is ours, not about what
- * Monaco does with it, which is not.
- *
+ * Monaco is replaced by a stub at the module boundary: assertions cover what the
+ * workbench registers and hands to it, which is ours, not what Monaco does with
+ * it, which is not.
  * Spec: modules/analytics/specs/analytics-lwql-workbench.feature
  */
 
@@ -95,15 +89,13 @@ const harness = vi.hoisted(() => {
   return { slots, monaco, editor, model };
 });
 
-// The editor reaches Monaco through the code-splitting shim, and that lazy
-// boundary never resolves under jsdom — the component sits on its loading
-// fallback forever. Standing the stub in for the shim's result mounts it
-// synchronously and leaves the real `LangWatchQLEditor`, which is what these
-// assertions are about, entirely untouched.
-//
-// Mount is announced during render rather than from an effect, and guarded by
-// a flag: a second announcement would register a second provider, which is
-// precisely the leak this stub must not paper over.
+// The editor reaches Monaco through a code-splitting shim that never resolves
+// under jsdom, so the stub mounts synchronously in its place, leaving the real
+// `LangWatchQLEditor` — what these assertions are about — untouched.
+
+// Mount is announced during render, guarded by a flag, since a second
+// announcement would register a second provider — the leak this stub must
+// not paper over.
 vi.mock("@monaco-editor/react", () => {
   function StubMonacoEditor(props: {
     value?: string;

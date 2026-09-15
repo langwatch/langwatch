@@ -1,6 +1,7 @@
-// New normal-use scenarios for Langy, targeting surfaces that don't exist in the original 42-scenario set in
-// langy.scenario.test.ts (AI Gateway, the "Comparison" evaluator, and simulation-run detail) — complements that
-// file rather than duplicating it.
+// New normal-use scenarios for Langy, targeting surfaces that don't exist in
+// the original 42-scenario set in langy.scenario.test.ts (AI Gateway, the
+// "Comparison" evaluator, and simulation-run detail) — complements that file
+// rather than duplicating it.
 
 import { setupScenarioTracing } from "@langwatch/scenario";
 
@@ -89,15 +90,10 @@ describe("Langy current-surfaces coverage", () => {
       expect(result.success).toBe(true);
     });
 
-    // "guardrails" and "cache-rules" scenarios were DROPPED here — verified
-    // directly against the `langwatch` CLI (Langy's only LangWatch transport,
-    // see services/langyagent/adapters/pi/spawn.go) that neither
-    // has a CLI surface at all (`langwatch --help` lists no such subcommand,
-    // unlike `virtual-keys` and `gateway-budgets` which do exist and ARE
-    // covered above/below). Testing an absent capability doesn't exercise
-    // Langy's judgment — it just re-confirms a known gap on every run, for
-    // no signal. Confirmed a real capability exists before scenario-testing
-    // it, per the "verify via the API first" rule for this suite.
+    // "guardrails" and "cache-rules" scenarios were DROPPED here: verified
+    // against the `langwatch` CLI that neither has a surface at all, unlike
+    // `virtual-keys` and `gateway-budgets` which do and are covered elsewhere.
+    // Testing an absent capability re-confirms a known gap, not Langy's judgment.
   });
 
   describe("when the user asks for instrumentation help", () => {

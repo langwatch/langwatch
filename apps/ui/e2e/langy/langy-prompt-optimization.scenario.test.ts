@@ -1,16 +1,7 @@
 /**
- * The prompt improvement loop, end to end: Langy on a seeded evaluations
- * workbench, graded by an LLM judge against the loop rubric and pinned to
- * hard facts through the workbench-state REST surface.
- *
- * The scenario adapter attaches no browser tab, so every workbench action a
- * conversation here triggers takes the backend fallback path by construction:
- * a green suite is also the proof that the loop survives the user stepping
- * away (specs/langy/langy-prompt-optimization-loop.feature, "The user steps
- * away and the loop continues on the backend").
- *
- * RUN (one file per vitest run, see README):
- *   cd apps/ui/e2e/langy && npx vitest run langy-prompt-optimization.scenario.test.ts --reporter=verbose
+ * The prompt improvement loop, end to end, graded by an LLM judge. The
+ * scenario adapter attaches no browser tab, so a green suite also proves
+ * the loop survives the user stepping away (see README to run this file).
  */
 
 import { openai } from "@ai-sdk/openai";

@@ -19,23 +19,10 @@ import { assertWebhookUrlAllowed, webhookUrlValidator } from "../webhook/url-pol
 import { nowInstant } from "@langwatch/time";
 
 /**
- * The outbound webhook sender both webhook channels run on: the automations
- * channel (one automation fire, Liquid-rendered body) and the webhook endpoints
- * platform (a batch envelope, org-scoped). Everything about the wire is decided
- * here for both — the address fence, the timeout, redirect refusal, Retry-After
- * parsing, the signature, and the dispatch-identity header, whose NAME is the
- * single parameter the two channels differ on.
- *
- * THE implementation, since 2026-09-02: the platform copy it was frozen
- * against was deleted with the webhook lane, so there is one sender and one
- * envelope again. While there were two, a difference between them was a
- * customer whose endpoint received different envelopes depending on which
- * process fired.
- *
- * WHAT DID NOT COME ACROSS AS A MODULE-LEVEL READ: the application's sender
- * reaches for its app's Redis (the dispatch cap) and its environment (the TLS
- * policy) from module scope. Here both are composed in once, because a package
- * that reached for either would only work inside the one process that had them.
+ * The outbound webhook sender both webhook channels run on (automations and
+ * the endpoints platform). Redis and the TLS policy are composed in
+ * explicitly rather than read at module scope, since a package reaching for
+ * either would only work inside the one process that had them.
  */
 export interface WebhookSendInput {
   url: string;
@@ -165,12 +152,9 @@ export class WebhookEgressService {
 
   /**
    * Sends one webhook request — the channel where the CUSTOMER supplies the
-   * endpoint.
-   *
-   * The URL is admitted before anything else happens, so a fenced destination
-   * costs no connection and no cap. The status is RETURNED for the caller to
-   * classify: the drawer's test fire wants the raw status to show the author,
-   * dispatch wants the DispatchError.
+   * endpoint. The URL is admitted before anything else, so a fenced
+   * destination costs no connection and no cap. Status is RETURNED (not
+   * thrown) so callers can classify it differently — a test fire shows it raw.
    */
   async send({
     url,

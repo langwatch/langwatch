@@ -1,22 +1,9 @@
 /**
- * Which codex session is live on this machine right now.
- *
- * Codex exports nothing about itself into the processes a session spawns: no
- * session id variable, no marker at all (openai/codex#8923). What it does
- * leave is the rollout transcript it appends to after every turn, so "the
- * rollout written to most recently" is the closest thing the machine has to
- * "the session asking". The window keeps a transcript from yesterday from
- * answering for a session that is not running any more.
- *
- * Nothing on disk says which of two simultaneously active sessions spawned
- * this process, so when two of them are active this resolves to no session at
- * all. Picking the newer of the two would attribute one session's checkout to
- * the other, and a declaration that names the wrong session is worse than no
- * declaration: the caller is told to name the session with the flags instead.
- *
- * Two windows are what separate "two sessions are running" from "codex was
- * restarted". See HOT_ROLLOUT_WINDOW_MS.
- *
+ * Which codex session is live on this machine right now. Codex exports no session id to a
+ * spawned process (openai/codex#8923), so "the rollout written to most recently" is the closest
+ * proxy for "the session asking"; the window keeps yesterday's transcript from answering for a
+ * dead session. Two simultaneously active sessions resolve to no session — picking the newer
+ * would misattribute one session's checkout to the other — so the caller must name it with flags.
  * Spec: specs/ai-governance/cli-wrappers/session-context-declare.feature
  */
 
@@ -30,16 +17,12 @@ import { defaultCodexSessionsRoot, findRecentRollouts } from "./codex-rollout-ot
 export const LIVE_ROLLOUT_WINDOW_MS = 15 * 60_000;
 
 /**
- * How recently a rollout must have been written for its session to count as
- * ACTIVE rather than merely recent.
- *
- * The session that runs `langwatch ingest context` is in the middle of a turn
- * while it runs it, so codex appended to that session's rollout seconds ago.
- * A session that sits idle, and above all one that ended when codex was
- * restarted, leaves a rollout that is stale-recent: inside the live window,
- * outside this one. That is what separates a restart, where only one session
- * is really running, from two sessions running side by side, and it is why
- * this refuses on two ACTIVE sessions rather than on two recent rollouts.
+ * How recently a rollout must have been written for its session to count as ACTIVE rather than
+ * merely recent. A session mid-turn (e.g. `langwatch ingest context`) appended seconds ago; an
+ * idle session, and especially one that ended when codex restarted, leaves a rollout that is
+ * stale-recent — inside the live window, outside this one. That distinguishes a restart (one
+ * session really running) from two sessions running side by side, which is why resolution
+ * refuses on two ACTIVE sessions rather than on two merely recent rollouts.
  */
 export const HOT_ROLLOUT_WINDOW_MS = 60_000;
 
@@ -67,13 +50,11 @@ export type CodexSessionResolution =
   | { kind: "none" };
 
 /**
- * The codex session asking on this machine. One live rollout answers on its
- * own; several answer only when exactly one of them is hot, because a hot
- * rollout is a session mid-turn and the caller is mid-turn by definition. Two
- * hot rollouts, or none, resolve to `ambiguous` and the caller declares
- * nothing. The session id comes from the rollout's filename, with the
- * transcript's own `session_meta` line as the fallback for a name codex ever
- * changes the shape of.
+ * The codex session asking on this machine. One live rollout answers on its own; several answer
+ * only when exactly one is hot, since a hot rollout means a session mid-turn — the caller by
+ * definition. Two hot rollouts, or none, resolve to `ambiguous`. The session id comes from the
+ * rollout's filename, falling back to the transcript's own `session_meta` line if codex ever
+ * changes the filename shape.
  */
 export async function resolveLiveCodexSession({
   sessionsRoot = defaultCodexSessionsRoot(),

@@ -99,27 +99,20 @@ export abstract class ApiKeyRepository {
   }): Promise<{ revokedAt: Instant | null; expiresAt: Instant | null } | null>;
   /**
    * Every unrevoked CLI login key (name carries {@link CLI_LOGIN_KEY_NAME_PREFIX})
-   * whose session has run out.
-   *
-   * Cross-tenant by design, like {@link revokeExpiredByName}: the caller is
-   * the hourly sweep, not a request, and a session the CLI stops refreshing
-   * leaves no other trace to scope a read to. `expiresAt: { not: null }` is
-   * carried explicitly so a login key minted before device metadata (and
-   * therefore no expiry) is never swept.
+   * whose session has run out. Cross-tenant by design, like
+   * {@link revokeExpiredByName}: the caller is the hourly sweep, not a
+   * request. `expiresAt: { not: null }` is explicit so a login key minted
+   * before device metadata (and therefore no expiry) is never swept.
    */
   abstract findElapsedLoginKeys(input: {
     now: Instant;
   }): Promise<Array<{ id: string; userId: string | null; organizationId: string }>>;
   /**
-   * Moves a live CLI login key's expiry with its session. A successful
-   * refresh calls this with the value `loginKeyExpiresAt` gives for the new
-   * refresh window, so a session nothing keeps refreshing is still retired
-   * by the hourly sweep rather than sliding forward forever.
-   *
-   * Scoped by name prefix as well as id/organization/user so this can never
-   * touch a key that is not a CLI login key. A key already revoked is left
-   * alone (`revokedAt: null`), so a refresh racing a revoke never brings a
-   * dead key back into the sweep's live set.
+   * Moves a live CLI login key's expiry with its session, so a session
+   * nothing keeps refreshing is still retired by the hourly sweep rather
+   * than sliding forward forever. Scoped by name prefix as well as
+   * id/organization/user, and a key already revoked is left alone, so a
+   * refresh racing a revoke never brings a dead key back into the sweep.
    */
   abstract extendLoginKeyExpiry(input: {
     id: string;

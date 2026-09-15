@@ -1,20 +1,6 @@
 /**
- * The chart grid's own unit — shared by the server-side layout validation
- * (`graphs.ts`, `dashboardWidgets.ts` and the saved-workbench-chart placement
- * schema) and the frontend grid that renders it (`ChartGrid.tsx`). Both sides
- * must agree on these numbers or a layout a client considers valid would be
- * rejected by the server, or vice versa.
- *
- * A column is a fraction of the grid's own width — {@link CHART_GRID_COLUMNS}
- * of them span the full row — and a row is a fixed
- * {@link CHART_GRID_ROW_HEIGHT_PX} regardless of container width, the same
- * fluid-column/fixed-row model `react-grid-layout` (and most dashboard grids
- * modelled on it, e.g. Grafana's) default to.
- *
- * Existing rows were converted to this unit once, by the
- * `chart_grid_eight_columns` Prisma migration; nothing here converts at read
- * time.
- *
+ * The chart grid's own unit, shared by server-side layout validation and the
+ * frontend `ChartGrid.tsx`: both must agree, or a layout valid on one side gets rejected.
  * @see specs/analytics/chart-grid-resize.feature
  */
 

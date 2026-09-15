@@ -1,17 +1,9 @@
 import { defineRule } from "../define-rule.mjs";
 
-// "Port" is not a word this codebase uses any more. State a module owns lives
-// behind a repository, messages it exchanges with something it does not own go
-// through a channel, technical clients the process supplies are members of the
-// module's Infrastructure, and behaviour lives in a service. A name ending in
-// `Port`, a file called `*.port.ts` and a `ports/` folder are all the older
-// shape, and the baseline for this rule may only shrink: nothing new may carry
-// the word.
-//
-// The match is deliberately case sensitive on `Port` and only fires on a
-// PascalCase name, so `transport`, `report`, `support`, `import`, `export`, a
-// network `PORT` and a real network port variable such as `freePort` are all
-// left alone. What is left is the abstraction: `UiRpcPort`, `DatasetStoragePort`.
+// "Port" is banned: state a module owns is a repository, an exchange with
+// something it does not own is a channel, a supplied client is
+// Infrastructure, and behaviour is a service. Case-sensitive on PascalCase
+// `*Port`, so `transport`, `report`, `import`, and `freePort` are untouched.
 
 const PORT_WORD = /^[A-Z][A-Za-z0-9]*Ports?(?![a-z])/;
 

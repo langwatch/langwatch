@@ -1,12 +1,8 @@
 /**
  * @vitest-environment jsdom
- *
- * The entrance: the card settles into place when the auth screens first paints.
- * What is pinned here is not the motion — it is the three rules around it:
- * once per page load, nothing at all under reduced motion, and never in front
- * of a keystroke.
- *
- * Spec: specs/identity/signin-signup-screens.feature
+ * Pins three rules around the auth-screen entrance card, not the motion
+ * itself: once per page load, nothing under reduced motion, and never in
+ * front of a keystroke. Spec: specs/identity/signin-signup-screens.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";

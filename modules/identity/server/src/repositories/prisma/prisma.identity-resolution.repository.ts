@@ -65,18 +65,11 @@ export class PrismaIdentityResolutionRepository implements IdentityResolver {
   }
 
   /**
-   * The callback of a provider that asserts its OWN issuer.
-   *
-   * Google, GitHub, GitLab and Azure AD are keyed by better-auth on the
-   * issuer the provider states rather than on one we mint, and the attach
-   * ceremony stores that verbatim — so this matches the pair the row carries
-   * and `@@index([issuer, providerAccountId])` serves it.
-   *
-   * It returns the row's `providerId` as well, because the account read
-   * underneath is keyed by it and the caller asked by issuer. Deriving it
-   * from the issuer instead would be a guess, and a provider subject is
-   * unique only WITHIN an issuer: a wrong guess answers with another IdP's
-   * user. A row whose `providerId` is null backs no protocol account, so it
+   * The callback of a provider that asserts its OWN issuer. Google, GitHub, GitLab and Azure AD
+   * are keyed by better-auth on the issuer the provider states, not one we mint, matched here via
+   * `@@index([issuer, providerAccountId])`. Returns the row's `providerId` too, since a provider
+   * subject is unique only WITHIN an issuer — deriving it from the issuer instead would risk
+   * answering with another IdP's user. A null `providerId` backs no protocol account, so it
    * resolves nobody here.
    */
   async resolveByIssuerSubject({

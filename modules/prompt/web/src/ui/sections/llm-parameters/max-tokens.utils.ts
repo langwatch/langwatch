@@ -82,13 +82,6 @@ function carryMaxTokens({
 }
 
 /**
- * Returns a clean LLMConfig for a new model.
- * Clears all registered parameters and applies sensible defaults.
- *
- * For max_tokens specifically:
- * - If previous value was at the previous model's max → set to new model's max (keep maxed)
- * - If previous value was below max (user customized) → min(previous, new max)
- *
  * @param newModel - The new model identifier
  * @param registry - Parameter registry (defaults to singleton)
  * @param newModelMetadata - Optional model metadata for the new model

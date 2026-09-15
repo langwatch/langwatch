@@ -130,11 +130,6 @@ export interface IdentityStack {
 }
 
 /**
- * memory engine underneath as the legacy branch. `databaseHooks` are OFF by default.
- * better-auth over the identity storage adapter (ADR-116 §1), with the same
- * — ADR-116 §5's move from a hook-level veto to a storage-level one — and a
- */
-/**
  * The memory engine standing in for the current legacy Prisma account table.
  * `Account` now has an issuer column; the wrapper remains the named fixture
  * for tests that pin translation against that real schema rather than against

@@ -1,20 +1,7 @@
 /**
- * One persisted dashboard widget, rendered read-only on a
- * dashboard grid — the `dashboard_srcdoc` sibling of
- * `LangWatchQLDashboardWidget`.
- *
- * No live re-fetch by id: unlike a placed workbench chart, a dashboard widget
- * widget has no separate source of truth to drift from. The `CustomGraph`
- * row IS the widget: the card's Edit drawer (`DashboardWidgetInPlaceEditor`)
- * mutates this exact row's `graph` column, so whatever the dashboard's own
- * list query already returned is already live.
- *
- * The period comes from the dashboard's own period control
- * (`usePeriodSelector`), exactly the way `LangWatchQLDashboardWidget` reads
- * it — one control moves every card, dashboard widgets included. There is
- * no per-card granularity override yet (dashboard widgets carry none the
- * way a placed workbench chart's `granularitySeconds` does), so every card
- * runs at the executor's own default step.
+ * A persisted dashboard widget, rendered read-only — the `dashboard_srcdoc`
+ * sibling of `LangWatchQLDashboardWidget`. No live re-fetch: the `CustomGraph`
+ * row IS the widget, so the dashboard's list query already has it live.
  */
 
 import { Box, Text } from "@chakra-ui/react";

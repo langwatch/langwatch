@@ -248,23 +248,9 @@ export class ApiKeyLifecycleService {
   }
 
   /**
-   * Retires the keys minted under one key.
-   *
-   * Lives on the primitive rather than on a CLI-specific caller because the
-   * parent link is a property of the row, and revoke reaches it from the
-   * API-keys page, the REST route and the tRPC mutation as well as from a
-   * `langwatch logout`. A cascade implemented in one caller is one the
-   * others skip.
-   *
-   * Best effort, and never fails the revoke that triggered it: the parent is
-   * already dead by the time this runs, and reporting a failure would say
-   * the revoke did not happen when it did. A child left behind is refused at
-   * authentication anyway, once the token-resolution path reads the parent.
-   *
-   * `callerIsAdmin` is true here for the same reason the cause is remapped:
-   * this is the platform retiring what a dead session owned, not the caller
-   * reaching for someone else's key. Whoever was allowed to revoke the
-   * parent is allowed to have its children go with it.
+   * Retires the keys minted under one key — best effort, never fails the
+   * triggering revoke (parent already dead; an orphan is refused at auth
+   * anyway). `callerIsAdmin` is forced true: retiring a dead session's key.
    */
   private async revokeChildrenOf({
     parentApiKeyId,

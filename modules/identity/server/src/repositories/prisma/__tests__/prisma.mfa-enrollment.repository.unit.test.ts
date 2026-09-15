@@ -4,21 +4,9 @@ import { guardOrganizationId } from "@langwatch/prisma-client";
 import { PrismaMfaEnrollmentRepository } from "../prisma.mfa-enrollment.repository.ts";
 
 /**
- * `findRequiringOrganizationSlugs` asks which of ONE person's organizations
- * require a second factor. That question spans every organization they belong
- * to, so it has no single-organization predicate to offer and
- * `guardOrganizationId` (ADR-021) refuses to serve it as a top-level
- * `organizationUser.findMany` — the refusal being a thrown `Error`, which the
- * boundary degrades to a generic 500 rather than to a skipped check.
- *
- * The identical query shape in the Backoffice impersonation service did exactly
- * that in production. This read is reachable from `disableMfa`, behind
- * `MFA_ENROLLMENT_OPEN`, so it would have waited for the flag to do the same.
- *
- * The stub below therefore runs the REAL guard rather than answering: the
- * repository is expected to read the memberships nested off the person, which
- * never reaches that delegate at all, and a regression to the top-level query
- * fails here with the production error.
+ * `findRequiringOrganizationSlugs` spans every org a person belongs to, so
+ * `guardOrganizationId` (ADR-021) refuses it as a top-level `findMany` — what
+ * broke Backoffice impersonation in production. The stub runs the REAL guard.
  */
 
 function makeGuardedPrisma(person: unknown) {

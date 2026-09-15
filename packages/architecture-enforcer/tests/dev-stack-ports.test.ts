@@ -1,17 +1,9 @@
 /**
  * @vitest-environment node
- *
- * The `pnpm dev` launcher derives a port per lane and has to actually hand it
- * over. It did not: the api lane's port was computed and left in the
- * launcher's own shell, so the api process fell through to PORT — the browser
- * application's — out of the workspace `.env`, and died with EADDRINUSE.
- *
- * Driven as real processes: dev/scripts/dev-stack.sh is run with a stand-in
- * `pnpm` first on PATH, which reports the argv and environment it was handed
- * instead of starting anything. That is the same handover the lanes get, so a
- * derivation that stops short of exporting fails here.
- *
- * Corresponds to specs/setup/dev-process-topology.feature.
+ * Guards the api lane's port actually being exported, not just computed and
+ * left in the launcher's own shell. Driven as real processes: a stand-in
+ * `pnpm` on PATH reports the argv/env it was handed instead of starting
+ * anything, so a derivation that stops short of exporting fails here.
  */
 
 import { execFileSync, execSync } from "node:child_process";

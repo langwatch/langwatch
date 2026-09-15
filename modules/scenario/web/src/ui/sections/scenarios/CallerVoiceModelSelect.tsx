@@ -8,14 +8,9 @@ import {
 import { callerVoiceOptions } from "./caller-voice-model-options";
 
 /**
- * The caller Voice picker: the caller voices the project has credentials for,
- * with a "Project default" entry at the top for the unset (null) state.
- *
- * A separate component from the chat/embedding `SimulationModelSelect` on
- * purpose — it lists caller voices, and keeping it apart means the chat and
- * embedding pickers keep their exact behaviour (AC18).
- *
- * `value === null` follows the project default voice; a string pins one.
+ * The caller Voice picker: caller voices the project has credentials for,
+ * with a "Project default" entry for the unset (null) state. Kept separate
+ * from `SimulationModelSelect` so the chat/embedding pickers keep their exact behaviour (AC18).
  */
 export function CallerVoiceModelSelect({
   value,

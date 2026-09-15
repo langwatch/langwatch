@@ -254,12 +254,10 @@ export class VirtualKeysApiService {
 
   /**
    * ONE page of the virtual keys visible to the caller, newest first. Pass
-   * `next_cursor` back as `cursor` for the next page, verbatim: a cursor this
-   * endpoint did not issue answers 400 rather than restarting the walk.
-   *
-   * `limit` is the page size (server default 50, capped at 200), and it caps
-   * the rows READ, not the rows returned: the visibility filter runs on the
-   * page afterwards. Prefer `list()` unless you mean to page deliberately.
+   * `next_cursor` back as `cursor` verbatim — an unrecognized cursor answers
+   * 400 rather than restarting the walk. `limit` caps the rows READ, not
+   * returned, since the visibility filter runs on the page afterwards.
+   * Prefer `list()` unless you mean to page deliberately.
    */
   async listPage(options?: {
     cursor?: string;
@@ -280,17 +278,11 @@ export class VirtualKeysApiService {
   }
 
   /**
-   * Every virtual key visible to the caller: keys scoped to this project, to
-   * its team, or to the whole organization.
-   *
-   * The endpoint pages; this follows `next_cursor` until it comes back null.
-   * Stopping on a short page would be wrong here specifically, because the
-   * server filters each page for visibility after reading it, so a page can
-   * hold fewer rows than the limit with more still to come.
-   *
-   * `limit` sizes each request in the walk, it does NOT cap what comes back.
-   * `cursor` resumes an interrupted walk. Take a single page with
-   * `listPage()`, or stream the walk with `iterate()`.
+   * Every virtual key visible to the caller (project, team, or org scoped).
+   * Follows `next_cursor` until it comes back null — a short page does NOT
+   * mean done, since the server's visibility filter runs after reading each
+   * page. `limit` sizes each request in the walk, it does not cap the total.
+   * Take one page with `listPage()`, or stream it with `iterate()`.
    */
   async list(options?: {
     cursor?: string;

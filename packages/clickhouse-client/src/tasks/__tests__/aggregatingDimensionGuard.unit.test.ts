@@ -3,29 +3,12 @@ import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
 /**
- * Guard: every column of an AggregatingMergeTree table declares how it merges.
- *
- * An AggregatingMergeTree collapses all rows that share a sorting key when it
- * merges parts. A column that is neither part of the sorting key nor an
- * aggregate state (AggregateFunction / SimpleAggregateFunction) has no rule for
- * that collapse: the surviving row keeps the value of whichever input row the
- * merge read last. The column still reads, so nothing at runtime reports it.
- *
- * ClickHouse 26.0 turned the same schema into a create-time error
- * (BAD_ARGUMENTS, "Column(s) X of the AggregatingMergeTree table are neither
- * part of the sorting key nor aggregate measures"). A migration run replays
- * every file from the start on a new install, so one such column stops a fresh
- * install against ClickHouse 26 or newer on that migration and leaves no schema
- * behind. Chart-managed ClickHouse is pinned, but an external ClickHouse is the
- * customer's own, and ClickHouse Cloud moves versions on its own schedule.
- *
- * SimpleAggregateFunction(max, T) is the fix: it states the rule the readers
- * already assume, is stored as the underlying type, and every supported
- * ClickHouse version accepts it.
- *
- * MATERIALIZED and ALIAS columns are exempt. They are computed on read from
- * other columns rather than carried through a merge, and ClickHouse accepts
- * them (verified against 26.8).
+ * Guard: every column of an AggregatingMergeTree table declares how it merges. A column that is
+ * neither part of the sorting key nor an aggregate state has no merge rule, so the surviving row
+ * silently keeps whichever input the merge read last. ClickHouse 26.0 turns this into a
+ * create-time error, and since migrations replay from scratch on install, one bad column stops a
+ * fresh install dead on 26+ (external/Cloud ClickHouse; Chart-managed is pinned). Fix:
+ * `SimpleAggregateFunction(max, T)`. MATERIALIZED/ALIAS columns are exempt (computed on read).
  */
 
 const MIGRATIONS_DIR = resolve(import.meta.dirname, "../../../migrations");
@@ -36,18 +19,12 @@ const CONVERGE_MIGRATION = "00088_aggregating_rollup_dimension_columns.sql";
 const NON_COLUMN_PREFIXES = ["INDEX", "CONSTRAINT", "PROJECTION", "PRIMARY"];
 
 /**
- * The columns that were declared without a merge rule before 00088, and the
- * merged migrations that still create them that way.
- *
- * These files have run somewhere, so they cannot change: `migration-order`
- * fails a branch that edits a migration already on main. A new install still
- * replays them, so on a server that enforces the check goose.ts runs them with
- * `allow_dimensions_outside_sorting_key` relaxed and 00088 converts the tables
- * immediately after. Every install therefore ends on the same schema.
- *
- * DO NOT add entries. A new migration runs without the compatibility setting,
- * so a column added without a merge rule fails on ClickHouse 26 at deploy time
- * and fails here on every version.
+ * The columns that were declared without a merge rule before 00088, and the merged migrations
+ * that still create them that way. These files have already run and cannot change
+ * (`migration-order` forbids editing a migration on main), so a new install replays them with
+ * `allow_dimensions_outside_sorting_key` relaxed, and 00088 converts the tables right after.
+ * DO NOT add entries: a new migration has no such relaxation, so a column without a merge rule
+ * fails on ClickHouse 26 at deploy time, and fails here on every version.
  */
 const HISTORICAL_DIMENSIONS: {
   file: string;

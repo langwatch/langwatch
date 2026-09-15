@@ -10,10 +10,7 @@ import { PromptTabStrip } from "./prompt-tab-strip.tsx";
 import { PromptBrowserWindowContent } from "./window/prompt-browser-window-content.tsx";
 import { DraggableTabsBrowser } from "./draggable-tabs-browser.tsx";
 
-/**
- * Tabbed browser for the prompt playground with draggable tabs and split-pane support.
- * Single Responsibility: Manages the browser-like tab interface for editing multiple prompts simultaneously.
- */
+/** Tabbed browser for the prompt playground, with draggable tabs and split-pane support. */
 export function PromptPlaygroundBrowser() {
   const windows = useDraggableTabsBrowserStore((state) => state.windows);
   const splitTab = useDraggableTabsBrowserStore((state) => state.splitTab);

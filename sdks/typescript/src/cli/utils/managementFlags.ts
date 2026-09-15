@@ -1,21 +1,7 @@
 /**
- * The flag grammar the management commands share.
- *
- * The management APIs take structured values a single `--flag value` cannot
- * carry: a permission is a resource and an action, a binding is a role and a
- * scope. Rather than invent a per-command spelling for each, the CLI uses one
- * colon-separated shape per concept and repeats the flag, which is the
- * convention the rest of the CLI already uses for lists (`--project-id` on
- * `api-keys create`).
- *
- * Every parser refuses a malformed value by NAMING the expected shape: a
- * message that says only "invalid" leaves the caller guessing at a grammar the
- * help text describes in one line.
- *
- * Parsing is pure and separate from the commands so it can be tested directly,
- * and so a command's failure is a validation error rather than a request the
- * platform has to reject. The invite grammar, the one shape with a JSON
- * spelling as well as a flag one, lives in `managementInvites`.
+ * The flag grammar the management commands share: one colon-separated shape per concept,
+ * repeated per flag, since a single `--flag value` can't carry a resource+action permission
+ * or a role+scope binding. Every parser refuses a malformed value by naming the expected shape.
  */
 import {
   MANAGEMENT_ROLES,
@@ -40,13 +26,10 @@ export class ManagementFlagError extends Error {
 export const oneOf = (values: readonly string[]): string => values.join(", ");
 
 /**
- * A non-negative integer flag, refused by name rather than sent as NaN.
- *
- * Matched as plain decimal digits rather than run through `Number`, which
- * reads "" as 0, "0x10" as 16 and "1e3" as 1000: a page size nobody typed.
- * Digits alone are not enough either, because past 2^53 a decimal string
- * rounds to a different integer and long enough becomes Infinity, so the
- * request would carry a number the caller never asked for.
+ * A non-negative integer flag, refused by name rather than sent as NaN. Matched as plain
+ * decimal digits rather than run through `Number`, which reads "" as 0, "0x10" as 16 and
+ * "1e3" as 1000. Digits alone aren't enough either: past 2^53 a decimal string can round to
+ * a different integer, so `Number.isSafeInteger` guards that too.
  */
 export const parseCount = ({ value, flag }: { value: string; flag: string }): number => {
   const trimmed = value.trim();

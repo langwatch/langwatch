@@ -1,34 +1,7 @@
 /**
  * @vitest-environment node
- *
- * An annotation that binds nothing and says nothing about it.
- *
- * The parity checker has three verdicts an author can see. A scenario with no
- * test is reported unbound. An annotation naming no scenario is reported
- * unknown. Both fail the run and both name the file. There is a fourth, and it
- * is silent: an annotation the extractor reads correctly, whose title is
- * perfectly good, which never reaches the binding table because the walk that
- * looks for the test call could not find one. `collectAllBindings` drops it
- * with a bare `continue`. No count, no file, no diagnostic.
- *
- * That is worse than an unbound scenario, because an unbound scenario is a gap
- * somebody is told about. This is a gap that reads as coverage. The test runs,
- * passes, and appears bound to a requirement that has no record of it.
- *
- * IT HAS ALREADY HAPPENED HERE. A privacy guard was written because a leak of
- * that exact shape reached production. Its third annotation sat on the second
- * line of a long comment block, and bound to nothing for as long as it existed.
- * The suite was green, parity was green, and the requirement had no test
- * against its name. That file is the fixture at the bottom of this one — not a
- * reconstruction of the shape, the artefact itself.
- *
- * WHY THIS IMPORTS THE PREDICATE RATHER THAN RESTATING IT. The acceptance rule
- * is extraction AND proximity. A guard that copies either half agrees with
- * itself and measures a question nobody asked; the first attempt at this guard
- * copied the extraction regex, passed its own mutation, and sat in a file that
- * contained a real unbound annotation the whole time. So both halves come from
- * the checker by import, and if the checker's rule changes this guard changes
- * with it or fails loudly.
+ * Guards a silent failure: an annotation that extracts fine but has no
+ * nearby test call is dropped with no diagnostic, reading as bound coverage.
  */
 import { readdirSync, readFileSync } from "node:fs";
 import { dirname, relative, resolve } from "node:path";
@@ -44,25 +17,10 @@ const HERE = dirname(fileURLToPath(import.meta.url));
 const APP_ROOT = resolve(HERE, "../..");
 
 /**
- * Every tree that can hold a test file.
- *
- * This deliberately is NOT the set of directories the author of this guard was
- * working in. An earlier version scanned three governance directories and
- * justified the narrowness as declining to report other people's debt. That was
- * wrong twice over, and both ways are worth recording because the reasoning is
- * seductive.
- *
- * It was wrong about coverage: a walk scoped to where the bug was found reports
- * zero everywhere it does not look, and a new dangling annotation outside the
- * scope never fails anything, forever. It was wrong about naming, too — the
- * guard read as a statement about the repository while checking a corner of it,
- * which is the same defect it exists to catch, one level up.
- *
- * The house pattern answers the same concern without the blindness: walk
- * everything, and carry the debt that already exists as data. See
- * `src/features/errors/logic/__tests__/noRawErrorToasts.unit.test.ts:49`, which
- * scans `src` and `ee` whole and holds its known exceptions in an `ALLOWED`
- * set, and `src/server/__tests__/frontend-boundary.unit.test.ts:65`.
+ * Every tree that can hold a test file. Deliberately not scoped to a few
+ * governance directories: a walk scoped to where a bug was found reports
+ * zero everywhere else it doesn't look, so a new dangling annotation outside
+ * that scope never fails anything. Walk everything; carry existing debt as data.
  */
 const ROOTS = ["src", "ee", "scripts"];
 
@@ -70,33 +28,10 @@ const TEST_FILE_RE = /\.(?:unit|integration|e2e)\.test\.tsx?$/;
 
 /**
  * Dangling annotations that already existed when this guard was written, by
- * file, with the exact count in each.
- *
- * WHY COUNTS AND NOT A FILE LIST. The precedent above allows whole files, and
- * warns in its own comment that a file-level entry blinds the guard to every
- * line that file will ever grow. That warning applies here with force: eleven
- * of these sit in one file, so allowing it outright would silence the twelfth.
- * An exact count keeps every one of these files live — add a dangling
- * annotation to any of them and the number moves and the guard fails.
- *
- * It ratchets in the other direction too. Fix one and the count no longer
- * matches, which fails with a message telling you to lower the number. That is
- * mildly annoying exactly once per fix, and it is the property that stops this
- * table from quietly becoming a list of files nobody checks.
- *
- * WHAT THESE ARE. 96 annotations across 43 files, all under `src`; nothing in
- * `ee` or `scripts` dangles. Four of them are not coverage hygiene — they name
- * requirements about cross-tenant reads, an api key's privilege ceiling, a lost
- * queue marker, and a migration dropping a concurrent write. Each has a passing
- * test and nothing bound to its name.
- *
- * They are recorded rather than fixed because this guard's job is to stop the
- * population growing, and because fixing a requirement's binding means reading
- * the requirement, which is the owning team's call and not a mechanical edit.
- * A second session measured the same population independently and agreed on the
- * order; its first attempt read 113 by reaching for the annotation's end offset
- * through a fallback rather than the `end` the extractor returns, which starts
- * the walk inside the annotation and over-reports.
+ * file, with the exact count in each. A count rather than a file allow list:
+ * an exact count keeps every file live, ratcheting both ways — a new
+ * dangling annotation moves the number up and fails, fixing one moves it
+ * down and fails until the entry is lowered to match.
  */
 const KNOWN_DEBT: Record<string, number> = {
   "src/components/settings/__tests__/ModelProviderForm.advanced-gateway.integration.test.tsx": 3,
@@ -263,19 +198,11 @@ describe("given the parity checker drops an annotation it cannot bind", () => {
 
   describe("when the annotation sits inside a block whose prose runs on below it", () => {
     /**
-     * The reproduction, kept verbatim.
-     *
-     * Three annotations. Two close their own comment and bind. The third opens
-     * the second line of a block comment whose prose runs on below it, and
-     * binds nothing — which is how it shipped, and why the requirement it names
-     * went untested while everything was green.
-     *
-     * This fixture is what makes the walk above meaningful. Without a case that
-     * fails, a matching count is indistinguishable from a walk that found no
-     * files, a predicate that always returns true, or an extractor that reads
-     * nothing. Both halves are mutation-proven: forcing `isFollowedByTestCall`
-     * to return true, and `findScenarioAnnotations` to return nothing, each
-     * turn this red.
+     * The reproduction, kept verbatim: the third annotation opens the second
+     * line of a block comment whose prose runs on below it and binds
+     * nothing — which is how it shipped. Both halves are mutation-proven:
+     * forcing `isFollowedByTestCall` true, or `findScenarioAnnotations` empty,
+     * each turn this red.
      */
     it("catches the annotation that actually shipped unbound", () => {
       const shipped = [

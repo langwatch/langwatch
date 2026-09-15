@@ -43,13 +43,9 @@ export class DashboardWidgetsApiError extends Error {
 }
 
 /**
- * Typed client for the dashboard widget family
- * (`/api/v1/projects/{projectId}/analytics/dashboard-widgets`).
- *
- * The twin of {@link ChartsApiService} for the widget's own rows: same
- * project-in-path routes, same once-resolved project id (the CLI's
- * request-scoped project first, then `LANGWATCH_PROJECT_ID`), and the same
- * loud refusal when none is known rather than guessing.
+ * Typed client for the dashboard widget family. The twin of
+ * {@link ChartsApiService}: same project-in-path routes, same once-resolved
+ * project id, and the same loud refusal when none is known rather than guessing.
  */
 export class DashboardWidgetsApiService {
   private readonly apiClient: LangwatchApiClient;

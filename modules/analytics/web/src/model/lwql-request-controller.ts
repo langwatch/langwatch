@@ -1,18 +1,7 @@
 /**
- * The workbench's request machine, with the side effects attached.
- *
- * `./lwql-request-state` decides what each event means; this issues the
- * request, aborts it, and publishes the state to whoever is subscribed. It is a
- * plain object rather than a hook so that every rule the feature file names —
- * the in-flight guard, reload sending the *submitted* snapshot, a cancelled
- * answer changing nothing — is covered without a component tree.
- *
- * Nothing here reads or rewrites the SQL. The statement handed to {@link
- * LangWatchQLExecute} is the one the member typed, character for character:
- * the backend owns parsing and policy, and a second opinion in the browser
- * could only disagree with it.
- *
- * @see modules/analytics/specs/analytics-lwql-workbench.feature
+ * The workbench's request machine: issues the request, aborts it, and
+ * publishes state built on `./lwql-request-state`. A plain object, not a
+ * hook, so the feature file's guards are covered without a component tree.
  */
 
 import type { LangWatchQLQueryResult } from "@langwatch/analytics-contract";
@@ -80,16 +69,10 @@ export interface LangWatchQLRequestController {
   /** Submits the current draft. No-op while a request is in flight. */
   runQuery(): void;
   /**
-   * Re-sends the LAST SUBMITTED snapshot, whatever the draft now says.
-   *
-   * Not what the toolbar's action calls, deliberately. `submitted` is the last
-   * request, which is not always the one that produced the visible result: run
-   * A, edit to B, run B, cancel, and `submitted` is B while the member is
-   * looking at A's rows. A button reading "Reload" there would re-run B. The
-   * toolbar therefore always submits the draft, which the label already
-   * guarantees is byte-identical to the visible result when it reads "Reload".
-   *
-   * This stays the seam for a data-only refresh of the last request.
+   * Re-sends the LAST SUBMITTED snapshot, whatever the draft now says. Not
+   * what the toolbar calls, deliberately: `submitted` can be ahead of the
+   * visible result (run A, edit to B, run B, cancel — `submitted` is B while
+   * A's rows show), so the toolbar always resubmits the draft instead.
    */
   reload(): void;
   /**

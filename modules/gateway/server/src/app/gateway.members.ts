@@ -173,7 +173,9 @@ export type PulledUsageTotals = {
 
 
 /**
- * Read targets for a plain list of budgets, no request context (a GROUP budget sums every member bucket, having no single member here). `now` is the instant periods are resolved at, shared with the rollup read — passing it explicitly rather than each floor reading the wall clock is what keeps an anchored budget's moving floor in agreement across both halves of the read.
+ * Read targets for a plain list of budgets, no request context (a GROUP
+ * budget sums every member bucket). `now` is shared with the rollup read so
+ * an anchored budget's moving floor agrees across both halves of the read.
  */
 export function budgetSpendTargetsFor({
   budgets,
@@ -306,7 +308,9 @@ export interface GatewayChangeEvents {
 }
 
 /**
- * The ClickHouse surface this feature uses, structurally, so the package does not depend on the driver. clickhouse_settings is scalars-only: the driver's type also admits a nested map, and declaring that here made the real client un-assignable (a parameter position is contravariant), yet nothing here ever passes a map setting. insert answers unknown for the mirror reason — Promise<InsertResult> isn't assignable to Promise<void> — and no call site reads what insert answers anyway.
+ * The ClickHouse surface this feature uses, structurally, so the package
+ * does not depend on the driver — the driver's stricter types (a nested-map
+ * setting, a typed insert result) are not assignable here (contravariance).
  */
 export type GatewayClickHouseClient = {
   query(input: {
@@ -333,7 +337,9 @@ export interface GatewayClickHouse {
 }
 
 /**
- * What the gateway bundle is assembled from besides the materialiser's own logic: the version token, the reserved model tiers a routing policy falls through to, and the model catalog a provider row declares it serves. A port because each reads something outside the service (provider graph, tier vocabulary, shipped registry); a process composes the concrete reader.
+ * What the gateway bundle is assembled from besides the materialiser's own
+ * logic: the version token, tier fallthrough, and a provider's model
+ * catalog. A port because each reads something outside the service.
  */
 export interface GatewayConfigAssembly {
   /** The `ETag` for one key's bundle. */
@@ -360,18 +366,9 @@ export interface GatewayConfigAssembly {
 }
 
 /**
- * The Enterprise governance ledger's view of a virtual key's life.
- *
- * A port rather than a direct call: governance is an Enterprise capability and
- * a core package may not reach one. The payload is restated structurally for
- * the same reason — the Enterprise signal type is the authority, and this is
- * the subset the gateway can produce.
- *
- * Absent on every deployment that composes no governance ledger, which is what
- * the application being retired did in every process: it constructed the
- * Enterprise service in its DISABLED form, so each of the five lifecycle
- * emissions below reached a null object. Leaving the port unset preserves that
- * behaviour and, unlike the disabled object, says so.
+ * The Enterprise governance ledger's view of a virtual key's life. A port
+ * rather than a direct call: governance is an Enterprise capability, and a
+ * core package may not reach one directly. Absent when no ledger is composed.
  */
 export type GatewayVirtualKeyLifecycleSignal = {
   virtualKey: {
@@ -391,13 +388,9 @@ export interface GatewayGovernanceSignals {
 }
 
 /**
- * Reads a model provider's stored custom keys.
- *
- * The rows are encrypted at rest with the deployment's credential cipher, and
- * the cipher belongs to the Model Provider feature. A gateway package may not
- * depend on another feature's server package, so the read arrives as a port
- * and the process wires `@langwatch/model-provider-server`'s lenient reader
- * behind it.
+ * Reads a model provider's stored custom keys, encrypted at rest with a
+ * cipher the Model Provider feature owns — a gateway package may not depend
+ * on another feature's server package directly, hence this port.
  */
 export interface GatewayModelProviderCredentials {
   readCustomKeys(stored: unknown): Record<string, unknown>;
@@ -410,14 +403,9 @@ export type GatewayPermissionScope =
   | { type: "project"; id: string; teamId: string };
 
 /**
- * The one authorization seam the virtual-key write paths decide on.
- *
- * Two questions rather than one, because the two credentials answer them
- * differently and collapsing them would let a scoped API key inherit the
- * user's full cascade: a browser session resolves through the role-binding
- * cascade, while a scoped API key resolves through its own ceiling
- * (`effective = key ∩ user`). A legacy project key is neither and is decided
- * in the service without reaching this port at all.
+ * The one authorization seam the virtual-key write paths decide on. Two
+ * questions, not one, because a scoped API key resolves through its own
+ * ceiling (`effective = key ∩ user`) rather than the session's full cascade.
  */
 export interface GatewayScopePermissions {
   sessionHolds(input: {
@@ -441,13 +429,9 @@ export interface GatewaySettlementPolicy {
 }
 
 /**
- * Writes one already-normalized span into the deployment's trace storage.
- *
- * The gateway emits exactly one span of its own — the settlement of a brokered
- * voice session — and it goes through the same normalized-span seam the OTLP
- * and REST collectors route through, so its (tenant, trace, span) dedup gate
- * makes a resent webhook write the span once rather than adding a second cost
- * to the trace.
+ * Writes one already-normalized span (the gateway's voice-settlement span)
+ * through the same seam OTLP and REST route through, so its dedup gate makes
+ * a resent webhook write the span once rather than adding a second cost.
  */
 export interface GatewaySpanIngestion {
   ingestNormalizedSpan(input: {
@@ -508,7 +492,9 @@ export interface GatewayTransaction {
 }
 
 /**
- * The virtual-key cipher, as the write path sees it: mint a secret, read its display prefix back, hash or verify one. The cipher itself is an adapter, so a process composes the peppered implementation and the service never reaches for it.
+ * The virtual-key cipher, as the write path sees it: mint a secret, read
+ * its display prefix back, hash or verify one. An adapter composes the
+ * peppered implementation; the service never reaches for it directly.
  */
 export interface GatewayVirtualKeyCrypto {
   mintSecret(nowMs?: number): string;

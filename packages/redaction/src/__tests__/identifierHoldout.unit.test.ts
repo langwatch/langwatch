@@ -12,23 +12,11 @@ import {
 const DECIMAL_TRACE_ADDRESS = "17575001234540000091234567890123";
 
 /**
- * The two value rules answer different questions and are deliberately not the
- * same rule.
- *
- * `isIdentifierShapedValue` decides whether to run shape-only recognizers — a
- * bitcoin pattern, a phone pattern. Getting it wrong costs a recognizer that
- * would have fired on a name anyway, because the native engine has no notion of
- * a person, so the rule can be generous.
- *
- * `isOpaqueIdentifierValue` decides whether a value is ever offered to the
- * service that DOES find names and places. Getting it wrong stores a name in
- * the clear, so the rule has to be mean: a value qualifies only when it carries
- * a run no person would type.
- *
- * Every identifier fixture below is GENERATED, never observed: each is drawn
- * from the same mulberry32 generator the corpus tests use, seeded 20260912,
- * over the hex or Crockford-base32 alphabet. Nothing here names a real trace,
- * span or session.
+ * The two value rules deliberately answer different questions:
+ * `isIdentifierShapedValue` can be generous (a false positive only wastes a
+ * shape recognizer), while `isOpaqueIdentifierValue` must be mean — getting
+ * it wrong stores a name in the clear. Every fixture below is GENERATED
+ * (seeded mulberry32, seed 20260912), never an observed real identifier.
  */
 describe("given the identifier hold-out rules", () => {
   describe("when the value is a machine identifier", () => {
@@ -199,13 +187,9 @@ describe("given the identifier hold-out rules", () => {
 
     /**
      * Every namespace the canonicaliser folds into `metadata.<key>` has to be
-     * recognised here, because redaction runs BEFORE that fold: a name this
-     * function misses is a name the hold-out never sees.
-     *
-     * The prefixes are read from the shared constant rather than copied, and
-     * the loop is over that constant rather than over a literal
-     * list. Adding a namespace there and not here is then a red test instead of
-     * a silent hole — which is exactly how `langwatch.trace.` was missed.
+     * recognised here, because redaction runs BEFORE that fold. Looping over
+     * the shared constant rather than a literal list makes a namespace added
+     * there and not here a red test instead of a silent hole.
      */
     it.each(
       METADATA_SUBKEY_PREFIXES,

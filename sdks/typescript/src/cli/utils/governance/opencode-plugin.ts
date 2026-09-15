@@ -1,29 +1,9 @@
 /**
- * The opencode plugin that makes a session report the repository it ran in.
- *
- * opencode has no command hooks. Its only seam for running our code inside a
- * session is a plugin module: any `.js` or `.ts` file under the config
- * directory's `plugins/` folder is imported at startup, and every function it
- * exports is called with the session's project, directory and worktree. What
- * the plugin gets in return is the session event bus, which is where the
- * session id lives: `session.created` carries the whole session record
- * (`properties.info.id` plus the directory it runs in) and `session.idle`
- * carries `properties.sessionID` at the end of every turn. That id is the same
- * one opencode puts on its own spans as `session.id`, which is what lets the
- * event join the session.
- *
- * The plugin itself does none of the work: it shells out to
- * `langwatch ingest hook opencode` with the same payload Claude Code and Codex
- * put on a hook's stdin, so the git work, the fingerprint, the payload and the
- * endpoint resolution stay in one command rather than being reimplemented in a
- * file we generate.
- *
- * It is written as plain JavaScript so nothing has to compile it, and it is
- * fire-and-forget: the child is spawned, handed its payload and unreferenced,
- * so a slow or missing collector can never delay or fail a session. opencode
- * awaits the event handler, so blocking here would block the session.
- *
- * Spec: specs/ai-governance/cli-wrappers/session-context-hook.feature
+ * The opencode plugin that makes a session report the repository it ran in. opencode has no
+ * command hooks — a plugin module is its only seam; the session id comes from the event bus
+ * (`session.created`'s `properties.info.id`, or `session.idle`'s `properties.sessionID`). It
+ * shells out to `langwatch ingest hook opencode`, spawned unreferenced so a slow collector
+ * can't block the session opencode awaits it for.
  */
 
 import * as fs from "node:fs";

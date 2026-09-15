@@ -1,25 +1,7 @@
 /**
- * The LangWatchQL chart drawn on a page where nothing may be evaluated from a
- * string. Renders `LangWatchQLVegaLiteChart` directly — the shared component
- * every chart surface (the dashboard widget) draws through — rather than a
- * page-specific wrapper, since the CSP claim under test is about the Vega
- * embed pipeline itself, not about any one surface's chrome around it.
- *
- * A Content-Security-Policy without `unsafe-eval` makes `eval` and the
- * `Function` constructor throw. The application's production policy still
- * carries `unsafe-eval` for unrelated scripts and dev mode serves no policy
- * header at all, so "renders under the real policy" would be vacuously green.
- * This hardens the page instead — `eval` and `Function` are replaced with
- * throwing stubs for the duration of the render, which is strictly stronger
- * than the deployed policy — and then proves the hardening is a real detector
- * by embedding the very same specification through the very same runtime with
- * `ast` turned off, where it fails.
- *
- * The hardening is installed only after every module has been imported: the
- * test harness itself evaluates modules from source text, and hardening before
- * that would fail the harness rather than the chart.
- *
- * Spec: specs/analytics/lwql-workbench.feature
+ * Hardens the page by replacing `eval`/`Function` with throwing stubs during
+ * render, since testing under the real CSP would be vacuous. Installed only
+ * after every module import, since the harness itself evals from source text.
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

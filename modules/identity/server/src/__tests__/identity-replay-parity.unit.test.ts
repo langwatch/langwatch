@@ -1,19 +1,9 @@
 /**
  * @vitest-environment node
- *
- * Replay parity for the `Identifier` projection (ADR-101 §3).
- *
- * The claim is not "the reducer is deterministic" — folding one list twice
- * proves nothing an assignment would not. The claim is that the projection
- * MAINTAINED INCREMENTALLY equals the one rebuilt from scratch: the live path
- * loads the rows it wrote, folds one event onto them and writes them back,
- * over and over, and every one of those round trips crosses the row shape.
- * A column the mapping loses, a field the reducer needs and the row cannot
- * carry, a state that only survives in memory — each shows up as a difference
- * here and nowhere else.
- *
- * The store is in memory but the ROW SHAPE is the real one: `factToRow` and
- * `rowToFact` are what the Prisma repository writes and reads.
+ * Replay parity for the `Identifier` projection (ADR-101 §3): incremental
+ * maintenance must equal a rebuild from scratch. The live path round-trips
+ * rows through `factToRow`/`rowToFact`, the same shape Prisma writes and
+ * reads, so a lost column or memory-only field shows up here and nowhere else.
  */
 import {
   emptyIdentityHeads,

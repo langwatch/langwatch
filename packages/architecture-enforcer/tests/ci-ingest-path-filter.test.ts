@@ -1,18 +1,10 @@
 /**
  * @vitest-environment node
- *
- * The gate that decides whether sdk-javascript-ci's `e2e` job runs.
- *
- * That job boots a real LangWatch server and posts real SDK telemetry at it,
- * which makes it the only check in the repo that watches the ingest routes
- * answer over a socket. Its `ingest` path filter is what carries an app-only
- * change to it, and the filter has two ways to be wrong that read as fine:
- * a pattern matching nothing, and a key the change detector never declares as
- * an output, which resolves to an empty string and leaves the job skipped
- * forever rather than failing.
- *
- * @see .github/workflows/sdk-javascript-ci.yml
- * @see .github/actions/detect-changes/action.yml
+ * The gate that decides whether sdk-javascript-ci's `e2e` job runs — the only
+ * check that boots a real server and posts real SDK telemetry at it. The
+ * `ingest` path filter can be wrong two ways that read as fine: a pattern
+ * matching nothing, or a key the detector never declares, which resolves to
+ * an empty string and leaves the job skipped forever rather than failing.
  */
 
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
@@ -116,18 +108,11 @@ const EVERY_PATTERN = Object.entries(filters).flatMap(([key, patterns]) =>
 );
 
 /**
- * File lists as `git show --name-only --format=` reports them. Held here
- * rather than read from git because the unit shards check out at the default
- * fetch depth of a single commit, where neither revision is reachable: a
- * git-backed read would pass on a developer machine and fail in CI.
- *
- * Both change-sets predate the platform application's removal, and every path
- * they name has moved. The historical list is kept verbatim under `wasFiles`
- * — it is the evidence for why this guard exists — and `files` restates the
- * same change against the tree that serves those routes today. Restating is
- * what keeps the guard honest: a fixture whose every path is gone matches no
- * filter, and the test would then be asserting that a change nobody can make
- * any more triggers a lane.
+ * File lists as `git show --name-only --format=` reports them, held here
+ * rather than read from git because CI's shallow checkout can't reach either
+ * revision. `wasFiles` is the historical evidence; `files` restates the same
+ * change against today's tree, so the guard doesn't end up asserting that a
+ * change nobody can make any more still triggers a lane.
  */
 const BREAKS_INGEST = {
   sha: "cea66e8e12fd3de8720bf9ba6978b471d4bd9286",

@@ -1,17 +1,10 @@
 /**
- * Blob storage as ONE client that routes itself.
- *
- * Every call names the project whose object it is, and this member resolves
- * the bucket, the endpoint and the credentials from it. There is no
- * `forProject` handing a caller a client, because a client a caller holds is a
- * client a caller can use for the wrong project one call later; the scope
- * travels with the operation instead.
- *
- * An organization that brings its own S3 account is routed to it. Every other
- * project writes to this deployment's shared bucket. A project this deployment
- * cannot place is refused, never written to the shared bucket by default:
- * putting one customer's objects where another customer's credentials reach
- * them is the failure this routing exists to prevent.
+ * Blob storage as ONE client that routes itself: every call names the
+ * project whose object it is, and this member resolves bucket, endpoint and
+ * credentials from it. No `forProject` hands out a client, since a held
+ * client is a client used for the wrong project one call later. A project
+ * this deployment cannot place is refused, never defaulted to the shared
+ * bucket — the exact failure this routing exists to prevent.
  */
 import {
   DeleteObjectCommand,

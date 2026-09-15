@@ -1,16 +1,8 @@
 /**
  * @vitest-environment node
- *
- * Tests for dev/scripts/dev-supervisor.mjs, which takes a dev stack down with
- * whoever started it so abandoned `pnpm dev` stacks stop accumulating.
- *
- * Driven as real processes, because the thing under test is process-group
- * behaviour and nothing else would exercise it: each test launches a stand-in
- * stack from a detached launcher shell (its own process-group leader, the same
- * shape as an agent's shell or a `sh -c`), kills the launcher by pid the way
- * the real leak happens, and then observes which processes are left.
- *
- * Corresponds to specs/setup/dev-stack-lifecycle.feature.
+ * Tests dev/scripts/dev-supervisor.mjs, which takes a dev stack down with whoever started it.
+ * Driven as real processes, since the thing under test is process-group behaviour: each test
+ * kills a detached launcher shell by pid, the way the real leak happens, and observes what's left.
  */
 
 import { spawn, spawnSync } from "node:child_process";

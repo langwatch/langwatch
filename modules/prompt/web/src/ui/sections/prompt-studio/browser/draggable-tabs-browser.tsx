@@ -74,11 +74,6 @@ function useTabWindowContext() {
   return context;
 }
 
-/**
- * DraggableTabsBrowser Root Component
- *
- * Single Responsibility: Provides drag-and-drop context and orchestrates tab movement between windows
- */
 interface DraggableTabsBrowserProps {
   children: React.ReactNode;
   onTabMove: (params: {
@@ -389,22 +384,11 @@ function DraggableTab({ id, children, ...rest }: DraggableTabTriggerProps) {
 const DraggableTabsContent = Tabs.Content;
 
 /**
- * Compound component for draggable browser-like tabs.
- * Provides drag-and-drop functionality for tabs across multiple windows.
- *
+ * Compound component for draggable browser-like tabs across multiple windows.
  * @example
- * ```tsx
  * <DraggableTabsBrowser.Root onTabMove={handleMove}>
- *   <DraggableTabsBrowser.Window windowId="g1" activeTabId="tab1">
- *     <DraggableTabsBrowser.TabBar tabIds={["tab1", "tab2"]}>
- *       <DraggableTabsBrowser.Tab id="tab1">
- *         <DraggableTabsBrowser.Trigger value="tab1">Tab 1</DraggableTabsBrowser.Trigger>
- *       </DraggableTabsBrowser.Tab>
- *     </DraggableTabsBrowser.TabBar>
- *     <DraggableTabsBrowser.Content value="tab1">Content</DraggableTabsBrowser.Content>
- *   </DraggableTabsBrowser.Window>
+ *   <DraggableTabsBrowser.Window windowId="g1" activeTabId="tab1">…</DraggableTabsBrowser.Window>
  * </DraggableTabsBrowser.Root>
- * ```
  */
 export const DraggableTabsBrowser = {
   Root: DraggableTabsBrowserRoot,

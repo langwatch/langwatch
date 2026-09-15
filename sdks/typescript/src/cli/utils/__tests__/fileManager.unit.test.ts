@@ -74,16 +74,11 @@ describe("FileManager.findProjectRoot (via getPromptsConfigPath)", () => {
   });
 
   /**
-   * Regression: the project root is memoised, and the cache MUST be keyed by the
-   * cwd it was derived from.
-   *
-   * In a process that serves one command and exits, an unkeyed cache is
-   * invisible. In one that serves many from different directories — the CLI
-   * daemon, but equally a test runner or any embedding host — the second caller
-   * silently inherits the first caller's project root, and `prompt init` writes
-   * prompts.json into someone else's directory while `prompt sync` then fails to
-   * find it. Note there is no `_resetProjectRootCache()` below: that is the
-   * point.
+   * Regression: the project-root cache is memoised and MUST be keyed by the cwd it was
+   * derived from. A process serving many callers from different directories (the CLI daemon,
+   * a test runner) would otherwise have the second caller silently inherit the first's root —
+   * `prompt init` writing into someone else's directory. No `_resetProjectRootCache()` below:
+   * that is the point.
    */
   describe("given one process serving callers from different directories", () => {
     describe("when the cwd changes between calls", () => {

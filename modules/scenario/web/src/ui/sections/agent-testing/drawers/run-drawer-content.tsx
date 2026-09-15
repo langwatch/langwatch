@@ -1,6 +1,6 @@
 /**
- * The body of the run drawer: the conversation, the judge results and the parameters, beside each other when the
- * window gives enough room and stacked under each other when it does not.
+ * The body of the run drawer: the conversation, the judge results and the parameters, beside
+ * each other when the window gives enough room and stacked under each other when it does not.
  * @see specs/features/agent-testing/side-by-side-run-drawer.feature
  */
 

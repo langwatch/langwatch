@@ -1,14 +1,9 @@
 /**
- * Every way a chart can fail to appear, and the words for each.
- *
- * A chart that cannot be drawn shows *why*, in its own state, naming the cause
- * and what to change. The one thing none of them does is render an empty box:
- * a blank plotting area is indistinguishable from a chart still loading, from
- * one encoding the wrong column, and from a bug.
- *
- * The copy map is exhaustive over the refusal codes at the type level, so a new
- * code cannot reach a member as an unexplained blank.
- *
+ * Every way a chart can fail to appear, and the words for each. None of
+ * them renders an empty box — a blank plotting area is indistinguishable
+ * from loading, a wrong-column encoding, or a bug. The copy map is
+ * exhaustive over refusal codes at the type level, so a new code can't
+ * reach a member as an unexplained blank.
  * @see modules/analytics/specs/analytics-lwql-workbench.feature
  */
 

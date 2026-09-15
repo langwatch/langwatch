@@ -1,7 +1,7 @@
 /**
  * @vitest-environment node
  * Real Postgres + real ClickHouse; "reset" moves the window, it does not wipe the counter.
- * Spec: specs/ai-gateway/end-user-attribution.feature, specs/ai-gateway/gateway-budget-targeting.feature
+ * Spec: specs/ai-gateway/{end-user-attribution,gateway-budget-targeting}.feature
  */
 import { fromDate, type Instant, nowInstant, Temporal } from "@langwatch/time";
 import { nanoid } from "nanoid";

@@ -1,31 +1,7 @@
 /**
- * A workbench page, without a browser.
- *
- * The scenario suites drive Langy through the real product surface but attach
- * no page, so every `langwatch ui call workbench.*` the agent runs falls back to
- * the backend after the 3 second claim window. This is the other half: a
- * headless object that does what the open page does: it hears the `ui` entry on
- * the turn stream the adapter is already reading, claims the action, applies the
- * same shared transform to the same store, saves with `expectedVersion`, and
- * completes the action. For `workbench.run` it posts the same
- * `POST /api/experiments/execute` request the page posts and drains the same
- * stream.
- *
- * Nothing is reimplemented that the page shares: the manifest, the store, the
- * transforms, `executeUiAction`, `buildExecutionRequest`, `resultsFold`,
- * `readLiveWorkbench` and `scopeFromRunPayload` are the app's own modules,
- * imported through the `~/` alias this suite's vitest config declares. What
- * IS reimplemented is the page's autosave (a React hook) and the page's SSE
- * client (`fetchSSE` needs an origin the browser supplies), and both are kept
- * to the shape the page's own code has.
- *
- * ONE TAB PER PROCESS. The store is a module singleton, so a second concurrent
- * tab would drive the same state. `fileParallelism: false` plus one file per
- * vitest run already serialize the suites, and `openFakeWorkbenchTab` refuses a
- * second tab rather than letting two share a board.
- *
- * See README.md, "The fake workbench tab", for the divergences from the real
- * page and which test owns each one.
+ * A workbench page, without a browser: claims the `ui` entry the adapter
+ * reads when no real page attaches, driving the same store/transforms.
+ * ONE TAB PER PROCESS — the store is a singleton, so a second tab is refused.
  */
 
 import { readLiveWorkbench } from "@langwatch/experiment-contract";

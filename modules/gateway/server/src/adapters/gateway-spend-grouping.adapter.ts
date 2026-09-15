@@ -56,9 +56,9 @@ export class GatewaySpendGroupingAdapter {
   }
 
   /**
-   * A time bucket rendered as a sortable string, so every grouping dimension is a String and one cursor comparison covers them all. The offset is applied
-   * inside ClickHouse rather than after the fact: a day boundary is the caller's local midnight, and re-bucketing UTC days client-side cannot recover the
-   * requests that fell on the other side of it.
+   * A time bucket as a sortable string, so one cursor comparison covers every
+   * grouping dimension. The offset applies inside ClickHouse, not after — a
+   * client-side re-bucket of UTC days can't recover requests on the far side.
    */
   bucketExpression({
     bucket,

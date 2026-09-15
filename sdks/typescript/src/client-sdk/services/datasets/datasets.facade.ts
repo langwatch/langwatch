@@ -27,46 +27,10 @@ type DatasetsFacadeConfig = {
 
 /**
  * Facade for dataset operations in the LangWatch SDK.
- * Provides a simplified interface for managing datasets, records, and file uploads.
  *
  * @example
  * ```typescript
- * const langwatch = new LangWatch({ apiKey: "your-api-key" });
- *
- * // List all datasets
  * const datasets = await langwatch.datasets.list();
- *
- * // Get a dataset by slug or ID
- * const dataset = await langwatch.datasets.get("my-dataset");
- *
- * // Create a new dataset
- * const newDataset = await langwatch.datasets.create({
- *   name: "my-dataset",
- *   columnTypes: [{ name: "input", type: "string" }],
- * });
- *
- * // Update a dataset
- * const updated = await langwatch.datasets.update("my-dataset", { name: "new-name" });
- *
- * // Delete a dataset
- * const archived = await langwatch.datasets.delete("my-dataset");
- *
- * // Create records
- * const records = await langwatch.datasets.createRecords("my-dataset", [
- *   { input: "hello", output: "world" },
- * ]);
- *
- * // Update a record
- * const record = await langwatch.datasets.updateRecord("my-dataset", "rec-1", { input: "updated" });
- *
- * // Delete records
- * const result = await langwatch.datasets.deleteRecords("my-dataset", ["rec-1", "rec-2"]);
- *
- * // Upload a file (append to existing or create new)
- * const uploadResult = await langwatch.datasets.upload("my-dataset", file);
- *
- * // Upload with replace strategy (delete all records first)
- * await langwatch.datasets.upload("my-dataset", file, { ifExists: "replace" });
  * ```
  */
 export class DatasetsFacade {
@@ -105,21 +69,6 @@ export class DatasetsFacade {
    * @param slugOrId - The slug or ID of the dataset to fetch
    * @param options - Optional configuration
    * @returns The dataset with metadata and entries
-   *
-   * @example
-   * ```typescript
-   * // Get dataset by slug
-   * const dataset = await langwatch.datasets.get("product-qa");
-   *
-   * // Typed dataset
-   * type MyDatasetEntry = { input: string; expected_output: string; };
-   * const dataset = await langwatch.datasets.get<MyDatasetEntry>("my-dataset");
-   *
-   * // Iterate over entries
-   * for (const entry of dataset.entries) {
-   *   console.log(entry.entry.input);
-   * }
-   * ```
    */
   get = <T extends Record<string, unknown> = Record<string, unknown>>(
     slugOrId: string,
@@ -204,15 +153,6 @@ export class DatasetsFacade {
    * @param slugOrId - The slug or ID of the dataset
    * @param options - Pagination options (page, limit)
    * @returns Paginated list of records
-   *
-   * @example
-   * ```typescript
-   * // List first page of records
-   * const result = await langwatch.datasets.listRecords("my-dataset");
-   *
-   * // With pagination
-   * const page2 = await langwatch.datasets.listRecords("my-dataset", { page: 2, limit: 25 });
-   * ```
    */
   listRecords = (
     slugOrId: string,
@@ -222,31 +162,12 @@ export class DatasetsFacade {
   };
 
   /**
-   * Uploads a file to a dataset with a configurable strategy for handling existing datasets.
-   *
-   * Strategies:
-   * - `"append"` (default): Upload to existing dataset; if not found, create a new one.
-   * - `"replace"`: Delete all existing records, then upload; if not found, create a new one.
-   * - `"error"`: Throw a 409 error if the dataset already exists; if not found, create a new one.
+   * Uploads a file to a dataset with a strategy for existing datasets (default "append").
    *
    * @param slugOrId - The slug or ID of the dataset
    * @param file - The file to upload (File or Blob)
    * @param options - Upload options including the ifExists strategy
    * @returns The upload result
-   *
-   * @example
-   * ```typescript
-   * const file = new File(["input,output\nhello,world"], "data.csv", { type: "text/csv" });
-   *
-   * // Append to existing or create new
-   * await langwatch.datasets.upload("my-dataset", file);
-   *
-   * // Replace all records
-   * await langwatch.datasets.upload("my-dataset", file, { ifExists: "replace" });
-   *
-   * // Fail if dataset already exists
-   * await langwatch.datasets.upload("my-dataset", file, { ifExists: "error" });
-   * ```
    */
   upload = (
     slugOrId: string,

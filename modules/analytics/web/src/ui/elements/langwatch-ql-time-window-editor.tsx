@@ -1,19 +1,9 @@
 /**
- * The period a submission reports over.
- *
- * Two values that look like parameters and deliberately are not: `period_start`
- * and `period_end` are supplied by whatever surface is showing the chart, and
- * the backend refuses a request that sends either among its own named
- * parameters. That is what makes a workbench-authored chart follow a dashboard
- * once it is placed on one — and why a member's one-off override adjusts the
- * *window* rather than pinning a parameter value that would then ignore the
- * dashboard.
- *
- * Shown in the same form as the database is bound with, `YYYY-MM-DD HH:MM:SS`
- * in UTC, so that what a member reads here and what their `WHERE` clause
- * compares against are the same string.
- *
- * @see @langwatch/analytics-contract — the contract this fills
+ * The period a submission reports over. `period_start`/`period_end` are NOT
+ * parameters: the backend refuses a request sending either among its own
+ * named parameters, so a member's override adjusts the *window*, not a
+ * pinned parameter that would ignore the dashboard. Shown as
+ * `YYYY-MM-DD HH:MM:SS` UTC, matching what a `WHERE` clause compares against.
  * @see modules/analytics/specs/analytics-lwql-workbench.feature
  */
 
@@ -36,23 +26,12 @@ import type { LangWatchQLTimeWindowValues } from "../../model/lwql-request-state
 const TYPED_INSTANT = /^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2})(?::(\d{2}))?)?$/;
 
 /**
- * A typed instant as epoch milliseconds, or `undefined` when it is not one yet.
- *
- * Read as UTC, matching what is displayed and what the database is bound with.
- * Reading it in the browser's zone would mean the member's own text meant
- * something different from the identical text in their `WHERE` clause.
- *
- * The shape alone is not enough to accept it. `Date.UTC` rolls an out-of-range
- * part over without a word — `2026-13-45` is the 14th of February 2027, and
- * `2026-02-30 99:00` the 6th of March — so the window committed would be one
- * the member never typed, with the field showing nothing wrong. Requiring the
- * parsed instant to format back to the text that produced it is what refuses
- * them.
- *
- * That also covers the halfway states of typing, which the shape check misses
- * for the same reason: `2026-02-24 09:60` is a complete shape a member reaches
- * while spelling out a minute, and it parses to ten o'clock — an hour that was
- * never on screen.
+ * A typed instant as epoch milliseconds, or `undefined` when it is not one
+ * yet, read as UTC to match what is displayed and what the database is bound
+ * with. Shape alone is not enough: `Date.UTC` silently rolls over an
+ * out-of-range part (`2026-13-45` becomes 2027-02-14), so the parsed instant
+ * must format back to the text that produced it, or it is refused — this also
+ * catches halfway-typed states like `09:60` rolling into an hour never shown.
  */
 export function parseLangWatchQLTimeWindowText(text: string): number | undefined {
   const match = TYPED_INSTANT.exec(text.trim());

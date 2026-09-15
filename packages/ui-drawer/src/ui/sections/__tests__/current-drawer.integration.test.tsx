@@ -1,11 +1,9 @@
 /**
  * @vitest-environment jsdom
- *
- * The whole address round trip: a URL names a drawer, the host mounts it, the
- * drawer closes itself, and the address is clean again. `platform/app` had no
- * such test — `CurrentDrawer` was only ever exercised through one drawer's bulk
- * selection — and it is the assertion the moved half most needs, because the
- * router underneath it is the one seam that was redesigned rather than moved.
+ * The whole address round trip: a URL names a drawer, the host mounts it, the drawer closes
+ * itself, and the address is clean again. `platform/app` had no such test — `CurrentDrawer`
+ * was only exercised through one drawer's bulk selection — and the router underneath it is
+ * the one seam that was redesigned rather than moved.
  */
 
 import { render, screen, waitFor } from "@testing-library/react";

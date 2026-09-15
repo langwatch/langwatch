@@ -1,14 +1,9 @@
 /**
- * A storage refusal is logged before it reaches the customer.
- *
- * better-auth catches an adapter throw and turns it into a redirect carrying
- * the error CODE and nothing else, so the customer lands on the sign-in error
- * page while the detail naming the offending shape stays on the error's own
- * `reasons` — unread. Production ran exactly that failure with zero log lines
- * naming it, which is what made it undiagnosable from the logs alone.
- *
- * Its own file because it mocks the logger factory, and the mock has to be
- * hoisted above the adapter's module-level `createLogger` call.
+ * A storage refusal is logged before it reaches the customer: better-auth
+ * turns an adapter throw into a redirect carrying only the error CODE, so
+ * production ran that failure with zero log lines naming it — undiagnosable
+ * from the logs alone. Its own file since mocking the logger factory needs
+ * hoisting above the adapter's module-level `createLogger` call.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 

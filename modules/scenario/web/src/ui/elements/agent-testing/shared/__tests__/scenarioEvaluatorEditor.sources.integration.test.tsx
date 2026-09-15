@@ -1,10 +1,6 @@
 /**
  * @vitest-environment jsdom
- *
- * The evaluator editor's mapping sources: the three scenario sources, the
- * suite fields listed under Scenario, and the routing to a code evaluator's
- * own editor.
- *
+ * Mapping sources: scenario sources, suite fields, and routing to a code evaluator's own editor.
  * @see specs/features/agent-testing/suite-editor.feature
  */
 import { cleanup, render, screen, waitFor } from "@testing-library/react";

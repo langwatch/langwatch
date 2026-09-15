@@ -7,20 +7,10 @@ import { createLogger } from "@langwatch/observability";
 const logger = createLogger("langwatch:clickhouse:migrations");
 
 /**
- * Goose migration wrapper for ClickHouse
- *
- * Bootstrap & Migration Flow:
- * 1. Pre-flight: Validates config, checks connectivity, verifies goose binary
- * 2. Bootstrap: Creates Replicated database and goose_db_version table
- * 3. Migrations: Goose connects to the database and runs migrations
- *
- * The goose_db_version table is created in the target database (e.g., langwatch).
- * For Replicated databases, DDL and data are automatically replicated across nodes.
- *
- * Configuration via environment variables:
- * - CLICKHOUSE_URL: Connection string with database in path (e.g., http://host:8123/langwatch)
- * - CLICKHOUSE_CLUSTER: Cluster name for Replicated database engine. If set, enables replication.
- *
+ * Goose migration wrapper for ClickHouse: pre-flight validates config and
+ * connectivity, bootstrap creates the Replicated database and
+ * `goose_db_version` table, then goose runs migrations. For a Replicated
+ * database (`CLICKHOUSE_CLUSTER` set), DDL and data replicate across nodes.
  * @see https://github.com/pressly/goose
  */
 
@@ -37,14 +27,11 @@ const VALID_DB_NAME = /^[a-zA-Z_][a-zA-Z0-9_]*$/;
 const AGGREGATING_DIMENSION_SETTING = "allow_dimensions_outside_sorting_key";
 
 /**
- * The last migration that runs with the setting above relaxed. 00088 is where
- * those four rollup columns gain their merge rule.
- *
- * Migrations up to here are merged history: they still create the tables the
- * old way on a new install, and on ClickHouse 26 they only run with the
- * setting above. Everything from 00087 on runs without it, so a new migration
- * that declares such a column fails on 26 rather than being quietly accepted.
- * `aggregatingDimensionGuard.unit.test.ts` fails it on every version.
+ * The last migration that runs with the setting above relaxed (00088 is
+ * where those four rollup columns gain their merge rule). Migrations up to
+ * here are merged history, still creating tables the old way; everything
+ * from 00087 on runs without the setting, so a new migration using such a
+ * column fails on ClickHouse 26 instead of being silently accepted.
  */
 const LAST_MIGRATION_NEEDING_DIMENSION_COMPAT = 86;
 
@@ -61,8 +48,13 @@ export interface ClickHouseConfig {
   databaseUrl: string; // For bootstrap with database context
   gooseConnectionString: string; // HTTP connection string for goose
   clusterName: string | undefined; // If set, enables replication with this cluster name
-  hasLocalPrimaryPolicy?: boolean; // Set during bootstrap — true if 'local_primary' storage policy exists
-  requiresDimensionCompat?: boolean; // Set during bootstrap — true if the server refuses an AggregatingMergeTree column outside the sorting key
+  /** Set during bootstrap: true if the 'local_primary' storage policy exists. */
+  hasLocalPrimaryPolicy?: boolean;
+  /**
+   * Set during bootstrap: true if the server refuses an AggregatingMergeTree
+   * column outside the sorting key.
+   */
+  requiresDimensionCompat?: boolean;
 }
 
 /**
@@ -406,15 +398,11 @@ function buildMigrationEnvVars({
     CLICKHOUSE_IS_REPLICATED: config.clusterName ? "1" : "0",
 
     // The settings appended to every CREATE TABLE, after index_granularity.
-    //
-    // Storage policy: use 'local_primary' if available (production with S3
-    // tiering), otherwise omit the setting (uses ClickHouse default policy).
-    //
-    // The compatibility setting rides along here because this substitution is
-    // the only one present in the SETTINGS clause of every historical CREATE
-    // TABLE, and those statements are merged history that cannot be edited.
-    // It is accepted by MergeTree, ReplacingMergeTree and AggregatingMergeTree
-    // alike, and ClickHouse only applies it to a table that aggregates.
+    // Storage policy: 'local_primary' if available (S3 tiering in
+    // production), otherwise the ClickHouse default. The compatibility
+    // setting rides along here too, since this substitution is the only one
+    // present in every historical CREATE TABLE's SETTINGS clause, and
+    // ClickHouse only applies it to a table that aggregates.
     CLICKHOUSE_STORAGE_POLICY_SETTING: [
       config.hasLocalPrimaryPolicy ? ", storage_policy = 'local_primary'" : "",
       allowDimensionsOutsideSortingKey ? `, ${AGGREGATING_DIMENSION_SETTING} = 1` : "",

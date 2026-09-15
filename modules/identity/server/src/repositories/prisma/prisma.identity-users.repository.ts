@@ -5,16 +5,9 @@ import type { IdentityUsersRepository } from "../identity-users.repository.ts";
 export type PrismaIdentityUsersDatabase = Pick<PrismaClient, "user">;
 
 /**
- * The two `User` columns identity touches.
- *
- * The `userHashKey` write is guarded (ADR-101 §4): only a user without a key
- * takes one, so a key minted concurrently — by the ceremony at user
- * creation, by another backfill pass — is never overwritten. Rewriting it
- * would orphan every identifier hash already computed with the old key.
- *
- * `User` is an identity table under the multitenancy middleware's
- * Identifier/Account exemption, so these queries carry no `projectId` — the
- * model has none, and a user is not scoped to a project.
+ * The two `User` columns identity touches. `userHashKey` is written only
+ * when absent (ADR-101 §4), so a concurrently minted key is never overwritten;
+ * `User` carries no `projectId` since it's an Identifier/Account-exempt table.
  */
 export class PrismaIdentityUsersRepository implements IdentityUsersRepository {
   static create(database: PrismaIdentityUsersDatabase): PrismaIdentityUsersRepository {
@@ -45,17 +38,9 @@ export class PrismaIdentityUsersRepository implements IdentityUsersRepository {
   }
 
   /**
-   * The legacy half of the cross-population collision guard (ADR-116 §6).
-   *
-   * Case-insensitive equality on the column as stored, which is the same
-   * comparison `User.email @unique` effectively defends — so this refuses,
-   * by name, exactly the collisions that would otherwise have surfaced as a
-   * constraint violation inside the fold. The port's docstring names the
-   * blind spot it inherits (a plus-addressed legacy row).
-   *
-   * Deactivated users still count as holders: their row keeps the address
-   * and the unique index keeps enforcing it, so calling it free here would
-   * hand the customer a refusal from Postgres one step later.
+   * The legacy half of the cross-population collision guard (ADR-116 §6):
+   * case-insensitive match on what `User.email @unique` defends. Deactivated
+   * users still count as holders, since the unique index still enforces it.
    */
   async tryFindUserIdByEmail({
     normalizedValue,

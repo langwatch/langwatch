@@ -1,6 +1,8 @@
 /**
  * @vitest-environment node
- * Real Postgres + real internal auth route. Reversible disable/enable: the state machine (grace preservation, revoke terminality) and the distinct rejection a disabled key's traffic gets. Spec: specs/ai-gateway/virtual-key-lifecycle.feature
+ * Real Postgres + real internal auth route. Reversible disable/enable: the state machine (grace
+ * preservation, revoke terminality) and the distinct rejection a disabled key's traffic gets.
+ * Spec: specs/ai-gateway/virtual-key-lifecycle.feature
  */
 
 import { type Instant, nowInstant } from "@langwatch/time";

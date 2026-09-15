@@ -1,10 +1,10 @@
 /**
  * @vitest-environment jsdom
- *
- * Where a queued run lands: a run of several scenarios opens the Results tab
- * on the plan and the run it started, and a run of one scenario opens in the
- * run drawer.
- *
+ */
+
+/**
+ * Where a queued run lands: several scenarios open the Results tab on the
+ * plan and the run it started; one scenario opens in the run drawer.
  * @see specs/features/agent-testing/run-dialog.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

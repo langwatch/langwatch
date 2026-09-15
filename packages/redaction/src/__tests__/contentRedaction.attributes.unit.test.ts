@@ -464,15 +464,10 @@ describe("redactAttributeNative on identifier-shaped values", () => {
 });
 
 /**
- * The reserved trace and span names buy an exemption the `_id` suffix rule
- * cannot give, because `traceid` and `spanid` carry no underscore. That
- * exemption has to read the VALUE for the same reason the personal-data
- * exemption does: the OTLP endpoint forwards caller-written attribute names
- * verbatim, so the name is an assertion by whoever sent the span and nothing
- * more. A reserved name over a credential is not a trace address.
- *
- * The `_id` names below are the control. They are exempt by suffix, which is
- * behaviour that predates the reserved list and is not what these assert.
+ * Reserved trace/span names buy an exemption the `_id` suffix rule can't give
+ * them (no underscore), but since OTLP forwards caller-written names verbatim,
+ * that exemption must still check the VALUE looks like the address it claims.
+ * The `_id` cases below are the control: exempt by suffix, predating this rule.
  */
 describe("redacting an attribute under a reserved trace identifier name", () => {
   const DECIMAL_TRACE_ADDRESS = "1757500123454000091";
@@ -523,14 +518,10 @@ describe("redacting an attribute under a reserved trace identifier name", () => 
   });
 
   /**
-   * This is the one thing the reserved list does that nothing else does, so it
-   * is worth a test that fails if the list stops being consulted.
-   *
-   * The value is a decimal address short enough that the shape rule rejects it
-   * and a phone recognizer claims it, and the name carries no `_id` suffix, so
-   * neither of the two older exemptions can be what keeps it. The unreserved
-   * control is the same value under a name nobody reserved: it is redacted, so
-   * the difference measured here is the name and not the value.
+   * The one thing the reserved list does that nothing else does: this value is
+   * short enough for the shape rule to reject and a phone recognizer to claim,
+   * and the name has no `_id` suffix, so neither older exemption could be what
+   * keeps it. The unreserved control below is redacted, isolating the name.
    */
   describe("given a short decimal address no shape rule would hold back", () => {
     const PHONE_SHAPED_ADDRESS = "12515420585";

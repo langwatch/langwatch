@@ -2,17 +2,7 @@ import { type Logger, type LogRecord } from "@opentelemetry/api-logs";
 import type * as intSemconv from "../semconv";
 import { type SemConvAttributes, type SemConvLogRecordAttributes } from "../semconv";
 
-/**
- * Body for a system message event in a GenAI span.
- *
- * Used to log system/instruction messages sent to the model.
- *
- * @property content - The message content.
- * @property role - The role of the message, typically 'system' or 'instruction'.
- *
- * @example
- * logger.emitGenAISystemMessageEvent({ content: 'You are a helpful assistant.' });
- */
+/** Body for a system message event in a GenAI span (a system/instruction to the model). */
 export interface LangWatchSpanGenAISystemMessageEventBody {
   /** Content of the system message */
   content?: string;
@@ -20,17 +10,7 @@ export interface LangWatchSpanGenAISystemMessageEventBody {
   role?: "system" | "instruction";
 }
 
-/**
- * Body for a user message event in a GenAI span.
- *
- * Used to log user/customer messages sent to the model.
- *
- * @property content - The message content.
- * @property role - The role of the message, typically 'user' or 'customer'.
- *
- * @example
- * logger.emitGenAIUserMessageEvent({ content: 'What is the weather today?' });
- */
+/** Body for a user message event in a GenAI span (a user/customer message to the model). */
 export interface LangWatchSpanGenAIUserMessageEventBody {
   /** Content of the user message */
   content?: string;
@@ -38,18 +18,7 @@ export interface LangWatchSpanGenAIUserMessageEventBody {
   role?: "user" | "customer";
 }
 
-/**
- * Body for an assistant message event in a GenAI span.
- *
- * Used to log assistant/bot responses, including tool calls.
- *
- * @property content - The message content.
- * @property role - The role of the message, typically 'assistant' or 'bot'.
- * @property tool_calls - Array of tool call objects, if the assistant invoked tools/functions.
- *
- * @example
- * logger.emitGenAIAssistantMessageEvent({ content: 'The weather is sunny.', role: 'assistant' });
- */
+/** Body for an assistant message event in a GenAI span (a response, including tool calls). */
 export interface LangWatchSpanGenAIAssistantMessageEventBody {
   /** Content of the assistant message */
   content?: string;
@@ -70,18 +39,7 @@ export interface LangWatchSpanGenAIAssistantMessageEventBody {
   }[];
 }
 
-/**
- * Body for a tool message event in a GenAI span.
- *
- * Used to log messages from tools/functions invoked by the assistant.
- *
- * @property content - The message content.
- * @property id - Unique identifier for the tool call.
- * @property role - The role, typically 'tool' or 'function'.
- *
- * @example
- * logger.emitGenAIToolMessageEvent({ content: 'Result from tool', id: 'tool-1', role: 'tool' });
- */
+/** Body for a tool message event in a GenAI span (a message from a tool the assistant invoked). */
 export interface LangWatchSpanGenAIToolMessageEventBody {
   /** Content of the tool message */
   content?: string;
@@ -91,18 +49,7 @@ export interface LangWatchSpanGenAIToolMessageEventBody {
   role?: "tool" | "function";
 }
 
-/**
- * Body for a choice event in a GenAI span.
- *
- * Used to log the model's output choices, including finish reason and message content.
- *
- * @property finish_reason - Why the generation finished (e.g., 'stop', 'length').
- * @property index - Index of the choice (for multi-choice outputs).
- * @property message - The message content and tool calls for this choice.
- *
- * @example
- * logger.emitGenAIChoiceEvent({ finish_reason: 'stop', index: 0, message: { content: 'Hello!' } });
- */
+/** Body for a choice event in a GenAI span (a model output choice, finish reason and message). */
 export interface LangWatchSpanGenAIChoiceEventBody {
   /** Reason the generation finished */
   finish_reason: intSemconv.VAL_GEN_AI_FINISH_REASONS | (string & {});
@@ -147,12 +94,8 @@ export interface LangWatchLogRecord extends LogRecord {
  */
 export interface EmitOptions {
   /**
-   * Whether to not include the OTel context on the log record.
-   *
-   * With standard OpenTelemetry, the context is not included on the log record by
-   * default, so this is useful if you want to emit a lot without having to manually
-   * set the context on each log record.
-   *
+   * Whether to omit the OTel context from the log record — standard OpenTelemetry
+   * omits it by default, so set this to avoid attaching context to every record.
    * @default false
    */
   excludeContext?: boolean;
@@ -171,10 +114,7 @@ export interface LangWatchLogger extends Logger {
   emit(logRecord: LangWatchLogRecord, options?: EmitOptions): void;
 
   /**
-   * Emit a GenAI system message event to the logger.
-   *
-   * This logs a system/instruction message sent to the model.
-   *
+   * Emit a GenAI system/instruction message event to the logger.
    * @param body - The event body (content and role)
    * @param system - The GenAI system (optional, e.g., 'openai', 'anthropic')
    * @param attributes - Additional OpenTelemetry attributes (optional)
@@ -186,10 +126,7 @@ export interface LangWatchLogger extends Logger {
     attributes?: SemConvAttributes,
   ): void;
   /**
-   * Emit a GenAI user message event to the logger.
-   *
-   * This logs a user/customer message sent to the model.
-   *
+   * Emit a GenAI user/customer message event to the logger.
    * @param body - The event body (content and role)
    * @param system - The GenAI system (optional)
    * @param attributes - Additional OpenTelemetry attributes (optional)
@@ -201,10 +138,7 @@ export interface LangWatchLogger extends Logger {
     attributes?: SemConvAttributes,
   ): void;
   /**
-   * Emit a GenAI assistant message event to the logger.
-   *
-   * This logs an assistant/bot response, including tool calls if present.
-   *
+   * Emit a GenAI assistant/bot message event to the logger (including tool calls, if any).
    * @param body - The event body (content, role, tool_calls)
    * @param system - The GenAI system (optional)
    * @param attributes - Additional OpenTelemetry attributes (optional)
@@ -216,10 +150,7 @@ export interface LangWatchLogger extends Logger {
     attributes?: SemConvAttributes,
   ): void;
   /**
-   * Emit a GenAI tool message event to the logger.
-   *
-   * This logs a message from a tool/function invoked by the assistant.
-   *
+   * Emit a GenAI tool/function message event to the logger (from a tool the assistant invoked).
    * @param body - The event body (content, id, role)
    * @param system - The GenAI system (optional)
    * @param attributes - Additional OpenTelemetry attributes (optional)
@@ -231,10 +162,7 @@ export interface LangWatchLogger extends Logger {
     attributes?: SemConvAttributes,
   ): void;
   /**
-   * Emit a GenAI choice event to the logger.
-   *
-   * This logs a model output choice, including finish reason and message content.
-   *
+   * Emit a GenAI choice event to the logger (a model output choice, finish reason, message).
    * @param body - The event body (finish_reason, index, message)
    * @param system - The GenAI system (optional)
    * @param attributes - Additional OpenTelemetry attributes (optional)

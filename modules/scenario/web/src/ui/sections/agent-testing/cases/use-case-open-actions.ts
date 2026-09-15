@@ -1,5 +1,5 @@
 /**
- * Every way the Scenarios tab opens one scenario: the editor drawer, whether it is reached from the row menu or from the row itself.
+ * Every way the Scenarios tab opens the editor drawer: row menu or row click.
  * @see specs/features/agent-testing/cases-table.feature
  * @see dev/docs/best_practices/drawers.md
  */

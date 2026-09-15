@@ -1,13 +1,7 @@
 /**
- * Retrying a statement that failed for a reason worth trying again.
- *
- * Composes the policies in ./resilience.ts rather than restating them, so the
- * classifier this uses is the same one the outer job queue uses and the two
- * cannot drift into disagreeing about what "transient" means.
- *
- * {@link ClickHouseQueryClient} runs this *inside* the concurrency limiter, so
- * a retrying statement keeps its slot instead of rejoining the queue behind
- * fresh work.
+ * Retrying a statement that failed for a reason worth trying again. Composes
+ * ./resilience.ts so this and the outer job queue can't drift on "transient",
+ * and runs inside the query client's limiter so a retry keeps its slot.
  */
 
 import type { AbortSignalLike, QueryRequest } from "./query.ts";
@@ -82,13 +76,9 @@ export interface RunWithRetryOptions extends Omit<
 }
 
 /**
- * Retry any operation under this package's policy.
- *
- * The loop lives here rather than in the client class so callers that are not
- * on the {@link ClickHouseQueryClient} port - `VendorClientResilience`, which
- * wraps the vendor client's own `query`/`insert`, and any host retrying
- * non-statement work - share one implementation instead of keeping a second
- * copy that drifts.
+ * Retry any operation under this package's policy. Lives here, not in the
+ * client class, so callers off the ClickHouseQueryClient port
+ * (`VendorClientResilience`, other host retries) share one implementation.
  */
 export async function runWithRetry<T>(
   fn: () => Promise<T>,

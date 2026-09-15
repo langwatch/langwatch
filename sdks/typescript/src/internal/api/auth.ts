@@ -1,16 +1,10 @@
 /**
- * Authentication header assembly for LangWatch SDK clients.
- *
- * Supports two token families that share the same HTTP surface:
- *
- *   1. `sk-lw-{random}` — legacy project API keys. The token itself carries
- *      the project identity, so we emit both `Authorization: Bearer <token>`
- *      and `X-Auth-Token: <token>` for backwards compatibility.
- *
- *   2. `sk-lw-{lookupId}_{secret}` or `pat-lw-{lookupId}_{secret}` — API
- *      keys (user-scoped). Must be paired with a `projectId` so the server
- *      can resolve the correct role binding. When a `projectId` is available
- *      we encode both into `Authorization: Basic base64(projectId:token)`.
+ * Authentication header assembly for LangWatch SDK clients. Supports two token families: (1)
+ * `sk-lw-{random}` legacy project keys, which carry project identity themselves, so we emit
+ * both `Authorization: Bearer` and `X-Auth-Token` for backward compat; (2)
+ * `sk-lw-{lookupId}_{secret}` / `pat-lw-{lookupId}_{secret}` user-scoped keys, paired with a
+ * `projectId` (when available) as `Authorization: Basic base64(projectId:token)` so the server
+ * can resolve the role binding.
  */
 
 /** Old PAT prefix — still accepted by the server for backward compat. */
@@ -33,13 +27,8 @@ export interface LangWatchAuthHeadersInput {
 export type LangWatchAuthHeaders = Record<string, string>;
 
 /**
- * Returns `true` when the supplied credential is a user-scoped API key
- * (as opposed to a legacy project key).
- *
- * Detection heuristics:
- *   - `pat-lw-*` → always a user-scoped key (old format)
- *   - `sk-lw-{chars}_{chars}` → user-scoped key (new format, has underscore)
- *   - `sk-lw-{chars}` (no underscore) → legacy project key
+ * Whether the credential is a user-scoped API key (as opposed to a legacy project key): a
+ * `pat-lw-` prefix, or a `sk-lw-` prefix with an underscore in the body (the new format).
  */
 export const isUserScopedApiKey = (token: string): boolean => {
   if (token.startsWith(LEGACY_PAT_PREFIX)) return true;

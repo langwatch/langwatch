@@ -252,8 +252,8 @@ describe("LangWatchLogsExporter", () => {
       const endpoint = "https://subdomain.example.com:8080/path";
       const exporter = new LangWatchLogsExporter({ endpoint });
 
-      // URL constructor behavior: new URL("/api/otel/v1/logs", "https://subdomain.example.com:8080/path")
-      // results in "https://subdomain.example.com:8080/api/otel/v1/logs" (path gets replaced, not appended)
+      // URL constructor behavior: a leading-slash path replaces the base's
+      // path rather than appending to it (not "...:8080/path/api/otel/v1/logs").
       expect((exporter as any).url).toBe(`https://subdomain.example.com:8080${LOGS_PATH}`);
     });
   });

@@ -1,11 +1,8 @@
 /**
- * The address a row writes when it opens the trace behind it.
- *
- * The overlay it names is `platform/app`'s and is mounted by chrome a packaged
- * screen has nothing above it to supply, so nothing opens yet — which is
- * exactly why the ADDRESS is what has to be pinned. It is what makes the
- * overlay come back for free when the chrome layout route lands, and it is what
- * a shared link already means.
+ * The address a row writes when it opens the trace behind it. The overlay
+ * itself is `platform/app`'s and nothing here can mount it directly, so the
+ * ADDRESS is what must be pinned — it's what makes the overlay return once
+ * the chrome route lands, and what a shared link already means.
  */
 
 import { describe, expect, it } from "vitest";

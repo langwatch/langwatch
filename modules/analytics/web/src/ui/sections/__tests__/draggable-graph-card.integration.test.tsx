@@ -1,33 +1,7 @@
 /**
  * @vitest-environment jsdom
- *
- * Which body a card draws, and which header controls it offers.
- *
- * The routing is decided by one field — `kind` — and both directions of getting
- * it wrong are silent. A workbench row sent to `CustomGraph` hands a builder
- * renderer a saved SQL statement in place of the series payload it expects; a
- * builder row sent to the widget asks the saved-chart procedures for a row they
- * will not find. Neither shows up as a type error, because `graph` is `unknown`
- * on the way through.
- *
- * The alert bell is the same shape of mistake with a longer fuse. The alert path
- * reads a builder payload's `series` to name what it thresholds, and a saved
- * statement has no series to read — so a bell offered on a workbench card
- * authors an alert the threshold dispatcher can never evaluate. It is excluded
- * on purpose, and this pins that it stays excluded.
- *
- * Both children are mocked to markers: the claim is *which* component receives
- * the row, and mounting the real Vega and tRPC stacks to prove it would test the
- * harness instead.
- *
- * A dashboard widget (`dashboard_srcdoc`) is the same shape of claim once
- * more: its sandboxed frame reads `{ code, queries }`, not a builder payload
- * or a saved statement, and its author code has no `series` either — the
- * alert bell has to stay excluded here for the identical reason it stays
- * excluded for a workbench row.
- *
- * @see specs/analytics/lwql-saved-charts.feature
- * @see specs/analytics/custom-chart-playground-dashboard-placement.feature
+ * The alert bell is deliberately excluded from both surfaces (neither has a
+ * `series` to threshold) — this test pins that exclusion staying in place.
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

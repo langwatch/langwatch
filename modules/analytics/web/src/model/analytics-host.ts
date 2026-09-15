@@ -1,26 +1,7 @@
 /**
- * What the analytics screens ask of the application they are mounted in.
- *
- * ONE PORT FOR THE WHOLE FAMILY — the eleventh of the shape governance,
- * gateway, me, automations, ops, agents, datasets, model-config, RBAC,
- * annotations and organization each wrote before it. Everything the nine page
- * files used to read off `useOrganizationTeamProject`, `useRouter`,
- * `usePublicEnv`, `useDrawer` and the toaster arrives through these methods,
- * which is what lets six thousand lines of chart move with their
- * `analyticsApi.x.y.useQuery` call sites unchanged.
- *
- * WHAT THIS PORT DOES NOT HAVE, and deliberately: a `pathname`. Nine page keys
- * are eight screens and one of them takes a `mode`, so nothing here has to read
- * the address to find out which page it is. The two things still read off the
- * address are the custom graph's `:id` and the report grid's `?dashboard=`,
- * and the router captured the first as a route PARAMETER.
- *
- * `setQuery` REPLACES THE WHOLE QUERY rather than merging, because every write
- * this family makes is a removal as well as a set: clearing a filter, dropping
- * a keyset cursor that describes a position in the previous result set, and
- * swapping an absolute range for a relative one all mean "these keys are gone".
- * A merging write cannot say that, and the platform hook went to some length
- * with `qs` to work around not being able to.
+ * What analytics screens ask of their host app. No `pathname` — only two
+ * screens still read the address. `setQuery` REPLACES the query rather than
+ * merging, since a write here often means certain keys are now gone.
  */
 
 import { createContext, useContext } from "react";
@@ -60,13 +41,10 @@ export type AnalyticsSuccessNotice = {
 };
 
 /**
- * A failure, as a screen knows it.
- *
- * The raw `error` travels, never a sentence the screen composed: the words a
- * customer reads are resolved from the error's `code` by the host's
- * presentation registry, and a screen that wrote its own would print the code
- * slug instead (#5984). `fallbackTitle` names the action that failed, so an
- * unrecognised code still says what the reader was doing.
+ * A failure, as a screen knows it. The raw `error` travels, never a composed
+ * sentence — customer-facing words are resolved from its `code` by the host's
+ * presentation registry (#5984). `fallbackTitle` names the failed action, so
+ * an unrecognised code still says what the reader was doing.
  */
 export type AnalyticsFailureNotice = {
   error: unknown;

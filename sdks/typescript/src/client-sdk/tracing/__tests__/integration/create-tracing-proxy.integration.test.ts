@@ -6,15 +6,7 @@ import { getLangWatchTracer } from "../../../../observability-sdk";
 import { createIntegrationObservability } from "../../../../observability-sdk/setup/node/__tests__/createIntegrationObservability";
 import type { setupObservability } from "../../../../observability-sdk/setup/node";
 
-/**
- * Integration tests for createTracingProxy with real OpenTelemetry setup.
- *
- * These tests verify:
- * - Real OpenTelemetry SDK initialization
- * - Actual span creation and data flow through proxy
- * - Integration between proxy and tracer components
- * - Data format consistency in exported spans
- */
+/** Integration tests for createTracingProxy with real OpenTelemetry setup. */
 
 describe("createTracingProxy Integration Tests", () => {
   let spanExporter: InMemorySpanExporter;

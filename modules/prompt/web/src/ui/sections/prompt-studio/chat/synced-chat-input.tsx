@@ -12,14 +12,7 @@ import {
 } from "../studio-internals.ts";
 
 /**
- * Custom chat input with sync across tabs functionality.
- * Single Responsibility: Provides chat input UI with optional sync and broadcast submit.
- *
- * Features:
- * - Synced input: When enabled, input text is shared across all chat instances
- * - Broadcast submit: When synced and submitted, all chats submit the same message
- * - Hover UI: Sync checkbox only visible on hover for clean interface
- * - Keyboard shortcuts: Enter to submit, Shift+Enter for new line
+ * Chat input that can sync its text and broadcast submit across chat tabs.
  */
 /** Matches Langy's composer, so the two read as the same control. */
 const COMPOSER_RADIUS = "18px";

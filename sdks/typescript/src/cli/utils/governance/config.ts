@@ -118,40 +118,16 @@ export interface GovernanceConfig {
   claude_plugin_last_update_check?: number;
 
   /**
-   * How to run this CLI from a process that cannot resolve it on PATH: the
-   * absolute path of the node binary it last ran under and of its own entry
-   * script. Written by `langwatch login`, `langwatch claude` and `langwatch
-   * instrument`, only when the values changed (see cli-location.ts).
-   *
-   * Read by the Claude Code plugin's launcher (`plugins/langwatch/scripts/
-   * launch.mjs`), which runs the hook commands through it before falling back
-   * to `langwatch` on PATH. A Claude Code started from a desktop app inherits
-   * a PATH with no version manager on it, and this is what still finds the
-   * CLI there. The launcher checks both paths exist before using them, so a
-   * node upgraded through a version manager leaves a stale record that is
-   * simply skipped.
+   * Absolute paths of the node binary and entry script this CLI last ran
+   * under, so a caller with no PATH resolution (e.g. the Claude Code plugin
+   * launcher) can still find it; a stale, no-longer-existing record is skipped.
    */
   cli_location?: CliLocation;
 
   /**
-   * Per-wrapped-tool routing mode answer.
-   *
-   *   "gateway"   — Path A: route the tool's HTTP calls through
-   *                  the AI Gateway via base-URL swap (full server-
-   *                  side I/O + cost capture, no client OTel).
-   *   "ingestion" — Path B: enable the tool's native OTel exporter
-   *                  pointed at /api/otel with the tool's ingest
-   *                  credential (project pin or personal `ik-lw-` key).
-   *                  For codex this also writes the [otel] block to
-   *                  ~/.codex/config.toml automatically.
-   *   "ask"       — re-prompt on the next `langwatch <tool>`. The
-   *                  default when this key is absent.
-   *
-   * The two modes are mutually exclusive per the no-double-trace
-   * rule — gateway capture + OTel emission on the same call would
-   * double-count both traces and cost. The wrapper picks Path A
-   * by default when a personal VK is configured, and falls back
-   * to Path B when no VK + the user opts in.
+   * Per-wrapped-tool routing mode — "gateway" (AI Gateway proxy), "ingestion"
+   * (tool's native OTel exporter), or "ask" (re-prompt, the default). The two
+   * are mutually exclusive: combining them double-counts both traces and cost.
    */
   tool_mode?: Record<string, "gateway" | "ingestion" | "ask">;
 

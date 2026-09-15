@@ -2,16 +2,10 @@ import { bench, describe } from "vitest";
 import { redactSecretsInText } from "../secrets.ts";
 
 /**
- * Redaction runs on every stored string at ingestion, so its cost is paid per
- * span rather than per request. These payloads are the three shapes that decide
- * that cost, and they are here because a rule can be fast on one and quadratic
- * on another: the connection-URL rule was 0.1 ms on URL-dense text and 2.4 ms on
- * prose with no URL in it at all, because the scheme led the match and every
- * letter therefore started a scan.
- *
- * Run with `pnpm --filter @langwatch/redaction bench`. Compare against the same
- * command on the base branch; there is no absolute number to assert, because a
- * loaded CI box moves them all together while the ratio between shapes holds.
+ * These payloads are the three shapes that decide redaction's per-span cost:
+ * a rule can be fast on one and quadratic on another (the connection-URL rule
+ * was 0.1ms on URL-dense text, 2.4ms on prose with none). Run with `pnpm
+ * --filter @langwatch/redaction bench`; compare ratios, not absolute numbers.
  */
 const SIZE = 200_000;
 

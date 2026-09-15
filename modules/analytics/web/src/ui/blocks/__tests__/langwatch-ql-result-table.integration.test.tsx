@@ -1,19 +1,10 @@
 /**
  * @vitest-environment jsdom
- *
- * The native result table: what it puts in the document, and what it keeps out
- * of it.
- *
- * ## Making virtualization observable in jsdom
- *
- * `@tanstack/react-virtual` measures its scroll element with
- * `offsetWidth`/`offsetHeight` (`virtual-core`'s `getRect`), and jsdom performs
- * no layout, so both are `0` and the window would collapse to a couple of rows
- * whether or not virtualization worked. Stubbing them gives the virtualizer a
- * real viewport, which is what makes "only a bounded window is materialized"
- * a claim this suite can actually fail.
- *
- * Spec: modules/analytics/specs/analytics-lwql-workbench.feature
+ * jsdom never lays out, so `@tanstack/react-virtual`'s scroll-element
+ * `offsetWidth`/`offsetHeight` read `0` unless stubbed — stubbing them gives
+ * the virtualizer a real viewport, so "only a bounded window is materialized"
+ * is a claim this suite can actually fail.
+ * @see modules/analytics/specs/analytics-lwql-workbench.feature
  */
 
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

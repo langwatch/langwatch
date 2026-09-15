@@ -28,13 +28,10 @@ const EMPTY_SECRETS = {
 } satisfies Required<IdentityAccountSecrets>;
 
 /**
- * The identity branch's storage, in memory: `Identifier` heads joined to a
- * credential map, and the `(value | subject) ⋈ migration state` resolution
- * read beside them.
- *
- * The heads are the SAME projection the guards read, so a suite that drives
- * real better-auth through the adapter watches one fold feed both. The
- * `Account` rows are the memory adapter's own, which is what makes the
+ * The identity branch's storage, in memory: `Identifier` heads joined to a credential map, and
+ * the `(value | subject) ⋈ migration state` resolution read beside them. The heads are the SAME
+ * projection the guards read, so a suite driving real better-auth through the adapter watches
+ * one fold feed both; the `Account` rows are the memory adapter's own, which is what makes the
  * bridge mirror observable.
  */
 export class InMemoryIdentityStorage implements IdentityAccounts, IdentityResolver {
@@ -259,14 +256,10 @@ const refuses = (method: string) => () => {
 };
 
 /**
- * Ports that hold nothing: what the adapter runs on when no user is latched.
- *
- * The READS answer empty rather than throwing, because a read by account id
- * has no user to gate on until it has read — that probe is how the branch
- * learns whose row it is, and it finding nothing is exactly how an unlatched
- * user reaches the legacy table. Every WRITE throws, which is the claim that
- * matters: a closed gate must not put a single row or fact into identity
- * storage.
+ * Ports that hold nothing: what the adapter runs on when no user is latched. Reads answer empty
+ * rather than throwing, because a read by account id has no user to gate on until it has read —
+ * that probe is how the branch learns whose row it is. Every write throws instead: a closed
+ * gate must not put a single row or fact into identity storage.
  */
 export const inertIdentityPorts = {
   accounts: {

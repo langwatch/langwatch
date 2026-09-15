@@ -1,15 +1,7 @@
 /**
- * The LangWatchQL schema, browsable.
- *
- * Everything on screen came back from the schema endpoint for this member. A
- * column the response marks unavailable stays listed — that is how the member
- * learns which permission would unlock it — but it is visibly disabled and
- * carries no affordance that would put its name in the editor, because the
- * validator would refuse it.
- *
- * Presented as a flat panel: dataset rows that expand in place, columns as
- * click-to-insert rows, and the dataset's example statement one button away.
- *
+ * The LangWatchQL schema, browsable. A column the response marks unavailable
+ * stays listed — that's how a member learns which permission would unlock
+ * it — but it's disabled and non-insertable, since the validator would refuse it.
  * @see modules/analytics/specs/analytics-lwql-workbench.feature
  */
 
@@ -357,13 +349,9 @@ function SchemaBrowserBody({
 }
 
 /**
- * The two reserved parameter names, said where a member is writing the `WHERE`
- * clause that would use them.
- *
- * Here rather than in a tooltip on the time-window fields: a chart that ignores
- * the period it is placed on is decided when the statement is typed, and by the
- * time someone reads the fields the statement already does or does not declare
- * them.
+ * The two reserved parameter names, said where a member types the `WHERE`
+ * clause — not a tooltip on the time-window fields, since whether a chart
+ * uses the period is decided when the statement is typed, not read later.
  */
 function TimeWindowNote() {
   return (

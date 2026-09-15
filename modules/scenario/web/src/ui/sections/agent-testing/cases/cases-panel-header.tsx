@@ -1,18 +1,7 @@
 /**
- * The lines above the scenarios table: the suite that is open, what it
- * holds, the label filter and the entry points that write; and under them
- * the fields and the evaluators the suite declares, when it declares any.
- *
- * The way into a recent run sits here too, between "Edit suite" and "Run
- * suite", so writing a scenario, editing the suite, reading what the suite
- * already did and running it again are one row of controls.
- *
- * A set that runs from code is read-only, so it offers the recent runs and
- * nothing else. Its results stay one click away: a row of the table opens
- * them as well.
- *
+ * Header above the scenarios table: suite picker, label filter, write entry
+ * points; read-only for code-run sets, which show only their recent runs.
  * @see specs/features/agent-testing/cases-table.feature
- * @see specs/features/agent-testing/suite-editor.feature
  */
 
 import { HStack, Icon, Spacer, Text, VStack } from "@chakra-ui/react";

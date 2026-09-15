@@ -1,11 +1,7 @@
 /**
  * @vitest-environment jsdom
- *
- * The target picker of a scenario run draws a connected agent no process is
- * holding, but does not let it be picked, and says why on hover. An HTTP
- * agent beside it has no presence and stays pickable.
- *
- * @see specs/features/agents/connected-agents-ui.feature
+ * Marks a presence-less connected agent unpickable, with why on hover; an
+ * HTTP agent, having no such presence, stays pickable.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";

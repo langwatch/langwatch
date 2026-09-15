@@ -1,25 +1,19 @@
 /**
- * The message contract between the parent page and a sandboxed chart frame.
- *
- * Framework-free on purpose: the shim (a string of plain JS), the parent
- * bridge, and the playground UI all speak these shapes, and the eventual
- * production CustomGraph kind can reuse them unchanged.
- *
- * Transport: the parent posts exactly one `lw:init` through `postMessage`
- * with a transferred `MessagePort`; every other message travels over that
- * port in both directions.
+ * The message contract between the parent page and a sandboxed chart frame. Framework-free on
+ * purpose: the shim (a string of plain JS), the parent bridge, and the playground UI all speak
+ * these shapes, and the eventual production CustomGraph kind can reuse them unchanged. Transport:
+ * the parent posts exactly one `lw:init` through `postMessage` with a transferred `MessagePort`;
+ * every other message travels over that port in both directions.
  */
 
 export type ChartFrameTheme = "light" | "dark";
 
 /**
- * Host-supplied, read-only context the frame is notified about — the
- * dashboard's own state, never something author code can set. Delivered on
- * `lw:init` and again on every `lw:dashboard-context-change`.
- *
- * `widgetId`/`dashboardId`/`projectId`/`widgetName` are optional: not every
- * frame boundary (e.g. the playground preview, which has no persisted
- * dashboard record yet) can supply them.
+ * Host-supplied, read-only context the frame is notified about — the dashboard's own state,
+ * never something author code can set. Delivered on `lw:init` and again on every
+ * `lw:dashboard-context-change`. `widgetId`/`dashboardId`/`projectId`/`widgetName` are optional:
+ * not every frame boundary (e.g. the playground preview, with no persisted dashboard record yet)
+ * can supply them.
  */
 export interface ChartFrameDashboardContext {
   /** Epoch milliseconds — plain numbers so the payload is structured-clonable. */

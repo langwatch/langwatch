@@ -1,31 +1,9 @@
 /**
- * The identity storage adapter with everything unlatched (ADR-116 §1).
- *
- * This is the migration-safety claim, checked rather than asserted: the gate
- * ships CLOSED, so deploying the adapter changes nothing on its own. The
- * suite drives the real `betterAuth()` twice over the same flows — once on
- * the completely stock engine, once with the adapter in `database:` — and
- * compares the transcripts.
- *
- * It is also what proves the FACTORY SPINE, which is the whole reason the
- * adapter sits where it does. Two pieces of better-auth's own traffic run
- * below any wrapper and therefore land on us here:
- *
- *  1. `findUserByEmail(email, { includeAccounts: true })` asks for the user
- *     with `join: { account: true }`, and with joins off — the default — the
- *     factory satisfies that join itself through the instance it was built
- *     around. Sign-in passing means the fallback join found our `findMany`.
- *  2. Sign-up runs inside `adapter.transaction`, which for that request is
- *     the ONLY method better-auth calls on the adapter. Sign-up passing
- *     means the factory's as-is passthrough handed better-auth this adapter
- *     rather than something below it.
- *
- * The identity accounts port is INERT: it holds nothing, and every WRITE on
- * it throws, so a closed gate that nevertheless put a row into identity
- * storage fails the suite instead of passing quietly.
- *
- * Hermetic (no database, no network), so it stays in the unit bucket like
- * the ceremonies' own better-auth suite.
+ * The identity storage adapter with everything unlatched (ADR-116 §1):
+ * proves the gate ships CLOSED (a dual real-`betterAuth()` run, stock vs.
+ * adapter-wired, diffed) and the FACTORY SPINE — two better-auth call paths
+ * that bypass any wrapper. The accounts port is INERT, so an accidental
+ * write fails loudly. Hermetic: no database, no network.
  */
 import { beforeEach, describe, expect, it } from "vitest";
 import type { AuthUnderTest, IdentityStack, MemoryDB } from "./support/storage-adapter-stack.ts";

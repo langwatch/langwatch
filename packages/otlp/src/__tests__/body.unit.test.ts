@@ -1,17 +1,10 @@
 /**
- * Parser-equivalence tests for the shared OTLP body helper.
- *
- * `parseOtlpBody.ts` is consumed by both the project-keyed `/api/otel/v1/traces`
- * receiver and the org-keyed governance `/api/ingest/otel/:sourceId` receiver.
- * Both must produce *byte-for-byte identical* parsed `IExportTraceServiceRequest`
- * for the same wire input — that is the whole architectural claim of the
- * unified-substrate direction. These tests lock the contract before the
- * receiver rewire (Sergey commit 2b) so the rewire can't accidentally diverge
- * the two call sites.
- *
- * Spec contract: specs/ai-gateway/governance/architecture-invariants.feature
- * (cross-cutting "shared OTLP parser" invariant) +
- * specs/ai-gateway/governance/receiver-shapes.feature.
+ * Parser-equivalence tests for the shared OTLP body helper: both the
+ * project-keyed and org-keyed governance receivers must produce
+ * byte-for-byte identical parsed output for the same wire input — the whole
+ * architectural claim of the unified-substrate direction. Locks the contract
+ * so the receiver rewire can't accidentally diverge the two call sites.
+ * @see specs/ai-gateway/governance/architecture-invariants.feature, receiver-shapes.feature
  */
 
 import { brotliCompressSync, deflateSync, gzipSync } from "node:zlib";

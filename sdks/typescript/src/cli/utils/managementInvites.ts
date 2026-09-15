@@ -1,16 +1,7 @@
 /**
- * The invite grammar, which is the one management shape with two spellings.
- *
- * An invited person always lands on at least one team, and the role they hold
- * is per team, so an invite is a small tree rather than a value. Repeated flags
- * spell the common case (a few people onto the same teams); the JSON forms
- * carry per-person team assignments and custom roles. Both produce the same
- * request, so a run that started as flags can be captured as JSON without
- * changing what happens.
- *
- * It lives beside `managementFlags` rather than inside it because the JSON form
- * validates a document the caller wrote, which is a different job from reading
- * a single colon-separated flag.
+ * The invite grammar: a person always lands on at least one team, with a
+ * role per team, so an invite is a small tree, not a value. Lives beside
+ * `managementFlags` because the JSON form validates a whole document.
  */
 import { ORGANIZATION_ROLES } from "@/client-sdk/services/_shared/management-types";
 import type { ManagementRole } from "@/client-sdk/services/_shared/management-types";
@@ -75,13 +66,9 @@ export interface InviteFlagInput {
 }
 
 /**
- * The invite batch the flags describe.
- *
- * One `--role` covers the whole batch; several must line up one-per-email, so
- * a mismatch is caught here rather than silently pairing the wrong role with
- * the wrong person. The team assignments apply to every invite in the batch:
- * an invite with per-person teams is a JSON batch, which the same command
- * accepts through `--json`, `--file` or `--stdin`.
+ * The invite batch the flags describe. One `--role` covers the whole batch;
+ * several must line up one-per-email, so a mismatch is caught here rather
+ * than silently pairing the wrong role with the wrong person.
  */
 export const composeInvitesFromFlags = (options: InviteFlagInput): InviteInput[] => {
   const emails = (options.email ?? []).map((email) => email.trim()).filter(Boolean);

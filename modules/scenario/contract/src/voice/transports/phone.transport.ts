@@ -43,23 +43,9 @@ export const PHONE_CONNECT_REJECTED_PREFIX = "Twilio rejected the call";
 export const TWILIO_MAX_CALL_DURATION_CAP_SECONDS = 300;
 
 /**
- * How long the callee must stay silent, in seconds, before the SDK ends the
- * callee's turn and hands the floor back to the simulated caller.
- *
- * Twilio Media Streams deliver 20 ms frames continuously — silence included —
- * and carry no speech/silence signal of their own (see ADR-131 "Turn-taking on
- * the media stream"). The SDK's Twilio adapter therefore gates inbound frames
- * on speech energy (`speechGate`, on by default since 1.7.0-dev.voice8) so
- * that a pause in the callee's speech reaches the runtime as a real gap, and
- * THIS knob is what turns that gap into a turn boundary. Without the gate the
- * turn only ever ended on hang-up or the SDK's 60s hard ceiling, so the caller
- * spoke exactly once and the callee was left asking "hello? are you still
- * there?" (#8014).
- *
- * 0.8s rather than the SDK's 0.6s default: a phone callee's inter-sentence
- * pauses run longer than a browser agent's, and the a-leg round trip adds
- * jitter. Long enough not to cut a sentence mid-way, short enough that the
- * caller answers promptly.
+ * How long the callee must stay silent before the SDK ends the callee's
+ * turn (#8014: without this the turn only ended on hang-up or the 60s
+ * ceiling). 0.8s, not the SDK's 0.6s default, since phone pauses run longer.
  */
 export const PHONE_RESPONSE_TAIL_SILENCE_SECONDS = 0.8;
 
@@ -166,24 +152,9 @@ export class VoicePublicBaseUrlInvalidError extends Error {
 }
 
 /**
- * Thrown when a phone run is about to dial but there is no public media URL the
- * WORKER's own listener answers: `VOICE_PUBLIC_BASE_URL` is unset (the worker
- * minted no quick tunnel — most often because the `cloudflared` binary is
- * missing, so the mint failed with ENOENT at worker boot) and the only value
- * left is the app's own `BASE_HOST`, which runs no voice media listener.
- *
- * Dialling `BASE_HOST` is the exact production failure this guards: Twilio
- * opens the media stream against `app.langwatch.ai`, the handshake never
- * completes, and the call dies with Twilio error 31920 after a 120-second
- * timeout with no trace attached. Failing HERE — at adapter-build time —
- * turns that silent timeout into an immediate, actionable run error naming
- * the remedy.
- *
- * A plain {@link Error}, not a {@link HandledError}: the remedy is an OPERATOR
- * action (set the env var, ship the binary), not one the customer can take, so
- * per ADR-045 it degrades to a generic "unknown" plus a trace id at the API
- * boundary rather than promising the caller an action they do not have —
- * matching {@link VoicePublicBaseUrlInvalidError} directly below.
+ * Thrown when a phone run has no public media URL for the worker's listener.
+ * Failing HERE turns a silent 120s Twilio timeout into an immediate, fixable
+ * error. Plain {@link Error}: the remedy is an OPERATOR action, not the customer's.
  */
 export class VoicePublicBaseUrlMissingError extends Error {
   constructor(source: PublicBaseUrlSource | "none", reason?: string) {

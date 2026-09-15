@@ -1,30 +1,10 @@
 /**
- * The command-hook entries that make a session report the repository it ran in,
- * merged into the hook file of whichever agent declares them.
- *
- * Two agents take command hooks today and they take them in the same shape: a
- * top-level `hooks` object keyed by event name, each event holding matcher
- * groups whose `hooks` array carries `{ type: "command", command, timeout }`.
- * Claude Code reads it from `~/.claude/settings.json`, beside the telemetry env
- * block (see app-settings.ts); Codex reads it from `hooks.json` in its config
- * home. One merge serves both, and the only per-agent facts live in `TARGETS`.
- *
- * Both agents fire `SessionStart` at the top of a session and `Stop` at the end
- * of every turn. One entry per event is all this needs: the command behind them
- * decides for itself when there is anything new to report.
- *
- * Codex additionally asks the user to review a newly declared hook before it
- * will run it, and the trust it records is a hash of the declaration written
- * into Codex's own config. That grant is the user's to give, so installing
- * writes the declaration and says so; nothing here forges the trust record.
- *
- * Ownership doctrine, the same one telemetry-targets.ts applies everywhere
- * else: hook arrays are shared with the user, so an entry is ours only when the
- * command it runs is one of ours. Every other entry, in the same array or
- * beside it, is read past and written back untouched: installing must never
- * cost someone their own hooks, and logout must never take them.
- *
- * Spec: specs/ai-governance/cli-wrappers/session-context-hook.feature
+ * The command-hook entries that make a session report the repository it ran
+ * in, merged into whichever agent's hook file declares them (shape and
+ * per-agent facts live in `TARGETS`). Ownership doctrine, as elsewhere: an
+ * entry is ours only when the command it runs is one of ours — every other
+ * entry is read past and written back untouched, so installing or logout
+ * never touches the user's own hooks.
  */
 
 import * as fs from "node:fs";
@@ -175,12 +155,9 @@ export function hasSessionContextHooks({
 
 /**
  * Strip every langwatch hook entry from the tool's hook file, leaving the
- * user's own entries (and every other key) exactly as they were. An event left
- * with no entries loses its key, and an empty `hooks` object goes with it, so
- * removal leaves no residue. Returns true when the file changed.
- *
- * A file we cannot parse is left alone rather than rewritten: there is no way
- * to strip our entries from JSON we could not read without losing the rest.
+ * user's own entries exactly as they were; an event left with no entries
+ * loses its key so removal leaves no residue. A file we cannot parse is left
+ * alone rather than rewritten. Returns true when the file changed.
  */
 export function removeSessionContextHooks({
   tool,

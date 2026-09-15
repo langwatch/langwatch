@@ -1,15 +1,7 @@
 /**
- * URL-routed singleton drawers: the address vocabulary and the navigation stack.
- *
- * Moved out of `platform/app/src/hooks/useDrawer.ts` whole. Everything about
- * how a drawer is addressed — `?drawer.open=<name>` plus one `drawer.<key>` per
- * serialisable prop, the module-scope stores for what a URL cannot carry, and
- * the stack that makes the back button mean something — is here and unchanged.
- *
- * TWO SEAMS ARE REDESIGNED, both because the platform import behind them has no
- * package export: the router (see `drawer-router.ts`) and the trace-drawer
- * funnel, which named two drawers by hand inside framework code and is now an
- * installable rewrite the host registers.
+ * URL-routed singleton drawers: the address vocabulary and the navigation
+ * stack. The router and the trace-drawer funnel are redesigned here because
+ * the platform import behind them has no package export.
  */
 
 import { createLogger } from "@langwatch/observability/browser";
@@ -46,13 +38,8 @@ export const getComplexProps = () => complexProps;
 // ============================================================================
 // Reactive subscription for the non-serializable drawer props
 // ============================================================================
-//
-// CurrentDrawer reads complexProps + flowCallbacks with plain getters during
-// render, so it only picks up changes when it re-renders — normally driven by
-// a URL change. A change that does NOT touch the URL (e.g. a page reload
-// re-hydrating a comparison editor's targets/dataset-columns from the workbench
-// store) would otherwise never reach the open drawer. This version counter +
-// listener set drives a useSyncExternalStore subscription in CurrentDrawer.
+// A non-URL change (e.g. rehydrating props from a store on reload) still needs
+// CurrentDrawer to see it; this version counter + listener set drives that.
 let drawerPropsVersion = 0;
 const drawerPropsListeners = new Set<() => void>();
 const notifyDrawerPropsChanged = () => {
@@ -85,36 +72,21 @@ export const setComplexProps = (props: Record<string, unknown>): void => {
 // ============================================================================
 
 /**
- * Flow callbacks registry - persists across drawer navigation.
- * Use this for callbacks that need to survive navigation between drawers
- * (e.g., onSelectPrompt callback that should work in promptList even when
- * opened from targetTypeSelector).
- *
- * Cleared automatically when closeDrawer() is called, except for the entries
- * registered with `keepOnClose`.
+ * Flow callbacks registry: persists across drawer navigation, and is cleared
+ * on closeDrawer() except entries registered with `keepOnClose`.
  */
 let flowCallbacks: Record<string, Record<string, unknown>> = {};
 
 /**
- * The drawers whose callbacks belong to a mounted component rather than to one
- * drawer flow.
- *
- * A page-level component that registers a callback for its own drawer holds it
- * for as long as it is mounted, and takes it back itself on unmount. Closing
- * an unrelated drawer must not take it away: the component would never know,
- * because nothing tells it, and the next time the drawer called that callback
- * there would be nothing there.
+ * Drawers whose callback belongs to a mounted component, not a drawer flow:
+ * closing an unrelated drawer must not clear it, since the owning component
+ * would never learn its callback was gone.
  */
 const keptOnClose = new Set<string>();
 
 /**
- * Set flow callbacks for a specific drawer type.
- * These persist across drawer navigation until closeDrawer() is called.
- *
- * @example
- * setFlowCallbacks("promptList", { onSelect: handleSelectPrompt });
- * setFlowCallbacks("agentList", { onSelect: handleSelectAgent });
- * openDrawer("targetTypeSelector");
+ * Sets flow callbacks for a drawer type; they persist across navigation until
+ * closeDrawer() is called.
  */
 export const setFlowCallbacks = (
   drawer: DrawerType,
@@ -206,14 +178,9 @@ export const getTopDrawer = (): DrawerType | undefined =>
 // ============================================================================
 
 /**
- * A rule that redirects one drawer-open request to another.
- *
- * `platform/app` hard-coded the Trace Explorer funnel inside this navigator: a
- * `traceDetails` open carrying a trace id became a `traceV2Details` open, so
- * every "view trace" call site landed on one drawer however it spelled the
- * request. That rule is a FEATURE's, not the framework's, so the framework
- * takes it as an install and the application registers it beside the registry
- * that names those two drawers.
+ * A rule that redirects one drawer-open request to another — e.g. rewriting a
+ * `traceDetails` open to `traceV2Details`. This is a feature's rule, not the
+ * framework's, so the application installs it rather than hard-coding it.
  */
 export type DrawerOpenRewrite = (
   drawer: DrawerType,
@@ -281,13 +248,9 @@ export const navigateToDrawer = (drawer: DrawerType, options: { resetStack?: boo
 // ============================================================================
 
 /**
- * Update individual `drawer.<key>` params in the URL without touching the
- * rest of the query or replacing the open drawer. Returns a setter that
- * accepts a partial update map; pass `undefined` to remove a key.
- *
- * Use `push: true` (default) so each call adds a browser history entry —
- * back / forward then walks through the user's tab navigation. Pass
- * `push: false` for silent updates (e.g. mirroring local state on mount).
+ * Updates `drawer.<key>` params in the URL without touching the rest of the
+ * query or the open drawer. `push: true` (default) adds a history entry;
+ * pass `push: false` for silent updates (e.g. mirroring state on mount).
  */
 export const useUpdateDrawerParams = () => {
   const router = useDrawerRouter();
@@ -377,17 +340,9 @@ function splitAsPath(asPath: string): {
 }
 
 /**
- * Pull a fragment apart into the part that belongs in the real query string and
- * the part that stays a fragment.
- *
- * Shared by both orderings on purpose. A URL can reach us as `#h?q` or as
- * `?q#h`, and only the first used to rescue `drawer.` params — so
- * `/traces?filter=active#conversations?drawer.open=x` left `drawer.open` parked
- * after the `#`, where `router.query` cannot see it, purely because a real
- * query happened to come first.
- *
- * The rescue still only fires for a fragment query carrying `drawer.` params;
- * bar state like `#conversations?preset=24h` is left where its owner reads it.
+ * Pulls a fragment into its query-string part and its fragment part. Shared
+ * by both `#h?q` and `?q#h` orderings so a `drawer.` param after `#` isn't
+ * lost; only `drawer.`-prefixed pairs move, other bar state stays put.
  */
 function rescueFragmentQuery(hash: string): {
   queryString: string;
@@ -416,28 +371,9 @@ function rescueFragmentQuery(hash: string): {
 }
 
 /**
- * `router.asPath` with its fragment replaced by the one the browser holds right
- * now.
- *
- * The traces page keeps its bar state — active lens, query, time range — in
- * the fragment, and writes it with a raw `history.replaceState`
- * (`useURLSync`). React Router never observes that write, so the hash inside
- * `router.asPath` is whatever the last router navigation left behind. Every
- * drawer URL below is rebuilt from `asPath` and republished through
- * `router.push`, which turned a stale hash into a real navigation: pick a
- * 24-hour window, open a conversation, and the page re-applied the fragment
- * from before the pick — snapping the table back to the 30-day default.
- *
- * Only the fragment is swapped. Path and query move exclusively through the
- * router, so `asPath` is authoritative for those; the fragment is the one axis
- * something else writes behind its back (the traces bar state, and the
- * onboarding spotlight marker).
- *
- * The swap happens before `splitAsPath` rather than after it, so that the hash
- * and the query it may need to give up are always read out of the same string —
- * splitting the router's fragment and then overwriting the hash with the
- * browser's would promote a `drawer.` param into the query while leaving a
- * stale copy of it in the fragment.
+ * `router.asPath` with its fragment replaced by the browser's live one: the
+ * traces page writes fragment state via raw `history.replaceState`, which the
+ * router never observes, so a stale hash must be swapped in before splitting.
  */
 function liveAsPath(asPath: string): string {
   if (typeof window === "undefined") return asPath;
@@ -454,16 +390,9 @@ function buildUrl(path: string, queryString: string, hash: string): string {
 }
 
 /**
- * Determines whether a value can be safely serialized into a URL query string.
- *
- * Primitives (string, number, boolean, null, undefined) are always serializable.
- * Arrays of primitives are serializable via qs's `arrayFormat: "comma"`.
- *
- * Note: single-element arrays round-trip as plain strings through qs
- * (e.g., `["a"]` → `"a"`). Consumers must handle both `T` and `T[]`.
- *
- * Functions, plain objects, Dates, and arrays containing objects are NOT
- * serializable and go to `complexProps` (module-level ephemeral store).
+ * Whether a value survives round-tripping through the URL query string.
+ * Note: qs collapses single-element arrays to plain strings on round-trip
+ * (`["a"]` → `"a"`), so consumers must handle both `T` and `T[]`.
  */
 function isUrlSerializable(value: unknown): boolean {
   if (value === null || value === undefined) return true;
@@ -485,18 +414,9 @@ function isUrlSerializable(value: unknown): boolean {
 // ============================================================================
 
 /**
- * Hook to manage drawer state via URL query params.
- * Includes navigation stack for automatic back button handling.
- *
- * GENERIC OVER THE REGISTRY, which is what the composed registry cost and
- * bought. `platform/app` derived `DrawerType` from `keyof typeof drawers`, a
- * union only one module could produce. Naming the application's registry —
- * `useDrawer<typeof installedUiDrawers>()` — gets the same per-drawer prop
- * checking at the call site; a caller inside a feature package, which may not
- * name the application's registry, gets strings.
- *
- * All returned functions are memoized with useCallback to prevent
- * unnecessary re-renders in consuming components.
+ * Manages drawer state via URL params, with a navigation stack for the back
+ * button. Generic over the registry so a caller naming the application's
+ * registry gets per-drawer prop checking; others just get strings.
  */
 export const useDrawer = <R extends UiDrawerRegistry = UiDrawerRegistry>() => {
   const router = useDrawerRouter();

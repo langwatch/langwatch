@@ -17,14 +17,9 @@ export type PostgresJoinRequestNotificationOptions = {
 
 /**
  * The Postgres composition seam for the join request's wake notifications.
- *
- * Everything behind the audience is plain Postgres over models this schema
- * already carries — the request row, the organization's name, its admins, and
- * the requester's own name and address. The only dependency that is not a
- * table is the mail port, which is exactly the split this seam exists to make:
- * a process holding a typed client and a mail gateway composes these
- * notifications for itself rather than receiving them from a tier that had
- * both.
+ * Everything behind the audience is plain Postgres; the only non-table
+ * dependency is the mail port — exactly the split this seam exists to make: a
+ * process holding both composes these notifications for itself.
  */
 export class PostgresJoinRequestNotificationAdapter {
   static create(

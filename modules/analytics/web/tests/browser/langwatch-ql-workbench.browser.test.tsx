@@ -1,26 +1,7 @@
 /**
- * The workbench in a real browser: typing, running, and reading the result.
- *
- * What this tier adds over `langwatch-ql-workbench.integration.test.tsx` is
- * layout. The result table windows its rows against the *measured* height of a
- * real scrolling box, so under jsdom — where every element is zero by zero —
- * the virtualizer can neither be shown to window nor shown to be wrong. Here
- * the box has a height, the rows have heights, and scrolling it moves the
- * window: the assertions below are about geometry that only a browser has.
- *
- * Two seams are stubbed, and neither is what the scenario is about:
- *
- *   - the transport, at the same `analyticsApi` seam the jsdom suite uses, so
- *     this suite is about the surface rather than about the endpoint;
- *   - `@monaco-editor/react`, so the editor is a plain textarea. The real one
- *     fetches from a public CDN by default; a test that reached for it would be
- *     both flaky and a network call this feature exists to forbid.
- *
- * Chart mode is stubbed for the same reason the jsdom suite stubs it — it has
- * its own real-browser suites: `langwatch-ql-chart-mode.browser.test.tsx`,
- * `langwatch-ql-vega-chart-without-eval.browser.test.tsx` and
- * `langwatch-ql-vega-spec-network-silence.browser.test.tsx`.
- *
+ * The workbench in a real browser: typing, running, and reading the result. Real geometry is
+ * what this tier adds over the jsdom suite — under jsdom every element is zero by zero, so the
+ * result table's row virtualizer can neither be shown to window nor shown to be wrong here.
  * Spec: modules/analytics/specs/analytics-lwql-workbench.feature
  */
 
@@ -137,14 +118,10 @@ function renderWorkbench() {
 }
 
 /**
- * How long a first paint is given, and why it is not the library's default.
- *
- * The editor is behind `lazy(() => import("@monaco-editor/react"))` and a
- * Suspense boundary, so even the stubbed module arrives a dynamic import later.
- * Testing Library waits one second by default; with all four files of this lane
- * driving their own Chromium context at once that budget is genuinely tight,
- * and the wait failed roughly one run in four. The suite's own `poll` already
- * uses ten seconds for the same reason.
+ * How long a first paint is given, and why it is not the library's default: the editor is
+ * behind `lazy(() => import("@monaco-editor/react"))` and Suspense, so even the stubbed module
+ * arrives a dynamic import later. Testing Library's default one-second wait failed roughly one
+ * run in four with all four files of this lane driving their own Chromium context at once.
  */
 const MOUNT_TIMEOUT = { timeout: 10_000 };
 

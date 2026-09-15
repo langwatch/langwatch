@@ -33,7 +33,9 @@ type SpendSettlementIntents = {
 };
 
 /**
- * Declared out here with an explicit intents type rather than inline — inline, the builder infers a wake handler's intents from the handler itself and types ctx.intents.sweep as possibly-undefined. Wake handlers must be pure/synchronous, so the query and sends run behind the outbox lease as an intent instead.
+ * An explicit intents type, not inline inference (which types
+ * `ctx.intents.sweep` as possibly-undefined). Wake handlers must be pure/sync,
+ * so query + sends run behind the outbox lease as an intent.
  */
 export const spendSettlementWake: WakeHandler<SpendSettlementState, SpendSettlementIntents> = (
   state,
@@ -44,7 +46,9 @@ export const spendSettlementWake: WakeHandler<SpendSettlementState, SpendSettlem
 });
 
 /**
- * The settlement sweeper: ONE process instance for the whole install, woken on a schedule, asking the spend record which admissions are open past grace. Replaces one instance per request (wrong shape — ProcessManagerInstance has no retention sweep, being bounded by entity population, and a timer per LLM call broke that). The fold already writes one gateway_spend row per request, staying "admitted" until an outcome lands, so "which requests are open" is a query, and settle is idempotent by (tenant, request, step) so a re-settled row is a no-op.
+ * The settlement sweeper: ONE process instance for the whole install, woken
+ * on a schedule to ask which admissions are open past grace — not one
+ * instance per request, whose timer-per-call broke retention.
  */
 export function spendSettlementPM(
   deps: SpendSettlementProcessDeps,

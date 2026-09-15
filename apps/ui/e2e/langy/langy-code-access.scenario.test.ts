@@ -1,14 +1,7 @@
 /**
- * The shared folder, end to end: the user asks for tracing, Langy offers the
- * two ways to reach the code, the command line shares the folder, and Langy
- * makes the change on the developer's own machine (ADR-129).
- *
- * Layer 2 is the repository itself. The branch, the commit and the diff are
- * read from git before the judge is asked anything, because a judge will
- * happily read a well-written promise as a change.
- *
- * RUN (one file per vitest run, see README):
- *   cd platform/app/e2e/langy && npx vitest run langy-code-access.scenario.test.ts --reporter=verbose
+ * The shared folder, end to end (ADR-129): Langy makes the change on the
+ * developer's own machine. The branch, commit and diff are read from git
+ * before the judge is asked, since a judge will happily read a well-written promise as a change.
  */
 
 import { openai } from "@ai-sdk/openai";

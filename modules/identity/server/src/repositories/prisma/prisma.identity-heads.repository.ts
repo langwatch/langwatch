@@ -16,18 +16,9 @@ export type PrismaIdentityHeadsDatabase = Pick<
 >;
 
 /**
- * A user's identifier heads, read off the `Identifier` projection and
- * `User.userHashKey`.
- *
- * Every read the guards, the ceremonies and the `User.email` fork take, and
- * nothing else. The fork uses one of them (`findHeads`) and satisfies its
- * narrower `IdentityHeadsReader` by being a superset — one class rather than
- * two, because two Prisma classes over one table would eventually disagree
- * about what a row means.
- *
- * Policy — which head answers for an address, what a state allows — lives in
- * the services and in `@langwatch/identity-contract`; this class returns
- * stored facts.
+ * A user's identifier heads, off `Identifier` and `User.userHashKey`. One
+ * class rather than two Prisma classes over one table — two would eventually
+ * disagree about what a row means. Returns stored facts; policy lives elsewhere.
  */
 export class PrismaIdentityHeadsRepository implements IdentityHeadsRepository {
   static create(database: PrismaIdentityHeadsDatabase): PrismaIdentityHeadsRepository {

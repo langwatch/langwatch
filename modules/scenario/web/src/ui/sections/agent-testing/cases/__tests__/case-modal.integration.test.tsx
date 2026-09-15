@@ -1,6 +1,7 @@
+/** @vitest-environment jsdom */
+
 /**
- * The scenario dialog of the Agent Testing page: what it asks, what its footer holds, what its chips open, and what Save and Run does.
- * @vitest-environment jsdom
+ * The Agent Testing scenario dialog: fields, footer, chip drawers, Save/Run.
  * @see specs/features/agent-testing/cases-table.feature
  * @see specs/features/agents/voice-agents-v1.feature
  */

@@ -4,14 +4,9 @@ import type { EventHandler, IntentSpec, WakeHandler } from "@langwatch/eventing"
 export const CONNECTION_TEARDOWN_PROCESS_NAME = "connectionTeardown" as const;
 
 /**
- * How long a requested teardown stays reversible.
- *
- * Seven days, because the thing being removed is how a whole organization
- * signs in: a teardown started on a Friday by someone who then goes on leave
- * has to be undoable by a colleague on the Monday, and an operator who
- * realizes the mistake a week later still has room. Nothing is torn down
- * silently in the meantime — TEARDOWN_PENDING stops routing the moment it is
- * requested, so the grace costs no exposure, only patience.
+ * How long a requested teardown stays reversible: seven days, so a teardown
+ * started Friday is undoable by a colleague Monday, and a mistake found a
+ * week later still has room — routing stops the moment it is requested.
  */
 export const CONNECTION_TEARDOWN_GRACE_MS = 7 * 24 * 60 * 60 * 1000;
 

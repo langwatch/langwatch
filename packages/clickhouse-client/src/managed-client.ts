@@ -329,7 +329,10 @@ export function withClickHouseStatementLimit<Client extends ClickHouseVendorClie
   }
 }
 
-/** Adds process-selected query defaults without changing insert, command, exec or lifecycle calls. */
+/**
+ * Adds process-selected query defaults without changing insert, command, exec or lifecycle
+ * calls.
+ */
 export function withClickHouseDefaultQuerySettings<Client extends ClickHouseVendorClient>(
   client: Client,
   defaults: Readonly<Record<string, unknown>>,

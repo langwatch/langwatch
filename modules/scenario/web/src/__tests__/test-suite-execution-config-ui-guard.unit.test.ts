@@ -1,5 +1,5 @@
 /**
- * A test suite row still carries execution settings, because a caller that addresses a test suite BY ID has nothing else to run against: the command line, the MCP tool and the SDK all reach `POST /api/suites/:id/run`.
+ * A suite row keeps execution settings — ID-based callers have nothing else to run against.
  * @vitest-environment node
  * @see specs/suites/test-suite-run-plan-reuse.feature
  */

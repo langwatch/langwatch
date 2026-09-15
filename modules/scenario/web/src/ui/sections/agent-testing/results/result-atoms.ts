@@ -1,5 +1,6 @@
 /**
- * The client side of the atom: what the filter row asks for, and how a stored atom becomes a row a person can read.
+ * The client side of the atom: what the filter row asks for, and how a stored
+ * atom becomes a row a person can read.
  * @see specs/features/agent-testing/results-tabs.feature
  * @see specs/features/agent-testing/results-atoms.feature
  */

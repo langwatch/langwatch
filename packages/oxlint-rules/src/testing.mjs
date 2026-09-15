@@ -31,11 +31,8 @@ function withSilentTestHooks(run) {
 }
 
 /**
- * Runs one rule over one source string and returns what it reported.
- *
- * The rule's `context.report` is intercepted rather than forwarded, so the
- * tester sees a clean file and we keep the diagnostics.
- *
+ * Runs one rule over one source string; intercepts `context.report` so the
+ * tester sees a clean file while we keep the diagnostics.
  * @param {{ meta: object, create: Function }} rule
  * @param {{ code: string, filename: string, options?: unknown[], cwd?: string }} run
  * @returns {Diagnostic[]}
@@ -91,15 +88,11 @@ function writeFile(root, relativePath, contents) {
 
 /**
  * A throwaway workspace for a rule to be linted inside.
- *
- * @param {object} [tree]
- * @param {Record<string, { layoutVersion?: number, roles?: Record<string, { exports?: string[] }> }>} [tree.features]
- *   Feature name to its `feature.json` layout version and the contract/server/web
- *   packages that exist for it.
- * @param {Record<string, string[]>} [tree.catalogue] Feature id to the subjects it claims,
- *   written as the real `catalogue.json` shape: `{ version, features: [{ id, subjects }] }`.
- * @param {Record<string, string>} [tree.files] Extra files, keyed by workspace path.
- * @returns {{ cwd: string, write: (path: string, contents: string) => string, cleanup: () => void }}
+ * @param {object} [tree.features] Feature name to its `feature.json` layout
+ *   version and the contract/server/web packages that exist for it.
+ * @param {object} [tree.catalogue] Feature id to the subjects it claims.
+ * @param {Record<string, string>} [tree.files] Extra files, keyed by path.
+ * @returns {object} cwd, write(path, contents), and cleanup().
  */
 export function createFixtureWorkspace({ catalogue = {}, features = {}, files = {} } = {}) {
   const cwd = realpathSync(mkdtempSync(join(tmpdir(), "langwatch-lint-")));

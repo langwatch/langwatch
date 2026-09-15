@@ -1,5 +1,8 @@
 /**
- * Version token for GET /api/internal/gateway/config/:vk_id: VirtualKey.revision covers the key; a provider digest over the materialiser's own resolver covers the dispatch chain the revision never reaches. Moves on any write, even one bypassing the service; budgets/cache/guardrails/spend excluded by decision.
+ * Version token for GET /api/internal/gateway/config/:vk_id: VirtualKey.revision covers the key;
+ * a provider digest over the materialiser's own resolver covers the dispatch chain the revision
+ * never reaches. Moves on any write, even one bypassing the service; budgets/cache/guardrails/
+ * spend excluded by decision.
  */
 import { createHash } from "node:crypto";
 import type { VirtualKeyWithScopes } from "@langwatch/gateway-contract";
@@ -70,7 +73,9 @@ export class GatewayConfigAssemblyAdapter implements GatewayConfigAssembly {
   }
 
   /**
-   * Reserved-tier fallthrough only — extending it to unrecognized models would silently resolve a typo instead of rejecting it. A tier with no explicit target and no default model stays an unknown name.
+   * Reserved-tier fallthrough only — extending it to unrecognized models would silently resolve
+   * a typo instead of rejecting it. A tier with no explicit target and no default model stays an
+   * unknown name.
    */
   withTierFallthrough({
     aliases,

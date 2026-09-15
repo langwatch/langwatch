@@ -142,16 +142,9 @@ describe("FieldsFilters", () => {
 
   /**
    * @regression #3749 — filter checkboxes on /messages no longer clickable.
-   *
-   * PR #3528 moved the option-row click handler from `<HStack onClick=...>`
-   * to `<Checkbox onChange=...>`. Inside the Popover + virtualizer, neither
-   * `onChange` nor `onCheckedChange` on the Chakra v3 Checkbox fires
-   * reliably — verified empirically: clicking the row container fires;
-   * clicking the Checkbox itself does not.
-   *
-   * Fix: put the click handler back on the `<HStack>` row container.
-   * The test asserts a click on a non-Checkbox sibling element (the count
-   * text) toggles the filter — only the row's onClick can deliver that.
+   * Inside the Popover + virtualizer, the Chakra v3 Checkbox's own
+   * `onChange`/`onCheckedChange` fires unreliably, so the click handler
+   * lives on the `<HStack>` row container instead — proved here by clicking a non-Checkbox sibling.
    */
   describe("when the user clicks an option row outside the Checkbox", () => {
     it("toggles the filter value", async () => {

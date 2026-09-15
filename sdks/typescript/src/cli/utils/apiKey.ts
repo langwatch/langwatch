@@ -9,22 +9,10 @@ import { fetchPersonalProject, SessionApiError } from "./governance/session-api"
 import { projectScopeErrorLines, ProjectScopeError, resolveProjectSelector } from "./projectScope";
 
 /**
- * Re-read the caller's .env, applying only the LANGWATCH_* keys.
- *
- * In-process this is mostly a no-op (index.ts already ran a full
- * `dotenv.config()` at boot — that path is untouched). Under the daemon it
- * runs per request, against the CALLER's cwd, in a long-lived shared process:
- * loading the whole file the way `dotenv.config()` does would stuff unrelated
- * secrets (DATABASE_URL, AWS credentials, …) into that process's memory for
- * every later request to potentially see, contradicting the
- * secret-minimisation the request env allowlist (daemon/eligibility.ts
- * collectForwardedEnv) is built on. The caller's .env therefore contributes
- * the same class of variables the allowlist would have forwarded: the
- * LANGWATCH_* ones — which covers everything the CLI itself reads
- * (LANGWATCH_API_KEY, LANGWATCH_ENDPOINT, LANGWATCH_PROJECT_ID, …).
- *
- * dotenv semantics are preserved: a variable that is already set (the
- * baseline, or the caller's forwarded overlay) is never overwritten.
+ * Re-reads the caller's .env for LANGWATCH_* keys only. In the daemon this
+ * runs per request in one shared process, so loading the whole file would
+ * leak one caller's secrets into another's request. Existing env vars are
+ * never overwritten (dotenv semantics).
  */
 const loadEnvFileScoped = (): void => {
   // `processEnv: {}` parses the file into a throwaway object instead of
@@ -53,56 +41,19 @@ export interface ResolvedCredentials {
 }
 
 /**
- * How long a device session's cached personal-project key is trusted before
- * the resolver re-confirms the session is still live. The key is a long-lived
- * `Project.apiKey`, not a session-bound token, so trusting it forever would
- * let a stolen `~/.langwatch/config.json` keep working after the device was
- * revoked from /me/devices. Bounding the trust to this window means a
- * server-side revocation severs CLI access within at most this long: past the
- * window every command re-validates through the session-authenticated
- * endpoint and drops the key when the session is gone. Minutes, not days.
- *
+ * How long a cached personal-project key is trusted before re-confirming
+ * liveness. Bounds how long a stolen `~/.langwatch/config.json` keeps
+ * working after device revocation to minutes, not days.
  * Spec: specs/ai-governance/cli-onboarding/me-credentials.feature
  */
 export const SESSION_REVALIDATE_WINDOW_MS = 5 * 60 * 1000;
 
 /**
- * Resolve the credentials an API-calling command runs with, in priority
- * order:
- *
- *   1. an explicit key argument (a command's own --api-key style flag),
- *   2. `LANGWATCH_API_KEY` from the environment or the caller's .env
- *      (scoped load above, so CI and scripts are never surprised),
- *   3. the device session in ~/.langwatch/config.json, which resolves the
- *      user-scoped LOGIN KEY (`cli_api_key`) when the login minted one, and
- *      the PERSONAL PROJECT's API key otherwise: both are shipped by the login
- *      exchange, then periodically re-validated against session liveness (see
- *      below).
- *
- * The session path also decides WHICH PROJECT the request names. The login key
- * carries no project identity, so the server reads it off the request: the
- * personal project by default, or the one `--project <id|slug>` selects. Both
- * the key and the project id go into the request-scoped credential store, and
- * `buildAuthHeaders` turns the pair into `Basic base64(projectId:key)`.
- *
- * The winning key is published into the request-scoped credential store
- * (internal/credentialContext.ts), NOT the shared `process.env`. Every
- * API-client factory reads that store first, so a service constructed
- * downstream of this call sees only this request's credential; the daemon
- * runs concurrent requests in separate async contexts, so one request can
- * never read another's key. Writing the resolved key to the process-global
- * env instead (the previous shape) was the cross-identity leak the daemon
- * design forbids. The endpoint stays on `process.env` (via `??=`, so a caller
- * value wins): it is resolved deterministically per execution window and
- * window switches are serialized, so it is not identity-sensitive the way the
- * key is.
- *
- * On success, prints the one-line identity notice (stderr only, 30-minute
- * suppression, see identityNotice.ts). With no credential anywhere it reports
- * the not-logged-in error and exits 1, structured on stdout for machine
- * callers, prose on stderr for humans.
- *
- * Spec: specs/ai-governance/cli-onboarding/me-credentials.feature
+ * Resolves credentials in priority order: --api-key flag, then env
+ * `LANGWATCH_API_KEY`, then the device session. Publishes into the
+ * request-scoped credential store (not `process.env`), so the daemon's
+ * concurrent requests — each its own async context — never cross identities;
+ * writing to the process-global env instead was the leak this design forbids.
  */
 export const resolveCredentials = async (
   opts: { apiKey?: string; project?: string } = {},
@@ -253,36 +204,11 @@ interface SessionCredential {
 }
 
 /**
- * The key for a device session, gated on session liveness.
- *
- * TWO KEYS CAN BE CACHED, and the login key wins when it is there. The
- * user-scoped `cli_api_key` reaches every project the user selected while
- * approving the login, so `--project` can move a command across projects with
- * it; `personal_project.api_key` reaches exactly one project and is what a
- * server predating the feature ships. Either way the request names the
- * personal project by default, so a login with a login key behaves exactly
- * like one without until a `--project` says otherwise.
- *
- * Both are long-lived credentials rather than session-bound tokens, so using
- * either unconditionally is the revocation bypass: a stolen
- * `~/.langwatch/config.json` would authenticate forever after the device was
- * revoked. The cache is therefore trusted only within
- * `SESSION_REVALIDATE_WINDOW_MS`; past it, every call re-confirms the session
- * through the session-authenticated `GET /api/auth/cli/personal-project`
- * (which fails once Redis has dropped the revoked/expired tokens), and:
- *
- *   - success       : refresh the personal project + validation clock, use it.
- *   - 401 (revoked) : DELETE both cached keys from config and return
- *                     undefined, so the command reports not-logged-in and the
- *                     stolen config is now inert.
- *   - 403 (session refused) : same as 401 — a session the server refuses is
- *                     one the CLI must stop presenting.
- *   - 404 (a server predating the endpoint) : can't revalidate; keep the
- *                     legacy key and reset the clock so old servers still
- *                     "just work" (they have no device-revocation semantics
- *                     to enforce anyway).
- *   - network/other : offline; keep the last-known key WITHOUT resetting the
- *                     clock, so the very next online command revalidates.
+ * The key for a device session. Two keys can be cached, and the login key
+ * (`cli_api_key`) wins over the personal-project key when present — using
+ * either past `SESSION_REVALIDATE_WINDOW_MS` unconditionally would be the
+ * revocation bypass, so each branch below re-confirms or falls back on its
+ * own terms (revoked, legacy server predating the endpoint, or offline).
  */
 async function resolveSessionCredential(
   cfg: GovernanceConfig,
@@ -369,13 +295,9 @@ function markPersonalProjectValidated(cfg: GovernanceConfig): void {
 }
 
 /**
- * The human error block, line by line. Exported for tests.
- *
- * Shape: what is wrong, the browser sign-in as the primary fix, the API-key
- * alternative, where a key is created, then the agent-facing guardrail.
- * Command lines are indented two spaces (the renderer colors them cyan by
- * that prefix), and no command line exceeds 80 columns, so no terminal wraps
- * one mid-token.
+ * The human error block, line by line. Exported for tests. Command lines are
+ * indented two spaces (the renderer colors them cyan by that prefix) and kept
+ * under 80 columns so no terminal wraps one mid-token.
  */
 export const missingCredentialsLines = (authUrl: string): string[] => [
   "Error: you're not logged in, and LANGWATCH_API_KEY is not set.",

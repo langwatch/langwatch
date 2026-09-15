@@ -14,13 +14,9 @@ export const JOIN_REQUEST_LIFECYCLE_PROCESS_NAME = "joinRequestLifecycle" as con
 export const JOIN_REQUEST_EXPIRY_MS = 14 * 24 * 60 * 60 * 1000;
 
 /**
- * When the admins are reminded — once, on the seventh day.
- *
- * Halfway is deliberate: early enough that a reminder still leaves a week to
- * act on, late enough that it is not just a second copy of the first mail.
- * There is exactly one, because a request that nobody wants to answer is
- * answered by the expiry, and a second nag would train admins to ignore the
- * first.
+ * When admins are reminded — once, on day seven: early enough to leave a week
+ * to act, late enough not to be a second copy of the first mail. Only one,
+ * because a second nag would train admins to ignore reminders altogether.
  */
 export const JOIN_REQUEST_REMINDER_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -78,15 +74,9 @@ export interface JoinRequestLifecycle {
 }
 
 /**
- * Arm both deadlines from the fact.
- *
- * The reminder is derived from the request's own creation time (`ctx.at`)
- * rather than `now`, which is the one place this deliberately diverges from
- * "schedule from `Math.max(at, now)`": both deadlines are PROMISES about when
- * the request was made, not delays from when the event was processed. A
- * backed-up subscriber must not buy a request an extra day of silence, and a
- * `nextWakeAt` already behind the present simply fires on the next poll —
- * which for an overdue reminder is exactly right.
+ * Arms both deadlines from the fact's own creation time (`ctx.at`), not `now`
+ * — deadlines are PROMISES about when the request was made, so a backed-up
+ * subscriber must not buy it extra silence; an overdue wake just fires next poll.
  */
 export const onJoinRequested: EventHandler<
   JoinRequestLifecycleState,
@@ -123,13 +113,9 @@ export const onJoinResolved: EventHandler<
 });
 
 /**
- * Pure and synchronous, like every wake handler: the commit that persists this
- * evolution is what fences racing workers, so exactly one of them proceeds.
- * The effects run as intents behind the outbox lease.
- *
- * Two slots, one timer. The first fires the reminder and re-arms to the
- * expiry; the second expires. `remindedAt` makes the first exactly-once — a
- * redelivered day-7 wake finds it set and goes straight to re-arming.
+ * Pure and synchronous: the persisted commit fences racing workers to exactly
+ * one. Two slots share one timer — day 7 reminds and re-arms to day 14, day 14
+ * expires; `remindedAt` makes the reminder exactly-once under redelivery.
  */
 export const joinRequestLifecycleWake: WakeHandler<
   JoinRequestLifecycleState,

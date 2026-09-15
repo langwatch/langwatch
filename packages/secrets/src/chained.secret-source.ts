@@ -4,13 +4,9 @@ import { SecretSource } from "./secret-source.port.ts";
 export type SecretAttribution = Readonly<{ key: string; source: string }>;
 
 /**
- * Ordered sources, first answer wins.
- *
- * Each source is asked only for the keys still outstanding, so a chain whose
- * first rung answers everything never starts the subprocess behind its second.
- * The attribution it records is what the boot line prints: key name and source
- * name, so a stale shell export shadowing the vault is visible rather than
- * mysterious.
+ * Ordered sources, first answer wins. Each source is asked only for keys
+ * still outstanding, so a chain whose first rung answers everything never
+ * starts the subprocess behind its second. Shadowing stays visible via boot-line attribution.
  */
 export class ChainedSecretSource extends SecretSource {
   static create({

@@ -1,20 +1,9 @@
 /**
- * One cell of the LangWatchQL result table.
- *
- * The classification and the words are decided in
- * `../logic/lwql-value-format`; this decides how each kind *looks* and
- * what a member can do with it. Two rules carry the weight:
- *
- *  - the six ways a value can be empty or non-finite are marked with
- *    `data-cell-kind`, so "null", "missing" and a String column literally
- *    holding the text `null` stay tellable apart by a reader and by a test;
- *  - only cells whose display is not the whole truth — a structure, or a value
- *    long enough to be clipped — grow controls. A copy button on every cell
- *    would put a hundred extra tab stops between a keyboard user and the next
- *    row for no gain, because an unclipped value is already on screen and
- *    selectable.
- *
- * @see modules/analytics/specs/analytics-lwql-workbench.feature
+ * One cell of the LangWatchQL result table: classification and words come
+ * from `../logic/lwql-value-format`, this decides how each kind looks. Six
+ * empty/non-finite states get `data-cell-kind` so "null" and a literal "null"
+ * string stay tellable apart; only cells whose display isn't the whole truth
+ * grow controls, sparing a keyboard user a tab stop for an already-visible value.
  */
 
 import { Box, Button, HStack, Text } from "@chakra-ui/react";

@@ -42,65 +42,36 @@ export interface SystemMigration {
 
   /**
    * Whether a SELF-HOSTED installation runs this migration automatically.
-   *
-   * Cloud never reads this. Self-hosted has no operator pacing at all (the
-   * in-place doctrine: nobody ever learns a migration happened), so its
-   * pacing is this declaration: an OSS release can ship a migration's code
-   * while cloud is still migrating and soaking, and the migration stays
-   * inert on every self-hosted installation - the runner does not drive it
-   * for any tenant, so it is never attempted, parked or reported - until a
-   * later release flips this to `true`. Flipping it IS the self-hosted
-   * release act, made only after the cloud rollout has soaked.
+   * Self-hosted has no operator pacing, so shipping this `false` keeps the
+   * migration inert until a later release flips it — that flip IS the
+   * self-hosted release act, made only after the cloud rollout has soaked.
    */
   readonly runsAutomaticallyOnSelfHosted: boolean;
 
   /**
    * Whether CLOUD puts every tenant in this migration's cohort with no
-   * operator action.
-   *
-   * The counterpart to `runsAutomaticallyOnSelfHosted` on the other
-   * installation, and a different axis from it: this one is about WHO, that
-   * one about WHETHER the installation drives the migration at all.
-   *
-   * `false` is the soaking posture: on cloud the migration processes only
-   * the tenants an operator has enrolled from the ops migrations page, so a
-   * release ships it dark and the rollout widens deliberately. `true` says
-   * the rollout is over - the migration has already run for the tenants that
-   * existed and must now reach every tenant, including every one created
-   * since, without an operator remembering to enroll it. Enrollment rows for
-   * such a migration decide nothing, so the ops page stops offering them.
-   *
-   * Self-hosted ignores this exactly as cloud ignores
-   * `runsAutomaticallyOnSelfHosted`: off cloud every tenant is in every
-   * driven migration's cohort already.
+   * operator action. `false` is the soaking posture — only tenants an
+   * operator enrolled are processed; `true` means the rollout is over and
+   * every tenant, including future ones, is included automatically.
    */
   readonly enrolledAutomatically: boolean;
 
   /**
-   * Migrate one tenant. The contract that makes the runner safe to re-run
-   * on every boot:
-   *
-   * - Idempotent: a second call after any outcome creates nothing new.
-   * - Self-proving: `finalized` may only be returned when the migration
-   *   verified the tenant behaves identically without its legacy path.
-   * - Held is not failed: return `migrated` when the work landed but the
-   *   proof found disagreements - the tenant stays on its legacy path,
-   *   behaviour unchanged, and later passes retry the proof.
-   * - Throwing parks the tenant; the runner records the error and retries
-   *   on a later pass.
-   *
-   * `previous` is the tenant's stored record, or null when it has never
-   * run. A migration whose writes land before its bookkeeping does needs it:
-   * a `parked` previous attempt is the signal that work may have committed
-   * without the follow-up that makes it visible, so this pass must redo the
-   * follow-up rather than short-circuit on "nothing left to write".
-   *
-   * `signal` aborts a long pass at shutdown. Honour it between units of
-   * work - the runner will not interrupt an in-flight call.
+   * Migrate one tenant, safe to re-run on every boot: idempotent, and
+   * self-proving (`finalized` only once verified without the legacy path).
+   * Held is not failed — `migrated` means work landed but proof disagreed,
+   * so the tenant stays on its legacy path for a later pass to retry.
    */
   migrateTenant(args: {
     tenantId: string;
+    /** Aborts a long pass at shutdown; honour it between units of work. */
     signal?: AbortSignal;
+    /**
+     * The tenant's stored record, or null when never run. A `parked`
+     * previous attempt signals work may have committed without the
+     * follow-up that makes it visible, so redo it rather than
+     * short-circuit on "nothing left to write".
+     */
     previous?: TenantMigrationRecord | null;
   }): Promise<TenantMigrationOutcome>;
 }

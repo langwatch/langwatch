@@ -1,15 +1,7 @@
 /**
  * A change to a running connected agent, made through the shared folder
- * (ADR-129).
- *
- * The demo application is running with `connectAgent`, so it answers
- * simulations from the platform. The developer asks for a free-plan-only case
- * on a named account. That is one change in the customer's program (a new run
- * parameter), one restart, and one re-registration, and every step is read
- * back: the diff, the terminal, and the agent the platform holds.
- *
- * RUN (one file per vitest run, see README):
- *   cd platform/app/e2e/langy && npx vitest run langy-local-connected-agent.scenario.test.ts --reporter=verbose
+ * (ADR-129): a new run parameter, restart, and re-registration, each step
+ * read back from the diff, the terminal, and the agent the platform holds.
  */
 
 import { openai } from "@ai-sdk/openai";

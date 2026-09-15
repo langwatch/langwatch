@@ -1,10 +1,8 @@
+/** @vitest-environment jsdom */
+
 /**
- * @vitest-environment jsdom
- *
- * The dashboard's refresh schedule: ticks on the chosen interval while the
- * tab is visible, none while hidden, a catch-up tick on return, and a choice
- * that survives the page.
- *
+ * The dashboard's refresh schedule: ticks on the chosen interval while
+ * visible, none while hidden, a catch-up tick on return, and a persisted choice.
  * @see specs/analytics/dashboard-widget-resilience.feature
  */
 

@@ -1,19 +1,10 @@
 /**
- * Heal a personal ingest key the collector rejected.
- *
- * A personal ingest key lives and dies with the CLI session that minted it,
- * but it can still die under a running agent: a revoke from the API-keys
- * page, or a session that ended while the agent kept running, after a
- * re-login on this device or a logout of a session that shared the key. The
- * agent's own OTLP exporter fails silently on the 401, and until now so did
- * the session context hook. The hook is the one process that learns the key
- * is dead on every session, so it is where the repair belongs: re-mint under
- * the device's current session through the same resolver `langwatch
- * instrument` uses, persist the cache, rewrite the tool's wiring, and hand
- * back a target for the retry.
- *
- * Nothing here throws to the caller: the hook is never allowed to be why a
- * session broke, so every failure is a null and a debug line.
+ * Heal a personal ingest key the collector rejected. Such a key can die under a running agent
+ * (a revoke, a session ending mid-run, a logout of a session that shared it); the hook is the
+ * one process that learns this on every session, so it re-mints under the device's current
+ * session (via the same resolver `langwatch instrument` uses), persists the cache, rewrites
+ * the tool's wiring, and hands back a retry target. Nothing here throws to the caller: the
+ * hook must never be why a session broke, so every failure is a null and a debug line.
  */
 import { installTelemetryWiring } from "./instrument-wiring";
 import {
@@ -36,19 +27,12 @@ export interface HealedTarget {
 }
 
 /**
- * How a heal ended, and whether it cost anything.
- *
- * The split the caller cares about is `declined` against the other three. A
- * decline is decided from the config alone, before any network call: this
- * device is not the one that can repair this 401, and running again a second
- * later would decide the same thing just as cheaply. The other three went to
- * the platform. A `failed` heal may already have spent a mint, so it is the
- * one that must not be retried in a loop. A `withheld` heal found that a
- * person revoked the key on purpose: the device must not replace it, and the
- * person must be told to set the device up again. An `expired` heal found
- * that the device itself is signed out, which no mint can repair either.
- * Throttling a decline would spend a repair window on a rejection that never
- * cost anything, and delay the real repair.
+ * How a heal ended, and whether it cost anything. `declined` is decided from config alone,
+ * before any network call, so retrying it costs nothing. The other three reached the
+ * platform: `failed` may already have spent a mint, so must not be retried in a loop;
+ * `withheld` means a person revoked the key on purpose, so the device must not replace it —
+ * they must set the device up again instead; `expired` means the device itself is signed out,
+ * which no mint can repair.
  */
 export type HealOutcome =
   | { status: "declined" }
@@ -118,28 +102,11 @@ const TOOL_BY_AGENT: Record<string, string> = {
 };
 
 /**
- * Re-mint the personal ingest key for `agent` and rewrite its wiring.
- *
- * Declines, without reaching the platform, when this device is not in a
- * position to repair the 401: no login to mint with, a tool pinned to a
- * project (that path is `langwatch instrument --project`), or a rejected
- * token that is not exactly the cached personal key (a pasted credential is
- * the user's, never overwritten, and a request that carried no bearer at all
- * was rejected for another reason).
- *
- * Withholds the repair when the platform says a person revoked the cached
- * key, or recorded no cause for the revoke. A revoke from the API-keys page
- * is a decision about this device, and a device that minted its way past it
- * would make that page a no-op. A key retired with its session, replaced by
- * a rotation or evicted by an older server's cap is re-minted; one retired
- * because its person was offboarded reads as a sign-out instead, since the
- * mint would be refused anyway.
- *
- * Reports a failure once it has gone to the platform and not come back with a
- * wired tool that this device can recognise again: a status call that did not
- * answer inside its deadline, a server that says the cached key is still
- * live, in which case the 401 means something else, or a key that minted but
- * could not be written into the cache or into the tool's wiring.
+ * Re-mint the personal ingest key for `agent` and rewrite its wiring. Declines without
+ * reaching the platform when this device isn't positioned to repair the 401 (no login, a
+ * tool pinned to a project, or a rejected token that isn't exactly the cached personal key).
+ * {@link revocationBlocksHeal} decides whether the platform's answer withholds the repair
+ * instead of granting it.
  */
 export async function healRevokedIngestKey({
   agent,
@@ -178,19 +145,12 @@ export async function healRevokedIngestKey({
 }
 
 /**
- * The status check that stands between the 401 and the mint, as an outcome
- * when it ends the heal and `null` when the key may be replaced.
- *
- * A platform that does not answer is not a platform that said "re-mint". The
- * one revocation the device must not mint past is a person's, so a status
- * call that times out or errors ends the heal rather than falling through to
- * the mint; the next session asks again once the window is up.
- *
- * A platform that refused the session is the same wall for a different
- * reason: the mint after this check would be refused too, so the heal ends
- * on `expired`, which is the one outcome that names a repair the person can
- * make. A key retired because its person was offboarded is that same wall,
- * read from the key rather than from a refused call.
+ * The status check that stands between the 401 and the mint: an outcome when it ends the
+ * heal, `null` when the key may still be replaced. A status call that times out or errors
+ * ends the heal rather than falling through to the mint — a platform that didn't answer never
+ * said "safe to re-mint", and the one revocation this device must not mint past is a
+ * person's. A refused session ends on `expired` instead, the one outcome that names a repair
+ * the person can make; a key retired because its person was offboarded reads the same way.
  */
 async function revocationBlocksHeal({
   cfg,

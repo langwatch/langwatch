@@ -1,20 +1,7 @@
 /**
- * What the address says the charts are filtered to.
- *
- * The reading half of `platform/app/src/hooks/useFilterParams.ts` and all of
- * `platform/app/src/server/analytics/utils.ts`, made pure: a query string in,
- * the filter record every analytics procedure takes out. Twenty-odd platform
- * modules still read the hook, so the platform copy stays and this is the
- * family's own — narrowed by everything below.
- *
- * WHAT DID NOT TRAVEL, and it is deliberate: the saved-view fallback. The
- * platform hook, finding no filter in the address, read a view id and a cached
- * view out of `localStorage` and filtered by it. A governed screen may not
- * touch browser storage, and there is nothing for it to read anyway — the bar
- * that writes those keys is `DashboardPageBody`'s `SavedViewsBar`, application
- * chrome a screen served from `apps/ui` has nothing above it to supply. The
- * annotations family recorded the same loss on `/annotations/all`; here the
- * mode was not merely unreachable, it was unreachable AND unwritable.
+ * What the address says the charts are filtered to. Deliberately missing:
+ * the saved-view fallback — a governed screen can't touch browser storage,
+ * and has no `SavedViewsBar` chrome above it to read one from anyway.
  */
 
 import { availableFilters } from "./analytics-filter-catalogue.ts";

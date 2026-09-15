@@ -225,19 +225,11 @@ export const PromptTextAreaWithVariables = ({
   // always 0) on the legacy reservation.
   const bannerRef = useRef<HTMLDivElement>(null);
   const [bannerHeight, setBannerHeight] = useState(0);
-  // Keep the reserved padding in sync with the banner's real height. The
-  // banner grows taller both when the set of undefined names changes and on
-  // layout-only changes: the prompt panel is resizable, so the same names can
-  // wrap onto more lines as it narrows. A ResizeObserver catches every height
-  // change, including reflows that do not re-render this component, so the
-  // reserved padding never lags behind the banner and hides the last line.
-  //
-  // Re-attaching the observer is keyed on a primitive signature of the names,
-  // not the `invalidVariables` array identity: that array is rebuilt upstream
-  // on every render, so an array dependency re-ran this effect every render and
-  // the per-render setState churned the commit phase into React's nested-update
-  // limit ("Maximum update depth exceeded"). The equal-bail guard stops a
-  // same-height measurement from re-triggering the effect.
+  // Padding stays in sync with the banner's real height via a ResizeObserver
+  // (layout-only reflows change it too, not just content). Keyed on a
+  // primitive signature of the names, not `invalidVariables` array identity:
+  // that array is rebuilt every render, so an identity dependency re-ran this
+  // effect every render and hit React's nested-update limit.
   const invalidVariablesKey = invalidVariables.join("\n");
   useLayoutEffect(() => {
     const node = bannerRef.current;

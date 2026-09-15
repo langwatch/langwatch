@@ -1,11 +1,11 @@
 /**
  * @vitest-environment jsdom
- *
- * Both gates on the Custom query surface, and both are server answers: the
- * permission guard, and the deployment's provisioning. Neither can be turned on
- * from the browser, which is the point of the first scenario below.
- *
- * Spec: modules/analytics/specs/analytics-lwql-workbench.feature
+ */
+
+/**
+ * Both gates on the Custom query surface are server answers — the
+ * permission guard and the deployment's provisioning — neither can be
+ * turned on from the browser, which the first scenario below tests.
  */
 
 import { render, screen } from "@testing-library/react";
@@ -123,15 +123,9 @@ beforeEach(() => {
 });
 
 /**
- * Which refusal the page is showing, by CODE.
- *
- * `platform/app`'s version resolved the registry's words and compared those;
- * the registry is the application's and does not travel, so the assertion moves
- * to the property the page actually decides — WHICH payload it hands the alert.
- * The two refusals have different remedies (an administrator's switch versus a
- * deployment with nothing to run a statement as), and reading one as the other
- * is exactly what the scenario is about. Asserting on the code rather than the
- * sentence is also the house rule: the message is copy and will change.
+ * Which refusal the page is showing, by CODE — asserting on the message
+ * broke when the registry's words moved into the application, and the
+ * house rule holds anyway: the message is copy and will change.
  */
 function codeOf(payload: unknown): string {
   const handled = readHandledError(payload);

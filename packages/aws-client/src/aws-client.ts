@@ -307,15 +307,12 @@ function resolveCredentials(
 ): AwsClientConfig["credentials"] {
   const staticIdentity = staticCredentialsOrUndefined(staticCredentials);
   if (!assumeRole) return staticIdentity;
-  // The STS call is a second request to a second host, and it gets the same
-  // treatment as the first: through the proxy if there is one, and bounded.
-  // Without this the AssumeRole leg was the one unbounded request left, and it
-  // runs before every delivery on a cold client.
-  //
-  // The China partition serves STS under .amazonaws.com.cn, and this name is
-  // only ever handed to the proxy resolver: spelling it the other way would
-  // ask the bypass rules about a host that does not exist, and the STS leg
-  // would take the opposite proxy decision from the service leg.
+  // The STS call gets the same proxy/bound treatment as the first request —
+  // without this, AssumeRole was the one unbounded request left, run before
+  // every delivery on a cold client. The China partition's STS host
+  // (.amazonaws.com.cn) is spelled this way because it's what the proxy
+  // resolver needs; the other spelling would ask bypass rules about a host
+  // that doesn't exist and pick the wrong proxy decision.
   const stsHost = present(region)
     ? `sts.${region}.amazonaws.com${region.startsWith("cn-") ? ".cn" : ""}`
     : "sts.amazonaws.com";

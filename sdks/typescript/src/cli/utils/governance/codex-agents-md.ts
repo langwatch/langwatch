@@ -1,28 +1,10 @@
 /**
- * The LangWatch guidance block in codex's global `AGENTS.md`.
- *
- * Codex has no channel that injects always-loaded context into a session:
- * its notify program and hooks are fire-and-forget notifications whose
- * output never reaches the model, and the Agent Plugins 1.0 portable core
- * carries only skills (progressive disclosure, matched against the user's
- * request) and MCP servers. A standing "whenever YOU switch repository or
- * branch, declare it" rule needs to sit in front of the model in every
- * session, and the AGENTS.md hierarchy is the one channel codex loads that
- * way, with `$CODEX_HOME/AGENTS.md` as its global layer.
- *
- * RETIREMENT NOTE: the moment codex (or the Agent Plugins standard) ships an
- * always-loaded context channel a plugin can carry, this block should move
- * there and this writer should be retired. The guidance text itself already
- * lives in `session-guidance.ts`, shared with the claude plugin's
- * additionalContext hook, so only the delivery would change.
- *
- * The block is bracketed in HTML comment markers so nothing of ours renders
- * as markdown structure, and everything of the user's is byte-preserved:
- * install replaces exactly our region or appends after their content, and
- * removal deletes exactly our region. Same ownership doctrine as the shell
- * rc and codex config.toml marker blocks.
- *
- * Spec: specs/ai-governance/cli-wrappers/session-context-declare.feature
+ * The LangWatch guidance block in codex's global `AGENTS.md`. Codex has no
+ * always-loaded context channel — notify/hooks are fire-and-forget, and Agent
+ * Plugins 1.0 carries only skills and MCP servers — so this sits in the
+ * AGENTS.md hierarchy's global layer instead. Bracketed in HTML comment
+ * markers so nothing renders as markdown structure and install/removal
+ * touches exactly our region, byte-preserving everything else the user wrote.
  */
 
 import * as fs from "node:fs";

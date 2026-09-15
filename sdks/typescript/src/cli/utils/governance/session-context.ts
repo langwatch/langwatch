@@ -1,17 +1,8 @@
 /**
- * The pure session-context vocabulary: everything needed to turn a git
- * identity plus a session id into one OTLP log record, with no process,
- * filesystem or network access of its own. Two seams build the same record
- * from it: `langwatch ingest hook <tool>` (a hook payload plus a live `git`
- * run) and the codex rollout harvest (the identity codex wrote into its own
- * transcript).
- *
- * Kept separate from those seams so each piece is directly testable, the
- * remote-URL grammar in particular, which has to cope with every shape a
- * user's `origin` can take (scp-like ssh, ssh:// with a port, https with
- * credentials, nested GitLab groups, a `.git` suffix or none).
- *
- * Spec: specs/ai-governance/cli-wrappers/session-context-hook.feature
+ * The pure session-context vocabulary: turns a git identity plus a session id
+ * into one OTLP log record, with no process/filesystem/network access. Kept
+ * separate from its two callers (the hook and the codex harvest) so each
+ * piece is directly testable, especially the remote-URL grammar's many shapes.
  */
 
 /** The event every session-context record carries, on the record and as an attribute. */
@@ -144,13 +135,10 @@ const TRACEPARENT = /^00-([0-9a-f]{32})-([0-9a-f]{16})-/;
 const ALL_ZERO = /^0+$/;
 
 /**
- * Read `{host, owner, name}` out of an origin remote URL. Null when the URL
- * is empty, unparseable, or carries no owner/name pair, which the caller
- * treats the same way it treats a directory with no remote at all.
- *
- * Nested paths keep every segment but the last as the owner, so a GitLab
- * subgroup remote reports `group/subgroup` rather than losing the group it
- * lives under.
+ * Read `{host, owner, name}` out of an origin remote URL. Null when it is
+ * empty, unparseable, or carries no owner/name pair. Nested paths keep every
+ * segment but the last as the owner, so a GitLab subgroup remote reports
+ * `group/subgroup` rather than losing the group it lives under.
  */
 export function parseGitRemoteUrl(url: string): RepositoryIdentity | null {
   const trimmed = url.trim();
@@ -216,13 +204,9 @@ export function parseOtlpHeaders(raw: string | undefined): Record<string, string
 
 /**
  * The trace and span ids out of a W3C `traceparent`. Only version `00` is
- * accepted: a future version may lay its fields out differently, and a
- * misread id would attach the record to a trace that does not exist.
- *
- * All-zero ids are rejected for the same reason. They are the W3C spelling of
- * "there is no valid context here", and OTel SDKs emit that string verbatim
- * when asked to inject one, so honouring it would point the record at a trace
- * that was never created.
+ * accepted, since a future version may lay its fields out differently. All-
+ * zero ids are rejected too: OTel SDKs emit that as "no valid context here",
+ * and honouring it would point the record at a trace that was never created.
  */
 export function parseTraceparent(raw: string | undefined): TraceContext | null {
   const match = TRACEPARENT.exec(raw?.trim() ?? "");

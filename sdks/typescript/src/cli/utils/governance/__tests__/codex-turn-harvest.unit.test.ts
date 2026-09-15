@@ -1,12 +1,7 @@
 /**
- * Recovering a codex session's conversation from its rollout transcript and
- * emitting it onto the trace codex already reported tokens on.
- *
- * These exercise the real transcript shape codex 0.146 writes, captured from a
- * live session rather than invented, because the whole mechanism rests on two
- * fields codex is under no obligation to keep: `task_started.trace_id` (the
- * join key) and `agent_message.phase == "final_answer"` (the reply). A drift in
- * either is silent — content simply stops arriving — so it is pinned here.
+ * Recovering a codex session's conversation from its rollout transcript.
+ * Fixtures use the real shape codex 0.146 writes, captured live, because
+ * the mechanism rests on two fragile fields and a drift in either is silent.
  */
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";

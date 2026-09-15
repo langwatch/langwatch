@@ -1,13 +1,9 @@
 /**
  * The rules the suite editor and the run dialog apply to an evaluator
  * attachment: how one is built when an evaluator is picked, whether it can
- * gate a scenario, and which of its inputs still read nothing.
- *
- * Everything here is pure, so the chips, the editor and the run gate read
- * one answer for one attachment.
- *
+ * gate a scenario, and which of its inputs still read nothing. Everything
+ * here is pure, so the chips, the editor and the run gate read one answer.
  * @see specs/features/agent-testing/suite-editor.feature
- * @see specs/features/agent-testing/run-dialog.feature
  */
 
 import { nanoid } from "nanoid";

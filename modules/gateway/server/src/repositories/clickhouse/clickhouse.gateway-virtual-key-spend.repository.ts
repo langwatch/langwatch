@@ -1,6 +1,10 @@
 import { Temporal } from "@langwatch/time";
 /**
- * Per-virtual-key spend, read from the cost path rather than the budget ledger: the ledger holds rows only for keys with an applicable budget (one per budget), so reading it reports $0.00 for uncapped keys and multiplies spend for doubly-capped ones. trace_summaries carries per-trace cost + langwatch.virtual_key_id on every span, answering "what did this key cost" for every key — the same store the rest of the product bills from. Dedup: RMT keyed (TenantId, TraceId), collapsed with argMax(..., UpdatedAt) before summing, or an unmerged re-projection double-counts.
+ * Per-virtual-key spend, read from the cost path rather than the budget ledger: the ledger only
+ * holds rows for keys with an applicable budget, so it reports $0.00 for uncapped keys and
+ * double-counts doubly-capped ones. trace_summaries carries per-trace cost plus
+ * langwatch.virtual_key_id on every span — the same store the product bills from. Dedup: RMT
+ * keyed (TenantId, TraceId), collapsed with argMax(..., UpdatedAt) before summing.
  */
 import { createLogger } from "@langwatch/observability";
 
@@ -28,7 +32,11 @@ export class GatewayVirtualKeySpendRepository implements GatewayVirtualKeySpend 
   }
 
   /**
-   * Spend per key over a window, summed across the given project tenants (plural, because a key's traces land in whichever project resolved as its trace destination — for org/team-scoped keys that's the org's governance project, not whatever an admin is looking at; reading a single tenant is how those keys showed nothing). Keys with no traffic are absent from the result; callers render $0.00 for them.
+   * Spend per key over a window, summed across the given project tenants (plural, because a
+   * key's traces land in whichever project resolved as its trace destination — org/team-scoped
+   * keys land in the org's governance project, not whatever an admin is looking at; reading a
+   * single tenant is how those keys showed nothing). Keys with no traffic are absent from the
+   * result; callers render $0.00 for them.
    */
   async spendByVirtualKey(args: {
     tenantIds: string[];
@@ -108,7 +116,10 @@ export class GatewayVirtualKeySpendRepository implements GatewayVirtualKeySpend 
   }
 
   /**
-   * The Usage tab's slices (per key/model/day, totals, blocked count), aggregated in one grouped ClickHouse query over deduped traces so every slice stays consistent and bounded by keys x models x days, not by traffic — a busy project's 90-day window is millions of traces but only a page of buckets.
+   * The Usage tab's slices (per key/model/day, totals, blocked count), aggregated in one grouped
+   * ClickHouse query over deduped traces so every slice stays consistent and bounded by keys x
+   * models x days, not by traffic — a busy project's 90-day window is millions of traces but
+   * only a page of buckets.
    */
   async usageBuckets(args: {
     tenantIds: string[];
@@ -199,14 +210,18 @@ export class GatewayVirtualKeySpendRepository implements GatewayVirtualKeySpend 
   }
 
   /**
-   * Most recent gateway traces in the window, one row per trace, deduped, newest first. `limit` is required — this is the "recent debits" list, and an unbounded pull of raw traces is exactly what usageBuckets exists to avoid.
+   * Most recent gateway traces in the window, one row per trace, deduped, newest first. `limit`
+   * is required — this is the "recent debits" list, and an unbounded pull of raw traces is
+   * exactly what usageBuckets exists to avoid.
    */
   async gatewayTraces(args: {
     tenantIds: string[];
     window: GatewaySpendWindow;
     virtualKeyIds?: string[];
     /**
-     * Narrow to one model, named the way usageBuckets names it: the trace's first model, or "unknown" if none. Applied after dedup, on the winning version's array — a filter on raw rows would answer from whichever version happened to match.
+     * Narrow to one model, named the way usageBuckets names it: the trace's first model, or
+     * "unknown" if none. Applied after dedup, on the winning version's array — a filter on raw
+     * rows would answer from whichever version happened to match.
      */
     model?: string;
     limit: number;

@@ -252,17 +252,10 @@ export type ExperimentCreateResponse =
   paths["/api/v1/experiments"]["post"]["responses"]["200"]["content"]["application/json"];
 
 /**
- * `GET /api/v1/experiments/{slug}/workbench-state`,
- * `PUT /api/v1/experiments/{slug}/workbench-state`,
- * `GET /api/v1/experiments/{slug}/versions` and
- * `POST /api/v1/experiments/{slug}/versions/{version}/restore` are all
- * declared `withRawResponse` (`experiment-v3.rest.ts:589, 625, 667, 722`), so
- * none of their responses can come from the document. Restored from the last
- * document that had them (`openapi-document.json` at `0a0f549cfd^`).
- *
- * The read answers one of two documents, chosen by the `fields` query. The
- * full setup is the one carrying `state`, so that field is what splits the
- * union into the two shapes the overloads promise.
+ * These endpoints are all declared `withRawResponse`, so none of their
+ * responses come from the document — restored from the last document that
+ * had them. The read answers one of two shapes, chosen by the `fields` query:
+ * `state` is what splits the union the overloads promise.
  */
 export interface ExperimentWorkbenchStateResponse {
   id: string;

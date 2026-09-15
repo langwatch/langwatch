@@ -1,7 +1,7 @@
 /**
- * Seeds the evaluations workbench the prompt-optimization scenarios run against: a support-bot prompt, an inline
- * dataset, and (per variant) a mapped evaluator, all through the same REST surface any integration uses, so a
- * passing seed also proves the workbench-state endpoints work.
+ * Seeds the evaluations workbench the prompt-optimization scenarios run against: a support-bot
+ * prompt, an inline dataset, and (per variant) a mapped evaluator, all through the same REST
+ * surface any integration uses, so a passing seed also proves the workbench-state endpoints work.
  */
 
 import { PROJECT_ID } from "./config";

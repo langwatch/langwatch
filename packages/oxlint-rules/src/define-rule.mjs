@@ -58,15 +58,13 @@ function defaultsFor(options) {
 }
 
 /**
- * Builds the oxlint rule object from a declaration.
- *
- * `applies` gates the whole rule on the per-file classification, so a rule
- * that does not apply to a file costs one memo lookup rather than a visitor.
- *
+ * Builds an oxlint rule from a declaration. `applies` gates the whole rule on the per-file
+ * classification, so a rule that does not apply to a file costs one memo lookup rather than
+ * a visitor.
  * @param {object} declaration
  * @param {string} declaration.name
  * @param {"problem" | "style" | "layout"} [declaration.kind]
- * @param {"code" | "whitespace"} [declaration.fixable] Set when a message's `create` supplies a `fix()`.
+ * @param {"code" | "whitespace"} [declaration.fixable] Set when `create` supplies a fix().
  * @param {(file: import("./classify.mjs").FileClassification) => boolean} [declaration.applies]
  * @param {Record<string, MessageDefinition>} declaration.messages
  * @param {Record<string, OptionDefinition>} [declaration.options]

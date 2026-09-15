@@ -1,15 +1,10 @@
 /**
- * What the evaluator results of a run say, read three ways: one result on one
- * scenario run, the evaluator that failed a run, and one evaluator over every
- * scenario of a run.
- *
- * A pass or fail evaluator on one run reads Pass or Fail; over a run it reads
- * a pass rate. A score evaluator reads its number on one run and the mean
- * over a run. A run on which an evaluator had nothing to read is skipped, and
- * a skipped result counts in no rate and no mean.
- *
+ * What the evaluator results of a run say, read three ways: one result on
+ * one scenario run, the evaluator that failed a run, and one evaluator over
+ * every scenario. A pass/fail evaluator reads Pass/Fail on one run and a pass
+ * rate over a run; a score evaluator reads its number, then the mean. A run
+ * on which an evaluator had nothing to read is skipped, counting in neither.
  * @see specs/features/agent-testing/results-tabs.feature
- * @see specs/features/agent-testing/side-by-side-run-drawer.feature
  */
 
 import {

@@ -6,13 +6,9 @@ import {
 } from "@langwatch/identity-contract";
 
 /**
- * The `Identifier` row shape a stored fact is read back from.
- *
- * Structural rather than the generated model type, because it is also the
- * contract a test writes rows against: every column the fold writes and the
- * heads read, and no other. A column added to the model that nothing here
- * names is a column this mapping does not carry, which is exactly what the
- * type should say.
+ * The `Identifier` row shape a stored fact is read back from. Structural
+ * rather than the generated model type, since it is also the contract a
+ * test writes rows against: every column the fold writes and the heads read, and no other.
  */
 export interface IdentifierRow {
   id: string;
@@ -33,13 +29,9 @@ export interface IdentifierRow {
 }
 
 /**
- * The stored lifecycle state, or a throw.
- *
- * A state this build does not know is not a state to treat as detached: the
- * row was written by a build that knew it, and guessing would answer a
- * question about somebody's live sign-in with a value nobody wrote. The read
- * fork above catches it and falls back to the legacy column, which is the one
- * safe reading of "this projection says something I cannot parse".
+ * The stored lifecycle state, or a throw. A state this build does not know
+ * is not a state to treat as detached — guessing would answer a question
+ * about somebody's live sign-in with a value nobody wrote.
  */
 export function parseIdentifierLifecycleState(raw: string): IdentifierLifecycleState {
   const state = IDENTIFIER_LIFECYCLE_STATES.find((candidate) => candidate === raw);

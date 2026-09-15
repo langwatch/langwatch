@@ -1,6 +1,7 @@
 /**
- * What the results column reads while it has nothing to show: the read that failed, the read that is still going,
- * the window that holds no run, and the run the address names before its first scenario has reported.
+ * What the results column reads while it has nothing to show: the read that
+ * failed, the read that is still going, the window that holds no run, and
+ * the run the address names before its first scenario has reported.
  * @see specs/features/agent-testing/results-tabs.feature
  */
 

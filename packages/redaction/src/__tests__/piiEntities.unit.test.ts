@@ -9,16 +9,8 @@ import { REDACTION_MARKER_ENTITIES, SECRET_MARKER_ENTITY } from "../markers.ts";
 
 /**
  * Spec: modules/data-privacy/specs/span-pii-redaction.feature
- *
- * These are LITERAL pins, not reads of the application's source.
- *
- * Two graphs redact the same tenants' spans while the trace conversion is in
- * flight, and these lists decide what each of them looks for. Nothing in a
- * stored span records which identifiers were searched: a span scanned for
- * nineteen identifiers and a span scanned for eighteen are the same row, and
- * the missing one is personal data left in ClickHouse. A test that read the
- * application's file would agree with it by construction and would also die
- * the moment either file moves.
+ * These are LITERAL pins: reading the app's file would agree with it by
+ * construction, hiding a dropped identifier that leaves data undetected.
  */
 describe("given the identifiers the native engine covers", () => {
   /** @scenario "The two identifier lists say the same thing in both processes" */

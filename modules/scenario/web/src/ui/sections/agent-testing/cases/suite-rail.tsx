@@ -1,5 +1,5 @@
 /**
- * The rail on the left of the Scenarios tab: the test suites of the project, then the sets that run from code.
+ * The rail on the left of Scenarios: the project's suites, then the sets that run from code.
  * @see specs/features/agent-testing/suites-rail.feature
  * @see specs/suites/test-suites.feature
  */

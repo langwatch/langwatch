@@ -1,22 +1,10 @@
 /**
- * When is a daemon worth spawning?
- *
- * Spawning one on the very first daemon-less invocation is tempting and wrong.
- * A daemon only pays for itself across MANY calls, and a great deal of CLI usage
- * is a single one-off command — a human running `langwatch trace get …` once, or
- * a CI job that shells out to the CLI twice in a pipeline. Spawning for those
- * leaves a credential-holding process alive for the whole idle window in
- * exchange for nothing, and in CI (where every job may resolve a different
- * identity, and therefore a different daemon) it leaves a pile of them.
- *
- * So we spawn on evidence, not on hope: the daemon appears once an identity has
- * MISSED at least twice inside a short window — which is exactly what an agent
- * hammering the CLI looks like on its second call, and is exactly what a one-off
- * command never looks like.
- *
- * The bookkeeping is a tiny JSON file of recent miss timestamps, 0600, beside
- * the socket. Every failure here is swallowed: a hint we cannot read or write
- * costs a spawn, never a command.
+ * Spawning on the first invocation would leave a credential-holding process
+ * alive for nothing on one-off commands, and pile up per-identity in CI. So it
+ * spawns on evidence instead: once an identity has MISSED at least twice inside
+ * a short window, tracked in a tiny 0600 JSON file beside the socket. Every
+ * failure reading or writing that file is swallowed, costing a spawn, never a
+ * command.
  */
 
 import * as fs from "node:fs";

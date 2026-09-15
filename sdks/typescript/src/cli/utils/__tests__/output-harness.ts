@@ -1,15 +1,7 @@
 /**
- * The console/env capture the output tests share.
- *
- * The port and the format gate both answer through `console.log`,
- * `process.stderr` and `process.exit`, so asserting on either means capturing
- * all three. Both must also run with agent-mode detection OFF: Claude Code sets
- * `CLAUDECODE` unconditionally, so a suite that inherited the ambient
- * environment would assert against agent mode by accident and pass for the
- * wrong reason.
- *
- * Not named `*.test.ts` on purpose — vitest's `include` is `src/**\/*.test.ts`,
- * so this module is imported by the suites rather than collected as one.
+ * The console/env capture the output tests share, run with agent-mode
+ * detection OFF since Claude Code sets `CLAUDECODE` unconditionally. Not
+ * named `*.test.ts` on purpose — vitest's `include` would collect it as a suite.
  */
 import { beforeEach, afterEach, vi } from "vitest";
 import { AGENT_MODE_ENV_VARS } from "../output";

@@ -1,18 +1,7 @@
 /**
- * The window the charts are drawn over, and the render seam that memoises it.
- *
- * `model/analytics-period.ts` is pure and takes `now`. THAT IS WHY THIS FILE
- * EXISTS. A relative window ends at the instant it is read, so calling the
- * reader straight out of a render body hands back a new `endDate` every frame —
- * and every analytics read keys on `{ startDate, endDate }`, so the page would
- * refetch on every render, forever. The annotations family shipped exactly that
- * bug into a test worker that walked to a four-gigabyte ceiling with no failing
- * assertion; `use-analytics-period.unit.test.ts` pins the referential stability
- * so it cannot come back here.
- *
- * `now` is deliberately outside the memo's dependencies. A remount — a refresh,
- * a route change, a project switch — gets a fresh anchor for free, and nothing
- * else moves the window.
+ * The window the charts are drawn over, memoised: calling the pure
+ * `analytics-period` reader straight from render hands back a new `endDate`
+ * every frame and refetches forever (see use-analytics-period.unit.test.ts).
  */
 
 import { useCallback, useMemo } from "react";

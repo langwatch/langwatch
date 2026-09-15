@@ -1,23 +1,7 @@
 /**
- * The Vega view's whole life: created once, fed many times, always finalized.
- *
- * The distinction this hook exists to hold is between a specification change
- * and a data change. Rebuilding the view when only the rows moved would throw
- * away every scale, every transition, and every bit of interaction state on
- * each Reload — so new rows go into the *running* view through
- * `view.data(name, rows)`, and only a new specification, a new theme, or a new
- * colour mode causes a re-embed.
- *
- * Everything that can end a view ends it the same way, through `finalize()`:
- * unmount, a specification the policy refused, and a runtime failure. Vega
- * registers global listeners and timers of its own, so a view that is dropped
- * without being finalized is a leak that outlives the page it was on.
- *
- * This module is where `vega-embed` — and therefore the whole Vega runtime —
- * is imported. It is reached only from the lazily loaded chart component, which
- * is what keeps Vega out of every other route's bundle.
- *
- * @see modules/analytics/specs/analytics-lwql-workbench.feature
+ * Created once, fed many times, always finalized: a spec change re-embeds,
+ * a data change pushes rows into the running view (no Reload jank), and
+ * every exit path calls `finalize()` — a dropped view leaks Vega's global listeners.
  */
 
 import { type RefObject, useEffect, useRef, useState } from "react";
@@ -82,18 +66,9 @@ const EMBEDDING: LangWatchQLVegaViewState = {
 const READY: LangWatchQLVegaViewState = { status: "ready", failure: null };
 
 /**
- * The options the chart runtime is given. Exported because they are a contract
- * rather than a detail: `actions: false` is what keeps the export and
- * open-in-editor menu off a LangWatchQL chart, `ast: true` is what makes Vega
- * interpret expressions instead of compiling them with `new Function` (which a
- * Content-Security-Policy without `unsafe-eval` refuses), and `loader` is the
- * repository-owned loader that refuses every network and file read.
- *
- * `expr` is deliberately not set. `vega-embed@7` resolves the interpreter as
- * `vega.expressionInterpreter ?? opts.expr ?? <its own vega-interpreter>`, and
- * `vega@6` exports no `expressionInterpreter`, so `ast: true` already reaches
- * the interpreter vega-embed depends on directly. Passing our own would add a
- * second copy of it to the bundle to change nothing.
+ * `ast: true` makes Vega interpret expressions instead of compiling them with
+ * `new Function`, which a CSP without `unsafe-eval` refuses. `expr` is deliberately
+ * unset: `ast: true` already reaches its own interpreter, so passing one would duplicate it.
  */
 export function lwqlVegaEmbedOptions({
   themeConfig,

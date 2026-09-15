@@ -1,18 +1,8 @@
 /**
- * Wire protocol between the thin CLI client and the daemon.
- *
- * Framing: newline-delimited JSON. One JSON object per line, no embedded
- * newlines (JSON.stringify escapes them). Output chunks carry base64 so
- * arbitrary bytes survive the round trip — a command's stdout is not
- * guaranteed to be valid UTF-8, and splitting a multi-byte sequence across
- * two chunks would corrupt it if we shipped strings.
- *
- * One connection carries exactly one request. That keeps cancellation and
- * crash semantics trivial: the connection IS the request's lifetime.
- *
- * This module must stay dependency-free (node builtins only) — it is loaded
- * on the client's hot path, where every millisecond of module load is a
- * millisecond added to every CLI invocation.
+ * Wire protocol between the CLI client and the daemon: newline-delimited
+ * JSON, output chunks base64'd (stdout isn't guaranteed valid UTF-8). One
+ * connection carries exactly one request. Dependency-free (node builtins
+ * only) — it loads on the client's hot path, on every CLI invocation.
  */
 import { StringDecoder } from "node:string_decoder";
 
@@ -53,17 +43,9 @@ export interface ExecFrame {
   /** Chalk colour level the caller's process would have resolved (0-3). */
   colorLevel: number;
   /**
-   * The CALLER's `process.argv[1]` — the bin it was actually invoked as.
-   *
-   * The package ships two bin names for one file (`lw` and `langwatch`), and
-   * ONE daemon serves both: `resolveBuildId` stats the same symlink target
-   * either way, so whichever bin happened to spawn the daemon is the one whose
-   * `argv[1]` it holds forever. Without this field, `buildProgram()` titles
-   * usage and every commander error (the root sets `.showHelpAfterError()`)
-   * with the DAEMON's bin, so an `lw` caller is shown `Usage: langwatch …`.
-   *
-   * Optional so a client that predates the field still parses; `buildProgram`
-   * falls back to the serving process's own `argv[1]`, i.e. today's behaviour.
+   * The CALLER's `process.argv[1]` — the bin it was invoked as. Two bin names
+   * (`lw`, `langwatch`) share one daemon, so without this the daemon's own bin
+   * name leaks into usage/error text for the other caller. Optional field.
    */
   bin?: string;
 }
@@ -174,13 +156,9 @@ export function encodeFrame(frame: AnyFrame): string {
 export class FrameDecoder<T extends AnyFrame = AnyFrame> {
   private buffer = "";
   /**
-   * Decodes across chunk boundaries. A socket splits wherever it likes, so a
-   * multi-byte UTF-8 sequence routinely straddles two reads — and
-   * `chunk.toString("utf8")` per chunk resolves each half to U+FFFD, silently
-   * mangling the frame while still producing parseable JSON. StringDecoder
-   * holds the incomplete tail until the rest of the sequence arrives. (The
-   * header above already warned about this for the base64'd output path; the
-   * framing layer itself had the same bug.)
+   * A socket can split a multi-byte UTF-8 sequence across two reads;
+   * `chunk.toString("utf8")` per chunk would resolve each half to U+FFFD,
+   * silently mangling the frame. `StringDecoder` holds the incomplete tail.
    */
   private readonly utf8 = new StringDecoder("utf8");
 

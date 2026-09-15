@@ -1,23 +1,9 @@
 /**
- * The fake workbench tab's run path, exercised directly.
- *
- * No scenario, no judge, no user simulator, no Langy turn: this drives the same
- * object the live suite attaches to a conversation, so a failure here is the
- * harness or the run pipeline rather than the agent. Run it first, because it
- * validates the shared request builder and the results fold for the price of a
- * handful of model calls.
- *
- * What it pins is the scoped-comparison seeding rule: running one column of a
- * comparison, with the other column's cells already filled, must not make the
- * judge report "Waiting on <column>" over verdicts no one asked to re-run.
- * Both carrier shapes are covered, because both leave the same hole:
- *
- *   - a comparison COLUMN-TARGET run on its own, whose variants are two other
- *     columns;
- *   - a comparison CHIP over two columns, with one of those columns run alone.
- *
- * RUN (one file per vitest run, see README):
- *   cd platform/app/e2e/langy && npx vitest run workbench-fake-tab.harness.test.ts --reporter=verbose
+ * The fake workbench tab's run path, exercised directly — no scenario,
+ * judge, simulator, or Langy turn, so a failure here is the harness or run
+ * pipeline, not the agent. Pins the scoped-comparison seeding rule: running
+ * one column with the other already filled must not report "Waiting on
+ * <column>" over verdicts nobody asked to re-run (both carrier shapes).
  */
 
 import { describe, expect, it } from "vitest";

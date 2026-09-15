@@ -65,17 +65,10 @@ describe("<ChartErrorState />", () => {
 
   describe("when the failure is a handled error", () => {
     /**
-     * THE CODE SLUG IS THE ONE THING A PACKAGE CAN STILL PIN HERE.
-     *
-     * `platform/app`'s version asserted the registry's exact words for
-     * `query_timeout` — "This search took too long" and its remediation line.
-     * The code-keyed presentation registry is `platform/app`'s and does not
-     * travel, so the package alert says what the registry itself says for a
-     * code it does not list: the action that failed, then the generic line.
-     * That is a RECORDED LOSS of specific copy, not a change of contract, and
-     * the half that still matters is asserted — since #5984 the wire message IS
-     * the code, so a surface that printed the message would show a customer
-     * `query_timeout`. It must not, and this is what catches it.
+     * THE CODE SLUG IS THE ONE THING A PACKAGE CAN STILL PIN HERE — the
+     * presentation registry is `platform/app`'s and does not travel, so this
+     * asserts only the failed action, never the code slug (#5984: the wire
+     * message IS the code).
      */
     it("names the action that failed and never the code slug", () => {
       renderChartErrorState({ error: handledError("query_timeout") });

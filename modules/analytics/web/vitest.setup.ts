@@ -1,24 +1,7 @@
 /**
- * What every test in this package needs before it renders anything.
- *
- * The same shape `@langwatch/agent-web`, `@langwatch/gateway-web`,
- * `@langwatch/user-web`, `@langwatch/automation-web` and
- * `@langwatch/annotation-web` state for themselves,
- * for the same reasons. `@testing-library/jest-dom` registers the DOM matchers
- * the suites moved from `platform/app` were written against —
- * `toBeInTheDocument`, `toBeDisabled`, `toHaveTextContent` — which that
- * application registered in its own global setup, so the assertions travel
- * unchanged rather than being rewritten into `.textContent` comparisons.
- *
- * The rest are browser APIs jsdom does not ship and Chakra's overlays reach for
- * on the way to positioning themselves. A missing `ResizeObserver` surfaces as
- * an unhandled rejection out of an animation frame rather than as a failure, so
- * a shard fails with its own summary all green — which is why they are stated
- * here rather than patched inside a render helper that only some tests use.
- *
- * `matchMedia` earns its place twice over in this package: the Design System's
- * colour-mode hook reads it on first render, and every chart in here asks that
- * hook which palette it is drawing in.
+ * What every test needs before it renders: jest-dom matchers, plus
+ * jsdom-missing APIs (ResizeObserver, matchMedia) Chakra reaches for. Stated
+ * here, not per-test — a missing one fails a shard silently, summary all green.
  */
 
 import "@testing-library/jest-dom/vitest";

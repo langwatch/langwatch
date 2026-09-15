@@ -16,20 +16,9 @@ export class OnePasswordUnavailableError extends Error {
 }
 
 /**
- * Resolves secrets through the `op` CLI, in two modes.
- *
- * Reference mode: the value already in the environment is itself an
- * `op://vault/item/field` reference, and this source replaces it with what it
- * points at. The developer's `.env` stays the index of what exists.
- *
- * Profile mode: a key with no value at all is looked up at
- * `op://<LANGWATCH_SECRETS_VAULT>/langwatch-<LANGWATCH_SECRETS_PROFILE>/<KEY>`,
- * off entirely unless the vault is set. Keyed on an explicit profile rather
- * than the worktree name: a directory rename must not silently turn a secret
- * into an absent one.
- *
- * The CLI rather than the SDK: the SDK needs a service-account token, itself a
- * long-lived secret to store on a laptop, and cannot use biometric unlock.
+ * Resolves secrets via the `op` CLI: reference mode replaces an `op://...`
+ * value already present; profile mode looks up an unset key under an
+ * explicit profile (never the worktree name, so a rename can't drop a secret).
  */
 export class OnePasswordSecretSource extends SecretSource {
   static create({

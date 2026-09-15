@@ -1,12 +1,7 @@
 /**
  * @see ADR-072 (pull gates under the same plan flag as push)
- * Billing reconciliation REST on `/api/gateway/v1`: cursor-paged spend pull, its
- * rollup fast path, one end user's standing, and webhook replay — two views of
- * one ledger, one canonical envelope, behind an organization credential.
- *
- * The family addresses itself literally: `/api/gateway/v1` is shared with the
- * virtual-key surface rather than owned, so each route's own path is the whole
- * address and no wildcard is claimed over the prefix.
+ * Billing reconciliation REST on `/api/gateway/v1`, shared with the
+ * virtual-key surface — each route owns its whole path, no wildcard claimed.
  */
 import { defineRestMiddleware, defineRestRouter } from "@langwatch/api/rest";
 import {
@@ -108,15 +103,9 @@ export type GatewaySpendWebhookDelivery = {
 
 /**
  * The whole of what the four reconciliation routes ask the application for.
- *
- * The webhook half is still described structurally rather than by importing
- * the platform's own types, but NOT because this package may not depend on it:
- * `modules/webhook` is fully OSS and publishes `WebhookApi`, and the gateway
- * module declares it as a peer, so the members below are answered by
- * `GatewayApp` from that peer. Structural descriptions stay because they say
- * exactly what a route reads — an endpoint's id and its subscriptions, one
- * page of envelopes — and a route that named the whole platform API would
- * claim reach it does not use.
+ * The webhook half stays structural (not importing `WebhookApi`, though the
+ * peer permits it) so the type states exactly what a route reads, not the
+ * whole platform surface it does not use.
  */
 export type GatewaySpendApp = Readonly<{
   /**

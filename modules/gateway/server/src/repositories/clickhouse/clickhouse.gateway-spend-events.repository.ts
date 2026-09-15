@@ -1,6 +1,10 @@
 import { Temporal } from "@langwatch/time";
 /**
- * Gateway spend, the per-request billing record, projected from the gateway_spend_processing pipeline: one row per REQUEST at its latest lifecycle status, keyed (TenantId, GatewayRequestId) on a ReplacingMergeTree versioned by the fold's monotonic updatedAt — every read here is FINAL since RMT dedup is eventual. CostNanoUSD is the integer of record; costUsd is derived at the read boundary for response shape. See migration 00067_create_gateway_spend.sql.
+ * Gateway spend: the per-request billing record, projected from the gateway_spend_processing
+ * pipeline, one row per REQUEST at its latest lifecycle status, keyed (TenantId,
+ * GatewayRequestId) on a ReplacingMergeTree versioned by the fold's monotonic updatedAt — every
+ * read here is FINAL since RMT dedup is eventual. CostNanoUSD is the integer of record; costUsd
+ * is derived at the read boundary. See migration 00067_create_gateway_spend.sql.
  */
 
 import { createLogger } from "@langwatch/observability";
@@ -37,7 +41,9 @@ const spendCursors = GatewaySpendCursorAdapter.create();
 const TABLE = "gateway_spend" as const;
 
 /**
- * Deadline for one page of the rollup walk. Generous, since a closed-month reconciliation is expected to be slow and worth waiting for; finite, since the aggregation rebuilds per page and an unbounded one would hold a reader open indefinitely.
+ * Deadline for one page of the rollup walk. Generous, since a closed-month reconciliation is
+ * expected to be slow and worth waiting for; finite, since the aggregation rebuilds per page and
+ * an unbounded one would hold a reader open indefinitely.
  */
 const SUMMARIES_MAX_EXECUTION_SECONDS = 60;
 
@@ -70,7 +76,9 @@ export class GatewaySpendEventsRepository extends GatewaySpendEvents {
   }
 
   /**
-   * Fold-store writer: one ReplacingMergeTree version per apply-batch commit. Absolute state in, absolute row out; version is the fold's monotonic updatedAt, so a redelivered batch re-setting the same state replaces rather than duplicates.
+   * Fold-store writer: one ReplacingMergeTree version per apply-batch commit. Absolute state in,
+   * absolute row out; version is the fold's monotonic updatedAt, so a redelivered batch
+   * re-setting the same state replaces rather than duplicates.
    */
   async upsertFromFold(
     entries: Array<{
@@ -132,7 +140,9 @@ export class GatewaySpendEventsRepository extends GatewaySpendEvents {
   }
 
   /**
-   * Read-back for the fold store: latest committed state for one request, or null. Only rows stamped with the CURRENT projection version decode; an older stamp reports a miss so the projection refolds that aggregate from the log instead of trusting an undecodable shape.
+   * Read-back for the fold store: latest committed state for one request, or null. Only rows
+   * stamped with the CURRENT projection version decode; an older stamp reports a miss so the
+   * projection refolds that aggregate from the log instead of trusting an undecodable shape.
    */
   async tryReadForFold({
     tenantId,
@@ -294,7 +304,10 @@ export class GatewaySpendEventsRepository extends GatewaySpendEvents {
   }
 
   /**
-   * Org-wide cursor page for the reconciliation pull surface. Ordered ASCENDING by (EventTimestamp, GatewayRequestId) — EventTimestamp is the fold's replacement version, so late-restated rows sort after an in-flight cursor and are never skipped. from/to stay OccurredAt bounds (billing periods are request-time periods).
+   * Org-wide cursor page for the reconciliation pull surface. Ordered ASCENDING by
+   * (EventTimestamp, GatewayRequestId) — EventTimestamp is the fold's replacement version, so
+   * late-restated rows sort after an in-flight cursor and are never skipped. from/to stay
+   * OccurredAt bounds (billing periods are request-time periods).
    */
   async walkSpendEvents({
     tenantIds,
@@ -355,7 +368,12 @@ export class GatewaySpendEventsRepository extends GatewaySpendEvents {
   }
 
   /**
-   * Windowed end-user rollup: sums the integer nano column, deriving the USD string once. Reconciliation checksum fast path sums only priced outcomes (confirmed/failed); settled requests are counted SEPARATELY so unpriced spend stays visible rather than reading as zero, and admitted rows are excluded. Paged by GROUP KEY ascending, not cost descending — a cost ordering keeps moving as late folds land, so a key could cross the page boundary and be served twice or skipped; the group key is immutable, so this walk is exact.
+   * Windowed end-user rollup: sums the integer nano column, deriving the USD string once. The
+   * reconciliation checksum fast path sums only priced outcomes (confirmed/failed); settled
+   * requests are counted SEPARATELY so unpriced spend stays visible rather than reading as zero,
+   * and admitted rows are excluded. Paged by GROUP KEY ascending, not cost descending — a cost
+   * ordering keeps moving as late folds land, so a key could cross the page boundary and be
+   * served twice or skipped; the group key is immutable, so this walk is exact.
    */
   async readSpendSummaries({
     tenantIds,
@@ -590,7 +608,9 @@ export class GatewaySpendEventsRepository extends GatewaySpendEvents {
   }
 
   /**
-   * Cursor and filter predicates of a spend-events walk, as clause fragments already carrying their leading AND plus bound parameters. Each is optional; an absent filter contributes neither clause nor parameter, so the query never binds a placeholder it doesn't reference.
+   * Cursor and filter predicates of a spend-events walk, as clause fragments already carrying
+   * their leading AND plus bound parameters. Each is optional; an absent filter contributes
+   * neither clause nor parameter, so the query never binds a placeholder it doesn't reference.
    */
   private static spendEventsWalkFilter({
     decoded,
@@ -654,7 +674,11 @@ export class GatewaySpendEventsRepository extends GatewaySpendEvents {
   }
 
   /**
-   * Tuple comparison over the grouping expressions: the one predicate advancing a multi-dimension walk without serving a boundary group twice. A cursor whose arity mismatches the grouping names a different shape and is refused — dropping the predicate instead would silently reset to page one, letting a reconciliation fold the same groups twice. The REST boundary refuses this before the read, so reaching here is a caller bug.
+   * Tuple comparison over the grouping expressions: the one predicate advancing a multi-dimension
+   * walk without serving a boundary group twice. A cursor whose arity mismatches the grouping
+   * names a different shape and is refused — dropping the predicate instead would silently reset
+   * to page one, letting a reconciliation fold the same groups twice. The REST boundary refuses
+   * this before the read, so reaching here is a caller bug.
    */
   private static summariesWalkClause({
     cursor,
@@ -752,7 +776,12 @@ export class GatewaySpendEventsRepository extends GatewaySpendEvents {
   }
 
   /**
-   * Quantities a spend row carries, or null if it measured nothing. Non-token columns are read straight off the raw row, not through {@link mapSpendEventRow} (which shapes REST/UI responses) — the fold needs them regardless, since a late admission folding over a confirmed request rewrites the whole row, and a quantity that doesn't decode here zeroes on the next write. Any measured quantity counts as usage, not tokens alone (e.g. a character-priced call has zero tokens and 4000 characters).
+   * Quantities a spend row carries, or null if it measured nothing. Non-token columns are read
+   * straight off the raw row, not through {@link mapSpendEventRow} (which shapes REST/UI
+   * responses) — the fold needs them regardless, since a late admission folding over a confirmed
+   * request rewrites the whole row, and a quantity that doesn't decode here zeroes on the next
+   * write. Any measured quantity counts as usage, not tokens alone (e.g. a character-priced call
+   * has zero tokens and 4000 characters).
    */
   private static foldUsage(row: SpendEventRow, raw: Record<string, unknown>): SpendUsage | null {
     const quantity = (column: string): number => Number(raw[column] ?? 0);

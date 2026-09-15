@@ -1,24 +1,10 @@
 /**
- * `/api/internal/gateway` — the control plane between the two halves of one
- * deployment: the Go AI Gateway's calls back into the application. Contract:
- * specs/ai-gateway/_shared/contract.md §4.
- *
- * Every route answers behind {@link gatewayInternalSignature}, the family's own
- * HMAC gate: the data plane signs METHOD, PATH, TIMESTAMP and a hash of the
- * body, and the gate runs under the family's paths ahead of any route, so a
- * route whose author forgets a check still ships authenticated. The routes
- * declare `publicRoute` for that reason and no other — no credential the
- * framework resolves reaches them, and the reason says which gate does.
- *
- * The paths are literal and carry no `/api/v1` twin: the gateway dials these
- * exact addresses, and a control plane between two halves of one deployment has
- * no dated contract to negotiate. Every body below — the error envelope the Go
- * client already parses, the 304 carrying its ETag, the 204 that ends a long
- * poll — is that client's contract, so each route writes its own bytes and
- * nothing here may be re-rendered into the house envelope.
- *
- * Each capability is OPTIONAL on the App: an absent one refuses its own route
- * (503) rather than failing to mount, or worse, silently allowing.
+ * `/api/internal/gateway` — control plane between the two halves of one
+ * deployment. Contract: specs/ai-gateway/_shared/contract.md §4. Every route
+ * answers behind {@link gatewayInternalSignature}'s HMAC gate, so routes
+ * declare `publicRoute` on purpose — the gate authenticates, not the
+ * framework. Each capability is OPTIONAL: an absent one refuses its own
+ * route (503) rather than mounting silently.
  */
 import { publicRoute } from "@langwatch/api/access";
 import {
@@ -211,14 +197,12 @@ function logAuthDecision(
 }
 
 /**
- * This family's whole gate. It travels with the declaration rather than with
- * the process that mounts it: the HMAC, its headers and its ±300s replay window
- * are what a deployed Go gateway sends, and a published control plane cannot
- * change what it demands because its installer moved.
- *
- * Checks headers, then signature (constant-time), then timestamp, in that
- * order — HMAC first avoids a timing channel. An unset secret answers 500
- * rather than letting `undefined === undefined` admit everyone.
+ * This family's whole gate, travelling with the declaration rather than the
+ * process that mounts it, since a published control plane can't change what
+ * a deployed Go gateway demands. Checks headers, then signature
+ * (constant-time), then timestamp, in that order — HMAC first avoids a
+ * timing channel. An unset secret answers 500 rather than letting
+ * `undefined === undefined` admit everyone.
  */
 export function gatewayInternalSignature(secretOf: () => string | undefined): MiddlewareHandler {
   return async function verify(c: Context, next: Next) {

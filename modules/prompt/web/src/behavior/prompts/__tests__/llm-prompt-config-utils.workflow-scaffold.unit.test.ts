@@ -1,11 +1,7 @@
 /**
- * The workflow scaffold round-trip (Issue #3196): a signature node carrying the
- * registry's default system message must keep that message when it crosses the
- * bridge into the prompt editor's LocalPromptConfig. Losing it puts the user's
- * first Save back on the empty-system codepath.
- *
- * The shape below mirrors the scaffold the studio registry produces; the
- * registry itself is not imported, to keep this a unit test.
+ * The workflow scaffold round-trip (Issue #3196): a signature node's default
+ * system message must survive the bridge into LocalPromptConfig, or the
+ * user's first Save lands on the empty-system codepath.
  */
 import { describe, expect, it } from "vitest";
 import { nodeDataToLocalPromptConfig } from "../llm-prompt-config-utils.ts";

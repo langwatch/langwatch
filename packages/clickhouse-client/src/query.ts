@@ -40,14 +40,10 @@ export interface QueryRequest {
   /** Cooperative cancellation. Policies should stop retrying when aborted. */
   signal?: AbortSignalLike | undefined;
   /**
-   * Declares a statement that genuinely has no tenant predicate - DDL, a
-   * `system.*` read, a migration, a cross-tenant maintenance sweep.
-   *
-   * The tenant guard refuses anything untenanted unless this is set, and it is
-   * a written reason rather than a boolean on purpose: it has to be typed out
-   * by a person, it shows up in review as an added string, and it is recorded
-   * on the span so an audit can list every unscoped statement the system ran
-   * and why. A boolean would be set to `true` and forgotten.
+   * Declares a statement that genuinely has no tenant predicate - DDL, a `system.*` read, a
+   * migration, a cross-tenant sweep. A written reason, not a boolean, on purpose: it must be
+   * typed by a person and is recorded on the span, so an audit can list every unscoped statement
+   * and why — a boolean would just be set to `true` and forgotten.
    */
   unscoped?: { reason: string } | undefined;
 }

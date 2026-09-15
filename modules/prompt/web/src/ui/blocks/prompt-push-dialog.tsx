@@ -1,15 +1,9 @@
 /**
- * Pushing one prompt's latest version out to the replicas made from it.
- *
- * A family-local copy of `platform/app/src/components/ui/PushToCopiesDialog.tsx`
- * (two other callers, un-repointable), narrowed to prompts — the agents
- * family's `agent-push-dialog`, second use.
- *
- * WHAT DID NOT TRAVEL is the toast and `HandledErrorAlert`. The words a
- * customer reads for a failure come from the application's code-keyed
- * presentation registry, which a feature-web package may not reach; the caller
- * resolves the line through the host and hands it down as `errorMessage`, and
- * the success notice is the screen's to raise.
+ * Pushing one prompt's latest version out to the replicas made from it. A feature-local copy of
+ * the shared push dialog, narrowed to prompts. The toast and `HandledErrorAlert` don't travel
+ * here: the application's code-keyed error-presentation registry is unreachable from a
+ * feature-web package, so the caller resolves the line through the host and hands it down as
+ * `errorMessage`; the success notice is the screen's to raise.
  */
 
 import { Button, Text, VStack } from "@chakra-ui/react";

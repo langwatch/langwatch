@@ -2,15 +2,10 @@ import { chakra } from "@chakra-ui/react";
 import { LuSend, LuSquare } from "react-icons/lu";
 
 /**
- * The composer's one action: send, or stop the run that is already going.
- *
- * A run in flight takes the button rather than sitting beside it - there is no
- * queue, so "send" has nothing to mean while a reply is arriving, and the
- * playground had no way to stop a run at all: the handler existed and the
- * composer dropped it on the floor.
- *
- * Round and fixed-size, matching Langy's composer, so the two controls read as
- * the same thing in two places.
+ * The composer's one action: send, or stop the run that is already going. A run in flight
+ * takes the button rather than sitting beside it — there's no queue, so "send" has nothing to
+ * mean while a reply is arriving. Round and fixed-size, matching Langy's composer, so the two
+ * controls read as the same thing in two places.
  */
 export interface ChatSendButtonProps {
   /** A run is in flight: the button stops it instead of sending. */

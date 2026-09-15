@@ -176,13 +176,11 @@ export const DEFAULT_COALESCE_MAX_BYTES = 4 * 1024 * 1024;
 
 /**
  * The `__*` namespace is reserved for queue machinery. Routing fields
- * (`__pipelineName`, `__jobType`, `__jobName`) are caller-set operational
- * routing metadata, so those pass through. Everything else `__*` is
- * queue-internal (`__context`,
- * `__attempt`, `__groupId`, `__stagedJobId`, `__dispatchScore`), and any
- * user-provided `__custom` would silently collide on the GQ2 content hash and
- * clobber on decode (because the strip is allowlist-free; ADR-029). Reject at
- * the public send-boundary so the contract is loud rather than silent.
+ * (`__pipelineName`, `__jobType`, `__jobName`) are caller-set and pass
+ * through; everything else is queue-internal, and a user-provided `__custom`
+ * would silently collide on the GQ2 content hash and clobber on decode (the
+ * strip is allowlist-free; ADR-029). Reject at the send-boundary so the
+ * contract is loud rather than silent.
  */
 const CALLER_RESERVED_KEYS = new Set(["__pipelineName", "__jobType", "__jobName"]);
 
@@ -237,15 +235,12 @@ const dropReasonOf = (err: unknown): DecodeFailureReason | "unknown" =>
   err instanceof DecodeFailureError ? err.reason : "unknown";
 
 /**
- * Group Queue Processor that provides per-group FIFO with cross-group parallelism.
- *
- * Architecture:
- * - A Redis staging layer coordinates job storage, per-group FIFO, weighted round-robin,
- *   dedup, group blocking, heartbeats, and crash recovery via Lua scripts
- * - Jobs flow: send() → staging → dispatch → fastq → processWithRetries → completion callback → dispatch next
- * - Per-group sequential processing eliminates ordering errors and distributed lock contention
- * - Weighted round-robin (sqrt(pendingCount)) provides fair scheduling across groups
- * - fastq provides concurrency-limited async task execution with backpressure
+ * Group Queue Processor: per-group FIFO with cross-group parallelism. A
+ * Redis staging layer coordinates storage, per-group FIFO, weighted
+ * round-robin (sqrt(pendingCount)), dedup, group blocking, heartbeats and
+ * crash recovery via Lua scripts. Flow: send() → staging → dispatch → fastq
+ * → processWithRetries → completion → dispatch next. fastq gives
+ * concurrency-limited execution with backpressure.
  */
 export class GroupQueueProcessor<Payload extends Record<string, unknown>> {
   private readonly logger = createLogger("langwatch:group-queue");
@@ -296,24 +291,12 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>> {
 
   private shutdownRequested = false;
   /**
-   * Whether `send`/`sendBatch` may still stage work.
-   *
-   * NOT the same thing as `shutdownRequested`, and the difference is the whole
-   * point. Shutdown is requested at the START of close(), while the drain that
-   * follows is still running jobs — and those jobs store events and dispatch
-   * them onward, into this same queue, because the projection, subscriber, map
-   * and fold queues are all facades over it. Gating sends on
-   * `shutdownRequested` meant the queue refused the work its own drain was
-   * producing, and nothing above retried it: every rollout quietly dropped a
-   * burst of projection dispatches (prod, 2026-08-24).
-   *
-   * Accepting them is safe. `send` stages into Redis over `redisConnection`,
-   * which the drain leaves alone — only the blocking connection is closed here,
-   * and the shared connections go afterwards, in App.close. Staged work is
-   * durable and shared, so anything staged during a drain is picked up by
-   * another pod rather than lost with this one.
-   *
-   * So the gate closes when the drain is over, however it ended.
+   * Whether `send`/`sendBatch` may still stage work. NOT the same as
+   * `shutdownRequested`: shutdown fires at the start of close(), while the
+   * drain that follows still dispatches back into this same queue (other
+   * queues are facades over it), so gating on `shutdownRequested` would
+   * refuse the drain's own work. Staging uses a connection the drain leaves
+   * alone, and staged work is durable, picked up by another pod if needed.
    */
   private stagingClosed = false;
   /** Tracks in-flight jobs for active count metrics. */
@@ -331,14 +314,11 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>> {
   private livenessTimer: ReturnType<typeof setInterval> | undefined;
 
   /**
-   * Whether this worker's beacon is known to have reached Redis.
-   *
-   * The guard reads a missing beacon as a death, so a worker that stamps claim
-   * markers it cannot vouch for hands every peer a false death — the exact
-   * failure this design removes, re-entered through the beacon write instead of
-   * the release. While the beacon is unconfirmed the guard sits out entirely:
-   * a real death then goes uncounted, which is the cheap direction to be wrong
-   * in. Parking a healthy group is the expensive one.
+   * Whether this worker's beacon is known to have reached Redis. The guard
+   * reads a missing beacon as a death, so an unconfirmed beacon would hand
+   * every peer a false death; while unconfirmed the guard sits out entirely.
+   * A real death then goes briefly uncounted — the cheap direction to be
+   * wrong in, versus parking a healthy group.
    */
   private beaconLive = false;
 
@@ -525,17 +505,12 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>> {
   }
 
   /**
-   * Resolves a ready score and reports what it had to refuse.
-   *
-   * Every path that writes a ready score goes through here, so the counter is
-   * raised at the one moment the information exists. Counting it later, by
-   * scanning the ready set for out-of-range scores, cannot work: by then the
-   * bad value has already been replaced by this function and the scan finds
-   * nothing while the broken producer carries on.
-   *
-   * `delay` is deliberately NOT part of this. Deferral is a queue decision
-   * added to the resolved score by the caller; only the producer's own claim
-   * about when the work occurred is judged here.
+   * Resolves a ready score and reports what it had to refuse. Every path that
+   * writes a ready score goes through here, so the counter fires at the one
+   * moment the information exists — scanning the ready set for out-of-range
+   * scores later can't work, since by then the bad value has been replaced.
+   * `delay` is deliberately excluded: it's a queue decision added by the
+   * caller, not part of the producer's own claim being judged here.
    */
   private resolveScore(rawScore: unknown, nowMs: number = nowInstant().epochMilliseconds): number {
     const { score, isRejected } = resolveReadyScore({
@@ -549,30 +524,11 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>> {
   }
 
   /**
-   * Ready score for a job the queue is putting BACK - an exhausted retry, a
-   * poison park, a drained sibling after a failed batch.
-   *
-   * Only the absolute check applies, not the two-sided one. The score was
-   * already judged against the producer's clock when the job was first staged,
-   * and re-judging it against a later clock would rewrite a legitimately old
-   * job (a long retry chain, a batch exported a day late) for no reason. What
-   * is still worth catching is a value that is not a timestamp at all, i.e. a
-   * row staged before this guard existed.
-   *
-   * All three re-stage paths share this so they cannot disagree. They used to:
-   * the exhausted-retry path re-scored an unusable value while drained siblings
-   * kept theirs verbatim, so one failure could move the failed job to now and
-   * leave its siblings at 0 - and on unblock the siblings dispatched ahead of
-   * the job they were drained behind.
-   *
-   * Deliberately does NOT raise `gq_ready_score_implausible_total`, which
-   * counts producers, not us. `originalScore` is always a value this queue
-   * wrote and then read back out of Redis, and staging already required it to
-   * clear MIN_PLAUSIBLE_EPOCH_MS - an ABSOLUTE floor, so a score that cleared
-   * it once clears it for ever. This check can therefore only ever fire for a
-   * row staged before the guard existed, or one corrupted in Redis. Neither is
-   * a broken score function, and counting them here would dilute the one
-   * signal that is with our own bookkeeping.
+   * Ready score for a job being put BACK. Only the absolute floor applies
+   * here: re-judging against a later clock would wrongly reject a
+   * legitimately old job. Doesn't raise `gq_ready_score_implausible_total` —
+   * that counts producers, and `originalScore` already cleared the floor once
+   * when staged, so firing here means a pre-guard row or Redis corruption.
    */
   private restageScore(originalScore: unknown): number {
     return isPlausibleReadyScore(originalScore) ? originalScore : fallbackReadyScore();
@@ -883,22 +839,12 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>> {
   }
 
   /**
-   * fastq worker function: poison guard, then the real job processing.
-   *
-   * The guard stamps this worker's identity onto the group's claim BEFORE any
-   * decode/parse work, and releases it on every path where the process survives
-   * (the finally below — success, retry, exhausted-park, drop-to-replay and
-   * graceful drain all pass through it). A job that seizes the event loop never
-   * reaches the finally: the liveness probe kills the process, its beacon stops,
-   * and the next worker to claim the group finds a marker whose owner is
-   * provably gone. Enough confirmed deaths and the claim parks the group instead
-   * of re-running the killer (specs/poison-group-park-guard.feature).
-   *
-   * Nothing here has to special-case shutdown. A claim held by a process that
-   * exits gracefully resolves through that process's retirement tombstone, and
-   * a release that never reaches Redis resolves through its still-live beacon —
-   * so neither needs the strike to be withheld, swept, or re-checked the way the
-   * count-and-subtract guard did.
+   * fastq worker function: poison guard, then the real job processing. The
+   * guard stamps this worker's identity onto the group's claim before any
+   * decode/parse work, releasing it on every path where the process
+   * survives. A job that seizes the event loop never reaches the release:
+   * the liveness probe kills the process, and the next claimant finds a
+   * marker whose owner is provably gone (specs/poison-group-park-guard.feature).
    */
   private async processWithRetries(dispatched: DispatchResult): Promise<void> {
     const { stagedJobId, groupId, jobDataJson, originalScore } = dispatched;
@@ -1045,16 +991,14 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>> {
     };
     const payload = this.stripInternalFields(jobData);
 
-    // Opt-in batch coalescing: if this job type supports it, drain additional
-    // already-staged DUE jobs from the same group and fold them alongside the
-    // dispatched one in a single handler call. The group's active key (held by
-    // this job) guarantees no other worker dequeues from the group meanwhile,
-    // so the drain is exclusive. Drained siblings are re-staged on failure so
-    // they are not lost. When disabled (maxBatch <= 1) this is a no-op and the
-    // per-job path below is unchanged.
-    // A preflight scope must propagate through every individual causal chain.
-    // Coalescing jobs from two concurrent scopes would retain only the first
-    // delivery's context and let the other preflight miss downstream fan-out.
+    // Opt-in batch coalescing: drains additional already-staged DUE jobs from
+    // the same group and folds them alongside the dispatched one in one
+    // handler call. The group's active key makes the drain exclusive; drained
+    // siblings are re-staged on failure. Disabled (maxBatch <= 1), it's a no-op.
+    //
+    // A preflight scope must propagate through every causal chain: coalescing
+    // jobs from two concurrent scopes would retain only the first delivery's
+    // context and let the other preflight miss downstream fan-out.
     const maxBatch = contextMetadata?.queueDispatchScopeKey
       ? 1
       : (this.coalesceMaxBatch?.(payload) ?? 1);
@@ -1064,15 +1008,11 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>> {
     let batchJobIds: string[] = [];
     let drainedSiblings: DrainedJob[] = [];
     if (maxBatch > 1 && this.processBatch) {
-      // Byte bound (ADR-066 pillar 2): the drain also stops before a job that
-      // would push the batch past maxBytes, counting the dispatched job's own
-      // payload size as the starting point. Whichever of the count/byte bound
-      // binds first wins; an oversized dispatched job (initialBytes already at
-      // or over the budget) drains no siblings and processes on its own.
-      //
-      // Payload size, not `jobDataJson.length`: an offloaded body leaves a small
-      // reference in the stored value, so measuring the value would let 256
-      // megabyte-sized records through a 4 MiB budget untouched.
+      // Byte bound (ADR-066 pillar 2): the drain stops before a job that would
+      // push the batch past maxBytes, counting the dispatched job's own
+      // payload size as the start. Measures payload size, not
+      // `jobDataJson.length` — an offloaded body leaves a small reference in
+      // the stored value, which would let oversized records through untouched.
       const maxBytes = this.coalesceMaxBytes?.(payload) ?? DEFAULT_COALESCE_MAX_BYTES;
       const initialBytes = readJobPayloadBytes(jobDataJson);
       try {
@@ -1094,19 +1034,13 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>> {
         );
         drainedSiblings = [];
       }
-      // Mixed-command groups (ADR-066 pillar 2): with `serializeByAggregate` the
-      // group key namespace is shared across command types, so a drained sibling
-      // can belong to a DIFFERENT job than the dispatched one. Fold/map groups
-      // are single-`__jobName` by construction, so for them this is a no-op. Only
-      // coalesce siblings whose `__jobName` matches the dispatched job's; restage
-      // the rest untouched (via the same path a failed batch uses) so they run as
-      // their own dispatches — a payload is never handed to another job's handler.
-      //
-      // Read the dispatched job's name the SAME way as each sibling
-      // (`readJobRoutingMeta`, null when absent), so a queue that sets no
-      // `__jobName` at all (every job null) still matches and coalesces — rather
-      // than the `jobName` local, which defaults absent to "unknown" and would
-      // mismatch a sibling's null.
+      // Mixed-command groups (ADR-066 pillar 2): with `serializeByAggregate` a
+      // drained sibling can belong to a different job than the dispatched one.
+      // Only coalesce siblings whose `__jobName` matches; restage the rest so
+      // they run as their own dispatches. Read both names via
+      // `readJobRoutingMeta` (null when absent) rather than the `jobName`
+      // local, which defaults to "unknown" and would wrongly mismatch a
+      // sibling's null.
       if (drainedSiblings.length > 0) {
         const dispatchedJobName = readJobRoutingMeta(jobDataJson).jobName;
         const matchingSiblings: DrainedJob[] = [];
@@ -1392,15 +1326,14 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>> {
                 await this.restageDrainedSiblings(groupId, drainedSiblings);
               }
 
-              // Group-quarantine circuit breaker (prod incident 2026-07-20). A
-              // producer that mints fresh jobs for ONE group faster than they
-              // drain never trips the per-JOB `maxAttempts` cap — every failure
-              // is a new attempt-1 job — so the group churns indefinitely and can
-              // starve the shared queue. Count consecutive retryable failures
-              // across the group's jobs (cleared on any success); once the streak
-              // crosses the threshold, route this job through the SAME
-              // exhausted-retry path that blocks the group, so it stops
-              // dispatching and an operator can inspect + drain it.
+              // Group-quarantine circuit breaker: a producer that mints fresh
+              // jobs for one group faster than they drain never trips the
+              // per-job `maxAttempts` cap (every failure is a new attempt-1
+              // job), so the group could churn forever and starve the shared
+              // queue. Count consecutive retryable failures across the group
+              // (cleared on success); past the threshold, route through the
+              // same exhausted-retry path that blocks the group, so an
+              // operator can inspect and drain it.
               let quarantined = false;
               let quarantineError: Error | undefined;
               if (isRetryable && this.quarantineFailStreakThreshold > 0) {
@@ -1508,27 +1441,13 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>> {
                 }
 
                 // STOP THE HEARTBEAT BEFORE THE RE-STAGE IS ISSUED, not after
-                // it returns (ADR-080).
-                //
-                // The re-stage sets the active key's TTL to the backoff window;
-                // a heartbeat REFRESH sets it to the full activeTtlSec and
-                // pushes the group's ready score out to match, which would
-                // stretch a sub-second backoff into a multi-minute stall.
-                //
-                // Two things close that window, and BOTH are needed:
-                //
-                //  - Ordering. A tick issues its EVALSHA synchronously, so any
-                //    beat already in flight was sent AHEAD of the re-stage on
-                //    the same connection and is served before it — its TTL is
-                //    then overwritten by the re-stage's.
-                //  - Cancellation. `runCancellable` withdraws the NOSCRIPT
-                //    fallback, which is the one hop that is issued AFTER an
-                //    await and could otherwise land behind the re-stage on a
-                //    cold script cache. Ordering alone does not cover it.
-                //
-                // This used to be handled by the id: the re-stage rotated the
-                // active key to a NEW id, so a late beat naming the old one no
-                // longer matched. With the id reused that guard is gone.
+                // (ADR-080): a heartbeat refresh would overwrite the re-stage's
+                // backoff TTL and stretch a sub-second backoff into a
+                // multi-minute stall. Two things close that window, and BOTH
+                // are needed: ordering (a tick's synchronous EVALSHA is served
+                // before the re-stage), and cancellation (`runCancellable`
+                // withdraws the NOSCRIPT fallback, the one hop issued after an
+                // await that could land behind the re-stage on a cold cache).
                 stopHeartbeat();
                 const restaged = await this.scripts.retryRestage({
                   groupId,
@@ -1546,19 +1465,15 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>> {
                   attempt: attempt + 1,
                   attemptTtlSec: GROUP_ATTEMPT_TTL_SECONDS,
                 });
-                // Only transfer once the replacement is actually staged.
-                // retryRestage returns false when the active key is stale —
-                // another worker owns this slot now — and nothing was written.
-                // Transferring anyway would take a lease for a value no staged
-                // job references (a phantom holding its blob for the full lease
-                // window) AND release the old one, dropping the live owner's
-                // protection. The publication and the transfer are still two
-                // round trips, so a crash between them leaves the replacement
-                // leaseless; that is survivable because the retry re-encodes to
-                // the SAME content hash, so the not-yet-released old lease keeps
-                // the blob alive until decode renews. Folding the transfer into
-                // the staging Lua is the real fix — tracked separately, it needs
-                // the blocked-restage path too.
+                // Only transfer once the replacement is staged: retryRestage
+                // returns false when the active key is stale (another worker
+                // owns the slot) and nothing was written, so transferring
+                // anyway would take a lease for an unreferenced value while
+                // releasing the live owner's protection. A crash between
+                // publish and transfer leaves the replacement leaseless, but
+                // that's survivable since the retry re-encodes to the SAME
+                // content hash, so the old lease keeps the blob alive until
+                // decode renews.
                 if (restaged) {
                   // For GQ2 the retry re-encodes to the SAME content hash, so one
                   // deadline replaces another in the lease set (the blob stays);

@@ -1,25 +1,8 @@
 /**
- * A sentence for a failure the API named but did not write prose for.
- *
- * The REST error envelope sends `message` equal to `code` on purpose: a
- * handled error's message is server copy, and the framework will not forward
- * it to an external caller. That leaves the code as the only thing describing
- * what happened, and printing it verbatim gives the user a line like
- * "Failed to fetch the organization: enterprise_plan_required".
- *
- * So the client renders its own copy, keyed on the code, the same way the web
- * app does. Two layers, in order:
- *
- *   1. `SENTENCE_BY_CODE`, for codes whose slug reads wrong on its own or
- *      leaves out the one fact the reader needs.
- *   2. Otherwise the slug, humanized. `organization_slug_taken` becomes
- *      "Organization slug taken", which is plain and never misleading, so an
- *      unlisted code degrades into something readable rather than into
- *      punctuation.
- *
- * What to DO about a failure lives in the CLI's `errorSuggestions.ts`; this is
- * only what happened. Keys are exact codes, never prefixes: a new code that
- * lands nowhere gets humanized, not filed under a neighbour.
+ * A sentence for a failure the API named but did not write prose for: the
+ * REST envelope sends `message` equal to `code`, so this renders the reader's
+ * copy keyed on `code` — `SENTENCE_BY_CODE` overrides, else the humanized
+ * slug. Keys are exact codes, never prefixes.
  */
 
 const SENTENCE_BY_CODE: Record<string, string> = {

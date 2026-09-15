@@ -1,12 +1,8 @@
 /**
- * Which ingest endpoints send the key in the clear.
- *
- * The distinction the warning rests on is loopback against everything else, so
- * the spellings of loopback are what this pins: the ones a person types, the
- * `.localhost` names the local dev proxy hands out, and the IPv4-mapped IPv6
- * form `new URL()` normalises a bracketed loopback address into.
- *
- * Feature: specs/ai-governance/cli-wrappers/instrument-command.feature
+ * Which ingest endpoints send the key in the clear. The warning's distinction is loopback
+ * against everything else, so this pins the spellings of loopback: what a person types, the
+ * `.localhost` names the dev proxy hands out, and the IPv4-mapped IPv6 form `new URL()`
+ * normalises a bracketed loopback address into. Feature: cli-wrappers/instrument-command.feature
  */
 
 import { describe, expect, it } from "vitest";

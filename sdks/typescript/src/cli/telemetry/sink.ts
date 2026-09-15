@@ -1,26 +1,9 @@
 /**
- * Where a live CLI event actually goes.
- *
- * The valuable, hard-won part of this feature is knowing WHERE in a command to
- * emit and WHAT to say — the call sites and the vocabulary. The wire is an
- * implementation detail, and it is the part most likely to change, so it sits
- * behind this interface and nothing upstream of it knows which one is in use.
- *
- * Two sinks exist today:
- *
- *   - IPC (`LANGWATCH_EVENTS_SOCKET`) — newline-delimited JSON straight down a
- *     unix socket the host is already listening on. Costs nothing to load (node
- *     builtins only), delivers in microseconds, and needs no collector. When the
- *     host hands us a socket it is saying "I am listening", so its presence IS
- *     the enablement — no flag required.
- *
- *   - OTLP logs (`LANGWATCH_OTEL_EVENTS` + an OTLP endpoint) — the standard,
- *     collector-shaped path. Works across a process/container boundary the socket
- *     cannot cross, and lands in the ingestion the platform already runs. Pays a
- *     ~60ms SDK load, which is why it is deferred behind the gate.
- *
- * IPC wins when both are configured: it is strictly cheaper and strictly faster,
- * and if the host is listening on a socket it is the host that wants the events.
+ * Where a live CLI event actually goes, kept behind an interface since the
+ * wire is the part most likely to change. Two sinks: IPC (cheap, no SDK,
+ * enabled just by the host handing us a socket) and OTLP logs (crosses a
+ * process boundary, pays a ~60ms SDK load). IPC wins when both are
+ * configured — strictly cheaper and faster, and the listening host wants it.
  */
 
 import net from "node:net";

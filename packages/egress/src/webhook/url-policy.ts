@@ -8,43 +8,12 @@ import {
 } from "../ssrf/url-validator.ts";
 
 /**
- * The one admission policy for a customer-supplied webhook destination, shared
- * by the automations channel and the webhook endpoints platform.
- *
- * The two channels used to admit different URLs. Automations refused anything
- * that was not https on the default port with no credentials, and blocked
- * private addresses unconditionally; the platform only asked for https. Same
- * threat, same senders, two answers — so a URL the trigger drawer rejected was
- * accepted as an endpoint, and `https://internal:6379` was a live port probe on
- * one channel and a rejected one on the other.
- *
- * This module is the UNION of the two, so the answer is the stricter one
- * everywhere:
- *
- *   - https only, on the default port, with a real host
- *   - no credentials in the URL, ever
- *   - private / loopback / link-local destinations blocked, regardless of any
- *     deployment-wide local-address toggle: a customer-supplied URL fired from
- *     our workers must never reach `10.x` or `localhost`, even where an
- *     operator relaxed that toggle for their own internal integrations
- *
- * `allowInsecureLocal` is the single escape hatch, for local development and
- * self-hosted installs whose receivers live on internal hosts. It relaxes the
- * origin (scheme and port) and the local-address block; it relaxes nothing else
- * — no redirects, no size or timeout budget, and no credentials.
- *
- * THE implementation, since 2026-09-02: the platform copy it was frozen
- * against was deleted with the webhook lane. The shape
- * half is not re-implemented but IMPORTED from `@langwatch/automation-contract`,
- * the same `findWebhookUrlProblem` the authoring drawer validates with: a
- * second copy of these rules is exactly how a URL comes to be accepted by the
- * form and refused by the sender.
- *
- * WHAT DID NOT COME ACROSS: the application reads its escape hatch from
- * `WEBHOOKS_UNSAFE_ALLOW_LOCAL_URLS === "1"` at call time. A package reads no
- * environment, so the hatch is a parameter and the caller states it. The
- * automations channel never passes it — only the endpoints platform does, which
- * is why the graph-alert transport is always strict.
+ * The one admission policy for a customer-supplied webhook destination,
+ * shared by automations and the endpoints platform: https-only on the
+ * default port, no credentials ever, and private/loopback/link-local hosts
+ * blocked regardless of any local-address toggle. `allowInsecureLocal` is the
+ * one escape hatch (local dev / self-hosted): it relaxes only origin and the
+ * local-address block — never redirects, size, timeout, or credentials.
  */
 
 const strictValidator = createSsrfUrlValidator({ blockLocal: true, allowedHosts: [] });
@@ -75,14 +44,9 @@ export function inspectWebhookUrl({
 }
 
 /**
- * If the URL's host is an IP literal that is private / loopback / link-local,
- * return it (brackets stripped); else null.
- *
- * `new URL(...).hostname` keeps IPv6 in brackets, which `isIP` rejects — so a
- * bracketed `[::1]` would otherwise slip past the validator's IP-literal check
- * and fail as an unresolvable hostname (a RETRYABLE error) rather than the
- * terminal block it is. This closes that gap at the webhook layer without
- * forking the address classifier.
+ * If the URL's host is an IP literal that is private/loopback/link-local,
+ * return it unbracketed; else null. `isIP` rejects bracketed IPv6, so without
+ * stripping, a private `[::1]` would wrongly fail as RETRYABLE instead of this terminal block.
  */
 function privateIpLiteral(url: string): string | null {
   let host: string;

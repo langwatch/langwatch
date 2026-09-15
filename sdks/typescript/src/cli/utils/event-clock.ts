@@ -1,15 +1,8 @@
 /**
- * Timestamps for the chronological listings the CLI prints one line at a time:
- * `sessions events` and `traces transcript`.
- *
- * Local time, because the reader compares these stamps against their own shell
- * history and their own memory of when something happened. A UTC clock with no
- * marker on it reads as their wall clock, silently shifted by their offset.
- *
- * The date is not on every line, which would be noise on a listing where nearly
- * every entry shares one. A listing prints it once at the top and again
- * whenever the local day rolls over, so two stamps either side of midnight are
- * still told apart.
+ * Timestamps for CLI listings (`sessions events`, `traces transcript`), in
+ * the reader's local time — a bare UTC stamp would silently read as their own
+ * wall clock. The date prints once at the top and again on each local-day
+ * rollover, not on every line, since most entries share one.
  */
 
 const pad = (value: number): string => String(value).padStart(2, "0");

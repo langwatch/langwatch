@@ -1,13 +1,7 @@
 /**
- * What happens to the execution window when a command is abandoned.
- *
- * The caller of a hung or cancelled command is settled AT ONCE (124/130) — a
- * timeout or a Ctrl-C must never make anybody wait. The window, though, stays
- * held until the abandoned work actually settles: node cannot unwind its
- * promise chain, so it is still running, and the next request's `applyWindow`
- * would chdir and rewrite `process.env` underneath it. A command that never
- * settles at all is bounded by the abandon grace, after which the daemon stops
- * being a daemon rather than corrupt anybody.
+ * The caller of a hung/cancelled command settles AT ONCE (124/130), but the window
+ * stays held until the abandoned work actually settles — node can't unwind its
+ * promise chain, so `applyWindow` on the next request would rewrite `process.env` from under it.
  */
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import * as fs from "node:fs";
@@ -299,20 +293,11 @@ describe("createCommandExecutor", () => {
 
   describe("when the cancel lands between admission and taking the window", () => {
     it("hands the window straight back instead of holding it forever", async () => {
-      // The narrowest interleaving there is: `drain()` has already resolved this
-      // request's acquire — so ExecutionWindow's abort listener sees an admitted
-      // waiter and does nothing — but the continuation that assigns
-      // `releaseWindow` has not run yet, so `armAbandonGrace` has nothing to arm.
-      //
-      // A window is genuinely held at that instant with no grace timer bounding
-      // it. If the continuation did not re-check `cancelled` and release, the
-      // daemon would sit at inflight 1 forever: the work never starts, so
-      // nothing ever settles, so `releaseOnce` never runs — and the idle timer
-      // cannot fire either, because a request is in flight. That is exactly the
-      // state `exitWhenWedged` exists to prevent, and it would be unreachable.
-      //
-      // A stub window is the only way to hold the resolution open across the
-      // single microtask that separates the two.
+      // The narrowest interleaving: `drain()` resolves the acquire before
+      // `releaseWindow` is assigned, so the window is held with no grace timer
+      // bounding it. Without a `cancelled` re-check on release, the daemon would
+      // wedge forever — nothing settles, the idle timer can't fire — exactly what
+      // `exitWhenWedged` exists to prevent.
       mockedBuildProgram.mockReturnValue(hungProgram());
 
       let admit!: (release: () => void) => void;

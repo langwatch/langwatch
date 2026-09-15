@@ -10,10 +10,7 @@ import { useDraggableTabsBrowserStore } from "../../../../behavior/use-prompt-ta
 import { PublishedPromptContent } from "./published-prompt-content.tsx";
 import { Sidebar, SidebarEmptyState } from "../studio-internals.ts";
 
-/**
- * Displays a list of published prompts grouped by folder.
- * Single Responsibility: Renders published prompts organized by folder with click-to-open functionality.
- */
+/** Displays a list of published prompts grouped by folder. */
 export function PublishedPromptsList() {
   const { data, isLoading } = useAllPromptsForProject();
   // Selecting the member itself. A selector that builds an object returns a

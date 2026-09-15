@@ -381,7 +381,7 @@ describe("span.ts", () => {
       expect(result).toBe(langwatchSpan);
 
       // Verify all methods were called
-      expect(mockSpan.setAttribute).toHaveBeenCalledTimes(7); // type, request/response models, input, output, metrics, rag
+      expect(mockSpan.setAttribute).toHaveBeenCalledTimes(7); // type, models, io, metrics, rag
       expect(mockSpan.addEvent).toHaveBeenCalledTimes(1); // hehe
     });
   });

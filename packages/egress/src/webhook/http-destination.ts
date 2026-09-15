@@ -3,26 +3,9 @@ import { fetchValidatedDestination, type EgressTlsPolicy } from "../ssrf/fenced-
 import type { SsrfUrlValidator } from "../ssrf/url-validator.ts";
 
 /**
- * The one fenced outbound HTTP utility every customer-endpoint dispatch shares.
- *
- * THE implementation, since 2026-09-02: the platform copy it was frozen
- * against was deleted with the webhook lane. All
- * outbound goes through the audited fence — metadata denylist, private-address
- * blocking, DNS-rebinding defeat via IP pinning, redirect refusal — never a
- * hand-rolled `fetch`. A total-request timeout bounds slow receivers (enforced
- * both by an AbortSignal and, as a backstop, by socket-level bounds on the
- * dispatching agent) and the response is read with a size cap.
- *
- * Transport-level failure (DNS, connection reset, timeout) throws a RETRYABLE
- * DispatchError; a fence block throws a TERMINAL one, because a fenced URL never
- * becomes valid on retry. The HTTP status is RETURNED, not thrown — each caller
- * classifies 2xx/4xx/5xx per its own contract (a webhook and Slack disagree on
- * what a 4xx means), then rides the outbox retry machinery.
- *
- * WHAT DID NOT COME ACROSS: the application's `validateUrl` is optional, and an
- * omitted one falls back to a module-level validator built from the environment.
- * A package has no environment, so naming the address policy is mandatory here.
- * There is no default that could be quietly weaker than the caller believed.
+ * The one fenced, audited outbound HTTP utility every dispatch shares —
+ * never a hand-rolled `fetch`. `validateUrl` has no default here: a package
+ * has no environment to draw an address policy from.
  */
 
 /** Total-request timeout — a slowloris receiver cannot pin a worker slot. */

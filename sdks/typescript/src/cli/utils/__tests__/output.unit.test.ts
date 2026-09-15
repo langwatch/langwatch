@@ -12,7 +12,10 @@ const DATA = [
   { name: "beta", id: "2", nested: { score: 0.1 } },
 ];
 
-/** Agent-mode env vars from the host (e.g. CLAUDECODE under Claude Code) must not leak into tests. */
+/**
+ * Agent-mode env vars from the host (e.g. CLAUDECODE under Claude Code) must
+ * not leak into tests.
+ */
 let savedAgentEnv: Record<string, string | undefined> = {};
 
 beforeEach(() => {

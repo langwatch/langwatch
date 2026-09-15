@@ -53,18 +53,9 @@ type _DeclarationIsMandatoryByConstruction = Assert<
 >;
 
 /**
- * The second structural guarantee: the options a root is created with reach
- * its `$types`, so `errorShape` is the shape this package's error formatter
- * returns.
- *
- * tRPC derives `errorShape` from the LITERAL type of the options object handed
- * to `create`, which means the root has to be created on the builder itself.
- * Forwarding the options through a wrapper method of our own passes a type
- * parameter instead, the inference reads it as `never`, and every router in
- * the process reports `errorShape: never` — at which point every
- * `error.data.code` / `error.data.httpStatus` read in a browser is a read off
- * `never`. Nothing else notices, so this assertion is what refuses the
- * wrapper.
+ * tRPC derives `errorShape` from the LITERAL type of the options object handed to `create`,
+ * so the root must be created on the builder itself — a wrapper infers `never` instead, and
+ * every `error.data.code` read silently becomes a read off `never`; this assertion refuses it.
  */
 const errorFormatter = createTrpcErrorFormatter({
   causePayload: { payloadFor: () => null },

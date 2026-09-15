@@ -1,6 +1,8 @@
 /**
  * @vitest-environment node
- * Real Postgres (testcontainers), no mocks. Pins PRINCIPAL-scope budgets in the strictest-wins cascade, incl. BLOCK when only PRINCIPAL is over-limit among all 5 scopes. Spec: specs/ai-gateway/budgets-principal-cascade.feature
+ * Real Postgres (testcontainers), no mocks. Pins PRINCIPAL-scope budgets in
+ * the strictest-wins cascade, incl. BLOCK when only PRINCIPAL is over-limit
+ * among all 5 scopes. Spec: specs/ai-gateway/budgets-principal-cascade.feature
  */
 
 import {

@@ -1,18 +1,7 @@
 /**
- * The workbench's request state: draft, submitted snapshot, and the outcome
- * that belongs to that snapshot.
- *
- * Three facts, kept apart on purpose. The draft is what the member is typing;
- * the submitted snapshot is what the database was actually asked; the outcome
- * belongs to the *submitted* snapshot and never to the draft. Collapsing any
- * two of them is how a result comes to look current for a statement that was
- * never run — the failure this whole module exists to make impossible.
- *
- * Pure and DOM-free: a reducer plus selectors, so every transition is covered
- * without rendering. The side effects (issuing the request, aborting it) live
- * in `./lwql-request-controller`, which is the only thing that calls this.
- *
- * @see modules/analytics/specs/analytics-lwql-workbench.feature
+ * Draft, submitted snapshot, and outcome are kept apart: the outcome belongs
+ * to the *submitted* snapshot, never the draft — collapsing any two is how a
+ * stale result comes to look current. See analytics-lwql-workbench.feature.
  */
 
 import type {
@@ -27,13 +16,10 @@ import type {
 export type LangWatchQLParameterValue = string | number | boolean | null;
 
 /**
- * The period a submission reports over, as instants.
- *
- * Epoch milliseconds rather than `Date`, so a snapshot stays comparable by
- * value — two `Date` objects for the same instant are never `Object.is`-equal,
- * and a staleness test built on them would call every result stale on the next
- * render. Epoch milliseconds are also what `useFilterParams` already hands the
- * rest of the analytics surfaces.
+ * The period a submission reports over, as instants. Epoch milliseconds
+ * rather than `Date`, so a snapshot stays comparable by value — two `Date`
+ * objects for the same instant are never `Object.is`-equal, and a staleness
+ * test built on them would call every result stale on the next render.
  */
 export interface LangWatchQLTimeWindowValues {
   readonly start: number;
@@ -46,22 +32,16 @@ export interface LangWatchQLSnapshot {
   readonly parameters: Readonly<Record<string, LangWatchQLParameterValue>>;
   /**
    * The window the surface supplies for the reserved `dashboard_context_period_start` /
-   * `dashboard_context_period_end` parameters. Part of the snapshot because it is part of the
-   * request: a result produced for last week's period is not current for this
-   * week's, and only a snapshot that carries it can say so.
-   *
-   * Absent on a workbench with no page period behind it, which is every caller
-   * that only ever writes unbounded statements.
+   * `dashboard_context_period_end` parameters. Part of the snapshot because a
+   * result produced for last week's period is not current for this week's, and
+   * only a snapshot that carries it can say so.
    */
   readonly timeWindow?: LangWatchQLTimeWindowValues;
   /**
    * The step the surface supplies for the reserved `dashboard_context_granularity_seconds`
-   * parameter, when it offers one.
-   *
-   * Part of the snapshot for the same reason the window is: it is part of the
-   * request. A result bucketed by the hour is not the answer to the same
-   * question asked by the second, and only a snapshot that carries the step can
-   * say the one on screen has gone stale.
+   * parameter. Part of the snapshot for the same reason the window is: a result
+   * bucketed by the hour is not the answer to the same question asked by the
+   * second, and only a snapshot carrying the step can say the one on screen has gone stale.
    */
   readonly granularitySeconds?: LangWatchQLGranularityStep;
 }
@@ -77,15 +57,10 @@ export type LangWatchQLAnswer =
   | { readonly kind: "error"; readonly error: unknown };
 
 /**
- * An answer and the snapshot that produced it.
- *
- * The snapshot rides on the outcome rather than being read off `submitted`,
- * and that is the whole of what makes staleness honest. `submitted` is the LAST
- * request, not the one the visible answer came from, and the two come apart the
- * moment a second submission is cancelled: run A, edit to B, run B, abandon.
- * `submitted` is then B while the visible result is still A's, so a staleness
- * test reading `submitted` would call A's rows current for B and offer to
- * "Reload" them.
+ * An answer and the snapshot that produced it. The snapshot rides on the
+ * outcome rather than `submitted`, because `submitted` is the LAST request,
+ * not the one the visible answer came from — they part ways the moment a
+ * second submission is cancelled after the first still shows on screen.
  */
 export type LangWatchQLOutcome =
   | {
@@ -193,15 +168,10 @@ export function lwqlSnapshotsMatch(
 }
 
 /**
- * The one transition function.
- *
- * Two refusals are load-bearing and both are here rather than at the call site,
- * so that no caller can forget them:
- *
- *  - a submission while one is in flight returns the state unchanged, which is
- *    what the controller reads as "do not issue a second request";
- *  - an answer whose `submissionId` is not the one being awaited is dropped,
- *    which is what makes an aborted or superseded response harmless.
+ * The one transition function. Two refusals are load-bearing and live here
+ * rather than at the call site, so no caller can forget them: a submission
+ * while one is in flight is a no-op, and an answer whose `submissionId` isn't
+ * the one awaited is dropped (making an aborted or superseded response harmless).
  */
 export function lwqlRequestReducer(
   state: LangWatchQLRequestState,
@@ -289,13 +259,10 @@ function withSubmission(
 }
 
 /**
- * Drops an answer for a submission that is no longer the one being awaited, and
- * otherwise records it against the snapshot that produced it.
- *
- * That snapshot is `state.submitted`: the id matched, so nothing has been
- * submitted since this request went out. Binding it here — the one moment the
- * two are provably the same request — is what lets every reader downstream
- * compare against the answer's own snapshot instead of the latest one.
+ * Drops an answer for a submission no longer awaited, and otherwise records it
+ * against `state.submitted` — the one moment id-matching proves the two are
+ * the same request — so every reader downstream compares against the answer's
+ * own snapshot instead of the latest one.
  */
 function withAnswer(
   state: LangWatchQLRequestState,

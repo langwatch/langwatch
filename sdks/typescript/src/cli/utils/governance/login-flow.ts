@@ -1,21 +1,9 @@
 /**
- * Shared device-code login implementations. Two entry points:
- *
- *   1. `runUnifiedLoginFlow({ kind })` — the canonical flow used by
- *      `langwatch login` (interactive routes here for both modes). The
- *      same browser-approval ceremony works for either credential type;
- *      only the persist target differs:
- *        kind: 'device_session' → ~/.langwatch/config.json
- *        kind: 'project_api_key' → $CWD/.env (LANGWATCH_API_KEY)
- *      No copy-paste of the credential ever — the server ships it
- *      back to the CLI over the same RFC 8628 poll endpoint.
- *
- *   2. `runDeviceFlowLogin(...)` — back-compat wrapper that calls
- *      `runUnifiedLoginFlow({ kind: 'device_session' })`. Preserved so
- *      `commands/login.ts --device` and `utils/governance/wrapper.ts`
- *      auto-login keep working without churn.
- *
- * Spec: specs/ai-governance/cli-onboarding/login-unified.feature
+ * Shared device-code login. `runUnifiedLoginFlow({ kind })` is canonical:
+ * one browser-approval flow for both credential kinds, persisted to
+ * `~/.langwatch/config.json` (device_session) or `$CWD/.env`
+ * (project_api_key). `runDeviceFlowLogin` is a back-compat wrapper for it.
+ * @see specs/ai-governance/cli-onboarding/login-unified.feature
  */
 
 import * as fs from "node:fs";

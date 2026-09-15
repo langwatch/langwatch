@@ -1,17 +1,8 @@
 /**
  * @vitest-environment node
- *
- * Tests for dev/scripts/lib/plan-langy-lane.sh, sourced the way
- * dev/scripts/dev-stack.sh sources it: before the launcher decides whether to
- * start the Langy agent manager and on which port.
- *
- * See specs/setup/dev-langy-agent-lane.feature.
- *
- * The planner is bash; we drive it by sourcing it from `bash -s` and reading
- * the decision it exports, the same technique as resolve-nlp-service.test.ts.
- * The two facts the planner cannot cheaply determine, a Go toolchain and a live
- * listener, are overridable functions, so a test states them instead of
- * depending on the machine it runs on.
+ * Drives dev/scripts/lib/plan-langy-lane.sh via `bash -s`. The two facts it
+ * cannot cheaply determine — a Go toolchain and a live listener — are
+ * overridable, so a test states them instead of depending on the machine.
  */
 
 import { execSync } from "node:child_process";
@@ -56,13 +47,10 @@ afterEach(() => {
 });
 
 /**
- * Expands the lane command the way the shell that runs it would, so a test can
- * see which value the manager ends up with.
- *
- * The command goes through an unquoted heredoc: bash expands `${VAR:-default}`
- * there and leaves every quote literal, so the command needs no escaping on the
- * way in. Interpolating it into a `bash -c '...'` string would need escaping for
- * both quotes and backslashes, and getting that half right is its own bug.
+ * Expands the lane command the way the shell that runs it would. Goes through
+ * an unquoted heredoc, since bash expands `${VAR:-default}` there while
+ * leaving every quote literal — interpolating into `bash -c '...'` would need
+ * escaping for both quotes and backslashes, which is its own bug to get right.
  */
 function expandLaneCommand({
   command,

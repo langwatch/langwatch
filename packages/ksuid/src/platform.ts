@@ -1,15 +1,8 @@
 import type { PlatformInfo, CryptoProvider } from "./types.ts";
 
 /**
- * Detects the current platform/runtime environment
+ * Detects the current platform/runtime environment.
  * @returns Platform information including flags for browser, Node.js, Bun, and Deno
- * @example
- * ```typescript
- * const platform = detectPlatform();
- * if (platform.isNode) {
- *   console.log('Running in Node.js');
- * }
- * ```
  */
 export function detectPlatform(): PlatformInfo {
   const isBrowser = typeof window !== "undefined" && typeof window.crypto !== "undefined";
@@ -32,14 +25,9 @@ export function detectPlatform(): PlatformInfo {
 }
 
 /**
- * Gets the appropriate crypto provider for the current platform
+ * Gets the appropriate crypto provider for the current platform.
  * @returns A crypto provider with getRandomValues method
  * @throws {Error} If no crypto provider is available
- * @example
- * ```typescript
- * const crypto = getCryptoProvider();
- * const randomBytes = crypto.getRandomValues(new Uint8Array(16));
- * ```
  */
 export function getCryptoProvider(): CryptoProvider {
   const platform = detectPlatform();
@@ -85,14 +73,9 @@ export function getCryptoProvider(): CryptoProvider {
 }
 
 /**
- * Generates cryptographically secure random bytes
+ * Generates cryptographically secure random bytes.
  * @param size - The number of random bytes to generate
  * @returns A Uint8Array filled with random bytes
- * @example
- * ```typescript
- * const randomBytes = getRandomBytes(16);
- * console.log(randomBytes.length); // 16
- * ```
  */
 export function getRandomBytes(size: number): Uint8Array {
   const crypto = getCryptoProvider();

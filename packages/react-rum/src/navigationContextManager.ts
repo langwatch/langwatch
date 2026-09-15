@@ -1,30 +1,9 @@
 /**
- * The context manager that lets an in-flight navigation parent the work it
- * causes.
- *
- * `StackContextManager` only keeps context across synchronous calls: it has no
- * way to follow an `await`, a `setTimeout` or a React commit. A navigation is
- * all three — the router resolves a lazy route, React mounts the page, and the
- * page's queries dispatch fetches from effects. By the time those fetches run,
- * the stack that started the navigation is long gone, so the fetch spans would
- * root their own traces and the navigation span would sit alone with no
- * children.
- *
- * Rather than adopt zone.js (a global patch of every async primitive, rejected
- * in ADR-058) this narrows the problem to the one case that matters. A
- * navigation is a singular, page-wide, explicitly delimited state — the tab
- * navigates to one place at a time, and the router says when that starts and
- * ends. So while a navigation is in flight it is published as an *ambient*
- * context: spans that would otherwise have no parent at all take it instead.
- *
- * This is deliberately weaker than real async propagation. It cannot tell the
- * difference between a fetch the navigation caused and an unrelated background
- * poll that happened to fire during it, so during a navigation both are
- * attributed to it. That over-attribution is bounded by the navigation's own
- * duration and is worth the trade: the alternative is a navigation span with no
- * children, which answers nothing.
- *
- * See ADR-058.
+ * Lets an in-flight navigation parent the work it causes.
+ * `StackContextManager` can't follow an `await`/React commit, so by the time
+ * a page's effects fetch, the navigation's stack is long gone. Rather than
+ * zone.js (rejected in ADR-058), a navigation publishes *ambient* context
+ * while in flight: any otherwise-parentless span takes it instead.
  */
 
 import { type Context, trace } from "@opentelemetry/api";

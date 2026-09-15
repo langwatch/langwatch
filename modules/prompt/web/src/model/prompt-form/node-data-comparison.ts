@@ -63,10 +63,9 @@ function standardizeNodeData(
 }
 
 /**
- * Compares two node data objects for semantic equality.
- * Ignores array ordering and optional fields like name, configId, and versionMetadata.
- * Only includes demonstrations parameter if at least one node has demonstration records.
- *
+ * Compares two node data objects for semantic equality, ignoring array ordering
+ * and optional fields like name, configId, and versionMetadata. Includes the
+ * demonstrations parameter only if at least one node has demonstration records.
  * @param nodeData1 - First node data to compare
  * @param nodeData2 - Second node data to compare
  * @returns True if the nodes are semantically equal

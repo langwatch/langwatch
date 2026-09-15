@@ -1,15 +1,9 @@
 /**
- * The gate that decides whether a command may answer in the format it was
- * asked for — `assertFormatIsSupported`.
- *
- * The failure this exists to prevent is a command that cannot serialize
- * anything quietly rendering a chalk table at exit 0 for a caller who asked for
- * JSON. Refusing is the only honest answer, so the interesting cases here are
- * the ones where refusing would be WRONG: the legacy `-f json` spelling that
- * has always worked, a command that owns its own `--json`, and agent mode
- * detected from the environment rather than demanded on the command line.
- *
- * Split out of `output-port.unit.test.ts`, which pins the port itself.
+ * `assertFormatIsSupported`: the gate deciding whether a command may answer in the format it was
+ * asked for. Prevents a command that cannot serialize anything from quietly rendering a chalk
+ * table at exit 0 for a caller who asked for JSON, so the interesting cases are where refusing
+ * would be WRONG: the legacy `-f json` spelling, a command owning its own `--json`, and agent
+ * mode detected from the environment rather than demanded on the command line.
  */
 import { describe, it, expect } from "vitest";
 import { Command } from "commander";

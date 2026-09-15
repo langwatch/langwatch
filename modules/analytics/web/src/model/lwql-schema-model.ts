@@ -1,17 +1,8 @@
 /**
  * The LangWatchQL schema, shaped for the browser and the editor's assistance.
- *
- * A projection of the schema response and nothing else. No dataset name, column
- * name, physical table or type is written here: everything the workbench offers
- * came back from the endpoint for *this* member, which is what makes the
- * surface tell the truth about what they may query. A hard-coded list would
- * survive a permission change, a catalog change and a deployment that publishes
- * fewer datasets — three ways to promise access the validator then refuses.
- *
- * Pure and DOM-free on purpose: the same functions feed the React tree and the
- * Monaco providers, and both are covered without rendering anything.
- *
- * @see modules/analytics/specs/analytics-lwql-workbench.feature
+ * A pure projection of the schema response — nothing hard-coded — since a
+ * fixed list would survive a permission change, a catalog change, or fewer
+ * published datasets, each promising access the validator then refuses.
  */
 
 import type {

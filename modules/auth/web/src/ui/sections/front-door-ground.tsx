@@ -29,16 +29,11 @@ export function FrontDoorGround({ protect = "center" }: { protect?: keyof typeof
   const reduceMotion = useReducedMotion();
   const { colorMode } = useColorMode();
   const stage = useFrontDoorStage();
-  // Probed once, and only when the answer will be used: the shaders throw
-  // where WebGL is unavailable (older browsers, blocked GPUs, jsdom), and a
-  // thrown background takes the whole door down with it. Under reduced motion
-  // the ground stays static whatever the probe would say — and the probe
-  // itself is not free: a machine with no GPU answers `getContext` through a
-  // software rasterizer that takes whole seconds to initialise, which turned
-  // every signed-out page view into a stall on exactly the machines (CI, VMs)
-  // that ask for stillness. A visitor who flips reduced motion off mid-visit
-  // keeps the static field until the next mount, which is the ground's arrival
-  // story anyway.
+  // Probed once, and only when the answer will be used: the shaders throw where WebGL is
+  // unavailable (older browsers, blocked GPUs, jsdom), and a thrown background takes the whole
+  // door down with it. The probe itself is not free — a machine with no GPU answers `getContext`
+  // through a software rasterizer that takes whole seconds, turning every signed-out page view
+  // into a stall on exactly the machines (CI, VMs) that ask for stillness.
   const [webglSupported] = useState(() => {
     if (reduceMotion) return false;
     try {

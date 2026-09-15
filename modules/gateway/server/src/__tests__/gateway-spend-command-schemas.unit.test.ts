@@ -1,5 +1,8 @@
 /**
- * The seam between what the gateway posts and what the pipeline appends. A field added to the command schema without a default turns every event written before deploy into a parse failure, so defaults are the compatibility contract, pinned here.
+ * The seam between what the gateway posts and what the pipeline appends. A
+ * field added to the command schema without a default turns every event
+ * written before deploy into a parse failure, so defaults are the
+ * compatibility contract, pinned here.
  */
 
 import { describe, expect, it } from "vitest";

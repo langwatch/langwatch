@@ -27,11 +27,6 @@ export class Base62Error extends Error {
  * Encodes a byte array to base62 string
  * @param input - The byte array to encode
  * @returns Base62 encoded string
- * @example
- * ```typescript
- * const bytes = new Uint8Array([1, 2, 3, 4]);
- * const encoded = encode(bytes); // '1A2B3C'
- * ```
  */
 export function encode(input: Uint8Array): string {
   if (input.length === 0) {
@@ -64,10 +59,6 @@ export function encode(input: Uint8Array): string {
  * @param input - The base62 string to decode
  * @returns Decoded byte array
  * @throws {Base62Error} If the input contains invalid characters
- * @example
- * ```typescript
- * const decoded = decode('1A2B3C'); // Uint8Array([1, 2, 3, 4])
- * ```
  */
 export function decode(input: string): Uint8Array {
   if (input.length === 0) {

@@ -6,60 +6,37 @@ import type { SettleSpendCommandData } from "../processes/gateway-spend-commands
 const logger = createLogger("langwatch:gateway-spend:settlement");
 
 /**
- * The settlement grace: how long an admission may sit without a
- * confirmation or failure before the sweeper settles it as
- * cost-unknown. The bound is sized for the SLOWEST legitimate request,
- * not the median: a long streaming generation can hold a connection for
- * many minutes, and the confirm only ships after the stream closes plus
- * the emitter's spool flush and drain. 30 minutes is comfortably past
- * any provider's stream ceiling while still bounding how stale the
- * billing ledger can be, and settling early is recoverable by design: a
- * late confirmation supersedes the settled record and delivers the
- * superseding completed envelope.
+ * The settlement grace: how long an admission may sit unconfirmed before the
+ * sweeper settles it as cost-unknown. Sized for the SLOWEST legitimate
+ * request, not the median (a long stream can hold a connection for minutes).
+ * Settling early is recoverable: a late confirmation supersedes the settled
+ * record with the completed envelope.
  */
 export const SETTLEMENT_GRACE_MS_DEFAULT = 30 * 60 * 1000;
 
 /**
- * How far back a sweep looks.
- *
- * `OccurredAt` is the spend table's partition key, so this bound is what keeps
- * the scan on the two most recent partitions instead of every month in the
- * 13-month retention, including the cold ones on object storage.
- *
- * Seven days is far past any grace an operator can configure, so the only
- * rows it excludes are ones a sweep already had many chances to settle. An
- * admission older than this stays visible as `admitted` in the spend record,
- * which is what already happened to anything the previous per-request timer
- * missed.
+ * How far back a sweep looks. `OccurredAt` is the spend table's partition
+ * key, so this bound keeps the scan on the two most recent partitions
+ * instead of the full 13-month retention, including the cold ones on object
+ * storage. Seven days is far past any grace an operator can configure, so
+ * the only rows excluded are ones a sweep already had many chances to settle.
  */
 export const SETTLEMENT_LOOKBACK_MS = 7 * 24 * 60 * 60 * 1000;
 
 /**
- * Sanity cap on one sweep. The steady-state population is the handful of
- * requests whose confirmation genuinely never arrived; a result this large
- * means something upstream stopped confirming, and settling a hundred
- * thousand live requests is the one outcome this must never produce.
- *
- * Applied TWICE, and both are load-bearing: once per ClickHouse instance, to
- * bound the query's own result, and again where the instances are merged, so
- * the number this sweep settles is the cap rather than the cap times the
- * number of instances.
- *
- * Lives with the sweep that reports on hitting it rather than beside the query
- * it bounds; the repository and the merging adapter both import it from here,
- * which is a one-way edge.
+ * Sanity cap on one sweep: a result this large means something upstream
+ * stopped confirming, not steady-state drift. Applied TWICE, and both are
+ * load-bearing — once per ClickHouse instance to bound its own query, and
+ * again after the instances are merged, so the sweep settles at most this
+ * cap rather than the cap times the number of instances.
  */
 export const MAX_OPEN_ADMISSIONS_PER_SWEEP = 10_000;
 
 /**
- * Operator override, epoch-milliseconds. Bounded below so a typo cannot
- * turn every in-flight request into a settlement storm.
- *
- * The raw value arrives as an argument rather than being read here: a
- * reusable package receives typed configuration, and the composition root
- * that owns the environment passes `LW_SPEND_SETTLEMENT_GRACE_MS` in. The
- * parse and its warning stay in one place so the REST settlement policy and
- * the sweeper cannot disagree about what the operator asked for.
+ * Operator override, epoch-milliseconds. Bounded below so a typo cannot turn
+ * every in-flight request into a settlement storm. The raw value arrives as
+ * an argument, parsed here once, so the REST settlement policy and the
+ * sweeper cannot disagree about what the operator asked for.
  */
 export function settlementGraceMs(raw: string | undefined): number {
   if (!raw) return SETTLEMENT_GRACE_MS_DEFAULT;
@@ -173,13 +150,9 @@ function settleCommandFor(admission: OpenAdmission, now: number): SettleSpendCom
 }
 
 /**
- * What one sweep tells operators.
- *
- * A sweep that came back full did not finish: the rest waits for the next
- * interval, and a run of these means the population is growing faster than
- * one sweep drains it. The doc block on the cap promised this was reported;
- * it was not, so an operator would have seen a steady settled count and no
- * sign of the backlog behind it.
+ * What one sweep tells operators. A sweep that came back full did not
+ * finish — the rest waits for the next interval — and a run of these means
+ * the population is growing faster than one sweep drains it.
  */
 function reportSweep({
   settled,

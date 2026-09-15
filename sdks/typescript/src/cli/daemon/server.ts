@@ -64,22 +64,11 @@ export interface DaemonServer {
 }
 
 /**
- * The trust problems that mean somebody ELSE holds this path, as opposed to the
- * ones that just mean we left debris behind.
- *
- * `socket-missing` is the ordinary empty state, and `socket-not-a-socket` is a
- * corpse `cleanStaleSocket` will unlink — neither is a squat. (A non-socket we
- * do NOT own cannot occur past `ensureSocketDir`: the directory is ours and
- * 0700 by then, so nobody else can create a file inside it, and a foreign
- * directory has already thrown.) Everything left is an ownership or mode
- * problem, i.e. a path we can neither trust nor repair.
- *
- * "A corpse `cleanStaleSocket` will unlink" covers both shapes
- * `socket-not-a-socket` can take inside a directory only we can write: a plain
- * file, and a symlink — including a DANGLING one, which `identifyFile` resolves
- * via `lstat` precisely so this claim stays true. It once did not: the dangling
- * case identified nothing, so nothing was unlinked, and `listen()` walked into
- * a permanent EEXIST at publish time.
+ * The trust problems that mean somebody ELSE holds this path, as opposed to
+ * the ones that just mean we left debris behind (`socket-missing`, or a
+ * corpse `cleanStaleSocket` will unlink — including a dangling symlink, which
+ * `identifyFile` resolves via `lstat`). Everything else is an ownership or
+ * mode problem: a path we can neither trust nor repair.
  */
 const SQUATTED_SOCKET_PROBLEMS: ReadonlySet<string> = new Set([
   "socket-dir-not-a-directory",
@@ -97,22 +86,12 @@ export class DaemonAlreadyRunningError extends Error {
 }
 
 /**
- * Is something actually listening on this socket, or is it a corpse?
- *
- * A daemon that is SIGKILLed (or whose machine loses power) leaves its socket
- * file behind. Binding on top of it fails with EADDRINUSE, and connecting to it
- * fails with ECONNREFUSED. Distinguishing the two is what keeps a crashed
- * daemon from wedging every future invocation.
- *
- * A socket owned by somebody else is neither: it is not OUR daemon, so "alive"
- * would be a lie with teeth. `listen()` turns a true here into
- * DaemonAlreadyRunningError, so a squatter who binds the path first — reachable
- * via LANGWATCH_DAEMON_DIR, XDG_RUNTIME_DIR or the tmp fallback — would stop
- * the real daemon from EVER starting. Nothing is disclosed (we send no bytes),
- * but the old credential-theft vector would become a permanent, silent denial
- * of service. So: a foreign socket is not alive, and it is not silent either —
- * `cleanStaleSocket` will not unlink it (it cannot), and `listen()` reports the
- * squat instead of misattributing it to a daemon that is already running.
+ * Is something actually listening on this socket, or is it a corpse left by a
+ * SIGKILLed daemon? Connecting distinguishes the two (ECONNREFUSED vs a live
+ * connect), which keeps a crash from wedging every future invocation. A
+ * socket owned by somebody else counts as not-alive too, so `listen()` reports
+ * the squat as DaemonAlreadyRunningError instead of letting a squatter block
+ * the real daemon from ever starting.
  */
 export async function isSocketAlive(socketPath: string): Promise<boolean> {
   if (!fs.existsSync(socketPath)) return false;
@@ -147,36 +126,9 @@ export interface FileIdentity {
 /**
  * What NAME `filePath` is right now, or null if nothing holds it.
  *
- * `lstat`, never `stat`, because the question every caller here is really
- * asking is "what would `unlink(2)` remove, and does `link(2)`/`bind(2)` find
- * this name taken?" — both of which are answered by the directory ENTRY, not by
- * whatever it may resolve to.
- *
- * That matters in two ways, and only `lstat` gets both right:
- *
- *   - A DANGLING SYMLINK is a name that exists (`link(2)` and `bind(2)` fail
- *     EEXIST/EADDRINUSE on it) while `stat` reports nothing at all. Under
- *     `stat`, `cleanStaleSocket` identified no corpse, unlinked nothing, and
- *     every daemon from then on died at `publishSocket` with EEXIST — which
- *     `daemon.ts` reads as "we lost a start race" and swallows in silence. One
- *     dangling link wedged the daemon permanently, with no output on any
- *     invocation, forever.
- *   - A LIVE SYMLINK is the mirror image. `stat` succeeds there, so the
- *     identity recorded is the TARGET's — but `unlink(2)` removes the link and
- *     never the target, so `unlinkIfSameFile` would be guarding an inode the
- *     call it authorises does not touch. Two different links to one target
- *     compare equal; one link repointed between the identify and the unlink
- *     compares unequal. Both answers are wrong, in opposite directions.
- *
- * `lstat` collapses the two into one rule: the link's own (dev, ino) is exactly
- * the file `unlink(2)` deletes, and a name that gains a target, or loses one,
- * between the identify and the unlink still reports the same inode — because
- * the entry itself did not change. `lstat` also succeeds everywhere `stat` does
- * (plus on symlink loops, where `stat` returns ELOOP), so nothing is lost.
- *
- * Neither the socket nor the staging path is ever a symlink of OUR making; the
- * symlink cases are debris `inspectSocketTrust` classifies as
- * `socket-not-a-socket` and this module then has to be able to clean up.
+ * `lstat`, never `stat`: `stat` gets a dangling symlink wrong (reports
+ * nothing, so a corpse looks clean) and a live one wrong the other way
+ * (identifies the target, not the link `unlink(2)` actually removes).
  */
 function identifyFile(filePath: string): FileIdentity | null {
   try {
@@ -192,17 +144,8 @@ function identifyFile(filePath: string): FileIdentity | null {
  * Unlink `filePath`, but only while it still holds the file `expected`
  * identified. Reports whether it removed anything.
  *
- * This is the module's one deletion primitive, and it exists so a single rule
- * holds everywhere: a process only ever removes a socket file it created
- * itself. Deleting somebody else's is not a tidy-up, it is an outage — a live
- * daemon whose name is unlinked keeps running on an unreachable inode, holding
- * credentials, serving nobody, while every caller sees "no daemon" and pays a
- * cold start forever.
- *
- * There is no POSIX "unlink this inode", so the check narrows the window
- * rather than closing it. What it removes is the LONG window (a probe, or ten
- * idle minutes) in which the file genuinely does change hands; what is left is
- * the microseconds between the stat and the unlink.
+ * A process only ever removes a socket it created itself — deleting somebody
+ * else's leaves a live daemon running on an unreachable inode forever.
  */
 export function unlinkIfSameFile(filePath: string, expected: FileIdentity | null): boolean {
   if (expected === null) return false;
@@ -225,15 +168,10 @@ export function unlinkIfSameFile(filePath: string, expected: FileIdentity | null
 /** Remove a socket file that nothing is listening on. Safe to call always. */
 export async function cleanStaleSocket(socketPath: string): Promise<boolean> {
   // Identify the corpse BEFORE probing it, and remove it only if the path
-  // still leads to that same file afterwards.
-  //
-  // `isSocketAlive` can take up to a second (a connect, or its own timeout),
-  // and a daemon starting concurrently can bind the path inside that window —
-  // concurrent starts are not exotic, `recordMissAndDecideToSpawn` deletes the
-  // hint file the moment it says yes, so several callers can each decide to
-  // spawn at once. Unlinking by path alone would then delete a LIVE daemon's
-  // socket on the strength of a probe that answered about a file which no
-  // longer exists.
+  // still leads to that same file afterwards — `isSocketAlive` can take up to
+  // a second, and a daemon starting concurrently can bind the path inside
+  // that window, so unlinking by path alone could delete a live daemon's
+  // socket on the strength of a stale probe.
   const corpse = identifyFile(socketPath);
   if (corpse === null) return false;
   if (await isSocketAlive(socketPath)) return false;
@@ -245,12 +183,8 @@ export async function cleanStaleSocket(socketPath: string): Promise<boolean> {
  * shared one. See `publishSocket` for why the shared path is never bound.
  *
  * Pid-scoped, so two daemons racing to start never bind the same file. The
- * `.sock` suffix is REPLACED rather than appended to, to keep the bound path
- * inside sockaddr_un.sun_path: `isSocketPathUsable` budgets 100 bytes against
- * a real limit of 103 (macOS) / 107 (Linux), and a pid is at most three bytes
- * longer than the `.sock` it stands in for — the allowance
- * `MAX_STAGING_OVERHEAD_BYTES` (identity.ts) holds every path budget to, so
- * that a shared path is only ever approved when this one fits as well.
+ * `.sock` suffix is REPLACED, not appended, to stay inside sockaddr_un's path
+ * limit (`MAX_STAGING_OVERHEAD_BYTES` in identity.ts).
  */
 export function stagingSocketPath(socketPath: string, pid: number): string {
   const base = socketPath.endsWith(".sock") ? socketPath.slice(0, -".sock".length) : socketPath;
@@ -258,26 +192,10 @@ export function stagingSocketPath(socketPath: string, pid: number): string {
 }
 
 /**
- * Give a bound socket its shared name.
- *
- * `link` rather than `rename` because link is fail-CLOSED. If another daemon
- * won the race and published first, link throws EEXIST and this one loses
- * politely; a rename would silently unlink the winner and orphan a live,
- * credential-holding process on an inode no client can reach.
- *
- * Publishing at all — rather than binding the shared path directly — is what
- * keeps node from doing the same thing on our behalf: libuv unlinks the path
- * it bound when the handle closes, by path and unconditionally, so a daemon
- * binding the shared path deletes whatever is there when it shuts down, ten
- * idle minutes later, even if that is a successor's live socket. Binding a
- * private name puts THAT unlink somewhere harmless and leaves the shared name
- * under the control of `unlinkIfSameFile`.
- *
- * Hard links to a socket are POSIX and work on every filesystem the daemon is
- * supported on. Should some exotic one refuse, publishing falls back to an
- * atomic rename — but only onto a name nothing holds, because rename is
- * fail-OPEN and such a filesystem sends EVERY start down that branch. See the
- * note on the fallback below.
+ * Give a bound socket its shared name. `link`, not `rename`: link is
+ * fail-CLOSED, so a daemon that published first throws EEXIST here rather
+ * than being silently unlinked by a renaming winner. See the fallback note
+ * below for the exotic-filesystem case where link is unavailable.
  */
 export function publishSocket(stagingPath: string, socketPath: string): void {
   try {
@@ -287,29 +205,12 @@ export function publishSocket(stagingPath: string, socketPath: string): void {
       throw new DaemonAlreadyRunningError(socketPath);
     }
 
-    // link() failed for a reason that is NOT "somebody got there first" — a
-    // filesystem that will not hard-link a socket at all (EPERM/EOPNOTSUPP).
-    // rename(2) is the only other atomic publish, and it REPLACES whatever
-    // holds the target: precisely the fail-open behaviour link was chosen to
-    // avoid. On such a filesystem every start lands here, so renaming
-    // unconditionally would not merely lose a rare race — the fail-closed
-    // property would be absent permanently, and silently.
-    //
-    // So: rename only onto a name nothing holds. `listen()` cleared this path
-    // moments ago (cleanStaleSocket) and has been binding ever since, so an
-    // occupant now is a daemon that published while we were starting. Refusing
-    // costs this process its daemon and nothing else — `listen()` closes the
-    // handle, libuv takes the staging file with it, and the caller runs the
-    // command in-process. Renaming would cost the WINNER its reachability: a
-    // live process holding resolved credentials on an inode no client can
-    // dial, which `stop()`'s `unlinkIfSameFile` then (correctly) declines to
-    // clean up, so it lingers for its full idle timeout.
-    //
-    // Reported as DaemonAlreadyRunningError, exactly as the branch above
-    // reports the same situation whenever link CAN tell us about it.
-    //
-    // Between this check and the rename the usual microsecond window remains;
-    // what it removes is the one that is open by construction.
+    // link() failed for a reason other than "somebody got there first" — a
+    // filesystem that will not hard-link a socket at all. rename(2) REPLACES
+    // whatever holds the target, so only rename onto a name nothing holds:
+    // an occupant now means a daemon published while we were starting, and
+    // renaming over it would orphan that live process instead of just losing
+    // our own start to it.
     if (identifyFile(socketPath) !== null) {
       throw new DaemonAlreadyRunningError(socketPath);
     }
@@ -403,22 +304,11 @@ export function createDaemonServer(options: DaemonServerOptions): DaemonServer {
       reason,
     });
 
-    // Unlinking here (not just closing the server) is what makes the next
-    // client see "no daemon" rather than a corpse it has to probe.
-    //
-    // Only while the path still leads to the file WE published, though. A
-    // daemon lives for ten idle minutes and this one may have been orphaned
-    // long ago — its name unlinked by a crash sweep and rebound by a successor
-    // it knows nothing about. Unlinking by path there would kill a live daemon
-    // on the way out, which is how "the daemon keeps disappearing" becomes
-    // self-sustaining: every casualty takes its replacement with it.
-    //
-    // BEFORE `server.close()`, deliberately. (dev, ino) only identifies a file
-    // while that inode is still referenced: drop the last reference and the
-    // number is free for immediate reuse — Linux reuses it readily — so a
-    // successor binding after our close could land on our old identity and be
-    // deleted by this very guard. While the socket is still bound we hold a
-    // reference, so the comparison cannot be fooled.
+    // Unlinking here makes the next client see "no daemon" rather than a
+    // corpse to probe — only while the path still leads to the file WE
+    // published, or a rebound successor's socket could be killed on the way
+    // out. Done BEFORE `server.close()`: once we drop our own reference the
+    // inode number can be reused immediately, so this guard would fool itself.
     try {
       unlinkIfSameFile(options.socketPath, publishedSocket);
     } catch {
@@ -436,27 +326,11 @@ export function createDaemonServer(options: DaemonServerOptions): DaemonServer {
     // would then report an exit code the client trusts. So: let them finish.
     if (!(await drainInflight(shutdownGraceMs))) {
       // They did not. Cut the connections rather than let the clients believe a
-      // result computed under a rewritten environment.
-      //
-      // The `fallback` frame goes first so the outcome is DIAGNOSED rather than
-      // inferred from a dead socket. What the client can do with it depends on
-      // whether it has committed output yet, and the two cases are genuinely
-      // different — this is not a uniformly clean re-run:
-      //
-      //   - Not committed (the overwhelming majority: everything under
-      //     DEFAULT_MAX_BUFFER_BYTES is still sitting in the client's buffer).
-      //     Nothing has reached the caller's stdout, so the client re-runs the
-      //     command in-process and the outcome is indistinguishable from having
-      //     no daemon at all. This case IS always correct.
-      //
-      //   - Committed (`trace search`, `analytics query`, a large
-      //     `--format json` — anything whose output crossed the buffer cap and
-      //     was flushed to the real stdout). Re-running would duplicate what the
-      //     caller has already seen, so the client cannot. It reports truncated
-      //     output and a non-zero status that is NOT the command's own. That is
-      //     a real, if rare, loss of fidelity, and routine version-skew eviction
-      //     (dispatch.ts requestStop) can trigger it. The frame at least lets
-      //     the client say so accurately instead of guessing from a socket close.
+      // result computed under a rewritten environment. The `fallback` frame
+      // goes first so the outcome is DIAGNOSED rather than inferred from a
+      // dead socket: if output already crossed DEFAULT_MAX_BUFFER_BYTES and
+      // reached the real stdout, the client can't safely re-run and instead
+      // reports truncated output with a non-command status.
       for (const connection of connections) {
         if (connection.destroyed) continue;
         // `end`, not `write`+`destroy`: destroy() discards anything still in the

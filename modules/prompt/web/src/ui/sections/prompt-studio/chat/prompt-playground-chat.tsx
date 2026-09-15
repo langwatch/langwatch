@@ -27,24 +27,16 @@ interface PromptPlaygroundChatProps extends BoxProps {
   variables?: z.infer<typeof runtimeInputsSchema>;
 }
 
-/**
- * PromptPlaygroundChatRef
- * Single Responsibility: Exposes imperative methods to control the chat instance (e.g., reset, focus).
- */
+/** Imperative methods to control the chat instance (reset, focus). */
 export interface PromptPlaygroundChatRef {
   resetChat: () => void;
   focusInput: () => void;
 }
 
 /**
- * The playground's conversation.
- *
- * Renders through the shared `ConversationThread` - the same renderer the
- * simulations grid and drawer use - so a tool call looks the same wherever you
- * read one, and so the playground shows tool calls at all. The CopilotKit
- * runtime this replaced converted them faithfully and then rendered nothing,
- * because rendering an action execution needed a registered `useCopilotAction`
- * and there has never been one.
+ * The playground's conversation. Renders through the shared
+ * `ConversationThread` — the same renderer the simulations grid and drawer
+ * use — so a tool call looks the same wherever you read one.
  */
 const PromptPlaygroundChat = forwardRef<PromptPlaygroundChatRef, PromptPlaygroundChatProps>(
   function PromptPlaygroundChat(props, ref) {

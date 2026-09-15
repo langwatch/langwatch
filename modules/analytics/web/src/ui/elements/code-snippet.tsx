@@ -1,14 +1,10 @@
 /**
- * A read-only snippet, highlighted and copyable.
- *
- * `platform/app`'s `components/code/RenderCode` reached `@langwatch/trace-web`
- * for its highlighter, and a web package may not import another web package.
- * The Design System publishes the same Shiki adapter the trace drawer uses, and
- * Chakra's own `CodeBlock` is what renders it — the gateway family's usage
- * snippet is the same shape, reached the same way.
- *
- * Highlighting is LAZY by construction: the adapter loads its grammars on first
- * render, so a page that never opens this dialog never downloads them.
+ * A read-only snippet, highlighted and copyable. A web package may not
+ * import another web package for its highlighter, so this goes through the
+ * Design System's shared Shiki adapter, rendered via Chakra's own
+ * `CodeBlock`. Highlighting is lazy by construction: the adapter loads its
+ * grammars on first render, so a page that never opens this never downloads
+ * them.
  */
 
 import { ClientOnly, CodeBlock, IconButton } from "@chakra-ui/react";

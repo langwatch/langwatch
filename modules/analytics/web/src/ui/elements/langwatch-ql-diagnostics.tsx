@@ -1,20 +1,8 @@
 /**
- * The notes the backend attached to a result.
- *
- * Three rules, and each of them is a way this could quietly stop being useful:
- *
- *  - **every** diagnostic is rendered. The API under-reports by design, so a
- *    surface that filtered them further would leave a member with neither the
- *    warning nor a reason to doubt the answer;
- *  - the message is rendered **unchanged**. Each one already names the fact
- *    that made it fire, and a shortened version would drop exactly that;
- *  - truncation is **visually prominent**. It is the one diagnostic that says
- *    the numbers on screen are not the whole answer, so it is a warning while
- *    the rest are informational.
- *
- * Rendered outside the mode tabs by {@link LangWatchQLResultPane}, so a chart
- * can never be the reason a warning about its own data went unread.
- *
+ * The notes the backend attached to a result. Every diagnostic is rendered unfiltered and
+ * unchanged — the API already under-reports, and each message names the fact that fired it,
+ * so filtering or shortening would drop exactly the information that matters. Truncation is
+ * visually prominent, the one diagnostic saying the numbers on screen aren't the whole answer.
  * @see @langwatch/analytics-contract/diagnostics.ts
  * @see modules/analytics/specs/analytics-lwql-workbench.feature
  */

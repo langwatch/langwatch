@@ -399,7 +399,8 @@ describe("<ScenarioFormDrawer /> mapping gate", () => {
     });
   });
 
-  // These guard the PRE-EXISTING input-only run-gate contract (this PR only corrected a comment in ScenarioFormDrawer.tsx, not its logic).
+  // These guard the PRE-EXISTING input-only run-gate contract (this PR only corrected a
+  // comment in ScenarioFormDrawer.tsx, not its logic).
   describe("when target is a workflow agent with a valid input mapping and no outputField", () => {
     beforeEach(() => {
       // Agent has scenarioMappings that satisfies hasScenarioInputMapping

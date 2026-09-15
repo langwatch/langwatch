@@ -1,15 +1,12 @@
 import { SecretEnvironmentService } from "@langwatch/secrets";
 
 /**
- * The hashing and encryption pepper the seed writes API-key hashes under, in
- * the order the applications read it.
- *
- * Both keys are `dev: optional` in the secret registry (packages/secrets/
- * keys.json), so a checkout that has neither is a configured state, not a
- * broken one — and it must not stop `haven up`. The value cannot be minted
- * here either: it keys stored hashes and the AES-GCM envelope around seeded
- * provider credentials, so a per-run random pepper would write rows the
- * running applications can never verify or decrypt.
+ * The hashing and encryption pepper the seed writes API-key hashes under, in the order the
+ * applications read it. Both keys are `dev: optional` in the secret registry, so a checkout
+ * with neither is a configured state, not a broken one, and must not stop `haven up`. It
+ * can't be minted here either: it keys stored hashes and the AES-GCM envelope around seeded
+ * provider credentials, so a per-run random pepper would write rows nothing could ever verify
+ * or decrypt.
  */
 export const API_KEY_PEPPER_KEYS = ["CREDENTIALS_SECRET", "NEXTAUTH_SECRET"] as const;
 

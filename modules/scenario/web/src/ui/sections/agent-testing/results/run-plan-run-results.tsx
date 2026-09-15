@@ -1,5 +1,6 @@
 /**
- * The results of the selected run: a table by default, or the classic wall of live conversation cards.
+ * The results of the selected run: a table by default, or the classic wall
+ * of live conversation cards.
  * @see specs/features/agent-testing/results-tabs.feature
  * @see specs/features/agent-testing/comparison-mode.feature
  */

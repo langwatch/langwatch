@@ -4,21 +4,9 @@ import type { Instant } from "@langwatch/time";
 import type { VirtualKeyWithScopes } from "@langwatch/gateway-contract";
 
 /**
- * The row reads the Go data plane's control-plane calls make that no service
- * on this package already owns.
- *
- * Every one of them was an inline `prisma.<model>.<verb>` inside a route
- * handler in the retired application. They are one repository here for the
- * reason the layering rule gives — a transport calls services, never a
- * database — and they are ONE repository rather than four because they are
- * one caller: the internal family, whose six methods are exactly what its
- * five routes read.
- *
- * The shapes are the reads as they were, not narrowed: `tryFindVirtualKeyForConfig`
- * returns the record the config materialiser is typed against, including the
- * routing policy that carries the model aliases, because a key materialised
- * without it emits an empty alias map and the gateway silently stops resolving
- * aliases and enforcing model deny rules.
+ * One repository, not four, because these are one caller (the internal family).
+ * Shapes are the original reads, not narrowed — `tryFindVirtualKeyForConfig` keeps
+ * the routing policy's aliases, or the gateway silently stops enforcing them.
  */
 export abstract class GatewayInternalStore {
   /**

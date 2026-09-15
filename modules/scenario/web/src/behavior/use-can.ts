@@ -4,7 +4,8 @@ import { api } from "./scenario-api.ts";
 import { useOrganizationTeamProject } from "./use-organization-team-project.ts";
 
 /**
- * The registry types are shared, so a typo'd permission string fails the build; the hierarchy helper is the same pure function the engine uses.
+ * The registry types are shared, so a typo'd permission string fails the
+ * build; the hierarchy helper is the same pure function the engine uses.
  * ADR-092 §5 — the client asks the server what it may do, once per
  * org+project, instead of re-deriving decisions from bundled role bags.
  */

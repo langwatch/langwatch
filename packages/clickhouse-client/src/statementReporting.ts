@@ -1,30 +1,7 @@
 /**
- * Everything the vendor-client policy says about a statement, and nowhere it
- * decides anything.
- *
- * Split from ./vendorClient.ts because the two answer different questions. That
- * module decides what happens to a statement — retry it, refuse it, guard its
- * stream. This one decides how the outcome is described: which sink, which
- * level, which fields, which counter.
- *
- * ## Why the ports are guarded here and not at the call sites
- *
- * The rule is ./observability.ts: reporting must not change what it reports.
- * Most of these calls run inside a `catch`, where a throw from a counter or a
- * log sink propagates *in place of* the ClickHouse error — the caller is handed
- * a telemetry failure and never learns what actually broke.
- *
- * Holding that rule by wrapping each call is a discipline, and disciplines are
- * forgotten by the next person to add a metric. So the ports are wrapped once,
- * on the way in: {@link StatementReporter} stores guarded views of whatever the
- * host passed, and every method below is then a plain call. Being unable to
- * throw is a property of the port, not of the code that uses it.
- *
- * The outcome sink is the one exception, and deliberately: its failure is worth
- * a line, so it is called raw and its throw reported on the notice sink. The
- * notice sink is guarded because it is the last resort — there is nowhere left
- * to report *its* failure, which also covers the host that passes one logger
- * for both and so breaks both at once.
+ * Everything the vendor-client policy says about a statement — split from
+ * ./vendorClient.ts, which decides what happens to it. Ports are wrapped once
+ * so a catch-site throw from a counter or log sink never masks the real error.
  */
 
 import { quietly } from "./observability.ts";
@@ -163,20 +140,10 @@ export class StatementReporter {
   }
 
   /**
-   * Report an attempt that failed and was raised to the caller.
-   *
-   * Warn, not error, and the cause off the `error` field — the same two rules
-   * as the vendor-log policy in ./logging.ts.
-   *
-   * The level is the substantive half. This layer does not know the outcome: a
-   * read's translated error is reported at the request boundary, and an insert
-   * is issued from a job the queue retries, which logs its own error and counts
-   * what it drops if it ever truly gives up. Claiming a verdict here made
-   * recovered work read as lost work — 17k records a day against zero jobs
-   * actually dropped.
-   *
-   * The failure is still counted: {@link outcome} runs at every call site, and
-   * a rate is what the alerting is built on.
+   * Report an attempt that failed and was raised to the caller. Warn, not
+   * error: this layer can't know the outcome (an insert is issued from a
+   * job the queue retries) — claiming a verdict here once made recovered
+   * work read as lost work, 17k records a day against zero jobs actually dropped.
    */
   failure({
     operation,
@@ -271,21 +238,9 @@ export class StatementReporter {
   }
 
   /**
-   * Report an attempt that failed and is about to be retried.
-   *
-   * For a transient failure that later succeeds this is the ONLY line emitted —
-   * {@link failure} never runs — so the cluster belongs here too, or a
-   * recovered failure on a customer's private instance is indistinguishable
-   * from one on the shared cluster.
-   *
-   * The only reporting method with no `catch`, and the one place a log line
-   * was deliberately dropped. {@link failure} and {@link success} write to the
-   * outcome sink and report their own failure on the notice sink — two
-   * different sinks, so the second line is worth emitting. This method already
-   * writes to the notice sink, so the old fallback reported a broken sink
-   * through the sink that had just broken. It only ever produced output for a
-   * host whose `debug`/`warn` threw while its `error` still worked, and the
-   * guard now covers the failure either way.
+   * Report an attempt that failed and is about to be retried. The only
+   * reporting method with no `catch`, deliberately: this already writes to
+   * the notice sink, so a fallback would report a broken sink through itself.
    */
   retryNotice({
     operation,

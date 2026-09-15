@@ -1,30 +1,7 @@
 /**
  * Shared OTLP body read + decompress + parse for both LangWatch OTel
- * receivers:
- *
- *   POST /api/otel/v1/{traces,logs,metrics}     (project-scoped LLM observability)
- *   POST /api/ingest/otel/:sourceId             (org-scoped governance audit feed)
- *
- * The two endpoints serve different products (per-project trace viewer
- * vs cross-platform Activity Monitor), but they share the OTLP wire
- * shape and must therefore share a single hardened parser. Specifically:
- *
- *   - decompression: gzip / deflate / brotli per Content-Encoding (most
- *     production OTel collectors enable gzip by default)
- *   - protobuf + JSON: most production collectors emit protobuf for size,
- *     so JSON-only parsing silently fails them
- *   - JSON-then-protobuf fallback path (for reasonable-looking JSON that
- *     was sent without the right Content-Type)
- *
- * Owners must compose this with their own auth, tenancy resolution,
- * and downstream pipeline (trace pipeline vs OCSF normaliser). The
- * helper deliberately doesn't take an IngestionSource / Project — it
- * stays a pure parser.
- *
- * Background: PR #3524 review (rchaves "we already have a /v1 otel
- * traces endpoint hardened over the years"). Master directive
- * 2026-04-27: keep public URLs separate; converge the receiver
- * internals into a shared module.
+ * receivers (project-scoped traces, org-scoped governance ingest), which
+ * share the wire shape but compose their own auth, tenancy and pipeline.
  */
 
 import { promisify } from "node:util";
@@ -47,16 +24,9 @@ const brotliDecompressAsync = promisify(brotliDecompress);
 
 /**
  * The generated protobuf root, through whichever shape the loader hands it in.
- *
- * `.../generated/root` is CommonJS. A bundler that applies the interop shim
- * (Vite, so every vitest run) copies the exports onto the namespace and
- * `root.opentelemetry` resolves; Node's own ESM loader does not — its
- * lexer finds no named exports on this file, so the namespace is
- * `{ default }` and the same expression is `undefined.proto`. That is a
- * module-load crash, not a runtime one: it takes down every process that
- * imports this package, which is `apps/api` and the OpenAPI generator both.
- * So the root is read through `default` first and the namespace second, and
- * the package's tests keep the bundler path honest.
+ * `.../generated/root` is CommonJS: a bundler's interop shim (Vite) puts the
+ * exports on `.default`, but Node's own ESM loader leaves them on the
+ * namespace directly — reading `default` first, namespace second, covers both.
  */
 export const otlpProtobufRoot: Record<string, any> =
   (rootModule as { default?: Record<string, any> }).default ??
@@ -76,22 +46,9 @@ function toArrayBuffer(buf: Buffer): ArrayBuffer {
 
 /**
  * The most we will read off the wire, and the most we will hold after
- * decompressing.
- *
- * One number covers both because they bound the same thing — the bytes this
- * process ends up holding for one request — and neither stage can express the
- * other. `bodyLimit` weighs the bytes on the wire, and the ratio between those
- * and the bytes in memory is chosen by the sender: a 10 MiB gzip of repetitive
- * protobuf expands by orders of magnitude. An uncompressed body has no such
- * ratio, but it is read whole before any of that, so a route with no wire limit
- * is exposed to the plain version of the same attack.
- *
- * Both caps live here rather than at each route because the routes do not agree
- * on middleware: the OTLP handler routes carry `bodyLimit`, and the governance
- * ingest routes carry none at all, which made them the more exposed of the two
- * receivers. Applying the bound in the one function both receivers share means
- * neither can be left out, and each still answers in its own contract — the
- * OTLP routes with a 413, the ingest routes with their existing ack-and-hint.
+ * decompressing — one number, since a compressed body's expansion ratio is
+ * chosen by the sender and cannot be trusted. Applied once, here, because the
+ * governance ingest routes carry no `bodyLimit` middleware of their own.
  */
 export const OTLP_MAX_BODY_BYTES = 10 * 1024 * 1024;
 
@@ -123,14 +80,10 @@ function isSupportedEncoding(encoding: string): encoding is SupportedEncoding {
 }
 
 /**
- * Release the reader without letting it throw.
- *
- * A reader whose stream was torn down mid-read can throw from `releaseLock()`
- * itself, and thrown from a `finally` block that error REPLACES the one already
- * on its way out. That is how a client disconnect came to be reported as an
- * unrelated stream-internals TypeError, and — being unclassified — answered
- * 500. Nothing here is worth reporting: the stream is already gone, and the
- * failure that matters has been raised.
+ * Release the reader without letting it throw: a torn-down stream's
+ * `releaseLock()` can throw from a `finally` block, and that REPLACES the
+ * real error already on its way out — the failure that matters was already
+ * raised, so nothing here is worth reporting.
  */
 function releaseQuietly(reader: { releaseLock: () => void }): void {
   try {
@@ -150,20 +103,9 @@ async function cancelQuietly(reader: { cancel: () => Promise<void> }): Promise<v
 }
 
 /**
- * Read the wire body, refusing it the moment it passes
- * {@link OTLP_MAX_BODY_BYTES}.
- *
- * Consuming the stream by hand rather than calling `req.arrayBuffer()` is the
- * point: `arrayBuffer()` buffers the whole body and only then hands it over, so
- * measuring afterwards would concede exactly the memory being defended.
- *
- * Every way this can fail is the sender's: the body was already consumed, the
- * connection ended mid-read, or it passed the size bound. None of them is a
- * server fault, and leaving them unclassified is what had them answered 500.
- */
-/**
- * "Body is unusable" — the body was already consumed, or another reader holds
- * the lock. Nothing can be read, and it is not a server fault.
+ * Consuming the stream by hand (not `req.arrayBuffer()`, which buffers the
+ * whole body first) applies the byte bound before that memory is spent, and
+ * every failure — already consumed, dropped, over-size — is the sender's, not a 500.
  */
 function acquireReader(
   stream: ReadableStream<Uint8Array>,
@@ -354,23 +296,9 @@ const MAX_FAILURE_DETAIL = 120;
 const MAX_FAILURE_MESSAGE = 300;
 
 /**
- * A parser's error message, reduced to the part that is ours to repeat.
- *
- * Nothing here logs the request body — and the body reached the log sink
- * anyway, because V8's `JSON.parse` SyntaxError quotes about ten characters of
- * its input inside the message and we passed that message straight through.
- * Those characters are arbitrary bytes, so they were routinely not valid UTF-8,
- * which broke consumers that parse a log record's own metadata.
- *
- * A JSON failure is therefore rebuilt rather than filtered: only a fixed phrase
- * and, where the parser gives one, a numeric position. Nothing from the input
- * can survive a construction that never reads it.
- *
- * A protobuf failure keeps its own words, because "index out of range: 57 +
- * 1307648 > 2070" is the sentence that says whether the sender truncated the
- * body or we mis-read it — and protobufjs describes structure, never content.
- * It is still stripped of quoted spans and anything unprintable, so a future
- * decoder that starts echoing bytes cannot reopen this.
+ * A parser's error message, reduced to what is safe to repeat. JSON failures
+ * are rebuilt (fixed phrasing + position) since SyntaxError used to leak body
+ * bytes into logs; protobuf failures keep their own structural-only words.
  */
 function describeParseFailure(err: unknown): string {
   const message = err instanceof Error ? err.message : String(err);

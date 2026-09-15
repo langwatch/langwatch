@@ -84,12 +84,9 @@ function VersionTimestamp({ createdAt }: { createdAt?: Date | string | null }) {
 
 /**
  * Author line for a version: an avatar (SSO/OAuth photo → initials → generic
- * silhouette), the author's display name, and a tooltip revealing who it is.
- *
- * The name falls back to the author's email, then to "Unknown author", so the
- * row is never a bare, unlabelled icon. Versions created through the SDK/API
- * have no author on record; that is stated in the tooltip rather than left
- * blank (which previously rendered as a nameless silhouette with no hover).
+ * silhouette), the display name (falling back to email, then "Unknown
+ * author"), and a tooltip. Versions created through the SDK/API have no
+ * author on record; that is stated in the tooltip rather than left blank.
  */
 function VersionAuthor({ author }: { author?: VersionHistoryItemData["author"] }) {
   const [brokenImageUrl, setBrokenImageUrl] = useState<string | null>(null);
@@ -208,19 +205,12 @@ function VersionIdentityLine({
 }
 
 /**
- * One version.
- *
- * Three lines, each with one job, so the eye can scan a column at a time:
- * which version and when (the identity line, with the row's action in its
- * trailing cell), what the author said they did (the loudest line, because it
- * is the reason to read the row at all), and who wrote it alongside the way in
- * to the diff.
- *
- * The version number is a quiet label rather than a tile: it identifies the
- * row, it does not deserve to be the first thing seen. The version the editor
- * currently holds is marked twice over - an accent down its leading edge and a
- * "Current" tag - because "which one am I on?" is the question a history is
- * opened to answer.
+ * One version, laid out as three lines so the eye can scan a column at a
+ * time: identity (version + when, with the row's action), what changed (the
+ * loudest line, the reason to read the row), and who wrote it. The version
+ * number is a quiet label, not a tile; the current version is marked twice
+ * (leading accent + "Current" tag) because "which one am I on?" is the
+ * question a history is opened to answer.
  */
 function VersionHistoryItem({
   data,
@@ -353,7 +343,7 @@ function VersionHistoryList({
   versions: VersionHistoryItemData[];
   onLoad: (params: VersionLoadRequest) => void;
   isLoading: boolean;
-  /** The versionId of the version currently being edited. If not provided, defaults to latest (index 0). */
+  /** The versionId currently being edited; defaults to latest (index 0) when omitted. */
   currentVersionId?: string;
 }) {
   if (isLoading) {

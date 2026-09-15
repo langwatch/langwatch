@@ -38,11 +38,8 @@ export type JsonSerializable =
 import type { SemConvAttributes } from "../semconv";
 
 /**
- * Supported types of spans for LangWatch observability. These types categorize the nature of the span for downstream analysis and visualization.
- *
- * @example
- * import { spanTypes, SpanType } from './span';
- * const myType: SpanType = 'llm';
+ * Supported types of spans for LangWatch observability, categorizing a span's
+ * nature for downstream analysis and visualization.
  */
 export const spanTypes = [
   "span",
@@ -68,20 +65,8 @@ export const spanTypes = [
 export type SpanType = (typeof spanTypes)[number];
 
 /**
- * Context for a RAG (Retrieval-Augmented Generation) span.
- *
- * This structure is used to record which document and chunk were retrieved and used as context for a generation.
- *
- * @property document_id - Unique identifier for the source document.
- * @property chunk_id - Unique identifier for the chunk within the document.
- * @property content - The actual content of the chunk provided to the model.
- *
- * @example
- * const ragContext: LangWatchSpanRAGContext = {
- *   document_id: 'doc-123',
- *   chunk_id: 'chunk-456',
- *   content: 'Relevant passage from the document.'
- * };
+ * Context for a RAG (Retrieval-Augmented Generation) span: which document and
+ * chunk were retrieved and used to generate a response.
  */
 export interface LangWatchSpanRAGContext {
   document_id: string;
@@ -116,43 +101,16 @@ export interface LangWatchSpanOptions extends SpanOptions {
 }
 
 /**
- * Extension of OpenTelemetry's Span with LangWatch-specific helpers for LLM, RAG, and GenAI tracing.
- *
- * This interface provides ergonomic methods for recording structured LLM/GenAI data, such as inputs, outputs, RAG contexts, and message events.
- *
- * All methods return `this` for chaining.
- *
- * @example
- * const span = createLangWatchSpan(otelSpan);
- * span
- *   .setType('llm')
- *   .setInput({ prompt: 'Hello' })
- *   .setOutput('Hi!')
- *   .addGenAIUserMessageEvent({ content: 'Hello' })
- *   .addGenAIAssistantMessageEvent({ content: 'Hi!' });
+ * Extension of OpenTelemetry's Span with LangWatch-specific helpers for LLM, RAG, and
+ * GenAI tracing. All methods return `this` for chaining.
  */
 export interface LangWatchSpan extends Span {
   /**
-   * Record a manual evaluation result on this span.
-   *
-   * This emits a `langwatch.evaluation.custom` OpenTelemetry span event whose
-   * `json_encoded_event` attribute carries the evaluation payload. It matches
-   * the Python SDK's `span.add_evaluation(...)` exactly, so the LangWatch
-   * backend parses both identically.
-   *
+   * Records a manual evaluation on this span as a `langwatch.evaluation.custom` event,
+   * matching the Python SDK's `span.add_evaluation(...)` exactly.
    * @param params - The evaluation parameters. Only `name` is required; see
    *   {@link AddEvaluationParams}. `status` defaults to `"processed"`.
    * @returns this
-   *
-   * @example
-   * ```typescript
-   * span.addEvaluation({
-   *   name: "response_quality",
-   *   passed: true,
-   *   score: 0.95,
-   *   details: "High quality response",
-   * });
-   * ```
    */
   addEvaluation(params: AddEvaluationParams): this;
 
@@ -304,11 +262,8 @@ export interface LangWatchSpan extends Span {
    */
   setInput(type: "evaluation_result", input: unknown): this;
   /**
-   * Record the input to the span with automatic type detection.
-   *
-   * Automatically detects: strings → text, ChatMessage[] → chat_messages,
-   * arrays → list, objects → json.
-   *
+   * Record the input to the span with automatic type detection: strings → text,
+   * ChatMessage[] → chat_messages, arrays → list, objects → json.
    * @param input - The input value (auto-detected type)
    * @returns this
    */
@@ -371,11 +326,8 @@ export interface LangWatchSpan extends Span {
    */
   setOutput(type: "evaluation_result", output: unknown): this;
   /**
-   * Record the output from the span with automatic type detection.
-   *
-   * Automatically detects: strings → text, ChatMessage[] → chat_messages,
-   * arrays → list, objects → json.
-   *
+   * Record the output from the span with automatic type detection: strings → text,
+   * ChatMessage[] → chat_messages, arrays → list, objects → json.
    * @param output - The output value (auto-detected type)
    * @returns this
    */

@@ -1,15 +1,8 @@
 /**
- * Runs a prompt from the playground and streams the reply back.
- *
- * Replaces `useCopilotChat` and the GraphQL runtime behind it. The conversation
- * is a plain `ChatMessage[]` — the same shape the tab store already persists and
- * the shared renderer already reads — so there is no message class to convert
- * into and back out of.
- *
- * Deltas are buffered and flushed on an animation frame (`useDeltaBuffer`). The
- * previous arrangement re-rendered per token AND re-persisted the whole
- * conversation to localStorage per token, which is what the old component's
- * dedup-key comment was working around.
+ * Runs a prompt from the playground and streams the reply back, replacing
+ * `useCopilotChat`. Deltas are buffered and flushed on an animation frame
+ * (`useDeltaBuffer`) — the old arrangement re-rendered and re-persisted the
+ * whole conversation to localStorage per token.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { z } from "zod";

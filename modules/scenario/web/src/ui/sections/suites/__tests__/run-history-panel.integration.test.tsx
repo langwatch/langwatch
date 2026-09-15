@@ -1,7 +1,6 @@
 /**
  * @vitest-environment jsdom
- * @see specs/features/suites/all-runs-panel.feature, specs/features/suites/all-runs-group-by.feature,
- *   specs/features/suites/suite-bugfixes-1956.feature
+ * @see specs/features/suites/{all-runs-panel,all-runs-group-by,suite-bugfixes-1956}.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, within } from "@testing-library/react";

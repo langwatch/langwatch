@@ -22,20 +22,11 @@ type UseLatestPromptVersionOptions = {
   currentVersion: number | undefined;
   /**
    * Whether this instance keeps the latest version live by re-fetching on
-   * window focus. Defaults to `true`.
-   *
-   * Pass `false` where the hook is mounted once per open tab or per table
-   * column. N always-mounted instances each re-firing a full-prompt fetch on
-   * every window focus was the query storm #5585 fixed. A gated instance is
-   * save-driven instead: `useHandleSavePrompt` invalidates this key, so
-   * same-app version bumps still move the badge, but another session's new
-   * version isn't reflected until the next save or reload.
-   *
-   * The callers left live are bounded by open *editors*, not by tab count:
-   * one prompt editor drawer, and one editor per browser window in Compare
-   * mode (a window renders only its active tab's content — the tab panels are
-   * `lazyMount unmountOnExit`). So focus costs one refetch per prompt being
-   * edited, and the two hooks inside a window share one query key.
+   * window focus. Defaults to `true`. Pass `false` where the hook is mounted
+   * once per open tab or per table column — N always-mounted instances each
+   * refetching on every focus was the query storm #5585 fixed. A gated
+   * instance is save-driven instead (`useHandleSavePrompt` invalidates the
+   * key), so another session's new version isn't reflected until reload.
    */
   isLiveRefetchEnabled?: boolean;
 };

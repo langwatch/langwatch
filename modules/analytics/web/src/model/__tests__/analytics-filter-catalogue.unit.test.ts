@@ -1,14 +1,9 @@
 /**
- * The filter catalogue is a COPY, and this is what keeps it honest.
- *
- * `availableFilters` beside this test is a family-local copy of
- * `platform/app/src/server/filters/registry.ts`, taken because thirty-odd
- * platform modules still read the original and deletes-only forbids repointing
- * them. A copy of a vocabulary is only safe while something proves it still
- * answers for the whole vocabulary — and the vocabulary itself is not copied:
- * `filterFieldsEnum` is `@langwatch/analytics-contract`'s, so a field added
- * there without an entry here fails on this line rather than disappearing out
- * of the filter rail with nothing to show for it.
+ * The filter catalogue is a COPY, and this is what keeps it honest. `availableFilters` beside
+ * this test is a family-local copy of `platform/app/src/server/filters/registry.ts`, taken
+ * because thirty-odd platform modules still read the original and deletes-only forbids
+ * repointing them. The vocabulary itself is not copied — `filterFieldsEnum` is
+ * `@langwatch/analytics-contract`'s — so a field added there without an entry here fails here.
  */
 
 import { filterFieldsEnum } from "@langwatch/analytics-contract";

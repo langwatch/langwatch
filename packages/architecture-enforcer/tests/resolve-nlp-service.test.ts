@@ -1,17 +1,10 @@
 /**
  * @vitest-environment node
- *
- * Tests for dev/scripts/lib/resolve-nlp-service.sh, sourced the way
- * dev/scripts/dev-stack.sh sources it: before the launcher decides which
- * port to start the Go NLP engine on. The launcher runs ahead of every Node
- * entry point and sees only the calling shell, while the app loads .env, so the
- * helper has to read that file to predict the address the app will actually
- * dial.
- *
- * See specs/setup/dev-nlp-engine-port.feature.
- *
- * The helper is bash; we drive it by sourcing it from `bash -s` and reading the
- * resulting env, the same technique as derive-gateway-base-url.unit.test.ts.
+ * @see specs/setup/dev-nlp-engine-port.feature
+ * Tests resolve-nlp-service.sh, sourced as dev-stack.sh sources it before
+ * picking the Go NLP engine's port: the launcher sees only the calling shell,
+ * not .env (which only the app loads), so the helper reads that file itself.
+ * Driven via `bash -s`, reading the resulting env.
  */
 
 import { execSync } from "node:child_process";

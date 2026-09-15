@@ -1,18 +1,9 @@
 /**
- * Restart policy for a sandboxed chart frame the bridge tore down.
- *
- * A frame that stops heartbeating is usually a transient wedge (a CDN script
- * that hung, a busy loop on a pathological result), so the card restarts it
- * on its own with a growing pause between attempts and gives up after
- * {@link FRAME_RESTART_MAX_ATTEMPTS}. A frame that then stays healthy for
- * {@link FRAME_HEALTHY_RESET_MS} earns its attempts back, so a widget that
- * hiccups once a day never runs out of retries.
- *
- * Restarts wait while the tab is hidden: background-tab throttling is what
- * silenced the heartbeat in the first place, and remounting a frame nobody
- * can see would burn the attempt for nothing.
- *
- * @see specs/analytics/dashboard-widget-resilience.feature
+ * Restart policy for a sandboxed chart frame the bridge tore down: backs off
+ * with a growing pause up to {@link FRAME_RESTART_MAX_ATTEMPTS}, and a frame
+ * healthy for {@link FRAME_HEALTHY_RESET_MS} earns its attempts back.
+ * Restarts wait while the tab is hidden, since background-tab throttling
+ * silenced the heartbeat in the first place.
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";

@@ -1,13 +1,10 @@
 /**
  * Real-shell execution test for the Path-B `unset -f` neutralization in
- * `buildShellReapply()`. String assertions in the unit suite prove the
- * prefix TEXT; this proves the RUNTIME effect the way `runWrapped` uses it —
- * spawns `$SHELL -i -c`, sources a persisted `tool() { … }` scoped function,
- * applies the reapply prefix, and observes that the REAL binary (not the
- * shadowing function) runs and inherits the reapplied env.
- *
- * A quoting / ordering / `-i -c`-sourcing regression on a shipped tool
- * (gemini/opencode/copilot) would pass every string assertion but fail here.
+ * `buildShellReapply()`. Unit tests prove the prefix TEXT; this proves the
+ * RUNTIME effect — spawns `$SHELL -i -c`, sources a persisted shadowing
+ * function, applies the prefix, and observes the real binary (not the
+ * shadow) runs. A quoting/ordering/`-i -c`-sourcing regression would pass
+ * every string assertion but fail here.
  */
 
 import { execFileSync } from "node:child_process";

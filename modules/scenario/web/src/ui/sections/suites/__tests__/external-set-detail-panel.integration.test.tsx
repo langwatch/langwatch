@@ -1,5 +1,6 @@
 /**
- * Integration tests for ExternalSetDetailPanel: a run row opens the drawer rather than navigating to a page of its own.
+ * Integration tests for ExternalSetDetailPanel: a run row opens the drawer
+ * rather than navigating to a page of its own.
  * @vitest-environment jsdom
  * @see specs/features/suites/suite-bugfixes-1956.feature
  */

@@ -1,5 +1,5 @@
 /**
- * Pins the on-platform (internal) run set's display treatment: it always reads with a friendly name, and v1 keeps the name it shows today while the v2 surface renames it on its own side.
+ * Pins the on-platform run set's friendly name: v1 keeps its current name, v2 renames separately.
  * @vitest-environment jsdom
  * @see specs/suites/internal-run-set-surface.feature
  */

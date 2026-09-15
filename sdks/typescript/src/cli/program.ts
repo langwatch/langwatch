@@ -831,24 +831,11 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
       await installCommand(tool, options);
     });
 
-  // `langwatch ingest hook <tool>`: what the agent's own hook entries and the
-  // Claude Code plugin's launcher run. Hidden: the install path writes it into
-  // the agent's settings and the plugin ships it in its launcher. It reads its
-  // payload on stdin, writes nothing to stdout (a SessionStart hook's stdout
-  // is injected into the user's session context) and always exits zero, so a
-  // hook can never be why a session broke.
-  //
-  // Unknown options and extra arguments are accepted and ignored, here and on
-  // `ingest guidance` below. That is the cross-version contract the plugin
-  // rests on: a plugin hooks.json from any version has to run with a CLI from
-  // any version, and a usage error over an argument this build does not know
-  // would be a non-zero exit with prose on stderr on every session start.
-  //
-  // Registered as rendering its own result because it renders NO result, in
-  // any format. Left unregistered, the auto-detected agent mode a hook always
-  // runs under (Claude Code sets CLAUDECODE in its children) would print
-  // "the table below is not machine-readable" to stderr on every session
-  // start and stop, about a table that does not exist.
+  // `langwatch ingest hook <tool>`: what the agent's own hook entries and
+  // the Claude Code plugin's launcher run. Hidden: install/plugin write it
+  // in; it always exits zero so a hook can never break a session. Unknown
+  // options/arguments are accepted and ignored, here and on `ingest
+  // guidance` below — the cross-version contract between any plugin and CLI version.
   rendersOwnResult(
     ingestCmd
       .command("hook <tool>", { hidden: true })

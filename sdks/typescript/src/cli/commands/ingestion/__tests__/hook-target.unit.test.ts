@@ -1,18 +1,9 @@
 /**
- * Where the session context hook posts, and what authenticates the record.
- *
- * The environment comes first, per the OTel exporter spec, and cannot be the
- * only source: Claude Code strips every `OTEL_*` variable from the processes it
- * spawns, so a session exporting perfectly well hands its hooks an environment
- * with no endpoint in it at all. The CLI's own device config is the fallback,
- * and a CLI signed in with no key for this agent is a no-op rather than a guess.
- *
- * The config holds two credentials for one agent, and they are read in the
- * order `langwatch instrument` chooses between them: a tool pinned with
- * `--key` or `--project` reports with that key, to the endpoint the pin
- * carries, and the personal key is what an unpinned tool falls back on.
- *
- * Feature: specs/ai-governance/cli-wrappers/session-context-hook.feature
+ * Where the session context hook posts, and what authenticates it. The
+ * environment comes first (OTel exporter spec) but can't be the only
+ * source — Claude Code strips every `OTEL_*` var from spawned processes,
+ * so the CLI's device config is the fallback (no key = no-op). A pinned
+ * tool (`--key`/`--project`) uses that pin; otherwise the personal key.
  */
 
 import { describe, expect, it } from "vitest";

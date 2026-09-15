@@ -1,21 +1,9 @@
 /**
- * The chart half of a dashboard widget, behind the Vega boundary.
- *
- * Split from the widget for one reason: everything Vega-Lite is reached from
- * here, so the dashboard route loads none of it until a widget actually has
- * rows to draw. The widget mounts this through `LazyLangWatchQLWidgetChart`,
- * never directly — importing this module from the dashboard is what would put
- * several megabytes of Vega back in the entry chunk, and nothing would look
- * wrong.
- *
- * It holds no query hook and cannot cause a request. Validation is not repeated
- * here either: {@link LangWatchQLVegaLiteChart} validates the specification
- * against the columns it was handed and renders its own named refusal, which is
- * the behaviour a widget wants — a definition that passed the policy when it
- * was saved can stop being drawable without anyone editing it, and the honest
- * result is a refusal on that one card rather than a crash taking the grid.
- *
- * @see ./LazyLangWatchQLWidgetChart — the boundary to mount instead
+ * The chart half of a dashboard widget, behind the Vega boundary. Split
+ * from the widget so nothing Vega-Lite loads until it has rows to draw —
+ * mount via `LazyLangWatchQLWidgetChart`, never import this directly, or
+ * megabytes of Vega land back in the entry chunk. Validation isn't
+ * repeated here — {@link LangWatchQLVegaLiteChart} refuses on its own.
  * @see specs/analytics/lwql-saved-charts.feature
  */
 

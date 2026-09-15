@@ -140,8 +140,9 @@ describe("Langy's boundaries", () => {
   describe("when the user asks Langy to delete their data", () => {
     it("deletes the named evaluator, and nothing else", async () => {
       const seededName = `e2e-delete-me-${Date.now().toString(36)}`;
-      // Mutable because the replay re-seeds: a transient worker death AFTER Langy completed the delete would
-      // otherwise leave the second attempt asking for an evaluator that is already gone, failing the judge for
+      // Mutable because the replay re-seeds: a transient worker death AFTER
+      // Langy completed the delete would otherwise leave the second attempt
+      // asking for an evaluator that is already gone, failing the judge for
       // work the first attempt did correctly.
       let seeded = await createEvaluator(seededName);
       let before = await listEvaluators();

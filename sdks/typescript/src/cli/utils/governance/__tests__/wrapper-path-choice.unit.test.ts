@@ -1,11 +1,7 @@
 /**
- * Unit tests for the runtime path-selection UX of `langwatch <tool>`.
- *
- * Covers the decision tree (override flag / env, remembered pref,
- * single-allowed-path, both-allowed prompt, non-TTY default) and the
- * `--tool-mode` arg-strip that keeps the wrapper flag out of the child's
- * argv. The prompt + config-save are injected seams, so no module mock
- * or filesystem touch is needed.
+ * Runtime path-selection UX for `langwatch <tool>`: the decision tree
+ * (override, remembered pref, single/both-allowed, non-TTY) and the
+ * `--tool-mode` arg-strip. Prompt + config-save are injected seams.
  */
 import { describe, it, expect, vi } from "vitest";
 

@@ -24,7 +24,7 @@ export type ParameterRowProps = {
   value: number | string | undefined;
   /** Callback when value changes */
   onChange: (value: number | string) => void;
-  /** Optional max override for sliders (e.g. model's maxCompletionTokens or provider constraints) */
+  /** Optional max override for sliders (e.g. model's maxCompletionTokens or provider limits) */
   maxOverride?: number;
   /** Optional min override for sliders (e.g. provider constraints) */
   minOverride?: number;

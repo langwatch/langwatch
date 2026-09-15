@@ -7,11 +7,8 @@ export interface ChatTextAreaProps extends TextareaProps {
 }
 
 /**
- * A chat-specific textarea component with auto-growing height.
- *
- * Single Responsibility: Provides a styled, accessible textarea for chat message input
- * with automatic height adjustment. Stays enabled during message processing so users
- * can continue typing their next message.
+ * A chat-specific textarea with auto-growing height; stays enabled during
+ * message processing so users can keep typing their next message.
  *
  * @param inProgress - Currently unused, kept for API compatibility
  * @param props - Standard Chakra UI Textarea props

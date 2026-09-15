@@ -23,7 +23,9 @@ export interface SpendEventsPageCursor {
 
 export interface SpendSummaryRow {
   /**
-   * The first grouping dimension's value, kept first so a consumer written against the single-dimension surface keeps reading what it always did; `group` is what tells two dimensions sharing one flat key apart.
+   * The first grouping dimension's value, kept first so a consumer written
+   * against the single-dimension surface keeps reading what it always did;
+   * `group` is what tells two dimensions sharing one flat key apart.
    */
   key: string;
   /** Every grouping dimension by name, e.g. `{ model: "gpt-5-mini" }`. */
@@ -37,9 +39,15 @@ export interface SpendSummaryRow {
   tokensCacheRead: number;
   tokensCacheWrite: number;
   tokensReasoning: number;
-  /** Image tokens billed on the input side, 0 when no row in the group used one. Priced at its own rate and disjoint from tokensInput. */
+  /**
+   * Image tokens billed on the input side, 0 when no row in the group used
+   * one. Priced at its own rate and disjoint from tokensInput.
+   */
   tokensInputImage: number;
-  /** Image tokens the answer was billed for, 0 when no row in the group produced one. Priced at its own rate and disjoint from tokensOutput. */
+  /**
+   * Image tokens the answer was billed for, 0 when no row in the group
+   * produced one. Priced at its own rate and disjoint from tokensOutput.
+   */
   tokensOutputImage: number;
   /** Images the group's requests carried, 0 when none did. Display only: no rate prices it. */
   imageCount: number;

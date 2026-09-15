@@ -6,7 +6,8 @@ import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
 import { Dialog } from "@langwatch/design-system/studio-dialog";
 
 /**
- * Editor for the parameters a scenario declares, opened from the Parameters group in the scenario editor footer.
+ * Editor for the parameters a scenario declares, opened from the Parameters
+ * group in the scenario editor footer.
  * @see specs/scenarios/scenario-run-parameters.feature
  * @see specs/scenarios/secret-run-parameters.feature
  */

@@ -1,17 +1,8 @@
 /**
  * Who a join-request notification reaches, and what they are called.
- *
- * Every read answers with a name or an address for somebody who is already
- * entitled to the message — an admin of the organization being asked, or the
- * person who did the asking. Nothing here enumerates a membership for a
- * decision; that is `JoinRequestReadRepository`'s side of the feature, and it
- * answers only in counts and enums for exactly this reason.
- *
- * The absences are real rather than defensive: a request whose row the fold
- * has not written yet, an organization renamed out from under a queued wake, a
- * user with no address at all. The service above decides what each one means,
- * because the answer differs — a missing address means send nothing, a missing
- * organization name means send the mail with a generic one.
+ * `JoinRequestReadRepository` owns membership decisions (counts/enums only);
+ * absences here are real, not defensive — an unwritten fold, a renamed org,
+ * an addressless user — and the service above decides what each one means.
  */
 export abstract class JoinRequestAudience {
   abstract tryFindRequesterId(input: { joinRequestId: string }): Promise<string | null>;

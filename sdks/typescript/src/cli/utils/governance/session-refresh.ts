@@ -1,19 +1,7 @@
 /**
- * Keeps a device-login session alive without the user noticing.
- *
- * `POST /api/auth/cli/exchange` hands out a short-lived access token
- * plus a long-lived rotating refresh token. Every authenticated CLI
- * call carries the access token; when the control plane rejects it the
- * CLI trades the refresh token for a fresh pair and retries, so an
- * actively used session keeps working and only a genuinely idle (or
- * revoked) session ends up back at `langwatch login --device`.
- *
- * Rotation is single-use server-side: the refresh call invalidates the
- * token it consumed. Two `langwatch <tool>` sessions running side by
- * side can therefore race, one of them presenting a token the other
- * already spent. That loses a race, not a session: on rejection this
- * module re-reads ~/.langwatch/config.json and retries once with
- * whatever the winner persisted.
+ * Keeps a device-login session alive: on rejection the CLI trades the
+ * refresh token for a fresh pair. Rotation is single-use server-side, so a
+ * race between two sessions re-reads config and retries with the winner's pair.
  */
 
 import * as deviceFlow from "./device-flow";

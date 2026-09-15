@@ -1,6 +1,6 @@
 /**
- * A prompt is authored in the prompt library and pointed at by a run plan, so the binding between a simulation
- * and the prompt's declared inputs is configured on the run plan form (#6590).
+ * A prompt is authored in the library and pointed at by a run plan, so the
+ * binding between a simulation and its declared inputs is configured here (#6590).
  * @vitest-environment jsdom
  */
 

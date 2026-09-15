@@ -1,5 +1,6 @@
 /**
- * The runs of one run plan, newest first: the number of the run, the note the person left with it, how long ago it started and how it went.
+ * The runs of one run plan, newest first: the run number, the note left with it,
+ * how long ago it started and how it went.
  * @see specs/features/agent-testing/results-tabs.feature
  * @see specs/suites/run-notes.feature
  */

@@ -1,16 +1,9 @@
 /**
- * The filters one SERIES of a custom graph is narrowed by.
- *
- * `platform/app`'s `SeriesFiltersDrawer`, mounted INLINE by the builder rather
- * than through the drawer registry — the gateway family's routing-policy shape,
- * applied to this family's own overlay. It had exactly one opener, so the
- * registry entry is deleted with it.
- *
- * THE CALLBACK REGISTRATION IS GONE, AND THAT IS THE POINT. The platform
- * version was opened through `openDrawer("seriesFilters", …)` after a separate
- * `setFlowCallbacks("seriesFilters", { onChange })` — a registry-wide side
- * channel for handing a component a function, because the address can only
- * carry strings. Mounted inline, `onChange` is just a prop.
+ * The filters one SERIES of a custom graph is narrowed by, mounted INLINE by the builder rather
+ * than through the drawer registry — this family's own overlay, with exactly one opener. That is
+ * why there is no `setFlowCallbacks` side channel here: the registry-wide workaround exists only
+ * because a drawer address can carry strings but not a function; mounted inline, `onChange` is
+ * just a prop.
  */
 
 import { Button, HStack, Text, VStack } from "@chakra-ui/react";

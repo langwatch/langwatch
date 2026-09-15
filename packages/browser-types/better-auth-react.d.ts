@@ -1,17 +1,7 @@
 /**
- * What the browser knows about `better-auth/react`.
- *
- * The real declaration reaches the server half of better-auth, and through it
- * a database adapter: importing `createAuthClient` loads 576 declaration files
- * into a browser program, 251 of them kysely — a SQL query builder no
- * first-party file names and no browser can run. The `paths` entries in
- * `apps/ui/tsconfig.json` and `modules/auth/web/tsconfig.json` point
- * the two browser programs here instead. Nothing about the RUNTIME changes:
- * vite and node both resolve the real package, which `paths` never touches.
- *
- * So this file is a contract, and it may only ever grow to match what the
- * three call sites use. `better-auth-surface.unit.test.ts` runs against the
- * real package and fails when a method named here stops existing.
+ * What the browser knows about `better-auth/react`. The real declaration
+ * pulls in the server half (576 files, 251 kysely) via `createAuthClient`,
+ * so both browser tsconfigs' `paths` point here — grows only to match usage.
  */
 
 /** A refusal, as better-auth reports one to the browser. */

@@ -1,13 +1,8 @@
 /**
- * Revoking a key retires the keys minted under it, from every entry point.
- *
- * The parent link (`parentApiKeyId`) is a property of the row, and the
- * revoke reaches it from the API-keys page, the REST route and the tRPC
- * mutation as well as from a `langwatch logout`. A cascade that lived in one
- * caller was one the other three skipped, which left a live ingestion
- * credential under a dead login.
- *
- * Spec: modules/api-key/specs/api-key.feature
+ * Revoking a key retires the keys minted under it, from every entry point:
+ * the API-keys page, the REST route, the tRPC mutation and `langwatch
+ * logout`. A cascade that lived in one caller was one the other three
+ * skipped, leaving a live ingestion credential under a dead login.
  */
 import { ApiKeyAlreadyRevokedError } from "@langwatch/api-key-contract";
 import { describe, expect, it, vi } from "vitest";

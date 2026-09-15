@@ -1,6 +1,8 @@
 /**
  * @vitest-environment node
- * Real Postgres + real ClickHouse. Pins: spend reports even with no budget, and one key's spend isn't multiplied by however many budgets cover it. Window is rolling [now-N days, now). Spec: specs/ai-gateway/budgets.feature
+ * Real Postgres + real ClickHouse. Pins: spend reports even with no budget, and one key's
+ * spend isn't multiplied by however many budgets cover it. Window is rolling [now-N days, now).
+ * Spec: specs/ai-gateway/budgets.feature
  */
 import { nowInstant, toDate } from "@langwatch/time";
 import type { ClickHouseClient } from "@clickhouse/client";

@@ -40,14 +40,10 @@ export const findUnclosedBraces = (
 };
 
 /**
- * Find a fully-typed `{{variable}}` ending exactly at the cursor.
- *
- * Typing the final closing brace makes `findUnclosedBraces` return null,
- * which used to dismiss the insertion menu at the exact moment the user
- * finished typing the name they wanted to create. Detecting the
- * just-completed token lets the menu stay open and keep offering
- * "Create variable" for unknown names. `start` follows the same
- * convention as `findUnclosedBraces` (position right after `{{`).
+ * Find a fully-typed `{{variable}}` ending exactly at the cursor. Typing the
+ * final closing brace makes `findUnclosedBraces` return null, which used to
+ * dismiss the insertion menu right when the user finished typing the name;
+ * `start` follows the same convention (position right after `{{`).
  */
 export const findJustCompletedVariable = (
   text: string,

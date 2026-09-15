@@ -172,16 +172,10 @@ export const loginCommand = async (options?: {
     // this CLI; the Claude Code plugin's hooks look it up there.
     recordCliLocation();
 
-    // Honor `--endpoint` flag OR `LANGWATCH_ENDPOINT` env. Persist the
-    // resolved value BEFORE the chosen flow runs so subsequent reads
-    // (in the device flow, the API-key flow, any sub-command spawned
-    // later) see the right control-plane URL. The 4-source resolver
-    // (flag > env > config > default) honors this value via the
-    // persisted-config layer for any flow that doesn't explicitly take
-    // a flag. Only the flag skips the cloud/self-hosted picker; persisting
-    // the env var here is what makes that endpoint the picker's first and
-    // default choice, so `LANGWATCH_ENDPOINT=... langwatch login` is one
-    // Enter rather than a re-typed URL.
+    // Honor `--endpoint`/`LANGWATCH_ENDPOINT`, persisted before the chosen flow
+    // runs so every subsequent read (device flow, API-key flow, spawned
+    // sub-commands) sees it — the env var becomes the picker's default choice,
+    // so `LANGWATCH_ENDPOINT=... langwatch login` is one Enter, not a retyped URL.
     const endpointFromEnv = process.env.LANGWATCH_ENDPOINT?.trim();
     const presetEndpoint = options?.endpoint ?? endpointFromEnv;
     if (presetEndpoint) {

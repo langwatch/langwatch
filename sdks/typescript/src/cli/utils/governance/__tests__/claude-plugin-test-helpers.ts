@@ -1,13 +1,8 @@
 /**
- * Shared fixtures for the three suites that read Claude Code's plugin state:
- * the plugin seam itself, the persist offer that installs it, and the logout
- * target scan that removes it. All three seed the same two files under
- * `~/.claude/plugins`, and a shape that drifts between them would let one suite
- * pass against a file the others prove nothing about.
- *
- * Not named `*.test.ts` on purpose — vitest's `include` is `src/**\/*.test.ts`,
- * so this module is imported by the suites rather than collected as one (same
- * convention as `telemetry-refresh-test-helpers.ts` beside it).
+ * Shared fixtures for the three suites reading Claude Code's plugin state,
+ * seeding the same two files under `~/.claude/plugins` so a shape drift
+ * cannot let one suite pass against a file the others prove nothing about.
+ * Not named `*.test.ts`: vitest's `include` would collect it as a suite.
  */
 import * as fs from "node:fs";
 import * as os from "node:os";
@@ -67,13 +62,9 @@ export const seedInstalledPlugin = ({
 
 /**
  * `known_marketplaces.json` with a marketplace named `langwatch` sourced from
- * `repo`, and the clone it points at. The default repo is the one we publish;
- * pass another to stand in for somebody else's registration under the same
- * name.
- *
- * `publishedVersion` writes the plugin manifest inside that clone, which is
- * what the update path compares the installed version against. Leaving it out
- * gives a listing whose manifest cannot be read, which is a case of its own.
+ * `repo` (default: the repo we publish) and its clone.
+ * `publishedVersion` writes the plugin manifest the update path compares
+ * against; omitting it yields a listing whose manifest cannot be read.
  */
 export const seedMarketplace = ({
   home,

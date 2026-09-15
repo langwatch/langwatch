@@ -16,16 +16,8 @@ export interface InstanceScheme {
 export type InstanceSchemeType = InstanceScheme[keyof InstanceScheme];
 
 /**
- * Represents a machine/container instance identifier
- *
- * Instances are used to ensure uniqueness across different machines
- * or containers when generating KSUIDs simultaneously.
- *
- * @example
- * ```typescript
- * const instance = new Instance(Instance.schemes.RANDOM, new Uint8Array(8));
- * const ksuid = new Ksuid('prod', 'user', Date.now(), instance, 0);
- * ```
+ * A machine/container instance identifier, used to keep KSUIDs unique across
+ * machines or containers generating them simultaneously.
  */
 export class Instance {
   /** Available instance schemes */
@@ -64,13 +56,8 @@ export class Instance {
   }
 
   /**
-   * Converts the instance to a 9-byte buffer (scheme + identifier)
+   * Converts the instance to a 9-byte buffer (scheme + identifier).
    * @returns A Uint8Array containing the scheme byte followed by the identifier
-   * @example
-   * ```typescript
-   * const instance = new Instance(Instance.schemes.RANDOM, new Uint8Array(8));
-   * const buffer = instance.toBuffer(); // 9 bytes: [82, 0, 0, 0, 0, 0, 0, 0, 0]
-   * ```
    */
   toBuffer(): Uint8Array {
     // Cache the buffer since it's immutable
@@ -87,15 +74,10 @@ export class Instance {
   }
 
   /**
-   * Creates an Instance from a 9-byte buffer
+   * Creates an Instance from a 9-byte buffer.
    * @param buffer - A 9-byte buffer containing scheme byte + identifier
    * @returns A new Instance object
    * @throws {ValidationError} If the buffer is not exactly 9 bytes
-   * @example
-   * ```typescript
-   * const buffer = new Uint8Array([82, 1, 2, 3, 4, 5, 6, 7, 8]);
-   * const instance = Instance.fromBuffer(buffer);
-   * ```
    */
   static fromBuffer(buffer: Uint8Array): Instance {
     checkUint8Array("buffer", buffer, 9);
@@ -104,28 +86,17 @@ export class Instance {
   }
 
   /**
-   * Returns a string representation of the instance
+   * Returns a string representation of the instance.
    * @returns A string showing the scheme and identifier
-   * @example
-   * ```typescript
-   * const instance = new Instance(Instance.schemes.RANDOM, new Uint8Array([1,2,3,4,5,6,7,8]));
-   * console.log(instance.toString()); // 'Instance(scheme=82, identifier=1,2,3,4,5,6,7,8)'
-   * ```
    */
   toString(): string {
     return `Instance(scheme=${this._scheme}, identifier=${this._identifier.toString()})`;
   }
 
   /**
-   * Compares this instance with another for equality
+   * Compares this instance with another for equality.
    * @param other - The instance to compare with
    * @returns True if both instances have the same scheme and identifier
-   * @example
-   * ```typescript
-   * const instance1 = new Instance(Instance.schemes.RANDOM, new Uint8Array(8));
-   * const instance2 = new Instance(Instance.schemes.RANDOM, new Uint8Array(8));
-   * console.log(instance1.equals(instance2)); // true
-   * ```
    */
   equals(other: Instance): boolean {
     if (!(other instanceof Instance)) {

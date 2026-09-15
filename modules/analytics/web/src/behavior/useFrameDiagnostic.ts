@@ -1,10 +1,7 @@
 /**
- * Keeps the most recent error a sandboxed chart frame reported, so a host
- * can show it instead of dropping it. Compile errors, render throws and
- * `LW.error(...)` all arrive here through the bridge's `onLog`; the frame
- * itself keeps running, because the widget's code is the cause and a
+ * Keeps the most recent error a sandboxed chart frame reported. It keeps
+ * running after an error — the widget's own code is the cause, so a
  * restart would only reproduce it.
- *
  * @see specs/analytics/dashboard-widget-resilience.feature
  */
 

@@ -180,8 +180,8 @@ export type DeleteRecordsResponse = {
 };
 
 /**
- * API response for uploading a file.
- * Covers both upload-to-existing (records) and create-from-file (recordsCreated, datasetId) responses.
+ * API response for uploading a file. Covers both upload-to-existing
+ * (records) and create-from-file (recordsCreated, datasetId) responses.
  */
 export type UploadResponse = {
   dataset?: DatasetMetadata;

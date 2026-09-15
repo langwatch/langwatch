@@ -1,17 +1,8 @@
 /**
  * @vitest-environment node
- *
- * Tests for dev/scripts/install-check-shims.mjs, which routes direct tsgo /
- * tsc invocations through the check queue so `pnpm exec tsgo -p ...`
- * cannot start a fourth 4 GiB run behind the counter's back.
- *
- * Driven as real processes: the installer runs against a scratch bin directory
- * holding a stand-in launcher, and the resulting bin entry is executed with the
- * arg shapes that matter. The stand-in reports whether a queue entry exists
- * while it runs, so "counts against the limit" is an observation of the
- * mechanism rather than an assertion about the shim's text.
- *
- * Corresponds to specs/setup/check-slots.feature.
+ * Tests install-check-shims.mjs (routes tsgo/tsc through the check queue) as
+ * real processes, so "counts against the limit" observes the mechanism, not
+ * the shim's text.
  */
 
 import { spawnSync } from "node:child_process";

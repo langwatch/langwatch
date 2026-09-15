@@ -1,20 +1,10 @@
+/** @vitest-environment jsdom */
+
 /**
- * @vitest-environment jsdom
- *
- * What the chart actually draws from what the server returned.
- *
- * The renderer is the single engine behind six analytics pages, the report
- * grid's cards and the builder's preview, so the shaping between a timeseries
- * response and a plotted series is the highest-traffic logic in this package.
- * Two properties are pinned here because both fail SILENTLY — a wrong chart
- * looks exactly like a right one:
- *
- * - `excludeUnknownBuckets` is what keeps the "unknown" grouping bucket off a
- *   leaderboard. Dropping the filter puts a bar labelled "unknown" at the top
- *   of every top-N chart, which reads as a real user, model or label.
- * - A failed read renders its own state with a retry rather than an empty
- *   plot. An empty plot is indistinguishable from "no traffic in this window",
- *   which is the one thing a chart must never say when it does not know.
+ * Two properties are pinned here because both fail SILENTLY: dropping
+ * `excludeUnknownBuckets` puts an "unknown" bucket at the top of a
+ * leaderboard, reading as a real user; a failed read must render a retry
+ * state, since an empty plot is indistinguishable from "no traffic".
  */
 
 import { cleanup, render, screen } from "@testing-library/react";

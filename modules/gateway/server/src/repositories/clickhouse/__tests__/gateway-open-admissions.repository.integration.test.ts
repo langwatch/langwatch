@@ -1,6 +1,15 @@
+/** @vitest-environment node */
+
 /**
- * @vitest-environment node
- * Real ClickHouse. A cleared/never-armed/duplicate wake are all one behavior: a request the query does not select, since the fold's ReplacingMergeTree keeps a resolved request's superseded `admitted` version on disk. Cross-tenant BY DESIGN (settlement is install-wide) — fixtures use per-run tenant ids in months no other spend fixture writes to, standing in for the usual WHERE TenantId isolation. Spec: specs/ai-gateway/billing-spend-events.feature
+ * Cleared/never-armed/duplicate wakes are one behavior: a request the query
+ * excludes, since ReplacingMergeTree keeps a resolved request's superseded
+ * `admitted` version on disk.
+ */
+
+/**
+ * Cross-tenant BY DESIGN (settlement is install-wide): fixtures use per-run
+ * tenant ids in unused months, standing in for the usual TenantId isolation.
+ * @see specs/ai-gateway/billing-spend-events.feature
  */
 
 import type { ClickHouseClient } from "@clickhouse/client";

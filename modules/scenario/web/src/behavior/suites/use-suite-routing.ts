@@ -328,7 +328,10 @@ export function deriveFromPath({
   };
 }
 
-/** Extract path segments from asPath (e.g., "/project/simulations/run-plans/slug" → ["run-plans", "slug"]) */
+/**
+ * Extract path segments from asPath (e.g.,
+ * "/project/simulations/run-plans/slug" → ["run-plans", "slug"])
+ */
 function extractPathFromAsPath(asPath: string): string[] | undefined {
   const pathOnly = asPath.split("?")[0]?.split("#")[0] ?? "";
   const match = pathOnly.match(/\/simulations\/(.+?)\/?$/);

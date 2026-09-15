@@ -10,16 +10,9 @@ import { resolveEndpoint } from "@/internal/endpoint";
 import { langwatchFetch } from "@/internal/http/langwatchFetch";
 
 /**
- * The quantities one priced request or rollup carries. Every field is always
- * present; a bucket the request never used reports 0.
- *
- * The token buckets are disjoint, not nested. An image generation reports its
- * render under `output_image_tokens` with `output_tokens` at 0, so reading
- * `output_tokens` alone sees none of the image traffic.
- *
- * Every priced quantity is charged once at its own rate. `reasoning_tokens`
- * is a subset of `output_tokens` and `image_count` is a count of images, so
- * no rate prices either and neither belongs in a cost sum.
+ * The quantities one priced request or rollup carries; every field is
+ * always present (0 when unused) and buckets are disjoint, not nested.
+ * `reasoning_tokens` and `image_count` are subsets already priced elsewhere.
  */
 export interface SpendUsage {
   input_tokens: number;
@@ -33,13 +26,9 @@ export interface SpendUsage {
 }
 
 /**
- * Fill the image quantities a server older than the release that added them
- * does not send.
- *
- * `SpendUsage` declares the three because a current server always sends them.
- * The cast is what a response from a deployment one release behind actually
- * looks like: three integers that are genuinely zero there, worth defaulting
- * rather than handing a caller `undefined` in the middle of a spend page.
+ * Fills image quantities a server older than the release that added them
+ * won't send — defaults them to 0 rather than handing a caller `undefined`
+ * mid-spend-page.
  */
 function spendUsageFromWire(usage: SpendUsage): SpendUsage {
   const wire = usage as Partial<SpendUsage>;

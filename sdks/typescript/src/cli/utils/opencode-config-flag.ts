@@ -1,19 +1,7 @@
 /**
- * Idempotent merge of `experimental.openTelemetry: true` into
- * `~/.config/opencode/opencode.jsonc`.
- *
- * opencode's OTLP exporter is gated on the `experimental.openTelemetry`
- * config flag — without it the SDK is constructed but never exports a
- * single span, even with all the OTEL_EXPORTER_OTLP_* env vars set on
- * the child. Path B (langwatch opencode run) is dead-on-arrival without
- * this flag flipped, so the wrapper writes it on first ingestion mode
- * invocation. Idempotent: if the key is already set true, we don't
- * touch the file. If it's set false explicitly, we DON'T overwrite —
- * the user expressed intent, surface a warning at the call site.
- *
- * The flag lives in `experimental.openTelemetry` per the binary's
- * lookup path `h.experimental?.openTelemetry` — a JSON-style nested
- * key, not a flat one.
+ * Idempotent merge of `experimental.openTelemetry: true` into opencode's
+ * config — without this flag its OTLP exporter never exports a span.
+ * Preserves an explicit `false` (user intent) instead of overwriting it.
  */
 
 import fs from "node:fs";
@@ -21,7 +9,10 @@ import os from "node:os";
 import path from "node:path";
 
 export interface OpencodeConfigFlagResult {
-  /** `created` (new file), `updated` (added/changed flag), `unchanged` (already true), `disabled-by-user` (user set false). */
+  /**
+   * `created` (new file), `updated` (added/changed flag), `unchanged`
+   * (already true), `disabled-by-user` (user set false).
+   */
   action: "created" | "updated" | "unchanged" | "disabled-by-user";
   /** Absolute path of the file that was inspected / written. */
   path: string;
@@ -44,23 +35,9 @@ function stripJsoncComments(s: string): string {
 }
 
 /**
- * Set `experimental.openTelemetry = true` in the opencode config.jsonc.
- * Preserves all other top-level keys. Behaviour:
- *
- * - Missing file: write a fresh JSON document with `$schema` +
- *   `experimental.openTelemetry: true`. Action: `created`.
- * - File present, flag missing: deep-merge under `experimental`,
- *   re-serialize the whole document. Action: `updated`.
- * - File present, flag === true: no write. Action: `unchanged`.
- * - File present, flag === false: bail without overwriting; caller
- *   logs a warning so the user knows Path B will silently produce no
- *   spans until they flip it. Action: `disabled-by-user`.
- *
- * JSONC comments + trailing commas in the existing file are preserved
- * approximately by stripping them for parse + re-emitting as plain
- * JSON. A user with a heavily annotated config will lose comments
- * after this runs — acceptable for an experimental flag the wrapper
- * manages.
+ * Sets `experimental.openTelemetry = true` in the opencode config,
+ * preserving other top-level keys; returns which of `created`/`updated`/
+ * `unchanged`/`disabled-by-user` happened. JSONC comments are not preserved.
  */
 export function setOpencodeOpenTelemetryFlag(
   options: { filePath?: string } = {},

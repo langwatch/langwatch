@@ -2,13 +2,10 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 /**
- * System migrations must have completed before a process serves traffic or
- * consumes jobs. The API and the worker both gate their production `start`
- * on the tasks app's preflight chain, and that chain must name the
- * system-migrations pass AFTER the schema migrations it depends on.
- *
- * Authored against the monolith's start.sh originally; re-pointed at the
- * application package.jsons when the start seam moved there.
+ * System migrations must complete before a process serves traffic or
+ * consumes jobs. The API and the worker both gate production `start` on the
+ * tasks app's preflight chain, which must name the system-migrations pass
+ * AFTER the schema migrations it depends on.
  */
 describe("system migration start ordering", () => {
   const read = (rel: string): { start: string; prepare: string } => {

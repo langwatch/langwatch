@@ -32,16 +32,10 @@ const EDITOR_OPTIONS: editor.IStandaloneEditorConstructionOptions = {
 };
 
 /**
- * Monaco's TypeScript worker checks a widget file against an ambient
- * lib/tsconfig that has never heard of this repo, `react`, or `recharts` —
- * left alone, every author file is a wall of red squiggles for imports and
- * JSX that compile and run fine (Babel does the real transpile; see
- * `bridge/authorRuntime.ts`). Semantic validation is what produces those
- * ("cannot find module", "implicit any" on JSX) and is the half with no
- * signal here, so it's turned off; syntax validation stays on — an actual
- * unmatched brace or broken JSX tag is still worth flagging inline. JSX
- * parsing itself needs `jsx` set or Monaco's parser rejects TSX syntax
- * outright, error or not.
+ * Monaco's TypeScript worker checks against an ambient lib that knows nothing
+ * of this repo, so semantic validation (imports, JSX types) is all false
+ * positives and is turned off; syntax validation stays on for real syntax
+ * errors. `jsx` must still be set or Monaco's parser rejects TSX outright.
  */
 const configureTypeScriptDefaults: BeforeMount = (monaco) => {
   monaco.languages.typescript.typescriptDefaults.setCompilerOptions({

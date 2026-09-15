@@ -1,5 +1,7 @@
 /**
- * Cursor pagination for Postgres-backed REST lists, matching the ClickHouse /spend-events contract: opaque cursor, limit defaulting to 50 capped at 200, next_cursor null iff exhausted. Keyset is on VALUES not Prisma's row cursor, so an archived row a caller paused on can't strand the walk.
+ * Cursor pagination for Postgres-backed REST lists, matching the ClickHouse
+ * /spend-events contract. Keyset is on VALUES, not Prisma's row cursor, so
+ * an archived row a caller paused on can't strand the walk.
  */
 
 const CURSOR_SEPARATOR = "\x00";
@@ -30,7 +32,9 @@ export class GatewayWirePaginationAdapter {
   }
 
   /**
-   * Values a cursor names, or null if not minted here or wrong arity. Null rather than a throw, matching the spend walk — the ROUTE decides a garbled cursor is a 400, since silently restarting would re-serve everything.
+   * Values a cursor names, or null if not minted here or wrong arity. Null
+   * rather than a throw, matching the spend walk — the ROUTE decides a
+   * garbled cursor is a 400, since silently restarting would re-serve everything.
    */
   decodePageCursor(encoded: string, arity: number): string[] | null {
     try {
@@ -45,7 +49,9 @@ export class GatewayWirePaginationAdapter {
   }
 
   /**
-   * The Prisma OR continuing a walk past `columns`: tuple comparison (a,b,c)>(x,y,z) has no Prisma spelling, so it expands to one branch per column, each pinning more-significant columns to equality. Last column unique means no row is skipped or served twice.
+   * The Prisma OR continuing a walk past `columns`: tuple comparison
+   * (a,b,c)>(x,y,z) has no Prisma spelling, so it expands to one branch per
+   * column, each pinning earlier columns to equality; a unique last column means no row repeats.
    */
   keysetAfter(columns: KeysetColumn[]): Array<Record<string, unknown>> {
     return columns.map((column, index) => {
@@ -60,7 +66,8 @@ export class GatewayWirePaginationAdapter {
   }
 
   /**
-   * Next-page cursor, or null when this page exhausted the walk — a page shorter than `limit` is the only honest end-of-walk signal without an extra count.
+   * Next-page cursor, or null when this page exhausted the walk — a page
+   * shorter than `limit` is the only honest end-of-walk signal without an extra count.
    */
   nextPageCursor<T>(
     rows: T[],

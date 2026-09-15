@@ -10,16 +10,7 @@ import { setupObservability } from "../../../setup/node";
 import { type LangWatchLogRecord } from "../../types";
 import { resetObservabilitySdkConfig } from "../../../config";
 
-/**
- * Integration tests for LangWatch logger with real OpenTelemetry setup.
- *
- * These tests verify:
- * - Real OpenTelemetry SDK initialization
- * - Actual log record creation and data flow
- * - Integration between logger and setup components
- * - Logger functionality and API
- * - Log records are actually sent to processors and exported
- */
+/** Integration tests for LangWatch logger with a real OpenTelemetry SDK. */
 
 // Test data constants for consistency
 const TEST_LOG_MESSAGE = "This is a test log message";
@@ -54,20 +45,12 @@ describe("given logger observability wired to a real OpenTelemetry SDK", () => {
   let observabilityHandle: ReturnType<typeof setupObservability>;
 
   /**
-   * Starts observability against a fresh in-memory exporter.
-   *
-   * `langwatch: "disabled"` keeps the real LangWatch exporter out of the test:
-   * otherwise setup attaches a BatchLogRecordProcessor to the live endpoint
-   * alongside the in-memory one, which times out and drops records in CI.
-   *
-   * Each start also gets its own exporter and processor, because shutting a
-   * handle down shuts down its processors too. A processor shared across tests
-   * would stop recording for every test after the first shutdown.
-   *
-   * `disableAutoShutdown` keeps setup from registering beforeExit/SIGINT/SIGTERM
-   * handlers on every start. Those are never removed, not even by shutdown, so
-   * without this each start leaks three process listeners and the suite trips
-   * Node's MaxListeners warning. `afterEach` owns teardown here.
+   * Starts observability against a fresh in-memory exporter. `langwatch:
+   * "disabled"` keeps the real exporter out of the test; a fresh exporter and
+   * processor per test avoids one test's shutdown silencing the others (a
+   * handle's shutdown shuts down its processors too); `disableAutoShutdown`
+   * skips the beforeExit/SIGINT/SIGTERM handlers that leak three listeners per
+   * start and would otherwise trip Node's MaxListeners warning across the suite.
    */
   function startObservability({
     dataCapture,

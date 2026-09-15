@@ -1,18 +1,9 @@
 /**
- * The folder boundary and the developer's answers, with the real command line
- * enforcing both (ADR-129, specs/langy/langy-local-permissions.feature).
- *
- * Three rules are under test and each has a hard fact behind it:
- *  - a path outside the folder is refused by the command line, and the refusal
- *    reaches the model as the tool result, so the test reads the tool output,
- *  - a denied command is not run again in that turn, so the test counts the
- *    asks and reads the terminal,
- *  - a pattern the developer allowed for the session holds across turns, so
- *    one turn grants it and the next turn runs a second command of the same
- *    family with no ask of its own.
- *
- * RUN (one file per vitest run, see README):
- *   cd platform/app/e2e/langy && npx vitest run langy-local-permissions.scenario.test.ts --reporter=verbose
+ * The folder boundary and the developer's answers, with the real command
+ * line enforcing both (ADR-129, specs/langy/langy-local-permissions.feature).
+ * Three rules: a refused path's denial reaches the model as the tool result;
+ * a denied command is not re-run in that turn; and a session-allowed pattern
+ * holds across turns with no repeat ask.
  */
 
 import { openai } from "@ai-sdk/openai";
@@ -104,15 +95,10 @@ describe("Langy stays inside the folder and takes the developer's answer", () =>
           });
 
         /**
-         * Put the developer's card answers in the record.
-         *
-         * The fixture answers every card through the panel's own mutation,
-         * which is what the developer does and also why the judge cannot see
-         * it: the conversation it grades holds Langy's messages and its tool
-         * results, and an answer given in the panel is in neither. Without
-         * these lines a criterion about what Langy did AFTER a grant or a
-         * denial has nothing to read, and the grade is inconclusive however
-         * well Langy behaved.
+         * Put the developer's card answers in the record. The fixture answers
+         * through the panel's own mutation, which the graded conversation
+         * cannot see — without these lines a criterion about what Langy did
+         * after a grant or denial has nothing to read.
          */
         const developerAnswers = async (executor: {
           message: (message: never) => Promise<unknown>;

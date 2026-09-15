@@ -1,15 +1,9 @@
 /**
- * Named scalar values that travel beside the SQL.
- *
- * The statement is never rewritten to carry them: a placeholder stays a
- * placeholder and the values ride in their own field, which is what keeps the
- * text that runs identical to the text that was written. The only check here is
- * the shape a value has to have to be sendable at all.
- *
- * When the backend refuses a submission for missing parameters, the names it
- * gave are listed here rather than in a message elsewhere on the page: the
- * member fixes it in this form, so this is where it has to be said.
- *
+ * Named scalar values that travel beside the SQL. The statement is never rewritten to carry
+ * them — a placeholder stays a placeholder, keeping the text that runs identical to the text
+ * that was written; the only check here is the shape a value has to have to be sendable. When
+ * the backend refuses a submission for missing parameters, the names it gave are listed here
+ * (not in a page-level message), since the member fixes it in this form.
  * @see modules/analytics/specs/analytics-lwql-workbench.feature
  */
 
@@ -86,17 +80,12 @@ function valueTyped(row: ParameterRow): boolean {
 }
 
 /**
- * What stops a row being sent, or `undefined` when it can be — including a row
- * still empty, which is not a parameter yet rather than a broken one.
- *
- * These are exactly the rows {@link recordOf} drops or collapses. Saying so on
- * the row and holding Run back is what keeps a dropped row from becoming a
- * round-trip that comes back naming a parameter the member can see they filled
- * in.
- *
- * A repeated name needs the whole set to see: {@link recordOf} keys by name, so
- * two rows called `limit` leave one entry and the later row silently wins. Read
- * one row at a time that is invisible — both rows look complete.
+ * What stops a row being sent, or `undefined` when it can be — an empty row is not a
+ * parameter yet, not a broken one. These are exactly the rows {@link recordOf} drops or
+ * collapses, so surfacing them here (and holding Run back) keeps a dropped row from becoming
+ * a round-trip naming a parameter the member can see they filled in. A repeated name needs
+ * the whole set to see: {@link recordOf} keys by name, so two rows called `limit` collapse to
+ * one and the later row silently wins — invisible from either row alone.
  */
 function rowProblem({
   row,

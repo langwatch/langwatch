@@ -1,15 +1,8 @@
 /**
  * @vitest-environment node
- *
- * Tests for dev/scripts/lib/derive-gateway-base-url.sh, sourced the same way
- * `make service` / `make service-watch` source it: after .env,
- * so an explicit LW_GATEWAY_BASE_URL (inherited from the shell, or set in
- * .env) always wins over the derived one. Mirrors the PORT + 1000 rule
- * dev/scripts/dev-stack.sh already uses for `pnpm dev` (the API port
- * Vite proxies to), so a gateway started either way targets the same place.
- *
- * The helper is bash; we drive it by sourcing it from `bash -s` and reading
- * the resulting env, the same technique as sanitize-dev-env.unit.test.ts.
+ * Tests for dev/scripts/lib/derive-gateway-base-url.sh, sourced after .env so
+ * an explicit LW_GATEWAY_BASE_URL always wins over the derived PORT + 1000
+ * one. Driven by sourcing the bash helper from `bash -s` and reading its env.
  */
 
 import { execSync } from "node:child_process";

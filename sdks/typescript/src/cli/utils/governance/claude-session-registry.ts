@@ -1,21 +1,14 @@
 /**
- * The name Claude Code itself holds for a session, read from the live session
- * registry it maintains under `<config dir>/sessions/<pid>.json`: one small
- * JSON file per running claude process, rewritten in place as the session
- * goes, carrying the session id and the current display name (`--name` at
- * launch, `/rename` mid-session, or claude's own derived default).
- *
- * Why the registry and not the hook payload alone: the SessionStart payload
- * carries `session_title` only at session start, and no hook fires on a
- * mid-session `/rename`. The Stop hook runs after every turn, so reading the
- * registry there is what makes a rename reach the platform within one turn.
- *
- * Best-effort by construction: an unreadable directory, a malformed file, an
- * oversized file or an unmatched session id all read as "no name", never as
- * an error — a missing name must never be why a hook broke a session. When
- * several files claim the same session id (a resumed session leaves the old
- * process's file behind until claude prunes it), the newest `updatedAt` wins.
- *
+ * The name Claude Code holds for a session, read from `<config dir>/sessions/
+ * <pid>.json` rather than the hook payload alone: SessionStart's `session_title`
+ * is set only at start and no hook fires on `/rename`, so reading the registry
+ * from the Stop hook is what lets a rename reach the platform within one turn.
+ */
+
+/**
+ * Best-effort: an unreadable, malformed, oversized or unmatched file reads as
+ * "no name", never an error. When several files claim one session id (a resumed
+ * session's old file lingers until pruned), the newest `updatedAt` wins.
  * Spec: specs/ai-governance/cli-wrappers/session-context-hook.feature
  */
 import { readdirSync, readFileSync, statSync } from "node:fs";

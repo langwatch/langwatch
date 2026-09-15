@@ -1,26 +1,7 @@
 /**
- * The frame-side shim, as a string of plain JavaScript.
- *
- * A string rather than a module because it executes inside a sandboxed
- * `srcdoc` iframe: `buildSrcdoc` inlines it as the document's first executed
- * script, ahead of the CDN-loaded React/ReactDOM/Recharts/Babel globals and
- * the author runtime that compiles and mounts the widget's file. It installs
- * the `LW` global, forwards console output and uncaught errors to the
- * parent, posts a heartbeat, and — the init-race fix — calls
- * `window.__lwActivateAuthor` only AFTER `lw:init` has delivered the port,
- * dashboardContext and params, so author code can read `LW.dashboardContext`
- * / `LW.params` synchronously at its first line.
- *
- * The shim itself knows nothing about Babel or the module format — that
- * lives in `bridge/authorRuntime.ts`, which is what defines the hook this
- * file calls. It does know about React for exactly one thing:
- * `LW.useChartQuery`, a hook wrapping `LW.query`'s promise in
- * `window.React.useState`/`useEffect` (React is CDN-loaded ahead of this
- * script — see `buildSrcdoc`). A future non-React chart kind can still reuse
- * everything else in this file unchanged and simply not call that hook.
- *
- * Protocol constants are interpolated from `bridgeProtocol.ts` so the two
- * sides cannot drift.
+ * The frame-side shim, as a string of plain JavaScript inlined ahead of any
+ * module system inside a sandboxed `srcdoc` iframe. Activates author code
+ * only after `lw:init` delivers its context, so `LW.params` reads synchronously.
  */
 
 import {

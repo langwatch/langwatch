@@ -1,5 +1,6 @@
 /**
- * The toolbar of the Results tab: how the list is grouped, what is cut from it, and the numbers those choices drive.
+ * The toolbar of the Results tab: how the list is grouped, what is cut from it,
+ * and the numbers those choices drive.
  * @vitest-environment jsdom
  * @see specs/features/agent-testing/results-tabs.feature
  */

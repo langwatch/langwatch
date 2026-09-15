@@ -285,7 +285,8 @@ export function useLoadSpanIntoPromptPlayground() {
           return;
         }
 
-        // Build chat messages from the trace (excluding system prompt, which goes into the form config)
+        // Build chat messages from the trace (excluding system prompt, which
+        // goes into the form config)
         const chatMessages = addIdToMessages(
           spanData.messages.filter((m) => m.role !== "system"),
           spanData.traceId,

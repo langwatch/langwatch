@@ -1,20 +1,7 @@
 /**
- * "+ Add chart" on a dashboard: creates a new dashboard widget without
- * leaving the page. Same editor as `DashboardWidgetEditDrawer` (the
- * playground page's own drawer), starter code + a starter query pre-filled
- * (`STARTER_WIDGET_CODE`/`STARTER_WIDGET_QUERIES` — the same defaults the
- * playground's own "+ New widget" button seeds), the only difference is
- * `onSave` calls `create` instead of `update`, with this dashboard's id
- * attached — the widget lands here already pinned, not on the playground's
- * unpinned list waiting for a separate pin step.
- *
- * The workbench builder ("Add chart" used to open `/analytics/custom`) has
- * its save path disabled while the custom-chart-playground is enabled — see
- * `saved_workbench_charts_disabled_for_playground` — so this is the only
- * "create a new chart" entry point that still works from a dashboard.
- *
- * All draft/preview/mutation state lives in `useCreateDashboardWidgetDrawer`;
- * this component only assembles the drawer and its preview frame.
+ * "+ Add chart" on a dashboard: same editor as `DashboardWidgetEditDrawer`,
+ * but `onSave` creates (pinned to this dashboard) instead of updating. The
+ * only working chart-creation entry point while the workbench builder's is disabled.
  */
 
 import { DashboardWidgetEditDrawer } from "./DashboardWidgetEditDrawer.tsx";

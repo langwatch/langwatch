@@ -160,14 +160,6 @@ class LangWatchSpanInternal implements LangWatchSpan {
  *
  * @param span - The OpenTelemetry Span to add LangWatch methods to
  * @returns A LangWatchSpan with additional methods for LLM/GenAI observability
- *
- * @example
- * ```typescript
- * import { createLangWatchSpan } from './span';
- * const otelSpan = tracer.startSpan('llm-call');
- * const span = createLangWatchSpan(otelSpan);
- * span.setType('llm').setInput('Prompt').setOutput('Completion');
- * ```
  */
 export function createLangWatchSpan(span: Span): LangWatchSpan {
   return new LangWatchSpanInternal(span);

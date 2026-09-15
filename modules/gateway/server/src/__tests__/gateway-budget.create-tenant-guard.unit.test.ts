@@ -1,6 +1,8 @@
 /**
  * @see specs/security/api-endpoint-authorization.feature
- * Covers the TEAM/PROJECT cross-org guard on create(): scopeId is request-supplied and the Team/Project FK is org-agnostic, so a caller could otherwise target another tenant's team or project.
+ * Covers the TEAM/PROJECT cross-org guard on create(): scopeId is
+ * request-supplied and the Team/Project FK is org-agnostic, so a caller
+ * could otherwise target another tenant's team or project.
  */
 
 import { describe, expect, it, vi } from "vitest";

@@ -1,6 +1,9 @@
 /**
  * @vitest-environment node
- * Real Postgres + real ClickHouse. Pins filtered-reconciliation trust: nothing-matching narrowing answers nothing, a team resolves to owned projects. Spec: specs/ai-gateway/gateway-spend-rest.feature
+ * @see specs/ai-gateway/gateway-spend-rest.feature
+ *
+ * Real Postgres + real ClickHouse. Pins filtered-reconciliation trust:
+ * nothing-matching narrowing answers nothing, a team resolves to owned projects.
  */
 import type { ClickHouseClient } from "@clickhouse/client";
 import { nanoid } from "nanoid";

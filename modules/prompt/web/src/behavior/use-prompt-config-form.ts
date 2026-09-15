@@ -26,7 +26,8 @@ export const usePromptConfigForm = ({
   onChange,
   initialConfigValues = {},
 }: UsePromptConfigFormProps) => {
-  // Instance-specific flags to prevent sync loops (NOT module-level to avoid cross-instance interference)
+  // Instance-specific flags to prevent sync loops (not module-level, to avoid cross-instance
+  // interference)
   const disableOnChangeRef = useRef(false);
   const disableNodeSyncRef = useRef(false);
   const disableFormSyncTimeoutRef = useRef<NodeJS.Timeout | null>(null);

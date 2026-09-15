@@ -1,5 +1,6 @@
 /**
- * The chips that customize a dialog: the run dialog and the scenario dialog both offer their optional fields this way.
+ * The chips that customize a dialog: the run dialog and the scenario dialog both offer their
+ * optional fields this way.
  * @see specs/features/agent-testing/run-dialog.feature
  * @see specs/features/agent-testing/cases-table.feature
  */

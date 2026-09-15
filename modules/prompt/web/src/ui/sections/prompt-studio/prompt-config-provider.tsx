@@ -149,8 +149,9 @@ export function PromptConfigProvider({ children }: { children: React.ReactNode }
       {children}
 
       {/*
-      We cannot render the dialogs conditionally - doing so will break the state machine of chakra dialogs
-      ie: index.mjs:321 [@zag-js/core > transition] Cannot transition a stopped machine
+      We cannot render the dialogs conditionally - doing so will break the state machine of
+      chakra dialogs, ie: index.mjs:321 [@zag-js/core > transition] Cannot transition a
+      stopped machine
        */}
       <SaveVersionDialog
         isOpen={false}

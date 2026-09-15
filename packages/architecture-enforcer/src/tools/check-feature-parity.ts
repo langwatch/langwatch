@@ -2019,17 +2019,11 @@ interface ParityAnalysis {
 }
 
 /**
- * `LEGACY_INERT` says a file yields NO enforced scenario. `LEGACY_UNBOUND` and
- * `LEGACY_PARTIAL` both say it yields some. A file on the inert list and on
- * either of the other two is therefore always a mistake, and it is one two
- * branches can make without conflicting: one tags a scenario in the file and
- * moves it to `LEGACY_PARTIAL`, the other leaves it untagged and adds it to
- * `LEGACY_INERT`, and main gets both. The stale-entry check then fails on the
- * copy that no longer describes the file, which is what this catches first.
- *
- * `LEGACY_UNBOUND` and `LEGACY_PARTIAL` are not exclusive of each other: a
- * file can have enforced scenarios that are unbound and untagged ones beside
- * them, and it needs both entries to be tolerated.
+ * `LEGACY_INERT` says a file yields NO enforced scenario; `LEGACY_UNBOUND`
+ * and `LEGACY_PARTIAL` both say it yields some, and are not exclusive of each
+ * other. A file on the inert list and on either of the other two is always a
+ * mistake — the kind two branches can each make without conflicting, which
+ * this catches before main carries both.
  */
 function validateNoCrossListEntries(): string[] {
   const inert = new Set(LEGACY_INERT);

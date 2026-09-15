@@ -130,23 +130,11 @@ function typescriptCompileCall(variables: PromptSnippetVariable[]): string {
 }
 
 /**
- * Returns code snippets that get a prompt from LangWatch and compile it.
- *
- * The SDK snippets show the whole job: fetch the prompt by its handle, then
- * fill in the variables it declares. Nothing is invented except the example
- * values: the handle, the tag and the variable names all come from the prompt
- * the reader has open.
- *
- * No snippet carries a project id. The REST family behind /api/prompts
- * resolves the project from the API key, and neither the Python nor the
- * TypeScript SDK takes one.
- *
- * @param promptHandle - The handle of the prompt to retrieve (defaults to "{handle}")
- * @param apiKey - The API key to use for authentication
- * @param label - Optional label/tag to fetch (e.g. "production", "staging").
- *   When provided, uses shorthand syntax: "handle:tag" in both SDK and REST snippets.
- * @param variables - The variables the prompt declares. An empty list compiles
- *   with no arguments rather than inventing any.
+ * Fetches a prompt by handle and compiles it; no project id (resolved from the API key).
+ * @param promptHandle - Prompt handle to retrieve (defaults to "{handle}")
+ * @param apiKey - API key used for authentication
+ * @param label - Optional tag (e.g. "production"); uses "handle:tag" shorthand
+ * @param variables - Variables the prompt declares; empty compiles with none
  * @returns Array of code snippets for getting and compiling the prompt
  */
 export function getGetPromptSnippets(params?: {

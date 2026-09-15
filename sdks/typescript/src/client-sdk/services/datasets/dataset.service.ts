@@ -450,7 +450,8 @@ export class DatasetService {
   }
 
   /**
-   * Replace strategy: if dataset exists, delete all records then upload; if not found, create from file.
+   * Replace strategy: if the dataset exists, delete all records then upload;
+   * if not found, create it from the file.
    */
   private async _uploadReplace(slugOrId: string, file: File | Blob): Promise<UploadResponse> {
     try {

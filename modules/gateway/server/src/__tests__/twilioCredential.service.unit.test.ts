@@ -1,13 +1,10 @@
 /**
  * @vitest-environment node
- *
+ * @see specs/features/agents/voice-phone.feature
  * `findTwilioProviderForProject` resolves the one enabled Twilio provider row a
  * project can reach, and `getTwilioCredential` reads the three keys off it. The
- * repository and Prisma are mocked at their seams so this exercises only the
- * twilio + enabled selection and the field reads. Mirrors
- * elevenLabsCredential.service.unit.test.ts.
- *
- * @see specs/features/agents/voice-phone.feature
+ * repository and Prisma are mocked so this exercises only the twilio+enabled
+ * selection and the field reads. Mirrors elevenLabsCredential.service.unit.test.ts.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 

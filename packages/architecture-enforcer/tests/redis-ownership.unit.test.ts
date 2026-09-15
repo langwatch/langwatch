@@ -1,7 +1,8 @@
 /**
  * @vitest-environment node
  *
- * ADR-093: `packages/redis-client` is the only place an ioredis client gets constructed. Only the two SOURCE GUARDS survived the platform app's deletion.
+ * ADR-093: `packages/redis-client` is the only place an ioredis client gets
+ * constructed. Only the two SOURCE GUARDS survived the platform app's deletion.
  */
 import { readFileSync } from "node:fs";
 import { dirname, join, relative, sep } from "node:path";
@@ -24,7 +25,9 @@ const CLIENT_PACKAGE = join(PACKAGES_ROOT, "redis-client") + sep;
 const SCANNED_ROOTS = ["apps", "packages", "dev", "tools", "mcp", "sdks", "plugins"] as const;
 
 /**
- * Every extension a module can be written in, not just TypeScript: `dev/scripts` holds `.mjs`/`.cjs` modules, and a `new IORedis(...)` in any of them used to scan clean.
+ * Every extension a module can be written in, not just TypeScript:
+ * `dev/scripts` holds `.mjs`/`.cjs` modules, and a `new IORedis(...)` in any
+ * of them used to scan clean.
  */
 const isSourceFile = (file: string): boolean =>
   /\.(?:mts|cts|tsx?|jsx?|mjs|cjs)$/.test(file) && !/\.d\.(?:mts|cts|ts)$/.test(file);
@@ -42,7 +45,9 @@ const isTestFile = (file: string): boolean =>
 const IOREDIS_CONSTRUCTION = /\bnew\s+(?:IORedis|Redis|Cluster)(?:\s*\.\s*\w+)*\s*\(/;
 
 /**
- * Any reference to a retired module-scope singleton, whatever relative name it was imported under. Anchored on the quoted specifier, not a leading `from`, since the reference that outlived the removal was a `vi.mock("~/server/redis")` merged from a stale branch — an import-only pattern misses a bare mock call.
+ * Any reference to a retired module-scope singleton, whatever relative name
+ * it was imported under. Anchored on the quoted specifier, not a leading
+ * `from`, because an import-only pattern misses a bare `vi.mock("~/server/redis")`.
  */
 const RETIRED_REDIS_MODULE = /["'][^"']*(?:~\/server\/redis|\.\.\/redis|\.\/redis)["']/;
 

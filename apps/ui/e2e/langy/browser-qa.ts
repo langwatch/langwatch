@@ -22,9 +22,9 @@ let browserPromise: Promise<Browser> | null = null;
 let contextPromise: Promise<BrowserContext> | null = null;
 
 /**
- * Clears the corresponding cache on rejection — otherwise a single transient launch/login failure would
- * permanently disable browser QA for every remaining scenario in the run (`??=` only checks null/undefined at
- * assignment time, and a rejected promise is neither).
+ * Clears the corresponding cache on rejection — otherwise a single transient launch/login
+ * failure would permanently disable browser QA for every remaining scenario in the run
+ * (`??=` only checks null/undefined at assignment time, and a rejected promise is neither).
  */
 async function getSharedContext(): Promise<BrowserContext> {
   browserPromise ??= chromium.launch({ headless: true }).catch((error) => {

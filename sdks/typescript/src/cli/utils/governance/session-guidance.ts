@@ -1,17 +1,9 @@
 /**
- * The one guidance text that tells a coding-agent session when to declare its
- * working context. Every channel carries this same constant, so the words a
- * claude session reads, the words a codex session reads and the words the
- * docs quote can never drift apart:
- *
- *   - `langwatch ingest guidance claude-code` prints it as SessionStart
- *     additionalContext JSON, run by the claude plugin's launcher
- *     (`plugins/langwatch/scripts/launch.mjs`) and by the raw claude settings
- *     hooks for installs without plugin support,
- *   - the codex global AGENTS.md carries it in a marker-managed block
- *     (`codex-agents-md.ts`), because codex has no plugin channel for
- *     always-loaded context.
- *
+ * The one guidance text that tells a coding-agent session when to declare its working context.
+ * Every channel carries this same constant, so claude, codex and the docs can never drift apart:
+ * `langwatch ingest guidance claude-code` prints it as SessionStart additionalContext JSON (the
+ * claude plugin launcher and the raw settings hooks), and the codex global AGENTS.md carries it
+ * in a marker-managed block (`codex-agents-md.ts`), since codex has no plugin channel.
  * Spec: specs/ai-governance/cli-wrappers/session-context-declare.feature
  */
 

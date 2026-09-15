@@ -1,21 +1,8 @@
 /**
- * The attribute vocabulary the CLI puts on its live OTEL log records, and the
- * contract the control plane reads them back with.
- *
- * Langy reaches LangWatch by running this CLI in a shell, so a command's
- * mid-flight state is invisible to the panel until the process exits. These
- * attributes are that missing channel: each log record is one beat of a
- * command's life cycle, and the control plane bridges them onto the turn's
- * ephemeral status / progress / metric signals that `StreamingStatusLine` and
- * `StreamingStatCard` already render.
- *
- * The names mirror the CLI's own grammar — `langwatch <resource> <verb>` — so a
- * record identifies itself the same way the tool call that produced it does
- * (see specs/langy/langy-cli-tool-envelope.feature).
- *
- * This vocabulary is a published contract. Add to it freely; renaming or
- * repurposing a key breaks the reader on the other side.
- *
+ * The attribute vocabulary the CLI puts on its live OTEL log records — the
+ * only channel Langy has into a command's mid-flight state, since it runs
+ * this CLI in a shell and sees nothing until exit. Published contract: add
+ * freely, but renaming or repurposing a key breaks the reader on the other side.
  * Spec: sdks/typescript/specs/telemetry/langy-live-events.feature
  */
 

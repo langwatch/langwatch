@@ -1,11 +1,7 @@
 /**
- * Copies one value and tells the caller what happened.
- *
- * A family-local copy of `platform/app/src/components/CopyButton.tsx`, narrowed
- * in one way: the application's version reached the toast singleton directly,
- * and a feature-web package may not. The outcome is handed back through
- * `onCopied` / `onRefused` so the screen tells the host, which is what decides
- * the words a reader sees.
+ * Copies one value and tells the caller what happened. A feature-web package may not reach the
+ * toast singleton directly (unlike the application's own copy-button), so the outcome is handed
+ * back through `onCopied` / `onRefused` and the host decides the words a reader sees.
  */
 
 import { Button, type ButtonProps } from "@chakra-ui/react";

@@ -8,17 +8,11 @@ export type PrismaJoinRequestAudienceDatabase = Pick<
 >;
 
 /**
- * Who a join-request notification reaches, out of Postgres.
- *
- * Four reads and a lookup, all of them by primary key or by one index. The
- * admin read filters `disabledAt: null` because a deactivated admin is not
- * somebody who can answer the request, and mailing them would be telling a
- * former colleague who is trying to join.
- *
- * These are identity-side tables under the multitenancy middleware's
- * Identifier/Account exemption plus the organization models, so no query here
- * carries a `projectId` — a join request is not scoped to a project, and none
- * of these models has the column.
+ * Who a join-request notification reaches, out of Postgres. The admin read
+ * filters `disabledAt: null` because a deactivated admin cannot answer the
+ * request. No query here carries a `projectId`: these are identity-side
+ * tables under the multitenancy middleware's exemption, and a join request
+ * is not scoped to a project — none of these models has the column.
  */
 export class PrismaJoinRequestAudienceRepository extends JoinRequestAudience {
   static create(database: PrismaJoinRequestAudienceDatabase): PrismaJoinRequestAudienceRepository {

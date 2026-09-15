@@ -1,25 +1,8 @@
 /**
- * Bounded concurrency, with shedding.
- *
- * Pool sizing bounds how many sockets a process may open. It does not bound how
- * many statements the process will try to run: work arrives from a queue whose
- * concurrency is set somewhere else entirely, and on a bad day every lane wants
- * the server at once. That is the shape of the 2026-07-31 incident - the server
- * hit `max_concurrent_queries`, rejected, the rejections were classified as
- * transient, and the retries went back into the same wall.
- *
- * Two rules follow, and they are the reason this exists as a separate layer
- * rather than a flag on the retry policy:
- *
- *  - A slot is held across retries, not taken per attempt. Compose this
- *    *outside* retry. Inside, a retrying statement releases its slot, joins the
- *    back of the queue, and competes with fresh work, which is how a queue
- *    turns a small overload into a persistent one.
- *
- *  - The waiting queue is bounded and sheds when full. An unbounded wait queue
- *    does not prevent overload, it hides it: the server stays inside its limit
- *    while memory grows and latency climbs until something upstream times out.
- *    Refusing immediately is worse for one caller and much better for the rest.
+ * Bounded concurrency, with shedding. A slot is held across retries, not
+ * taken per attempt — otherwise a retrying statement escapes the bound
+ * entirely. The wait queue sheds when full, since an unbounded queue hides
+ * overload instead of preventing it.
  */
 
 import type { AbortSignalLike } from "./query.ts";

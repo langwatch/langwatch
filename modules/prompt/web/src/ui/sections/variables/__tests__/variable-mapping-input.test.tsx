@@ -1015,14 +1015,8 @@ describe("VariableMappingInput", () => {
 
     describe("selecting field with children marks it complete AND opens nested dropdown", () => {
       /**
-       * This test verifies the UX flow where:
-       * 1. User clicks on a field with children (e.g., "spans")
-       * 2. The field is added to the path as a badge
-       * 3. A NEW dropdown immediately opens showing the nested children
-       * 4. User can then select a child, which adds another badge
-       * 5. This continues until user selects a leaf field (no children)
-       *
-       * This is the "cascading selection" UX pattern.
+       * The "cascading selection" UX pattern: selecting a field with children
+       * immediately opens its nested dropdown.
        */
       it("after selecting a field with children, shows badge AND immediately shows nested options dropdown", async () => {
         const user = userEvent.setup();

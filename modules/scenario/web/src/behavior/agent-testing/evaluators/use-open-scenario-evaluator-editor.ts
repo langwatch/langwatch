@@ -1,15 +1,8 @@
 /**
- * Opens the evaluator editor drawer on one attachment of a suite or a run
- * plan.
- *
- * The drawer is the same one the evaluations workbench opens: the sources it
- * offers for the mappings are the conversation, the scenario and the trace,
- * and under the mappings it carries the gate switch and the way to take the
- * attachment off. Every edit writes straight back into the attachment through
- * flow callbacks, so the chip behind the drawer follows as the person maps.
- *
- * @see specs/features/agent-testing/suite-editor.feature
- * @see dev/docs/best_practices/drawers.md
+ * Opens the evaluator editor drawer on one attachment of a suite or run plan
+ * — the same drawer the evaluations workbench opens. Every edit writes
+ * straight back into the attachment through flow callbacks, so the chip
+ * behind the drawer follows as the person maps.
  */
 
 import { useCallback } from "react";

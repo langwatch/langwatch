@@ -1,41 +1,10 @@
 /**
- * The telemetry seam.
- *
- * This is the reason daemon mode exists, not a side benefit of it.
- *
- * A 200ms CLI process cannot emit useful telemetry: it has to construct a
- * TracerProvider, an exporter and an HTTP connection, then SYNCHRONOUSLY flush
- * them before exit. Spans get dropped when the flush loses the race with
- * process teardown, and *mid-flight* progress is structurally impossible to
- * emit — there is no "mid-flight" in a process that barely exists.
- *
- * A daemon lives for minutes. It can hold one long-lived TracerProvider with a
- * BatchSpanProcessor and one warm OTLP connection, and it can emit events WHILE
- * a command runs — which is what the Langy UI needs in order to show live
- * progress for a command an agent is executing right now.
- *
- * THIS CHANGE DELIBERATELY SHIPS NO OTEL EMISSION. It ships the seam:
- *
- *   - `DaemonTelemetry` is the interface a real exporter implements.
- *   - `noopTelemetry` is what the daemon uses today; it does nothing.
- *   - `createDaemonServer({ telemetry })` takes it by injection, so the
- *     exporter can be attached without touching the server, and so tests can
- *     assert on the events without a collector.
- *
- * TO ATTACH THE PERSISTENT OTLP EXPORTER LATER:
- *
- *   1. Implement `DaemonTelemetry` over a `NodeTracerProvider` +
- *      `BatchSpanProcessor` + `OTLPTraceExporter` built ONCE in
- *      `daemonStarted` (the SDK already depends on all three).
- *   2. `requestStarted` opens a span; `requestProgress` adds span events (this
- *      is the live-progress hook — it fires as each chunk of output is
- *      produced, not at the end); `requestFinished` closes the span with the
- *      exit code.
- *   3. `shutdown` is the ONLY place a flush is needed, and it is called on the
- *      idle-timeout path and on `daemon stop` — where, unlike in a short-lived
- *      CLI process, there is time to actually complete it.
- *
- * Nothing else in the daemon needs to change to light that up.
+ * The telemetry seam — the reason daemon mode exists, not a side benefit. A
+ * short-lived CLI process can't emit useful telemetry (it would have to
+ * flush a fresh exporter synchronously before exit, losing spans and
+ * mid-flight progress); a daemon holds one long-lived exporter instead, for
+ * Langy's live-progress UI. Ships only the seam: `DaemonTelemetry` is the
+ * interface a real exporter implements, injected via `createDaemonServer`.
  */
 
 export interface DaemonRequestStartedEvent {

@@ -1,26 +1,10 @@
 /**
- * Where Vega is allowed to be reached from.
- *
- * Vega, Vega-Lite, vega-embed and the generated schema validator are several
- * megabytes that only a chart-rendering surface needs, and one
- * ordinary-looking static import is all it takes to put every byte of it in
- * the entry chunk — with nothing visibly wrong. The import graph is what the
- * bundler splits on, so it is the import graph that is pinned here.
- *
- * The claim is containment: within this feature, every module that reaches a
- * Vega package is reachable only *behind a lazy boundary* — a module some
- * `Lazy…` wrapper loads with a dynamic `import()` and nothing imports directly.
- *
- * One such boundary: the dashboard widget mounts `LangWatchQLWidgetChart`,
- * which reaches `LangWatchQLVegaLiteChart` and so reaches Vega; what matters
- * is that it is not reachable statically. Pinning this boundary keeps the
- * dashboard's chart from being imported directly from the grid — several
- * megabytes back in the entry chunk, with nothing visibly wrong. (The
- * workbench page and its own `LangWatchQLChartMode` boundary were removed
- * along with the Custom query page; this is the one surface left that draws
- * a Vega-Lite chart.)
- *
- * Node environment on purpose — this reads source, and evaluates none of it.
+ * Where Vega is allowed to be reached from. Vega, Vega-Lite, vega-embed and
+ * the schema validator are megabytes only a chart surface needs, and one
+ * static import puts all of it in the entry chunk invisibly. The claim:
+ * every module in this feature that reaches a Vega package is reachable only
+ * behind a lazy boundary (a `Lazy…` wrapper's dynamic `import()`), never
+ * imported directly.
  */
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
@@ -57,17 +41,11 @@ const EXTENSIONS = [".ts", ".tsx", ".js"];
 
 /**
  * Static `import`/`export … from` specifiers. Deliberately not `import()`.
- *
- * The clause between the keyword and `from` is bounded so one match cannot
- * span two statements. Unbounded (`[\s\S]*?`) it could, and the cost was not
- * a duplicate — it was a miss: `export type Foo = string;` followed by
- * `import vegaEmbed from "vega-embed"` matched as a single `export type …`
- * span, which `TYPE_ONLY` then discarded whole, taking the runtime import
- * with it. The scan reported no Vega in the chunk while Vega was statically
- * imported, which is the one direction this file must not fail in.
- *
- * So: no `;` inside the clause, and a newline only where the next line does
- * not begin a new `import`/`export`. Multi-line brace lists still match.
+ * The clause between keyword and `from` is bounded so one match can't span
+ * two statements: unbounded (`[\s\S]*?`), an `export type Foo = string;`
+ * followed by a Vega import could match as one `export type …` span, which
+ * `TYPE_ONLY` discards whole — reporting no Vega while it was statically
+ * imported, the one direction this file must not fail in.
  */
 const STATIC_IMPORT =
   /(?:^|\n)\s*(?:import|export)(?:[^;\n]|\n(?!\s*(?:import|export)\b))*?\sfrom\s+["']([^"']+)["']|(?:^|\n)\s*import\s+["']([^"']+)["']/g;

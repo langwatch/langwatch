@@ -1,24 +1,8 @@
 /**
- * Resilience over the vendor client's own `query`/`insert`.
- *
- * Most of this repo's statements still go through `@clickhouse/client`
- * directly rather than through the {@link ClickHouseQueryClient} port, and
- * this class is the policy layer they get: retry on transient read failures,
- * outcome logging that names the cluster, an outcome metric per statement, and
- * the in-band exception guard for streamed results.
- *
- * The vendor package itself is deliberately not imported. Everything here is
- * declared structurally — a client is anything with `query` and `insert`, a
- * result is anything with a `json` method — which is what keeps this package
- * free of the driver dependency and lets a test double be an object literal.
- * The host supplies what is host-specific through ports: where metrics go,
- * where log lines go, how a raised error is translated for its callers, and
- * which queries count as cold scans.
- *
- * Two neighbours carry the parts that are not policy. Reading facts back out of
- * the vendor's untyped params and rows is ./statementShape.ts. Saying what
- * happened — which sink, which level, which counter, and the guarantee that
- * none of it can throw into the caller's path — is ./statementReporting.ts.
+ * Policy layer over the vendor client's `query`/`insert`, for the statements
+ * that still go through `@clickhouse/client` directly rather than the
+ * {@link ClickHouseQueryClient} port: retry, outcome logging/metrics, and an
+ * in-band exception guard for streamed results.
  */
 
 import { runWithRetry } from "./retry.ts";
@@ -107,31 +91,9 @@ export class VendorClientResiliencePolicy extends VendorClientPolicy {
 }
 
 /**
- * The resilience policy a vendor-shaped client is wrapped in, held as one
- * object so it is configured once and applied to every client the same way.
- *
- * Reads retry because they are idempotent and nothing above them will do it: a
- * transient overload would otherwise surface as a failed page.
- *
- * Writes deliberately do not. Every insert in this system is issued from a job
- * on a queue that retries the whole job on its own backoff, so a client-side
- * retry does not add resilience - it multiplies attempts. The two layers
- * compounded: 4 attempts here inside up to 25 there, so one insert could be
- * tried ~100 times against a server that was rejecting precisely because it
- * was overloaded.
- *
- * It was also the unsafe half. These are async inserts (`async_insert` +
- * `wait_for_async_insert`) and `async_insert_deduplicate` is not set anywhere,
- * so it takes ClickHouse's default of off. A failure raised after the server
- * has accepted the batch into its buffer - `Query was cancelled`, or the
- * memory limit hit while executing `WaitForAsyncInsert`, which between them
- * were most of the insert retries in production - can still flush. Retrying
- * then writes the rows twice. ReplacingMergeTree collapses that for the tables
- * keyed to collapse it; the rollup and analytics tables just double-count.
- *
- * If insert retries are ever wanted back, make them idempotent first: set
- * `async_insert_deduplicate`, or pass a deterministic
- * `insert_deduplication_token` per batch.
+ * Reads retry (idempotent); inserts deliberately do not. Every insert already
+ * retries via its queue job, and — being an async insert with no dedup token
+ * set — a retry after the server buffers it can double-write the rows.
  */
 export class VendorClientResilience {
   private readonly maxRetries: number;
@@ -253,30 +215,9 @@ export class VendorClientResilience {
   }
 
   /**
-   * ClickHouse streams results over HTTP. Once rows have been flushed, a
-   * failure can no longer change the 200 status code, so the server writes the
-   * error INTO the output as a final `{"exception": "..."}` line
-   * (`http_write_exception_in_output_format`, on by default). The transport
-   * never throws, the line parses as JSON, and without this guard it reaches
-   * the caller as a "row" with none of the selected columns — which surfaces
-   * as a property access on a missing column deep in a decoder, pointing every
-   * investigation away from ClickHouse. (Observed live: a
-   * MEMORY_LIMIT_EXCEEDED mid-`FINAL` arriving as a data row.)
-   *
-   * Outcome accounting is two-phase for streamed results. The transport-level
-   * "success" is recorded when the query resolves — that cannot be deferred
-   * to consumption, because a caller may stream() or never read the body at
-   * all. When consumption then surfaces an in-band exception, the failure is
-   * recorded HERE (failure log + error counter), so dashboards alerting on
-   * errors see it. The earlier success increment is left standing and
-   * documents itself as "the server accepted and started answering"; an
-   * in-band failure therefore shows up as one success + one error for the
-   * same query, never as silence.
-   *
-   * No transport-level retry happens for in-band exceptions: the body has
-   * been consumed, and the classes that arrive in-band (memory limit, server
-   * timeout) are not transient. Callers that need a retry get it from their
-   * own layer — the job queue re-runs the whole unit of work.
+   * ClickHouse can flush a 200 then write a failure INTO the stream as a final
+   * `{"exception": ...}` row; without this guard it reaches the caller as a
+   * normal row missing every column instead of surfacing as an error.
    */
   private guardInbandException({
     result,

@@ -1,6 +1,6 @@
 /**
- * The body of the run dialog: the name of the run, the agent it goes against, what it covers when that is still
- * being chosen, whatever the chips added, and then the chips themselves.
+ * The body of the run dialog: name, agent, coverage while still being
+ * chosen, whatever the chips added, then the chips themselves.
  * @see specs/features/agent-testing/run-dialog.feature
  */
 

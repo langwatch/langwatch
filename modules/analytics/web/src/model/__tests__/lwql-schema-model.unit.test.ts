@@ -1,11 +1,7 @@
 /**
- * The schema response is the whole of what the workbench knows.
- *
- * The load-bearing assertion is the negative one: fed an empty response the
- * mapping offers nothing at all. A hard-coded dataset, column or physical table
- * anywhere in the frontend would survive that and show up here.
- *
- * Spec: modules/analytics/specs/analytics-lwql-workbench.feature
+ * The schema response is the whole of what the workbench knows. The
+ * load-bearing assertion is the negative one: an empty response must map to
+ * nothing at all, or a hard-coded dataset/column/table would survive it.
  */
 
 import { describe, expect, it } from "vitest";

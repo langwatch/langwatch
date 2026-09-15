@@ -1,19 +1,10 @@
 /**
  * @vitest-environment node
- *
  * @see specs/scenarios/scenario-canary-healthcheck.feature
- *
- * Route-level proof for `GET /api/health/scenarios`: project API key auth
- * (identical to the sibling health probes) runs and can reject BEFORE any run
- * is queued, a busy probe answers 429, and a healthy/unhealthy
- * outcome from the service maps onto the documented response shape. The
- * service's own retry/budget/single-flight logic is unit-tested against an
- * injected queue/poll boundary in
- * `../../health-probes/__tests__/scenario-canary.service.unit.test.ts` — this
- * file mocks the service's production entrypoint
- * (`runScenarioHealthCanary`) as the one boundary this route crosses, so a
- * queued-run assertion here is "was the entrypoint invoked", never a real
- * queue call.
+ * Route-level proof for `GET /api/health/scenarios`: auth, a busy 429, and a
+ * healthy/unhealthy outcome map onto the documented response shape. Retry/budget
+ * logic is unit-tested separately; this file mocks `runScenarioHealthCanary` as
+ * the one boundary this route crosses.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 

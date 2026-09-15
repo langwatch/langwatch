@@ -1,14 +1,7 @@
 /**
- * Which organization a tenant belongs to, read off this process's own Postgres.
- *
- * Both routed members ask this one question, which is why it is built on the
- * `prisma` member and never through `ProjectApi`: project's own live tier reads
- * ClickHouse, so member to ProjectApi to project repositories back to member is
- * a cycle that would deadlock the boot it sits in.
- *
- * A tenant this deployment cannot place answers null, and the router refuses
- * rather than falling back to the shared server. A wrong route is a data-leak
- * bug, not a slow query.
+ * Which organization a tenant belongs to, read off this process's own
+ * Postgres directly, never `ProjectApi` (cycles back via its ClickHouse
+ * tier). A wrong route is a data-leak bug, not a slow query, so refuse.
  */
 import { PLATFORM_TENANT, type TenantDirectory } from "@langwatch/clickhouse-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
@@ -55,13 +48,8 @@ const DEFAULT_MAX_CACHE_ENTRIES = 10_000;
 
 /**
  * The same answers, remembered, so the two routed members share one lookup
- * rather than each asking Postgres per statement.
- *
- * A membership is fixed at creation, so a cached answer never goes stale and
- * eviction is the only reason to drop one. A NULL is deliberately not cached: a
- * tenant that does not exist yet is a different thing from one that never will,
- * and remembering the negative would make a newly created project unroutable
- * until the entry aged out.
+ * instead of asking Postgres per statement. A NULL is deliberately not
+ * cached, or a newly created tenant would stay unroutable until eviction.
  */
 export function cachedTenantDirectory(
   directory: TenantDirectory,

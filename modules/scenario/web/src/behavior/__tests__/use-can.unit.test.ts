@@ -1,6 +1,6 @@
 /**
- * The client half of ADR-092 §5: `can()` answers from the server's effective set, applying the same hierarchy the
- * engine does, and it FAILS CLOSED whenever it has no set to answer from.
+ * The client half of ADR-092 §5: `can()` answers from the server's effective
+ * set and FAILS CLOSED whenever it has no set to answer from.
  * @vitest-environment jsdom
  */
 import { cleanup, renderHook } from "@testing-library/react";

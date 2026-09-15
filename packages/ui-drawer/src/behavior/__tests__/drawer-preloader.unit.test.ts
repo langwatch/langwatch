@@ -1,12 +1,8 @@
 /**
  * @vitest-environment jsdom
- *
  * specs/navigation/drawer-chunk-warmup.feature
- *
- * Moved from `platform/app/src/hooks/__tests__/usePreloadDrawer.unit.test.ts`.
- * The application's copy mocked the one module-scope registry; the preloader is
- * built from a composed registry now, so the warm-up is a plain spy handed to
- * the hook factory and every scenario reads the same.
+ * The preloader is built from a composed registry, so the warm-up is a plain spy handed to the
+ * hook factory and every scenario reads the same.
  */
 import { cleanup, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";

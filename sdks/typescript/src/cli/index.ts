@@ -15,15 +15,9 @@ import "./compileCache";
 import { config } from "dotenv";
 
 /**
- * The ONE boot that must not absorb a .env: the daemon server. It is spawned
- * with cwd=$HOME (daemon/spawn.ts), so the boot-time load below would read
- * ~/.env — and the daemon's process env becomes the BASELINE every request
- * resets to (daemon/execution.ts applyWindow), which would drop the user's
- * home-directory secrets (DATABASE_URL, AWS creds, …) into every caller's
- * execution window. Identity-relevant variables the daemon actually needs are
- * pinned explicitly by the spawner (daemon/identity.ts identityEnv); per
- * request, the caller's own .env is re-read scoped to LANGWATCH_* keys
- * (utils/apiKey.ts). Every other invocation keeps the full load.
+ * The ONE boot that must not absorb a .env: the daemon server runs with
+ * cwd=$HOME, so loading here would leak home-directory secrets into the
+ * BASELINE every request resets to. Every other invocation loads normally.
  */
 const isDaemonServerBoot =
   process.argv[2] === "daemon" &&
@@ -38,24 +32,15 @@ if (!isDaemonServerBoot) {
 import { runCli } from "./daemon/dispatch";
 
 /**
- * The entrypoint is deliberately almost empty.
- *
- * The command tree lives in `./program.ts` and is loaded lazily, because an
- * invocation that a warm daemon can serve should never pay for commander, the
- * client SDK, or any command module — that graph is most of the cold start.
- *
- * `runCli` falls back to building and parsing the program in-process whenever a
- * daemon is unavailable, disabled, or unsuitable for this command, which is the
- * default and is byte-for-byte what the CLI did before daemon mode existed.
+ * The entrypoint is deliberately almost empty: the command tree in
+ * `./program.ts` loads lazily so a daemon-served invocation never pays for
+ * commander or the client SDK — most of the cold start.
  */
+
 /**
- * Top-level safety net. Commands render their own errors (structured on
- * stdout / human on stderr) and exit themselves; this catch exists only for
- * failures that escape the command tree entirely — e.g. a rejected action
- * promise a command forgot to catch (an invalid --jq expression outside a
- * try/catch). Kept dependency-free on purpose: statically importing the error
- * renderer would pull the program graph into every invocation, daemon-served
- * ones included, and cold start is the whole point of the lazy imports above.
+ * Top-level safety net for a promise that escapes the command tree
+ * uncaught. Kept dependency-free — importing the error renderer here would
+ * defeat the lazy imports above and pull the whole program graph in.
  */
 void runCli(process.argv).catch((error: unknown) => {
   const message = error instanceof Error ? error.message : String(error);

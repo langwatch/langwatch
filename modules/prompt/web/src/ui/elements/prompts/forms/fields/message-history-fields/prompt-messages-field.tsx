@@ -65,7 +65,10 @@ type MessageRowProps = {
   showControls?: boolean;
   /** Whether to render textarea in borderless mode (for horizontal layout) */
   borderless?: boolean;
-  /** Whether this message should fill remaining height (only for last message in borderless mode) */
+  /**
+   * Whether this message should fill remaining height (only for the last
+   * message in borderless mode).
+   */
   fillHeight?: boolean;
 };
 

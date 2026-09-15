@@ -1,22 +1,9 @@
 /**
  * The members a process holds, built from the config that process parsed.
- *
- * Three properties are the whole point of this file.
- *
- *  - A member is built EAGERLY, when boot reads it, and boot reads exactly the
- *    union of what the installed modules declared and what the chosen
- *    repository tier requires. Nothing is lazy: `cache`, `idempotency` and
- *    `rateLimiter` are built from the `redis` member itself rather than from
- *    config a second time, because two constructions of the same client give
- *    one process two fold caches, two dedup keyspaces and two tenant broadcast
- *    channels.
- *  - A member this process was not configured for REFUSES BY NAME, rather than
- *    answering with something emptier that a caller cannot tell from the real
- *    thing.
- *  - A member handed in as an own property with the value `undefined` is a
- *    refusal, never an omission. `exactOptionalPropertyTypes` is off in
- *    `tsconfig.base.json`, so without that case a misspelt override in a test
- *    silently becomes the real client.
+ * Built EAGERLY at boot, not re-derived per use — two constructions of the
+ * same client would split one process into duplicate caches and dedup
+ * keyspaces. An unconfigured member REFUSES BY NAME; an explicit `undefined`
+ * override refuses too (exactOptionalPropertyTypes is off), never a silent omission.
  */
 import { createLogger } from "@langwatch/observability";
 import { buildClickHouse } from "./clickhouse-member.ts";

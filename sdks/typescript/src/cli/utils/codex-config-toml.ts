@@ -1,24 +1,8 @@
 /**
  * Idempotent merge of the LangWatch [otel] activation block into
- * ~/.codex/config.toml.
- *
- * Codex 0.130+ links the opentelemetry-otlp Rust SDK but its
- * exporter is gated on a `[otel]` block in `~/.codex/config.toml` —
- * env vars alone are a silent no-op. The Path B install flow needs
- * to write this block for the user so the drawer / CLI surface
- * can collapse to a single command.
- *
- * Why a handwritten merger and not a TOML library: the file may
- * contain valid TOML the user authored by hand, and we want to
- * preserve ordering + comments verbatim. The merger only ever
- * appends a marker-bracketed block at the end of the file and
- * regex-replaces the same block on re-runs. No structural rewrite
- * of the existing TOML.
- *
- * Marker comments:
- *   # >>> langwatch otel begin >>>
- *   …
- *   # <<< langwatch otel end <<<
+ * ~/.codex/config.toml. Hand-written, not a TOML library, so the user's
+ * existing ordering and comments survive verbatim; it only ever touches
+ * the region between the `# >>> langwatch otel begin/end <<<` markers.
  */
 
 import * as fs from "node:fs";
@@ -81,32 +65,10 @@ function tomlStr(s: string): string {
 }
 
 /**
- * Build the bracketed [otel] block with BOTH signal exporters. Returned WITH
- * leading + trailing markers and a trailing newline.
- *
- * codex splits its `[otel]` exporters by signal: `trace_exporter` posts spans
- * (`session_task.turn` carries the turn's tokens and session key) and
- * `exporter` posts the EVENTS as log records (`codex.user_prompt`,
- * `codex.tool_result`, `codex.turn_ttft`, ...) — the half that carries the
- * tools, prompts and TTFT no codex span reports. Both default to none, so
- * the block enables both; `metrics_exporter` is deliberately left alone
- * (its default is codex's own analytics, not ours to redirect).
- *
- * The TRACE exporter stays FIRST: `codexOtelBlockEndpoint` reads the block's
- * first `endpoint =` line, and the login-time staleness compare checks it
- * against {@link codexTraceEndpoint}.
- *
- * `log_user_prompt` is not set: codex then exports the prompt LENGTH and
- * redacts the text, and the conversation content arrives through the notify
- * harvest instead, on the user's existing opt-in.
- *
- * `includeAuthHeader` controls whether the write-only ingest key is
- * inlined as a `headers` entry on each exporter. codex reads that
- * header on every run, so persisting it makes a plain `codex` (no
- * langwatch wrapper) capture without leaking OTEL vars into the shell
- * rc. When false, the header comes from OTEL_EXPORTER_OTLP_HEADERS at
- * runtime instead (the wrapper-only default that keeps the secret off
- * disk until the user opts in).
+ * Build the bracketed [otel] block with both signal exporters (trace_exporter
+ * for spans, exporter for events as log records); metrics_exporter is left
+ * alone. The trace exporter must stay FIRST: `codexOtelBlockEndpoint` reads
+ * the block's first `endpoint =` line to detect login-time staleness.
  */
 export function buildCodexOtelBlock(
   inputs: CodexOtelBlockInputs,
@@ -226,14 +188,10 @@ export function codexOtelBlockLogsEndpoint(
 }
 
 /**
- * The ingest token inlined on the langwatch `[otel]` block's `headers` entry,
- * or null when the block carries no persisted header.
- *
- * This is what lets the turn-completion harvest stand on its own: it runs as a
- * bare process codex spawned, with no session and no login to lean on, and the
- * one file that says "capture is on for plain codex" is the same file holding
- * the endpoint and key codex itself is posting with. Reading them back means
- * the harvest posts exactly where codex's own spans went.
+ * The ingest token inlined on the langwatch `[otel]` block's `headers`
+ * entry, or null when unset. The turn-completion harvest runs as a bare
+ * codex-spawned process with no session/login, so this file is the only
+ * place it can read where and with what key codex itself is posting.
  */
 export function codexOtelBlockAuthToken(
   filePath: string = defaultCodexConfigPath(),
@@ -264,15 +222,9 @@ export interface CodexOtelWriteResult {
 }
 
 /**
- * Idempotent merge into the codex config.toml. Behaviour:
- *
- * - If the file does not exist: create the parent dir if needed,
- *   write the block as the entire file contents.
- * - If the file exists with NO marker pair: append the block + a
- *   leading blank line so it doesn't fuse with the prior section.
- * - If the file exists WITH a marker pair: regex-replace the
- *   bracketed region. The replacement is byte-for-byte the same
- *   when the inputs haven't changed → returns 'unchanged'.
+ * Idempotent merge into codex config.toml: creates the file, appends the
+ * block when no marker pair exists, or regex-replaces the bracketed region
+ * in place — byte-for-byte unchanged inputs return 'unchanged'.
  */
 export function writeCodexOtelBlock(
   inputs: CodexOtelBlockInputs,
@@ -311,28 +263,20 @@ function escapeRe(s: string): string {
 }
 
 /**
- * Replace the span `re` matches with `replacement` exactly as written.
- *
- * A string replacement is not inserted literally: `$&`, `` $` ``, `$'` and `$n`
- * are directives that splice the match and the text around it back into the
- * result. Every replacement in this file is built from values the user
- * authored, and a config holding a shell one-liner reaches for all of them, so
- * expanding them duplicates the surrounding config until codex refuses to parse
- * the file. A replacer function is inserted as-is and has no such reading.
+ * Replace what `re` matches with `replacement`, verbatim. A *string*
+ * replacement treats `$&`, `` $` ``, `$'` and `$n` as directives, and user
+ * TOML can literally contain such sequences — a replacer function inserts
+ * `replacement` as-is, with no such interpretation.
  */
 function replaceVerbatim(content: string, re: RegExp, replacement: string): string {
   return content.replace(re, () => replacement);
 }
 
 /**
- * Write `content` and enforce `0600`. `writeFileSync`'s `mode` option is
- * only honored when CREATING the file — on an existing file it is silently
- * ignored, leaving whatever permissions the file already had. Codex may
- * have created `config.toml` at `0644`, and these blocks can carry a bearer
- * token, so narrow the file to `0600` BEFORE writing when it already exists:
- * otherwise the token would land in a world-readable file for the window
- * between the write and a trailing chmod. On create, the `mode` option sets
- * `0600` up front. The final chmod is a belt-and-suspenders safety check.
+ * Write `content` and enforce `0600`. `writeFileSync`'s `mode` option only
+ * applies when creating a file; on an existing one permissions are left
+ * as-is. These blocks can carry a bearer token, so chmod BEFORE writing
+ * closes the window where it would sit in a world-readable file.
  */
 function writeFile0600(filePath: string, content: string): void {
   if (fs.existsSync(filePath)) {
@@ -390,14 +334,10 @@ function uncommentDisplaced(commented: string): string {
 }
 
 /**
- * The user's own notify argv as a prior install stored it, or null when the
- * file carries no displaced region.
- *
- * Once the region is written, the argv it holds is a comment: no scan for a
- * live `notify` will ever see it again. Reading it back from here is what keeps
- * the chain alive across repeat installs, where otherwise the second write
- * would find nothing to chain and quietly stop running the user's program while
- * the note left in their file still says we run it.
+ * The user's own notify argv as a prior install stored it, or null when
+ * none is displaced. Once written, the argv is a comment, invisible to any
+ * scan for a live `notify` — reading it back here is what keeps a repeat
+ * install chaining it instead of silently dropping it.
  */
 function findDisplacedNotify(
   content: string,
@@ -432,16 +372,10 @@ function tomlStringArray(values: readonly string[]): string {
 }
 
 /**
- * The harvest argv to write into `notify`, as an absolute node binary plus this
- * CLI's own entry script.
- *
- * Spelled out rather than left as the bare `langwatch` name because codex runs
- * it as a plain process with whatever environment codex itself was started in:
- * a name resolved against PATH works from the shell the user installed from and
- * then quietly stops working from a launcher, a cron, or an editor terminal.
- *
- * Returns null when the entry script cannot be determined, which is the caller's
- * cue to skip the install rather than write an argv that will never run.
+ * The harvest argv to write into `notify`: absolute node binary + this
+ * CLI's entry script, not the bare `langwatch` name — codex runs it in
+ * whatever environment it started in, and a PATH-resolved name silently
+ * stops working from a launcher, cron, or editor terminal.
  */
 export function defaultCodexNotifyCommand(): string[] | null {
   const entry = process.argv[1];
@@ -459,19 +393,9 @@ export function codexNotifyCommandIsEphemeral(command: readonly string[]): boole
 }
 
 /**
- * Build the bracketed `notify` block, WITH markers and a trailing newline.
- *
- * Codex exports no conversation content on its telemetry signal — the reply is
- * parsed out of the streaming response and dropped before export, and no codex
- * setting turns it back on. What codex does offer is `notify`: a program it
- * runs after every completed turn, handed a JSON payload naming the session
- * that finished. Pointing that at our own harvest is what lets a plain `codex`
- * (no langwatch wrapper in front) record the conversation.
- *
- * The chained argv, when present, is the user's own notify program: we run it
- * after ours so installing capture never silently kills their notifications.
- * It is passed BEFORE `--notify` on purpose — codex appends the turn payload as
- * the final argv, so `--notify` has to be last to receive it as its value.
+ * Build the bracketed `notify` block. Codex's telemetry carries no conversation
+ * content, so this points codex's post-turn hook at our harvest; a chained user
+ * program runs first, then `--notify` LAST since codex appends the turn payload.
  */
 export function buildCodexNotifyBlock(inputs: CodexNotifyBlockInputs): string {
   const chained = inputs.chained?.length ? ["--chain", JSON.stringify(inputs.chained)] : [];
@@ -496,18 +420,9 @@ interface ScanState {
 }
 
 /**
- * Advance the scan across one line, ignoring brackets inside strings and after
- * an unquoted `#`. Multi-line values are the reason this is needed: a line's
- * meaning depends on what an earlier line left open.
- *
- * All four TOML string forms are tracked. Literal strings are single-quoted and
- * have no escape mechanism at all, so `path = 'C:\dir['` is an unbalanced
- * bracket that must not count, and single-quoted values are the form codex's
- * own documentation uses for commands. The triple-delimited forms span lines
- * and are opaque in between: an `instructions = """..."""` block full of
- * brackets and `#` characters is prose, not structure, and reading it as
- * structure would leave the scanner at a depth that hides the real top-level
- * `notify` below it.
+ * Advance the scan across one line, ignoring brackets/`#` inside any of the
+ * four TOML string forms — multi-line strings mean a line's meaning depends
+ * on what an earlier line left open, and content inside a string is prose.
  */
 function scanLine(line: string, state: ScanState): ScanState {
   let next = state.depth;
@@ -595,15 +510,11 @@ function topLevelNotifyOffsets(content: string): number[] {
 }
 
 /**
- * The offset of codex's own top-level `notify = [` assignment, or null when the
- * file has none above its first table header.
- *
- * Depth is tracked rather than cutting at the first line that starts with `[`.
- * TOML lets an array span lines, so a nested one puts an element like `[1, 2],`
- * at the start of a continuation line. Reading that as a table header would
- * hide a genuinely top-level `notify` below it, and hiding it is not a benign
- * miss: the writer would then add a second `notify`, and a duplicate key stops
- * codex parsing its config at all.
+ * The offset of codex's own top-level `notify = [`, or null. Depth is
+ * tracked instead of cutting at the first line starting with `[`, since a
+ * multi-line array's continuation can start with `[` too — misreading it
+ * as a table header would let a duplicate `notify` key get written, which
+ * stops codex parsing its config at all.
  */
 function topLevelNotifyMatch(content: string): { index: number } | null {
   const [first] = topLevelNotifyOffsets(content);
@@ -611,27 +522,10 @@ function topLevelNotifyMatch(content: string): { index: number } | null {
 }
 
 /**
- * The value of codex's own top-level `notify` key in `content`, or null when
- * absent. Returns the span the assignment occupies alongside the raw text and
- * the parsed argv, so a caller moves those exact bytes. The span is what makes
- * it the live assignment that moves: an identical spelling quoted in a comment
- * or inside a `"""` block is prose, and searching for the text would find that
- * copy first and comment out someone's documentation instead of the key codex
- * reads.
- *
- * "Top-level" is enforced, not assumed. TOML binds a bare key to the table
- * above it, so `[integrations.slack]` followed by `notify = [...]` is
- * `integrations.slack.notify` and has nothing to do with codex — displacing it
- * would rewrite unrelated config and run someone else's program on every turn.
- *
- * Only single-line and simple multi-line array forms are recognised, which is
- * every form codex's own docs show. Anything else is left alone rather than
- * half-parsed — see `writeCodexNotifyBlock` for what that means for the user.
- *
- * Both quoting forms are read. A literal (single-quoted) element is valid TOML
- * and is what codex's own docs use for a Windows path, and since the assignment
- * would be displaced either way, failing to parse it would comment the user's
- * program out and chain nothing in its place, silently dropping it.
+ * Codex's own top-level `notify` value, or null. "Top-level" is enforced,
+ * not assumed — a bare key binds to the table above it, so `notify` nested
+ * under an unrelated table (e.g. `[integrations.slack]`) is left alone
+ * rather than displaced and run as if it were codex's own.
  */
 const TOML_ARRAY_ELEMENT = /"((?:[^"\\]|\\.)*)"|'([^']*)'/g;
 
@@ -718,19 +612,9 @@ export interface CodexNotifyWriteResult {
 }
 
 /**
- * Idempotent merge of the notify block into config.toml.
- *
- * The block is always written at the TOP of the file. `notify` is a top-level
- * key, and TOML binds a bare key to whatever table precedes it — appended after
- * the `[otel]` block the way the other blocks are, it would silently become
- * `otel.notify`, which codex ignores without complaint. Writing it first is the
- * one placement that cannot be wrong regardless of what the user's file holds.
- *
- * A user-authored `notify` is moved aside rather than left in place: TOML
- * forbids a duplicate key, so keeping both would stop codex from starting. The
- * displaced argv is commented out where it stood and re-run from our block, and
- * a repeat install reads it back out of that region so their program stays on
- * the chain instead of being dropped the second time capture is enabled.
+ * Idempotent merge of the notify block, written at the TOP of the file:
+ * appended after `[otel]` like the other blocks, TOML would silently bind
+ * it to that table as `otel.notify` instead of the top-level key codex reads.
  */
 export function writeCodexNotifyBlock(
   inputs: CodexNotifyBlockInputs,
@@ -863,16 +747,11 @@ export interface CodexGatewayWriteResult {
 const PROFILE_NAME = "langwatch-gateway";
 
 /**
- * Build the additive [model_providers.langwatch] block that lives
- * in ~/.codex/config.toml. Codex 0.130+ defaults to ChatGPT OAuth
- * and ignores OPENAI_API_KEY unless an explicit model_provider
- * config is selected with `name = "OpenAI"`, `env_key`, and
- * `wire_api = "responses"` (the "chat" wire_api is no longer
- * supported per the codex binary strings dump).
- *
- * Codex 0.134+ rejects a [profiles.<name>] entry inside
- * config.toml when the user passes --profile <name>; the profile
- * body is now written to a sibling file (see buildCodexGatewayProfileFile).
+ * Build the additive [model_providers.langwatch] block. Codex 0.130+
+ * defaults to ChatGPT OAuth and ignores OPENAI_API_KEY unless this explicit
+ * provider is selected (`wire_api = "responses"`; "chat" is no longer
+ * supported). Codex 0.134+ also rejects an inline `[profiles.<name>]`, so
+ * the profile body lives in a sibling file (`buildCodexGatewayProfileFile`).
  */
 export function buildCodexGatewayBlock(inputs: CodexGatewayBlockInputs): string {
   const envKey = inputs.envKey ?? "OPENAI_API_KEY";
@@ -898,15 +777,10 @@ export function buildCodexGatewayBlock(inputs: CodexGatewayBlockInputs): string 
 }
 
 /**
- * Build the contents of the sibling profile file
- * (~/.codex/langwatch-gateway.config.toml). The filename IS the
- * profile name; the body holds the settings that previously went
- * under [profiles.langwatch-gateway] inside config.toml.
- *
- * We DO NOT bracket this file with langwatch markers because the
- * file is entirely owned by langwatch — the wrapper creates it
- * fresh on every invocation. Hand-edits to it will be overwritten
- * (a header comment explains this to anyone reading the file).
+ * Contents of the sibling profile file; the filename IS the profile name.
+ * Not bracketed with langwatch markers because the file is entirely
+ * langwatch-owned — recreated fresh on every invocation, so hand edits
+ * are silently overwritten.
  */
 export function buildCodexGatewayProfileFile(): string {
   return [
@@ -931,17 +805,10 @@ export function defaultCodexProfilePath(profile: string = PROFILE_NAME): string 
 }
 
 /**
- * Idempotent merge of the gateway provider block into config.toml
- * + write of the sibling profile file. Both writes happen in one
- * call so the wrapper can't end up with a half-installed state.
- *
- * config.toml: regex-replace inside the marker pair or append. The
- * [otel] marker pair (Path B) coexists independently — a user who
- * runs both Path A and Path B keeps both blocks; only one fires per
- * invocation per the no-double-trace rule.
- *
- * <profile>.config.toml: full-file replace. The file is entirely
- * owned by langwatch.
+ * Merge the gateway provider block into config.toml and write the sibling
+ * profile file in one call, so the wrapper can't end up half-installed.
+ * The [otel] marker pair (Path B) coexists independently — only one path
+ * fires per invocation per the no-double-trace rule.
  */
 export function writeCodexGatewayBlock(
   inputs: CodexGatewayBlockInputs,
@@ -1080,14 +947,10 @@ export function removeCodexGatewayProfileFile(
 }
 
 /**
- * Whether the file at `profilePath` looks like the profile body this CLI
- * writes (`model_provider = "langwatch"`, the entire content of
- * buildCodexGatewayProfileFile()) rather than some unrelated file a user
- * happened to place at this distinctively-named path. The path name alone
- * is a strong hint but not proof of ownership - this content check is what
- * the logout scan and the remover itself gate listing/deletion on, so a
- * non-owned file at the same path is never presented as removable or
- * silently deleted.
+ * Whether `profilePath` looks like a profile body this CLI writes. The
+ * distinctive path is a strong hint but not proof of ownership — this
+ * content check is what the logout scan and remover gate on, so a
+ * non-owned file at the same path is never silently deleted.
  */
 export function codexProfileFileIsLangwatchOwned(
   profilePath: string = defaultCodexProfilePath(),

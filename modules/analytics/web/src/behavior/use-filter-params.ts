@@ -1,18 +1,7 @@
 /**
- * What every chart on these pages is narrowed to, read off the address.
- *
- * The binding half of `platform/app/src/hooks/useFilterParams.ts`: the reading
- * and the writing are pure in `model/analytics-filter-params.ts`, and this is
- * the seam that gives them the address and the range.
- *
- * `queryOpts` travels unchanged because it is load-bearing three times over.
- * `enabled` keeps a read from firing before a project resolves or with an
- * unparseable date — the two ways a chart used to ask for `projectId: ""`,
- * which reads as a wiring bug at ERROR. `refetchOnMount` and
- * `refetchOnWindowFocus` are both off because an analytics page is read, not
- * watched, and every one of these reads is a ClickHouse aggregate.
- * `skipBatch` keeps one slow series off the other eleven: batched, a
- * thirty-second percentile query holds up every chart on the page.
+ * Binds `useFilterParams`'s pure model to the address: `enabled` avoids
+ * firing before a project resolves; refetch-on-mount/focus stay off since
+ * every read here is a one-shot ClickHouse aggregate.
  */
 
 import { useCallback, useMemo } from "react";
@@ -46,14 +35,9 @@ const QS_WRITE_OPTIONS: qs.IStringifyOptions & { allowEmptyArrays?: boolean } = 
 };
 
 /**
- * The address's filters, as a nested structure rather than as flat keys.
- *
- * `qs` is what does the nesting: a filter like `evaluations.score` arrives as
- * `?evaluation_score.<evaluatorId>=0.8`, and only a parser that understands
- * dots and comma lists turns that back into the two-level record the procedures
- * take. The host port hands over the query FLAT — one value per key — so this
- * re-serialises and re-parses it, which is exactly what the platform hook did
- * with `router.asPath`.
+ * `qs` nests the address's filters: `evaluations.score` arrives as
+ * `?evaluation_score.<evaluatorId>=0.8`, and only a dot/comma-aware parser
+ * turns that into the two-level record the procedures take.
  */
 function parseQuery(query: Readonly<Record<string, string | undefined>>) {
   const present = Object.entries(query).filter(
@@ -75,13 +59,9 @@ export function useFilterParams() {
   const filters = useMemo(() => readFiltersFromQuery(queryParams), [queryParams]);
 
   /**
-   * Writes a new query string.
-   *
-   * A keyset cursor describes a position in the PREVIOUS result set, and every
-   * caller of this changes which rows match — carrying it across resumes the
-   * new list partway down, so the first rows matching the filter the reader
-   * just applied are the ones they never see. Dropping it sends them to the
-   * first page, which is what applying a filter means.
+   * A keyset cursor describes a position in the PREVIOUS result set; carrying
+   * it across a filter change would resume the new list partway down, so the
+   * first matching rows are never shown. Dropping it returns to the first page.
    */
   const writeQuery = useCallback(
     (next: Record<string, unknown>) => {

@@ -1,5 +1,6 @@
 /**
- * The target area of the run dialog: the agent cards, the prompt picker, or the setup box a project with nothing to test reads instead.
+ * The target area of the run dialog: the agent cards, the prompt picker, or
+ * the setup box a project with nothing to test reads instead.
  * @see specs/features/agent-testing/run-dialog.feature
  * @see specs/features/agents/connected-agents-ui.feature
  */

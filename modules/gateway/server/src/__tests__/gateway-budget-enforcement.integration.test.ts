@@ -1,6 +1,8 @@
+/** @vitest-environment node */
+
 /**
- * @vitest-environment node
- * Real Postgres + real ClickHouse. Regression for #6141: budgets accrued nothing on 4 of 6 windows, so warn/block never fired. Spec: specs/ai-gateway/budgets.feature
+ * Real Postgres + real ClickHouse. Regression for #6141.
+ * @see specs/ai-gateway/budgets.feature
  */
 import { nowInstant, toDate } from "@langwatch/time";
 import { nanoid } from "nanoid";

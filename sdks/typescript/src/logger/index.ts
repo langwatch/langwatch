@@ -1,18 +1,5 @@
-// Logger utility for SDKs
-//
-// Usage:
-//   - If you pass your own Logger implementation, the SDK will use it as-is (no log level filtering or prefixing applied).
-//   - If you use ConsoleLogger, you can specify log level and prefix options.
-//   - NoOpLogger disables all logging.
-//
-// Example:
-//   const logger = new ConsoleLogger({ level: "warn", prefix: "SDK" });
-//   logger.info("This will not show");
-//   logger.warn("This will show with prefix");
-//
-//   // If you pass your own logger, SDK will not filter logs:
-//   const customLogger: Logger = { ... };
-//   // SDK uses customLogger as-is
+// Logger utility for SDKs. A custom `Logger` implementation is used as-is, with no level
+// filtering or prefixing; `ConsoleLogger` applies both, and `NoOpLogger` disables logging.
 
 export type LogLevel = "debug" | "info" | "warn" | "error";
 

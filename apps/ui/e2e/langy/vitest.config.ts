@@ -12,9 +12,10 @@ export default defineConfig({
   test: moduleVitestTestOptions({
     kind: "node",
     test: {
-      // Scenarios are slow (LLM judge + simulator + multi-tool flows), and a single turn may legitimately work for up to
-      // TURN_STREAM_TIMEOUT_MS (langy-agent.ts), which is 420s. runScenarioAndLog replays the whole scenario once on a transient
-      // infrastructure failure, so a two-turn scenario needs four turn windows: 4 x 420s = 1_680_000 ms, rounded up.
+      // Scenarios are slow (LLM judge + simulator + multi-tool flows), and a single turn may
+      // legitimately work for up to TURN_STREAM_TIMEOUT_MS (langy-agent.ts), which is 420s.
+      // runScenarioAndLog replays the whole scenario once on a transient infrastructure failure,
+      // so a two-turn scenario needs four turn windows: 4 x 420s = 1_680_000 ms, rounded up.
       testTimeout: 1_800_000,
       // The dogfood beforeAll runs both seeders: seedNavigablePrompt allows three
       // attempts at 20s each and seedFailingApplicationTraces polls to a 45s

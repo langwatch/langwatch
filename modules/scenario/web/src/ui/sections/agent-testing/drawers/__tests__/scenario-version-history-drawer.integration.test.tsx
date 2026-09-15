@@ -1,7 +1,8 @@
 /**
  * @vitest-environment jsdom
- * @see specs/features/agent-testing/case-version-history.feature, specs/scenarios/scenario-versioning.feature,
- *   specs/scenarios/scenario-version-restore.feature
+ * @see specs/features/agent-testing/case-version-history.feature
+ * @see specs/scenarios/scenario-versioning.feature
+ * @see specs/scenarios/scenario-version-restore.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen, waitFor, within } from "@testing-library/react";

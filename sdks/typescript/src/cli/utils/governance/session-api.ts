@@ -1,25 +1,8 @@
 /**
  * Session-authenticated calls that trade the device session for project
- * credentials:
- *
- *   - `fetchPersonalProject`   - GET /api/auth/cli/personal-project, the lazy
- *     personal-key exchange for sessions minted before /exchange shipped
- *     `personal_project`. Called at most once per session by the credential
- *     resolver, which persists the result into ~/.langwatch/config.json.
- *   - `fetchProjectKeyBySlug`  - POST /api/auth/cli/project-key, the
- *     non-interactive `langwatch login --project <slug>` path for headless
- *     contexts. Returns the named project's EXISTING key; nothing is minted.
- *
- * Both refresh an expired access token once (rotating the stored pair) before
- * giving up, because access tokens live one hour and these calls typically
- * happen days after login. The rotation itself goes through
- * `session-refresh.ts`, the one implementation shared with `cli-api.ts`, so
- * concurrent CLI processes racing over a single-use refresh token resolve the
- * same way here as everywhere else. Only a server rejection drops the stored
- * tokens, so the next command reports "not logged in" instead of retrying a
- * dead session forever; a network failure leaves them alone.
- *
- * Spec: specs/ai-governance/cli-onboarding/me-credentials.feature
+ * credentials, refreshing an expired token first via the shared
+ * `session-refresh.ts` so concurrent CLI processes resolve consistently.
+ * Only a server rejection drops the stored tokens; a network failure leaves them alone.
  */
 
 import { normalizeEndpoint } from "../../../internal/endpoint";

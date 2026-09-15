@@ -76,76 +76,20 @@ export interface SetupObservabilityOptions {
   attributes?: SemConvAttributes;
 
   /**
-   * Configuration for automatic data capture.
-   *
-   * This provides control over input/output data capture by LangWatch instrumentations.
-   * You can use a simple string mode, a configuration object, or a predicate function
-   * for dynamic control based on the operation context.
-   *
-   * @example
-   * ```typescript
-   * // Simple mode - capture everything
-   * dataCapture: "all"
-   *
-   * // Simple mode - capture only input data
-   * dataCapture: "input"
-   *
-   * // Simple mode - capture only output data
-   * dataCapture: "output"
-   *
-   * // Simple mode - capture nothing
-   * dataCapture: "none"
-   *
-   * // Configuration object
-   * dataCapture: {
-   *   mode: "all"
-   * }
-   *
-   * // Dynamic predicate function
-   * dataCapture: (context) => {
-   *   // Don't capture sensitive data in production
-   *   if (context.environment === "production" &&
-   *       context.operationName.includes("password")) {
-   *     return "none";
-   *   }
-   *   // Capture everything else
-   *   return "all";
-   * }
-   * ```
-   *
+   * Configuration for automatic input/output data capture by LangWatch
+   * instrumentations: a simple mode string ("all" | "input" | "output" |
+   * "none"), a configuration object, or a context-based predicate function.
+   * @example dataCapture: (context) => context.operationName.includes("password") ? "none" : "all"
    * @default "all"
    */
   dataCapture?: DataCaptureOptions;
 
   /**
-   * Dedicated TracerProvider for complete trace isolation from other OTel SDKs.
-   *
-   * When provided, LangWatch attaches its trace exporter to this provider
-   * and does NOT touch the global provider. Spans created through this
-   * provider's tracers go only to LangWatch. The other SDK keeps the
-   * global provider and never sees LLM traces.
-   *
-   * Pass any instrumentations you want on this provider via the
-   * `instrumentations` option — they will be registered against this
-   * provider instead of the global one.
-   *
-   * @remarks Trace-only mode. Log export (`logRecordProcessors`,
-   * `debug.consoleLogging`) is not supported when using a dedicated
-   * TracerProvider — use the default setup for full log+trace support.
-   *
-   * @example
-   * ```typescript
-   * import { NodeTracerProvider } from "@opentelemetry/sdk-trace-node";
-   *
-   * const lwProvider = new NodeTracerProvider();
-   * setupObservability({
-   *   tracerProvider: lwProvider,
-   *   langwatch: { apiKey: "..." },
-   * });
-   *
-   * // Use lwProvider.getTracer() for LLM calls
-   * const tracer = lwProvider.getTracer("my-llm-service");
-   * ```
+   * Dedicated TracerProvider for complete trace isolation from other OTel
+   * SDKs: LangWatch attaches its exporter here and never touches the global
+   * provider, so another SDK sharing the process never sees LLM traces.
+   * @remarks Trace-only — log export needs the default setup instead.
+   * @example new NodeTracerProvider()
    */
   tracerProvider?: TracerProvider;
 
@@ -303,12 +247,9 @@ export interface SetupObservabilityOptions {
    */
   advanced?: {
     /**
-     * Whether to throw errors during setup or return no-op handles.
-     *
-     * When false (default), setup errors are logged but the function
-     * returns no-op handles to prevent breaking your application.
-     * When true, setup errors will be thrown.
-     *
+     * Whether to throw errors during setup or return no-op handles. When
+     * false (default), setup errors are logged but no-op handles are
+     * returned instead, so a setup failure never breaks your application.
      * @default false
      */
     throwOnSetupError?: boolean;
@@ -333,67 +274,38 @@ export interface SetupObservabilityOptions {
 
     /**
      * Attach LangWatch processors to an existing global TracerProvider
-     * instead of returning a no-op when another OTel-based SDK has already
-     * initialized.
-     *
-     * Use this when running LangWatch alongside another OTel-based SDK.
-     * LangWatch will add its span processors to the
-     * existing provider so both SDKs receive spans. Combine with
-     * LangWatchTraceExporter filter options to scope LangWatch to only
-     * LLM-related spans.
+     * instead of returning a no-op when another OTel-based SDK already
+     * initialized one. Combine with LangWatchTraceExporter filter options to
+     * scope LangWatch to only LLM-related spans.
      *
      * @default false
      */
     attachToExistingProvider?: boolean;
 
     /**
-     * Disable all observability setup and return no-op handles.
-     *
-     * When true, no OpenTelemetry setup will occur and all operations
-     * will be no-ops. Useful for testing or when you want to completely
-     * disable observability without changing your code.
+     * Disable all observability setup and return no-op handles. Useful for
+     * testing or when you want to disable observability without changing code.
      *
      * @default false
      */
     disabled?: boolean;
 
     /**
-     * Disable the automatic shutdown of the observability system when the application
-     * terminates.
-     *
-     * When enabled (default), the SDK registers handlers for `beforeExit` (event loop
-     * drains), `SIGINT` (Ctrl+C), and `SIGTERM` (external kill / Docker stop) to flush
-     * pending traces before the process exits.
-     *
-     * The SDK never terminates your process. Node runs every listener registered for a
-     * signal, so once the flush is done the SDK stands aside and lets your own shutdown
-     * logic decide when the process ends. The one exception keeps one-shot scripts
-     * working: if the SDK's handler turns out to be the only listener for that signal,
-     * it removes itself and re-raises the signal, so the process ends on the signal
-     * exactly as it would have if the SDK were not installed.
-     *
-     * Note: `process.exit()` calls (e.g. from test runners like vitest) bypass these
-     * handlers. In those environments, call `shutdown()` explicitly in your teardown.
-     *
+     * Disable the automatic shutdown of the observability system on
+     * `beforeExit` / `SIGINT` / `SIGTERM`. The SDK flushes then stands aside
+     * rather than terminating your process — except when its handler is the
+     * only listener for a signal, when it re-raises the signal so the process
+     * still ends. `process.exit()` (e.g. vitest) bypasses these handlers.
      * @default false
      */
     disableAutoShutdown?: boolean;
 
     /**
-     * Exit the process with status 0 as soon as the automatic shutdown has flushed.
-     *
-     * WARNING: this terminates your application from inside the observability SDK. Any
-     * other `SIGINT` / `SIGTERM` listener that has not finished — a queue drain, in-flight
-     * database writes, connection teardown — is cut off mid-flight, and the process
-     * reports success even though it was signalled. This is what the SDK used to do
-     * unconditionally; the option exists only so an application that depended on it can
-     * keep the old behaviour while it moves the exit into its own signal handler, where
-     * it belongs.
-     *
-     * Leave this off unless your process now fails to exit on a signal, which happens
-     * only when you register a signal handler of your own that never terminates the
-     * process. Ignored when `disableAutoShutdown` is set.
-     *
+     * Exit the process with status 0 as soon as the automatic shutdown has
+     * flushed. WARNING: this cuts off any other in-flight `SIGINT`/`SIGTERM`
+     * listener (queue drains, writes) and reports success regardless. Leave
+     * it off unless your process now fails to exit on a signal; ignored when
+     * `disableAutoShutdown` is set.
      * @default false
      */
     UNSAFE_exitProcessAfterAutoShutdown?: boolean;
@@ -401,58 +313,20 @@ export interface SetupObservabilityOptions {
 }
 
 /**
- * Handle returned from observability setup. If you disable the automatic shutdown,
- * or are running in an environment where process signals are not available (e.g.
- * test runners that call `process.exit()`), you can use the shutdown function to
- * manually shut down the observability system and ensure that no data is lost.
+ * Handle returned from observability setup. Use the `shutdown` function
+ * yourself when automatic shutdown is disabled, or process signals aren't
+ * available (e.g. test runners that call `process.exit()`).
  *
- * @example
- * ```typescript
- * const { shutdown } = setupObservability({
- *   advanced: { disableAutoShutdown: true }
- * });
- *
- * // Manual shutdown in test teardown
- * afterAll(async () => {
- *   await shutdown();
- * });
- * ```
+ * @example const { shutdown } = setupObservability({ advanced: { disableAutoShutdown: true } });
  */
 export interface ObservabilityHandle {
   /**
-   * Gracefully shuts down the observability system.
-   *
-   * This method should be called when the application is terminating
-   * to ensure all pending traces are exported before shutdown.
-   *
-   * The shutdown process:
-   * 1. Flushes any pending traces to the exporter
-   * 2. Closes the trace exporter
-   * 3. Shuts down the tracer provider
-   * 4. Cleans up any registered instrumentations
+   * Gracefully shuts down the observability system: flushes pending traces,
+   * closes the exporter, shuts down the tracer provider, and cleans up
+   * registered instrumentations. Call it when the application is terminating.
    *
    * @returns Promise that resolves when shutdown is complete
-   *
-   * @example
-   * ```typescript
-   * // Graceful shutdown
-   * process.on('SIGTERM', async () => {
-   *   console.log('Shutting down observability...');
-   *   await shutdown();
-   *   console.log('Observability shutdown complete');
-   *   process.exit(0);
-   * });
-   *
-   * // Force shutdown with timeout
-   * process.on('SIGINT', async () => {
-   *   console.log('Force shutdown...');
-   *   await Promise.race([
-   *     shutdown(),
-   *     new Promise(resolve => setTimeout(resolve, 5000))
-   *   ]);
-   *   process.exit(1);
-   * });
-   * ```
+   * @example process.on('SIGTERM', async () => { await shutdown(); process.exit(0); });
    */
   shutdown: () => Promise<void>;
 }

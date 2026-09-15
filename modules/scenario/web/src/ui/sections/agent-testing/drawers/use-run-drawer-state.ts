@@ -261,7 +261,10 @@ export function useRunDrawerState({ open }: { open: boolean }) {
     isSideBySide,
     /** True while the run-state read is still on its way. */
     isReadingRun: storedDetail.isRunStateLoading && !storedDetail.runStateError,
-    /** True when the run-state read failed for a reason other than a run that does not exist yet. */
+    /**
+     * True when the run-state read failed for a reason other than a run that does not exist
+     * yet.
+     */
     readFailed: isHardReadError(storedDetail.runStateError),
   };
 }

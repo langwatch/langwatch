@@ -7,7 +7,10 @@ export function ShadowDivider({
   scrollRef,
   fadeAfterPx = 100,
 }: {
-  /** When provided, the divider starts invisible and fades in as this element scrolls past `fadeAfterPx`. */
+  /**
+   * When provided, the divider starts invisible and fades in as this element
+   * scrolls past `fadeAfterPx`.
+   */
   scrollRef?: React.RefObject<HTMLElement | null>;
   /** Scroll distance (px) at which the divider reaches full opacity. Default: 100. */
   fadeAfterPx?: number;

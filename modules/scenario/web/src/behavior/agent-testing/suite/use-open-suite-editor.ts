@@ -1,11 +1,7 @@
 /**
- * Opens the suite editor on one test suite, from any of its ways in: the
- * Edit suite button, the rail row menu, and the chips under the suite name.
- *
- * A pill may also ask for one attachment's editor; the attachment id travels
- * as a URL param so a follow-up visit can restore focus on it once the suite
- * editor's evaluators section reads it.
- *
+ * Opens the suite editor on one test suite, from any of its ways in: the Edit suite button, the
+ * rail row menu, and the chips under the suite name. A pill may also ask for one attachment's
+ * editor; the attachment id travels as a URL param so a follow-up visit can restore focus on it.
  * @see specs/features/agent-testing/suite-editor.feature
  */
 

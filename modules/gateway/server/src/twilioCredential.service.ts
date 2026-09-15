@@ -1,15 +1,7 @@
 /**
- * Reads the stored Twilio credential for one provider row.
- *
- * The phone transport dials from a headless voice run in the pool child, which
- * has no session to authorize with, so `ModelProviderService` (which takes an
- * authz context) does not fit. This is the service layer for that path: it
- * keeps the Prisma query and the decryption out of the runner. Mirrors
- * {@link findElevenLabsProviderForProject}/{@link getElevenLabsApiCredential}.
- *
- * Nothing here throws. A provider that cannot serve is `null`, and the caller
- * (the prefetcher) turns a null credential into the runner's named
- * missing-key failure — "add Twilio in Settings > Model Providers".
+ * Reads the stored Twilio credential for one provider row. A headless voice
+ * run has no session to authorize `ModelProviderService` with, so this
+ * keeps the query and decryption out of the runner. Nothing here throws.
  */
 
 import { prisma } from "~/server/db";

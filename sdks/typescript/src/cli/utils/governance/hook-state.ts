@@ -1,19 +1,10 @@
 /**
- * What the session-context seams remember between invocations: one small file
- * per session holding the last context it managed to post. The command hooks
- * (`langwatch ingest hook <tool>`) and the codex rollout harvest share this
- * state, so a device carrying both seams posts a session's context once.
- *
- * That file is the whole reason a Stop hook on a quiet session costs nothing,
- * and the reason a branch switch mid-session is reported. It lives beside the
- * CLI's own config rather than in the repository, because it describes a
- * session on this machine and nothing a checkout should carry.
- *
- * Reads report "nothing recorded" for every failure, so an unreadable file
- * costs one duplicate record rather than silence. Writes throw, and the caller
+ * What the session-context seams remember between invocations: one small
+ * file per session, shared by the command hooks and the codex rollout
+ * harvest so a device posts a session's context once. Lives beside the CLI's
+ * own config, not the repository, since it describes this machine. Reads
+ * report "nothing recorded" on any failure; writes throw, and the caller
  * decides what a lost fingerprint is worth.
- *
- * Spec: specs/ai-governance/cli-wrappers/session-context-hook.feature
  */
 
 import * as fs from "node:fs";

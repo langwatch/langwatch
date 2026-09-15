@@ -32,7 +32,7 @@ function targetOf(filename, specifier, cwd) {
   return targetOfSpecifier(specifier) ?? (specifier.startsWith(".") ? targetOfRelative(filename, specifier, cwd) : undefined);
 }
 
-/** The installer, transport declarations, the Infrastructure type, and (in a test file) a fixture double. */
+/** The installer, transport declarations, the Infrastructure type, and a test fixture double. */
 function isAllowedName(name, { isTest, isTypeOnly }) {
   if (typeof name !== "string") return false;
   if (isTypeOnly) return name.endsWith("Infrastructure");

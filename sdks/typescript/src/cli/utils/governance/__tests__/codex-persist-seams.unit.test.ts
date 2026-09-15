@@ -1,19 +1,8 @@
 /**
- * The codex exporters and the turn harvest are one wiring: the `[otel]` block
- * on its own reports tokens and captures no conversation. Every seam that
- * writes the block has to install the harvest beside it.
- *
- * This reads the CLI source instead of exercising the seams, because the
- * defect is a missing call at a call site that does not exist yet, which no
- * test of the seams we already have can see. Two seams shipped without the
- * harvest exactly that way.
- *
- * The pairing check is per file, not per call, so on its own it would prove
- * "every file that writes also wires" rather than "every write is wired". The
- * last check below closes that gap by holding each seam to a single write,
- * which is the shape they all have.
- *
- * Spec: specs/ai-governance/cli-wrappers/shell-rc-persistence.feature
+ * Every seam writing the `[otel]` block must install the turn harvest beside
+ * it. Reads CLI source rather than exercising the seams: the defect is a
+ * missing call at a call site that doesn't exist yet, invisible to any test of
+ * the seams we already have.
  */
 import { readdirSync, readFileSync } from "node:fs";
 import { join, relative, resolve } from "node:path";

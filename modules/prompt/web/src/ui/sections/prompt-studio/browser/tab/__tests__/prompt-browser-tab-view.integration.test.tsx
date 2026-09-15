@@ -1,12 +1,9 @@
 /**
  * @vitest-environment jsdom
  *
- * Covers the folder and crowded-strip rules in
- * specs/prompts/prompt-tab-switcher.feature.
- *
- * Only the tab's controller is mocked. The tab itself renders for real, so this
- * fails if the tab starts spending its narrow width on a folder name again, or
- * on a close button it has no room for.
+ * Covers specs/prompts/prompt-tab-switcher.feature. Only the tab's controller
+ * is mocked; the tab itself renders for real, so this fails if it spends its
+ * narrow width on a folder name or a close button it has no room for.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { TabIdProvider } from "../../../studio-internals.ts";

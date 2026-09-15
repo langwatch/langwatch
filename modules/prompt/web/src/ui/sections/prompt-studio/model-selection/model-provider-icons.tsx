@@ -1,28 +1,9 @@
 /**
- * The provider marks the model picker and the published-prompt rows render.
- *
- * A FOURTH COPY, taken verbatim from `@langwatch/model-provider-web`'s (which
- * is itself `@langwatch/gateway-web`'s, which is itself the map in
- * `platform/app/src/components/modelProviders/iconsMap.tsx`) so that no two
- * halves of the product disagree about what a vendor looks like. The
- * model-config family recorded a third copy as the signal to promote these into
- * a surface on the model-provider feature; this one is the fourth, and it is
- * recorded rather than acted on for the same reason - promotion is a change to
- * three packages and eleven `platform/app` call sites that a page-family move
- * does not own. See `dev/docs/plans/ui-family-move-manifests.md`.
- *
- * WHAT THIS COPY ADDS BACK is `ProviderIconGlyph` and the monochrome set. The
- * model-config copy dropped them because neither of its screens called them;
- * the published-prompt rows here do, so the wrapper travels with the map. Its
- * `IconGlyph` is the Design System's, which is character-for-character the
- * application's.
- *
- * The four marks the Design System already publishes are imported rather than
- * copied. The remaining ten are drawn here because they are `platform/app`
- * components the whole product still uses.
- *
- * The key set is the contract's, so a provider added to the registry fails the
- * typecheck here rather than rendering a blank cell.
+ * The provider marks the model picker and published-prompt rows render — a
+ * duplicate of `@langwatch/model-provider-web`'s map, kept in sync
+ * deliberately rather than promoted (see
+ * `dev/docs/plans/ui-family-move-manifests.md`). The key set is the
+ * contract's, so an added provider fails typecheck here, not a blank cell.
  */
 
 import { Box } from "@chakra-ui/react";

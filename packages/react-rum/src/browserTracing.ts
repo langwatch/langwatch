@@ -1,14 +1,8 @@
 /**
- * Browser tracing: the half of a trace that happens before the request leaves
- * the tab.
- *
- * Exports OTLP to the app's own origin rather than to a collector directly —
- * same-origin means no CORS and no internet-facing collector. The host app is
- * expected to proxy {@link RUM_TRACES_PATH} on to a collector. See ADR-058.
- *
- * Everything here is best-effort. Telemetry that breaks the page it is
- * measuring is worse than no telemetry, so the whole bootstrap is wrapped and
- * a failure leaves the app running untraced.
+ * Browser tracing: the half of a trace that happens before the request leaves the tab. Exports
+ * OTLP to the app's own origin, not a collector directly (no CORS, no internet-facing collector;
+ * the host app proxies {@link RUM_TRACES_PATH} on, see ADR-058). Best-effort throughout: the
+ * whole bootstrap is wrapped so telemetry that breaks the page it measures leaves it untraced.
  */
 
 import { W3CTraceContextPropagator } from "@opentelemetry/core";

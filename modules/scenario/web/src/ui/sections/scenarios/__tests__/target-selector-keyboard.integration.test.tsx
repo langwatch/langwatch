@@ -1,5 +1,5 @@
 /**
- * The agent rows of the target picker read to the keyboard: the Tab key reaches them and Enter picks the one that has the focus.
+ * The target picker's agent rows are keyboard-reachable: Tab focuses, Enter selects.
  * @vitest-environment jsdom
  * @see specs/features/agents/connected-agents-ui.feature
  */

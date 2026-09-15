@@ -63,31 +63,9 @@ export interface IdentityBirthLedger {
 }
 
 /**
- * The event-sourcing stack every identity ledger STAGES through.
- *
- * The writers used to reach a service locator for it — `tryGetApp()`, waited
- * on for five seconds because better-auth builds its storage adapter at module
- * load, before any application exists. That wait was the locator's problem
- * rather than the ledger's: a process that composes its eventing before its
- * identity graph has the handle already, and one that never composes eventing
- * should say so rather than sleep and then fail.
- *
- * ONE method, and that is the doctrine rather than a small surface. Under
- * ADR-110 the queued run is the sole appender: it re-executes the same guard
- * the calling path ran and appends what it decides, so a ledger that appended
- * here as well would write every fact twice. The port used to carry a
- * `tryEventStore` beside this, which is what let one ledger keep the older
- * order — and on the tier those ledgers actually run, a producer, that append
- * was refused by name and took the whole ceremony with it. With no seam there
- * is no way back into it.
- *
- * `try…` because a deployment may run with the event stack disabled, and the
- * caller decides what that means. Three of the four ledgers refuse by name: a
- * command with nowhere to land is a failed ceremony, not a quiet one. The
- * directory-sync ledger is the exception and says why in its own docblock — an
- * identity provider's push must not fail because its history could not be
- * written — so it records the loss at `error`, naming the missing
- * registration, and lets the push through.
+ * The event-sourcing stack an identity ledger STAGES through. ONE method, by
+ * doctrine (ADR-110): the queued run is the sole appender, so appending here
+ * too would double-write every fact. `try…` allows a deployment with no event stack.
  */
 export interface IdentityEventing {
   /**
@@ -117,17 +95,10 @@ export interface IdentityWriteGateState {
 }
 
 /**
- * The two mails a join request's own timers send (D12).
- *
- * Only two, deliberately. The other four — arrived, approved, rejected, the
- * automatic-join notice — are sent by the request-side service in answer to
- * something a person did, and that service has not moved. These two are the
- * ones the process manager's wakes own: nobody asked for them, and if the
- * process that holds the wakes cannot send them, nobody sends them at all.
- *
- * The port takes resolved names and addresses rather than ids: deciding WHO is
- * told is this package's job, and WHAT they read is the composition root's,
- * beside the mail gateway and the deployment host every link is built from.
+ * The two mails a join request's own timers send (D12) — nobody asked for
+ * them, so if the process holding the wakes cannot send them, nobody does.
+ * The port takes resolved names/addresses: deciding WHO is told is this
+ * package's job; WHAT they read is the composition root's.
  */
 export interface JoinRequestMail {
   /** The one nudge, on the seventh day. Sent to one organization admin. */
@@ -142,17 +113,9 @@ export interface JoinRequestMail {
 }
 
 /**
- * The six messages a join request sends, as the notifier asks for them.
- *
- * The notifier decides WHO is told — it reads the organization's admins, the
- * requester's display name and their address — and this port decides WHAT they
- * read. That split is what keeps the react-email rendering, the mail gateway
- * and the deployment's public host out of every process that composes the
- * identity graph: a backend process resolving a join request must not pull a
- * React renderer onto its import graph to do it.
- *
- * Every method takes resolved names and addresses. Nothing here is asked to
- * look anything up.
+ * The notifier decides WHO is told; this port decides WHAT they read. That
+ * split keeps react-email rendering and the mail gateway out of every process
+ * composing the identity graph. Every method takes resolved names/addresses.
  */
 export interface JoinRequestNotificationMail {
   /** Somebody is asking. Sent to one organization admin. */

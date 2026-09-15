@@ -1,15 +1,7 @@
 /**
- * The statements behind a virtual key — the gateway's credential.
- *
- * Two properties carry the weight here and neither is visible from the service
- * above. First, which reads are scoped to an organization and which are
- * deliberately not: `tryFindByIdGlobal` and `tryFindByHashedSecret` answer
- * across every tenant on purpose, because a request arrives bearing a secret
- * and nothing else. Second, the rotation grace window — a rotated key keeps
- * working for a bounded period, and "bounded" is a single `gt` predicate.
- *
- * A recording fake stands in for Prisma: the claim is about the statement
- * issued, not about what a database does with it.
+ * `tryFindByIdGlobal`/`tryFindByHashedSecret` scope across every tenant on
+ * purpose — a request arrives bearing only a secret. A recording fake stands
+ * in for Prisma: the claim is about the statement issued, not what a database does with it.
  */
 
 import { nowInstant, Temporal, toDate } from "@langwatch/time";

@@ -1,16 +1,7 @@
 /**
- * Transactional mail, through the one gateway this deployment named.
- *
- * The four transports, their credentials and their retries belong to
- * `@langwatch/mail`; what belongs here is the one decision the process makes
- * about them - which gateway, and from which address - and the one shape a
- * module writes, so a module sends without naming a provider or an address.
- *
- * `MAIL_PROVIDER` is the discriminant (ADR-144, ruling 13a), so each gateway's
- * own leaves are required for that gateway alone and unreadable for the
- * others. There is no inference from whichever credential happens to be
- * present: a deployment that carries a leftover key for a gateway it no longer
- * uses would otherwise send from an unexpected sender domain.
+ * Transactional mail, through the one gateway this deployment named. Owns
+ * only which gateway and address a send uses; `MAIL_PROVIDER` is the sole
+ * discriminant (ADR-144 §13a) — no inference from a leftover credential.
  */
 import { directSesClientConfiguration, MailerAdapter } from "@langwatch/mail/gateway";
 import type { MailConfig, OutboundProxyConfig } from "./config.ts";

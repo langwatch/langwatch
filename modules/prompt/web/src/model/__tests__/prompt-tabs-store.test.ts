@@ -369,15 +369,12 @@ describe("DraggableTabsBrowserStore", () => {
         expect(store.getState().windows[1]?.activeTabId).toBe(newTabId);
       });
 
-      // Characterization test, not a regression test: it locks the invariant
-      // that splitTab commits plain, unaliased data, but it passes against both
-      // cloneDeep(sourceTab.data) and cloneDeep(current(sourceTab).data). The
-      // commit that introduced current() claimed lodash-es cloneDeep throws on
-      // an immer draft; that could not be reproduced against immer@11 /
-      // lodash-es@4.18 (cloneDeep returns a correct plain clone either way), so
-      // there is no failing case to pin. current() is kept because taking the
-      // snapshot before cloning is the correct way to leave a recipe, not
-      // because it fixes an observed crash.
+      // Characterization, not regression: this passes with either
+      // cloneDeep(data) or cloneDeep(current(data)) — the claimed
+      // lodash-es-throws-on-an-immer-draft bug could not be reproduced
+      // (immer@11 / lodash-es@4.18). `current()` stays because taking the
+      // snapshot before cloning is correct practice, not because it fixes an
+      // observed crash.
       it("stores plain, fully detached data on the split tab", () => {
         const originalData = createTabData({ meta: { title: "Original" } });
         store.getState().addTab({ data: originalData });
