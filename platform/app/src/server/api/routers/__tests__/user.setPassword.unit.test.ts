@@ -34,9 +34,14 @@ vi.mock("@ee/audit-log/auditLog", () => ({
   auditLog: vi.fn().mockResolvedValue(undefined),
 }));
 
-const { resolveAuthProviderMock, setFirstPasswordMock } = vi.hoisted(() => ({
+const {
+  resolveAuthProviderMock,
+  setFirstPasswordMock,
+  addressRoutesToConnectionMock,
+} = vi.hoisted(() => ({
   resolveAuthProviderMock: vi.fn(),
   setFirstPasswordMock: vi.fn(),
+  addressRoutesToConnectionMock: vi.fn(),
 }));
 vi.mock("@ee/sso/sso-gate", () => ({
   resolveAuthProvider: resolveAuthProviderMock,
@@ -48,6 +53,10 @@ vi.mock("~/server/app-layer/identity/runtime", async (importOriginal) => ({
     typeof import("~/server/app-layer/identity/runtime")
   >()),
   credentialAccounts: () => ({ setFirstPassword: setFirstPasswordMock }),
+  // No organization routes this suite's address. The real one asks the
+  // router, which reaches Prisma — and the question it answers has its own
+  // scenario; here it must simply not be the thing under test.
+  addressRoutesToConnection: addressRoutesToConnectionMock,
 }));
 
 describe("userRouter.setPassword", () => {
@@ -55,6 +64,7 @@ describe("userRouter.setPassword", () => {
     vi.clearAllMocks();
     resolveAuthProviderMock.mockResolvedValue("email");
     setFirstPasswordMock.mockResolvedValue("set");
+    addressRoutesToConnectionMock.mockResolvedValue(false);
   });
 
   const createCaller = ({
@@ -150,6 +160,22 @@ describe("userRouter.setPassword", () => {
   describe("given a deployment that federates", () => {
     it("refuses, because the password does not live here", async () => {
       resolveAuthProviderMock.mockResolvedValue("auth0");
+
+      await expect(call()).rejects.toMatchObject({ code: "BAD_REQUEST" });
+      expect(setFirstPasswordMock).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given an address an organization routes through its own provider", () => {
+    /** @scenario "An organization's own connection still refuses a local password" */
+    it("refuses even where the deployment issues its own passwords", async () => {
+      // The bypass this closes: a company mandating SSO gets session
+      // lifetime, conditional access and revocation from its own connection,
+      // and a local password beside it answers none of them. Widening WHO may
+      // hold a password never overrules whose company has already said
+      // otherwise — so this refusal stands on a deployment where the previous
+      // test's would not.
+      addressRoutesToConnectionMock.mockResolvedValue(true);
 
       await expect(call()).rejects.toMatchObject({ code: "BAD_REQUEST" });
       expect(setFirstPasswordMock).not.toHaveBeenCalled();

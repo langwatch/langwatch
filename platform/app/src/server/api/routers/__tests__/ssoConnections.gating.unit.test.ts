@@ -62,6 +62,9 @@ vi.mock(
 
 vi.mock("~/server/app-layer/identity/runtime", () => ({
   ssoConnections: mockSsoConnections,
+  // The credential boundary asks this before it lets a password through; no
+  // organization routes this suite's addresses.
+  addressRoutesToConnection: async () => false,
   BACKUP_CODE_COUNT: 10,
   betterAuthInstance: () => ({ provide: () => undefined }),
   deploymentIsFederationCapable: () => false,
