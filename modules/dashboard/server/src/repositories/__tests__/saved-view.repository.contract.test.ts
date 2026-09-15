@@ -81,10 +81,10 @@ function contractCases(backend: Backend): void {
           projectId: backend.projectId(),
           data: { name: "Renamed" },
         }),
-      ).rejects.toThrow();
+      ).rejects.toThrow(Error);
       await expect(
         repository.delete({ id: "view_absent", projectId: backend.projectId() }),
-      ).rejects.toThrow();
+      ).rejects.toThrow(Error);
     });
   });
 
@@ -274,10 +274,10 @@ function contractCases(backend: Backend): void {
           projectId: backend.projectId(),
           data: { name: "Stolen" },
         }),
-      ).rejects.toThrow();
+      ).rejects.toThrow(Error);
       await expect(
         repository.delete({ id: foreign.id, projectId: backend.projectId() }),
-      ).rejects.toThrow();
+      ).rejects.toThrow(Error);
       await expect(
         repository.findById({ id: foreign.id, projectId: backend.otherProjectId() }),
       ).resolves.toMatchObject({ name: "Theirs" });

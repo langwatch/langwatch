@@ -42,16 +42,13 @@ function validateSpanDataIntegrity(spans: any[], expectedTypes: string[]) {
     expect(span.status).toBeDefined();
     expect(span.spanContext().traceId).toBeDefined();
     expect(span.spanContext().spanId).toBeDefined();
-
-    if (!span.attributes["langwatch.span.type"]) {
-      return;
-    }
-
-    const spanType = span.attributes["langwatch.span.type"];
-    if (spanType === "llm") {
-      expect(span.attributes["gen_ai.request.model"]).toBeDefined();
-    }
   });
+
+  spans
+    .filter((span) => span.attributes["langwatch.span.type"] === "llm")
+    .forEach((span) => {
+      expect(span.attributes["gen_ai.request.model"]).toBeDefined();
+    });
 }
 
 describe.skipIf(!RUN_EXTERNAL)("LangChain Multi-Agent Integration Tests", () => {

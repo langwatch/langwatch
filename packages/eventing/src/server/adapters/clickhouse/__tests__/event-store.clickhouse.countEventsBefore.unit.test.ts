@@ -211,15 +211,13 @@ describe("EventStoreClickHouse - countEventsBefore", () => {
       // Verify query includes both timestamp and ID comparison
       // The actual query is multiline with parameterized placeholders
       const callArgs = vi.mocked(mockClickHouseClient.query).mock.calls[0]?.[0];
-      expect(callArgs).toBeDefined();
-      if (callArgs && typeof callArgs === "object" && "query" in callArgs) {
-        const query = String(callArgs.query);
-        // Verify query contains both conditions
-        expect(query).toMatch(/EventTimestamp\s*<\s*\{beforeTimestamp:UInt64\}/s);
-        expect(query).toMatch(
-          /EventTimestamp\s*=\s*\{beforeTimestamp:UInt64\}\s*AND\s*EventId\s*<\s*\{beforeEventId:String\}/s,
-        );
-      }
+      expect(callArgs).toHaveProperty("query");
+      const query = String((callArgs as { query: unknown }).query);
+      // Verify query contains both conditions
+      expect(query).toMatch(/EventTimestamp\s*<\s*\{beforeTimestamp:UInt64\}/s);
+      expect(query).toMatch(
+        /EventTimestamp\s*=\s*\{beforeTimestamp:UInt64\}\s*AND\s*EventId\s*<\s*\{beforeEventId:String\}/s,
+      );
     });
 
     it("handles ClickHouse query errors gracefully", async () => {

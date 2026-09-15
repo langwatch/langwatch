@@ -173,11 +173,9 @@ describe("given a shared folder", () => {
         timeout: 1,
       });
       await expect(command.result).rejects.toBeInstanceOf(LocalCallFailure);
-      await command.result.catch((error: LocalCallFailure) => {
-        expect(error.code).toBe("timeout");
-        expect(error.message).toBe(
-          `The command was stopped at its 1 second limit. To give it more time, ask for it again with a larger timeout parameter, which is in seconds and may go up to ${BASH_MAX_TIMEOUT_SECONDS}. The output so far is at ${command.logPath}.`,
-        );
+      await expect(command.result).rejects.toMatchObject({
+        code: "timeout",
+        message: `The command was stopped at its 1 second limit. To give it more time, ask for it again with a larger timeout parameter, which is in seconds and may go up to ${BASH_MAX_TIMEOUT_SECONDS}. The output so far is at ${command.logPath}.`,
       });
     });
 
@@ -397,7 +395,7 @@ describe("given the environment a command runs with", () => {
   /** @scenario "A command runs with the machine's own variables and no more" */
   it("keeps the machine and the toolchain, and never a name that reads as a secret", () => {
     for (const [name, inherited] of variables) {
-      expect(inheritsVariable(name), name).toBe(inherited);
+      expect(inheritsVariable(name)).toBe(inherited);
     }
     const source = Object.fromEntries(
       variables.map(([name]) => [name, `value-of-${name}`]),

@@ -9,7 +9,7 @@ describe("needsGithubAuth", () => {
       "gh repo view --json defaultBranchRef",
       "gh api user --jq .id",
     ]) {
-      expect(needsGithubAuth(command), command).toBe(true);
+      expect(needsGithubAuth(command)).toBe(true);
     }
   });
 
@@ -23,7 +23,7 @@ describe("needsGithubAuth", () => {
       'git -C "$HOME/work/foo" push',
       "git -c core.pager=cat fetch origin",
     ]) {
-      expect(needsGithubAuth(command), command).toBe(true);
+      expect(needsGithubAuth(command)).toBe(true);
     }
   });
 
@@ -42,7 +42,7 @@ describe("needsGithubAuth", () => {
       "cat /home/langy/github-notes.md",
       "echo 'see github.com for docs'",
     ]) {
-      expect(needsGithubAuth(command), command).toBe(false);
+      expect(needsGithubAuth(command)).toBe(false);
     }
   });
 
@@ -55,11 +55,11 @@ describe("needsGithubAuth", () => {
       "GH_USER_ID=$(gh api user --jq .id)",
       "GIT_TERMINAL_PROMPT=0 git push",
     ]) {
-      expect(needsGithubAuth(command), command).toBe(true);
+      expect(needsGithubAuth(command)).toBe(true);
     }
 
     for (const command of ["", "   ", "&&"]) {
-      expect(needsGithubAuth(command), command).toBe(false);
+      expect(needsGithubAuth(command)).toBe(false);
     }
   });
 });

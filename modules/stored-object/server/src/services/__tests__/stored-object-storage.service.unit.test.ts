@@ -125,7 +125,7 @@ describe("StoredObjectStoragePortAdapter", () => {
         projectId: "project-1",
         address: { provider: "s3", destinationId: "bucket", relativeId },
       }),
-    ).rejects.toThrow();
+    ).rejects.toThrow(Error);
   });
 
   it("rejects unknown providers and destination injection", async () => {
@@ -149,15 +149,13 @@ describe("StoredObjectStoragePortAdapter", () => {
       },
     ];
     for (const address of addresses) {
-      await expect(adapter.tryRead({ projectId: "project-1", address })).rejects.toThrow();
+      await expect(adapter.tryRead({ projectId: "project-1", address })).rejects.toThrow(Error);
     }
   });
 
-  it("turns a missing read race into null but propagates other read failures", async () => {
-    for (const failure of [
-      new ObjectNotFoundError("s3://bucket/project-1/object-1"),
-      new Error("network"),
-    ]) {
+  describe("when a read races a delete", () => {
+    it("turns the missing-object failure into null", async () => {
+      const failure = new ObjectNotFoundError("s3://bucket/project-1/object-1");
       const driver = new ThrowingReadDriver(failure);
       driver.values.set("s3://bucket/project-1/object-1", Buffer.from("present"));
       const runtime = StoredObjectStorageRuntimeAdapter.create({
@@ -173,11 +171,27 @@ describe("StoredObjectStoragePortAdapter", () => {
         projectId: "project-1",
         address: { provider: "s3", destinationId: "bucket", relativeId: "project-1/object-1" },
       });
-      if (failure instanceof ObjectNotFoundError) {
-        await expect(read).resolves.toBeNull();
-      } else {
-        await expect(read).rejects.toThrow("network");
-      }
-    }
+      await expect(read).resolves.toBeNull();
+    });
+
+    it("propagates any other read failure", async () => {
+      const failure = new Error("network");
+      const driver = new ThrowingReadDriver(failure);
+      driver.values.set("s3://bucket/project-1/object-1", Buffer.from("present"));
+      const runtime = StoredObjectStorageRuntimeAdapter.create({
+        destination: new Destination(),
+        s3ForProject: () => driver,
+        fileForProject: () => driver,
+      });
+      const adapter = StoredObjectStoragePortAdapter.create({
+        runtime,
+        aws: AwsClientProcessRuntime.create({ outboundProxy: new NoProxy() }),
+      });
+      const read = adapter.tryRead({
+        projectId: "project-1",
+        address: { provider: "s3", destinationId: "bucket", relativeId: "project-1/object-1" },
+      });
+      await expect(read).rejects.toThrow("network");
+    });
   });
 });

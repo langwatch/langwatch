@@ -19,9 +19,8 @@ describe("commandEnvelope", () => {
         idempotencyKey: "key-123",
       });
       expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data.idempotencyKey).toBe("key-123");
-      }
+      if (!result.success) return;
+      expect(result.data.idempotencyKey).toBe("key-123");
     });
 
     it("rejects missing tenantId", () => {
@@ -55,14 +54,13 @@ describe("commandEnvelope", () => {
       });
 
       expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data).toEqual({
-          tenantId: "tenant-1",
-          occurredAt: 1700000000000,
-          batchRunId: "batch-123",
-          total: 5,
-        });
-      }
+      if (!result.success) return;
+      expect(result.data).toEqual({
+        tenantId: "tenant-1",
+        occurredAt: 1700000000000,
+        batchRunId: "batch-123",
+        total: 5,
+      });
     });
 
     it("includes optional idempotencyKey in merged schema", () => {
@@ -77,9 +75,8 @@ describe("commandEnvelope", () => {
       });
 
       expect(result.success).toBe(true);
-      if (result.success) {
-        expect(result.data.idempotencyKey).toBe("idem-1");
-      }
+      if (!result.success) return;
+      expect(result.data.idempotencyKey).toBe("idem-1");
     });
   });
 

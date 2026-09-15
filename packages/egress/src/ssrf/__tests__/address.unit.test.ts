@@ -45,16 +45,17 @@ describe("the shared SSRF conformance corpus", () => {
         });
 
         it("honours blockLocal the same way Go's Blocked does", () => {
+          let expected: { withoutBlockLocal: boolean; withBlockLocal: boolean };
           if (v.category === "metadata") {
-            expect(blocked({ ip: v.addr, blockLocal: false })).toBe(true);
-            expect(blocked({ ip: v.addr, blockLocal: true })).toBe(true);
+            expected = { withoutBlockLocal: true, withBlockLocal: true };
           } else if (v.category === "special") {
-            expect(blocked({ ip: v.addr, blockLocal: false })).toBe(false);
-            expect(blocked({ ip: v.addr, blockLocal: true })).toBe(true);
+            expected = { withoutBlockLocal: false, withBlockLocal: true };
           } else {
-            expect(blocked({ ip: v.addr, blockLocal: false })).toBe(false);
-            expect(blocked({ ip: v.addr, blockLocal: true })).toBe(false);
+            expected = { withoutBlockLocal: false, withBlockLocal: false };
           }
+
+          expect(blocked({ ip: v.addr, blockLocal: false })).toBe(expected.withoutBlockLocal);
+          expect(blocked({ ip: v.addr, blockLocal: true })).toBe(expected.withBlockLocal);
         });
       });
     }

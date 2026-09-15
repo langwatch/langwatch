@@ -135,7 +135,7 @@ describe("trace", () => {
               );
             },
           }),
-        ).rejects.toThrow();
+        ).rejects.toThrow(Error);
 
         const recorded = JSON.stringify(errors);
         expect(recorded).not.toContain("SELECT");
@@ -152,7 +152,7 @@ describe("trace", () => {
               throw new Error("boom");
             },
           }),
-        ).rejects.toThrow();
+        ).rejects.toThrow(Error);
 
         expect(ended()).toBe(1);
       });
@@ -190,7 +190,7 @@ describe("trace", () => {
               throw new Error("boom");
             },
           }),
-        ).rejects.toThrow();
+        ).rejects.toThrow(Error);
 
         expect(onComplete).toHaveBeenCalledWith(
           expect.objectContaining({ error: expect.any(Error) }),

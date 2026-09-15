@@ -18,7 +18,7 @@ describe("ApiHttpListener", () => {
     await expect(response.text()).resolves.toBe("ready");
 
     await Promise.all([listener.close(), listener.close()]);
-    await expect(fetch(`http://127.0.0.1:${address.port}/ready`)).rejects.toThrow();
+    await expect(fetch(`http://127.0.0.1:${address.port}/ready`)).rejects.toThrow(TypeError);
   });
 
   /** @scenario A request in flight when the listener closes is allowed to finish */
@@ -82,7 +82,7 @@ describe("ApiHttpListener", () => {
 
     await listener.close();
 
-    await expect(response).rejects.toThrow();
+    await expect(response).rejects.toThrow(TypeError);
     expect(logger.info).toHaveBeenCalledWith(
       { drainGraceMs: 1 },
       "API requests outlived the drain grace, closing remaining connections",
@@ -118,7 +118,7 @@ describe("ApiHttpListener", () => {
     // The teardown alone outlasts the grace, so nothing is left of it for the
     // request. Were the grace started after the teardown, it would have had the
     // full 50ms afterwards and the reap below would never have happened.
-    await expect(response).rejects.toThrow();
+    await expect(response).rejects.toThrow(TypeError);
     expect(logger.info).toHaveBeenCalledWith(
       { drainGraceMs: 50 },
       "API requests outlived the drain grace, closing remaining connections",
@@ -155,7 +155,7 @@ describe("ApiHttpListener", () => {
       expect.objectContaining({ error: expect.any(Error) }),
       "API session teardown failed during shutdown, draining connections anyway",
     );
-    await expect(response).rejects.toThrow();
+    await expect(response).rejects.toThrow(TypeError);
     expect(logger.info).toHaveBeenCalledWith(
       { drainGraceMs: 1 },
       "API requests outlived the drain grace, closing remaining connections",

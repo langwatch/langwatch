@@ -61,7 +61,7 @@ describe("given a folder shared with a Langy conversation", () => {
         { tool: "local_grep", params: { pattern: "langwatch", path: "src" } },
       ];
       for (const call of calls) {
-        expect(at(call), call.tool).toEqual({ kind: "run" });
+        expect(at(call)).toEqual({ kind: "run" });
       }
     });
   });
@@ -89,21 +89,21 @@ describe("given a folder shared with a Langy conversation", () => {
         "cat package.json | wc -l",
       ];
       for (const command of commands) {
-        expect(bash(command), command).toEqual({ kind: "run" });
+        expect(bash(command)).toEqual({ kind: "run" });
       }
     });
 
     /** @scenario "The GitHub CLI sign-in check runs at once" */
     it("runs the GitHub CLI sign-in check and its version at once", () => {
       for (const command of ["gh auth status", "gh --version", "gh version"]) {
-        expect(bash(command), command).toEqual({ kind: "run" });
+        expect(bash(command)).toEqual({ kind: "run" });
       }
       for (const command of [
         "gh pr create --title x",
         "gh auth login",
         "gh repo clone acme/support",
       ]) {
-        expect(bash(command).kind, command).toBe("ask");
+        expect(bash(command).kind).toBe("ask");
       }
     });
   });
@@ -121,7 +121,7 @@ describe("given a folder shared with a Langy conversation", () => {
         ["git worktree lock old", "ask"],
       ];
       for (const [command, kind] of worktrees) {
-        expect(bash(command).kind, command).toBe(kind);
+        expect(bash(command).kind).toBe(kind);
       }
     });
   });
@@ -255,10 +255,10 @@ describe("given a folder shared with a Langy conversation", () => {
       ];
       for (const row of table) {
         const decision = bash(row.command);
-        expect(decision.kind, row.command).toBe("ask");
+        expect(decision.kind).toBe("ask");
         if (decision.kind !== "ask") continue;
-        expect(decision.reason, row.command).toBe(row.reason);
-        expect(decision.reason, row.command).not.toContain('"');
+        expect(decision.reason).toBe(row.reason);
+        expect(decision.reason).not.toContain('"');
       }
     });
 
@@ -269,7 +269,7 @@ describe("given a folder shared with a Langy conversation", () => {
         "ls | xargs rm",
         "ls\nrm -rf build",
       ]) {
-        expect(bash(command).kind, command).toBe("ask");
+        expect(bash(command).kind).toBe("ask");
       }
     });
   });
@@ -279,13 +279,13 @@ describe("given a folder shared with a Langy conversation", () => {
     it("asks", () => {
       const withExec = bash("find . -name '*.py' -exec rm {} ;");
       expect(withExec.kind).toBe("ask");
-      if (withExec.kind === "ask") expect(withExec.reason).toContain("writes files");
+      if (withExec.kind !== "ask") return;
+      expect(withExec.reason).toContain("writes files");
 
       const redirected = bash("ls -la > listing.txt");
       expect(redirected.kind).toBe("ask");
-      if (redirected.kind === "ask") {
-        expect(redirected.reason).toContain("writes files");
-      }
+      if (redirected.kind !== "ask") return;
+      expect(redirected.reason).toContain("writes files");
 
       for (const command of [
         "cat package.json >> log.txt",
@@ -293,7 +293,7 @@ describe("given a folder shared with a Langy conversation", () => {
         "ls 2> errors.txt",
         "find . -delete",
       ]) {
-        expect(bash(command).kind, command).toBe("ask");
+        expect(bash(command).kind).toBe("ask");
       }
     });
 
@@ -304,7 +304,7 @@ describe("given a folder shared with a Langy conversation", () => {
         "diff <(cat a) <(cat b)",
         'echo "value: $(whoami)"',
       ]) {
-        expect(bash(command).kind, command).toBe("ask");
+        expect(bash(command).kind).toBe("ask");
       }
     });
 
@@ -319,10 +319,9 @@ describe("given a folder shared with a Langy conversation", () => {
     it("asks", () => {
       for (const command of ["./sed -i s/a/b/ x", "/usr/bin/ls -la", "/bin/cat x"]) {
         const decision = bash(command);
-        expect(decision.kind, command).toBe("ask");
-        if (decision.kind === "ask") {
-          expect(decision.segments?.[0]?.readOnly).toBe(false);
-        }
+        expect(decision.kind).toBe("ask");
+        if (decision.kind !== "ask") continue;
+        expect(decision.segments?.[0]?.readOnly).toBe(false);
       }
     });
 
@@ -343,7 +342,8 @@ describe("given a folder shared with a Langy conversation", () => {
     it("still asks for the same command with another first argument", () => {
       const decision = bash("git commit -m done", { grants: ["git push"] });
       expect(decision.kind).toBe("ask");
-      if (decision.kind === "ask") expect(decision.pattern).toBe("git commit");
+      if (decision.kind !== "ask") return;
+      expect(decision.pattern).toBe("git commit");
     });
 
     it("runs any command of a name granted with a star", () => {
@@ -381,7 +381,6 @@ describe("given a folder shared with a Langy conversation", () => {
             tokens,
             ...(quoted === undefined ? {} : { quoted }),
           }),
-          tokens.join(" "),
         ).toBe(expected);
       }
     });
@@ -394,9 +393,8 @@ describe("given a folder shared with a Langy conversation", () => {
       ).toBe("run");
       const asked = bash(".venv/bin/python -m http.server", { grants });
       expect(asked.kind).toBe("ask");
-      if (asked.kind === "ask") {
-        expect(asked.pattern).toBe(".venv/bin/python -m");
-      }
+      if (asked.kind !== "ask") return;
+      expect(asked.pattern).toBe(".venv/bin/python -m");
     });
   });
 
@@ -405,7 +403,8 @@ describe("given a folder shared with a Langy conversation", () => {
     it("spends one grant on both spellings", () => {
       const asked = bash("python -m compileall src");
       expect(asked.kind).toBe("ask");
-      if (asked.kind === "ask") expect(asked.pattern).toBe("python -m");
+      if (asked.kind !== "ask") return;
+      expect(asked.pattern).toBe("python -m");
 
       const grants = ["python *"];
       expect(bash("python -m compileall src", { grants })).toEqual({
@@ -456,7 +455,7 @@ describe("given a folder shared with a Langy conversation", () => {
       ];
       for (const call of calls) {
         const decision = at(call);
-        expect(decision.kind, JSON.stringify(call)).toBe("refuse");
+        expect(decision.kind).toBe("refuse");
         if (decision.kind !== "refuse") continue;
         expect(decision.code).toBe("path_refused");
         expect(decision.message).toContain(ROOT);
@@ -471,8 +470,9 @@ describe("given a folder shared with a Langy conversation", () => {
         "ls outside-link",
       ]) {
         const decision = bash(command);
-        expect(decision.kind, command).toBe("refuse");
-        if (decision.kind === "refuse") expect(decision.code).toBe("path_refused");
+        expect(decision.kind).toBe("refuse");
+        if (decision.kind !== "refuse") continue;
+        expect(decision.code).toBe("path_refused");
       }
     });
 
@@ -500,7 +500,7 @@ describe("given a folder shared with a Langy conversation", () => {
         "git --work-tree /other status",
       ]) {
         const decision = bash(command);
-        expect(decision.kind, command).toBe("refuse");
+        expect(decision.kind).toBe("refuse");
         if (decision.kind !== "refuse") continue;
         expect(decision.code).toBe("path_refused");
         expect(decision.message).toContain(ROOT);
@@ -522,7 +522,7 @@ describe("given a folder shared with a Langy conversation", () => {
         "git status --porcelain && printf '\\nDEFAULT=/etc/paths\\n' && git diff",
         'printf "/etc/hosts"',
       ]) {
-        expect(bash(command).kind, command).not.toBe("refuse");
+        expect(bash(command).kind).not.toBe("refuse");
       }
 
       for (const command of [
@@ -532,10 +532,9 @@ describe("given a folder shared with a Langy conversation", () => {
         "printf '%s\\n' ../other/notes.txt",
       ]) {
         const decision = bash(command);
-        expect(decision.kind, command).toBe("refuse");
-        if (decision.kind === "refuse") {
-          expect(decision.code, command).toBe("path_refused");
-        }
+        expect(decision.kind).toBe("refuse");
+        if (decision.kind !== "refuse") continue;
+        expect(decision.code).toBe("path_refused");
       }
     });
 
@@ -608,7 +607,7 @@ describe("given a folder shared with a Langy conversation", () => {
         ["git --work-tree /etc status", true],
       ];
       for (const [command, refused] of words) {
-        expect(bash(command).kind === "refuse", command).toBe(refused);
+        expect(bash(command).kind === "refuse").toBe(refused);
       }
     });
 
@@ -664,7 +663,7 @@ describe("given a folder shared with a Langy conversation", () => {
         "echo hi | sudo tee /etc/hosts",
       ]) {
         const decision = bash(command);
-        expect(decision.kind, command).toBe("refuse");
+        expect(decision.kind).toBe("refuse");
         if (decision.kind !== "refuse") continue;
         expect(decision.code).toBe("command_refused");
         expect(decision.message).toContain("without administrator rights");
@@ -689,7 +688,7 @@ describe("given a folder shared with a Langy conversation", () => {
       ];
       for (const name of names) {
         const decision = at({ tool: "local_read", params: { path: name } });
-        expect(decision.kind, name).toBe("ask");
+        expect(decision.kind).toBe("ask");
         if (decision.kind !== "ask") continue;
         expect(decision.reason).toContain("may hold secrets");
         expect(decision.summary).toBe(`read ${name}`);
@@ -707,10 +706,10 @@ describe("given a folder shared with a Langy conversation", () => {
         ".env.dist",
         ".env.EXAMPLE",
       ]) {
-        expect(isSecretFileName(name), name).toBe(false);
-        expect(at({ tool: "local_read", params: { path: name } }), name).toEqual(
-          { kind: "run" },
-        );
+        expect(isSecretFileName(name)).toBe(false);
+        expect(at({ tool: "local_read", params: { path: name } })).toEqual({
+          kind: "run",
+        });
       }
       expect(isSecretFileName(".env.example.local")).toBe(true);
     });
@@ -818,7 +817,7 @@ describe("when a command wraps another one in env", () => {
   /** @scenario "An env option that can carry a program asks" */
   it("runs only the forms that prepare the environment of a read-only command", () => {
     for (const [command, kind] of forms) {
-      expect(bash(command).kind, command).toBe(kind);
+      expect(bash(command).kind).toBe(kind);
     }
   });
 
@@ -826,9 +825,8 @@ describe("when a command wraps another one in env", () => {
   it("says the environment may hold secrets when it would be printed", () => {
     const decision = bash("env");
     expect(decision.kind).toBe("ask");
-    if (decision.kind === "ask") {
-      expect(decision.reason).toContain("prints the environment");
-    }
+    if (decision.kind !== "ask") return;
+    expect(decision.reason).toContain("prints the environment");
   });
 });
 
@@ -872,7 +870,7 @@ describe("when an allowed command carries an operand that writes", () => {
   /** @scenario "An allowed command with an operand that writes asks" */
   it("judges the operands and not only the command name", () => {
     for (const [command, kind] of grammar) {
-      expect(bash(command).kind, command).toBe(kind);
+      expect(bash(command).kind).toBe(kind);
     }
   });
 });
@@ -894,17 +892,16 @@ describe("when a shell command reads a file that may hold secrets", () => {
       ["cat src/main.py", "run"],
     ];
     for (const [command, kind] of reads) {
-      expect(bash(command).kind, command).toBe(kind);
+      expect(bash(command).kind).toBe(kind);
     }
 
     // The file tool and the shell answer the same way for the same file.
     expect(at({ tool: "local_read", params: { path: ".env" } }).kind).toBe("ask");
     const shell = bash("cat .env");
     expect(shell.kind).toBe("ask");
-    if (shell.kind === "ask") {
-      expect(shell.reason).toContain(".env may hold secrets");
-      expect(shell.segments?.[0]?.readOnly).toBe(false);
-    }
+    if (shell.kind !== "ask") return;
+    expect(shell.reason).toContain(".env may hold secrets");
+    expect(shell.segments?.[0]?.readOnly).toBe(false);
   });
 });
 
@@ -933,7 +930,7 @@ describe("when Langy lists the branches or the tags of the repository", () => {
   /** @scenario "A listing form of a git subcommand that also writes runs" */
   it("runs the listing forms and asks for the ones that write", () => {
     for (const [command, kind] of listings) {
-      expect(bash(command).kind, command).toBe(kind);
+      expect(bash(command).kind).toBe(kind);
     }
   });
 
@@ -964,7 +961,7 @@ describe("when a write option is attached to its value or to another flag", () =
       ["date -u", "run"],
     ];
     for (const [command, kind] of spellings) {
-      expect(bash(command).kind, command).toBe(kind);
+      expect(bash(command).kind).toBe(kind);
     }
   });
 });
@@ -1026,7 +1023,7 @@ describe("when a file may hold secrets", () => {
   /** @scenario "A shell command that reads a file which may hold secrets asks" */
   it("asks for the same file through the file tool and through the shell", () => {
     for (const target of secrets) {
-      expect(at({ tool: "local_read", params: { path: target } }).kind, target).toBe(
+      expect(at({ tool: "local_read", params: { path: target } }).kind).toBe(
         "ask",
       );
       expect(bash(`cat ${target}`).kind, `cat ${target}`).toBe("ask");
@@ -1036,7 +1033,7 @@ describe("when a file may hold secrets", () => {
   /** @scenario "A shell command that reads a file which may hold secrets asks" */
   it("runs the files that carry placeholders or code", () => {
     for (const target of ordinary) {
-      expect(at({ tool: "local_read", params: { path: target } }).kind, target).toBe(
+      expect(at({ tool: "local_read", params: { path: target } }).kind).toBe(
         "run",
       );
       expect(bash(`cat ${target}`).kind, `cat ${target}`).toBe("run");

@@ -62,18 +62,13 @@ describe("code-prompts Gemini CLI compatibility (issue #3104)", () => {
     { name: "PROMPT_LEVEL_UP", text: PROMPT_LEVEL_UP },
   ];
 
-  describe.each(prompts)("given $name pasted into Gemini CLI", ({ name, text }) => {
+  describe.each(prompts)("given $name pasted into Gemini CLI", ({ text }) => {
     describe("when Gemini's atCommandProcessor scans the prompt", () => {
       /** @scenario 'Pasting the tracing setup prompt does not crash Gemini CLI' */
       /** @scenario 'Pasting the "level up" prompt does not crash Gemini CLI' */
       it(`extracts no path component longer than ${MAX_COMPONENT_LENGTH} bytes`, () => {
-        const { match, longestComponent } = longestAtTokenComponent(text);
-        expect(
-          longestComponent.length,
-          `${name} would have Gemini CLI lstat a ${longestComponent.length}-byte ` +
-            `component (NAME_MAX=${NAME_MAX}). Full match excerpt: ` +
-            JSON.stringify(match.slice(0, 120)),
-        ).toBeLessThanOrEqual(MAX_COMPONENT_LENGTH);
+        const { longestComponent } = longestAtTokenComponent(text);
+        expect(longestComponent.length).toBeLessThanOrEqual(MAX_COMPONENT_LENGTH);
       });
 
       it("does not embed @langwatch/mcp-server inside a JSON string literal", () => {
@@ -97,16 +92,13 @@ describe("code-prompts Gemini CLI compatibility (issue #3104)", () => {
         const { match } = longestAtTokenComponent(PROMPT_TRACING);
         const fakeWorkspace = mkdtempSync(join(tmpdir(), "gemini-regression-"));
         const crashingPath = join(fakeWorkspace, match);
+        let code: string | undefined;
         try {
           lstatSync(crashingPath);
         } catch (error) {
-          expect(
-            (error as NodeJS.ErrnoException).code,
-            `lstat on the longest @-token from PROMPT_TRACING raised ` +
-              `${(error as NodeJS.ErrnoException).code}; ENAMETOOLONG means ` +
-              `Gemini CLI would crash. Match: ${JSON.stringify(match.slice(0, 120))}`,
-          ).not.toBe("ENAMETOOLONG");
+          code = (error as NodeJS.ErrnoException).code;
         }
+        expect(code).not.toBe("ENAMETOOLONG");
       });
     });
   });

@@ -75,10 +75,9 @@ describe("salvageLangyDerivedCard", () => {
     it("salvages and validates it", () => {
       const result = salvageLangyDerivedCard(`${statsBlock()}}`);
       expect(result.ok).toBe(true);
-      if (result.ok) {
-        expect(result.card.kind).toBe("stats");
-        expect(result.card.blockId).toBe("b1");
-      }
+      if (!result.ok) return;
+      expect(result.card.kind).toBe("stats");
+      expect(result.card.blockId).toBe("b1");
     });
   });
 
@@ -87,7 +86,8 @@ describe("salvageLangyDerivedCard", () => {
       // The whole closing tail is missing — salvage closes it.
       const result = salvageLangyDerivedCard(statsBlock());
       expect(result.ok).toBe(true);
-      if (result.ok) expect(result.card.kind).toBe("stats");
+      if (!result.ok) return;
+      expect(result.card.kind).toBe("stats");
     });
   });
 

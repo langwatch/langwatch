@@ -48,8 +48,12 @@ afterEach(async () => {
     try {
       // Its own group, so this reaches the lanes as well as the stack itself.
       process.kill(-(child.pid as number), "SIGKILL");
-    } catch {
-      // Already gone, which is what most of these tests assert.
+    } catch (error) {
+      // Already gone is what most of these tests assert, so ESRCH is the
+      // normal outcome; a permission refusal is a real teardown failure.
+      if (!(error instanceof Error && "code" in error && error.code === "ESRCH")) {
+        throw error;
+      }
     }
   }
   await sleep(100);
@@ -312,11 +316,8 @@ describe("clearing the dev ports", () => {
 
         const result = clearPorts(String(port), { KILL_DEV_TREE_GRACE: "2" });
 
-        // The script's own account of what it did, so a failure here says what
-        // it found rather than only a number.
-        const said = `${result.stdout}${result.stderr}`;
-        expect(result.status, said).toBe(0);
-        expect(liveMembers(stack), said).toBe(0);
+        expect(result.status).toBe(0);
+        expect(liveMembers(stack)).toBe(0);
 
         // Cleared only now: a replacement lane coming up DURING the takedown
         // is the behaviour under test, not a failure. What must not happen is
@@ -325,8 +326,8 @@ describe("clearing the dev ports", () => {
         // rather than the gap between two lanes.
         rmSync(readyFile(), { force: true });
         await sleep(3000);
-        expect(existsSync(readyFile()), said).toBe(false);
-        expect(listening(port), said).toBe(false);
+        expect(existsSync(readyFile())).toBe(false);
+        expect(listening(port)).toBe(false);
       }, 30000);
     });
   });
@@ -344,9 +345,8 @@ describe("clearing the dev ports", () => {
           PATH: pathWithOnlySs(port),
         });
 
-        const said = `${result.stdout}${result.stderr}`;
-        expect(result.status, said).toBe(0);
-        expect(liveMembers(stack), said).toBe(0);
+        expect(result.status).toBe(0);
+        expect(liveMembers(stack)).toBe(0);
       }, 30000);
     });
   });
@@ -403,11 +403,10 @@ describe("clearing the dev ports", () => {
           KILL_DEV_TREE_GRACE: "2",
         });
 
-        const said = `${result.stdout}${result.stderr}`;
-        expect(result.status, said).toBe(1);
+        expect(result.status).toBe(1);
         expect(result.stdout).not.toContain("ports free");
-        expect(liveMembers(stack), said).toBe(0);
-        expect(liveMembers(stranger), said).toBeGreaterThan(0);
+        expect(liveMembers(stack)).toBe(0);
+        expect(liveMembers(stranger)).toBeGreaterThan(0);
       }, 30000);
 
       /** @scenario "A port held by something we did not start is reported, not claimed" */
@@ -423,10 +422,9 @@ describe("clearing the dev ports", () => {
           KILL_DEV_TREE_GRACE: "2",
         });
 
-        const said = `${result.stdout}${result.stderr}`;
-        expect(result.status, said).toBe(1);
+        expect(result.status).toBe(1);
         expect(result.stdout).not.toContain("ports free");
-        expect(liveMembers(stranger), said).toBeGreaterThan(0);
+        expect(liveMembers(stranger)).toBeGreaterThan(0);
       }, 30000);
     });
   });
@@ -439,7 +437,7 @@ describe("clearing the dev ports", () => {
 
         const result = clearPorts(String(port));
 
-        expect(result.status, result.stderr).toBe(0);
+        expect(result.status).toBe(0);
         expect(result.stdout).toContain("nothing of ours is listening");
       });
 
@@ -472,12 +470,11 @@ describe("clearing the dev ports", () => {
           PATH: pathWithUnattributableSs(port),
         });
 
-        const said = `${result.stdout}${result.stderr}`;
-        expect(result.status, said).not.toBe(0);
+        expect(result.status).not.toBe(0);
         expect(result.stdout).not.toContain("ports free");
         expect(result.stderr).not.toContain("not a node process of ours");
         expect(result.stderr).toContain("could not inspect");
-        expect(liveMembers(lane), said).toBeGreaterThan(0);
+        expect(liveMembers(lane)).toBeGreaterThan(0);
       }, 30000);
 
       it("reports how to call it when given no ports at all", () => {

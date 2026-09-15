@@ -29,7 +29,7 @@ describe("the sandboxed Liquid factory", () => {
           `{% render '${A_FILE_IN_THE_WORKING_DIRECTORY}' %}`,
           {},
         ),
-      ).rejects.toThrow();
+      ).rejects.toThrow(Error);
     });
 
     /** @scenario "The sandboxed engine refuses an include tag" */
@@ -39,14 +39,14 @@ describe("the sandboxed Liquid factory", () => {
           `{% include '${A_FILE_IN_THE_WORKING_DIRECTORY}' %}`,
           {},
         ),
-      ).rejects.toThrow();
+      ).rejects.toThrow(Error);
     });
 
     /** @scenario "The sandboxed engine refuses a render tag" */
     it("refuses a relative path that climbs out of the working directory", async () => {
       await expect(
         createSandboxedLiquid().parseAndRender("{% render '../../../../package.json' %}", {}),
-      ).rejects.toThrow();
+      ).rejects.toThrow(Error);
     });
 
     /** @scenario "The sandboxed engine still renders ordinary templates" */
@@ -65,14 +65,14 @@ describe("the sandboxed Liquid factory", () => {
           template: `{% render '${A_FILE_IN_THE_WORKING_DIRECTORY}' %}`,
           context: {},
         }),
-      ).rejects.toThrow();
+      ).rejects.toThrow(Error);
     });
 
     /** @scenario "A notification template cannot inline a file" */
     it("is the engine the shared factory built", async () => {
       await expect(
         getLiquidEngine().parseAndRender(`{% include '${A_FILE_IN_THE_WORKING_DIRECTORY}' %}`, {}),
-      ).rejects.toThrow();
+      ).rejects.toThrow(Error);
     });
   });
 });

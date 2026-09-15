@@ -207,17 +207,18 @@ describe("Feature: verifying a LangWatch webhook delivery", () => {
       const stale = vector("valid_single_secret");
       // The vector's timestamp is fixed in the past, so with the real clock
       // the same delivery must now read as stale.
+      let error: unknown;
       try {
         verifyWebhookSignature({
           body: stale.body,
           header: stale.header,
           secret: stale.secrets,
         });
-        throw new Error("expected the delivery to be judged stale");
-      } catch (error) {
-        expect(error).toBeInstanceOf(WebhookSignatureVerificationError);
-        expect((error as WebhookSignatureVerificationError).code).toBe("stale_timestamp");
+      } catch (caught) {
+        error = caught;
       }
+      expect(error).toBeInstanceOf(WebhookSignatureVerificationError);
+      expect((error as WebhookSignatureVerificationError).code).toBe("stale_timestamp");
       expect(nowSeconds).toBeGreaterThan(stale.now_seconds);
     });
   });

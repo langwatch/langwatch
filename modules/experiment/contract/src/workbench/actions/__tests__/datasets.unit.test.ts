@@ -5,6 +5,16 @@ import { describe, expect, it } from "vitest";
 import { addColumn, addRows, setCellValue, TransformError } from "../transforms/index.ts";
 import { baseState, refusalCode, savedDataset } from "./workbench-fixtures.ts";
 
+/** Runs `fn`, returning what it threw, or fails the test if it did not throw. */
+function thrownBy(fn: () => void): unknown {
+  try {
+    fn();
+  } catch (error) {
+    return error;
+  }
+  throw new Error("Expected function to throw");
+}
+
 describe("setCellValue", () => {
   it("writes the cell", () => {
     const { state } = setCellValue({
@@ -79,7 +89,7 @@ describe("setCellValue", () => {
     });
 
     it("throws TransformError, carrying the ids the caller named", () => {
-      try {
+      const error = thrownBy(() =>
         setCellValue({
           state: baseState(),
           payload: {
@@ -88,13 +98,11 @@ describe("setCellValue", () => {
             columnId: "input",
             value: "",
           },
-        });
-        expect.unreachable("the unknown dataset must refuse");
-      } catch (error) {
-        expect(error).toBeInstanceOf(TransformError);
-        expect((error as TransformError).code).toBe("dataset_not_found");
-        expect((error as TransformError).meta).toEqual({ datasetId: "nope" });
-      }
+        }),
+      );
+      expect(error).toBeInstanceOf(TransformError);
+      expect((error as TransformError).code).toBe("dataset_not_found");
+      expect((error as TransformError).meta).toEqual({ datasetId: "nope" });
     });
   });
 

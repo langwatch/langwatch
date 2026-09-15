@@ -27,6 +27,16 @@ const codeOf = async (promise: Promise<unknown>): Promise<string> => {
   return "no_error";
 };
 
+/** Awaits `promise`, returning what it rejected with, or fails the test if it did not reject. */
+const thrownBy = async (promise: Promise<unknown>): Promise<unknown> => {
+  try {
+    await promise;
+  } catch (error) {
+    return error;
+  }
+  throw new Error("Expected the call to be refused");
+};
+
 function makeService(): ExperimentWorkbenchService {
   const repository = {
     getWorkbenchState: async () => {
@@ -53,15 +63,13 @@ describe("given an experiment that is not an evaluations workbench", () => {
     it("refuses with the type-mismatch code and a 400", async () => {
       const service = makeService();
 
-      try {
-        await service.getWorkbenchState({ projectId: "project_1", id: "experiment_1" });
-        expect.unreachable("the read should have been refused");
-      } catch (error) {
-        expect(HandledError.isHandled(error)).toBe(true);
-        if (!HandledError.isHandled(error)) return;
-        expect(error.code).toBe("experiment_type_mismatch");
-        expect(error.httpStatus).toBe(400);
-      }
+      const error = await thrownBy(
+        service.getWorkbenchState({ projectId: "project_1", id: "experiment_1" }),
+      );
+      expect(HandledError.isHandled(error)).toBe(true);
+      if (!HandledError.isHandled(error)) return;
+      expect(error.code).toBe("experiment_type_mismatch");
+      expect(error.httpStatus).toBe(400);
     });
   });
 

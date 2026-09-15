@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 
+import { SecurityError } from "../../services/errorHandling.ts";
 import { createTenantId } from "../tenantId.ts";
 
 describe("createTenantId", () => {
@@ -46,31 +47,31 @@ describe("createTenantId", () => {
     it("throws error for empty string", () => {
       expect(() => {
         createTenantId("");
-      }).toThrow();
+      }).toThrow(SecurityError);
     });
 
     it("throws error for whitespace-only string with spaces", () => {
       expect(() => {
         createTenantId("   ");
-      }).toThrow();
+      }).toThrow(SecurityError);
     });
 
     it("throws error for whitespace-only string with tabs", () => {
       expect(() => {
         createTenantId("\t\t\t");
-      }).toThrow();
+      }).toThrow(SecurityError);
     });
 
     it("throws error for whitespace-only string with newlines", () => {
       expect(() => {
         createTenantId("\n\n\n");
-      }).toThrow();
+      }).toThrow(SecurityError);
     });
 
     it("throws error for whitespace-only string with mixed whitespace", () => {
       expect(() => {
         createTenantId(" \t\n ");
-      }).toThrow();
+      }).toThrow(SecurityError);
     });
   });
 
@@ -78,37 +79,37 @@ describe("createTenantId", () => {
     it("throws error for null", () => {
       expect(() => {
         createTenantId(null as unknown as string);
-      }).toThrow();
+      }).toThrow(SecurityError);
     });
 
     it("throws error for undefined", () => {
       expect(() => {
         createTenantId(undefined as unknown as string);
-      }).toThrow();
+      }).toThrow(SecurityError);
     });
 
     it("throws error for number", () => {
       expect(() => {
         createTenantId(123 as unknown as string);
-      }).toThrow();
+      }).toThrow(SecurityError);
     });
 
     it("throws error for boolean", () => {
       expect(() => {
         createTenantId(true as unknown as string);
-      }).toThrow();
+      }).toThrow(SecurityError);
     });
 
     it("throws error for object", () => {
       expect(() => {
         createTenantId({ id: "test" } as unknown as string);
-      }).toThrow();
+      }).toThrow(SecurityError);
     });
 
     it("throws error for array", () => {
       expect(() => {
         createTenantId(["tenant"] as unknown as string);
-      }).toThrow();
+      }).toThrow(SecurityError);
     });
   });
 

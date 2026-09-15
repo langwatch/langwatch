@@ -129,11 +129,10 @@ describe("pollForScenarioRun", () => {
         const result = await pollOnce();
 
         expect(result.success).toBe(false);
-        if (!result.success) {
-          expect(result.error).toBe("run_failed");
-          // And carries the run id so the caller can offer to open the results.
-          expect(result.scenarioRunId).toBe("run_123");
-        }
+        if (result.success) return;
+        expect(result.error).toBe("run_failed");
+        // And carries the run id so the caller can offer to open the results.
+        expect(result.scenarioRunId).toBe("run_123");
       });
     });
 
@@ -146,10 +145,9 @@ describe("pollForScenarioRun", () => {
         const result = await pollOnce();
 
         expect(result.success).toBe(false);
-        if (!result.success) {
-          expect(result.error).toBe("run_error");
-          expect(result.scenarioRunId).toBe("run_123");
-        }
+        if (result.success) return;
+        expect(result.error).toBe("run_error");
+        expect(result.scenarioRunId).toBe("run_123");
       });
 
       it("reports run_error for a run cancelled before it finished", async () => {
@@ -162,10 +160,9 @@ describe("pollForScenarioRun", () => {
         const result = await pollOnce();
 
         expect(result.success).toBe(false);
-        if (!result.success) {
-          expect(result.error).toBe("run_error");
-          expect(result.scenarioRunId).toBe("run_123");
-        }
+        if (result.success) return;
+        expect(result.error).toBe("run_error");
+        expect(result.scenarioRunId).toBe("run_123");
       });
     });
 
@@ -205,9 +202,8 @@ describe("pollForScenarioRun", () => {
         const result = await resultPromise;
 
         expect(result.success).toBe(false);
-        if (!result.success) {
-          expect(result.error).toBe("timeout");
-        }
+        if (result.success) return;
+        expect(result.error).toBe("timeout");
       });
     });
   });

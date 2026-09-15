@@ -31,9 +31,9 @@ describe("given the generated OpenAPI document", () => {
         const operation = paths[path]?.[method];
 
         expect(operation, `${where} is not in the document`).toBeDefined();
-        expect(operation.summary, where).toBeTruthy();
-        expect(operation.tags, where).toContain("Analytics / LangWatchQL");
-        expect(operation.responses?.[success], where).toBeDefined();
+        expect(operation.summary).toBeTruthy();
+        expect(operation.tags).toContain("Analytics / LangWatchQL");
+        expect(operation.responses?.[success]).toBeDefined();
       }
     });
 

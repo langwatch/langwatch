@@ -25,25 +25,31 @@ const state = (
   ...overrides,
 });
 
+/** Runs `fn`, returning what it threw, or fails the test if it did not throw. */
+function thrownBy(fn: () => void): unknown {
+  try {
+    fn();
+  } catch (error) {
+    return error;
+  }
+  throw new Error("Expected function to throw");
+}
+
 describe("Experiment workbench contract", () => {
   /** @scenario "A state that does not match the schema is refused" */
   it("reports invalid persisted state as the established handled error", () => {
-    try {
-      parseWorkbenchState({ ...state(), activeDatasetId: 42 });
-      expect.unreachable("the invalid state should be rejected");
-    } catch (error) {
-      expect(HandledError.isHandled(error)).toBe(true);
-      if (!HandledError.isHandled(error)) return;
-      expect(error.code).toBe("experiment_invalid_workbench_state");
-      expect(error.meta).toEqual({
-        issues: [
-          {
-            path: "activeDatasetId",
-            message: "Invalid input: expected string, received number",
-          },
-        ],
-      });
-    }
+    const error = thrownBy(() => parseWorkbenchState({ ...state(), activeDatasetId: 42 }));
+    expect(HandledError.isHandled(error)).toBe(true);
+    if (!HandledError.isHandled(error)) return;
+    expect(error.code).toBe("experiment_invalid_workbench_state");
+    expect(error.meta).toEqual({
+      issues: [
+        {
+          path: "activeDatasetId",
+          message: "Invalid input: expected string, received number",
+        },
+      ],
+    });
   });
 
   it("refuses a comparison column on a non-comparison evaluator", () => {
@@ -64,21 +70,17 @@ describe("Experiment workbench contract", () => {
       ],
     });
 
-    try {
-      parseWorkbenchState(invalid);
-      expect.unreachable("the comparison invariant should be rejected");
-    } catch (error) {
-      expect(HandledError.isHandled(error)).toBe(true);
-      if (!HandledError.isHandled(error)) return;
-      expect(error.code).toBe("experiment_invalid_workbench_state");
-      expect(error.meta).toMatchObject({
-        issues: [
-          {
-            path: "evaluators.0.comparison",
-          },
-        ],
-      });
-    }
+    const error = thrownBy(() => parseWorkbenchState(invalid));
+    expect(HandledError.isHandled(error)).toBe(true);
+    if (!HandledError.isHandled(error)) return;
+    expect(error.code).toBe("experiment_invalid_workbench_state");
+    expect(error.meta).toMatchObject({
+      issues: [
+        {
+          path: "evaluators.0.comparison",
+        },
+      ],
+    });
   });
 
   it("repairs a legacy pairwise evaluator without touching live results", () => {

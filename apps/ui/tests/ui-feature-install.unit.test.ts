@@ -104,23 +104,23 @@ function featureExportsOf(module: Record<string, unknown>): Record<string, unkno
 describe("given the feature directories under apps/ui/src/features", () => {
   describe("when the installed feature list is composed", () => {
     /** @scenario "A new feature cannot be half-registered" */
+    it("registers annotation's non-standard web installation", () => {
+      expect(annotationModule.annotationWeb, "annotation/index.ts exports no WebInstallation").toBeDefined();
+      expect(installedUiFeatures.apis?.map((api) => api.name)).toContain(
+        "@langwatch/annotation-web",
+      );
+    });
+
+    /** @scenario "A new feature cannot be half-registered" */
     it("registers every exported feature value, so a new feature cannot be half-registered", () => {
       for (const [directory, module] of Object.entries(featureModules)) {
+        if (directory === "annotation") continue;
         const exported = featureExportsOf(module);
-        if (directory === "annotation") {
-          expect(
-            module.annotationWeb,
-            "annotation/index.ts exports no WebInstallation",
-          ).toBeDefined();
-          expect(installedUiFeatures.apis?.map((api) => api.name)).toContain(
-            "@langwatch/annotation-web",
-          );
-          continue;
-        }
         expect(exported.length, `${directory}/index.ts exports no *Feature value`).toBeGreaterThan(
           0,
         );
 
+        const names = (installedUiFeatures.apis ?? []).map((binding) => binding.name);
         for (const feature of exported) {
           for (const key of Object.keys(feature.loaders as Record<string, unknown>)) {
             expect(
@@ -137,12 +137,10 @@ describe("given the feature directories under apps/ui/src/features", () => {
           }
 
           const api = feature.api as { name: string } | undefined;
-          if (api) {
-            const names = (installedUiFeatures.apis ?? []).map((binding) => binding.name);
-            expect(names, `api "${api.name}" from ${directory} is not installed`).toContain(
-              api.name,
-            );
-          }
+          if (!api) continue;
+          expect(names, `api "${api.name}" from ${directory} is not installed`).toContain(
+            api.name,
+          );
         }
       }
     });

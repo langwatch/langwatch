@@ -91,10 +91,7 @@ describe.skipIf(!hasGo())(
 
       // The execute_component path must emit per-node state events —
       // without them the eval-v3 result cell has nothing to populate.
-      expect(
-        componentEvents.length,
-        "nlpgo emitted no component_state_change frames for the " + "execute_component request",
-      ).toBeGreaterThan(0);
+      expect(componentEvents.length).toBeGreaterThan(0);
 
       // CORE ASSERTION — the field eval-v3's TargetCell reads
       // (execution_state.trace_id, resultMapper.ts:306) is present
@@ -107,12 +104,7 @@ describe.skipIf(!hasGo())(
           es,
           `component_state_change missing execution_state: ${JSON.stringify(ev)}`,
         ).toBeTruthy();
-        expect(
-          es.trace_id,
-          `component_state_change.execution_state.trace_id missing/blank ` +
-            `(status=${es?.status}) — eval-v3 TargetCell would render no ` +
-            `"View trace" link. Frame: ${JSON.stringify(ev)}`,
-        ).toBe(KNOWN_TRACE_ID);
+        expect(es.trace_id).toBe(KNOWN_TRACE_ID);
       }
     }, 60_000);
   },

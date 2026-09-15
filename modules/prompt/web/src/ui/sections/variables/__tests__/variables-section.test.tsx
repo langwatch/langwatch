@@ -254,15 +254,12 @@ describe("VariablesSection", () => {
       await user.type(editInput, "question"); // Try to rename to existing name
       fireEvent.blur(editInput);
 
-      // Should not have called onChange with duplicate
-      // The last call should NOT change the identifier to "question"
-      const lastCall = onChange.mock.calls[onChange.mock.calls.length - 1];
-      if (lastCall) {
-        const updatedVariables = lastCall[0];
-        const hasQuestionTwice =
-          updatedVariables.filter((v: Variable) => v.identifier === "question").length > 1;
-        expect(hasQuestionTwice).toBe(false);
-      }
+      // No call to onChange should ever have produced a duplicate "question".
+      const everCalledWithDuplicate = onChange.mock.calls.some(
+        ([updatedVariables]: [Variable[]]) =>
+          updatedVariables.filter((v) => v.identifier === "question").length > 1,
+      );
+      expect(everCalledWithDuplicate).toBe(false);
     });
 
     it("does not enter edit mode when readOnly", async () => {
@@ -503,13 +500,13 @@ describe("VariablesSection", () => {
       const inputs = screen.getAllByRole("textbox");
       // The value input should be the one without a value (empty)
       const valueInput = inputs.find((input) => (input as HTMLInputElement).value === "");
+      expect(valueInput).toBeDefined();
+      if (!valueInput) return;
 
-      if (valueInput) {
-        await user.type(valueInput, "hello");
-        expect(onValueChange).toHaveBeenCalled();
-        // Should be called with identifier and new value
-        expect(onValueChange).toHaveBeenCalledWith("question", expect.any(String));
-      }
+      await user.type(valueInput, "hello");
+      expect(onValueChange).toHaveBeenCalled();
+      // Should be called with identifier and new value
+      expect(onValueChange).toHaveBeenCalledWith("question", expect.any(String));
     });
 
     it("displays multiple variable values correctly", () => {

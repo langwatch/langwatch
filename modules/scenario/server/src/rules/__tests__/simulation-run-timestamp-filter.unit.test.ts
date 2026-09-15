@@ -60,10 +60,9 @@ describe("filterRunsByTimestamp()", () => {
       });
 
       expect(out.changed).toBe(true);
-      if (out.changed) {
-        expect(out.runs).toHaveLength(1);
-        expect(out.runs[0]!.scenarioRunId).toBe("run-1");
-      }
+      if (!out.changed) return;
+      expect(out.runs).toHaveLength(1);
+      expect(out.runs[0]!.scenarioRunId).toBe("run-1");
     });
   });
 
@@ -83,10 +82,9 @@ describe("filterRunsByTimestamp()", () => {
       const out = filterRunsByTimestamp(result, { "run-1": 1000 });
 
       expect(out.changed).toBe(true);
-      if (out.changed) {
-        expect(out.runs).toHaveLength(1);
-        expect(out.runs[0]!.scenarioRunId).toBe("run-2");
-      }
+      if (!out.changed) return;
+      expect(out.runs).toHaveLength(1);
+      expect(out.runs[0]!.scenarioRunId).toBe("run-2");
     });
   });
 
