@@ -191,7 +191,11 @@ describe("given the default gate classifier", () => {
 });
 
 describe("given the opt-out catalog over the committed manifest", () => {
-  const handWritten = LWQL_HAND_WRITTEN_SOURCE_TABLES;
+  // Widened to a plain string array: manifest table names are dynamic strings,
+  // not the literal union `LWQL_HAND_WRITTEN_SOURCE_TABLES` carries, and
+  // `.includes` on a `readonly [...] as const` tuple requires an argument of
+  // that exact literal union.
+  const handWritten: readonly string[] = LWQL_HAND_WRITTEN_SOURCE_TABLES;
   const derived = LWQL_DERIVED_CATALOG;
   const bySource = new Map(derived.map((view) => [view.sourceTable, view]));
 

@@ -9,7 +9,6 @@
  * state (sum/count) with its merge combinator under a `GROUP BY` the engine key.
  */
 
-import type { Partial } from "lodash";
 import type { DatasetOverride } from "../defineDatasetFromTable";
 
 export const GATEWAY_OVERRIDES: Record<string, Partial<DatasetOverride>> = {

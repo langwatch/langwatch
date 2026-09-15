@@ -6,7 +6,6 @@
  * - dspy_steps: dspy optimizer steps with LLM calls and parameters gated as output
  */
 
-import type { Partial } from "lodash";
 import type { DatasetOverride } from "../defineDatasetFromTable";
 
 export const EXPERIMENTS_OVERRIDES: Record<string, Partial<DatasetOverride>> = {

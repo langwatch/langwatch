@@ -5,7 +5,6 @@
  * execution results. Both are operational metadata with no content or cost gating.
  */
 
-import type { Partial } from "lodash";
 import type { DatasetOverride } from "../defineDatasetFromTable";
 
 export const AUDIT_OVERRIDES: Record<string, Partial<DatasetOverride>> = {

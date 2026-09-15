@@ -103,12 +103,14 @@ describe("Dataset overrides", () => {
 
     it("governance_cost_rollup_1d.AmountNanoMinor is gated costs", () => {
       const override = GOVERNANCE_OVERRIDES.governance_cost_rollup_1d;
-      expect(override.columnGates?.AmountNanoMinor).toEqual(["costs"]);
+      expect(override).toBeDefined();
+      expect(override?.columnGates?.AmountNanoMinor).toEqual(["costs"]);
     });
 
     it("governance_ocsf_events.RawOcsfJson is gated output", () => {
       const override = GOVERNANCE_OVERRIDES.governance_ocsf_events;
-      expect(override.columnGates?.RawOcsfJson).toEqual(["output"]);
+      expect(override).toBeDefined();
+      expect(override?.columnGates?.RawOcsfJson).toEqual(["output"]);
     });
   });
 

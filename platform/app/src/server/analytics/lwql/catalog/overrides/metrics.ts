@@ -14,7 +14,6 @@
  * the engine key.
  */
 
-import type { Partial } from "lodash";
 import type { DatasetOverride } from "../defineDatasetFromTable";
 
 export const METRICS_OVERRIDES: Record<string, Partial<DatasetOverride>> = {

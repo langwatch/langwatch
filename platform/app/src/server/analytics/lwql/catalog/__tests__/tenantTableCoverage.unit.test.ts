@@ -38,7 +38,11 @@ const manifestTableNames = LWQL_COLUMNS_MANIFEST.tables.map(
   (table) => table.name,
 );
 
-const handWritten = LWQL_HAND_WRITTEN_SOURCE_TABLES;
+// Widened to a plain string array: manifest table names are dynamic strings,
+// not the literal union `LWQL_HAND_WRITTEN_SOURCE_TABLES` carries, and
+// `.includes` on a `readonly [...] as const` tuple requires an argument of
+// that exact literal union.
+const handWritten: readonly string[] = LWQL_HAND_WRITTEN_SOURCE_TABLES;
 const derived = LWQL_DERIVED_CATALOG;
 const derivedSourceTables = new Set(derived.map((view) => view.sourceTable));
 
