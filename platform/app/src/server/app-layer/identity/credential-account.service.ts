@@ -288,8 +288,10 @@ export class CredentialAccountService {
       occurredAtMs: created.accountCreatedAt.getTime(),
     });
 
-    // Email-mode sign-ups bypass better-auth's user-create hooks, so the
-    // milestone is stated here rather than by a ceremony that never runs.
+    // This door writes its rows itself and so bypasses better-auth's
+    // user-create hooks: the milestone is stated here rather than by a
+    // ceremony that never runs. True of every deployment that offers a
+    // password, not only the email-mode ones it was once the whole of (D09).
     this.deps.milestones.signedUp({ userId: created.id });
 
     return { id: created.id };
