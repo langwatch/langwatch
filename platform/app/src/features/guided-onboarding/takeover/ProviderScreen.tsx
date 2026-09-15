@@ -16,7 +16,7 @@ import { useCodexDeviceSignIn } from "~/components/settings/useCodexDeviceSignIn
 import { useColorModeValue } from "~/components/ui/color-mode";
 import { Dialog } from "~/components/ui/dialog";
 import { Link } from "~/components/ui/link";
-import { HEADING_FONT } from "~/features/auth-front-door/frontDoorTheme";
+import { HEADING_FONT } from "~/features/auth/authTheme";
 import { langyFirstPartyLinkProps } from "~/features/langy/hooks/useLangyExternalLinkGuard";
 import type { IconData } from "~/features/onboarding/regions/shared/types";
 import { useCopyToClipboard } from "~/features/traces-v2/hooks/useCopyToClipboard";

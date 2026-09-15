@@ -1,7 +1,7 @@
 import { Box } from "@chakra-ui/react";
 import { useEffect, useMemo, useState } from "react";
 import { useAnalytics } from "react-contextual-analytics";
-import { HEADING_FONT } from "~/features/auth-front-door/frontDoorTheme";
+import { HEADING_FONT } from "~/features/auth/authTheme";
 import { helloSegments, NEXT_AFTER_TYPING_MS } from "./copy";
 import { NextButton } from "./NextButton";
 import { TakeoverRow } from "./TakeoverRow";

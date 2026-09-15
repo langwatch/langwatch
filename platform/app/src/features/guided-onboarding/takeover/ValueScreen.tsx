@@ -1,7 +1,7 @@
 import { Box, chakra, Flex, Grid, Text } from "@chakra-ui/react";
 import { useEffect, useMemo, useState } from "react";
 import { useAnalytics } from "react-contextual-analytics";
-import { HEADING_FONT } from "~/features/auth-front-door/frontDoorTheme";
+import { HEADING_FONT } from "~/features/auth/authTheme";
 import {
   GUIDED_PATH_DESCRIPTIONS,
   GUIDED_PATH_TITLES,
