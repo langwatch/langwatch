@@ -55,12 +55,9 @@ export const subscribeDrawerProps = (listener: () => void): (() => void) => {
 export const getDrawerPropsVersion = (): number => drawerPropsVersion;
 
 /**
- * Merge non-serializable props into the CURRENT drawer's complexProps and
- * notify subscribers so CurrentDrawer re-renders and re-reads them. Use to
- * (re)attach in-memory context to an already-open drawer WITHOUT a URL change —
- * e.g. rebuilding a comparison editor's context after a reload wiped the
- * ephemeral complexProps. `openDrawer` still fully REPLACES complexProps on a
- * fresh open; this only augments what is already attached.
+ * Merges non-serializable props into the CURRENT drawer's complexProps and
+ * notifies subscribers, to (re)attach in-memory context WITHOUT a URL change.
+ * `openDrawer` still fully REPLACES complexProps on open; this only augments.
  */
 export const setComplexProps = (props: Record<string, unknown>): void => {
   complexProps = { ...complexProps, ...props };
@@ -101,13 +98,10 @@ export const setFlowCallbacks = (
     keepOnClose?: boolean;
   },
 ) => {
-  // Deliberately does NOT notify. Callers register callbacks BEFORE opening a
-  // drawer (the URL change renders it) or, on the re-hydration path, right
-  // before a setComplexProps that does notify — and CurrentDrawer re-reads both
-  // maps on any re-render, so a notify here is redundant. It is also expensive:
-  // this is called from ~65 sites across the app, and notifying would re-render
-  // CurrentDrawer — and cascade through the open drawer's subtree — every time
-  // any unrelated flow registered a callback.
+  // Deliberately does NOT notify: callers register callbacks before opening a
+  // drawer, or right before a setComplexProps that does notify — so a notify
+  // here is redundant, and expensive (~65 call sites; would cascade a
+  // re-render through the open drawer's subtree on every registration).
   flowCallbacks[drawer] = callbacks as Record<string, unknown>;
   if (options?.keepOnClose) keptOnClose.add(drawer);
   else keptOnClose.delete(drawer);
@@ -123,11 +117,9 @@ export const getFlowCallbacks = (drawer: DrawerType): Record<string, any> | unde
 };
 
 /**
- * Clear the flow callbacks of the drawer flows. Called automatically by
- * closeDrawer().
- *
- * What a mounted component registered with `keepOnClose` stays: it belongs to
- * that component, which is still there and still expects to be called.
+ * Clears the flow callbacks of the drawer flows; called automatically by
+ * closeDrawer(). What a mounted component registered with `keepOnClose`
+ * stays: it belongs to that component, still expecting to be called.
  */
 export const clearFlowCallbacks = () => {
   const kept: Record<string, Record<string, unknown>> = {};
@@ -164,11 +156,9 @@ export const clearDrawerStack = () => {
 };
 
 /**
- * The drawer currently on top of the stack, or `undefined` when nothing is
- * stacked. A drawer that mounts from its own store rather than from the URL
- * (the Trace Explorer) checks this before asking for a back navigation: the
- * stack is module-global and outlives any single drawer, so going back on a
- * stack that no longer describes the open drawer walks into an unrelated one.
+ * The drawer on top of the stack, or `undefined` when empty. Checked by a
+ * drawer that mounts from its own store, not the URL (Trace Explorer): the
+ * stack is module-global, so a stale one walks back into an unrelated drawer.
  */
 export const getTopDrawer = (): DrawerType | undefined =>
   drawerStack[drawerStack.length - 1]?.drawer;
@@ -305,10 +295,9 @@ export const useDrawerParams = () => {
 // ============================================================================
 
 /**
- * Split an address into (path, query, hash). Handles both `?q#h` and `#h?q`
- * orderings — important for lens routes like `/traces#conversations` where
- * naive concatenation can leave drawer query params parked after the hash,
- * which `location.search` cannot see.
+ * Split an address into (path, query, hash), handling both `?q#h` and `#h?q`
+ * orderings — needed for lens routes like `/traces#conversations`, where naive
+ * concatenation parks query params after the hash, invisible to `location.search`.
  */
 function splitAsPath(asPath: string): {
   path: string;
@@ -474,10 +463,7 @@ export const useDrawer = <R extends UiDrawerRegistry = UiDrawerRegistry>() => {
 
   /**
    * Open a drawer with type-safe props.
-   *
    * @example
-   * openDrawer("promptEditor", { promptId: "abc" });
-   * openDrawer("promptEditor", { promptId: "abc", urlParams: { targetId: "123" } });
    * openDrawer("promptEditor", { promptId: "abc" }, { resetStack: true });
    */
   const openDrawer = useCallback(
@@ -529,13 +515,10 @@ export const useDrawer = <R extends UiDrawerRegistry = UiDrawerRegistry>() => {
         drawerStack.pop();
         drawerStack.push({ drawer: effectiveDrawer, params: allParams });
       } else {
-        // A drawer is already open - navigating forward, push to stack.
-        // An empty stack means the open drawer came from a deep link or
-        // outlived a reload, so seed it from the URL the browser is actually
-        // on and back navigation can return there. It has to be the address
-        // bar and not the router snapshot: the snapshot can still name a
-        // drawer the reader has since dismissed, and seeding that one lets
-        // back navigation bring a dismissed drawer back.
+        // A drawer is already open - navigating forward, push to stack. An empty
+        // stack means the drawer came from a deep link or outlived a reload, so seed
+        // it from the address bar (not the router snapshot, which can still name a
+        // drawer the reader has since dismissed) so back navigation can return there.
         if (drawerStack.length === 0) {
           const openInUrl = openDrawerInLocation();
           if (openInUrl) drawerStack.push({ drawer: openInUrl, params: {} });
@@ -554,13 +537,10 @@ export const useDrawer = <R extends UiDrawerRegistry = UiDrawerRegistry>() => {
           topEntry.params = currentUrlParams;
         }
 
-        // A drawer appears in the stack once: opening one that is already in
-        // it returns to that entry instead of stacking a second copy. Drawers
-        // are non-modal, so the page behind one stays clickable. Without
-        // this, reading a trace, adding it to a dataset and then clicking
-        // another trace in the table leaves trace → dataset → trace, and
-        // closing that trace walks back into a dataset drawer the reader had
-        // already left behind.
+        // A drawer appears in the stack once: opening one already in it returns to
+        // that entry instead of stacking a second copy. Without this, trace →
+        // dataset → trace would leave closing the trace walking back into a dataset
+        // drawer the reader had already left behind.
         const existingIndex = drawerStack.findIndex((entry) => entry.drawer === effectiveDrawer);
         if (existingIndex !== -1) drawerStack.length = existingIndex;
 

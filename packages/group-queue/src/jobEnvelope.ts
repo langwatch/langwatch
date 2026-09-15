@@ -18,15 +18,9 @@ import type { BlobRef, TieredBlobStore } from "./tieredBlobStore.ts";
 import type { TenantId } from "./storage.ts";
 
 /**
- * Decompression with the over-limit error converted to a park signal. bodyCodec
- * already caps both codecs' output at the encode ceiling (ADR-026) so a
- * tampered or corrupt blob (e.g. a tenant zip-bombing their own BYOC object)
- * can't OOM the worker; zlib reports the over-limit result as
- * ERR_BUFFER_TOO_LARGE (or an "output length" RangeError depending on version).
- * Both mean the same thing here: the staged value would materialize past the
- * decode ceiling, so throw {@link PayloadTooLargeError} and let the caller park
- * the group for inspection instead of dropping the job to replay (which would
- * re-materialize the same value).
+ * zlib reports an over-limit result as ERR_BUFFER_TOO_LARGE (or an "output
+ * length" RangeError depending on version) — both mean the same thing: park
+ * for inspection via {@link PayloadTooLargeError} rather than drop to replay.
  */
 async function boundedDecompress(data: Buffer): Promise<Buffer> {
   try {
@@ -44,21 +38,9 @@ async function boundedDecompress(data: Buffer): Promise<Buffer> {
 }
 
 /**
- * Inflate + parse a body, naming the failure if it will not read.
- *
- * Named `decode*`, not `read*`: every `read*` in this file contractually never
- * throws (`readJobRoutingMeta`, `readEnvelopeDescriptor`, `readEnvelopeLease`…),
- * and this throws the `DecodeFailureError`s the drop path dispatches on.
- *
- * A body that is present but unreadable — bad compression frame, a codec this
- * worker does not know, a parse that fails — is NOT the same event as a blob that
- * is gone, and this is the exact rolling-deploy vector described at the top of
- * this file: an old worker meeting a body written by a new one. Naming it
- * `body_unreadable` is what lets the caller keep the value instead of retiring
- * it, so the next worker can read what this one could not.
- *
- * {@link PayloadTooLargeError} passes through untouched — that is the park signal,
- * and an oversized body must keep parking rather than be recast as corrupt.
+ * Named `decode*`, not `read*` (which never throws): failures throw
+ * `DecodeFailureError` reason `body_unreadable`, distinct from a gone blob —
+ * an old worker meeting a new one's body must let the next worker retry it.
  */
 async function decodeBody(data: Buffer): Promise<Record<string, unknown>> {
   let inflated: Buffer;
@@ -94,10 +76,9 @@ function parseInlineBody(body: string): Record<string, unknown> {
 }
 
 /**
- * Decode-side twin of {@link assertPayloadWithinCap}: an invalid persisted
- * value must not reach JSON.parse unbounded. A synchronous parse of a runaway
- * value seizes the worker event loop, which the liveness probe converts into a
- * process-wide crash loop.
+ * Decode-side twin of {@link assertPayloadWithinCap}: a synchronous parse of
+ * a runaway value seizes the worker event loop, which the liveness probe
+ * converts into a process-wide crash loop.
  */
 function assertDecodeWithinCap(byteLength: number): void {
   if (byteLength > MAX_BLOB_BYTES) {
@@ -107,16 +88,8 @@ function assertDecodeWithinCap(byteLength: number): void {
 
 /**
  * Canonical envelope for staged job values: `GQ2|<headerLen>|<headerJson><body>`.
- *
- * The header carries only what dispatch-time Lua and the ops dashboard need
- * without touching the body (routing fields + body encoding). The body is the
- * full payload JSON: raw or gzip+base64 inline when it stays in the envelope,
- * or empty when offloaded to a standalone blob whose reference the header
- * carries.
- *
- * Bodies above 4 KiB use a content-addressed, tenant-namespaced blob through
- * {@link TieredBlobStore}; smaller bodies remain inline. Values outside this
- * format are rejected at the persisted-data boundary.
+ * The header carries routing + encoding for Lua/dashboard without touching the
+ * body; bodies above {@link INLINE_CEILING_BYTES} move to {@link TieredBlobStore}.
  */
 const ENVELOPE_PREFIX_V2 = "GQ2|";
 /** The prefix is four ASCII bytes. */
@@ -157,20 +130,9 @@ export interface EnvelopeHeader {
   /** GQ2 per-stage lease holder identity for this staged occupancy. */
   h?: string;
   /**
-   * Serialized payload size in bytes, BEFORE compression and before any offload
-   * to the blob store — the size the payload has once it is back in a worker's
-   * hands (ADR-066 pillar 2).
-   *
-   * It exists because the stored value's own length answers a different
-   * question. A body over {@link INLINE_CEILING_BYTES} leaves only a reference
-   * behind, and a body over {@link COMPRESSION_THRESHOLD_BYTES} is stored
-   * compressed, so `#value` can be two or three orders of magnitude under the
-   * bytes a coalesced batch will actually hold in memory and append downstream.
-   * The drain's byte budget reads this field, so its bound survives offload.
-   *
-   * In the header, never the body: the body is content-addressed and hashing it
-   * with a size field would be harmless but redundant, while the header is what
-   * both the Lua drain and the ops dashboard can read without blob I/O.
+   * Payload size in bytes BEFORE compression/offload (ADR-066 pillar 2) — the
+   * stored value's own length lies once a body is compressed or offloaded, and
+   * the drain's byte budget reads this field so its bound survives offload.
    */
   s?: number;
   /** Routing fields read by the Lua dispatcher and ops dashboard WITHOUT parsing the body. */
@@ -178,22 +140,17 @@ export interface EnvelopeHeader {
   t?: string;
   n?: string;
   /**
-   * GQ2: queue-machinery fields (every `__*` key in jobData) lifted out of the
-   * body so they don't perturb the content hash. Restored onto the parsed body
-   * on decode. The user payload is everything else; the body is hashed over
-   * the payload alone, so the same event fanned out to N subscribers collapses to
-   * one stored blob (ADR-029). Allowlist-free: any future `__*` field is
-   * automatically treated as machinery.
+   * GQ2: queue-machinery fields (every `__*` key) lifted out so they don't
+   * perturb the content hash — the same event fanned out to N subscribers then
+   * collapses to one stored blob (ADR-029). Allowlist-free: any `__*` is machinery.
    */
   m?: Record<string, unknown>;
 }
 
 /**
  * GQ2: split jobData into (machinery, payload). Every `__*` key is queue
- * machinery — the queue assigns these fields per-stage (`__stagedJobId`,
- * `__attempt`, `__context`) or per-subscriber (`__jobName`, `__jobType`,
- * `__pipelineName`), and they perturb the body bytes if left in, defeating
- * content-addressed dedup. The user payload is the rest.
+ * machinery that would perturb the body bytes if left in, defeating
+ * content-addressed dedup; the user payload is the rest.
  */
 function splitMachineryFromBody(jobData: Record<string, unknown>): {
   machinery: Record<string, unknown>;
@@ -212,13 +169,9 @@ function splitMachineryFromBody(jobData: Record<string, unknown>): {
 }
 
 /**
- * GQ2 decode side of {@link splitMachineryFromBody}: re-merge the queue
- * machinery back onto the parsed body. The routing trio
- * (`__pipelineName/__jobType/__jobName`) lives in `header.p/t/n` only — the
- * read-fast-path used by the Lua dispatcher and `readJobRoutingMeta` without
- * touching the body. The rest of the machinery lives in `header.m`. Keeping
- * the trio out of `m` saves ~50 wire bytes per envelope and removes a second
- * source of truth that could drift.
+ * GQ2 decode side of {@link splitMachineryFromBody}. The routing trio lives
+ * in `header.p/t/n` only — the fast path `readJobRoutingMeta` reads without
+ * touching the body — while the rest of the machinery lives in `header.m`.
  */
 function mergeMachinery(
   body: Record<string, unknown>,
@@ -250,14 +203,9 @@ function finalize(prefix: string, header: EnvelopeHeader, body: string): string 
 }
 
 /**
- * Picks the inline encoding for a body that stays in the envelope: raw JSON, or
- * compressed+base64 when compression actually wins (mutates `header.e` to
- * `"gz"`).
- *
- * `"gz"` means "compressed"; the codec itself is sniffed from the magic bytes on
- * decode rather than named in the header, so a zstd body and a gzip body are
- * both `"gz"` and a reader never has to trust a header that could disagree with
- * the bytes it actually got.
+ * Picks the inline encoding: raw JSON, or compressed+base64 when compression
+ * wins (mutates `header.e` to `"gz"`). The codec itself is sniffed from magic
+ * bytes on decode, not named in the header, so header and bytes can't disagree.
  */
 async function inlineBody(
   json: string,
@@ -292,40 +240,16 @@ export class PayloadTooLargeError extends Error {
 }
 
 /**
- * Why a decode failed, as a closed set derived from the failure TYPE.
- *
- * Message text is not a classifier: zlib's wording is Node-version-dependent and
- * not ours to own, so an alert built on substring matching breaks under a runtime
- * upgrade. `GroupQueue` labels its drop counter with these, so oncall can separate
- * "the body is gone" from "we cannot read the body we have" without grepping.
- *
- * - `missing_blob` — the envelope's blob resolved to nothing. The body is GONE:
- *   no retry, park, or replay resurrects it. Irreducible loss at this layer.
- * - `malformed_envelope` — the envelope's own structure is unreadable, so we
- *   cannot even find the body.
- * - `body_unreadable` — we found the body and could not turn it back into an
- *   object: a bad compression frame, a codec this worker does not know, or a
- *   parse that failed. One name for all three because they are one event
- *   operationally (these bytes are unreadable *to this worker*) with one fix
- *   (do not retire them). Named for the CONDITION, not one of its mechanisms —
- *   it also fires on an inline, never-compressed body, where nothing was
- *   decompressed at all.
- *
- * `malformed_envelope` and `body_unreadable` are body-PRESENT: the value is
- * intact and a later worker may decode it fine (a rolling-deploy format skew is
- * exactly this — see the codec note at the top of this file). Callers must not
- * retire such a value; see `GroupQueue`'s drop branch.
+ * A closed set derived from the failure TYPE, not message text (zlib's wording
+ * is Node-version-dependent). `missing_blob` is irreducible loss; the other two
+ * are body-PRESENT (a rolling-deploy skew) and must never be retired.
  */
 export type DecodeFailureReason = "missing_blob" | "malformed_envelope" | "body_unreadable";
 
 /**
- * A decode failure we can name. Distinct from {@link PayloadTooLargeError} (park,
- * do not parse) and `TransientBlobStoreError` (retry — the body is temporarily
- * unreachable, not gone).
- *
- * Carries only `reason`; the envelope descriptor is read from the value itself by
- * {@link readEnvelopeDescriptor}, so throw sites don't thread it and a plain
- * `Error` from anywhere still gets a descriptor.
+ * Distinct from {@link PayloadTooLargeError} (park) and `TransientBlobStoreError`
+ * (retry — not gone). Carries only `reason`; a plain `Error` still gets a
+ * descriptor, read from the value itself.
  */
 export class DecodeFailureError extends Error {
   readonly reason: DecodeFailureReason;
@@ -347,25 +271,9 @@ export interface EnvelopeDescriptor {
 }
 
 /**
- * Describes an envelope for a drop log — format, version, blob id. Never throws;
- * unreadable values yield nulls. Sibling of {@link readJobRoutingMeta}, and the
- * same trick: the header survives what the body does not, so a value we could not
- * decode can still say what it WAS. All-nulls is itself a signal — it means the
- * envelope would not even split.
- *
- * Deliberately shape-only. The body may hold tenant PII; the header holds routing
- * and storage machinery, and blob ids are content hashes.
- */
-/**
- * A blob id only if it LOOKS like one. This reader runs on envelopes we already
- * know are malformed, so `header.ref.hash` is an attacker-shaped
- * strings by that point and the value goes straight to a log. Anything off-shape
- * becomes null rather than a free-text field in the drop record (#5538, review).
- *
- * The id is `sha256(bytes).subarray(0,16).toString("base64url")`
- *   (`tieredBlobStore.ts`): 22 chars of `[A-Za-z0-9_-]`. **Not hex** — an earlier
- *   hex-only guard here nulled every legitimate GQ2 id and broke the AC1
- *   descriptor. The unit tests caught it; do not narrow this to hex.
+ * Never throws; unreadable envelopes yield nulls (shape only — never PII).
+ * Only a string that LOOKS like a blob id passes (#5538): base64url, not hex
+ * — an earlier hex-only guard broke real ids; keep this pattern.
  */
 const safeBlobId = (id: string | null): string | null =>
   id && /^[A-Za-z0-9_-]{8,128}$/.test(id) ? id : null;
@@ -553,43 +461,9 @@ export function readJobRoutingMeta(value: string): JobRoutingMeta {
 }
 
 /**
- * How many bytes this job costs a coalesced batch: the header's recorded
- * payload size when the value carries one, and for the values that carry none,
- * whichever reading cannot let the batch overshoot.
- *
- * Three cases, only one of which is a plain measurement:
- *
- * 1. `s` present and a non-negative safe integer — the payload size the encoder
- *    recorded. Exact. Anything else in that field (fractional, `Infinity`,
- *    `NaN`, negative) is not a byte count and is not trusted: a forged or
- *    corrupt header must not be able to talk the budget down, and `Infinity`
- *    would reach the Lua drain as an unparseable ARGV. Those fall through to
- *    the encoding rule below, so an offloaded body still costs the cap.
- * 2. No `s`, body inline and uncompressed (`e:"j"`) — the stored length is a
- *    conservative fallback.
- * 3. No `s`, body compressed or offloaded (`e` of `gz`/`redis`/`s3`, or
- *    absent) — the stored length is a fraction of the payload and there is
- *    nothing in the value that says by how much. Worth {@link MAX_BLOB_BYTES}:
- *    an unreadable payload is treated as the largest payload we accept.
- *
- * Case 3 exists for the length of a rolling deploy: old workers keep staging
- * pre-`s` envelopes while new ones drain them, and a deep backlog is exactly
- * where it does not age out promptly — which is also exactly where the byte
- * bound is load-bearing. Reading the stored length there would reinstate the
- * defect this field was added to close, for the window with the most jobs
- * queued. Costing the cap instead makes such a job drain alone (any sane
- * `coalesceMaxBytes` is far under 50 MiB), so the rollout loses coalescing on
- * those jobs rather than losing the bound. Coalescing is an optimization; the
- * bound is what keeps a worker from assembling a batch it cannot hold.
- *
- * Never throws: a value this cannot parse at all is worth its stored length,
- * not an exception on the drain path.
- *
- * Has a Lua twin: `gqPayloadSize` in `scripts.ts` makes the same three
- * decisions, because the drain spends the byte budget inside Redis while this
- * sets its starting point. An envelope-format change — new prefix, renamed
- * header field, different length-prefix encoding — has to land in both or the
- * two ends of one budget silently disagree.
+ * Byte cost for a value that hasn't been decoded — see ADR-069 for the
+ * three-case algorithm. Has a Lua twin (`gqPayloadSize` in `scripts.ts`):
+ * an envelope-format change must land in both.
  */
 export function readJobPayloadBytes(value: string): number {
   try {
@@ -608,15 +482,9 @@ export function readJobPayloadBytes(value: string): number {
 }
 
 /**
- * Reads the retry attempt from the envelope header. Never throws; an absent or
- * unreadable attempt is null.
- *
- * This exists so the retry count can live ON THE MESSAGE and still be legible
- * to the one reader that cannot decode a message: when a job's body is held in
- * a blob store that is temporarily unreachable, the ladder that decides whether
- * to retry or give up has nothing but the value in hand. The header is plain
- * inline JSON in front of the body, so it is readable with no blob I/O.
- *
+ * Never throws; an absent or unreadable attempt is null. Lives ON THE HEADER
+ * so the retry ladder can read it with no blob I/O, even when the blob store
+ * is temporarily unreachable and nothing else about the job is legible.
  */
 export function readJobAttempt(value: string): number | null {
   try {
@@ -635,16 +503,9 @@ export function readJobAttempt(value: string): number | null {
 }
 
 /**
- * The same value with its retry attempt stamped into the header, rewriting the
- * HEADER ONLY.
- *
- * The body string is reused byte for byte, which is the whole point: the body
- * is what the blob store content-addresses and what identical jobs share, so
- * re-encoding it to change a counter would split that shared copy and churn the
- * lease identity. Advancing an attempt is metadata, and costs no blob I/O.
- *
- * Unsupported values are returned unchanged so the caller can report them
- * through the canonical decode-failure path without mutating their bytes.
+ * Rewrites the HEADER ONLY; the body is reused byte for byte, since it's what
+ * the blob store content-addresses — re-encoding it would split a shared
+ * copy and churn the lease identity. Unsupported values return unchanged.
  */
 export function withJobAttempt({ value, attempt }: { value: string; attempt: number }): string {
   if (!value.startsWith(ENVELOPE_PREFIX_V2)) return value;
@@ -674,14 +535,10 @@ export function readEnvelopeLeaseFromHeader(
 }
 
 /**
- * Every tiered ref the decoder would fetch, whether or not it carries a lease.
- *
- * The tenant guard MUST key off this rather than off {@link readEnvelopeLeaseFromHeader}:
- * that one additionally requires `header.h`, so an envelope with a valid
- * cross-tenant `ref` and no holder id yields no lease, skips the guard, and is
- * still fetched by `decodeJobEnvelope` — which has no tenant check of its own.
- * A forged or mis-routed envelope could read another tenant's blob that way.
- * Validate the ref; use the lease only for renewal (ADR-029).
+ * The tenant guard MUST key off this, not {@link readEnvelopeLeaseFromHeader}:
+ * that also requires `header.h`, so a cross-tenant `ref` with no holder id
+ * skips the guard yet is still fetched. Validate the ref; lease is for
+ * renewal only (ADR-029).
  */
 export function readEnvelopeTieredRefFromHeader(header: EnvelopeHeader): BlobRef | null {
   if ((header.e === "redis" || header.e === "s3") && header.ref) {

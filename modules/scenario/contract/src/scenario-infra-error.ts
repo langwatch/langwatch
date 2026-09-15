@@ -25,8 +25,7 @@ export const ScenarioInfraErrorCode = {
   /**
    * The target agent points at a `langwatch agent dev` tunnel whose session
    * seems to have ended. Same code as the app-level handled error
-   * (`AgentDevTunnelUnreachableError`) so the two surfaces name the failure
-   * identically.
+   * (`AgentDevTunnelUnreachableError`) so both surfaces agree on the name.
    */
   AgentDevTunnelUnreachable: "agent_dev_tunnel_unreachable",
   /**
@@ -46,10 +45,9 @@ export const ScenarioInfraErrorCode = {
    */
   AgentPayloadTooLarge: "agent_payload_too_large",
   /**
-   * The agent's own code raised. NOT an infrastructure failure - it is here
-   * because this classifier is the single place a scenario failure is turned
-   * into something a customer reads, and without it a user-code failure gets
-   * bucketed as one of the codes above (lw#3439).
+   * The agent's own code raised. NOT an infrastructure failure — it's here
+   * because this classifier is the one place a scenario failure becomes
+   * customer-readable, and without it a user-code failure gets misbucketed (lw#3439).
    */
   UserCodeError: "scenario_user_code_error",
   /** Anything else that failed at the members level. */
@@ -78,11 +76,9 @@ const MAX_GENERIC_MESSAGE_LENGTH = 300;
 const GENERIC_FAILURE_MESSAGE = "The simulation failed before it could run.";
 
 /**
- * Shown when there IS a raw error but none of it can be shown safely.
- *
- * Deliberately not GENERIC_FAILURE_MESSAGE: that one asserts the run never
- * started, which is false for a failure suppressed mid-run and lands in the
- * verdict a customer reads. A vaguer true sentence beats a precise false one.
+ * Shown when there IS a raw error but none of it can be shown safely. Not
+ * GENERIC_FAILURE_MESSAGE: that one asserts the run never started, which is
+ * false for a failure suppressed mid-run — a vaguer true sentence beats a precise false one.
  */
 const UNREADABLE_FAILURE_MESSAGE =
   "The simulation failed, but it didn't report a reason we can show.";
@@ -94,9 +90,8 @@ function contains(haystack: string, needle: string): boolean {
 
 /**
  * Pull the provider's own error text out of a gateway/provider failure. The Go
- * AI Gateway surfaces `{"error":{"message":"Model not found: …","type":"provider_error"}}`,
- * and the `ai` SDK throws messages like "API key is invalid." — we prefer the
- * innermost human sentence over the JSON wrapper.
+ * AI Gateway wraps it as `{"error":{"message":"...","type":"provider_error"}}`,
+ * and the `ai` SDK throws bare messages — we prefer the innermost sentence.
  */
 function extractProviderMessage(raw: string): string | undefined {
   const jsonMessage = /"message"\s*:\s*"((?:[^"\\]|\\.)*)"/.exec(raw)?.[1];
@@ -194,20 +189,16 @@ function findMeaningfulLine(text: string): string | undefined {
 }
 
 /**
- * Where an HTML error document starts inside an otherwise-prose line. The
- * HTTP adapter appends the upstream's response body after its own prose
- * (`HTTP 502: … (request-id: …): <body>`), so a gateway's HTML error page
- * lands mid-line. Only the unambiguous document openers match — a bare `<`
- * also appears in legitimate prose like `expected <value>`.
+ * Where an HTML error document starts inside an otherwise-prose line — the
+ * HTTP adapter appends the upstream's body after its own prose, so a gateway's
+ * page lands mid-line. Only unambiguous openers match (a bare `<` also appears in prose).
  */
 const HTML_DOCUMENT_MARKER = /<!doctype\s+html|<html[\s>]/i;
 
 /**
- * Pull the customer-facing part out of the adapter's user-code failure.
- *
- * The adapter renders `type: <ExceptionClass>` and an indented traceback whose
- * last line is the exception. That last line is what a developer reads first,
- * so prefer it, then the declared type, then whatever is left.
+ * Pull the customer-facing part out of the adapter's user-code failure. The
+ * adapter renders `type: <ExceptionClass>` plus an indented traceback whose
+ * last line is the exception — prefer that, then the declared type, then what's left.
  */
 function extractUserCodeDetail(raw: string): string {
   const lines = raw
@@ -285,20 +276,17 @@ const TUNNEL_GONE_NEEDLES = ["HTTP 530", "error code: 1033"] as const;
 
 /**
  * True when the raw text carries BOTH Cloudflare markers. Requiring both is
- * what makes the signal unambiguous: an origin can answer 530 for its own
- * reasons, and "1033" can appear in an ordinary payload, but only the
- * Cloudflare edge answers 530 with the 1033 tunnel-error body.
+ * what makes the signal unambiguous: 530 alone can be any origin's own error,
+ * and "1033" alone can appear in an ordinary payload.
  */
 function isTunnelGoneFailure(text: string): boolean {
   return TUNNEL_GONE_NEEDLES.every((needle) => contains(text, needle));
 }
 
 /**
- * True when a raw run failure is transport-level: the connection itself
- * failed (or the tunnel edge reported its origin gone) rather than the target
- * rejecting the request. This is the gate for naming a failure a dead dev
- * tunnel: the caller supplies the "target has a devTunnel" fact, this module
- * supplies the "the failure looks like the tunnel is gone" half.
+ * True when a raw run failure is transport-level — the connection itself
+ * failed, or the tunnel edge reported its origin gone, rather than the target
+ * rejecting the request; combined with "target has a devTunnel" to name it.
  */
 export function isTransportLevelScenarioFailure(raw: string | undefined): boolean {
   const text = (raw ?? "").trim();
@@ -326,10 +314,8 @@ const NODE_CRASH_MARKERS = ["node:internal/modules", "Require stack:", "at Modul
 
 /**
  * The wrapper `scenario.processor.ts` puts on a child that exited non-zero
- * WITHOUT reporting a structured error — which is exactly the case where our
- * own runner died before it could say anything. When the runner does report
- * (an adapter failure, a judge error), its own text is used and this wrapper
- * never appears.
+ * WITHOUT reporting a structured error — exactly when our own runner died
+ * before it could say anything; a reported failure never shows this wrapper.
  */
 const CHILD_EXIT_WRAPPER = /Child process exited with code \d+/i;
 
@@ -435,18 +421,15 @@ function connectedAgentRules(): ClassificationRule[] {
 
 /**
  * The marker the scenario runner throws when a model answers with no text at
- * all. The provider accepted the request and answered: the answer simply
- * carried no words, which happens when a reasoning model spends its whole
- * output budget on reasoning, or when the prompt leaves the model nothing
- * more to say.
+ * all — the provider accepted and answered, the answer just carried no words,
+ * e.g. a reasoning model spending its whole budget on reasoning.
  */
 const EMPTY_MODEL_RESPONSE_NEEDLE = "No response content from LLM";
 
 /**
  * Which model went quiet, read from the `[AgentName]` prefix the scenario
- * runner wraps every agent failure in. Naming it is most of the answer: the
- * simulated user and the judge are models the platform chose, and the customer
- * changes them in a different place than their own agent.
+ * runner wraps every agent failure in — naming it matters because the
+ * simulated user/judge models are changed in a different place than the agent's own.
  */
 const EMPTY_MODEL_RESPONSE_SUBJECTS: Record<string, string> = {
   UserSimulatorAgent: "The model that plays the simulated user",
@@ -473,10 +456,8 @@ function emptyModelResponseRule(): ClassificationRule {
 
 /**
  * What the `ai` SDK puts in front of every request that never got an answer
- * from the model endpoint. It says nothing about why on its own: the cause,
- * when there is one, follows the colon, and a refused certificate or a
- * rejected key arrives under this same wrapper. So it classifies only what no
- * other rule could name.
+ * from the model endpoint. A refused certificate or rejected key arrives
+ * under this same wrapper too, so it classifies only what no other rule names.
  */
 const MODEL_ENDPOINT_UNREACHABLE_NEEDLE = "Cannot connect to API";
 
@@ -546,11 +527,9 @@ const CLASSIFICATION_RULES: ClassificationRule[] = [
   },
   {
     // A terms-restricted model (codex) ran outside the coding-assistant
-    // surfaces its plan licenses — the resolver only lets a saved value
-    // reach execution when it predates the restriction (see the canonical
-    // Model Provider resolution service's restricted-model skip). Kept ahead
-    // of the generic model-provider rule below since this is the more specific,
-    // more actionable failure.
+    // surfaces its plan licenses for — the resolver only lets a saved value
+    // reach execution when it predates the restriction. Kept ahead of the
+    // generic model-provider rule below since this is more specific and actionable.
     needles: [CODING_ASSISTANT_SURFACES_ONLY_NEEDLE],
     build: () => ({
       code: ScenarioInfraErrorCode.ModelNotAllowedForSurface,
@@ -582,11 +561,9 @@ const CLASSIFICATION_RULES: ClassificationRule[] = [
   {
     // The runner process died before it could run anything — a module missing
     // from the production bundle, a native addon that won't load, an ESM/CJS
-    // mismatch. Always our deployment, never the customer's scenario, so the
-    // copy says so plainly instead of dumping the loader's stack. The build
-    // gate in scripts/build-server.mjs is what stops the common cause (an
-    // external require that isn't declared in dependencies) from shipping;
-    // this rule is the user-facing half for anything that still gets through.
+    // mismatch. Always our deployment, never the customer's scenario. The build
+    // gate in scripts/build-server.mjs stops the common cause; this rule is the
+    // user-facing half for anything that still gets through.
     needles: [
       "MODULE_NOT_FOUND",
       "ERR_MODULE_NOT_FOUND",
@@ -653,9 +630,8 @@ const CLASSIFICATION_RULES: ClassificationRule[] = [
 
 /**
  * The target host named by an HTTP agent transport error, when the raw text
- * is one. Knowing which target failed is most of what makes the message
- * actionable, so it is carried through to the customer-facing copy; anything
- * else classifies without a host and keeps the generic sentence.
+ * is one. Carried through to the customer-facing copy since knowing which
+ * target failed is most of what makes the message actionable.
  */
 function targetHostFromTransportError(text: string): string | undefined {
   return /HTTP agent target (\S+) could not be reached/.exec(text)?.[1];
@@ -663,11 +639,8 @@ function targetHostFromTransportError(text: string): string | undefined {
 
 /**
  * The class name of the adapter, which the scenario runner writes in front of
- * every failure it catches: `[SerializedConnectedAgentAdapter] ...`.
- *
- * On the platform the adapter is ours and the reader never chose it, so the
- * name states an implementation detail and pushes the sentence that matters
- * off the first line. The classifier reads the sentence behind it either way.
+ * every failure (`[SerializedConnectedAgentAdapter] ...`) — an implementation
+ * detail that pushes the sentence that matters off the first line.
  */
 const RUNNER_ADAPTER_PREFIX = /^\[\w*Adapter\]\s*/;
 
@@ -678,7 +651,6 @@ function withoutAdapterName(text: string): string {
 
 /**
  * Classify a raw scenario-runner error string into a handled error envelope.
- *
  * Falls back to a trimmed generic message so we never lose information, but
  * never surface a raw dump.
  */
@@ -765,23 +737,17 @@ export function extractScenarioErrorText(raw: string): string {
 
 /**
  * Resolve any raw run-error string into a handled-error envelope for display.
- *
- * Prefers an already-encoded envelope (the failure handler's canonical output);
- * otherwise extracts the human text and classifies it. This is the single entry
- * point the run drawer uses so every error — envelope, SDK-serialized JSON, or
- * plain string — reads as one clean, actionable handled error.
+ * Prefers an already-encoded envelope, otherwise classifies the extracted
+ * text — the single entry point the run drawer uses for every error shape.
  */
 export function resolveScenarioError(raw: string): ScenarioErrorEnvelope {
   return decodeScenarioError(raw) ?? classifyScenarioInfraError(extractScenarioErrorText(raw));
 }
 
 /**
- * The raw text behind a failure, for a reader who opens the details.
- *
- * The customer-facing message says what happened; this says where. The
- * scenario SDK stores `{ name, message, stack }`, so the stack is what a
- * reader wants, with its line breaks kept. An envelope we wrote ourselves
- * carries nothing under its message, so it answers with nothing.
+ * The raw text behind a failure, for a reader who opens the details. The
+ * customer-facing message says what happened; this says where — the SDK's
+ * `{ name, message, stack }` payload's stack, or undefined for our own envelopes.
  */
 export function scenarioErrorDetail(raw: string | null | undefined): string | undefined {
   const trimmed = (raw ?? "").trim();

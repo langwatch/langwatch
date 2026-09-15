@@ -1,10 +1,7 @@
 /**
- * The procedures this package calls, and the hooks that call them.
  * Hand-written until the mounted router can generate it (ADR-130).
- * `organization`/`limits` are load-bearing tRPC cache-key segments —
- * renaming one stops sharing a cache with the many `api.organization.*`
- * call sites that have not moved. `EnrichedAuditLog` is the producer's
- * own type, not a restatement.
+ * `organization`/`limits` are load-bearing tRPC cache-key segments — renaming
+ * one stops sharing a cache with `api.organization.*` call sites that haven't moved.
  */
 
 import type { Plan } from "@langwatch/entitlement-contract";
@@ -24,12 +21,9 @@ import type {
 import { createModuleApi, type OutputsFromMap } from "@langwatch/api/web";
 
 /**
- * Every filter the audit table narrows by, in the one shape both the table and
- * the CSV export send.
- *
- * The export has to send exactly this: a download taken from a pre-filtered
- * deep-link that silently widened to the whole organization's history would be
- * a disclosure dressed up as a convenience.
+ * The export must send this exact shape: a pre-filtered deep-link that
+ * silently widened to the whole organization's history would be a
+ * disclosure dressed up as a convenience.
  */
 export type AuditLogFilters = {
   organizationId: string;
@@ -70,10 +64,9 @@ export type TeamProjectReading = {
 };
 
 /**
- * A team with its projects, as the teams page lists one. `isPersonal` is
- * declared here (not on {@link TeamReading}) since it arrives only on LIST
- * reads; the edit-project drawer uses it to exclude the personal workspace
- * as a move target.
+ * `isPersonal` arrives only on LIST reads (not on {@link TeamReading}); the
+ * edit-project drawer uses it to exclude the personal workspace as a move
+ * target.
  */
 export type TeamWithProjects = TeamReading & {
   isPersonal: boolean;
@@ -81,11 +74,9 @@ export type TeamWithProjects = TeamReading & {
 };
 
 /**
- * One person's membership of a team, as the team detail form edits it.
- *
- * `role` is the stored membership and `assignedRole` the access row that
- * overrides it where one exists — the form offers the second and falls back to
- * the first, which is why both travel.
+ * `role` is the stored membership; `assignedRole` is the access row that
+ * overrides it where one exists. The form offers the second and falls back
+ * to the first, which is why both travel.
  */
 export type TeamMemberReading = {
   userId: string;
@@ -101,10 +92,9 @@ export type TeamWithMembers = TeamWithProjects & {
 };
 
 /**
- * One person's access, FLAT, as the teams list renders a row: name and
- * image sit on the row rather than a join. `viaGroupId` marks a row
- * un-editable in place — a grant held through a group is changed on the
- * group, not here.
+ * FLAT: name and image sit on the row rather than a join. `viaGroupId`
+ * marks a row un-editable in place — a grant held through a group is
+ * changed on the group, not here.
  */
 export type TeamAccessRow = {
   userId: string;
@@ -121,12 +111,9 @@ export type TeamAccessRow = {
 };
 
 /**
- * One person's access to a PROJECT inside a team.
- *
- * `source` is the whole reason a project row expands: `team` means the grant is
- * inherited from the team and is read-only here, and `override` means it was
- * set on the project itself and can be changed or removed. `teamRole` is what
- * the override is overriding, which is what makes the difference legible.
+ * `source` decides how a project row expands: `team` means the grant is
+ * inherited and read-only here; `override` means it was set on the project
+ * and can be changed. `teamRole` is what the override overrides.
  */
 export type ProjectAccessRow = TeamAccessRow & {
   source: "team" | "override" | "group";
@@ -136,10 +123,8 @@ export type ProjectAccessRow = TeamAccessRow & {
 
 export type TeamWithRoleBindings = TeamWithProjects & {
   /**
-   * People who reach a PROJECT of this team without being on the team.
-   *
-   * The list shows them under the team because that is where a reader looks
-   * for "who can see this", and names the project each one reaches.
+   * Shown under the team, not the project, because that's where a reader
+   * looks for "who can see this"; names the project each one reaches.
    */
   projectOnlyAccess: Array<TeamAccessRow & { projectName: string }>;
   directMembers: TeamAccessRow[];
@@ -184,10 +169,8 @@ export type OrganizationInviteReading = {
   role: OrganizationUserRole;
   status: string;
   /**
-   * What the table actually prints, which is not always `status`.
-   *
-   * An invitation past its expiry is still `PENDING` in the row and EXPIRED to
-   * a reader, and the difference decides whether "resend" is offered.
+   * An invitation past its expiry is still `PENDING` in the row and EXPIRED
+   * to a reader; the difference decides whether "resend" is offered.
    */
   displayStatus: string;
   inviteCode: string;
@@ -208,11 +191,8 @@ export type RoleBindingReading = {
   groupId?: string | null;
   groupName?: string | null;
   /**
-   * Everybody a GROUP binding reaches.
-   *
-   * A binding held by a group grants to every member of it, and the members
-   * table has to attribute those grants to the people who hold them — which is
-   * why the row carries the ids rather than the table joining for them.
+   * A group binding grants to every member of it; the row carries the
+   * member ids rather than the table joining for them.
    */
   memberUserIds: string[];
 };
@@ -232,10 +212,8 @@ export type DepartmentReading = {
 };
 
 /**
- * Which department each team, project and person has been assigned to.
- *
- * One department per entity, which is why the value is an id and not a list:
- * the picker is a single select and the column prints one chip.
+ * One department per entity, which is why the value is an id and not a
+ * list: the picker is a single select and the column prints one chip.
  */
 export type DepartmentAssignment = { id: string; departmentId: string | null };
 
@@ -249,11 +227,8 @@ export type DepartmentAssignments = {
 export type DomainJoinSetting = "off" | "request" | "auto";
 
 /**
- * A request to join this organization, waiting on an administrator.
- *
- * The DOMAIN is on the row rather than derived from the address: what the table
- * says is "somebody at this verified domain asked to join", and an organization
- * can verify more than one.
+ * The DOMAIN is on the row rather than derived from the address: an
+ * organization can verify more than one, so the table needs to say which.
  */
 export type JoinRequestReading = {
   joinRequestId: string;
@@ -267,11 +242,9 @@ export type JoinRequestReading = {
 export type OrganizationApiMap = {
   organization: {
     /**
-     * One page of the organization's audit trail, newest first.
-     *
-     * `pageOffset`/`pageSize` are real offset paging — the audit trail is a
-     * Prisma read with `skip`, not a keyset walk — which is why the footer this
-     * screen renders drives its own offsets rather than carrying a cursor.
+     * `pageOffset`/`pageSize` are real offset paging — a Prisma `skip` read,
+     * not a keyset walk — which is why the footer drives its own offsets
+     * rather than carrying a cursor.
      */
     getAuditLogs: {
       query: {
@@ -303,10 +276,9 @@ export type OrganizationApiMap = {
     };
 
     /**
-     * Every member of the organization, with their teams. One procedure,
-     * two readers: the audit page's user search and the members table.
-     * `OrganizationMemberMatch` stays exported as the audit page's narrower
-     * view (`members[].user`) of the same row.
+     * One procedure, two readers: the audit page's user search and the
+     * members table. `OrganizationMemberMatch` stays exported as the audit
+     * page's narrower view (`members[].user`) of the same row.
      */
     getOrganizationWithMembersAndTheirTeams: {
       query: {
@@ -328,12 +300,9 @@ export type OrganizationApiMap = {
     };
 
     /**
-     * One invitation per row of the form, sent in one call.
-     *
-     * ONE RESULT PER INVITE, and `emailNotSent` is the field the members page
-     * turns on: a deployment with no mail provider still CREATES the invitation
-     * and hands back a link to send by hand, which is why this is a per-row
-     * flag rather than a failure.
+     * ONE RESULT PER INVITE: `emailNotSent` is set when there's no mail
+     * provider, since the invite is still CREATED and a link is handed back
+     * to send by hand — a per-row flag, not a failure.
      */
     createInvites: {
       mutation: {
@@ -385,10 +354,8 @@ export type OrganizationApiMap = {
           customRoleId?: string | null;
         };
         /**
-         * The teams this change would leave with nobody able to administer them.
-         *
-         * Named rather than counted, because the dialog lists them: a warning
-         * that says "three teams" and not which three is one an administrator
+         * Named rather than counted: the dialog lists them, and a warning
+         * saying "three teams" without which three is one an administrator
          * cannot act on.
          */
         output: { teamsLeftWithoutAdmin?: Array<{ id: string; name: string }> };
@@ -398,11 +365,9 @@ export type OrganizationApiMap = {
 
   limits: {
     /**
-     * What this organization has used, against what it may use.
-     *
      * TWO READERS, ONE ENTRY: the audit page's Enterprise gate reads
-     * `activePlan.type`, and the seat meter beside the members table reads the
-     * two counts. Same procedure, same cache key, one round trip.
+     * `activePlan.type`, and the seat meter reads the two counts — same
+     * procedure, same cache key, one round trip.
      */
     getUsage: {
       query: {
@@ -459,12 +424,9 @@ export type OrganizationApiMap = {
 
   project: {
     /**
-     * Creates a project, and optionally the team to hold it.
-     *
-     * `teamId` and `newTeamName` are the two halves of one choice — pick a team
-     * you have or name a new one — and the server refuses a call that makes
-     * neither. The answer carries the SLUG rather than the id, because that is
-     * what the address of the new project is.
+     * `teamId`/`newTeamName` are one choice — the server refuses a call
+     * that names neither. The answer carries the SLUG, not the id: that is
+     * the new project's address.
      */
     create: {
       mutation: {
@@ -481,12 +443,9 @@ export type OrganizationApiMap = {
     };
 
     /**
-     * Renames a project, or moves it to another team.
-     *
-     * Every field but `projectId` is optional and only the changed ones are
-     * sent: the same procedure saves the whole project-settings page, and a
-     * drawer that posted its untouched fields back would overwrite settings it
-     * never showed the reader.
+     * Every field but `projectId` is optional: this procedure saves the
+     * whole project-settings page, and a drawer posting untouched fields
+     * back would overwrite settings it never showed the reader.
      */
     update: {
       mutation: {
@@ -502,11 +461,9 @@ export type OrganizationApiMap = {
 
   plan: {
     /**
-     * The plan this organization is on.
-     *
-     * THE PRODUCER'S OWN TYPE, not a restatement: `Plan` is declared in
-     * `@langwatch/entitlement-contract` and the plan provider is annotated with
-     * it, so a field the seat banner reads is a field the producer promises.
+     * `Plan` is the producer's own type (`@langwatch/entitlement-contract`),
+     * not a restatement — a field the seat banner reads is a field the
+     * producer promises.
      */
     getActivePlan: {
       query: { input: { organizationId: string }; output: Plan };
@@ -515,10 +472,9 @@ export type OrganizationApiMap = {
 
   licenseEnforcement: {
     /**
-     * Whether one more of something is within the licence.
-     *
-     * Answered optimistically while it is still arriving — the write enforces
-     * the limit again — and invalidated by every page here that frees a seat.
+     * Answered optimistically while it is still arriving — the write
+     * enforces the limit again — and invalidated by any page here that
+     * frees a seat.
      */
     checkLimit: {
       query: {
@@ -756,12 +712,9 @@ export type OrganizationApiMap = {
 
   joinRequests: {
     /**
-     * How this organization treats somebody arriving from a verified domain.
-     *
-     * Three settings and not a boolean: `off` refuses them, `request` queues
-     * them for an administrator, and `auto` lets them in. The domains it
-     * applies to travel with it, because an organization can verify more than
-     * one and the setting is meaningless without knowing which.
+     * Three settings, not a boolean: `off` refuses, `request` queues for an
+     * administrator, `auto` lets them in. The domains travel with it, since
+     * an organization can verify more than one.
      */
     joining: {
       query: {

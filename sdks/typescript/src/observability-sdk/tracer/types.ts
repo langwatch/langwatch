@@ -27,8 +27,6 @@ export interface LangWatchTracer extends Tracer {
   startActiveSpan<F extends (span: LangWatchSpan) => unknown>(name: string, fn: F): ReturnType<F>;
 
   /**
-   * Starts a new active LangWatchSpan with options and executes the provided function.
-   *
    * @param name - The name of the span
    * @param options - Span configuration options
    * @param fn - Function to execute with the active span
@@ -41,7 +39,6 @@ export interface LangWatchTracer extends Tracer {
   ): ReturnType<F>;
 
   /**
-   * Starts a new active LangWatchSpan with options and context, then executes the function.
    * @param name - The name of the span
    * @param options - Span configuration options
    * @param context - Context to use for extracting parent span information
@@ -66,8 +63,6 @@ export interface LangWatchTracer extends Tracer {
   withActiveSpan<F extends (span: LangWatchSpan) => unknown>(name: string, fn: F): ReturnType<F>;
 
   /**
-   * Creates and manages a span with options and automatic lifecycle management.
-   *
    * @param name - The name of the span
    * @param options - Span configuration options
    * @param fn - Function to execute with the managed span (can be sync or async)
@@ -80,7 +75,6 @@ export interface LangWatchTracer extends Tracer {
   ): ReturnType<F>;
 
   /**
-   * Creates and manages a span with options, context, and automatic lifecycle management.
    * @param name - The name of the span
    * @param options - Span configuration options
    * @param context - Context to use for extracting parent span information
@@ -95,9 +89,7 @@ export interface LangWatchTracer extends Tracer {
   ): ReturnType<F>;
 
   /**
-   * Records a manual evaluation on the currently active span (a no-op if none is active).
-   * Mirrors the Python SDK's `trace.add_evaluation(...)` and emits the same
-   * `langwatch.evaluation.custom` event as {@link LangWatchSpan.addEvaluation}.
+   * A no-op if no span is active.
    * @param params - Evaluation parameters; only `name` is required, see
    *   {@link AddEvaluationParams}. `status` defaults to `"processed"`.
    */

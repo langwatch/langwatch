@@ -55,10 +55,9 @@ export interface JobRegistryEntry {
   deduplication?: DeduplicationConfig<any>;
   spanAttributes?: (payload: any) => Record<string, string | number | boolean>;
   /**
-   * Optional batch processor for group coalescing. When set together with
-   * `coalesceMaxBatch > 1`, the global queue may fold several same-group jobs
-   * into one call (the dispatched job plus drained siblings, in occurredAt
-   * order). The first payload is always the dispatched job.
+   * Optional batch processor for group coalescing: with `coalesceMaxBatch
+   * > 1` the queue may fold same-group jobs into one call (dispatched job
+   * plus drained siblings, occurredAt order; first payload is dispatched).
    */
   processBatch?: (payloads: any[], delivery?: JobDelivery) => Promise<void>;
   /**
@@ -99,9 +98,8 @@ interface CommandRegistryEntry<EventType extends Event> {
 
 /**
  * The command queue's domain key: grouped by aggregate when
- * `serializeByAggregate` opts in, otherwise by the command's own group key
- * (falling back to its aggregate id). Extracted so the nested choice reads
- * as a name, not a nested ternary.
+ * `serializeByAggregate` opts in, otherwise by the command's own group
+ * key (falling back to its aggregate id).
  */
 function resolveCommandDomainKey<EventType extends Event>(
   cmdEntry: CommandRegistryEntry<EventType>,
@@ -128,10 +126,9 @@ function validateCommandPayload<EventType extends Event>(
 }
 
 /**
- * Wraps a command's base facade with pre-send schema validation, and with the
- * migration preflight that claims the pipeline's groups BEFORE anything is
- * staged into them. Order matters both ways: an invalid payload never reaches
- * the preflight, and a preflight that refuses stops the send.
+ * Wraps a command's base facade with pre-send schema validation and the
+ * migration preflight that claims groups BEFORE staging. Order matters:
+ * an invalid payload never reaches preflight, and a refusal stops the send.
  */
 function buildValidatingCommandFacade<EventType extends Event>(
   cmdEntry: CommandRegistryEntry<EventType>,
@@ -176,11 +173,9 @@ interface QueuedEventConsumerDefinition<E extends Event> {
 }
 
 /**
- * Manages queue facades for event handlers, projections, commands, and subscribers.
- *
- * Creates per-job-type facades that inject routing metadata (__pipelineName, __jobType, __jobName)
- * into a global shared queue. The global queue and job registry are owned by EventSourcing
- * and shared across all pipelines.
+ * Manages queue facades for event handlers, projections, commands, and
+ * subscribers: per-job-type facades that inject routing metadata
+ * (__pipelineName, __jobType, __jobName) into the global shared queue.
  */
 export class QueueManager<EventType extends Event = Event> {
   private readonly aggregateType: AggregateType;
@@ -222,9 +217,8 @@ export class QueueManager<EventType extends Event = Event> {
 
   /**
    * Builds a hierarchical group key function: `${tenantId}/${jobPath}/${domainKey}`.
-   *
-   * - jobPath reflects the pipeline topology (e.g. `fold/traceSummary/reactor/evaluationTrigger`)
-   * - domainKey defaults to `${aggregateType}:${aggregateId}`, overridable via custom fn
+   * jobPath reflects pipeline topology; domainKey defaults to
+   * `${aggregateType}:${aggregateId}`, overridable via a custom fn.
    */
   private buildGroupKey({
     jobPath,
@@ -247,11 +241,9 @@ export class QueueManager<EventType extends Event = Event> {
   }
 
   /**
-   * Names every group this pipeline's aggregates may reach before a command is
-   * staged, so a migration's allow-list is complete rather than discovered one
-   * job at a time. A job routed by a custom group key contributes `undefined`,
-   * which the queue refuses — failing closed beats staging into a group the
-   * preflight never claimed.
+   * Names every group this pipeline's aggregates may reach before a command
+   * is staged, so a migration's allow-list is complete. A custom-group-key
+   * job contributes `undefined`, which the queue refuses — failing closed.
    */
   private async registerPreflightAggregateTargets(
     identities: readonly { tenantId: string; aggregateId: string }[],
@@ -291,11 +283,9 @@ export class QueueManager<EventType extends Event = Event> {
   }
 
   /**
-   * Creates a facade that wraps the global queue, injecting __pipelineName/__jobType/__jobName
-   * metadata on every send and namespacing dedup IDs.
-   *
-   * Registers the entry into the global job registry so the global queue's
-   * process/groupKey/score callbacks can dispatch to the right handler.
+   * Creates a facade that wraps the global queue, injecting
+   * __pipelineName/__jobType/__jobName metadata and namespacing dedup IDs,
+   * and registers the entry so the queue's callbacks dispatch to it.
    */
   private createFacade<P extends Record<string, unknown>>(
     jobType: string,
@@ -712,14 +702,11 @@ export class QueueManager<EventType extends Event = Event> {
     // dispatch — its presence is the opt-in. A plain number opts in above 1.
     const coalescesAppends = typeof coalesceMaxBatch === "function" || (coalesceMaxBatch ?? 1) > 1;
 
-    // ADR-066 pillar 2 visibility: a producer whose jobs funnel into a shared
-    // queue group and does NOT coalesce can still flood the event log one tiny
-    // insert per item under high fan-in. Both grouping shapes qualify —
-    // `serializeByAggregate` (many commands, one aggregate) and an explicit
-    // `getGroupKey` (many aggregates, one shard or bucket) — because the
-    // funnel, not the key that names it, is what parks items behind one
-    // consumer. Record the gap at registration so it can be found and closed,
-    // instead of surfacing only as ClickHouse small-parts pressure.
+    // ADR-066 (bounded coalescing): a grouped producer (`serializeByAggregate`
+    // or a custom `getGroupKey`) that doesn't coalesce can flood the event
+    // log with one tiny insert per item under high fan-in. Logged at
+    // registration so the gap is found before it shows up as ClickHouse
+    // small-parts pressure.
     const isGroupedProducer =
       Boolean(cmdEntry.options.serializeByAggregate) || Boolean(cmdEntry.getGroupKey);
     if (isGroupedProducer && !coalescesAppends) {
@@ -945,12 +932,9 @@ export class QueueManager<EventType extends Event = Event> {
   }
 
   /**
-   * Registers a standalone job in the global queue.
-   *
-   * Unlike handler/projection/subscriber queues that are tied to event processing,
-   * standalone jobs are independent work items (e.g. deferred evaluation checks).
-   *
-   * Returns `null` when the global queue is not available (event sourcing disabled).
+   * Registers a standalone job in the global queue — independent work
+   * (e.g. deferred evaluation checks), not tied to event processing.
+   * Returns `null` when the global queue is unavailable.
    */
   registerJob<P extends Record<string, unknown>>({
     name,

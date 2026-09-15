@@ -95,6 +95,14 @@ sums:    CostSum, NonBilledCostSum, DurationSum (root span),
 
 `TraceUniq`/`UserUniq`/`ConversationUniq` (uniq state) and `FirstTokenSum` (fold-time, not per-span) were dropped — distinct-counts and TTFT route to the slim table. Per-trace averages derive at read as `sum(MetricSum) / sum(TraceCount)` for the non-nullable metrics (see Read routing); `TraceCount` is also the future error-RATE denominator.
 
+## Eval fields
+
+**`evaluation_analytics_rollup`** — additive `SimpleAggregateFunction(sum, …)` bucketed by `(TenantId, BucketStart, EvaluatorType, Status)` (migration 00040), carrying `EvalCount, PassCount, FailCount, ErrorCount, SkippedCount, ScoreSum, ScoreCount`. `cardinality` maps to `sum(EvalCount)`; `avg` maps to `sum(ScoreSum) / nullIf(sum(ScoreCount), 0)` — a true weighted mean, not an average-of-averages; pass rate is `sum(PassCount) / nullIf(sum(PassCount) + sum(FailCount), 0)`. `min`/`max` are **excluded** (eval5014-P1): the naive `min/max(ScoreSum/ScoreCount)` per rollup row is the min/max of per-bucket averages, not the true per-eval extremum — they route to the eval slim table (one row per evaluation) instead.
+
+**`evaluations.evaluator_type` is DELIBERATELY excluded from the eval rollup's group-by keys** (eval5014-002): the map projection's two-event (scheduled → completed) path has no fold-state access to lift the identity, so it emits `evaluatorType: ''` — grouping by it on the rollup would pile every two-event evaluation into a phantom "unknown" bucket. `evaluations.evaluation_status` is final at completion and stays safe to group by.
+
+The eval rollup also enables `dedupeByIdempotencyKey`: eval terminal events are re-reported by design (deterministic ids, SDK retries), so without it every duplicate append would double-count the bucket — unlike the accepted per-span crash-retry noise on the trace side.
+
 ## Consequences
 
 - Native ClickHouse aggregation; no app-level summing of mutable state, no signs.

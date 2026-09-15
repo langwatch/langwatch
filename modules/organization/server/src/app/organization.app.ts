@@ -189,11 +189,9 @@ export interface ServerOrganizationAppDependencies {
 }
 
 /**
- * Config schema: this process's own name, which every refusal the membership
- * half raises is attributed to, and the demo organization's person and project.
- * Both default to the deleted composition's own absent-config answer — the
- * process name it was constructed with, and empty strings, which is what
- * `demoProject` carried on a deployment that names no demo.
+ * Config schema: this process's name (attributed in refusals) and the demo
+ * organization's person/project, defaulting to the deleted composition's
+ * own absent-config answer (constructed name; empty strings for no demo).
  */
 const organizationAppConfigSchema = z.object({
   processName: z.string().default("langwatch"),
@@ -240,10 +238,9 @@ const TEAM_PROJECT_PAGE = { page: 1, limit: 1_000 } as const;
 const GROUP_PAGE = { page: 1, limit: 1_000 } as const;
 
 /**
- * The caller may not read this organization's audit trail through the project
- * they filtered it by. Separate from the organization-tier refusal the
- * declaration already made, and the same code, so the customer reads one
- * sentence either way.
+ * The caller may not read this audit trail through the project they
+ * filtered it by. Separate from the organization-tier refusal, same code,
+ * so the customer reads one sentence either way.
  */
 class AuditTrailDeniedError extends HandledError {
   declare readonly code: "permission_denied";
@@ -274,16 +271,9 @@ function refusing<T>(capability: string): T {
 }
 
 /**
- * The organization feature's application.
- *
- * It implements two things by name: the module's own {@link OrganizationApi},
- * which peer modules and the tRPC namespaces call, and
- * {@link TeamManagementApi}, which is what the `/api/teams` door calls. The
- * second is declared here rather than left to agree by attention — the door is
- * handed this object through the operations-only feature-API proxy, so a member
- * it names and this class does not serve is not a type error at the seam, it is
- * a `TypeError` on the first request. Naming the door's shape in this
- * `implements` clause is what turns that back into a build failure.
+ * The organization feature's application: implements {@link OrganizationApi}
+ * and {@link TeamManagementApi} explicitly, so a `/api/teams` member this
+ * class doesn't serve fails the build instead of throwing at request time.
  */
 export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi {
   static readonly contract = OrganizationApi;
@@ -396,12 +386,9 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
   }
 
   /**
-   * Test-only construction over stub services, wired the way `create` wires a
-   * booted one: the door services close over the application, so a suite that
-   * built it by hand would drive an application whose doors were never attached.
-   *
-   * Only the members a suite names is supplied; every other member refuses
-   * by name, which is what a deployment that composed none of it does.
+   * Test-only construction over stub services, wired the way `create` wires
+   * a booted one (door services close over the application). Unnamed
+   * members refuse by name, matching an unconfigured deployment.
    */
   static createForTesting(setup: {
     dependencies: Omit<ServerOrganizationAppDependencies, "groups" | "shares" | "apiKeys"> & {
@@ -562,11 +549,9 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
   }
 
   /**
-   * Trace sharing switched off means every existing share link on every
-   * project in the organization now has to go: this feature owns neither
-   * projects nor shares, so it reaches both peers directly rather than
-   * leaving the revocation to whoever called it. Loud on purpose - a share
-   * link that survives the switch is a live leak.
+   * Trace sharing switched off revokes every share link org-wide — this
+   * feature owns neither projects nor shares, so it reaches both peers
+   * directly. Loud on purpose: a surviving link is a live leak.
    */
   async #revokeTraceSharesIfRequired(
     organizationId: string,
@@ -640,11 +625,9 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
   }
 
   /**
-   * Provisions an organization, its bootstrap admin service key and reads the
-   * summary back, self-hosted instance administrators only. Without its
-   * bootstrap key the organization is unreachable, so a failure past creation
-   * compensates by deleting it; the caller sees the ORIGINAL failure, so a
-   * failed compensation is only reported.
+   * Provisions an organization + bootstrap admin key + summary read, for
+   * self-hosted admins only. A failure past creation deletes the org
+   * (unreachable without its key); the caller sees the ORIGINAL failure.
    */
   async createForProvisioningWithAdminKey(input: {
     name: string;
@@ -943,13 +926,9 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
   }
 
   /**
-   * Renames one team, scoped to the organization the caller's credential
-   * resolved — never to the team's own organization, which would let a
-   * management token issued for one organization rename another's team.
-   *
-   * Distinct from `updateTeamWithMembers`: that one saves the settings form's
-   * whole diff and demands the membership array with it, and a PATCH carrying
-   * only a name has none to give.
+   * Renames one team, scoped to the caller credential's organization —
+   * never the team's own, which would let one org's token rename another's
+   * team. Distinct from `updateTeamWithMembers`, which demands the full diff.
    */
   updateTeam(input: UpdateOrganizationTeamInput): Promise<OrganizationTeam> {
     return this.#dependencies.organizations.updateTeam(input);
@@ -961,10 +940,9 @@ export class ServerOrganizationApp implements OrganizationApi, TeamManagementApi
   }
 
   /**
-   * The bindings that make somebody a member of a team, read through the one
-   * permission service this application already holds. The `/api/teams` door
-   * reads it here rather than through an injected authorization accessor,
-   * because an accessor is a member no composition supplies.
+   * The bindings that make somebody a member of a team, read through the
+   * one permission service this application already holds — not an
+   * injected authorization accessor, which no composition supplies.
    */
   listTeamMemberBindings(
     input: AuthzListTeamMemberBindingsInput,

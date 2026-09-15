@@ -35,12 +35,9 @@ import { clearVscodeTerminalOtelEnv } from "./vscode-settings";
 export type WrapperMode = "gateway" | "ingestion";
 
 /**
- * Copilot is the one tool where landing on the gateway changes WHO PAYS:
- * BYOK routing bills the org's provider keys while the user's Copilot
- * seat sits idle (ADR-039 Decision 3). Every mid-run fallback ONTO the
- * gateway (policy downgrade here, mint-failure fallback in wrapper.ts)
- * appends this so the shift is named, never silent. Empty for every
- * other tool — their gateway swap is billing-neutral.
+ * Copilot is the one tool where the gateway changes WHO PAYS: BYOK routing bills the org's
+ * provider keys while the user's Copilot seat sits idle (ADR-039 Decision 3).
+ * Every mid-run fallback onto the gateway appends this so the shift is named, never silent.
  */
 export function copilotSeatBypassSuffix(tool: string): string {
   if (tool !== "copilot") return "";
@@ -48,12 +45,9 @@ export function copilotSeatBypassSuffix(tool: string): string {
 }
 
 /**
- * Whether an env value expresses an explicit content-capture opt-out.
- * OTel booleans are parsed case-insensitively, and this repo's sibling
- * parsers also honour "0"/"no"/"off", so `FALSE`, `False`, `0`, `no`,
- * `off` must all count — otherwise a user who disabled capture is
- * silently overridden into exporting full prompt/response content
- * (privacy regression). Unset means "not opted out" (default-on).
+ * OTel booleans are case-insensitive, and this repo's sibling parsers honour
+ * "0"/"no"/"off" too — skip any and capture silently re-enables (privacy
+ * regression). Unset means "not opted out" (default-on).
  */
 function isCaptureOptOut(raw: string | undefined): boolean {
   if (raw === undefined) return false;
@@ -61,10 +55,9 @@ function isCaptureOptOut(raw: string | undefined): boolean {
 }
 
 /**
- * Catches any error so a housekeeping failure (an EACCES/EROFS from an
- * unguarded fs write) can never crash the wrapped tool launch — the same
- * best-effort guarantee the login-time refresh gives. Warns to stderr and
- * returns `fallback` on failure.
+ * Catches any error so a housekeeping failure can never crash the wrapped
+ * tool launch — the same best-effort guarantee the login-time refresh
+ * gives. Warns to stderr and returns `fallback`.
  */
 function tryRefresh<T>(label: string, fn: () => T, fallback: T): T {
   try {
@@ -88,10 +81,9 @@ export interface WrapperModeResult {
    */
   codexConfigPath?: string;
   /**
-   * Path of the sibling profile file
-   * (~/.codex/langwatch-gateway.config.toml). Set only on codex
-   * Path A. codex 0.134+ requires the profile body in a separate
-   * file when --profile is passed.
+   * Path of the sibling profile file (~/.codex/langwatch-gateway.config.toml).
+   * Set only on codex Path A: codex 0.134+ requires the profile body in a
+   * separate file when --profile is passed.
    */
   codexProfilePath?: string;
   /**
@@ -101,10 +93,9 @@ export interface WrapperModeResult {
    */
   extraArgs?: string[];
   /**
-   * Env-var names to strip from the inherited environment before merging the
-   * wrapper's vars in — propagated from the per-tool `ToolEnv.clears` so a
-   * legacy-twin var (e.g. claude's `ANTHROPIC_API_KEY`) doesn't collide with
-   * the one this wrapper sets.
+   * Env-var names to strip before merging the wrapper's vars in — propagated
+   * from `ToolEnv.clears` so a legacy-twin var (e.g. claude's
+   * `ANTHROPIC_API_KEY`) doesn't collide with the one this wrapper sets.
    */
   clears?: string[];
   /** True when the wrapper minted a fresh ingest key (vs reused a cached one). */
@@ -116,43 +107,36 @@ export interface WrapperModeResult {
    */
   projectScope?: { label?: string };
   /**
-   * Path B (ingestion) only: the OTLP base endpoint (`.../api/otel`) and the
-   * ingest key. The wrapper uses these AFTER the child exits to POST codex's
-   * recovered turn input/output (from the rollout transcript) onto codex's own
-   * trace_ids, since codex never puts content on the wire itself.
+   * Path B (ingestion) only. Used AFTER the child exits to POST codex's
+   * recovered turn input/output (from the rollout transcript) onto codex's
+   * own trace_ids, since codex never puts content on the wire itself.
    */
   endpoint?: string;
   ingestionToken?: string;
   /**
-   * Optional one-line notice for the wrapper to print to stderr, set when
-   * the platform policy changed the resolved path (e.g. the org admin turned
-   * direct OTLP off for this tool, so the wrapper routed through the gateway
-   * instead). The member sees why the path differs from the default.
+   * One-line notice printed to stderr when platform policy changed the
+   * resolved path (e.g. the org admin turned OTLP off for this tool), so
+   * the member sees why the path differs from the default.
    */
   notice?: string;
   /**
-   * Labels of persisted telemetry targets (claude settings env, scoped
-   * shell functions) that were re-synced to this run's endpoint + key
-   * because a previous install left stale values behind (latest login
+   * Labels of persisted telemetry targets re-synced to this run's endpoint +
+   * key because a previous install left stale values behind (latest login
    * wins, #6202). The wrapper surfaces one line per label.
    */
   refreshedWiring?: string[];
   /**
-   * State of the claude project-level pin ($CWD/.claude/settings.local.json)
-   * after this resolution: written/refreshed in ingestion mode (project
-   * settings outrank user-level, so the wrapped run can't be rerouted),
-   * removed in gateway mode (gateway capture + a live exporter would
-   * double-trace). `removed` only appears on the gateway path.
+   * Written/refreshed in ingestion mode (project settings outrank
+   * user-level, so the run can't be rerouted); removed in gateway mode
+   * (capture + a live exporter would double-trace).
    */
   claudeProjectPin?: ClaudeProjectPinResult | { action: "removed"; path: string };
 }
 
 /**
- * Resolve mode for a single tool invocation. Does NOT prompt the user — the
- * path-selection UX lives upstream in `resolveWrapperPath`, which passes its
- * decision in via `forcedMode`. Platform policy still GATES the resolved mode
- * here regardless of how it was chosen, so a forced mode the org admin
- * disabled is downgraded the same as an unforced one.
+ * Does NOT prompt — path selection lives upstream in `resolveWrapperPath`.
+ * Platform policy still GATES the resolved mode regardless of how it was
+ * chosen, so a forced mode the admin disabled downgrades like an unforced one.
  */
 export async function resolveWrapperMode(
   cfg: GovernanceConfig,
@@ -235,12 +219,10 @@ export async function resolveWrapperMode(
   // personal path. The mint guard below turns this into a clear error.
 
   if (mode === "gateway") {
-    // Structural guard: a tool with no gateway env shape (envForTool has
-    // no case for it — `code` is the current example) must fail loudly
-    // here, not launch with empty vars and no capture, no explanation.
-    // Probed with a placeholder VK because envForTool also returns empty
-    // when no VK is stored yet, and that case is handled by the lazy
-    // issue below, not by this guard.
+    // Structural guard: a tool with no gateway env shape must fail loudly
+    // here, not launch with empty vars and no explanation. Probed with a
+    // placeholder VK, since envForTool also returns empty when no VK is
+    // stored yet — that case is handled by the lazy issue below.
     const probe = envForTool({ ...cfg, default_personal_vk: { secret: "vk-lw-probe" } }, tool);
     if (Object.keys(probe.vars).length === 0) {
       throw new GovernanceCliError(
@@ -297,12 +279,10 @@ export async function resolveWrapperMode(
         };
       }
     }
-    // Codex 0.130+ defers to ChatGPT OAuth by default and ignores
-    // OPENAI_API_KEY unless the active model_provider is an
-    // explicit env-keyed entry. Write a langwatch provider +
-    // profile to ~/.codex/config.toml and force codex into it via
-    // `--profile`. Other tools (claude/gemini/cursor/opencode)
-    // honour their base-URL+API-key env directly, no toml needed.
+    // Codex 0.130+ defers to ChatGPT OAuth and ignores OPENAI_API_KEY unless
+    // the active model_provider is an explicit env-keyed entry, so we write
+    // a langwatch provider + profile to ~/.codex/config.toml and force codex
+    // into it via `--profile`.
     if (tool === "codex") {
       const gw = writeCodexGatewayBlock({
         gatewayUrl: cfg.gateway_url,
@@ -353,12 +333,10 @@ export async function resolveWrapperMode(
     );
   }
 
-  // Resolve the ingest credential: the project pin when the tool carries
-  // one (used verbatim, no server call), else the cached personal
-  // `ik-lw-` key when the platform confirms it is still live, else a
-  // fresh personal mint. The mint route returns the plaintext key once,
-  // so it is persisted to the per-tool cache below and read back on
-  // later invocations rather than re-minted.
+  // Resolve the ingest credential: project pin, else cached personal
+  // `ik-lw-` key if still live, else a fresh mint. The mint route returns
+  // the plaintext key once, so it's persisted to the per-tool cache below
+  // and read back rather than re-minted.
   const { token, endpoint, minted, scope, projectLabel } = await resolveIngestionCredential({
     cfg,
     tool,
@@ -368,11 +346,9 @@ export async function resolveWrapperMode(
   const vars = buildOtelEnvBlock(tool, endpoint, token);
 
   // Copilot content-capture opt-out: the capture flag is a STANDARD OTel
-  // GenAI env var, so a user (or enterprise policy) that exported it as
-  // "false" expressed explicit intent — never override it (same semantics
-  // as the opencode experimental-flag respect below). Dropping our "true"
-  // lets the inherited "false" win in the spawn merge; the notice makes
-  // the tokens-only consequence visible instead of silent (ADR-039 D5).
+  // GenAI env var, so an explicit "false" from the user/enterprise policy
+  // is never overridden — dropping our "true" lets it win in the spawn
+  // merge; the notice makes the tokens-only consequence visible (ADR-039 D5).
   if (
     (tool === "copilot" || tool === "code") &&
     isCaptureOptOut(process.env.OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT)
@@ -382,14 +358,11 @@ export async function resolveWrapperMode(
     notice = notice ? `${notice}\n${optOutNotice}` : optOutNotice;
   }
 
-  // Latest login wins (#6202): a previous install may have persisted this
-  // tool's telemetry wiring with the OLD login's endpoint + key. Claude
-  // applies its settings.json env block ON TOP of the child env, and the
-  // scoped shell functions shadow the binary inside the login shell the
-  // wrapper spawns through, so stale persisted values would override the
-  // correct env this run just computed. Re-sync them in place before the
-  // spawn; codex gets the same treatment via its unconditional [otel]
-  // write below.
+  // Latest login wins (#6202): claude applies settings.json env ON TOP of
+  // the child env, and scoped shell functions shadow the binary in the
+  // login shell, so a previous install's stale wiring would override this
+  // run's env. Re-synced in place before spawn; codex gets the same
+  // treatment via its unconditional [otel] write below.
   const refreshedWiring: string[] = [];
   let claudeProjectPin: ClaudeProjectPinResult | undefined;
   if (tool === "claude") {
@@ -405,11 +378,10 @@ export async function resolveWrapperMode(
       undefined,
     );
   } else if (SHELL_FUNCTION_TOOLS.includes(tool)) {
-    // Every scoped-function tool (gemini/opencode/copilot) needs its
-    // persisted rc function re-synced per run: after a key re-mint the
-    // wrapped run gets the fresh token but the rc function would keep
-    // serving the old one to bare `<tool>` invocations — silent 401s
-    // forever (the #6202 class). Login-time refresh only fires on
+    // Every scoped-function tool (gemini/opencode/copilot) needs its rc
+    // function re-synced per run: after a key re-mint the rc function would
+    // keep serving the old token to bare `<tool>` invocations — silent
+    // 401s forever (#6202 class). Login-time refresh only fires on
     // endpoint drift, not key drift.
     refreshedWiring.push(
       ...tryRefresh(
@@ -426,12 +398,11 @@ export async function resolveWrapperMode(
     }
   }
 
-  // VS Code hardening, coupled to the env INJECTION (not to the shell-rc
-  // persistence consent): every `code` ingestion run injects the bearer
-  // into a long-lived editor whose integrated terminals inherit it, so the
-  // terminal clear must be (re)applied on every run — declining or later
-  // removing the persisted function must not leave terminals inheriting
-  // the token. ADR-039 §Extension #2.
+  // VS Code hardening, coupled to env INJECTION (not shell-rc persistence
+  // consent): every `code` run injects the bearer into a long-lived editor
+  // whose terminals inherit it, so the terminal clear must be reapplied
+  // every run — declining the rc function must not leave terminals
+  // inheriting the token. ADR-039 §Extension #2.
   if (tool === "code") {
     const vscodePlatform = process.platform;
     if (vscodePlatform === "darwin" || vscodePlatform === "linux" || vscodePlatform === "win32") {
@@ -480,12 +451,11 @@ export async function resolveWrapperMode(
   }
 
   if (tool === "opencode") {
-    // opencode constructs its OTLP exporter but only EMITS spans when
-    // `experimental.openTelemetry` is true in ~/.config/opencode/opencode.jsonc.
-    // Without this the OTEL_EXPORTER_OTLP_* env vars we set below are
-    // accepted-and-ignored - Path B silently produces nothing. Idempotent
-    // merge: if the user already turned it on, no write; if they
-    // explicitly set false, we don't overwrite their intent.
+    // opencode only EMITS spans when `experimental.openTelemetry` is true
+    // in opencode.jsonc; without it the OTEL_EXPORTER_OTLP_* vars we set
+    // below are accepted-and-ignored, so Path B silently produces nothing.
+    // Idempotent merge: no write if already on, and an explicit false is
+    // never overwritten.
     setOpencodeOpenTelemetryFlag();
   }
 
@@ -527,10 +497,9 @@ export async function resolveWrapperMode(
 }
 
 /**
- * Scrubs copilot's BYOK provider vars in ingestion mode: if hand-exported,
- * they'd keep BYOK active (routing traffic off the Copilot seat) and
- * double-capture against the OTLP lane. Gateway mode scrubs its own
- * conflicting twins; this is the ingestion-side counterpart.
+ * Scrubs copilot's BYOK provider vars in ingestion mode: hand-exported,
+ * they'd keep BYOK active and double-capture against the OTLP lane.
+ * Gateway mode scrubs its own conflicting twins; this is the counterpart.
  */
 function ingestionClears(tool: string): string[] {
   if (tool === "copilot") {

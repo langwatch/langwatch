@@ -1,8 +1,6 @@
 /**
- * Shared device-code login. `runUnifiedLoginFlow({ kind })` is canonical:
- * one browser-approval flow for both credential kinds, persisted to
- * `~/.langwatch/config.json` (device_session) or `$CWD/.env`
- * (project_api_key). `runDeviceFlowLogin` is a back-compat wrapper for it.
+ * Shared device-code login: `runUnifiedLoginFlow({ kind })` is canonical
+ * (persists to config.json or .env); `runDeviceFlowLogin` is a back-compat wrapper.
  * @see specs/ai-governance/cli-onboarding/login-unified.feature
  */
 
@@ -44,10 +42,9 @@ export interface RunUnifiedLoginOptions {
 export type RunDeviceFlowLoginOptions = Omit<RunUnifiedLoginOptions, "kind">;
 
 /**
- * Run the canonical device-code login flow end-to-end. Selects what to
- * mint via `kind` (defaults to device_session); the same browser
- * approval ceremony covers both modes. On success, persists to the
- * right store + returns the latest GovernanceConfig.
+ * Run the canonical device-code login flow end-to-end. Selects what to mint
+ * via `kind` (defaults to device_session); the same browser approval
+ * ceremony covers both modes, persisting to the right store on success.
  */
 export async function runUnifiedLoginFlow(
   opts: RunUnifiedLoginOptions = {},
@@ -107,12 +104,10 @@ export async function runUnifiedLoginFlow(
       const bootstrap = await fetchBootstrapSafely(cfg);
 
       // Pick up the server's authoritative gateway URL. Without this,
-      // self-hosted CLI users would see the SaaS default
-      // (https://gateway.langwatch.ai) on whoami / login output even
-      // though the actual gateway is on localhost:5563. The server's
-      // `gatewayUrl` reflects `LW_GATEWAY_BASE_URL` or the IS_SAAS-
-      // aware fallback. Backwards-compatible: older servers (without
-      // this field) leave the local default in place.
+      // self-hosted CLI users would see the SaaS default on whoami/login
+      // output even though the gateway is local. Reflects `LW_GATEWAY_BASE_URL`
+      // or the IS_SAAS-aware fallback; older servers without this field leave
+      // the local default in place.
       if (bootstrap?.gatewayUrl) {
         cfg.gateway_url = bootstrap.gatewayUrl;
         saveConfig(cfg);
@@ -164,13 +159,11 @@ export async function runUnifiedLoginFlow(
         }
       }
 
-      // Latest login wins (#6202): any langwatch-authored telemetry wiring a
-      // previous install persisted (claude settings env, codex [otel] block,
-      // gemini/opencode shell functions) that still points at a DIFFERENT
-      // instance would silently reroute every plain-tool run there - claude
-      // even applies its settings env ON TOP of a wrapper's process env.
-      // Re-point it at this login now, minting fresh ingest keys on this
-      // instance where needed. Best-effort: a login never fails on this.
+      // Latest login wins (#6202): telemetry wiring a previous install
+      // persisted (claude settings env, codex [otel] block, gemini/opencode
+      // shell functions) pointing at a DIFFERENT instance would silently
+      // reroute every plain-tool run there. Re-point it at this login now,
+      // minting fresh ingest keys where needed. Best-effort: never fails a login.
       try {
         const refresh = await refreshTelemetryWiringForLogin(cfg);
         if (refresh.mintedAny) saveConfig(cfg);
@@ -310,13 +303,11 @@ function persistDeviceSession(cfg: GovernanceConfig, result: ExchangeDeviceSessi
       prefix: result.default_personal_vk.prefix,
     };
   }
-  // The personal project's API key is what data commands (`langwatch trace
-  // search`, ...) authenticate with when no LANGWATCH_API_KEY is set, so a
-  // device login Just Works with zero env vars. Older servers omit the
-  // field; the credential resolver then lazily exchanges it once. Either
-  // way the PREVIOUS login's cached project must go first: kept, its fresh
-  // validated_at could authenticate the new session as the prior user
-  // until the revalidation window lapsed.
+  // The personal project's API key is what data commands authenticate with
+  // when no LANGWATCH_API_KEY is set, so a device login Just Works with zero
+  // env vars. The PREVIOUS login's cached project must be deleted first:
+  // kept, its fresh validated_at could authenticate the new session as the
+  // prior user until the revalidation window lapsed.
   delete cfg.personal_project;
   if (result.personal_project?.api_key) {
     cfg.personal_project = {
@@ -396,9 +387,8 @@ async function fetchBootstrapSafely(cfg: GovernanceConfig): Promise<CliBootstrap
 
 /**
  * The login has already succeeded by the time this runs, so the epilogue
- * gets a deadline rather than the user's patience: a control plane that
- * accepts the connection and never answers would otherwise stop the
- * ceremony from printing at all.
+ * gets a deadline rather than the user's patience — otherwise a control
+ * plane that accepts but never answers would stop the ceremony from printing.
  */
 const BUDGET_OVERVIEW_TIMEOUT_MS = 5_000;
 
@@ -432,12 +422,11 @@ async function openInBrowser(url: string, override?: string): Promise<void> {
   }
 }
 
-// The post-login shell-rc persist offer was removed when `langwatch
-// login` became auth-only: the device session in config.json is
-// already authoritative, so login never edits the shell rc. The
-// persist offer now lives in the `langwatch <tool>` wrapper and fires
-// only in ingestion mode (maybeOfferIngestionShellRcPersist in
-// shell-rc.ts), framed as installing telemetry.
+// The post-login shell-rc persist offer moved when `langwatch login` became
+// auth-only: the device session in config.json is already authoritative, so
+// login never edits the shell rc. It now lives in the `langwatch <tool>`
+// wrapper (`maybeOfferIngestionShellRcPersist` in shell-rc.ts), firing only
+// in ingestion mode.
 
 // Type-only re-exports so callers can import the shapes from this
 // module without reaching into device-flow.ts.

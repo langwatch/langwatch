@@ -65,10 +65,9 @@ export interface ClusteringStoreSummary {
 }
 
 /**
- * The write-path seed guard: seeds one project's pre-ownership Topic rows
- * onto its stream unless the projection already owns the model. Implemented
- * by the legacy-import migration; structural so the runner never depends on
- * the migration's construction.
+ * Seeds one project's pre-ownership Topic rows onto its stream unless the
+ * projection already owns the model. Structural (implemented by the
+ * legacy-import migration) so the runner never depends on its construction.
  */
 export interface TopicClusteringWritePathSeed {
   seedProjectTopicModel(projectId: string): Promise<"seeded" | "skipped">;
@@ -171,13 +170,11 @@ export const clusterTopicsForProject = async (
     Temporal.Instant.fromEpochMilliseconds(0),
   );
 
-  // The cadence gate throttles run STARTS only, so a continuation page
-  // (searchAfter present) never re-takes it. Page 1 of a batch run writes
-  // topics whose createdAt is "now"; if page 2 re-evaluated the gate it
-  // would always read those fresh topics as "recently clustered" and end
-  // the walk with a skip and no cursor — any batch backlog larger than one
-  // page silently stopped after page one. The run was approved when its
-  // first page passed the gate; later pages are the same run.
+  // The cadence gate throttles run STARTS only — a continuation page
+  // (searchAfter present) never re-takes it. Page 1 writes topics whose
+  // createdAt is "now"; re-evaluating the gate on page 2 would read them as
+  // "recently clustered" and stop the walk, silently truncating any backlog
+  // larger than one page. The run was approved on page 1; later pages are the same run.
   const daysFrequency = assignedTracesCount < 100 ? 7 : assignedTracesCount < 500 ? 3 : 2;
   const cadenceHorizon = nowInstant().subtract({
     milliseconds: daysFrequency * 24 * 60 * 60 * 1000,
@@ -232,14 +229,11 @@ export const clusterTopicsForProject = async (
 
   const mode = isIncrementalProcessing ? "incremental" : "batch";
 
-  // Keep paging while the page returned more than a trivial handful of raw
-  // rows (>10 — the legacy heuristic, kept bit-identical; NOT "page was
-  // full", which would be the CTE's 2000). Progress is driven by the page
-  // boundary (returnedCount / lastSort from the page CTE), not the
-  // post-filter usable count — older eligible traces can sit beyond a page
-  // of empty-input (or already-clustered) traces, and stopping on the
-  // usable count would strand them. Worst case of the loose threshold is
-  // one extra near-empty page before the walk ends.
+  // Keep paging while the page returned >10 raw rows (the legacy heuristic,
+  // kept bit-identical — NOT "page was full", the CTE's 2000). Progress is
+  // driven by the page boundary (returnedCount/lastSort), not the
+  // post-filter usable count: older eligible traces can sit beyond a page of
+  // empty/already-clustered ones, and stopping on usable count would strand them.
   const nextSearchAfter = returnedCount > 10 && lastSort ? lastSort : undefined;
 
   if (traces.length < minimumTraces) {
@@ -440,14 +434,11 @@ export async function fetchTracesFromClickHouse(
       ...(searchAfter ? { lastTs: searchAfter[0], lastTraceId: searchAfter[1] } : {}),
     },
     format: "JSONEachRow",
-    // The outer query reads ComputedInput (a potentially large payload) for the
-    // page of <=2000 traces. Even though rows stream (no outer sort/LIMIT), the
-    // dedup still resolves the latest version per trace, and peak memory scales
-    // with the number of read streams holding a ComputedInput block at once. For
-    // tenants with large inputs that peak crossed max_memory_usage_per_query
-    // (MEMORY_LIMIT_EXCEEDED). This is a background clustering batch, not a
-    // latency-critical path, so cap the read streams to keep peak memory well
-    // under the per-query limit; the returned rows are unchanged.
+    // The outer query reads ComputedInput (a potentially large payload) for a
+    // page of <=2000 traces; peak memory scales with the number of read
+    // streams holding one at once. Large-input tenants crossed
+    // max_memory_usage_per_query here (MEMORY_LIMIT_EXCEEDED). This is a
+    // background batch, not latency-critical, so read streams are capped; rows are unchanged.
     clickhouse_settings: { max_threads: 2 },
   });
 
@@ -464,14 +455,11 @@ export async function fetchTracesFromClickHouse(
     return a.TraceId < b.TraceId ? -1 : a.TraceId > b.TraceId ? 1 : 0; // TraceId ASC
   });
 
-  // Defensive de-duplication by TraceId. The monotonic `UpdatedAt` invariant
-  // should make `(TenantId, TraceId, max(UpdatedAt))` match exactly one row per
-  // trace, but `returnedCount` / `lastSort` now drive pagination, so collapse
-  // any same-version duplicate here in JS rather than at the SQL layer — the
-  // per-key SQL dedup operator is banned in this path for OOM safety (it reads
-  // heavy columns for the whole granule; see trace-dedup-oom-safety.unit.test).
-  // Rows are ordered `OccurredAt DESC, TraceId ASC` (sorted above), so the first
-  // row per TraceId is the one the boundary cursor should land on.
+  // Defensive de-dup by TraceId in JS, not SQL: the per-key SQL dedup
+  // operator is banned in this path for OOM safety (it reads heavy columns
+  // for the whole granule; see trace-dedup-oom-safety.unit.test). Rows are
+  // ordered `OccurredAt DESC, TraceId ASC` above, so the first row per
+  // TraceId is the one the boundary cursor should land on.
   const seenTraceIds = new Set<string>();
   const rows = rawRows.filter((row) => {
     if (seenTraceIds.has(row.TraceId)) return false;
@@ -532,12 +520,11 @@ const getProjectTopicClusteringModelProvider = async (
   deps: TopicClusteringRunnerDeps,
   projectId: string,
 ) => {
-  // Resolve the analytics.topic_clustering_llm feature at the project's
-  // cascade (through the models port). Throws ModelNotConfiguredError when
-  // nothing is set at any scope; nothing here catches it — it propagates to
-  // the intent handler, retries through the outbox, and the run records
-  // run_failed with the user-actionable model_not_configured code (surfaced
-  // as guidance on the settings page).
+  // Resolve the analytics.topic_clustering_llm feature via the models
+  // port. Throws ModelNotConfiguredError when nothing is set at any scope;
+  // nothing here catches it — it propagates to the intent handler, retries
+  // through the outbox, and the run records run_failed with the
+  // user-actionable model_not_configured code (settings-page guidance).
   const resolved = await deps.models.resolveClusteringModel(projectId);
   const topicClusteringModel = resolved.model;
   const provider = topicClusteringModel.split("/")[0];
@@ -842,11 +829,9 @@ const postToTopicClustering = async (
 ): Promise<TopicClusteringResponse> => {
   // Every clustering call carries a deadline — see
   // TOPIC_CLUSTERING_REQUEST_DEADLINE_MS for why an unbounded one is a
-  // data-loss race and not just a slow request.
-  //
-  // An explicit controller rather than AbortSignal.timeout(): the deadline is
-  // then driven by an ordinary timer, which tests can advance to exercise this
-  // branch for real instead of asserting around it.
+  // data-loss race, not just a slow request. An explicit controller (not
+  // AbortSignal.timeout()) drives it via an ordinary timer, so tests can
+  // advance it to exercise this branch for real instead of asserting around it.
   const controller = new AbortController();
   const deadline = setTimeout(() => {
     controller.abort();
@@ -878,10 +863,9 @@ const postToTopicClustering = async (
       }
       // Ours by default. The body often quotes an upstream provider error,
       // but quoting is not evidence — attributing a 5xx to the customer's
-      // credentials on the strength of the text inside it is how this used to
-      // tell people to rotate working keys during our own outages. The
-      // message keeps the detail for operators; the customer is told the code
-      // only.
+      // credentials on the strength of it is how this used to tell people
+      // to rotate working keys during our own outages. Operators get the
+      // detail in the message; the customer is told the code only.
       throw new ClusteringError(
         CLUSTERING_ERROR_CODES.CLUSTERING_SERVICE,
         `Failed to fetch topics ${label} clustering (langevals): ${response.statusText}\n\n${body}`,
@@ -890,14 +874,11 @@ const postToTopicClustering = async (
 
     return (await response.json()) as TopicClusteringResponse;
   } catch (error) {
-    // Our own deadline firing is a fact we know at the throw site, so it is
-    // classified here rather than guessed at from the message later (see
-    // topic-clustering.errors.ts). It is the clustering service failing to
-    // answer in time — ours, not the customer's, and worth retrying: the
-    // outbox redelivers the intent and the next attempt gets a fresh
-    // deadline. A ClusteringError from the !ok branch keeps its own
-    // (identically retryable) identity even if the timer happens to fire
-    // while it unwinds.
+    // Our own deadline firing is known at the throw site, so it's classified
+    // here rather than guessed at from the message later (see
+    // topic-clustering.errors.ts): ours, not the customer's, and worth
+    // retrying — the outbox redelivers with a fresh deadline. A
+    // ClusteringError from the !ok branch keeps its own identity regardless.
     if (controller.signal.aborted && !(error instanceof ClusteringError)) {
       logger.warn(
         {

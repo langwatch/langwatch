@@ -188,11 +188,8 @@ export type OpsProcessExplorer = {
 };
 
 /**
- * The projection replay runner, as the operator surface calls it.
- *
- * Typed with the contract's own vocabulary rather than `unknown`. It was the
- * latter, and `unknown` is what the browser receives as `{}` - every field the
- * replay drawer, the history table and the status banner read came back
+ * Typed with the contract's own vocabulary rather than `unknown`: as `unknown`,
+ * the browser received `{}`, and every field the replay UI reads came back
  * unchecked.
  */
 export type OpsReplayRunner = {
@@ -232,11 +229,8 @@ export interface OpsAppDependencies {
 
 /** The process-owned adapters used to make one Ops capability at boot. */
 /**
- * The in-place system migrations, as the process runs them.
- *
- * Infrastructure rather than a peer module: the runner is composed from the
- * process's own migration registry and its ledger, and it is the one thing on
- * this surface that no service of this module owns.
+ * Infrastructure, not a peer module: composed from the process's own
+ * migration registry and ledger — the one thing here no module service owns.
  */
 export interface OpsSystemMigrationRunner {
   getOverview(): Promise<OpsMigrationOverview[]>;
@@ -290,10 +284,9 @@ export interface BugReportNotifier {
 }
 
 /**
- * Fixed-window counter for the PUBLIC report endpoint. The bucket key is the
- * nearest-hop IP, which the caller asserts, so this is a flood bound rather
- * than an authorization: the deployment's own counter decides, and its absence
- * would let one client fill a cross-tenant inbox.
+ * Fixed-window counter for the PUBLIC report endpoint, keyed on the
+ * caller-asserted nearest-hop IP — a flood bound, not authorization; its
+ * absence would let one client fill a cross-tenant inbox.
  */
 export interface BugReportRateLimiter {
   consume(input: {
@@ -408,11 +401,9 @@ export interface OpsBadgeReading {
 }
 
 /**
- * A destructive operator write reached the application without a session.
- *
- * Unreachable behind an authenticated procedure, and kept anyway: a guard
- * whose strictest branch is the one a missing session bypasses is fail-open in
- * shape, and this one stands in front of irreversible members work.
+ * Unreachable behind an authenticated procedure, kept anyway: a guard whose
+ * strictest branch is the one a missing session bypasses is fail-open in
+ * shape, and this stands in front of irreversible members work.
  */
 export class OpsOperatorSessionRequiredError extends HandledError {
   declare readonly code: "ops_operator_session_required";
@@ -427,12 +418,9 @@ export class OpsOperatorSessionRequiredError extends HandledError {
 }
 
 /**
- * A destructive operator write was attempted from an impersonation session.
- *
- * The operator scope deliberately falls back to the impersonator's own grant,
- * so `ops:manage` is inherited by an impersonation session - and "acting as"
- * another user is the wrong posture for irreversible members surgery,
- * because the audit trail would name the impersonated account.
+ * The operator scope falls back to the impersonator's own grant, so
+ * `ops:manage` is inherited by an impersonation session — the wrong posture
+ * for irreversible surgery, since the audit trail would name the impersonated account.
  */
 export class OpsImpersonatedOperatorRefusedError extends HandledError {
   declare readonly code: "ops_impersonated_operator_refused";
@@ -448,12 +436,9 @@ export class OpsImpersonatedOperatorRefusedError extends HandledError {
 }
 
 /**
- * A destructive operator write arrived without its typed confirmation.
- *
- * The damage these writes do is silent - deleting a blob completes the job
- * that referenced it without its handler ever running - so the confirmation is
- * what makes the act deliberate rather than a mis-click. The dialog in the ops
- * UI is not this guard: every one of these procedures is callable directly.
+ * The damage these writes do is silent — deleting a blob completes the job
+ * that referenced it without its handler running — so the confirmation makes
+ * the act deliberate. The ops UI dialog is not this guard: procedures are callable directly.
  */
 export class OpsConfirmationRequiredError extends HandledError {
   declare readonly code: "ops_confirmation_required";
@@ -468,11 +453,9 @@ export class OpsConfirmationRequiredError extends HandledError {
 }
 
 /**
- * A feature-flag write named a key the registry does not declare.
- *
- * Reads are deliberately permissive - the operator catalogue surfaces orphan
- * rows so they can be deleted - but a write to an unregistered key would store
- * a value nothing ever reads.
+ * Reads are deliberately permissive — the catalogue surfaces orphan rows so
+ * they can be deleted — but a write to an unregistered key would store a
+ * value nothing ever reads.
  */
 export class OpsUnknownFeatureFlagError extends HandledError {
   declare readonly code: "ops_feature_flag_unknown";
@@ -488,12 +471,9 @@ export class OpsUnknownFeatureFlagError extends HandledError {
 }
 
 /**
- * Somebody who is not on the deployment's operator allow-list asked for an
- * operator surface.
- *
- * The whole platform tier is decided by that list rather than by an RBAC grain
- * an id in the input could be checked at, so the refusal is the module's and
- * not a scope decision the door could have made.
+ * The whole platform tier is decided by the operator allow-list, not by an
+ * RBAC grain an id in the input could be checked at — so this refusal is the
+ * module's own, not a scope decision the door could have made.
  */
 export class OpsOperatorRequiredError extends HandledError {
   declare readonly code: "permission_denied";
@@ -532,10 +512,9 @@ export class OpsApp implements OpsApi {
   static readonly reads = reads("prisma", "redis", "clickhouse", "eventing", "logger");
 
   /**
-   * Builds this process's own {@link OpsAppInfrastructure} from the members
-   * it reads and its own config, then composes over it exactly as
-   * {@link OpsApp.fromInfrastructure} does. What a hand composition (or a
-   * test) still supplies directly.
+   * Builds this process's own {@link OpsAppInfrastructure} from the members it
+   * reads, then composes over it exactly as {@link OpsApp.fromInfrastructure}
+   * does — what a hand composition (or a test) still supplies directly.
    */
   static create(setup: OpsSetup): OpsApp {
     const infrastructure = buildOpsInfrastructure({
@@ -648,11 +627,9 @@ export class OpsApp implements OpsApi {
   }
 
   /**
-   * One aggregate's state under one projection, at one event index.
-   *
-   * An answer with no `aggregateType` means the projection name matched
-   * nothing, which is a not-found rather than a half-filled result the caller
-   * has to inspect.
+   * One aggregate's state under one projection, at one event index. An answer
+   * with no `aggregateType` means the projection name matched nothing — a
+   * not-found, not a half-filled result the caller has to inspect.
    */
   async computeProjectionState(input: {
     aggregateId: string;
@@ -721,11 +698,8 @@ export class OpsApp implements OpsApi {
   }
 
   /**
-   * Deletes a stored flag row.
-   *
-   * Deliberately permissive about the key: the operator catalogue surfaces
-   * orphan rows - keys that no longer match the registry or the pipeline graph
-   * - so operators can delete them, and validating the key here would break
+   * Deliberately permissive about the key: the catalogue surfaces orphan rows
+   * so operators can delete them, and validating the key here would break
    * exactly that cleanup path.
    */
   clearFeatureFlag(input: { key: string; lastEditedBy: string | null }): Promise<void> {
@@ -988,10 +962,9 @@ export class OpsApp implements OpsApi {
   }
 
   /**
-   * The one gate every operator procedure passes. Platform-tier: it resolves
-   * the deployment's own allow-list and reads no id from the request, because
-   * there is no scope an operator surface could be checked at. A write whose
-   * damage nobody would notice in time passes a second gate as well.
+   * The one gate every operator procedure passes: platform-tier, resolving the
+   * allow-list with no id from the request — there is no scope to check at.
+   * Silent-damage writes pass a second gate too (destructive-operator checks).
    */
   admitOperator(operator: OpsOperator | null, permission: OpsOperatorPermission): void {
     if (!this.#operatorOf(operator)) throw new OpsOperatorRequiredError(permission);
@@ -1320,12 +1293,9 @@ export interface AnomalyHardTierAlert {
 }
 
 /**
- * The live pipeline surface the ops explorers read.
- *
- * The application derived these off a module-global registry backed by
- * `getApp().eventSourcing.definitions`; a package may not reach a process
- * global, so the walk is an adapter over the definitions the composition
- * already holds and this is the seam the explorers take.
+ * The live pipeline surface the ops explorers read: a package may not reach
+ * `getApp().eventSourcing.definitions` (a process global), so this is the
+ * adapter seam over the definitions the composition already holds.
  */
 export interface OpsProjectionMetadata {
   projectionName: string;

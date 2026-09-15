@@ -1,19 +1,7 @@
 /**
- * Filter Translator - Converts ES filter definitions to ClickHouse WHERE clauses.
- *
- * WHY REGISTRY PATTERN: ClickHouse requires different WHERE clause patterns
- * depending on where data is stored (trace_summaries vs stored_spans vs
- * evaluation_runs). Some filters use simple attribute lookups, others need
- * IN subqueries. The registry pattern:
- * 1. Makes it easy to add new filter types without modifying existing code (OCP)
- * 2. Centralizes the mapping of filter fields to their translation logic
- * 3. Provides a clear, testable contract for each filter type
- *
- * WHY IN SUBQUERIES (NOT EXISTS): Originally chosen because ClickHouse v25.10
- * planner crashed with "Cannot clone Sorting plan step" when EXISTS was combined
- * with the old per-row dedup pattern (issue #2660). The dedup was migrated to
- * IN-tuple in #3158, but IN subqueries are kept since they work correctly and
- * are semantically equivalent to EXISTS.
+ * Filter Translator — converts ES filter definitions to ClickHouse WHERE
+ * clauses via a registry of per-field handlers (`filterHandlers` below).
+ * IN subqueries are used rather than EXISTS; the two are equivalent here.
  */
 
 import type { FilterField } from "@langwatch/analytics-contract";
@@ -32,13 +20,9 @@ export interface FilterTranslation {
 }
 
 /**
- * Handler function type for filter translation.
- *
- * `spanTimePredicate` is an optional SQL fragment (e.g. `AND StartTime >= ...`)
- * that handlers whose subquery reads the time-partitioned `stored_spans` table
- * inject into that subquery's WHERE, so the scan prunes to the dashboard's date
- * range instead of cold-scanning every weekly partition (incl. cold S3).
- * Handlers that don't touch `stored_spans` ignore it.
+ * Handler function type for filter translation. `spanTimePredicate` is an
+ * optional SQL fragment that handlers reading `stored_spans` inject into
+ * their subquery WHERE, pruning the scan to the dashboard's date range.
  */
 type FilterHandler = (
   values: string[],
@@ -66,13 +50,7 @@ function genParamName(prefix: string): string {
   return `${prefix}_${paramCounter++}`;
 }
 
-/**
- * Registry of filter handlers by field type.
- *
- * WHY: This registry maps filter fields to their translation functions,
- * eliminating the need for a large switch statement. Each handler knows
- * how to translate its specific filter type to ClickHouse SQL.
- */
+/** Registry of filter handlers by field type — replaces a large switch statement. */
 // Exhaustive on purpose: a field added to `filterFieldsEnum` without a handler
 // here fails to compile. The platform copy of this file had that guarantee and
 // this one lost it when the type went out of reach — a `Record<string, …>`
@@ -161,12 +139,9 @@ export function translateFilter(
 }
 
 /**
- * Translate topic filter.
- *
- * WHY PARAMETERIZED QUERIES: All filter translations use parameterized queries
- * instead of string interpolation to prevent SQL injection attacks. The
- * parameter names are auto-generated with a counter to ensure uniqueness
- * when multiple filters of the same type are combined.
+ * Translate topic filter. All filter translations use parameterized queries
+ * (never string interpolation) to prevent SQL injection; parameter names are
+ * auto-generated with a counter for uniqueness across combined filters.
  */
 function translateTopicFilter(values: string[]): FilterTranslation {
   const ts = tableAliases.trace_summaries;
@@ -267,12 +242,9 @@ function translatePromptIdsFilter(values: string[]): FilterTranslation {
 }
 
 /**
- * Translate origin filter.
- *
- * "application" is the default origin for traces that have no explicit
- * langwatch.origin attribute (empty string or NULL). All other origin
- * values (e.g. "evaluation", "simulation", "playground") are matched
- * directly. When multiple origins are selected they are ORed together.
+ * Translate origin filter. "application" is the default for traces with no
+ * explicit langwatch.origin attribute (empty string or NULL); other values
+ * ("evaluation", "simulation", "playground", ...) match directly and OR together.
  */
 function translateOriginFilter(values: string[]): FilterTranslation {
   const ts = tableAliases.trace_summaries;
@@ -307,10 +279,9 @@ function translateOriginFilter(values: string[]): FilterTranslation {
 }
 
 /**
- * Translate error filter
- * Uses ContainsErrorStatus from trace_summaries which captures errors from
- * multiple sources: StatusCode, error attributes, and exception events.
- * This is more reliable and performant than an EXISTS subquery.
+ * Translate error filter. Uses ContainsErrorStatus from trace_summaries,
+ * which captures errors from multiple sources (StatusCode, error attributes,
+ * exception events) — more reliable and performant than an EXISTS subquery.
  */
 function translateErrorFilter(values: string[]): FilterTranslation {
   const ts = tableAliases.trace_summaries;
@@ -351,17 +322,9 @@ function translateTraceNameFilter(values: string[]): FilterTranslation {
 }
 
 /**
- * Translate span type filter (requires JOIN).
- *
- * WHY IN SUBQUERY: Span-level filters use IN subqueries instead of direct JOINs
- * because a trace can have multiple spans. A direct JOIN would duplicate the
- * trace for each matching span, inflating count metrics. IN returns true
- * once a matching TraceId is found, preserving correct trace counts.
- *
- * WHY NOT EXISTS: ClickHouse v25.10 planner crashes with "Cannot clone Sorting
- * plan step" when EXISTS subqueries are combined with LIMIT 1 BY in JOINed
- * subqueries (issue #2660). IN subqueries are semantically equivalent and avoid
- * this planner bug.
+ * Translate span type filter (requires JOIN). Uses an IN subquery rather than
+ * a direct JOIN: a trace with multiple matching spans would be duplicated by
+ * a JOIN, inflating count metrics — IN returns true once, once is enough.
  */
 function translateSpanTypeFilter(values: string[], spanTimePredicate = ""): FilterTranslation {
   const ts = tableAliases.trace_summaries;
@@ -400,10 +363,8 @@ function translateSpanModelFilter(values: string[], spanTimePredicate = ""): Fil
 
 /**
  * Translate evaluator ID filter (requires JOIN).
- *
- * @param additionalWhere - Optional extra WHERE predicates appended inside the
- *   subquery (e.g. "AND Passed IS NOT NULL"). Used by the has_passed / has_score /
- *   has_label variants so the subquery filters by result-type, not just EvaluatorId.
+ * @param additionalWhere - Extra WHERE appended inside the subquery, used
+ *   by has_passed/has_score/has_label to filter by result-type.
  */
 function translateEvaluatorIdFilter(values: string[], additionalWhere = ""): FilterTranslation {
   const ts = tableAliases.trace_summaries;
@@ -568,10 +529,9 @@ function translateEventTypeFilter(values: string[], spanTimePredicate = ""): Fil
 }
 
 /**
- * Translate event metric key filter
- *
- * Uses paired arrayExists to correlate Events.Name with Events.Attributes at the same index.
- * This prevents false positives where event type matches at one index but key matches at another.
+ * Translate event metric key filter. Uses paired arrayExists to correlate
+ * Events.Name with Events.Attributes at the same index — this prevents false
+ * positives where event type matches at one index but key matches at another.
  */
 function translateEventMetricKeyFilter(
   values: string[],
@@ -617,10 +577,9 @@ function translateEventMetricKeyFilter(
 }
 
 /**
- * Translate event metric value filter (numeric range)
- *
- * Uses paired arrayExists to correlate Events.Name with Events.Attributes at the same index.
- * This prevents false positives where event type matches at one index but value matches at another.
+ * Translate event metric value filter (numeric range). Uses paired
+ * arrayExists to correlate Events.Name with Events.Attributes at the same
+ * index, preventing a type match at one index from pairing with a value at another.
  */
 function translateEventMetricValueFilter(
   values: string[],
@@ -722,12 +681,9 @@ function translateAnnotationFilter(values: string[]): FilterTranslation {
 }
 
 /**
- * Combine multiple filter translations with AND.
- *
- * WHY FILTER NON-TRIVIAL: "1=1" is the no-op placeholder for empty filters.
- * We filter these out before combining to avoid bloating the WHERE clause
- * with unnecessary conditions. This also makes the generated SQL more readable
- * for debugging and performance analysis.
+ * Combine multiple filter translations with AND, filtering out "1=1"
+ * no-op placeholders first so empty filters don't bloat the generated
+ * WHERE clause with unnecessary conditions.
  */
 export function combineFilters(translations: FilterTranslation[]): FilterTranslation {
   const nonTrivial = translations.filter((t) => t.whereClause !== "1=1");

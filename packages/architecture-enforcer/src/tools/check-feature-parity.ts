@@ -34,10 +34,9 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 /**
- * The repository root, found by walking up from this file until
- * `pnpm-workspace.yaml` turns up — the one file every worktree has exactly
- * once, at the root. A fixed `../..` count breaks the moment this tool moves
- * again; this does not care where in the tree it runs from.
+ * Walks up from this file until `pnpm-workspace.yaml` turns up — the one
+ * file every worktree has exactly once, at the root. Unlike a fixed
+ * `../..` count, this doesn't break when the tool moves.
  */
 function findRepoRoot(from: string): string {
   let directory = from;
@@ -155,12 +154,10 @@ const DEFAULT_TEST_ROOTS: string[] = [
   // vitest, and their tests live beside them. Without this root, a scenario
   // describing what a guard refuses could only ever be @unimplemented.
   ".github/scripts",
-  // dev/scripts' own JS/TS logic (e.g. dev-supervisor.mjs's debounce and
-  // signal handling) is tested with `node --test`, not vitest, and lives
-  // beside the scripts it tests. DEFAULT_BATS_TEST_ROOTS already scans this
-  // same directory for `.bats` files; this is its `.test.mjs` counterpart.
-  // Without it, a scenario describing dev-tooling behavior could only ever
-  // be @unimplemented.
+  // dev/scripts' own JS/TS logic is tested with `node --test`, not vitest,
+  // and lives beside the scripts it tests — DEFAULT_BATS_TEST_ROOTS already
+  // scans this directory for `.bats` files; this is the `.test.mjs`
+  // counterpart. Without it, dev-tooling scenarios could only ever be @unimplemented.
   "dev/scripts/__tests__",
 ];
 
@@ -509,6 +506,7 @@ const LEGACY_INERT: string[] = [
   // Wave 3's specs, every scenario @unimplemented on purpose: each deliverable's
   // specs ship ahead of the code, and the PR that builds each surface binds its
   // file as it lands. Remove each entry with its first binding.
+
   // PLANNED, NOT YET BUILT (ADR-135). Every scenario is @unimplemented because
   // the dispatch-and-read write path does not exist yet — tagging them now
   // would report bindings that are not there. Each scenario names the tag it
@@ -755,12 +753,10 @@ const LEGACY_PARTIAL: string[] = [
   "specs/ai-governance/puller-framework/s3-polling.feature",
   "specs/analytics/dashboard-rest-api.feature",
   "specs/analytics/event-sourced-analytics-materialization.feature",
-  // Reason: left LEGACY_INERT once this branch tagged and bound the
-  // enterprise-OAuth callback-path outline to `legacyCallbackParity.test.ts`.
-  // The other two scenarios (on-prem credentials, Google OAuth) are
-  // deliberately untagged per the file's own header — they document live
-  // behaviour proven by browser QA and other unit tests, not a single bound
-  // assertion, so tagging them would misstate what covers them.
+  // Left LEGACY_INERT once this branch bound the enterprise-OAuth callback
+  // outline to `legacyCallbackParity.test.ts`. The other two scenarios stay
+  // untagged per the file's header — they're proven by browser QA/units, not
+  // a single bound assertion, so tagging them would misstate coverage.
   "specs/auth/auth-signin-flows.feature",
   "specs/automations/authoring-drawer.feature",
   "specs/automations/process-manager-dispatch.feature",
@@ -783,13 +779,11 @@ const LEGACY_PARTIAL: string[] = [
   // and the trace-pipeline pair is proven for event_log but not yet for
   // stored_metric_records or dspy_steps. Each needs a test, not a tag.
   "specs/data-retention/ingestion-stamping.feature",
-  // Reason: left LEGACY_INERT once this branch tagged and bound the three
-  // event-log-category scenarios (category selection, per-tenant/category/
-  // table rate limiting, and parallel category mutations) to
-  // `retroactiveUpdate.unit.test.ts`. The seven that remain untagged predate
-  // this branch and describe the UI/progress-card side (confirmation dialog,
-  // progress tracking, kill-mutation button) and the immediate-vs-retroactive
-  // stamping contract, which this branch does not own.
+  // Left LEGACY_INERT once this branch tagged the three event-log-category
+  // scenarios (selection, rate limiting, parallel mutations) to
+  // `retroactiveUpdate.unit.test.ts`. The seven untagged predate this
+  // branch: the UI/progress-card side (dialog, progress, kill-mutation) and
+  // the immediate-vs-retroactive stamping contract, which this branch does not own.
   "specs/data-retention/retroactive-update.feature",
   "specs/datasets/add-to-dataset-span-mapping.feature",
   "specs/dependencies/zod-first-schema-source-of-truth.feature",
@@ -908,10 +902,9 @@ interface Report {
   /** Of those, how many are explicitly parked as `@unimplemented`. */
   unimplementedScenarios: number;
   /**
-   * Scenarios carrying neither a lane tag nor `@unimplemented` — declared,
-   * unmeasured, and invisible to the bound count. A file with any of these
-   * next to enforced scenarios reads `N/N bound` while saying nothing about
-   * them; see `isPartiallyTagged`.
+   * Neither a lane tag nor `@unimplemented` — unmeasured and invisible to
+   * the bound count. A file with these next to enforced scenarios reads
+   * `N/N bound` while saying nothing about them; see `isPartiallyTagged`.
    */
   untaggedScenarios: number;
 }
@@ -2019,11 +2012,9 @@ interface ParityAnalysis {
 }
 
 /**
- * `LEGACY_INERT` says a file yields NO enforced scenario; `LEGACY_UNBOUND`
- * and `LEGACY_PARTIAL` both say it yields some, and are not exclusive of each
- * other. A file on the inert list and on either of the other two is always a
- * mistake — the kind two branches can each make without conflicting, which
- * this catches before main carries both.
+ * `LEGACY_INERT` means NO enforced scenario; `LEGACY_UNBOUND`/`LEGACY_PARTIAL`
+ * mean some do. A file on the inert list and either other is always a
+ * mistake two branches can each make without conflicting — this catches it before main does.
  */
 function validateNoCrossListEntries(): string[] {
   const inert = new Set(LEGACY_INERT);

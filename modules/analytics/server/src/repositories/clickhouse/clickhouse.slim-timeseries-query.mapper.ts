@@ -1,25 +1,7 @@
 /**
- * Slim SQL builder for `trace_analytics` (ADR-034 Phase 3 app-layer module).
- *
- * Single source of truth for the SQL emitted against the slim table.
- * Deliberately separate from the legacy
- * `~/server/analytics/clickhouse/aggregation-builder.ts` (which targets
- * `trace_summaries` and is left UNTOUCHED): slim is one-row-per-trace with
- * hoisted columns + a trimmed Attributes map, so the SQL doesn't need
- * stored_spans / evaluation_runs JOINs or the legacy fan-out fixes.
- *
- * Routing decides whether to call this builder (see `routing/route-table.ts`);
- * the builder only handles what slim supports — any unsupported shape is a
- * programmer error and throws.
- *
- * All queries:
- *   * include `WHERE TenantId = {tenantId:String}` as the FIRST predicate
- *     (multi-tenancy contract, CLAUDE.md);
- *   * filter on the partition column `OccurredAt` so ClickHouse prunes
- *     partitions (clickhouse-queries best-practices);
- *   * dedup the slim table via the IN-tuple pattern — slim is
- *     `ReplacingMergeTree(UpdatedAt)`; same dedup discipline as the legacy
- *     `dedupedTraceSummaries` helper.
+ * Slim SQL builder for `trace_analytics` (ADR-034 Phase 3) — deliberately
+ * separate from the legacy `aggregation-builder.ts` (trace_summaries). Follows
+ * clickhouse-queries.md's TenantId/partition/dedup rules; throws on unsupported shapes.
  */
 
 import { buildMetricAlias } from "./clickhouse.metric-translator.mapper.ts";
@@ -45,12 +27,9 @@ const SLIM_TABLE = "trace_analytics" as const;
 const ta = "ta";
 
 /**
- * Group-by keys the slim builder serves (typed columns + Attributes reads).
- *
- * `metadata.model` is deliberately NOT here: model group-bys need per-SPAN
- * attribution (the legacy builder's span-model partition join) so buckets
- * partition the ungrouped totals; slim has no span data. The router sends
- * them to `trace_summaries`; see SLIM_TRACE_GROUP_BY_KEYS in route-table.ts.
+ * Group-by keys the slim builder serves. `metadata.model` is deliberately
+ * NOT here: model group-bys need per-SPAN attribution slim has no data for;
+ * the router sends them to `trace_summaries` (see route-table.ts).
  */
 export type SlimGroupByKey =
   | "topics.topics"
@@ -61,12 +40,9 @@ export type SlimGroupByKey =
   | "metadata.labels";
 
 /**
- * Slim column / Attributes-map read for a registry metric (Phase 2 hoisted
- * columns; `Attributes['…']` for legacy reads kept by the trim service).
- *
- * Narrowed to `SlimTraceMetricKey` so the exhaustive switch is enforced
- * at compile time; `buildSlimTimeseriesQuery` validates each metric via
- * `isSlimEligibleTraceMetricKey` before dispatch.
+ * Slim column / Attributes-map read for a registry metric. Narrowed to
+ * `SlimTraceMetricKey` so the exhaustive switch is enforced at compile time;
+ * `buildSlimTimeseriesQuery` validates each metric before dispatch.
  */
 function slimColumnFor(metric: SlimTraceMetricKey): string {
   switch (metric) {
@@ -99,12 +75,10 @@ function slimColumnFor(metric: SlimTraceMetricKey): string {
     case "performance.total_tokens":
       return `(coalesce(${ta}.PromptTokens, 0) + coalesce(${ta}.CompletionTokens, 0))`;
     case "performance.total_processed_tokens":
-      // Mirror the rollup's `total_processed_tokens` shape (rollup-timeseries-
-      // query.ts:80) by summing the SAME four typed columns — NOT the
-      // Attributes-map mirror. Reading the typed columns avoids per-row
-      // toUInt64OrZero casts AND insulates this metric from the trim
-      // service's policy on `langwatch.reserved.*` keys (which could drop
-      // or rename them at any time without affecting analytics correctness).
+      // Mirrors the rollup's `total_processed_tokens` shape (rollup-timeseries-
+      // query.ts:80) by summing the SAME four typed columns, not the Attributes-map
+      // mirror — avoids per-row casts and insulates this metric from the trim
+      // service's policy on `langwatch.reserved.*` keys.
       return `(coalesce(${ta}.PromptTokens, 0) + coalesce(${ta}.CompletionTokens, 0) + coalesce(${ta}.CacheReadTokens, 0) + coalesce(${ta}.CacheWriteTokens, 0))`;
     case "performance.tokens_per_second":
       return `${ta}.TokensPerSecond`;
@@ -162,9 +136,8 @@ function slimGroupByExpression(groupBy?: string): string | null {
 
 /**
  * Group-bys whose expression resolves empty/NULL to an explicit `'unknown'`
- * bucket rather than `''`. These mirror the legacy field definitions carrying
- * `handlesUnknown: true`, and like legacy they must NOT get a
- * `HAVING group_key != ''` clause.
+ * bucket rather than `''`, mirroring legacy's `handlesUnknown: true` fields —
+ * like legacy, these must NOT get a `HAVING group_key != ''` clause.
  */
 function slimGroupByHandlesUnknown(groupBy?: string): boolean {
   return groupBy === "traces.trace_name";
@@ -200,23 +173,9 @@ function slimAggExpression(agg: AnalyticsAggregation, column: string): string {
 }
 
 /**
- * Build a deduped FROM-clause for the slim table — IN-tuple dedup against
- * `(TenantId, TraceId, UpdatedAt)` because slim is
- * `ReplacingMergeTree(UpdatedAt)`. Same pattern as the legacy
- * `dedupedTraceSummaries` helper, parameterised for the slim table + its
- * OccurredAt partition column.
- *
- * `TRACE_ANALYTICS_HAS_SIGNAL_SQL`: the store now writes dimension-only
- * states — a topic, an annotation, a rename, with no span or log record —
- * where it used to not write them at all (that always-write is what lets the
- * fold trust an absent read). This filter is what keeps such rows out of the
- * product's numbers: a row on this table is otherwise counted as A TRACE by
- * every aggregate below. The verdict is DERIVED from columns the row already
- * carries — no schema change — and defined next to the in-memory predicate it
- * mirrors, so the two cannot drift apart silently. Outer SELECT only: the
- * verdict is monotonic non-decreasing across a trace's versions (spans only
- * accumulate), so the latest version speaks for the trace and the
- * max(UpdatedAt) grouping needs no second filter.
+ * Deduped FROM-clause for the slim table (IN-tuple dedup; see
+ * clickhouse-queries.md). `TRACE_ANALYTICS_HAS_SIGNAL_SQL` keeps dimension-only
+ * rows (a topic, annotation, no span) from counting as A TRACE by every aggregate.
  */
 function dedupedSlim(alias: string, dateClause: string): string {
   return `(
@@ -238,12 +197,9 @@ function dedupedSlim(alias: string, dateClause: string): string {
 const SLIM_DATE_FILTER_BOTH_PERIODS = `AND ((OccurredAt >= {currentStart:DateTime64(3)} AND OccurredAt < {currentEnd:DateTime64(3)}) OR (OccurredAt >= {previousStart:DateTime64(3)} AND OccurredAt < {previousEnd:DateTime64(3)}))`;
 
 /**
- * Translate the small slice of filter fields slim natively serves into a
- * WHERE fragment + params. Anything else MUST have been rejected by
- * `pickAnalyticsTable` already — throws on an unhandled field as a guardrail.
- *
- * Filter values pass through ClickHouse parameter placeholders to avoid
- * injection (same shape as the legacy translator's parameterised reads).
+ * Translates the small slice of filter fields slim natively serves into a
+ * WHERE fragment + params, throwing on an unhandled field as a guardrail
+ * (anything else must have been rejected by `pickAnalyticsTable` already).
  */
 function buildSlimFilterClauses(filters: AnalyticsTimeseriesBuilderInput["filters"]): {
   whereClause: string;
@@ -370,18 +326,9 @@ function buildSlimFilterClauses(filters: AnalyticsTimeseriesBuilderInput["filter
 }
 
 /**
- * Build a slim query for `trace_analytics`.
- *
- * Shape:
- *
- *   SELECT
- *     period, [date], [group_key], <agg(slim col)> AS alias, …
- *   FROM <deduped trace_analytics ta>
- *   WHERE ta.TenantId = {tenantId:String}
- *     AND OccurredAt in [previousStart, currentEnd)
- *     [AND <slim filters>]
- *   GROUP BY period [, date] [, group_key]
- *   ORDER BY period [, date]
+ * Build a slim query for `trace_analytics`: SELECT period, [date],
+ * [group_key], aggregated columns FROM the deduped table, filtered on
+ * TenantId + OccurredAt range [+ slim filters], grouped/ordered by the same.
  */
 export function buildSlimTimeseriesQuery(
   input: AnalyticsTimeseriesBuilderInput,

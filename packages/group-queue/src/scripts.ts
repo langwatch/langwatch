@@ -447,10 +447,9 @@ end
 `;
 
 /**
- * Set of groups that may hold a pending job, updated atomically with each
- * insert. Deliberately a SUPERSET: scanning lifecycle indexes one at a time
- * can miss a group mid-transition, but over-inclusion is harmless here, so
- * reconcile can safely prune what it observes empty.
+ * Set of groups that may hold a pending job. Deliberately a SUPERSET: missing
+ * a group mid-transition is the real risk, so over-inclusion is preferred —
+ * reconcile safely prunes whatever it observes empty.
  */
 export const PENDING_INDEX_HELPER_LUA = `
 local function gqMarkPending(keyPrefix, groupId)
@@ -1536,10 +1535,8 @@ export const CLAIM_MARKER_TTL_SECONDS = 60 * 60;
 
 /**
  * How long a worker's `alive` beacon survives without a refresh. Must exceed
- * {@link WORKER_LIVENESS_REFRESH_MS} by enough that a couple of lost writes (a
- * Redis blip, a GC pause) do not read as a death — an absent beacon is the one
- * piece of evidence that CAN park a group, so it has to mean the process is
- * genuinely gone rather than briefly unlucky.
+ * {@link WORKER_LIVENESS_REFRESH_MS} enough that a lost write or GC pause doesn't
+ * read as a death — the one piece of evidence that alone CAN park a group.
  */
 export const WORKER_LIVENESS_TTL_SECONDS = 90;
 
@@ -1561,10 +1558,9 @@ export const WORKER_RETIRED_TTL_SECONDS = CLAIM_MARKER_TTL_SECONDS * 2;
 export const DEFAULT_GROUP_QUARANTINE_THRESHOLD = 500;
 
 /**
- * The failure streak self-expires so a group that fails sparsely (well below its
- * success rate) never accumulates to the threshold from blips hours apart.
- * Refreshed on every failure, so an actively-churning group keeps its count; the
- * group's next success clears it outright.
+ * The failure streak self-expires so a group failing sparsely never accumulates
+ * to the threshold from blips hours apart. Refreshed on every failure so an
+ * actively-churning group keeps its count; a success clears it outright.
  */
 export const GROUP_QUARANTINE_TTL_SECONDS = 15 * 60;
 
@@ -1577,20 +1573,15 @@ export const DEFAULT_BISECTION_SPLITS_PER_DISPATCH = 32;
 
 /**
  * Global in-flight budget for the dynamic water-level cap (option C, 2026-05-29).
- * 0 (the default) disables the dynamic cap. A positive caller-supplied value is
- * the fleet's true ceiling. The water-fill then divides that
- * whole capacity across competing tenants, so a lone tenant gets the full budget
- * (bursts to fleet) while N contenders converge to a max-min fair share.
+ * 0 (default) disables it; a positive value is the fleet's ceiling that
+ * water-fill divides across tenants for a max-min fair share.
  */
 export const DEFAULT_GLOBAL_BUDGET = 0;
 
 /**
- * Set holding every active group-queue name (e.g. "{event-sourcing/jobs}").
- * Producers register themselves here on construction so the ops dashboard can
- * enumerate queues with an O(1) SMEMBERS instead of an O(keyspace)
- * `SCAN MATCH *:gq:ready`, which scanned all ~190K keys to find a single ready
- * set and pegged the Redis main thread once the keyspace grew. The dedicated
- * hash tag keeps the set in a single Redis Cluster slot.
+ * Set holding every active group-queue name. Producers register on
+ * construction so the ops dashboard enumerates queues with O(1) SMEMBERS;
+ * the hash tag keeps the set in one Redis Cluster slot.
  */
 export const GROUP_QUEUE_REGISTRY_KEY = "{gq-registry}:names";
 
@@ -1764,10 +1755,8 @@ export class GroupStagingScripts {
 
   /**
    * Stage a batch of jobs into their respective group queues.
-   *
-   * @returns `newStagedCount` (new jobs, excluding deduped) and the
-   *   index-aligned `orphanedValues` of squashed jobs (`""` where nothing was
-   *   displaced). Leases move inside the eval — see {@link stage}.
+   * @returns `newStagedCount` and index-aligned `orphanedValues` of squashed
+   *   jobs (`""` where nothing displaced) — see {@link stage} for lease timing.
    */
   async stageBatch(
     jobs: Array<{
@@ -1961,9 +1950,8 @@ export class GroupStagingScripts {
     jobName?: string;
     /**
      * The slot is being freed because the job was DISCARDED, not processed
-     * (#5538). Keeps the group advancing while withholding the completed-counter
-     * INCRs and the stored-error clear, so ops can tell a thrown-away event from
-     * a successful one. Defaults false — a plain `complete()` is still a success.
+     * (#5538) — keeps the group advancing while withholding the completed
+     * counter and stored-error clear, so ops can tell it from a success.
      */
     dropped?: boolean;
   }): Promise<boolean> {
@@ -2062,11 +2050,9 @@ export class GroupStagingScripts {
     stagedJobId: string;
     activeTtlSec: number;
     /**
-     * Withdraws the refresh if the caller stops wanting it while the call is in
-     * flight. Only the NOSCRIPT fallback can be withdrawn — see
-     * {@link CachedLuaScript.runCancellable} — which is exactly the window
-     * where a refresh could otherwise land behind a re-stage and undo its
-     * backoff.
+     * Withdraws the refresh if the caller stops wanting it mid-flight. Only
+     * the NOSCRIPT fallback can be withdrawn — see
+     * {@link CachedLuaScript.runCancellable} for the backoff race this guards.
      */
     isCancelled?: () => boolean;
   }): Promise<boolean> {
@@ -2214,10 +2200,9 @@ export class GroupStagingScripts {
   }
 
   /**
-   * Publish this worker's liveness beacon. Called once before the worker takes
-   * its first claim and refreshed on {@link WORKER_LIVENESS_REFRESH_MS}: the
-   * beacon is what stops another worker booking this one's leftover claim
-   * markers as deaths, so it has to exist before the claims do.
+   * Publish this worker's liveness beacon before its first claim, refreshed
+   * per {@link WORKER_LIVENESS_REFRESH_MS} — it must exist before claims do,
+   * or another worker books this one's leftover markers as deaths.
    */
   async recordWorkerAlive(workerId: string): Promise<void> {
     await this.redis.set(
@@ -2243,10 +2228,9 @@ export class GroupStagingScripts {
   }
 
   /**
-   * Take ownership of a group's claim; see {@link CLAIM_GUARD_LUA} for why death
-   * counts derive from the previous owner's beacon, not the absence of a delete.
-   * @returns the confirmed-death count and previous-owner state (`none`, `self`,
-   *   `alive`, `retired`, or `gone` — the state that books a death); diagnostic only.
+   * Take ownership of a group's claim; see {@link CLAIM_GUARD_LUA} for why
+   * death counts derive from the beacon, not a delete.
+   * @returns death count and previous-owner state (none/self/alive/retired/gone) — diagnostic.
    */
   async recordClaim({
     groupId,
@@ -2407,11 +2391,9 @@ export class GroupStagingScripts {
   }
 
   /**
-   * Earliest dispatch-after score in the ready set, or null when empty.
-   * The dispatcher clamps its BRPOP fallback to this so groups staged
-   * with a dispatch delay wake when due: their send-time signals fire
-   * (and get drained) while the job is still inside its delay window,
-   * and nothing re-signals at the due time.
+   * Earliest dispatch-after score in the ready set, or null when empty. The
+   * dispatcher clamps its BRPOP fallback to this so a group staged with a
+   * dispatch delay still wakes when due, since nothing else re-signals it.
    */
   async getEarliestReadyScore(): Promise<number | null> {
     const result = await this.redis.zrange(`${this.keyPrefix}ready`, 0, 0, "WITHSCORES");
@@ -2437,12 +2419,9 @@ export function pendingGroupsKey(keyPrefix: string): string {
 }
 
 /**
- * Key holding the drift the last reconcile pass measured for this queue, from
- * its key prefix (`<name>:gq:`).
- *
- * Shared rather than per-process because the reconcile is single-flighted: only
- * the instance that wins the marker computes a drift, so any other instance
- * reporting its own local figure reports zero for a queue it never recomputed.
+ * Key holding the drift the last reconcile pass measured, from the queue's
+ * key prefix. Shared, not per-process — reconcile is single-flighted, so a
+ * losing instance's own figure would be a false zero for what it never computed.
  */
 export function pendingDriftKey(keyPrefix: string): string {
   return `${keyPrefix}stats:pending-drift`;

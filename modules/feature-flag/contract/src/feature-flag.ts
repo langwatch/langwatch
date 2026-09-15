@@ -15,10 +15,8 @@ export interface FeatureFlagDefinition {
   /** Surface for the operator UI; `null` for product flags. */
   family?: string;
   /**
-   * Extra env-var name to honor on top of the auto-derived
-   * UPPERCASE(key) name. Used when the flag is migrating from an
-   * older, differently-named env var and we want existing operator
-   * setups to keep working.
+   * Extra env-var name to honor on top of the auto-derived UPPERCASE(key)
+   * name, for a flag migrating from an older, differently-named env var.
    */
   legacyEnvVar?: string;
   /**
@@ -38,10 +36,9 @@ export interface FeatureFlagDefinition {
 export interface FeatureFlagFamily {
   keyPrefix: string;
   /**
-   * Optional required suffix on top of the prefix. Used to narrow a
-   * family to a specific generated shape (e.g. `es-...-killswitch`)
-   * so unrelated keys that merely start with the prefix don't get
-   * misclassified into the family's scope.
+   * Optional required suffix narrowing a family to a specific generated
+   * shape (e.g. `es-...-killswitch`), so unrelated keys sharing the
+   * prefix aren't misclassified into it.
    */
   keySuffix?: string;
   scope: FeatureFlagScope;
@@ -85,13 +82,9 @@ export const FEATURE_FLAGS = [
       "Skips the strict PII redaction pass that calls the external analysis service (Presidio via langevals). The native secrets and essential PII redaction in the ingestion pipeline are unaffected. Emergency operator override to shed analysis-service load.",
     family: "Collector",
   },
-  // Kill switch for the evaluator settings recovery (langwatch#6397). The
-  // recovery is ON by default: an evaluator whose prompt was stored at the top
-  // level of `config` instead of under `config.settings` has it recovered on the
-  // online path, instead of being silently dropped and replaced by langevals'
-  // own strict default prompt — which scored every trace 0.
-  //
-  // SYSTEM scope keeps this operational rollback out of product targeting.
+  // Kill switch for the evaluator settings recovery (langwatch#6397): without
+  // it, a prompt stored at the top level of `config` was silently dropped and
+  // replaced by langevals' strict default, which scored every trace 0.
   {
     key: "ops_evaluator_settings_recovery_disabled",
     scope: "SYSTEM",
@@ -100,12 +93,6 @@ export const FEATURE_FLAGS = [
       "Disables recovery of evaluator settings stored at the top level of `config` on the online evaluation path. While on, such evaluators fall back to `monitor.parameters` and, when that is empty, run against the judge's own default prompt. Emergency operator rollback for langwatch#6397.",
     family: "Event sourcing",
   },
-  // Kill switch for the evaluation-inputs offload (ADR-040). The offload is ON
-  // by default: oversized evaluator inputs go to the durable stored-objects
-  // service and the event/row carry a bounded marker instead of the full
-  // payload. Flipping this ON keeps inputs inline (only the unconditional
-  // repository cap bounds the ClickHouse row). Operators flip it from
-  // /ops/feature-flags.
   {
     key: "ops_evaluation_payload_offload_disabled",
     scope: "SYSTEM",
@@ -132,14 +119,10 @@ export const FEATURE_FLAGS = [
     family: "Collector",
   },
 
-  // Per-organization gate for pulled provider usage cost (ADR-088). Checked
-  // once per pull run, not per usage item. Off by default: with it off the
-  // puller behaves exactly as it did before — OCSF audit rows only, no
-  // `PulledUsageObserved` event and no ledger row — so enabling is an explicit
-  // opt-in for the first provider integration. It is the ADR's stated gate for
-  // "new pulled_usage event + ledger write", and the reason it is per-ORG
-  // rather than per-project is that pulled usage is attributed at org/team and
-  // has no project of its own (Decision 4, deferred).
+  // Per-organization gate for pulled provider usage cost (ADR-088),
+  // checked once per pull run, not per item. Per-ORG rather than
+  // per-project because pulled usage has no project of its own
+  // (Decision 4, deferred).
   {
     key: "release_pulled_usage_cost_enabled",
     scope: "PRODUCT",
@@ -149,12 +132,10 @@ export const FEATURE_FLAGS = [
     family: "Governance",
   },
 
-  // Deliberately its own key rather than a reuse of the one above, and it
-  // gates strictly less. That one decides whether pulled cost is RECORDED at
-  // all; this one decides whether a version of a charge that a later pull
-  // superseded is WITHDRAWN. Turning the recording off to stop bad
-  // withdrawals would also stop every good record, so the two need separate
-  // switches or the only available remedy is far too blunt.
+  // Deliberately its own key, not a reuse of the flag above: that one gates
+  // whether pulled cost is RECORDED, this one whether a superseded charge
+  // is WITHDRAWN — one switch would make stopping bad withdrawals also stop
+  // every good record.
   {
     key: "release_pulled_usage_retraction_enabled",
     scope: "PRODUCT",
@@ -263,13 +244,9 @@ export const FEATURE_FLAGS = [
     description:
       "Tripwire for ADR-034 Phase 3: when ON alongside release_event_sourced_analytics_read, runs the routed and legacy trace_summaries queries in parallel and logs divergence beyond a small tolerance. Returns the routed result either way.",
   },
-  // NOTE: `release_es_graph_triggers_firing` (ADR-034 Phase 5) was retired —
-  // the event-sourced graph-alert path is now unconditional and the K8s cron
-  // was removed, so there is no longer a cron/ES choice to gate.
   // SYSTEM on purpose despite being a product surface: the Langy rollout is
   // decided solely by the internal flag store — never an env var
-  // (envOverridable: false) — so the /ops/feature-flags toggle is the one
-  // authoritative lever.
+  // (envOverridable: false) — so /ops/feature-flags is the one lever.
   {
     key: "release_langy_enabled",
     scope: "SYSTEM",
@@ -379,10 +356,8 @@ export const FEATURE_FLAG_FAMILIES: readonly FeatureFlagFamily[] = [
 ];
 
 /**
- * Union of every flag key the application can resolve at runtime.
- *
- * Use this type wherever a flag key is accepted so the TypeScript
- * compiler keeps unregistered flags out of the build.
+ * Union of every flag key the application can resolve at runtime. Use it
+ * wherever a flag key is accepted so unregistered flags fail the build.
  */
 export type RegisteredFeatureFlagKey = (typeof FEATURE_FLAGS)[number]["key"];
 
@@ -398,11 +373,9 @@ const FLAGS_BY_KEY: Map<string, FeatureFlagDefinition> = new Map(
 );
 
 /**
- * Resolve a flag key to its registered definition, preferring exact
- * matches over family-prefix matches. Returns undefined when the key
- * does not appear in either list; callers should fall through to a
- * legacy in-memory evaluation in that case (back-compat for flags that
- * existed before the registry).
+ * Resolve a flag key to its registered definition, exact matches before
+ * family-prefix matches. Undefined means callers fall through to legacy
+ * in-memory evaluation (back-compat for pre-registry flags).
  */
 export function resolveFlagDefinition(key: string): FeatureFlagDefinition | undefined {
   const explicit = FLAGS_BY_KEY.get(key);

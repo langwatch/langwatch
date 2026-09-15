@@ -42,10 +42,9 @@ export interface ExchangeProject {
 }
 
 /**
- * The caller's personal workspace project, shipped on device-session
- * exchanges so data commands can authenticate with its API key without
- * any env var. Older servers omit it; the CLI then lazily exchanges via
- * `GET /api/auth/cli/personal-project` on first use.
+ * Shipped on device-session exchanges so data commands can authenticate
+ * without an env var. Older servers omit it; the CLI then lazily exchanges
+ * via `GET /api/auth/cli/personal-project` on first use.
  */
 export interface ExchangePersonalProject {
   id: string;
@@ -70,10 +69,9 @@ export interface ExchangeCliApiKeyScope {
 }
 
 /**
- * Mints two credential types: "device_session" (user-scoped OAuth token pair, for the
- * `claude`/`codex` wrappers) and "project_api_key" (the project-scoped SDK key verbatim, for
- * SDK/CLI data commands). Same approval ceremony for both; only the persist target differs
- * (`~/.langwatch/config.json` vs `.env`).
+ * "device_session": user-scoped OAuth token pair, for the `claude`/`codex`
+ * wrappers. "project_api_key": the project-scoped SDK key verbatim. Same
+ * approval ceremony for both; only the persist target differs.
  */
 export type CredentialType = "device_session" | "project_api_key";
 
@@ -108,10 +106,9 @@ export interface ExchangeApiKeyResult {
 export type ExchangeResult = ExchangeDeviceSessionResult | ExchangeApiKeyResult;
 
 /**
- * Back-compat alias for the device-session shape. Pre-`f9fcc3927` server
- * builds returned the unkinded shape verbatim; the runtime normaliser
- * below maps that to `{ kind: 'device_session', ... }` so callers can
- * always assume the discriminated form.
+ * Back-compat: pre-`f9fcc3927` servers returned this shape unkinded; the
+ * runtime normaliser below maps it to `{ kind: 'device_session', ... }` so
+ * callers can always assume the discriminated form.
  */
 export type LegacyExchangeResult = Omit<ExchangeDeviceSessionResult, "kind"> & {
   kind?: "device_session";
@@ -142,11 +139,8 @@ export interface DeviceFlowOptions {
 
 /**
  * `POST /api/auth/cli/device-code` — mint a device-code + user-code pair.
- *
- * Optional `credentialType` selects what `/exchange` will return on
- * approval: a user-scoped device session (default) or a project-scoped
- * API key. Older servers ignore the field and stay on the device-session
- * shape — back-compat is the server's responsibility.
+ * Optional `credentialType` selects what `/exchange` returns: a user-scoped
+ * device session (default) or a project-scoped API key.
  */
 export async function startDeviceCode(
   opts: DeviceFlowOptions,
@@ -160,10 +154,9 @@ export async function startDeviceCode(
 }
 
 /**
- * Device fingerprint stamped onto the CLI session at /exchange time, so /me/devices can render
- * "Mac (rchaves.local)" instead of "Unknown device" — needed to revoke one session without
- * nuking every device a user is logged into. Server contract:
- * `modules/auth/server/src/transport/api-rest/auth-cli-device-flow.api.ts#clientInfoSchema`.
+ * Fingerprint stamped on the CLI session so /me/devices can render "Mac
+ * (rchaves.local)" and one device can be revoked without logging out every
+ * device. Contract: `auth-cli-device-flow.api.ts#clientInfoSchema`.
  */
 function collectClientInfo(): {
   hostname: string;
@@ -187,10 +180,9 @@ function collectClientInfo(): {
 }
 
 /**
- * `POST /api/auth/cli/exchange` — single poll. Returns the access+refresh
- * token bundle on success (200), or throws DeviceFlowError with a
- * categorised `kind` so the caller can decide whether to keep polling
- * (`pending`, `slow_down`) or stop (`denied`, `expired`).
+ * `POST /api/auth/cli/exchange` — single poll. Returns the token bundle on
+ * success (200), or throws `DeviceFlowError` with a `kind` so the caller
+ * can decide whether to keep polling or stop.
  */
 export async function exchange(
   opts: DeviceFlowOptions,
@@ -226,10 +218,9 @@ export async function exchange(
 }
 
 /**
- * `GET /api/auth/cli/device-approval` — a stream that emits one frame the moment the browser
- * approves or denies, carrying no credential (it only says "poll now"). Resolves when a frame
- * arrives and never otherwise, so a server that predates the route, a buffering proxy, or a
- * dropped connection all leave the poll timer in charge rather than firing early.
+ * `GET /api/auth/cli/device-approval` — emits one frame when the browser
+ * approves/denies (no credential, just "poll now"); never resolves otherwise,
+ * so an old server or dropped connection leaves the poll timer in charge.
  */
 function watchDeviceApproval({
   opts,
@@ -321,11 +312,9 @@ async function waitForNextPoll({
 }
 
 /**
- * Poll `exchange` until the user approves, denies, or the device-code expires. Honours RFC 8628
- * §3.5 by doubling the interval on `slow_down`. Two accelerators keep the wait short — the first
- * poll fires immediately, and the approval stream cuts later waits short the moment the browser
- * settles the code — both layered over the same timer, so a server or network supporting neither
- * still logs in at the cadence the server asked for.
+ * Poll `exchange` until approved, denied, or expired — honouring RFC 8628
+ * §3.5 by doubling the interval on `slow_down`. The approval stream also
+ * cuts a wait short the moment the browser settles the code.
  */
 export async function pollUntilDone(
   opts: DeviceFlowOptions,
@@ -337,12 +326,10 @@ export async function pollUntilDone(
 
   const watch = watchDeviceApproval({ opts, deviceCode: dc.device_code });
   const approval = watch.settled;
-  // A signal fires once, so it is tracked in two parts. `signalled` says the
-  // frame arrived, `spent` says a poll has already been let through because
-  // of it. A frame that lands while an /exchange is in flight therefore still
-  // shortens the next wait instead of being dropped, and once it is spent the
-  // loop stops racing an already-resolved promise, which would otherwise turn
-  // into a hot poll if /exchange somehow still answered `pending`.
+  // A signal fires once, tracked in two flags: `signalled` (frame arrived) and
+  // `spent` (already let one poll through for it) — a frame during an in-flight
+  // exchange still shortens the next wait, and `spent` stops the loop racing
+  // an already-resolved promise into a hot poll.
   let signalled = false;
   let spent = false;
   void approval.then(() => {
@@ -406,11 +393,9 @@ export async function refresh(
 }
 
 /**
- * `POST /api/auth/cli/logout` — server-side revoke a refresh token
- * AND its paired access token (per `e7a042c69`: a stolen access
- * token used to survive logout for up to 1h until expiry; sending
- * both closes the gap). Idempotent — 200 on already-revoked or
- * unknown tokens.
+ * `POST /api/auth/cli/logout` — revokes the refresh token AND its paired
+ * access token (per `e7a042c69`: a stolen access token used to survive
+ * logout for up to 1h; sending both closes the gap). Idempotent.
  */
 export async function logout(
   opts: DeviceFlowOptions,

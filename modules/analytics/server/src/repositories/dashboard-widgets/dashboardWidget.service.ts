@@ -1,24 +1,7 @@
 /**
- * Dashboard widgets — the write path the REST surface uses.
- *
- * A lean twin of {@link SavedWorkbenchChartService} for the playground's own
- * rows: `CustomGraph` records of kind {@link DASHBOARD_SRCDOC_CHART_KIND},
- * whose `graph` column holds a {@link DashboardWidgetDefinition}
- * (`{ version, code, queries }`). Every read and write filters by that kind
- * alongside `projectId`, so a dashboard widget is never read, updated or
- * deleted through the builder or workbench paths — the same invariant the
- * `dashboardWidgets` tRPC router keeps for the UI.
- *
- * Deliberately thin: unlike the workbench chart service there is no LangWatchQL
- * or Vega-Lite governor to call, because a widget's queries are validated at
- * run time by `LW.query` inside the sandbox (see
- * {@link validateDashboardWidgetQueryParams}), not at save. The persistence shape is
- * the one the tRPC router already writes; this module exists so the REST route
- * that backs the `langwatch dashboard-widget` CLI has a single, kind-scoped
- * write path instead of reaching into Prisma from the handler.
- *
- * @see ../dashboardWidgetDefinition — the `graph` column's versioned shape
- * @see ../../api/routers/dashboardWidgets.ts — the UI's tRPC twin
+ * A lean twin of {@link SavedWorkbenchChartService}, kind-scoped by
+ * {@link DASHBOARD_SRCDOC_CHART_KIND} + `projectId` so a widget is never
+ * touched through the builder or workbench paths (see ../dashboardWidgetDefinition).
  */
 
 import { HandledError } from "@langwatch/handled-error";
@@ -44,12 +27,9 @@ import {
 } from "../dashboardWidgetDefinition.ts";
 
 /**
- * No dashboard widget with that id in this project.
- *
- * A widget belonging to another project earns this too, and that is the point:
- * the answer must not let a caller tell "not yours" from "never existed" — the
- * same reasoning as {@link SavedWorkbenchChartNotFoundError}, applied to the
- * dashboard widget's id space.
+ * A widget in another project earns this too, on purpose: the answer must
+ * not let a caller tell "not yours" from "never existed" — same reasoning
+ * as {@link SavedWorkbenchChartNotFoundError}, applied to this id space.
  */
 export class DashboardWidgetNotFoundError extends HandledError {
   declare readonly code: "dashboard_widget_not_found";
@@ -64,12 +44,9 @@ export class DashboardWidgetNotFoundError extends HandledError {
 }
 
 /**
- * A stored definition does not match the versioned schema.
- *
- * `platform` fault and a 5xx on purpose: every write goes through a schema, so
- * a row that cannot be read back is something this application got wrong — a
- * hand-edited row, or a version skew a build shipped. Charging it to the
- * customer would file a real defect as routine noise.
+ * `platform` fault and a 5xx on purpose: every write goes through a schema,
+ * so an unreadable row is something this application got wrong. Charging
+ * it to the customer would file a real defect as routine noise.
  */
 export class DashboardWidgetDefinitionInvalidError extends HandledError {
   declare readonly code: "dashboard_widget_definition_invalid";
@@ -121,12 +98,9 @@ const graphOf = (
 });
 
 /**
- * Dashboard widgets — the only way the REST surface writes one.
- *
  * Constructed with a Prisma client rather than injected repositories: the
- * write path is direct and kind-scoped, and the prototype has no unit suite to
- * drive against an in-memory store. Mirror {@link SavedWorkbenchChartService}
- * if that changes.
+ * write path is direct and kind-scoped, and the prototype has no unit
+ * suite to drive against an in-memory store.
  */
 export class DashboardWidgetService {
   private constructor(private readonly prisma: PrismaClient) {}
@@ -151,7 +125,6 @@ export class DashboardWidgetService {
 
   /**
    * One dashboard widget.
-   *
    * @throws {DashboardWidgetNotFoundError} when no widget of this kind has
    *   that id in this project — including when it has that id in another one.
    */
@@ -170,15 +143,9 @@ export class DashboardWidgetService {
   }
 
   /**
-   * Saves a new widget below the lowest row it would collide with.
-   *
-   * Row computation and write share one interactive transaction so two
-   * concurrent creates cannot read the same maximum row and then both write
-   * it — the placement is atomic, not last-writer-wins.
-   *
-   * @throws {DashboardWidgetNotFoundError} when `dashboardId` is given but
-   *   names no dashboard in this project — including one in another project,
-   *   which must not be distinguishable from a missing one (IDOR).
+   * Saves a new widget below the lowest row it would collide with; row
+   * computation and write share one transaction so concurrent creates can't race.
+   * @throws {DashboardWidgetNotFoundError} when `dashboardId` names no dashboard here (IDOR).
    */
   async createWidget({
     projectId,
@@ -229,7 +196,6 @@ export class DashboardWidgetService {
 
   /**
    * Updates a widget's name, its definition, or both, then returns it.
-   *
    * @throws {DashboardWidgetNotFoundError} when the update touches no row —
    *   a missing id, or one in another project.
    */
@@ -265,15 +231,9 @@ export class DashboardWidgetService {
   }
 
   /**
-   * Reads back the stored definition and re-merges it with a partial update.
-   *
-   * A partial definition update keeps the untouched half: `code` alone must
-   * not blank the stored queries, nor `queries` alone the stored code. The
-   * `graph` column is one JSON blob, so the surviving side is read back and
-   * re-merged inside the caller's transaction rather than overwritten.
-   *
-   * @throws {DashboardWidgetNotFoundError} when the widget is not in this
-   *   transaction's project scope.
+   * A partial update keeps the untouched half: `code` alone must not blank
+   * the stored queries, nor `queries` alone the stored code. The `graph`
+   * column is one JSON blob, re-read and re-merged in the caller's transaction.
    */
   private async mergeDefinitionUpdate({
     tx,
@@ -299,7 +259,6 @@ export class DashboardWidgetService {
 
   /**
    * Deletes a widget.
-   *
    * @throws {DashboardWidgetNotFoundError} when nothing was deleted, so a
    *   caller cannot tell a foreign id from a gone one by the status.
    */
@@ -317,14 +276,9 @@ export class DashboardWidgetService {
   }
 
   /**
-   * Adds a widget to a dashboard at the next free row, keeping its size.
-   *
-   * Row computation and write share one interactive transaction so two
-   * concurrent assignments cannot both read the same maximum row and overlap.
-   *
-   * @throws {DashboardWidgetNotFoundError} when the target dashboard is not in
-   *   this project (including one in another project, indistinguishable from
-   *   missing — IDOR), or when the update touches no widget row.
+   * Adds a widget to a dashboard at the next free row; row computation and
+   * write share one transaction so concurrent assignments can't overlap.
+   * @throws {DashboardWidgetNotFoundError} when the dashboard/widget isn't in this project (IDOR).
    */
   async assignToDashboard({
     id,

@@ -1,8 +1,7 @@
 /**
- * Idempotent merge of the LangWatch [otel] activation block into
- * ~/.codex/config.toml. Hand-written, not a TOML library, so the user's
- * existing ordering and comments survive verbatim; it only ever touches
- * the region between the `# >>> langwatch otel begin/end <<<` markers.
+ * Idempotent merge of the LangWatch [otel] block into ~/.codex/config.toml.
+ * Hand-written (not a TOML library) so existing ordering/comments survive
+ * verbatim, touching only the region between the begin/end markers.
  */
 
 import * as fs from "node:fs";
@@ -15,10 +14,9 @@ const END = "# <<< langwatch otel end <<<";
 
 export interface CodexOtelBlockInputs {
   /**
-   * The bare ingestion base, e.g. https://app.langwatch.ai/api/otel. The
-   * block derives BOTH signal endpoints from it (codex's OTLP config is
-   * signal-specific and appends no path of its own): /v1/traces for the
-   * trace exporter and /v1/logs for the events exporter.
+   * The bare ingestion base, e.g. https://app.langwatch.ai/api/otel. Codex's
+   * OTLP config is signal-specific and appends no path of its own, so this
+   * derives both endpoints: /v1/traces for traces, /v1/logs for events.
    */
   baseEndpoint: string;
   /** Plaintext personal ingest key (sk-lw-<...>). */
@@ -42,10 +40,9 @@ export function displayCodexConfigPath(): string {
 }
 
 /**
- * The trace-signal endpoint codex's otlp-http exporter posts to. codex
- * (unlike the Node/Python/Go OTel SDKs) does NOT append `/v1/traces` to
- * the configured endpoint, so the suffix is spelled out here. Callers
- * pass the bare ingestion base (e.g. https://app.langwatch.ai/api/otel).
+ * The trace-signal endpoint codex's otlp-http exporter posts to. Unlike the
+ * Node/Python/Go OTel SDKs, codex does NOT append `/v1/traces` itself, so
+ * the suffix is spelled out here; callers pass the bare ingestion base.
  */
 export function codexTraceEndpoint(baseEndpoint: string): string {
   return `${normalizeEndpoint(baseEndpoint)}/v1/traces`;
@@ -65,10 +62,9 @@ function tomlStr(s: string): string {
 }
 
 /**
- * Build the bracketed [otel] block with both signal exporters (trace_exporter
- * for spans, exporter for events as log records); metrics_exporter is left
- * alone. The trace exporter must stay FIRST: `codexOtelBlockEndpoint` reads
- * the block's first `endpoint =` line to detect login-time staleness.
+ * Build the bracketed [otel] block with both signal exporters (metrics_exporter
+ * is left alone). The trace exporter must stay FIRST: `codexOtelBlockEndpoint`
+ * reads the block's first `endpoint =` line to detect login-time staleness.
  */
 export function buildCodexOtelBlock(
   inputs: CodexOtelBlockInputs,
@@ -121,10 +117,9 @@ export function buildCodexOtelBlock(
 }
 
 /**
- * Whether the current langwatch [otel] block in the file already
- * carries a persisted `headers` line (the inlined Authorization
- * header). Used to (a) stay quiet in the persist offer once the header
- * is installed and (b) let the unconditional setup write preserve it.
+ * Whether the current langwatch [otel] block already carries a persisted
+ * `headers` line (the inlined Authorization header) — used to stay quiet
+ * in the persist offer once installed, and to let setup preserve it.
  */
 export function codexOtelBlockHasAuthHeader(filePath: string): boolean {
   let content: string;
@@ -141,10 +136,9 @@ export function codexOtelBlockHasAuthHeader(filePath: string): boolean {
 }
 
 /**
- * The trace-exporter endpoint currently written inside the langwatch
- * [otel] marker block, or null when the file / block / endpoint line is
- * absent. The login-time "latest login wins" refresh compares this to
- * the current login's endpoint to decide whether the block is stale.
+ * The trace-exporter endpoint currently written inside the langwatch [otel]
+ * block, or null when absent. The login-time "latest login wins" refresh
+ * compares this to the current login's endpoint to detect staleness.
  */
 export function codexOtelBlockEndpoint(filePath: string = defaultCodexConfigPath()): string | null {
   let content: string;
@@ -163,9 +157,8 @@ export function codexOtelBlockEndpoint(filePath: string = defaultCodexConfigPath
 
 /**
  * The log-signal endpoint from the langwatch `[otel]` block: the `endpoint`
- * line whose URL ends in `/v1/logs` (the events exporter's). Null on a block
- * written before the events exporter existed, which is the caller's cue that
- * there is no log endpoint to post to rather than a URL to guess.
+ * line whose URL ends in `/v1/logs`. Null on a block written before the
+ * events exporter existed — the caller's cue there is no endpoint to guess.
  */
 export function codexOtelBlockLogsEndpoint(
   filePath: string = defaultCodexConfigPath(),
@@ -188,10 +181,9 @@ export function codexOtelBlockLogsEndpoint(
 }
 
 /**
- * The ingest token inlined on the langwatch `[otel]` block's `headers`
- * entry, or null when unset. The turn-completion harvest runs as a bare
- * codex-spawned process with no session/login, so this file is the only
- * place it can read where and with what key codex itself is posting.
+ * The ingest token inlined on the langwatch `[otel]` block's `headers` entry,
+ * or null when unset. The turn-completion harvest runs as a bare codex-spawned
+ * process with no session/login, so this file is its only source of the key.
  */
 export function codexOtelBlockAuthToken(
   filePath: string = defaultCodexConfigPath(),
@@ -264,19 +256,17 @@ function escapeRe(s: string): string {
 
 /**
  * Replace what `re` matches with `replacement`, verbatim. A *string*
- * replacement treats `$&`, `` $` ``, `$'` and `$n` as directives, and user
- * TOML can literally contain such sequences — a replacer function inserts
- * `replacement` as-is, with no such interpretation.
+ * replacement treats `$&`, `` $` ``, `$'`, `$n` as special, and TOML can
+ * contain such sequences literally — a replacer function avoids that.
  */
 function replaceVerbatim(content: string, re: RegExp, replacement: string): string {
   return content.replace(re, () => replacement);
 }
 
 /**
- * Write `content` and enforce `0600`. `writeFileSync`'s `mode` option only
- * applies when creating a file; on an existing one permissions are left
- * as-is. These blocks can carry a bearer token, so chmod BEFORE writing
- * closes the window where it would sit in a world-readable file.
+ * Write `content` and enforce `0600`. `writeFileSync`'s `mode` only applies
+ * when creating a file, not an existing one — and these blocks can carry a
+ * bearer token, so chmod BEFORE writing closes the world-readable window.
  */
 function writeFile0600(filePath: string, content: string): void {
   if (fs.existsSync(filePath)) {
@@ -290,19 +280,17 @@ const NOTIFY_BEGIN = "# >>> langwatch codex notify begin >>>";
 const NOTIFY_END = "# <<< langwatch codex notify end <<<";
 
 /**
- * Prefix stamped on a user-authored `notify` line we had to move aside. TOML
- * rejects a duplicate key outright, so leaving theirs in place next to ours
- * would stop codex from starting at all; the original argv is preserved
- * verbatim in the comment AND re-run via the chain arg in our own block.
+ * Prefix stamped on a user-authored `notify` line moved aside because TOML
+ * rejects a duplicate key outright; the original argv is preserved verbatim
+ * in the comment and re-run via the chain arg in our own block.
  */
 const DISPLACED_NOTE =
   "# langwatch moved this notify into the block at the top of the file, which still runs it:";
 
 /**
  * Bracket the displaced assignment so removal restores exactly the lines it
- * commented out. Without an explicit end, "the comments after the note" is the
- * only available boundary, and that silently annexes whatever the user wrote
- * below their own notify.
+ * commented out — without an explicit end, "comments after the note" would
+ * silently annex whatever the user wrote below their own notify.
  */
 const DISPLACED_BEGIN = "# >>> langwatch displaced notify begin >>>";
 const DISPLACED_END = "# <<< langwatch displaced notify end <<<";
@@ -334,10 +322,9 @@ function uncommentDisplaced(commented: string): string {
 }
 
 /**
- * The user's own notify argv as a prior install stored it, or null when
- * none is displaced. Once written, the argv is a comment, invisible to any
- * scan for a live `notify` — reading it back here is what keeps a repeat
- * install chaining it instead of silently dropping it.
+ * The user's own notify argv as a prior install stored it, or null when none
+ * is displaced. Once written it is a comment, invisible to any scan for a
+ * live `notify` — reading it back is what keeps a repeat install chaining it.
  */
 function findDisplacedNotify(
   content: string,
@@ -372,10 +359,9 @@ function tomlStringArray(values: readonly string[]): string {
 }
 
 /**
- * The harvest argv to write into `notify`: absolute node binary + this
- * CLI's entry script, not the bare `langwatch` name — codex runs it in
- * whatever environment it started in, and a PATH-resolved name silently
- * stops working from a launcher, cron, or editor terminal.
+ * The harvest argv to write into `notify`: absolute node binary + this CLI's
+ * entry script, not the bare `langwatch` name — codex runs it in whatever
+ * environment it started in, where a PATH-resolved name silently fails.
  */
 export function defaultCodexNotifyCommand(): string[] | null {
   const entry = process.argv[1];
@@ -511,10 +497,8 @@ function topLevelNotifyOffsets(content: string): number[] {
 
 /**
  * The offset of codex's own top-level `notify = [`, or null. Depth is
- * tracked instead of cutting at the first line starting with `[`, since a
- * multi-line array's continuation can start with `[` too — misreading it
- * as a table header would let a duplicate `notify` key get written, which
- * stops codex parsing its config at all.
+ * tracked rather than cutting at the first `[`, since a multi-line array's
+ * continuation can start with `[` too and risk a duplicate `notify` key.
  */
 function topLevelNotifyMatch(content: string): { index: number } | null {
   const [first] = topLevelNotifyOffsets(content);
@@ -524,8 +508,7 @@ function topLevelNotifyMatch(content: string): { index: number } | null {
 /**
  * Codex's own top-level `notify` value, or null. "Top-level" is enforced,
  * not assumed — a bare key binds to the table above it, so `notify` nested
- * under an unrelated table (e.g. `[integrations.slack]`) is left alone
- * rather than displaced and run as if it were codex's own.
+ * under an unrelated table is left alone rather than displaced and run.
  */
 const TOML_ARRAY_ELEMENT = /"((?:[^"\\]|\\.)*)"|'([^']*)'/g;
 
@@ -708,10 +691,8 @@ export interface CodexGatewayBlockInputs {
   gatewayUrl: string;
   /**
    * Env var name codex should read the API key from. Defaults to
-   * OPENAI_API_KEY because that's the standard codex env. The
-   * wrapper still sets OPENAI_API_KEY to the user's VK before
-   * spawning codex, so this matches the wrapper's env injection
-   * out of the box.
+   * OPENAI_API_KEY, matching the wrapper's env injection: it sets
+   * OPENAI_API_KEY to the user's VK before spawning codex.
    */
   envKey?: string;
 }
@@ -724,10 +705,9 @@ export interface CodexGatewayWriteResult {
    */
   path: string;
   /**
-   * The separate ~/.codex/<profile>.config.toml path that received
-   * the profile body. codex 0.134+ rejects [profiles.X] entries
-   * inside config.toml when the user passes --profile X, requiring
-   * a sibling file named <profile>.config.toml.
+   * The separate ~/.codex/<profile>.config.toml path that received the
+   * profile body — codex 0.134+ rejects inline [profiles.X] entries when
+   * the user passes --profile X, requiring this sibling file.
    */
   profilePath: string;
   /**
@@ -736,10 +716,9 @@ export interface CodexGatewayWriteResult {
    */
   profileAction: CodexOtelWriteAction;
   /**
-   * The profile name codex must be invoked with to actually route
-   * through the langwatch provider — e.g. `codex --profile
-   * langwatch-gateway`. Returned so the wrapper doesn't have to
-   * hardcode the name in two places.
+   * The profile name codex must be invoked with to route through the
+   * langwatch provider (e.g. `codex --profile langwatch-gateway`) — returned
+   * so the wrapper doesn't hardcode the name in two places.
    */
   profile: string;
 }
@@ -747,11 +726,9 @@ export interface CodexGatewayWriteResult {
 const PROFILE_NAME = "langwatch-gateway";
 
 /**
- * Build the additive [model_providers.langwatch] block. Codex 0.130+
- * defaults to ChatGPT OAuth and ignores OPENAI_API_KEY unless this explicit
- * provider is selected (`wire_api = "responses"`; "chat" is no longer
- * supported). Codex 0.134+ also rejects an inline `[profiles.<name>]`, so
- * the profile body lives in a sibling file (`buildCodexGatewayProfileFile`).
+ * Build the additive [model_providers.langwatch] block. Codex 0.130+ ignores
+ * OPENAI_API_KEY unless this provider is selected (`wire_api = "responses"`);
+ * 0.134+ also rejects inline `[profiles.<name>]`, hence the sibling file.
  */
 export function buildCodexGatewayBlock(inputs: CodexGatewayBlockInputs): string {
   const envKey = inputs.envKey ?? "OPENAI_API_KEY";
@@ -779,8 +756,7 @@ export function buildCodexGatewayBlock(inputs: CodexGatewayBlockInputs): string 
 /**
  * Contents of the sibling profile file; the filename IS the profile name.
  * Not bracketed with langwatch markers because the file is entirely
- * langwatch-owned — recreated fresh on every invocation, so hand edits
- * are silently overwritten.
+ * langwatch-owned, recreated fresh on every call — hand edits are lost.
  */
 export function buildCodexGatewayProfileFile(): string {
   return [
@@ -806,9 +782,8 @@ export function defaultCodexProfilePath(profile: string = PROFILE_NAME): string 
 
 /**
  * Merge the gateway provider block into config.toml and write the sibling
- * profile file in one call, so the wrapper can't end up half-installed.
- * The [otel] marker pair (Path B) coexists independently — only one path
- * fires per invocation per the no-double-trace rule.
+ * profile file in one call, so the wrapper can't end up half-installed —
+ * the [otel] marker pair (Path B) coexists, but only one path fires per call.
  */
 export function writeCodexGatewayBlock(
   inputs: CodexGatewayBlockInputs,
@@ -870,11 +845,9 @@ export function writeCodexGatewayBlock(
 export const CODEX_GATEWAY_PROFILE_NAME = PROFILE_NAME;
 
 /**
- * Cut a marker-bracketed langwatch block out of `content`. Removes at most
- * one leading newline and one trailing newline around the block so the
- * blank line the install path inserts before the block goes with it, but
- * unrelated user whitespace is left alone. Returns the stripped content, or
- * null when no such block is present.
+ * Cut a marker-bracketed langwatch block out of `content`, removing at most
+ * one leading/trailing newline so the blank line the install path inserts
+ * goes with it, without touching unrelated user whitespace. Null if absent.
  */
 function stripMarkerBlock(content: string, begin: string, end: string): string | null {
   const re = new RegExp(`\\n?${escapeRe(begin)}[\\s\\S]*?${escapeRe(end)}\\n?`, "m");
@@ -947,10 +920,9 @@ export function removeCodexGatewayProfileFile(
 }
 
 /**
- * Whether `profilePath` looks like a profile body this CLI writes. The
- * distinctive path is a strong hint but not proof of ownership — this
- * content check is what the logout scan and remover gate on, so a
- * non-owned file at the same path is never silently deleted.
+ * Whether `profilePath` looks like a profile body this CLI writes. The path
+ * alone is a hint, not proof — this content check is what the logout scan
+ * and remover gate on, so a non-owned file is never silently deleted.
  */
 export function codexProfileFileIsLangwatchOwned(
   profilePath: string = defaultCodexProfilePath(),

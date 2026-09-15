@@ -212,12 +212,9 @@ function fromRestBody(err: unknown): HandledErrorShape | null {
 }
 
 /**
- * The envelope keys of a flat REST error body. Everything else was `meta`,
- * spread at the top level by `handledErrorResponseBody`.
- *
- * `message` is folded back into `meta.message` rather than dropped: it is the
- * handled error's own sentence, which is the one channel the registry reads
- * for a code it has no copy for.
+ * Envelope keys of a flat REST error body; everything else was `meta`.
+ * `message` folds back into `meta.message` — the one channel the registry
+ * reads for a code it has no copy for.
  */
 const REST_ENVELOPE_KEYS = new Set([
   "error",
@@ -244,10 +241,8 @@ function restMeta(body: Record<string, unknown>): Record<string, unknown> {
 }
 
 /**
- * The trace id for any error, handled or not.
- *
- * Unhandled errors carry no handled payload by design, but support still needs
- * something to correlate on — each boundary attaches one for exactly this case
+ * The trace id for any error, handled or not: unhandled errors carry no
+ * handled payload, but each boundary still attaches one to correlate on
  * (`data.traceId` over tRPC, `trace.traceId` over REST).
  */
 export function readErrorTraceId(err: unknown): string | undefined {
@@ -258,12 +253,9 @@ export function readErrorTraceId(err: unknown): string | undefined {
 }
 
 /**
- * The trace id each boundary attaches OUTSIDE the handled payload.
- *
- * Split out of {@link readErrorTraceId} so a caller that has already parsed
- * the handled payload can finish the lookup without parsing it a second time.
- * `resolveErrorCopy` does exactly that — reading title, description, tips,
- * docs link and trace id used to cost four separate parses of the same error.
+ * The trace id each boundary attaches OUTSIDE the handled payload. Split out
+ * of {@link readErrorTraceId} so a caller that already parsed the handled
+ * payload can finish the lookup without parsing it a second time.
  */
 export function readEnvelopeTraceId(err: unknown): string | undefined {
   const traceId = (err as { data?: { traceId?: unknown } })?.data?.traceId;
@@ -275,22 +267,18 @@ export function readEnvelopeTraceId(err: unknown): string | undefined {
 }
 
 /**
- * The server defaults this, but an older payload may predate the field.
- * `customer` matches the server-side default rather than inventing a different
- * one on the client — and an absent one must never index `FAULT_TITLES` with
- * `undefined`, which renders the literal string "undefined" at a customer.
+ * `customer` matches the server-side default for an older payload predating
+ * this field — an absent one must never index `FAULT_TITLES` with `undefined`,
+ * which renders the literal string "undefined" at a customer.
  */
 function safeFault(value: unknown): HandledErrorFault {
   return typeof value === "string" && FAULTS.has(value) ? (value as HandledErrorFault) : "customer";
 }
 
 /**
- * Remediation tips, bounded in both directions.
- *
- * These ride the same untrusted relay path `meta.message` is clamped for — a
- * Go service parses them off an upstream body — so an upstream that answers
- * with fifty paragraphs must not get to render fifty paragraphs inside
- * LangWatch's own error chrome. `<HandledErrorAlert>` lists all of them.
+ * Remediation tips, bounded in both directions — they ride the same untrusted
+ * relay path `meta.message` is clamped for, so an upstream answering with
+ * fifty paragraphs can't render fifty paragraphs in our error chrome.
  */
 function safeTips(value: unknown): readonly string[] {
   if (!Array.isArray(value)) return [];
@@ -386,12 +374,9 @@ export function handledShapeFromSerialized(serialized: SerializedHandledError): 
 }
 
 /**
- * Every code the platform can put on the wire as a message.
- *
- * Checking membership beats guessing at the shape: a regex requiring an
- * underscore lets single-word codes through, and the registry has several
- * (`unauthorized`, `not_found`), so `"unauthorized"` would have been rendered
- * to the customer as though it were a sentence.
+ * Every code the platform can put on the wire as a message. Checking
+ * membership beats guessing at shape: a regex requiring an underscore lets
+ * single-word codes like `"unauthorized"` through as though it were a sentence.
  */
 const KNOWN_CODES = new Set<string>([
   ...APP_ERROR_CODES,
@@ -418,12 +403,9 @@ export function readAuthoredMessage(err: unknown): string | undefined {
 }
 
 /**
- * {@link readAuthoredMessage} minus its handled-error guard.
- *
- * Only for a caller that has ALREADY established `readHandledError` returned
- * `null` for this error — a handled error's copy comes from the registry, and
- * skipping the guard without that fact would let its wire message (the code
- * slug) through. It exists so the render path parses each error once.
+ * {@link readAuthoredMessage} minus its handled-error guard — only for a
+ * caller that already established `readHandledError` returned `null`, since
+ * skipping the guard otherwise would let a handled error's wire code through.
  */
 export function readAuthoredMessageOfUnhandled(err: unknown): string | undefined {
   const data = (err as { data?: { httpStatus?: unknown; authored?: unknown } })?.data;
@@ -449,11 +431,9 @@ export function readAuthoredMessageOfUnhandled(err: unknown): string | undefined
 }
 
 /**
- * Longer than this and nobody wrote it for a customer.
- *
- * Authored copy is a sentence or two ("That project name is already taken").
- * A stack frame, a serialised query, or a driver's diagnostic block runs to
- * hundreds of characters, and length alone separates them reliably.
+ * Longer than this and nobody wrote it for a customer: authored copy is a
+ * sentence or two, while a stack frame or diagnostic block runs to hundreds
+ * of characters — length alone separates them reliably.
  */
 const MAX_AUTHORED_LENGTH = 200;
 
@@ -461,10 +441,9 @@ const MAX_AUTHORED_LENGTH = 200;
 const SCREAMING_CASE = /^[A-Z][A-Z0-9_]*$/;
 
 /**
- * Shapes that mean a machine wrote this string, not a person — the second,
- * conservative layer behind `data.authored`. Deliberately case-SENSITIVE: a
- * case-insensitive SQL match would reject real copy like "Select a template
- * from the list before running this."
+ * Shapes that mean a machine wrote this, not a person — deliberately
+ * case-SENSITIVE: a case-insensitive SQL match would reject real copy like
+ * "Select a template from the list before running this."
  */
 const MACHINE_PROSE = new RegExp(
   [

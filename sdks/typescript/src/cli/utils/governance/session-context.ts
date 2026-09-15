@@ -1,8 +1,7 @@
 /**
- * The pure session-context vocabulary: turns a git identity plus a session id
- * into one OTLP log record, with no process/filesystem/network access. Kept
- * separate from its two callers (the hook and the codex harvest) so each
- * piece is directly testable, especially the remote-URL grammar's many shapes.
+ * The pure session-context vocabulary: turns a git identity plus a session
+ * id into one OTLP log record, with no process/filesystem/network access.
+ * Kept separate from its two callers (hook, codex harvest) for testability.
  */
 
 /** The event every session-context record carries, on the record and as an attribute. */
@@ -20,18 +19,15 @@ const SERVICE_NAME = "langwatch-cli";
 
 /**
  * The attribute a derived title rides on. Codex generates no title of its
- * own, so the harvest names the session from the transcript's first typed
- * prompt; the platform fills an empty title from it and lets an
- * agent-generated title outrank it.
+ * own, so the harvest names it from the transcript's first prompt; an
+ * agent-generated title still outranks it.
  */
 const SESSION_TITLE_ATTR = "langwatch.session.title";
 
 /**
- * The attribute the session's OWN name rides on: the name the harness itself
- * holds (claude's `--name` flag and `/rename` command, codex's thread name),
- * mirrored by the capture seams rather than invented by them. The platform
- * folds the newest name onto the session's title in place, above both
- * derived titles.
+ * The attribute the session's OWN name rides on — the harness's own name
+ * (claude's `--name`/`/rename`, codex's thread name), mirrored rather than
+ * invented. The platform folds it onto the title, above derived titles.
  */
 const SESSION_NAME_ATTR = "langwatch.session.name";
 
@@ -49,10 +45,9 @@ export function normalizeSessionName(raw: string | null | undefined): string | n
 }
 
 /**
- * A session name out of a prompt's text: the first line, whitespace
- * collapsed, capped. Null when the text is empty or opens with a tag —
- * agents inject notifications and context as user turns wrapped in tags,
- * and a session named `<environment_context>` names nothing.
+ * A session name out of a prompt's text: first line, whitespace collapsed,
+ * capped. Null when empty or opening with a tag — agents inject context as
+ * user turns wrapped in tags, and `<environment_context>` names nothing.
  */
 export function sessionTitleFromPrompt(text: string): string | null {
   const trimmed = text.trim();
@@ -135,10 +130,9 @@ const TRACEPARENT = /^00-([0-9a-f]{32})-([0-9a-f]{16})-/;
 const ALL_ZERO = /^0+$/;
 
 /**
- * Read `{host, owner, name}` out of an origin remote URL. Null when it is
- * empty, unparseable, or carries no owner/name pair. Nested paths keep every
- * segment but the last as the owner, so a GitLab subgroup remote reports
- * `group/subgroup` rather than losing the group it lives under.
+ * Read `{host, owner, name}` out of an origin remote URL. Null when empty,
+ * unparseable, or ownerless. Nested paths keep every segment but the last
+ * as the owner, so a GitLab subgroup reports `group/subgroup`.
  */
 export function parseGitRemoteUrl(url: string): RepositoryIdentity | null {
   const trimmed = url.trim();
@@ -204,9 +198,8 @@ export function parseOtlpHeaders(raw: string | undefined): Record<string, string
 
 /**
  * The trace and span ids out of a W3C `traceparent`. Only version `00` is
- * accepted, since a future version may lay its fields out differently. All-
- * zero ids are rejected too: OTel SDKs emit that as "no valid context here",
- * and honouring it would point the record at a trace that was never created.
+ * accepted (a future version may lay fields out differently). All-zero ids
+ * are rejected too: OTel SDKs emit that as "no valid context here".
  */
 export function parseTraceparent(raw: string | undefined): TraceContext | null {
   const match = TRACEPARENT.exec(raw?.trim() ?? "");
@@ -219,10 +212,8 @@ export function parseTraceparent(raw: string | undefined): TraceContext | null {
 
 /**
  * Build the OTLP/HTTP JSON body for one session-context record.
- *
- * Attribute-only by design: everything a consumer reads is an attribute, so
- * the record carries no body to parse. Trace and span ids are hex strings,
- * which is how the OTLP JSON encoding spells ids on the wire.
+ * Attribute-only by design — no body to parse. Trace/span ids are hex
+ * strings, how OTLP JSON spells ids on the wire.
  */
 export function buildSessionContextLogPayload({
   sessionId,

@@ -1,8 +1,6 @@
 /**
- * The policy spine every tRPC procedure runs through: the ports the process
- * fills, the declared authorization checks, the scope-lineage guard, the
- * builder that makes a declaration mandatory, and the process middlewares those
- * are wrapped in.
+ * The policy spine every tRPC procedure runs through: ports, declared
+ * authorization checks, the scope-lineage guard, and the mandatory builder.
  */
 import {
   type AuthzDeclaration,
@@ -97,10 +95,8 @@ export type TrpcRequestLike = {
 export type TrpcResponseLike = { statusCode?: number };
 
 /**
- * The one identity the spine attributes a call to. `impersonatorId` is the
- * real admin when an admin is acting as someone else: `id` stays the
- * impersonated user, because that is who the authorization decision is about,
- * and the audit row stamps the human who actually clicked.
+ * `impersonatorId` is the real admin acting as someone else; `id` stays the
+ * impersonated user, since that is who the authorization decision is about.
  */
 export type TrpcActor = Readonly<{ id: string; impersonatorId?: string }>;
 
@@ -110,11 +106,8 @@ export interface TrpcActorReader<TContext> {
 }
 
 /**
- * Identity, as the authenticated procedure needs it.
- *
- * `authenticate` both refuses an anonymous caller and answers the context
- * override the rest of the chain sees, so the process keeps ownership of its
- * own session shape.
+ * `authenticate` refuses an anonymous caller and answers the context override
+ * the rest of the chain sees, so the process keeps its own session shape.
  */
 export interface TrpcIdentity<
   TContext,
@@ -171,9 +164,8 @@ export type TrpcTranslatedCause = Readonly<{
 
 /**
  * Application error classes this package does not own but must still answer
- * correctly for. A handled error states its own status and needs no entry
- * here; this is for the typed causes a process re-raises with a code of its
- * own so a client interceptor can act on them.
+ * for. A handled error needs no entry here; this is for typed causes a
+ * process re-raises with a code a client interceptor can act on.
  */
 export interface TrpcCauseTranslation {
   translate(cause: unknown): TrpcTranslatedCause | undefined;
@@ -187,22 +179,17 @@ export interface TrpcAuthorizationDecisions {
 }
 
 /**
- * Resolves the authorization service for one request.
- *
- * A resolver rather than a value, because the decisions are request scoped:
- * the process composes them per request and this package must not reach for a
- * process-wide one.
+ * A resolver rather than a value: decisions are request scoped, so the
+ * process composes them per request instead of reaching for a process-wide one.
  */
 export interface TrpcAuthorization<TContext> {
   forRequest(ctx: TrpcMiddlewareContext<TContext>): TrpcAuthorizationDecisions;
 }
 
 /**
- * The two refusals whose concrete error class is the process's to choose.
- *
  * The denial SHAPE is this package's — which condition is answered first, and
- * that both answer UNAUTHORIZED with the domain error as the cause — but the
- * classes themselves carry product copy and codes a client renders.
+ * that both answer UNAUTHORIZED with the domain error as cause — but the
+ * concrete error classes are the process's to choose, carrying its own copy.
  */
 export interface TrpcAuthorizationDenial {
   /** The membership exists but an admin disabled it, so it grants nothing. */
@@ -212,12 +199,9 @@ export interface TrpcAuthorizationDenial {
 }
 
 /**
- * The part of a process's tRPC context the policy spine reads directly.
- *
  * Everything the spine could reach through a service on the context arrives
- * as a port instead. What is left is the transport itself — the request and
- * response the log line and the audit row describe — plus the one flag the
- * fail-closed backstop exists to read.
+ * as a port instead; what remains is the transport itself plus the one flag
+ * the fail-closed backstop exists to read.
  */
 export interface TrpcPolicyContext {
   readonly req?: TrpcRequestLike | undefined;
@@ -243,12 +227,9 @@ type ScopeInput = Partial<Record<ScopeTierField, unknown>>;
 export type TrpcOrganizationRole = string;
 
 /**
- * What a declared check writes back onto the request context.
- *
- * `permissionChecked` is what `enforcePermissionCheck` reads: a procedure that
- * reaches its resolver without it was never checked. `organizationRole` is the
- * legacy carry-forward the project and team resolutions leave for downstream
- * code.
+ * `permissionChecked` is what `enforcePermissionCheck` reads: a procedure
+ * that reaches its resolver without it was never checked. `organizationRole`
+ * is the legacy carry-forward project/team resolutions leave downstream.
  */
 export interface TrpcDeclaredAuthzContext {
   permissionChecked: boolean;
@@ -256,10 +237,9 @@ export interface TrpcDeclaredAuthzContext {
 }
 
 /**
- * `any` here is load-bearing, not laziness: tRPC's `.use()` requires a
- * middleware whose return is assignable to its own `MiddlewareResult`, and a
- * declared check is written against the scope input rather than against one
- * procedure's generics.
+ * `any` here is load-bearing: tRPC's `.use()` requires a middleware whose
+ * return is assignable to its own `MiddlewareResult`, and a declared check
+ * is written against the scope input rather than one procedure's generics.
  */
 type DeclaredCheckNext = () => any;
 
@@ -270,12 +250,8 @@ export type TrpcDeclaredCheckParams<TContext> = {
 };
 
 /**
- * What a check that reads nothing but the request context is handed.
- *
- * Naming `input` is what makes a check installable ONLY after a procedure's own
- * `.input()` parser: before one runs, tRPC types the validated input as its
- * `UnsetMarker`, which no scope shape accepts. `authorizeInService` reads no id
- * at all, so omitting the field here says so.
+ * What a check reading only the request context is handed. `authorizeInService`
+ * reads no id at all, so this omits the `input` field the other checks require.
  */
 export type TrpcContextOnlyCheckParams<TContext> = {
   ctx: TrpcMiddlewareContext<TContext>;
@@ -299,11 +275,9 @@ export type TrpcContextOnlyDeclaredCheck<TContext> = DeclaredAuthzMiddleware<
 const SENSITIVE_SCOPE_FIELDS = Object.values(SCOPE_TIER_FIELDS) as ScopeTierField[];
 
 /**
- * The four builders one process's declared checks are made of.
- *
- * Deliberately not parameterised on the request context: what the chain needs
- * back is an installed check, and naming the context here would make every
- * process's own middleware shape part of the contract.
+ * Deliberately not parameterised on the request context: what the chain
+ * needs back is an installed check, and naming the context here would make
+ * every process's own middleware shape part of the contract.
  */
 export interface TrpcDeclaredAuthzMiddlewares<TContext> {
   permission(
@@ -331,10 +305,9 @@ export type TrpcDeclaredAuthzMembers<TContext> = Readonly<{
 }>;
 
 /**
- * Writes through the narrow context this package owns rather than through the
- * process's own type parameter: a write to a generic's property is not
- * expressible, and widening the parameter would let a caller pass a context
- * these checks were never meant to mutate.
+ * Writes through the narrow context this package owns, not the process's own
+ * type parameter: a write to a generic's property is not expressible, and
+ * widening it would let a caller pass a context never meant to be mutated.
  */
 function markPermissionChecked(ctx: TrpcDeclaredAuthzContext): void {
   ctx.permissionChecked = true;
@@ -407,10 +380,8 @@ export function createDeclaredAuthzMiddlewares<TContext extends TrpcDeclaredAuth
     );
 
   /**
-   * `.permissionAny(…)` — any one of the permissions is enough, checked at the
-   * input's project scope. One scope resolution serves every candidate; the
-   * denial names the FIRST permission, so callers list the primary surface
-   * first.
+   * `.permissionAny(…)` — any one of the permissions is enough. The denial
+   * names the FIRST permission, so callers list the primary surface first.
    */
   const permissionAny = (
     permissions: readonly [AuthzPermission, ...AuthzPermission[]],
@@ -459,10 +430,9 @@ export function createDeclaredAuthzMiddlewares<TContext extends TrpcDeclaredAuth
     );
 
   /**
-   * `.noPermission({ reason, allow })` — authenticated, deliberately
-   * unchecked. The type layer refuses scoped input fields that are not
-   * individually allowed with a reason; this runtime guard is the defense in
-   * depth behind it.
+   * `.noPermission({ reason, allow })` — authenticated, deliberately unchecked.
+   * This runtime guard is the defense in depth behind the type layer's own
+   * refusal of unallowed scoped input fields.
    */
   const noPermission = ({
     reason,
@@ -475,12 +445,10 @@ export function createDeclaredAuthzMiddlewares<TContext extends TrpcDeclaredAuth
       { kind: "no-permission", reason, allow },
       async ({ ctx, input, next }: TrpcDeclaredCheckParams<TContext>) => {
         const allowedKeys = Object.keys(allow ?? {});
-        // `input` is typed as ScopeInput (always an object), but a procedure
-        // declared with no `.input()` at all hands tRPC's actual runtime
-        // value through untouched — `undefined` — so the type is a promise
-        // the runtime does not keep. Without this guard, `key in input`
-        // throws and every such procedure 500s at the boundary instead of
-        // running the (vacuous, but valid) no-permission check.
+        // `input` is typed as ScopeInput, but a procedure with no `.input()` hands
+        // tRPC's actual runtime value through as `undefined`. Without this guard,
+        // `key in input` throws and every such procedure 500s instead of running
+        // the (vacuous, but valid) no-permission check.
         const safeInput: object = typeof input === "object" && input !== null ? input : {};
 
         for (const key of SENSITIVE_SCOPE_FIELDS) {
@@ -496,12 +464,9 @@ export function createDeclaredAuthzMiddlewares<TContext extends TrpcDeclaredAuth
     );
 
   /**
-   * `.authorizeInService({ reason, permissions, enforces })` — the scope is
-   * data the handler loads at runtime, so the SERVICE performs the real
-   * authorization and the declaration records which permissions it enforces.
-   *
-   * `enforces` names, per scope field, WHAT in the resolver enforces it. The
-   * sweep counts a claimed field as covered, so it has to survive this hop.
+   * `.authorizeInService(...)` — the scope is data the handler loads at runtime,
+   * so the SERVICE performs the real authorization; `enforces` names what in
+   * the resolver covers each scope field for the sweep.
    */
   const serviceAuthorized = ({
     reason,
@@ -549,10 +514,9 @@ function requireDeclaredScope({
 }
 
 /**
- * The caller named the scope field and left it empty. Answered as the bad
- * request it is, rather than as the wiring bug below: a blank id is something
- * the caller can fix, and reporting it as an internal error both misleads them
- * and pages us for their typo.
+ * The caller named the scope field and left it empty — answered as a bad
+ * request, not the wiring bug below: it's the caller's typo to fix, not an
+ * internal error that misleads them and pages us for it.
  */
 function blankScopeId({ field }: { field: string }): TRPCError {
   const blank = new BlankScopeIdError({ field });
@@ -582,10 +546,9 @@ function wiringBug({
 }
 
 /**
- * The one denial shape for every tier. An id that resolves to nothing
- * answers exactly like an id the caller may not touch — the resolvers
- * already fold both into `permitted: false`, so no probe can learn whether a
- * scope EXISTS.
+ * The one denial shape for every tier: an id that resolves to nothing
+ * answers exactly like one the caller may not touch, so no probe can learn
+ * whether a scope EXISTS.
  */
 function deniedError({
   permission,
@@ -769,12 +732,9 @@ export interface PendingPermissionProcedureBuilder<
     TCaller
   >;
   /**
-   * The custom-check escape hatch, and it only takes middleware that says
-   * what it is: `declareAuthzMiddleware(...)` is the sole way to produce the
-   * brand, so a hand-rolled function that flips `ctx.permissionChecked`
-   * without declaring its policy is a compile error here rather than a CI
-   * sweep finding. Non-authz middleware (plan gates, error handlers) belongs
-   * AFTER the declaration, on the plain builder this returns.
+   * The custom-check escape hatch — only middleware branded by
+   * `declareAuthzMiddleware(...)` is accepted, so an undeclared function that
+   * flips `ctx.permissionChecked` is a compile error here, not a CI finding.
    */
   use: (
     middleware: DeclaredAuthzMiddleware<TrpcCheckMiddleware<TCheckContext, TInputOut>>,
@@ -789,12 +749,8 @@ export interface PendingPermissionProcedureBuilder<
     TCaller
   >;
   /**
-   * ADR-092 delivery-plan decision 25: declare the required permission,
-   * typed against the validated input the check reads its scope id from.
-   * The permission's registry tiers decide which of `projectId` / `teamId` /
-   * `organizationId` the input must carry — a missing id, or an id from a
-   * tier the permission cannot be granted at, is a compile error naming the
-   * problem. The most specific allowed tier present decides the check scope.
+   * ADR-092 decision 25: declare the required permission, typed against the
+   * input; a missing or wrong-tier scope id is a compile error naming it.
    */
   permission<P extends AuthzPermission>(
     permission: P & ValidateDeclaredPermission<P, TInputOut>,
@@ -809,11 +765,9 @@ export interface PendingPermissionProcedureBuilder<
     TCaller
   >;
   /**
-   * The derivation form, for a permission whose tier the input does not name
-   * directly: `.permission("organization:manage", { via: "teamId" })` checks
-   * the organization the input's team belongs to. `via` must name a required
-   * input field whose tier can derive one the permission is grantable at —
-   * the derivation is written at the call site, never inferred.
+   * The derivation form, for a permission whose tier the input omits: `via`
+   * must name a field whose tier can derive one the permission is grantable
+   * at — written at the call site, never inferred.
    */
   permission<P extends AuthzPermission>(
     permission: P,
@@ -829,10 +783,9 @@ export interface PendingPermissionProcedureBuilder<
     TCaller
   >;
   /**
-   * Any one of the permissions is enough, checked at the input's project
-   * scope. List the primary surface's permission first — the denial names
-   * it, so granting it resolves the refusal whichever feature the caller
-   * came through.
+   * Any one of the permissions is enough. List the primary surface's
+   * permission first — the denial names it, so granting it resolves the
+   * refusal whichever feature the caller came through.
    */
   permissionAny<Ps extends readonly [AuthzPermission, ...AuthzPermission[]]>(
     ...permissions: PermissionAnyArgs<Ps, TInputOut>
@@ -847,11 +800,9 @@ export interface PendingPermissionProcedureBuilder<
     TCaller
   >;
   /**
-   * Authenticated, deliberately unchecked — for procedures that read no
-   * organization-, team-, or project-scoped data. Requires a written reason,
-   * and every scope id the input carries must be individually allowed with
-   * one: the legacy `skipPermissionCheck` runtime guard, moved to compile
-   * time.
+   * Authenticated, deliberately unchecked. Every scope id the input carries
+   * must be individually allowed with a written reason: the legacy
+   * `skipPermissionCheck` runtime guard, moved to compile time.
    */
   noPermission(
     options: DeclaredNoPermissionOptions<TInputOut>,
@@ -866,10 +817,9 @@ export interface PendingPermissionProcedureBuilder<
     TCaller
   >;
   /**
-   * The scope is data the handler loads at runtime (a row's own scope set),
-   * so the SERVICE performs the real authorization. The declaration records
-   * why, and which permissions the service enforces — this only moves WHERE
-   * the check happens, never whether one does.
+   * The scope is data the handler loads at runtime, so the SERVICE performs
+   * the real authorization — this only moves WHERE the check happens, never
+   * whether one does.
    */
   authorizeInService(options: {
     reason: string;
@@ -926,11 +876,9 @@ type ChainableProcedure = { use(middleware: unknown): ChainableProcedure };
 type InstallableCheck = DeclaredAuthzMiddleware<(params: never) => Promise<unknown>>;
 
 /**
- * Builds one process's declaring procedure builder.
- *
- * `TCheckContext` is the request context a hand-written custom check receives
- * through `.use()`. It is the process's, named once here, so this package
- * never has to know what else rides on that context.
+ * `TCheckContext` is the request context a hand-written custom check
+ * receives through `.use()` — the process's, named once here, so this
+ * package never has to know what else rides on that context.
  */
 export function createPermissionProcedureBuilder<TCheckContext, TDeclaredContext>(
   middlewares: TrpcPolicyChainMiddlewares,
@@ -993,11 +941,9 @@ export function createPermissionProcedureBuilder<TCheckContext, TDeclaredContext
     >;
 
     /**
-     * The one chain every entry point builds: the surrounding middlewares are
-     * identical and only the permission check in the middle differs, so
-     * `.use()` and `.permission()` cannot drift in what wraps them. Order is
-     * behaviour — the check must sit inside the error/tracing middlewares and
-     * before `enforceCheck`, which is what proves a check ran at all.
+     * The one chain every entry point builds. Order is behaviour: the check
+     * must sit inside the error/tracing middlewares and before `enforceCheck`,
+     * which proves a check ran at all.
      */
     const withPermissionCheck = (check: InstallableCheck): Declared =>
       (procedure as unknown as ChainableProcedure)
@@ -1015,12 +961,10 @@ export function createPermissionProcedureBuilder<TCheckContext, TDeclaredContext
 
     const builder = {
       input(input: Parser) {
-        // tRPC types `.input()` as a conditional on the input already
-        // accumulated, and this builder forwards for a procedure whose input
-        // is a type parameter — the conditional never resolves, so it lands
-        // on the framework's `TypeError<…>` branch. The cast is on the
-        // FORWARDING seam only: the parser reaching tRPC is the caller's own,
-        // and the builder returned re-derives its types from the result.
+        // tRPC types `.input()` as a conditional on the input already accumulated,
+        // which never resolves for a forwarding procedure and lands on the
+        // framework's `TypeError<…>` branch. The cast is on the FORWARDING seam
+        // only — the parser reaching tRPC is the caller's own.
         return permissionProcedureBuilder(
           procedure.input(input as Parameters<typeof procedure.input>[0]),
         );
@@ -1089,10 +1033,9 @@ function procedureMiddlewareList(value: unknown): readonly unknown[] {
 }
 
 /**
- * Whether a built procedure skips the process's authentication middleware —
- * i.e. was built from the public procedure and is callable without a session.
- * Backs the public-surface allowlist test, the tripwire that makes adding a
- * new unauthenticated endpoint a deliberate, reviewed act.
+ * Whether a built procedure skips authentication — built from the public
+ * procedure and callable without a session. Backs the public-surface
+ * allowlist test, the tripwire for a deliberate unauthenticated endpoint.
  */
 export function createIsPublicProcedure(
   enforceUserIsAuthed: unknown,
@@ -1185,10 +1128,9 @@ function handledErrorToTRPCCode(error: HandledError): TRPCError["code"] {
 }
 
 /**
- * Builds one process's policy middlewares and its authenticated procedure.
- *
- * Called once per root. Every middleware it returns belongs to that root, so a
- * process composes exactly one of these and hands the pieces to its mounts.
+ * Called once per root. Every middleware it returns belongs to that root,
+ * so a process composes exactly one of these and hands the pieces to its
+ * mounts.
  */
 export function createTrpcRuntimePolicy<
   TContext extends TrpcPolicyContext & object,

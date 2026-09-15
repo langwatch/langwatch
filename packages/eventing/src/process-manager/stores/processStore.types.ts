@@ -60,12 +60,9 @@ export interface OutboxMessageRecord extends NewOutboxMessage {
   sourceEventId: string | null;
   status: OutboxMessageStatus;
   /**
-   * Delivery attempts STARTED so far — incremented at lease time, not at
-   * acknowledgement. Counting starts instead of conclusions is what lets a
-   * message whose lease keeps lapsing (handler never acknowledges) cross
-   * `maxAttempts` and retire, instead of redelivering as attempt 1 forever.
-   * A message released un-attempted by `releaseLease` hands its increment
-   * back.
+   * Delivery attempts STARTED so far, incremented at lease time (not ack) —
+   * so a message whose lease keeps lapsing without an ack still crosses
+   * `maxAttempts` and retires. `releaseLease` refunds the increment.
    */
   attempts: number;
   /** Epoch ms before which the message must not be leased. */
@@ -131,10 +128,9 @@ export interface ProcessStore {
   }): Promise<PersistedProcessInstance<State> | null>;
 
   /**
-   * Checks the inbox identity before pure evolution. `commit` remains the
-   * authoritative atomic dedup fence; this read lets synchronous retries
-   * return the already-committed state without re-running a domain transition
-   * that may now correctly reject from its terminal state.
+   * Checks the inbox identity before pure evolution — `commit` remains the
+   * authoritative atomic dedup fence, but this read lets a synchronous retry
+   * return the already-committed state without re-running the transition.
    */
   hasConsumedSource(params: { ref: ProcessRef; sourceEventId: string }): Promise<boolean>;
 
@@ -142,12 +138,9 @@ export interface ProcessStore {
   commit<State = unknown>(commit: ProcessCommit<State>): Promise<CommitResult>;
 
   /**
-   * Appends a transient evolution's intents. See {@link AppendIntentsResult}
-   * for why this is neither transactional nor inbox-backed.
-   *
-   * Idempotent: a key that already exists is reported as duplicate rather
-   * than inserted, so a partial write followed by a redelivery converges on
-   * exactly the intended set.
+   * Appends a transient evolution's intents (see {@link AppendIntentsResult}
+   * for why this is neither transactional nor inbox-backed). Idempotent — an
+   * existing key reports as duplicate, so a partial write plus redelivery still converges.
    */
   appendIntents(params: {
     ref: ProcessRef;
@@ -172,20 +165,17 @@ export interface ProcessStore {
     limit: number;
     leaseDurationMs: number;
     /**
-     * Restrict leasing to these processNames. The outbox table is shared
-     * across every process manager, so each domain's dispatcher MUST scope
-     * its leases — an unfiltered dispatcher would lease another domain's
-     * intents, fail to find a handler, and retry-churn them (ADR-051 §4).
-     * Omitted means unfiltered (single-domain deployments and tests).
+     * Restrict leasing to these processNames. Each dispatcher MUST scope its
+     * leases (ADR-051 §4) — unfiltered, it would lease another domain's
+     * intents, fail to find a handler, and retry-churn them.
      */
     processNames?: readonly string[];
   }): Promise<LeasedOutboxMessageRecord[]>;
 
   /**
-   * `applied: false` means the update matched no row: the lease lapsed and
-   * a newer token superseded this one. Callers must surface that — a fenced
-   * acknowledgement means the effect may have run more than once and the
-   * message is still pending under someone else's lease.
+   * `applied: false` means the update matched no row — the lease lapsed and
+   * a newer token superseded it. Callers must surface that: a fenced ack
+   * means the effect may have run twice and the message is still pending.
    */
   markDispatched(params: {
     identity: OutboxMessageIdentity;
@@ -213,11 +203,9 @@ export interface ProcessStore {
   }): Promise<void>;
 
   /**
-   * Return a leased message to the pool WITHOUT running it: clears the lease
-   * and hands back the attempt the lease charged, leaving the row
-   * immediately due. For batch tails whose lease budget ran out before their
-   * delivery started — releasing instead of dispatching is what keeps a slow
-   * batch from ever running past its own lease.
+   * Return a leased message to the pool WITHOUT running it, clearing the
+   * lease and refunding the attempt it charged. For a batch tail whose lease
+   * budget ran out before delivery — this keeps it from outrunning its lease.
    */
   releaseLease(params: {
     identity: OutboxMessageIdentity;
@@ -235,10 +223,8 @@ export interface ProcessStore {
 
   /**
    * Retention for high-frequency recurring intents (ADR-052): deletes
-   * DISPATCHED outbox rows of one processName whose dispatch finished
-   * before `before`. Pending/dead rows are never touched — dead rows are
-   * the operator's failure record, pending rows are work. Returns the
-   * deleted count.
+   * DISPATCHED rows of one processName finished before `before`. Pending/dead
+   * rows are never touched — dead is the operator's failure record, pending is work.
    */
   deleteDispatchedBefore(params: { processName: string; before: number }): Promise<number>;
 
@@ -247,9 +233,8 @@ export interface ProcessStore {
 
   /**
    * Retention sweep, dead family: delete at most `limit` DEAD outbox rows
-   * last touched before `before`, across every processName and project.
-   * Dead rows are the operator's failure record, so callers give this a far
-   * longer window than the dispatched family.
+   * last touched before `before`, across every processName and project —
+   * dead rows are the operator's failure record, so callers use a far longer window.
    */
   deleteDeadOutboxBatch(params: { before: number; limit: number }): Promise<number>;
 
@@ -257,11 +242,9 @@ export interface ProcessStore {
   deleteConsumedInboxBatch(params: { before: number; limit: number }): Promise<number>;
 
   /**
-   * Dead-letter recovery: flip DEAD rows of one process back to pending
-   * with a fresh attempt budget, due immediately. Scoped by processKey
-   * (one process instance's rows) and optionally narrowed by messageKey
-   * prefix so an operator can requeue one endpoint's batches without
-   * resurrecting every failure in the domain. Returns the requeued count.
+   * Dead-letter recovery: flip DEAD rows of one process back to pending with
+   * a fresh attempt budget, due immediately. Scoped by processKey, optionally
+   * narrowed by messageKey prefix to requeue one endpoint without the whole domain.
    */
   requeueDeadMessages(params: {
     processName: string;

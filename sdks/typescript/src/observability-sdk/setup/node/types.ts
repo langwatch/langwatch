@@ -21,38 +21,26 @@ import { type DataCaptureOptions } from "../../features/data-capture/types";
  */
 export interface SetupObservabilityOptions {
   /**
-   * LangWatch configuration for sending observability data to LangWatch.
-   *
-   * Set to 'disabled' to completely disable LangWatch integration.
-   * API key and endpoint can also be set via LANGWATCH_API_KEY and
-   * LANGWATCH_ENDPOINT environment variables.
+   * LangWatch config for sending data; 'disabled' turns it off. apiKey/
+   * endpoint default from LANGWATCH_API_KEY / LANGWATCH_ENDPOINT.
    */
   langwatch?:
     | {
         /**
          * LangWatch API key for authentication.
-         * Defaults to LANGWATCH_API_KEY environment variable.
-         *
-         * @example "sk-lw-1234567890abcdef"
          * @default LANGWATCH_API_KEY environment variable
          */
         apiKey?: string;
 
         /**
-         * LangWatch endpoint URL for sending traces and logs.
-         * Defaults to LANGWATCH_ENDPOINT environment variable or production endpoint.
-         *
-         * @default "https://app.langwatch.ai"
-         * @default LANGWATCH_ENDPOINT environment variable
+         * LangWatch endpoint for traces and logs.
+         * @default LANGWATCH_ENDPOINT env var, else "https://app.langwatch.ai"
          */
         endpoint?: string;
 
         /**
-         * Type of span processor to use for LangWatch exporter.
-         *
-         * - 'simple': Exports spans immediately (good for debugging)
-         * - 'batch': Batches spans for better performance (recommended for production)
-         *
+         * Span processor type: 'simple' exports immediately (debugging),
+         * 'batch' batches for throughput (recommended for production).
          * @default 'batch'
          */
         processorType?: "simple" | "batch";
@@ -60,116 +48,83 @@ export interface SetupObservabilityOptions {
     | "disabled";
 
   /**
-   * Name of the service being instrumented.
-   * Used to identify your service in traces, logs, and metrics.
-   *
-   * @example "user-service"
+   * Name of the service being instrumented, for identification in
+   * traces, logs, and metrics.
    */
   serviceName?: string;
 
   /**
-   * Global attributes added to all telemetry data.
-   * Useful for adding service-level metadata like version, environment, etc.
-   *
-   * @example { "service.version": "1.0.0", "deployment.environment": "production" }
+   * Global attributes added to all telemetry data (e.g. service version,
+   * deployment environment).
    */
   attributes?: SemConvAttributes;
 
   /**
-   * Configuration for automatic input/output data capture by LangWatch
-   * instrumentations: a simple mode string ("all" | "input" | "output" |
-   * "none"), a configuration object, or a context-based predicate function.
-   * @example dataCapture: (context) => context.operationName.includes("password") ? "none" : "all"
+   * Automatic input/output data capture: a mode string ("all" | "input" |
+   * "output" | "none"), a config object, or a context-based predicate.
    * @default "all"
    */
   dataCapture?: DataCaptureOptions;
 
   /**
-   * Dedicated TracerProvider for complete trace isolation from other OTel
-   * SDKs: LangWatch attaches its exporter here and never touches the global
-   * provider, so another SDK sharing the process never sees LLM traces.
-   * @remarks Trace-only — log export needs the default setup instead.
-   * @example new NodeTracerProvider()
+   * Dedicated TracerProvider for isolation from other OTel SDKs: LangWatch
+   * attaches its exporter here without touching the global provider, so
+   * another SDK sharing the process never sees LLM traces (trace-only).
    */
   tracerProvider?: TracerProvider;
 
   /**
-   * Custom trace exporter for sending spans to external systems.
-   * If not provided, LangWatch will create its own exporter.
-   * This is a simpler alternative to spanProcessors for single exporter use cases.
-   *
-   * @example new OTLPTraceExporter({ url: "https://custom-collector.com/v1/traces" })
+   * Custom trace exporter for external systems; LangWatch creates its own
+   * if omitted. Simpler than spanProcessors for a single exporter.
    */
   traceExporter?: SpanExporter;
 
   /**
-   * Custom span processors for advanced trace processing.
-   * Use this when you need full control over batching, filtering, or
-   * custom processing logic.
-   *
-   * @example [new SimpleSpanProcessor(new LangWatchExporter())]
-   * @example [new BatchSpanProcessor(exporter, { maxExportBatchSize: 100 })]
+   * Custom span processors for full control over batching, filtering,
+   * or processing logic.
    */
   spanProcessors?: SpanProcessor[];
 
   /**
-   * Span limits configuration.
-   * Controls the maximum number of attributes, events, and links per span.
-   *
-   * @example { attributeCountLimit: 128, eventCountLimit: 128 }
+   * Span limits: max attributes, events, and links per span.
    */
   spanLimits?: SpanLimits;
 
   /**
    * Sampling strategy for controlling which traces to collect.
-   *
-   * @example new TraceIdRatioBasedSampler(0.1) // Sample 10% of traces
    */
   sampler?: Sampler;
 
   /**
    * Custom ID generator for span and trace IDs.
-   *
-   * @example new RandomIdGenerator()
    */
   idGenerator?: IdGenerator;
 
   /**
-   * Custom log record processors for advanced log processing.
-   * Use this when you need full control over batching, filtering, or
-   * custom processing logic.
-   *
-   * @example [new BatchLogRecordProcessor({ exporter, maxExportBatchSize: 100 })]
+   * Custom log record processors for full control over batching,
+   * filtering, or processing logic.
    */
   logRecordProcessors?: LogRecordProcessor[];
 
   /**
    * Custom metric reader for collecting and exporting metrics.
-   *
-   * @example new PeriodicExportingMetricReader({ exporter: new PrometheusExporter() })
    */
   metricReader?: IMetricReader;
 
   /**
-   * Metric views for controlling aggregation and filtering.
-   * Views determine which metrics are collected and how they are processed.
-   *
-   * @example [{ instrumentName: 'http.server.duration', aggregation: Aggregation.Histogram() }]
+   * Metric views: control which metrics are collected and how they're
+   * aggregated/filtered.
    */
   views?: ViewOptions[];
 
   /**
-   * Auto-instrumentation libraries to enable.
-   * These automatically capture telemetry from common libraries and frameworks.
-   *
-   * @example [new HttpInstrumentation(), new ExpressInstrumentation()]
+   * Auto-instrumentation libraries to enable, capturing telemetry from
+   * common libraries and frameworks.
    */
   instrumentations?: (Instrumentation | Instrumentation[])[];
 
   /**
-   * Whether to automatically detect and configure resource attributes.
-   * When enabled, OpenTelemetry automatically detects host, process, and environment info.
-   *
+   * Auto-detect resource attributes (host, process, environment info).
    * @default true
    */
   autoDetectResources?: boolean;
@@ -180,26 +135,20 @@ export interface SetupObservabilityOptions {
   contextManager?: ContextManager;
 
   /**
-   * Text map propagator for trace context propagation across service boundaries.
-   * Controls how trace context is serialized in HTTP headers and other carriers.
-   *
-   * @example new W3CTraceContextPropagator()
+   * Text map propagator: controls how trace context is serialized in
+   * HTTP headers and other carriers across service boundaries.
    */
   textMapPropagator?: TextMapPropagator;
 
   /**
-   * Resource detectors for automatic resource attribute detection.
-   * These detect information about the runtime environment.
-   *
-   * @example [envDetector, processDetector, hostDetector]
+   * Resource detectors for automatic detection of runtime environment
+   * attributes.
    */
   resourceDetectors?: Array<ResourceDetector>;
 
   /**
-   * Custom resource configuration representing the entity being monitored.
-   * Includes service, host, and deployment metadata.
-   *
-   * @example new Resource({ "service.name": "my-service", "service.version": "1.0.0" })
+   * Custom resource configuration for the entity being monitored
+   * (service, host, deployment metadata).
    */
   resource?: Resource;
 
@@ -209,27 +158,19 @@ export interface SetupObservabilityOptions {
    */
   debug?: {
     /**
-     * Enable console output for traces (debugging).
-     * When true, spans will be logged to the console in addition
-     * to any other configured exporters.
-     *
+     * Log spans to the console in addition to configured exporters.
      * @default false
      */
     consoleTracing?: boolean;
 
     /**
-     * Enable console output for logs (debugging).
-     * When true, log records will be logged to the console in addition
-     * to any other configured exporters.
-     *
+     * Log records to the console in addition to configured exporters.
      * @default false
      */
     consoleLogging?: boolean;
 
     /**
-     * Log level for LangWatch SDK internal logging.
-     * Controls verbosity of SDK diagnostic messages.
-     *
+     * Log level for LangWatch SDK internal diagnostic messages.
      * @default 'warn'
      */
     logLevel?: "debug" | "info" | "warn" | "error";
@@ -247,86 +188,66 @@ export interface SetupObservabilityOptions {
    */
   advanced?: {
     /**
-     * Whether to throw errors during setup or return no-op handles. When
-     * false (default), setup errors are logged but no-op handles are
-     * returned instead, so a setup failure never breaks your application.
+     * Throw during setup instead of returning no-op handles; false means
+     * a setup failure is logged but never breaks your application.
      * @default false
      */
     throwOnSetupError?: boolean;
 
     /**
-     * Skip OpenTelemetry setup entirely and return no-op handles.
-     * Useful when you want to handle OpenTelemetry setup yourself.
-     *
+     * Skip OpenTelemetry setup and return no-op handles, for when you
+     * set up OpenTelemetry yourself.
      * @default false
      */
     skipOpenTelemetrySetup?: boolean;
 
     /**
-     * Force reinitialization of OpenTelemetry even if already set up.
-     *
-     * WARNING: This can cause conflicts and is primarily intended for testing.
-     * Use with extreme caution in production.
-     *
+     * Force OpenTelemetry reinitialization even if already set up.
+     * WARNING: can cause conflicts; testing only, avoid in production.
      * @default false
      */
     UNSAFE_forceOpenTelemetryReinitialization?: boolean;
 
     /**
      * Attach LangWatch processors to an existing global TracerProvider
-     * instead of returning a no-op when another OTel-based SDK already
-     * initialized one. Combine with LangWatchTraceExporter filter options to
-     * scope LangWatch to only LLM-related spans.
-     *
+     * instead of no-op'ing when another OTel SDK already initialized one.
      * @default false
      */
     attachToExistingProvider?: boolean;
 
     /**
-     * Disable all observability setup and return no-op handles. Useful for
-     * testing or when you want to disable observability without changing code.
-     *
+     * Disable all observability setup and return no-op handles, for
+     * testing or disabling without code changes.
      * @default false
      */
     disabled?: boolean;
 
     /**
-     * Disable the automatic shutdown of the observability system on
-     * `beforeExit` / `SIGINT` / `SIGTERM`. The SDK flushes then stands aside
-     * rather than terminating your process — except when its handler is the
-     * only listener for a signal, when it re-raises the signal so the process
-     * still ends. `process.exit()` (e.g. vitest) bypasses these handlers.
-     * @default false
+     * Disable auto shutdown on `beforeExit`/`SIGINT`/`SIGTERM` (off by
+     * default). The SDK flushes then stands aside, re-raising the signal
+     * only if it was the sole listener; `process.exit()` bypasses this.
      */
     disableAutoShutdown?: boolean;
 
     /**
-     * Exit the process with status 0 as soon as the automatic shutdown has
-     * flushed. WARNING: this cuts off any other in-flight `SIGINT`/`SIGTERM`
-     * listener (queue drains, writes) and reports success regardless. Leave
-     * it off unless your process now fails to exit on a signal; ignored when
-     * `disableAutoShutdown` is set.
-     * @default false
+     * Exit with status 0 once shutdown flushes (off by default). WARNING:
+     * cuts off any other in-flight signal listener and reports success
+     * regardless; ignored when `disableAutoShutdown` is set.
      */
     UNSAFE_exitProcessAfterAutoShutdown?: boolean;
   };
 }
 
 /**
- * Handle returned from observability setup. Use the `shutdown` function
- * yourself when automatic shutdown is disabled, or process signals aren't
- * available (e.g. test runners that call `process.exit()`).
- *
- * @example const { shutdown } = setupObservability({ advanced: { disableAutoShutdown: true } });
+ * Handle returned from observability setup. Call `shutdown` yourself when
+ * automatic shutdown is disabled, or signals aren't available (e.g. test
+ * runners that call `process.exit()`).
  */
 export interface ObservabilityHandle {
   /**
-   * Gracefully shuts down the observability system: flushes pending traces,
-   * closes the exporter, shuts down the tracer provider, and cleans up
-   * registered instrumentations. Call it when the application is terminating.
-   *
+   * Gracefully shuts down: flushes pending traces, closes the exporter,
+   * and cleans up instrumentations. Call when the application terminates.
    * @returns Promise that resolves when shutdown is complete
-   * @example process.on('SIGTERM', async () => { await shutdown(); process.exit(0); });
    */
   shutdown: () => Promise<void>;
 }

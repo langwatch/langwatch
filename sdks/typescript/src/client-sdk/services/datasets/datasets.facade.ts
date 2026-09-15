@@ -27,11 +27,8 @@ type DatasetsFacadeConfig = {
 
 /**
  * Facade for dataset operations in the LangWatch SDK.
- *
  * @example
- * ```typescript
  * const datasets = await langwatch.datasets.list();
- * ```
  */
 export class DatasetsFacade {
   readonly #datasetService: DatasetService;
@@ -42,7 +39,6 @@ export class DatasetsFacade {
 
   /**
    * Lists all datasets for the project, with optional pagination.
-   *
    * @param options - Pagination options (page, limit)
    * @returns Paginated list of datasets with metadata
    */
@@ -52,7 +48,6 @@ export class DatasetsFacade {
 
   /**
    * Creates a new dataset.
-   *
    * @param options - Dataset creation options (name, columnTypes)
    * @returns The created dataset metadata
    */
@@ -65,7 +60,6 @@ export class DatasetsFacade {
 
   /**
    * Fetches a dataset by its slug or ID, returning metadata and entries.
-   *
    * @param slugOrId - The slug or ID of the dataset to fetch
    * @param options - Optional configuration
    * @returns The dataset with metadata and entries
@@ -79,7 +73,6 @@ export class DatasetsFacade {
 
   /**
    * Updates a dataset by its slug or ID.
-   *
    * @param slugOrId - The slug or ID of the dataset to update
    * @param options - Fields to update (name, columnTypes)
    * @returns The updated dataset metadata
@@ -95,7 +88,6 @@ export class DatasetsFacade {
 
   /**
    * Deletes (archives) a dataset by its slug or ID.
-   *
    * @param slugOrId - The slug or ID of the dataset to delete
    * @returns The archived dataset metadata
    */
@@ -105,7 +97,6 @@ export class DatasetsFacade {
 
   /**
    * Creates records in a dataset in batch.
-   *
    * @param slugOrId - The slug or ID of the dataset
    * @param entries - Array of record entries to create
    * @returns The created records with IDs
@@ -122,7 +113,6 @@ export class DatasetsFacade {
 
   /**
    * Updates a single record in a dataset.
-   *
    * @param slugOrId - The slug or ID of the dataset
    * @param recordId - The ID of the record to update
    * @param entry - The updated entry data
@@ -138,7 +128,6 @@ export class DatasetsFacade {
 
   /**
    * Deletes records from a dataset by IDs.
-   *
    * @param slugOrId - The slug or ID of the dataset
    * @param recordIds - Array of record IDs to delete
    * @returns Object with the count of deleted records
@@ -149,7 +138,6 @@ export class DatasetsFacade {
 
   /**
    * Lists records in a dataset with optional pagination.
-   *
    * @param slugOrId - The slug or ID of the dataset
    * @param options - Pagination options (page, limit)
    * @returns Paginated list of records
@@ -163,7 +151,6 @@ export class DatasetsFacade {
 
   /**
    * Uploads a file to a dataset with a strategy for existing datasets (default "append").
-   *
    * @param slugOrId - The slug or ID of the dataset
    * @param file - The file to upload (File or Blob)
    * @param options - Upload options including the ifExists strategy

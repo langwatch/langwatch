@@ -70,15 +70,13 @@ const dark = {
   },
 } as const;
 
-/**
- * Headings use Sentient from Fontshare (fallback to serif stack where remote fonts
- * unavailable). Weight and tracking stay the same in both.
- */
-/**
- * Where fine print sends readers who want to know more.
- */
+/** Where fine print sends readers who want to know more. */
 export const DOCUMENTATION_URL = "https://docs.langwatch.ai";
 
+/**
+ * Headings use Sentient from Fontshare (fallback to serif stack where remote
+ * fonts unavailable). Weight and tracking stay the same in both.
+ */
 const HEADING_FONT = '"Sentient", ui-serif, Georgia, "Times New Roman", serif';
 const BODY_FONT =
   '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif';
@@ -97,11 +95,9 @@ const SPACE = { finePrint: 18, row: 16, block: 26, header: 24, cardTop: 34, card
 const RADIUS = { card: "14px", field: "10px", action: "999px" } as const;
 
 /**
- * The one expressive flourish: the site's mesh, cut to a band.
- *
- * What survives from a shader over a whole viewport is the colour order, as a
- * static strip under the wordmark. The gradient sits over a solid colour, so a
- * client that drops gradients gets a quiet warm rule rather than a gap.
+ * The one expressive flourish: the site's mesh, cut to a band. The gradient
+ * sits over a solid colour, so a client that drops gradients gets a quiet
+ * warm rule under the wordmark rather than a gap.
  */
 const MESH = {
   light: {
@@ -122,22 +118,17 @@ const WORDMARK_LIGHT = "https://app.langwatch.ai/images/logo.png";
 const WORDMARK_DARK = "https://app.langwatch.ai/images/logo-full-darktheme.svg";
 
 /**
- * Hiding one of a pair of assets, against an inline `display: block`.
- *
- * `Img` writes an inline `display: block` that outranks a class rule without
- * `!important`, so the wrong wordmark drew through. Everything that could still
- * reserve space or draw the `alt` goes with it, and the shown cut restores each.
+ * Hiding one of a pair of assets, against an inline `display: block` that
+ * `Img` writes and outranks a class rule without `!important` — so the wrong
+ * wordmark drew through. Space and `alt` go with it; the shown cut restores each.
  */
 const HIDDEN_ASSET = `display: none !important; mso-hide: all; width: 0 !important; max-height: 0 !important; overflow: hidden !important; font-size: 0 !important; line-height: 0 !important;`;
 const SHOWN_ASSET = `display: block !important; width: 112px !important; max-height: none !important; overflow: visible !important; font-size: 20px !important; line-height: normal !important;`;
 
 /**
- * The face, from the people who publish it.
- *
- * Both the stylesheet link and an `@font-face` of the same files: a client that
- * drops `<link>` but keeps a `<style>` block still gets the font, and a client
- * that drops both falls through to the stack with nothing to clean up. `swap`
- * so a heading is never invisible while the file arrives.
+ * The face, from the people who publish it: both a stylesheet `<link>` and
+ * an `@font-face` of the same files, so dropping either still gets the font
+ * (dropping both falls through cleanly). `swap` keeps headings visible while it loads.
  */
 const SENTIENT_STYLESHEET = "https://api.fontshare.com/v2/css?f[]=sentient@400&display=swap";
 const SENTIENT_FILES =
@@ -283,11 +274,9 @@ export const EmailLayout = ({
 );
 
 /**
- * The wordmark, with the brand name as its own fallback.
- *
- * The `alt` is styled for the clients that block images by default: where the
- * mark does not draw, the word "LangWatch" arrives in the site's serif at the
- * same size, which is the wordmark set in type rather than a broken-image box.
+ * The wordmark, with the brand name as its own fallback. The `alt` is styled
+ * for clients that block images by default: where the mark doesn't draw,
+ * "LangWatch" arrives in the site's serif at the same size, not a broken-image box.
  */
 const Wordmark = ({
   src,
@@ -319,11 +308,9 @@ const Wordmark = ({
 );
 
 /**
- * The mesh band, as a table cell with a solid colour behind the gradient.
- *
- * Outlook draws no percentage-width `div`, so this is a one-cell table. The
- * height is the cell's own `height`, `line-height` and zero font size rather
- * than anything inside it, which is the only way a 3 pixel row stays 3 pixels.
+ * The mesh band: a table cell with a solid colour behind the gradient.
+ * Outlook draws no percentage-width `div`, so this is a one-cell table whose
+ * own `height`/`line-height`/zero font-size — not its contents — keep a 3px row 3px.
  */
 const MeshBand = () => (
   <table
@@ -570,12 +557,9 @@ export const DetailTable = ({ rows }: { rows: readonly { label: string; value: R
 );
 
 /**
- * One column of a data table.
- *
- * `align` is the whole of the numeric treatment a mail can carry: tabular
- * figures are asked for and the client either has them or does not, but a
- * right edge lines up in every client there is, and a column of counts that
- * does not line up is the difference between a table and a list.
+ * One column of a data table. `align` is the whole numeric treatment a mail
+ * can carry: tabular figures are asked for but not guaranteed, while a right
+ * edge lines up everywhere — the difference between a table and a list.
  */
 export interface DataColumn {
   key: string;
@@ -690,12 +674,9 @@ export const DataTable = ({
 };
 
 /**
- * A code block with its tokens coloured.
- *
- * The colour is inline for the clients that read no stylesheet and a class for
- * the ones that honour the dark block, which is the same two-cut rule the rest
- * of this shell follows. A plain token gets neither, so the markup is a block
- * of text with a few spans in it rather than a span per word.
+ * A code block with its tokens coloured: inline colour for clients with no
+ * stylesheet, a class for ones honouring the dark block — the same two-cut
+ * rule the rest of this shell follows. A plain token gets neither.
  */
 export const HighlightedCode = ({
   code,

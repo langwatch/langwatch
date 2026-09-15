@@ -29,12 +29,9 @@ function extractRawSql(args: unknown): string | null {
 }
 
 /**
- * Genuinely global / cross-cutting models with no tenancy column at all: the
- * NextAuth identity tables, the top-level tenancy entities themselves (queried
- * by their own id / slug), and cluster-wide config. None can carry a projectId
- * and none is org-scoped, so each is listed here by hand. The partition test
- * forbids any org-bearing model from appearing here - those derive from the org
- * registry instead (see the EXEMPT_MODELS computation below).
+ * Global / cross-cutting models with no tenancy column: NextAuth tables,
+ * top-level tenancy entities (by id/slug), and cluster config. The partition
+ * test forbids any org-bearing model here — those derive from EXEMPT_MODELS.
  */
 const GLOBAL_MODELS = [
   // NextAuth identity tables.
@@ -81,11 +78,9 @@ const GLOBAL_MODELS = [
 ] as const;
 
 /**
- * Relational join / membership tables bounded by a parent foreign key or a
- * composite primary key rather than a projectId or organizationId column. They
- * are reached through their parent (or written via nested writes), never with a
- * bare top-level query, so the projectId requirement does not apply. Listed by
- * hand because there is no scope column to derive from.
+ * Relational join / membership tables bounded by a parent FK or composite
+ * key rather than a projectId/organizationId column — reached only through
+ * their parent, never a bare top-level query, so projectId doesn't apply.
  */
 const RELATIONAL_PARENT_SCOPED = [
   // Membership join tables: @@id([userId, <parent>]).
@@ -102,10 +97,9 @@ const RELATIONAL_PARENT_SCOPED = [
 ] as const;
 
 /**
- * Project-scoped models (they DO carry projectId) that are additionally read by
- * org-level license-counting queries walking project.team.organizationId with
- * no projectId in the WHERE. Exempt so those org rollups don't throw; their
- * normal project-scoped writes still carry projectId.
+ * Project-scoped models (they DO carry projectId) also read by org-level
+ * license-counting queries walking project.team.organizationId with no
+ * projectId in the WHERE. Exempted only for that read; writes still enforce.
  */
 const LICENSE_COUNTED_PROJECT_MODELS = [
   "Workflow",
@@ -121,12 +115,9 @@ const LICENSE_COUNTED_PROJECT_MODELS = [
  */
 type ScopedModelConfig = {
   /**
-   * Where-clause validator. Returns `null` if OK, error message otherwise.
-   *
-   * `action` is the Prisma action being guarded, so a model can hold bulk
-   * writes (`updateMany` / `deleteMany`) to a stricter predicate than reads:
-   * a where clause that is merely a bounded *view* of many tenants is still
-   * an unbounded *edit* of them.
+   * Where-clause validator: null if OK, an error message otherwise. `action`
+   * lets bulk writes (`updateMany`/`deleteMany`) hold a stricter predicate
+   * than reads — a bounded *view* of many tenants is still an unbounded *edit*.
    */
   validateWhere: (where: any, action?: string) => string | null;
   /** Data validator for create / createMany. */
@@ -134,10 +125,9 @@ type ScopedModelConfig = {
 };
 
 /**
- * A scopeId value is acceptable when it's either a string (single
- * id) or a Prisma list filter `{ in: [...] }` with a non-empty array.
- * Both shapes constrain the query to a finite, caller-known scope
- * set; `{}` or a bare `{ in: [] }` would not, so we keep them out.
+ * A scopeId value is acceptable as a string (single id) or a Prisma list
+ * filter `{ in: [...] }` with a non-empty array — both constrain the query
+ * to a finite, caller-known scope; `{}` or `{ in: [] }` would not, so both are rejected.
  */
 const isScopeIdValue = (value: any): boolean => {
   if (typeof value === "string") return true;
@@ -159,13 +149,11 @@ const hasScopePredicate = (where: any): boolean => {
   if (typeof where.scopeType === "string" && isScopeIdValue(where.scopeId)) {
     return true;
   }
-  // Nested through a `scopes` relation (`{ scopes: { some: ... } }`),
-  // either a single predicate or an OR-list. Every OR-branch must be
-  // a valid scope predicate so a query can't sneak in `{ OR: [{}] }`
-  // and walk every row. scopeId accepts both `string` and `{ in: [...] }`
-  // shapes - the cascade walker passes lists for TEAM / PROJECT tiers
-  // (every team in the org / every project in the org the caller can
-  // see), and that list IS the tenancy constraint.
+  // Nested through a `scopes` relation (`{ scopes: { some: ... } }`), single
+  // or OR-list — every OR-branch must be valid so a query can't sneak in
+  // `{ OR: [{}] }` and walk every row. scopeId accepts `string` or
+  // `{ in: [...] }`; the cascade walker's lists for TEAM/PROJECT tiers ARE
+  // the tenancy constraint.
   const some = where.scopes?.some;
   if (some && typeof some === "object") {
     if (typeof some.scopeType === "string" && isScopeIdValue(some.scopeId)) {
@@ -720,21 +708,17 @@ const SCOPED_MODELS: Record<string, ScopedModelConfig> = {
     },
   },
   // In-place system migration state (@langwatch/system-migrations). Its
-  // tenancy column is `tenantId` - deliberately not an FK, because the runner
-  // is generic over whatever a migration calls a tenant (an organization, for
-  // ADR-092 stage B). Two shapes are legitimately bounded: one tenant's row
-  // (what the runner and the authz fallback gate read), and one migration's
-  // rows across tenants (the platform-scope ops rollup, which is the whole
-  // point of the dashboard). A query naming neither would walk every
-  // migration's every tenant, so it throws.
+  // tenancy column `tenantId` isn't an FK — the runner is generic over
+  // whatever a migration calls a tenant (ADR-092 stage B). Two shapes are
+  // legitimate: one tenant's row, or one migration across all tenants (the
+  // ops rollup); naming neither would walk every migration's every tenant.
   SystemMigrationTenantState: {
     validateWhere: (where, action) => {
-      // A migration-wide predicate is a legitimate way to READ (the ops
-      // rollup lists one migration across tenants) and never a legitimate
-      // way to WRITE: `deleteMany({ where: { migrationName } })` would drop
-      // every tenant's row at once, and the rows it drops include the
-      // `finalized` latches - silently returning every switched-over
-      // organization to its legacy path. Bulk writes must name a tenant.
+      // A migration-wide predicate is legitimate for READ (the ops rollup
+      // lists one migration across tenants), never for WRITE:
+      // `deleteMany({ where: { migrationName } })` would drop every tenant's
+      // `finalized` latch at once, silently reverting every org to its
+      // legacy path. Bulk writes must name a tenant.
       const bulkWrite = action === "updateMany" || action === "deleteMany";
       const reason = bulkWrite
         ? "requires a tenantId in the where clause (a migration-wide bulk write would rewrite every tenant's migration state)"
@@ -798,13 +782,11 @@ const EXEMPT_MODELS = new Set<string>([
 const _guardProjectId = ({ params }: { params: GuardParams }) => {
   const action = params.action;
 
-  // Raw queries (`$queryRaw`, `$executeRaw`) carry their tenancy scope
-  // inside the SQL string itself, where the structural guard cannot see
-  // it. Two cheap structural defences still apply: require the SQL text
-  // to mention a tenancy column, or accept an explicit grep-able
-  // `-- @tenancy: <reason>` opt-out for genuinely cross-tenant queries.
-  // This must run BEFORE the no-model exemption below: raw ops have no
-  // `params.model`, so an earlier `!params.model` return would skip it.
+  // Raw queries (`$queryRaw`/`$executeRaw`) carry tenancy scope inside the
+  // SQL string, invisible to the structural guard. Two cheap defences apply:
+  // require a tenancy column mention, or a grep-able `-- @tenancy: <reason>`
+  // opt-out. Must run BEFORE the no-model exemption below — raw ops have no
+  // `params.model`, so an earlier `!params.model` return would skip this.
   if (action === "queryRaw" || action === "executeRaw") {
     const sql = extractRawSql(params.args);
     if (!sql) return;
@@ -828,12 +810,11 @@ const _guardProjectId = ({ params }: { params: GuardParams }) => {
 
   const model = params.model;
 
-  // Scoped models opt in to a stricter check than EXEMPT_MODELS:
-  // SOMETHING tenancy-shaped (row id, scope predicate, parent FK,
-  // or legacy projectId) MUST be present on every query. A bare
-  // `findMany()` or a where-without-scope-predicate throws here
-  // instead of quietly leaking across tenants. See SCOPED_MODELS
-  // comment for the rationale.
+  // Scoped models opt in to a stricter check than EXEMPT_MODELS: SOMETHING
+  // tenancy-shaped (row id, scope predicate, parent FK, or legacy projectId)
+  // MUST be present on every query. A bare `findMany()` or a
+  // where-without-scope-predicate throws here instead of quietly leaking
+  // across tenants. See SCOPED_MODELS for the rationale.
   if (model && SCOPED_MODELS[model]) {
     const config = SCOPED_MODELS[model];
     if (action === "create" || action === "createMany") {
@@ -851,12 +832,10 @@ const _guardProjectId = ({ params }: { params: GuardParams }) => {
     return;
   }
 
-  // ShareLink resolution: an anonymous viewer presents only a share token (or
-  // internal id) — the projectId is what the row teaches them, so it cannot be
-  // required in the where. The `token` lookup is the capability path; `id`
-  // covers the pre-revocation ownership check. Deliberately NO other lookup
-  // shape is exempt: everything else on ShareLink must carry projectId.
-  // See ADR-057.
+  // ShareLink resolution: an anonymous viewer presents only a share token
+  // (or id) — the projectId is what the row teaches them, so it cannot be
+  // required in the where. `token` is the capability path; `id` covers the
+  // pre-revocation ownership check. No other lookup shape is exempt (ADR-057).
   if (
     (action === "findFirst" || action === "findUnique") &&
     model === "ShareLink" &&
@@ -876,14 +855,11 @@ const _guardProjectId = ({ params }: { params: GuardParams }) => {
     return;
   }
 
-  // Gateway warm-cache resolver: /api/internal/gateway/config/:vk_id
-  // hits findUnique({ where: { id: vkId }}) because the gateway
-  // already authenticated the VK via resolve-key and now needs the
-  // full config payload (keyed by id it learned from the JWT). The
-  // HMAC-signed transport + JWT validation upstream is the tenancy
-  // check; adding projectId here would require a redundant JWT
-  // lookup. Narrow: only findUnique on VirtualKey with a bare id in
-  // the where clause - everything else still under the normal guard.
+  // Gateway warm-cache resolver: /api/internal/gateway/config/:vk_id hits
+  // findUnique({ where: { id: vkId }}) after the gateway already
+  // authenticated the VK via resolve-key. HMAC-signed transport + JWT
+  // validation upstream IS the tenancy check; adding projectId here would
+  // need a redundant JWT lookup. Narrow: only findUnique/VirtualKey/bare id.
   if (
     action === "findUnique" &&
     model === "VirtualKey" &&

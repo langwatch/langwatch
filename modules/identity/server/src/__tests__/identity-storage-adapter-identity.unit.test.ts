@@ -16,9 +16,8 @@ type Stack = IdentityStack;
 
 /**
  * The issuer better-auth 1.7 keys an account by, for a provider with none of
- * its own. Inlined rather than imported: the builder lives only in
- * `@better-auth/core/db`, and taking that dependency for two lines of string
- * construction would widen the seam just for a test.
+ * its own. Inlined rather than imported since the builder lives only in
+ * `@better-auth/core/db`, not worth a dependency for two lines of string construction.
  */
 const oauthIssuer = (providerId: string): string => `local:oauth:${encodeURIComponent(providerId)}`;
 
@@ -39,10 +38,9 @@ const statedIdentifiers = (stack: Stack) =>
 const accountRow = (stack: Stack, id: string) => stack.db.account?.find((row) => row.id === id);
 
 /**
- * The `Account` row the fold maintains during the bridge phase, since the
- * memory engine has no fold of its own. The issuer is not decoration:
- * better-auth 1.7 finds a credential account by `(providerId, issuer,
- * accountId)`, so a row missing it reads to the customer as a wrong password.
+ * The `Account` row the fold maintains during the bridge phase (the memory
+ * engine has no fold of its own). The issuer isn't decoration: better-auth
+ * 1.7 keys the credential account by it, so a missing value reads as a wrong password.
  */
 function seedBridgeRow(stack: Stack, accountId: string): void {
   stack.db.account?.push({
@@ -322,10 +320,9 @@ describe("better-auth over the identity storage adapter", () => {
 
     describe("when the account key names a real issuer", () => {
       /**
-       * The issuer a provider brings itself. Google's is this URL, and it is
-       * hardcoded in better-auth's own provider rather than configurable, so
-       * `local:oauth:google` — what a derivation from the provider id would
-       * produce — is simply the wrong key for a Google account.
+       * The issuer a provider brings itself. Google's is this URL, hardcoded
+       * in better-auth's own provider rather than configurable — so
+       * `local:oauth:google`, a derivation from the provider id, is the wrong key.
        */
       const GOOGLE_ISSUER = "https://accounts.google.com";
 
@@ -1092,11 +1089,9 @@ describe("better-auth over the identity storage adapter", () => {
   });
 
   /**
-   * Enterprise SSO: a latched user signing in through an IdP callback with
-   * no legacy `Account` row behind them. The hazard: `Identifier.provider`
-   * folds every enterprise IdP into `oidc`, while `Identifier.providerId`
-   * keeps better-auth's own id verbatim — and the verbatim one must come
-   * back out, or no configured provider would match the row again.
+   * Enterprise SSO: a latched user signing in via IdP callback with no legacy
+   * `Account` row. `Identifier.provider` folds every IdP into `oidc`, but
+   * `providerId` must come back verbatim or no configured provider matches.
    */
   describe("given a latched user who signs in through an enterprise IdP", () => {
     let stack: Stack;
@@ -1174,10 +1169,9 @@ describe("better-auth over the identity storage adapter", () => {
       });
 
       /**
-       * The cross-tenant sign-in this branch found and fixed: the lookup used
-       * to fold `auth0` and `okta` into `oidc` and match on that, so two IdPs
-       * minting the same subject collapsed onto one identifier and signed the
-       * second customer in as the first. Keyed on the verbatim `providerId` now.
+       * Regression: keying the lookup on the folded `oidc` provider instead
+       * of verbatim `providerId` would collapse two IdPs minting the same
+       * subject onto one identifier, signing the second customer in as the first.
        */
       it("resolves each IdP's subject to its own user when the subject strings collide", async () => {
         // One subject string, two different enterprise IdPs, two different

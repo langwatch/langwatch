@@ -1,8 +1,7 @@
 /**
- * One vocabulary for every card shape: ~90 CLI commands collapse into handful
- * of shapes. Measured (CLI-generated, stamped server-side) and Derived (Langy
- * JSON inline) channels use the same vocabulary but differ in tolerance: measured
- * preserves unknown fields, derived validates strictly. See ADR-079 and ADR-060.
+ * One vocabulary for every card shape: Measured (CLI-generated) and Derived
+ * (Langy JSON inline) channels share it but differ in tolerance — measured
+ * preserves unknown fields, derived validates strictly. ADR-079, ADR-060.
  */
 import * as z from "zod";
 import {
@@ -69,12 +68,9 @@ export const metricsCardSchema = z.looseObject({
 });
 
 /*
- * ── THE SHARED SHAPE VOCABULARY ────────────────────────────────────────────
- *
- * The pieces both channels are built from. A field map (`…Fields`) is spread
+ * ── THE SHARED SHAPE VOCABULARY ──────────────────────────────────────────
+ * The pieces both channels are built from: a field map (`…Fields`) is spread
  * into whichever object mode the channel needs; a leaf schema is used as-is.
- * Nothing below is declared twice anywhere in the codebase — that duplication,
- * and the header comment admitting to it, is what this module exists to end.
  */
 
 /** How to format values. Drives the axis, the tooltip and the comparison. */
@@ -99,10 +95,9 @@ export const timeseriesComparisonFields = {
 export const tableCellSchema = z.union([z.string(), z.number(), z.boolean(), z.null()]);
 
 /**
- * `table` — named columns, rows of primitive cells.
- *
- * Row length is deliberately not pinned to the column count: a ragged row
- * renders short rather than failing the whole card.
+ * `table` — named columns, rows of primitive cells. Row length is
+ * deliberately not pinned to the column count: a ragged row renders short
+ * rather than failing the whole card.
  */
 export const tableCardFields = {
   title: z.string().optional(),
@@ -125,12 +120,9 @@ export const statsCardFields = {
 } as const;
 
 /**
- * `choices` — a question with grounded options (ADR-060 §6).
- *
- * An option may ground itself in a real entity via `ref`; the platform
- * hydrates the ref as the VIEWER through the existing id-reference seam, so a
- * dead ref renders disabled and a live one renders with current,
- * permission-true detail.
+ * `choices` — a question with grounded options (ADR-060 §6). An option may
+ * ground itself in a real entity via `ref`, hydrated as the VIEWER through
+ * the id-reference seam: a dead ref renders disabled, a live one current.
  */
 export const choicesCardFields = {
   question: z.string().min(1),
@@ -267,12 +259,9 @@ export const namesCreatedResource = (payload: unknown): boolean => {
 };
 
 /**
- * `<resource> create` — the card that says a NEW thing exists.
- *
- * Strictly narrower than {@link resourceCardSchema} on purpose: this is the one
- * write card whose copy asserts a fact the payload has to substantiate, so a
- * payload that names nothing must not parse as one. The panel then renders the
- * outcome as unconfirmed instead of manufacturing a success out of `[]`.
+ * `<resource> create` — the card that says a NEW thing exists. Strictly
+ * narrower than {@link resourceCardSchema} on purpose: a payload naming
+ * nothing must not parse as one, or the panel manufactures success from `[]`.
  */
 export const createdResourceCardSchema = resourceCardSchema.refine(namesCreatedResource, {
   message: "a created-resource result must name the resource it created",
@@ -299,11 +288,9 @@ export const spendProbeSchema = z.union([
 ]);
 
 /**
- * `evaluator get`, `monitor get` — the config card.
- *
- * What a user asks about an evaluator is what it checks and whether it is on, so
- * the discriminator is an explicit enabled/type flag. A bare `{ name }` is every
- * resource in the product and must never land here.
+ * `evaluator get`, `monitor get` — the config card, discriminated on an
+ * explicit enabled/type flag (what it checks, whether it's on) rather than
+ * a bare `{ name }`, which is every resource in the product.
  */
 export const evaluatorConfigCardSchema = resourceCardSchema;
 
@@ -315,10 +302,9 @@ export const evaluatorConfigProbeSchema = z.union([
 ]);
 
 /**
- * `dashboard get`, `graph get` — the one resource that genuinely IS a visual.
- *
- * Discriminated on carrying graph/panel definitions rather than on the noun, so
- * a dashboard payload renders as one wherever it came from.
+ * `dashboard get`, `graph get` — the one resource that genuinely IS a visual,
+ * discriminated on carrying graph/panel definitions rather than on the noun,
+ * so a dashboard payload renders as one wherever it came from.
  */
 export const dashboardCardSchema = resourceCardSchema;
 
@@ -331,11 +317,8 @@ export const dashboardProbeSchema = z.union([
 
 /**
  * Every card the panel can draw, whichever channel wrote it. ONE list, so the
- * measured and derived channels cannot grow separate vocabularies.
- *
- * Both channels are SUBSETS of this list: {@link MEASURED_CARD_KINDS} below,
- * and the derived allowlist in `derived-safe.ts`. Neither subset is the whole,
- * and neither is allowed to be — see {@link CARD_SHAPE}.
+ * measured and derived channels cannot grow separate vocabularies. Both are
+ * SUBSETS of this ({@link MEASURED_CARD_KINDS}, `derived-safe.ts`'s allowlist).
  */
 export const CARD_KINDS = [
   "traces",

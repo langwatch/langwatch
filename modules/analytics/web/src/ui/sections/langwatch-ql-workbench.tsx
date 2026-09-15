@@ -45,10 +45,9 @@ export interface LangWatchQLWorkbenchQuery {
   readonly setParameters: (parameters: Readonly<Record<string, LangWatchQLParameterValue>>) => void;
   readonly setTimeWindow: (timeWindow: LangWatchQLTimeWindowValues | undefined) => void;
   /**
-   * The bucketing step the next submission carries, or `undefined` for a
-   * statement that does not declare one. Surface-owned exactly like the
-   * window: sending it for a statement that never asked makes it a reserved
-   * value the backend refuses.
+   * The bucketing step the next submission carries, `undefined` when the
+   * statement doesn't declare one. Surface-owned like the window: sending
+   * it for a statement that never asked is a reserved value the backend refuses.
    */
   readonly setGranularity: (granularitySeconds: LangWatchQLGranularityStep | undefined) => void;
   readonly runQuery: () => void;
@@ -116,14 +115,9 @@ const NO_FAILURE_VIEW: FailureView = {
 };
 
 /**
- * Splits the names a missing-parameter refusal listed into the ones a member
- * can actually fill in and the reserved ones they cannot.
- *
- * A reserved name reaching that list is not a member's omission: it is the
- * surface's own to supply, and the granularity step's arrives on the very first
- * run of a statement that declares it. Prompting for it sends the member to a
- * form where typing the name is itself refused — a catch-22 with no third move,
- * which is exactly what this split removes. The step gets its own control.
+ * Splits refusal-listed names into ones a member can fill in vs reserved
+ * ones the surface owns — prompting for a reserved name is a catch-22 (the
+ * value itself gets refused), which is exactly what this split avoids.
  */
 function splitMissing(names: readonly string[]): {
   fillable: readonly string[];
@@ -157,12 +151,9 @@ function failureView(state: LangWatchQLRequestState): FailureView {
 }
 
 /**
- * The step the visible answer was bucketed at, when it reports one.
- *
  * Read off the result because only the backend parses the statement.
- * Staleness is not consulted, because choosing a step is itself what makes the
- * visible result stale — and the note this feeds describes the answer on
- * screen, which is exactly the stale one.
+ * Staleness is deliberately not consulted: choosing a step is itself what
+ * makes the result stale, and this describes exactly that (now-stale) answer.
  */
 function ranAtGranularityOf(state: LangWatchQLRequestState): {
   ranAt?: number;
@@ -179,17 +170,9 @@ function ranAtGranularityOf(state: LangWatchQLRequestState): {
 }
 
 /**
- * What the last answer said about the statement declaring the step.
- *
- * `undefined` when the answer says nothing either way, which is every failure
- * other than the unfilled-step refusal — a timeout tells you nothing about what
- * the statement declares, so it must not be read as a denial.
- *
- * Deliberately NOT filtered by staleness, unlike the markers. The step is part
- * of the draft, so choosing one makes the visible result stale by definition;
- * hiding the picker on that basis would retract the very control that was just
- * used. Staleness governs what a result *claims*, not whether the control that
- * produced it exists.
+ * `undefined` means the answer said nothing (any failure but the unfilled-
+ * step refusal) — never read as a denial. Deliberately NOT filtered by
+ * staleness like the markers: that would retract the control just used.
  */
 function granularityDeclaredBy(
   state: LangWatchQLRequestState,
@@ -201,23 +184,9 @@ function granularityDeclaredBy(
 }
 
 /**
- * The step the workbench sends, held for the member.
- *
- * Shows the coarsest offered step rather than the finest: the coarsest is the
- * one that fits the bucket budget over any period a page can show, so the first
- * run of a granularity statement answers instead of being refused for asking a
- * finer question than the member ever asked for.
- *
- * That shown step is NOT written into the draft until the member picks one or
- * runs, and the distinction is load-bearing. The picker appears in response to
- * a refusal; writing to the draft as it appeared would move the draft away from
- * the snapshot that refusal belongs to, marking it stale — and a stale refusal
- * has its annotations withdrawn, so the very act of offering the step would
- * erase the rest of the refusal that prompted it, including the member's own
- * missing parameters. What the picker renders as pressed and what a submission
- * carries must still be the same number, so `run` writes the shown step —
- * chosen or default — into the draft at the moment Run is pressed, when
- * staling the refusal is exactly what running does anyway.
+ * Shows the coarsest offered step (fits the bucket budget over any period).
+ * NOT written to the draft until picked/run — writing it as shown would stale
+ * the very refusal offering it, erasing that refusal's other annotations too.
  */
 function useWorkbenchGranularity({
   query,
@@ -240,22 +209,19 @@ function useWorkbenchGranularity({
     revision: number;
     step: LangWatchQLGranularityStep;
   } | null>(null);
-  // Held rather than derived per render, and this is load-bearing. Sending the
-  // step puts it in the draft, which makes the visible result stale; deriving
-  // "does it declare one" from that same result would flip the answer back,
-  // clear the step, un-stale the result, and set it again — an update loop
-  // through the store. What the statement declares is a fact about a past
-  // answer, so it is remembered as one.
+  // Held, not derived per render — load-bearing. Deriving "does it declare
+  // one" from the (now-stale) result would flip the answer back, clear the
+  // step, un-stale the result, and set it again: an update loop through the
+  // store. What the statement declares is a fact about a past answer, kept as one.
   const [shown, setShown] = useState<{ revision: number; on: boolean }>({
     revision: openedRevision,
     on: false,
   });
   // The revision the last submission ran under. `declared` is read off the
-  // live outcome, and the outcome does not know which chart earned it: open a
-  // chart whose statement is byte-identical to a refused one and the old
-  // refusal stops being stale — its answer would resurrect the picker for a
-  // chart that has never run. Only an answer produced by this revision's own
-  // run may flip the picker.
+  // live outcome, which doesn't know which chart earned it: a chart whose
+  // statement is byte-identical to a refused one would un-stale that old
+  // refusal and resurrect the picker for a chart that never ran. Only an
+  // answer from this revision's own run may flip the picker.
   const [ranRevision, setRanRevision] = useState<number | null>(null);
 
   // Opening a saved chart replaces the statement, so what the previous one
@@ -283,12 +249,11 @@ function useWorkbenchGranularity({
     [openedRevision],
   );
 
-  // Every submission goes through this rather than `query.runQuery`: while
-  // the picker is on screen, the request must carry the very step it shows as
-  // pressed — a picker that renders a pressed default but sends nothing earns
-  // the missing-parameter refusal for a value the member is looking at. The
-  // controller is synchronous, so arming writes the draft before the same
-  // tick snapshots it.
+  // Every submission goes through this, not `query.runQuery`: while the
+  // picker is on screen, the request must carry the step it shows as
+  // pressed — otherwise it earns a missing-parameter refusal for a value
+  // the member is looking at. The controller is synchronous, so arming
+  // writes the draft before the same tick snapshots it.
   const { runQuery } = query;
   const run = useCallback(() => {
     setRanRevision(openedRevision);

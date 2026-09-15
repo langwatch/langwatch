@@ -1,9 +1,7 @@
 /**
- * Emit codex turn input/output (recovered from the rollout transcript) as OTLP
- * spans on codex's own per-turn trace_ids, so they join the native token-spans
- * and the trace summary's computed input/output populate with no receiver
- * change. See codex-rollout.ts for why the transcript is the only content
- * source codex offers.
+ * Emit codex turn input/output as OTLP spans on codex's own per-turn
+ * trace_ids, so they join the native token-spans with no receiver change.
+ * See codex-rollout.ts for why the transcript is the only content source.
  */
 import { createHash } from "node:crypto";
 import { readFile, readdir, stat } from "node:fs/promises";
@@ -43,10 +41,9 @@ interface OtlpExportRequest {
 }
 
 /**
- * Build an OTLP/JSON ExportTraceServiceRequest with one span per turn, using codex's real
- * trace_id. `langwatch.input`/`langwatch.output` carry the LangWatch `chat_messages` envelope,
- * which the receiver's extractor canonicalises to `gen_ai.input.messages`, so the drawer
- * renders it like a claude trace.
+ * One span per turn, using codex's real trace_id. `langwatch.input`/`langwatch.output`
+ * carry the LangWatch `chat_messages` envelope, which the receiver canonicalises to
+ * `gen_ai.input.messages` so the drawer renders it like a claude trace.
  */
 export function buildCodexIOExportRequest(turns: CodexTurnIO[], nowMs: number): OtlpExportRequest {
   const spans = turns.map((turn) => {
@@ -92,17 +89,15 @@ export function buildCodexIOExportRequest(turns: CodexTurnIO[], nowMs: number): 
 
 /**
  * How many of a session's most recent completed turns the per-turn hook
- * re-sends. One would do for correctness; a few give a turn whose POST failed
- * a chance to land on the next turn without making the upload grow with the
- * session.
+ * re-sends. One would do for correctness; a few let a turn whose POST failed
+ * land on the next turn, without the upload growing with the session.
  */
 const RECENT_TURN_WINDOW = 3;
 
 /**
  * Walk codex's `YYYY/MM/DD` session tree, handing every rollout file to `onFile`. Zero-padded
  * path segments make a descending name sort a descending date sort, so a caller that stops on
- * a match (`onFile` returning true) finds a recent session first, rather than after walking a
- * long-lived account's older ones.
+ * a match finds a recent session first, not after walking a long-lived account's older ones.
  */
 async function walkRolloutFiles(
   root: string,
@@ -130,10 +125,9 @@ async function walkRolloutFiles(
 }
 
 /**
- * Where codex keeps its session transcripts. Honours `CODEX_HOME` the same way
- * codex itself does: with it set, codex writes transcripts under
- * `$CODEX_HOME/sessions`, and a harvest hard-coded to the home directory would
- * find the config but never the conversations it points at.
+ * Honours `CODEX_HOME` the same way codex itself does: with it set, codex
+ * writes transcripts under `$CODEX_HOME/sessions`, and a harvest hard-coded
+ * to the home directory would find the config but never the conversations.
  */
 export function defaultCodexSessionsRoot(): string {
   const codexHome = process.env.CODEX_HOME;
@@ -141,9 +135,8 @@ export function defaultCodexSessionsRoot(): string {
 }
 
 /**
- * The rollout transcript for one codex session, or null when it is not on
- * disk. Codex names the file `rollout-<timestamp>-<threadId>.jsonl`, so the
- * thread id a completed turn reports pins the exact file with no time-window
+ * Codex names the file `rollout-<timestamp>-<threadId>.jsonl`, so the thread
+ * id a completed turn reports pins the exact file with no time-window
  * guessing and no reading of unrelated sessions.
  */
 export async function findRolloutForThread(
@@ -164,8 +157,7 @@ export async function findRolloutForThread(
 /**
  * Send the declarations a sandboxed `langwatch ingest context` could not: the notify program
  * codex runs is spawned outside that sandbox, so it can reach the collector when the agent's
- * own shell cannot. Runs after the session-context post above so a declared checkout becomes
- * the session's current branch.
+ * own shell cannot. Runs after the session-context post so a declared checkout becomes current.
  */
 async function drainCodexSpool(args: {
   nowMs: number;
@@ -204,12 +196,9 @@ async function drainCodexSpool(args: {
 }
 
 /**
- * Recover and emit ONE codex session's turns, by thread id. Only the last
- * {@link RECENT_TURN_WINDOW} are posted (not the whole transcript) so a failed POST gets one
- * retry on the next turn without the upload growing quadratically with session length.
- * Receiver-side dedup is by span id and keeps the first version to arrive — harmless only
- * because a turn is emitted once, after its reply is final; do not let emitted content depend
- * on anything that keeps changing afterward.
+ * Only the last {@link RECENT_TURN_WINDOW} turns are posted, giving a failed
+ * POST one retry without quadratic growth. Dedup is by span id, keeping the
+ * first arrival — safe only because a turn is emitted once, after it's final.
  */
 export async function harvestCodexThread(args: {
   threadId: string;
@@ -303,11 +292,9 @@ async function readRollouts({
 }
 
 /**
- * A refusal from the ingest endpoint, named so the caller can act on it.
- *
- * The key codex posts with lives in its config file and is the normal thing to
- * go stale, so a refusal of the key reads as a key problem rather than as a
- * status code the reader has to look up.
+ * The key codex posts with lives in its config file and is the normal thing
+ * to go stale, so a refusal reads as a key problem, not a status code the
+ * reader has to look up.
  */
 function ingestRefusal(status: number): GovernanceCliError {
   if (status === 401 || status === 403) {
@@ -325,11 +312,9 @@ function ingestRefusal(status: number): GovernanceCliError {
 }
 
 /**
- * POST a batch of turns as OTLP IO spans. Capped at 5s so a slow or unreachable endpoint
- * can't wedge the user's shell. A refused upload throws, same as an unreachable one — a
- * response that arrived is not the same as content that landed, and the turn-completion path
- * runs after every turn of every session, so "the key expired" would otherwise read as
- * success forever. Each caller decides what to do with the throw.
+ * Capped at 5s so a slow/unreachable endpoint can't wedge the shell. A
+ * refused upload throws like an unreachable one — an arrived response
+ * isn't landed content, so "the key expired" never reads as success.
  */
 async function postCodexTurns(args: {
   turns: CodexTurnIO[];
@@ -361,12 +346,9 @@ async function postCodexTurns(args: {
 }
 
 /**
- * Which repository and branch a codex session is working in. Live (via `runGit`) is tried
- * first: codex fills its own `session_meta` only at session start and never revises it, so a
- * reviewer checking out several PR branches in turn still reports the first one, and a
- * session started a directory above the checkout reports nothing for its whole life. The
- * rollout's `session_meta` is the fallback — what a transcript harvested on another machine,
- * or after the checkout is gone, still has.
+ * Live (`runGit`) is tried first: codex's `session_meta` is set once at
+ * session start and never revised, so switching branches still reports the
+ * first one. The rollout's version is the fallback for a transcript from elsewhere.
  */
 function codexSessionContext({
   meta,
@@ -386,12 +368,9 @@ function codexSessionContext({
 }
 
 /**
- * POST the session's repository identity as one `langwatch.session_context` log record, the
- * same record the command hooks send for claude — built here from the rollout's own
- * `session_meta` instead of a hook payload, since codex needs no hooks.json entry for this.
- * Deduped through the same fingerprint state the hooks use, so a session posts once and
- * re-posts nothing while unchanged. Best-effort: a missing identity or refused POST just
- * reports false — the content spans riding beside this are worth posting either way.
+ * Built from the rollout's own `session_meta` (codex needs no hooks.json
+ * entry), deduped through the hooks' fingerprint state so a session posts
+ * once. Best-effort: a missing identity or refused POST just returns false.
  */
 export async function postCodexSessionContext(args: {
   meta: CodexRolloutMeta | null;
@@ -476,12 +455,9 @@ const CONTEXT_POST_CONCURRENCY = 6;
 const CONTEXT_POST_BUDGET_MS = 15_000;
 
 /**
- * POST every session's context record before the turn spans go out: the context's title is
- * first-write, so it must reach the server before the spans create the session row. Posts run
- * concurrently under a shared time budget rather than sequentially — awaiting them one at a
- * time against an unreachable endpoint cost the full 5s per-post timeout per session. Sessions
- * the batch doesn't reach keep their state empty and retry on the next harvest, like a refused
- * POST.
+ * The context's title is first-write and must reach the server before the
+ * spans create the session row. Posts run concurrently under a shared time
+ * budget — a serial await would cost the full 5s timeout per session.
  */
 async function postCodexSessionContexts(args: {
   metas: CodexRolloutMeta[];
@@ -527,10 +503,9 @@ async function postCodexSessionContexts(args: {
 }
 
 /**
- * Recover codex turn I/O from rollouts written during this session and POST it
- * as OTLP spans. Returns the number of turns emitted (0 when nothing was
- * found), and rejects when the upload did not land, so a caller that reports a
- * count is only ever reporting content the server took.
+ * Recover codex turn I/O from rollouts written during this session and POST
+ * it. Returns the number emitted (0 when nothing found), and rejects when
+ * the upload didn't land, so a caller reporting a count only reports content the server took.
  */
 export async function harvestAndEmitCodexIO(args: {
   sinceMs: number;
@@ -576,11 +551,9 @@ export async function harvestAndEmitCodexIO(args: {
 }
 
 /**
- * Streaming harvester: emits each turn the moment it completes, instead of dumping the whole
- * session in one POST on exit. The wrapper polls `harvest()` on an interval (plus one final
- * sweep on exit); an in-flight turn simply isn't in `parseCodexRollout`'s output yet, and we
- * additionally dedup by trace_id so a turn is POSTed exactly once — though re-emitting it
- * would be idempotent server-side anyway, so a failed POST is safely retried next tick.
+ * Streaming harvester: emits each turn as it completes, polled via
+ * `harvest()` on an interval. Dedup is by trace_id, but re-emitting would be
+ * idempotent server-side anyway, so a failed POST is safely retried next tick.
  */
 export function createCodexIOStreamer(args: {
   sinceMs: number;

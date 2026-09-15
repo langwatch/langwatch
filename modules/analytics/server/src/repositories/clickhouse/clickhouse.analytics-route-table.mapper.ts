@@ -1,43 +1,7 @@
 /**
- * Analytics table routing — ADR-034 Phase 3 (app-layer module), extended in
- * Phase 6 to cover the eval pipeline.
- *
- * Picks ONE of six ClickHouse tables to serve a `getTimeseries` query:
- *
- *   TRACE-source paths:
- *   - `trace_analytics_rollup` — additive `SimpleAggregateFunction(sum, …)`
- *     bucketed by `(TenantId, BucketStart, Model, SpanType)` (migration 00038).
- *     Cheap, but only ever serves UNGROUPED additive sums (plus the one
- *     avg in `ROLLUP_AVG_METRIC_KEYS`) on metrics that live as a column on
- *     the rollup, with no filters on dimensions the rollup is not keyed by.
- *     Its `Model` / `SpanType` keys exist to keep the merged row count low;
- *     they are NOT group-by targets, because the rollup attributes metrics
- *     per SPAN while every other path attributes them per TRACE (see
- *     `ROLLUP_TRACE_GROUP_BY_KEYS`).
- *
- *   - `trace_analytics` — slim `ReplacingMergeTree(UpdatedAt)`, one row per
- *     trace, hoisted dim columns + a heuristically-trimmed `Attributes` map
- *     (migration 00039). Serves percentiles, late/rich-dim group-bys,
- *     hoisted-column filters, metadata.* / langwatch.reserved.* attribute reads,
- *     arbitrary attribute keys whose values are known to fit ≤ 256 chars.
- *
- *   - `trace_summaries` — legacy fallback, UNCHANGED.
- *
- *   EVAL-source paths (Phase 6):
- *   - `evaluation_analytics_rollup` — additive `SimpleAggregateFunction(sum, …)`
- *     bucketed by `(TenantId, BucketStart, EvaluatorType, Status)` (00040).
- *   - `evaluation_analytics` — slim `ReplacingMergeTree(UpdatedAt)`, one row
- *     per evaluation, hoisted dim columns + trimmed Attributes (00041).
- *   - `evaluation_runs` — legacy fallback for the eval pipeline, the
- *     pre-rewrite per-evaluation ReplacingMergeTree.
- *
- * Defaults: **on any doubt, return the source's legacy fallback table**
- * (`trace_summaries` for trace-source metrics; `evaluation_runs` for
- * eval-source metrics). Slim/rollup are opt-in optimisations.
- *
- * The function is the SINGLE place where the routing decision lives — the
- * downstream query-builders consume the chosen table, they do not re-derive
- * it.
+ * Analytics table routing — picks ONE of six ClickHouse tables (trace/eval
+ * × rollup/slim/legacy) to serve a `getTimeseries` query. Full decision
+ * table, invariants and rationale: ADR-034.
  */
 
 import type { AnalyticsSeries } from "@langwatch/analytics-contract";
@@ -111,20 +75,9 @@ function slimTableFor(source: AnalyticsMetricSource): AnalyticsTable {
 // ─── Trace-source rollup eligibility ─────────────────────────────────
 
 /**
- * Registry metric keys ("<group>.<metric>") that can be served from
- * `trace_analytics_rollup` for additive aggregations. Derived directly from
- * the rollup column set (migration 00038 — see
- * `traceAnalyticsRollup.mapProjection.ts`):
- *
- *   CostSum, NonBilledCostSum, DurationSum (root), PromptTokensSum,
- *   CompletionTokensSum, CacheReadTokensSum, CacheWriteTokensSum,
- *   ReasoningTokensSum, SpanCount, TraceCount (root), ErrorCount.
- *
- * Distinct trace counts over arbitrary dims (TraceUniq) are NOT in the
- * rollup — that requires `AggregateFunction(uniq, …)` (binary state), and the
- * rollup only has `SimpleAggregateFunction(sum, …)`. `metadata.trace_id`
- * (cardinality) therefore routes to slim instead. Plain per-bucket trace
- * counts ARE available additively via `sum(TraceCount)` (1 per root span).
+ * Registry metric keys servable from `trace_analytics_rollup`'s additive
+ * columns (migration 00038). `TraceUniq`-shaped distinct counts are not
+ * among them — see ADR-034.
  */
 const ROLLUP_ROLLABLE_TRACE_METRIC_KEYS_LIST = [
   "performance.total_cost",
@@ -142,15 +95,9 @@ const ROLLUP_ROLLABLE_TRACE_METRIC_KEYS_LIST = [
 export type TraceRollupMetricKey = (typeof ROLLUP_ROLLABLE_TRACE_METRIC_KEYS_LIST)[number];
 
 /**
- * Registry metric keys that can be served from `evaluation_analytics_rollup`
- * for additive aggregations. The rollup carries pass/fail/error/skipped
- * counters, a score sum + count pair (for true avg), and total eval count;
- * see migration 00040 + `evaluationAnalyticsRollup.mapProjection.ts`.
- *
- * `evaluations.evaluation_runs` rolls up to `EvalCount` (additive sum) —
- * the registry's `cardinality` aggregation maps to `sum(EvalCount)`. Score
- * uses `sum(ScoreSum) / nullIf(sum(ScoreCount), 0)` for `avg`. Pass rate
- * uses `sum(PassCount) / nullIf(sum(PassCount) + sum(FailCount), 0)`.
+ * Registry metric keys servable from `evaluation_analytics_rollup`'s
+ * additive columns (migration 00040) — aggregation formulas in ADR-034
+ * ("Eval fields").
  */
 export type EvalRollupMetricKey = EvalMetricKey;
 
@@ -187,23 +134,9 @@ export function isSlimEligibleTraceMetricKey(metric: string): metric is SlimTrac
 // ─── Slim eligibility ────────────────────────────────────────────────
 
 /**
- * The subset of rollable metrics whose `avg` can be served from the rollup as
- * `sum(<MetricSum>) / nullIf(sum(TraceCount), 0)` — a per-TRACE mean, which is
- * what the legacy path computes.
- *
- * Only `performance.completion_time` qualifies, because parity with legacy
- * `avg(column)` requires the trace_summaries column to be NON-NULLABLE (CH
- * `avg` skips NULLs, shrinking legacy's denominator to "traces where the
- * metric is present"; `sum/TraceCount` divides by ALL rooted traces).
- * `TotalDurationMs` is Int64 NOT NULL, so every trace counts on both paths.
- * Cost and token columns are Nullable — a rollup avg for those needs a
- * per-metric non-null trace count the rollup doesn't carry, so they stay on
- * slim (whose one-row-per-trace shape reproduces NULL-skipping for free).
- *
- * Known accepted divergences for completion_time (same class already
- * accepted for sums): rollup duration is the ROOT SPAN's own duration while
- * legacy folds max(end)-min(start), and rootless traces contribute neither
- * duration nor TraceCount to the rollup.
+ * The one rollable metric whose `avg` is servable from the rollup as a true
+ * per-trace mean: `completion_time`, whose legacy column is non-nullable
+ * (parity requires that — see ADR-034, Read routing).
  */
 const ROLLUP_AVG_METRIC_KEYS_LIST = ["performance.completion_time"] as const;
 export type RollupAvgMetricKey = (typeof ROLLUP_AVG_METRIC_KEYS_LIST)[number];
@@ -273,40 +206,9 @@ const SLIM_ELIGIBLE_EVAL_METRIC_KEYS: ReadonlySet<string> = new Set<string>(
 // ─── Group-by eligibility ────────────────────────────────────────────
 
 /**
- * Group-by keys the trace rollup may serve: NONE. The rollup is an ungrouped
- * fast-path only.
- *
- * It is *keyed* by `(…, Model, SpanType)` so that same-minute spans sharing a
- * model and span type merge into one row — that is a storage concern, not a
- * read contract. Grouping on those keys is not parity-safe:
- *
- *   - **Root-only columns collapse into one bucket.** `DurationSum`,
- *     `TraceCount` and `ErrorCount` are recorded on the ROOT span only. A root
- *     span is usually a workflow/agent span carrying no model, so grouping
- *     `sum(performance.completion_time)` by model puts ~100% of duration in
- *     the `'unknown'` bucket and reports 0 for every real model. Whether that
- *     happens depends on whether the customer wraps their LLM call in a parent
- *     span — i.e. the same query returns different shapes for different SDK
- *     usage.
- *   - **No zero-contribution suppression.** The legacy builder's span-model
- *     partition join (see `buildSpanModelPartitionJoin`) suppresses the
- *     spurious `'unknown'` bucket a trace's model-less workflow spans would
- *     otherwise mint; the rollup's per-(Model, SpanType) rows can't tell a
- *     zero-contribution root apart from a genuinely model-less trace.
- *
- * `metadata.model` therefore routes to the legacy `trace_summaries` builder,
- * whose span-model partition join attributes each additive metric (cost,
- * tokens) to the SPAN's own model so per-model buckets sum exactly to the
- * ungrouped totals. (It used to route to slim, whose whole-trace
- * `arrayJoin(Models)` attribution counted a multi-model trace's FULL totals
- * once per model, the double-count this partition join fixed.)
- * `metadata.span_type` has no slim column at all (span type is per-span; slim
- * is per-trace) and so falls back to `trace_summaries` as well.
- *
- * INVARIANT: this set must stay a subset of `SLIM_TRACE_GROUP_BY_KEYS` —
- * anything the rollup can group by, slim must also be able to group by, since
- * slim is the strictly more capable table. The same invariant binds the eval
- * pair below. Pinned by a test in `route-table.unit.test.ts`.
+ * Group-by keys the trace rollup serves: NONE — grouping by its (Model,
+ * SpanType) storage keys is not parity-safe (see ADR-034, Read routing).
+ * Must stay a subset of `SLIM_TRACE_GROUP_BY_KEYS` (route-table.unit.test.ts).
  */
 const ROLLUP_TRACE_GROUP_BY_KEYS: ReadonlySet<string> = new Set<string>();
 
@@ -316,28 +218,17 @@ const ROLLUP_TRACE_GROUP_BY_KEYS: ReadonlySet<string> = new Set<string>();
  *   {none, EvaluatorType, Status}.
  */
 const ROLLUP_EVAL_GROUP_BY_KEYS: ReadonlySet<string> = new Set([
-  // eval5014-002: `evaluations.evaluator_type` is DELIBERATELY excluded.
-  // The rollup's map projection emits `evaluatorType: ''` on the two-event
-  // (scheduled → completed) path because it has no fold-state access to
-  // lift the identity — grouping by EvaluatorType on the rollup would pile
-  // every two-event evaluation into a phantom "unknown" bucket. Route
-  // EvaluatorType-grouped queries to slim/legacy instead.
+  // `evaluations.evaluator_type` is DELIBERATELY excluded (eval5014-002):
+  // the rollup's two-event fold path can't lift the identity, so grouping
+  // by it would pile everything into a phantom "unknown" bucket — see
+  // ADR-034 (Eval fields).
   "evaluations.evaluation_status",
 ]);
 
 /**
- * Group-by keys the slim trace table carries (typed columns + Attributes reads).
- *
- * `metadata.model` is DELIBERATELY absent. Model group-bys attribute additive
- * metrics (cost, tokens) per SPAN via the legacy builder's span-model
- * partition join, so per-model buckets sum exactly to the ungrouped totals.
- * Slim is one row per trace with no span-level data, so it can only reproduce
- * the old whole-trace `arrayJoin(Models)` attribution, the very shape that
- * counted a multi-model trace's FULL totals once per model (~2.9x observed on
- * a real multi-agent session). Model group-bys therefore fall back to
- * `trace_summaries`.
- *
- * `metadata.span_type` requires a stored_spans join (not on slim).
+ * Group-by keys the slim trace table carries. `metadata.model` is absent
+ * (whole-trace attribution double-counts multi-model traces) and
+ * `metadata.span_type` has no slim column — see ADR-034, Read routing.
  */
 const SLIM_TRACE_GROUP_BY_KEYS: ReadonlySet<string> = new Set([
   "topics.topics",
@@ -391,40 +282,17 @@ const SLIM_EVAL_FILTER_FIELDS: ReadonlySet<string> = new Set<string>([
 ]);
 
 /**
- * Aggregations the trace rollup can compute CORRECTLY from its columns. The
- * rollup carries `SimpleAggregateFunction(sum, …)` columns — one summed
- * value per (bucket, model, span_type):
- *
- *   - `sum(col)`     → the additive total. Correct.
- *   - `avg(col)`     → naive `avg(col)` would be the mean of per-bucket SUMS
- *                      (merge-state-dependent, wrong). The builder instead
- *                      computes `sum(col) / nullIf(sum(TraceCount), 0)` — a
- *                      true per-trace mean — but ONLY for the metrics in
- *                      ROLLUP_AVG_METRIC_KEYS (non-nullable legacy columns)
- *                      and ONLY ungrouped: TraceCount lands in the ROOT
- *                      span's (Model, SpanType) bucket while metric sums
- *                      spread across every bucket the trace touched, so a
- *                      grouped division would use the wrong denominator.
- *   - `min/max(col)` → min/max of per-bucket sums, which changes value
- *                      across background merges. Non-deterministic + wrong.
- *                      Excluded; routes to slim.
+ * Aggregations the trace rollup computes CORRECTLY: `sum`; `avg` only for
+ * `ROLLUP_AVG_METRIC_KEYS` and only ungrouped; `min`/`max` excluded
+ * (merge-state-dependent on summed columns) — see ADR-034, Read routing.
  */
 const ROLLUP_SUM_AGGREGATION: AnalyticsAggregation = "sum";
 const ROLLUP_AVG_AGGREGATION: AnalyticsAggregation = "avg";
 
 /**
- * Aggregations the eval rollup can compute CORRECTLY. `avg` is safe because
- * the eval rollup carries the (ScoreSum, ScoreCount) pair, so the builder
- * computes a true weighted mean `sum(ScoreSum)/nullIf(sum(ScoreCount),0)`
- * rather than an average-of-averages. `cardinality` is additive (every
- * terminal eval contributes EvalCount = 1; distinct eval-id count is
- * `sum(EvalCount)`).
- *
- * `min`/`max` are DELIBERATELY excluded: the builder computes them as
- * `min/max(ScoreSum / ScoreCount)` per rollup ROW, i.e. the min/max of
- * per-bucket AVERAGES — merge-state-dependent and not the true worst/best
- * score. They fall through to the eval slim table, one row per evaluation,
- * where `min/max(Score)` is the real per-eval extremum (eval5014-P1).
+ * Aggregations the eval rollup computes CORRECTLY: `sum`, weighted `avg`,
+ * and `cardinality`. `min`/`max` are excluded (eval5014-P1) — see ADR-034
+ * (Eval fields).
  */
 const ROLLUP_EVAL_AGGREGATIONS: ReadonlySet<AnalyticsAggregation> = new Set<AnalyticsAggregation>([
   "sum",
@@ -449,19 +317,9 @@ export interface PickAnalyticsTableInput {
 }
 
 /**
- * Decide which ClickHouse table should serve a `getTimeseries` query.
- *
- * Source-aware (ADR-034 Phase 6): a query's metric source is determined by
- * the first series' metric key. ALL series in a query must share the same
- * source — if they don't, we fall back to the trace legacy table
- * (`trace_summaries`) because the legacy SQL builder can mix trace + eval
- * reads via its existing JOIN path, and that's the safe default.
- *
- * Order of evaluation per source (any failure cascades to the source's
- * legacy fallback):
- *   1. Try the source's rollup — strictest, fastest.
- *   2. Try the source's slim.
- *   3. Otherwise the source's legacy fallback.
+ * Decide which ClickHouse table serves a `getTimeseries` query: source-
+ * aware (all series must share one metric source, else the trace legacy
+ * table), then rollup -> slim -> legacy fallback in that order per source.
  */
 export function pickAnalyticsTable(input: PickAnalyticsTableInput): AnalyticsTable {
   // Empty series → can't route confidently; fall back to the broad legacy.
@@ -544,24 +402,19 @@ function rollupHandlesSeries(
   source: AnalyticsMetricSource,
   groupBy?: string,
 ): boolean {
-  // A `key` on an eval series is an evaluator ID. NEITHER fast-path table can
-  // filter by it: the rollup is keyed on `EvaluatorType` (a slug, which an ID
-  // never equals) and the slim row hoists `EvaluatorType` too — neither
-  // carries an `EvaluatorId` column (migrations 00040 / 00041). Serving a
-  // keyed series from either would silently aggregate across every evaluator
-  // in the project, so keyed series fall to `evaluation_runs`, the only table
-  // that can express the predicate. Trace-source metrics carry no key today.
+  // A `key` on an eval series is an evaluator ID; neither fast table has an
+  // EvaluatorId column (only EvaluatorType, a slug) — serving it would
+  // silently aggregate across every evaluator, so keyed series fall to
+  // `evaluation_runs`, the only table that can express the predicate.
   if (s.key !== undefined || s.subkey !== undefined) return false;
   if (source === "evaluation") {
     if (!ROLLUP_EVAL_AGGREGATIONS.has(s.aggregation)) return false;
     return ROLLUP_ROLLABLE_EVAL_METRIC_KEYS.has(s.metric);
   }
   // Trace source: `sum` for every rollable metric; `avg` only ungrouped and
-  // only for ROLLUP_AVG_METRIC_KEYS — TraceCount is the denominator and it
-  // lands in the ROOT span's (Model, SpanType) bucket, so a grouped division
-  // would use the wrong denominator. `!groupBy` mirrors
-  // rollupHandlesGroupBy's "no group" test (undefined and "" both mean
-  // ungrouped).
+  // only for ROLLUP_AVG_METRIC_KEYS — TraceCount lands in the ROOT span's
+  // bucket while metric sums spread across every bucket touched, so a
+  // grouped division would use the wrong denominator.
   if (!ROLLUP_ROLLABLE_TRACE_METRIC_KEYS.has(s.metric)) return false;
   if (s.aggregation === ROLLUP_SUM_AGGREGATION) return true;
   if (s.aggregation === ROLLUP_AVG_AGGREGATION) {
@@ -598,12 +451,10 @@ function slimHandlesAllSeries(series: AnalyticsSeries[], source: AnalyticsMetric
 }
 
 function slimHandlesSeries(s: AnalyticsSeries, source: AnalyticsMetricSource): boolean {
-  // group by a dim then re-aggregate the groups. The slim builder does NOT
-  // implement the outer re-aggregation — it only ever emits the flat inner
-  // aggregation, silently returning e.g. the total distinct trace count for
-  // an "average traces per user" query (trace5012-P0). Until the slim builder
-  // grows real pipeline support, route ALL pipeline series to the legacy
-  // fallback, which computes the two-level aggregation correctly.
+  // Pipeline series group by a dim then re-aggregate the groups; the slim
+  // builder only emits the flat inner aggregation, silently returning the
+  // wrong number (e.g. total distinct traces for "avg traces per user",
+  // trace5012-P0). Route all pipeline series to legacy until slim supports it.
   if (s.pipeline) return false;
   // Same reasoning as the rollup branch: an eval `key` is an evaluator ID and
   // the slim row has no `EvaluatorId` column, so keyed series go to
@@ -638,10 +489,9 @@ function slimHandlesFilters(
 // ---------------------------------------------------------------------------
 
 /**
- * Heuristic — does `filters` reference a blocklisted attribute key via the
- * generic `metadata.key` / `metadata.value` filters? Mirrors the slim trim
- * service's blocklist; if a user is filtering on `gen_ai.prompt` we MUST
- * fall back because slim dropped the key at write time.
+ * Does `filters` reference a blocklisted attribute key via `metadata.key`/
+ * `metadata.value`? Mirrors the slim trim service's blocklist — slim
+ * dropped that key at write time, so such a filter MUST fall back.
  */
 function filtersHitBlocklist(filters: PickAnalyticsTableInput["filters"]): boolean {
   if (!filters) return false;

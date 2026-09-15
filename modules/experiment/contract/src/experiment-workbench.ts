@@ -118,11 +118,9 @@ export const pairwiseEvaluatorConfigSchema = z.object({
   variantA: z.string(),
   variantB: z.string(),
   /**
-   * Optional output-field path for variant A. When the picked variant emits
-   * a structured object (e.g. `{answer, confidence}`), the judge shouldn't
-   * see the full blob — pick a single subfield here. Empty / omitted means
-   * "use the whole output" (the pre-existing behavior — orchestrator paths
-   * predating this field must continue to work unchanged).
+   * Optional output-field path for variant A: when the variant emits a
+   * structured object, the judge shouldn't see the full blob. Empty/omitted
+   * means "use the whole output" — orchestrator paths predating this field.
    */
   variantAOutputPath: z.array(z.string()).optional(),
   variantBOutputPath: z.array(z.string()).optional(),
@@ -207,11 +205,9 @@ export type EvaluatorConfig = Omit<
 };
 
 /**
- * Agent types for targets (matches database agent types).
- *
- * Says how the column runs the agent: which DSL node the row becomes, or, for
- * a connected agent, that the row is one turn through the relay rather than a
- * node at all.
+ * Agent types for targets (matches database agent types): which DSL node
+ * the row becomes, or, for a connected agent, that the row is one turn
+ * through the relay rather than a node at all.
  */
 export const agentTypeEnum = z.enum(["code", "signature", "workflow", "http", "connected"]);
 export type AgentTypeEnum = z.infer<typeof agentTypeEnum>;
@@ -241,12 +237,9 @@ export const targetConfigObjectSchema = z.object({
   promptId: z.string().optional(),
   promptVersionId: z.string().optional(),
   /**
-   * The version number currently loaded for this target.
-   * Used for:
-   * - Displaying version badge in UI
-   * - Comparing with latest DB version to detect outdated status
-   * - When undefined + no localPromptConfig, target "follows latest" automatically
-   * - When set + has localPromptConfig, target is "pinned" to this version
+   * The version number currently loaded for this target, for the version badge
+   * and outdated-check. Undefined + no localPromptConfig: "follows latest".
+   * Set + has localPromptConfig: "pinned" to this version.
    */
   promptVersionNumber: z.number().optional(),
   localPromptConfig: localPromptConfigSchema.optional(),
@@ -270,9 +263,8 @@ export const targetConfigObjectSchema = z.object({
    */
   targetEvaluatorId: z.string().optional(),
   /**
-   * Local evaluator config for unsaved changes.
-   * Stores name and settings modifications until the user clicks "Save".
-   * When present, the target header shows an orange dot indicator.
+   * Local evaluator config for unsaved changes: name/settings modifications
+   * until "Save". When present, the target header shows an orange dot.
    * Only set when type === "evaluator".
    */
   localEvaluatorConfig: localEvaluatorConfigSchema.optional(),
@@ -283,19 +275,15 @@ export const targetConfigObjectSchema = z.object({
    */
   pairwise: pairwiseEvaluatorConfigSchema.optional(),
   /**
-   * Comparison config for column-style comparison targets. Set only when
-   * type === "evaluator" AND the underlying evaluator is the comparison
-   * judge. Gives the column path a single source of truth for which other
-   * targets to compare; per-row input mappings are derived from
-   * variants/goldenField at save time and run time. Also drives the
-   * target-column Swords icon and the "reuse existing comparison" flow.
+   * Comparison config for column-style comparison targets — set only when
+   * type === "evaluator" and the evaluator is the comparison judge. Single
+   * source of truth for which targets to compare; drives the Swords icon.
    */
   comparison: comparisonEvaluatorConfigSchema.optional(),
   /**
-   * Studio workflow target: the committed studio workflow evaluated as a whole
-   * per dataset row (distinct from an "agent" target with agentType "workflow",
-   * which is a saved agent built as a single code node). Only set when
-   * type === "workflow".
+   * Studio workflow target: evaluated as a whole per dataset row — distinct
+   * from an "agent" target with agentType "workflow" (a saved agent built as
+   * a single code node). Only set when type === "workflow".
    */
   workflowId: z.string().optional(),
   workflowVersionId: z.string().optional(),
@@ -462,12 +450,9 @@ export type EvaluationsV3State = {
   ui: UIState;
 
   /**
-   * The stored workbench counter this board was last loaded from, or
-   * `undefined` before anything has been loaded or saved.
-   *
-   * Read by the version history to mark which entry is the one on screen, and
-   * by autosave to write against the version it started from rather than
-   * whatever the server holds now.
+   * The stored workbench counter this board was last loaded from (`undefined`
+   * before load/save). Read by version history to mark the on-screen entry,
+   * and by autosave to write against the version it started from.
    */
   workbenchVersion?: number | undefined;
 
@@ -537,12 +522,9 @@ export type EvaluationsV3Actions = {
   // Target actions
   addTarget: (target: TargetConfig) => void;
   /**
-   * Copy a target, keeping its wiring: its own mappings and every evaluator's
-   * mappings for it. Returns the copy's id.
-   *
-   * `name` only lands for evaluator targets, the one kind that carries a name
-   * in workbench state; prompt, agent and workflow targets take their name from
-   * the entity they reference.
+   * Copy a target, keeping its wiring (its own mappings and every evaluator's
+   * mappings for it); returns the copy's id. `name` only lands for evaluator
+   * targets — others take their name from the entity they reference.
    */
   duplicateTarget: (args: { targetId: string; name?: string }) => string | undefined;
   // Apply a transform-backed action from the manifest against the live store.
@@ -660,11 +642,9 @@ export type TableRowData = {
 };
 
 /**
- * Table meta - used to pass dynamic data to column headers/cells
- * without causing column definition changes (which would remount components).
- *
- * IMPORTANT: All dynamic data must go through meta to keep columns stable.
- * If columns change, TanStack Table will remount all headers.
+ * Table meta: dynamic data for column headers/cells that must NOT trigger a
+ * column definition change — TanStack Table remounts every header when
+ * columns change, so all dynamic data must go through meta instead.
  */
 export type TableMeta = {
   // Target data

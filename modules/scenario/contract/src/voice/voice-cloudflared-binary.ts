@@ -1,10 +1,7 @@
 /**
- * Puts the `cloudflared` binary on PATH before the vendored SDK spawns it:
- * `openTwilioTunnel` does a bare PATH-lookup spawn, never reading
- * `CLOUDFLARED_BIN` or calling the npm package's `install()`, so the
- * build-time-downloaded binary is never on the child's PATH and the dial
- * fails with `ENOENT`. This bridges the gap, searching scopes in
- * dependency-edge order since `cloudflared` is a prod dep of `langwatch`, not of scenario.
+ * Puts the `cloudflared` binary on PATH before the SDK's bare PATH-lookup
+ * spawn dials `ENOENT` (it never reads `CLOUDFLARED_BIN` or calls `install()`).
+ * Searches scopes in dependency-edge order: `cloudflared` is `langwatch`'s dep, not scenario's.
  */
 
 import { spawnSync } from "node:child_process";
@@ -14,9 +11,8 @@ import path from "node:path";
 
 /**
  * The slice of the npm `cloudflared` package this module drives: the resolved
- * binary path and the lazy installer. Both are re-exported from the package
- * root (`lib/lib.js`), the same surface the SDK's own CLI reaches via
- * `import("cloudflared")`.
+ * binary path and the lazy installer, both re-exported from the package root
+ * (`lib/lib.js`) — the same surface the SDK's own CLI reaches via `import("cloudflared")`.
  */
 export interface CloudflaredModule {
   /** Absolute path the binary lives at: `<pkg root>/bin/cloudflared`. */
@@ -26,10 +22,9 @@ export interface CloudflaredModule {
 }
 
 /**
- * How long the fallback download may take before it is abandoned. A hung
- * download must not park worker boot forever; the binary is normally already
- * present from the build-time postinstall, so this only bounds the rare
- * fallback fetch.
+ * How long the fallback download may take before it's abandoned. A hung
+ * download must not park worker boot forever — the binary is normally
+ * already present from the build-time postinstall, so this bounds only the rare fallback fetch.
  */
 export const CLOUDFLARED_INSTALL_TIMEOUT_MS_DEFAULT = 60_000;
 
@@ -55,10 +50,8 @@ export interface EnsureCloudflaredOnPathDeps {
 
 /**
  * Thrown when `cloudflared` is neither on PATH nor installable. A plain
- * {@link Error}, not `HandledError`: per ADR-045, the remedy (ship the binary,
- * fix GitHub egress) is an OPERATOR action, not a customer one, so it degrades
- * to "unknown" at the API boundary, keeping the full cause chain so the run
- * error names the real failure.
+ * {@link Error}, not `HandledError` — per ADR-045 the remedy (ship the binary,
+ * fix GitHub egress) is an OPERATOR action, so it degrades to "unknown" at the boundary.
  */
 export class VoiceTunnelBinaryError extends Error {
   constructor(summary: string, cause?: unknown) {
@@ -105,11 +98,9 @@ export interface CloudflaredScope {
 }
 
 /**
- * Loads the npm `cloudflared` package's `bin`/`install` from the first
- * {@link CloudflaredScope} that can resolve `cloudflared/package.json`. Resolving
- * the `package.json` is the robust presence check; the package root
- * (`lib/lib.js`) then re-exports `bin` + `install`. Throws naming every tried
- * scope when none can resolve it.
+ * Loads `cloudflared`'s `bin`/`install` from the first {@link CloudflaredScope}
+ * that can resolve `cloudflared/package.json` — the robust presence check,
+ * since the package root then re-exports both. Throws naming every scope tried.
  */
 export function resolveCloudflaredFromScopes(
   scopes: CloudflaredScope[],
@@ -135,11 +126,9 @@ export function resolveCloudflaredFromScopes(
 }
 
 /**
- * Resolves the npm `cloudflared` package's `bin`/`install`, searching scopes in
- * dependency-truth order: the `langwatch` SDK scope (which actually depends on
- * `cloudflared`), then `@langwatch/scenario` as a secondary fallback, then the
- * app's own scope. Under pnpm's strict `node_modules` layout `cloudflared` is
- * only reachable from the `langwatch` scope, so that scope must be tried first.
+ * Resolves `cloudflared`'s `bin`/`install`, searching scopes in dependency-
+ * truth order: `langwatch` SDK (the actual dependent), `@langwatch/scenario`,
+ * then the app scope — pnpm's strict layout only exposes it from `langwatch` first.
  */
 function defaultResolveModule(): CloudflaredModule {
   const appRequire = createRequire(import.meta.url);
@@ -197,10 +186,9 @@ function prependToPath({
 }
 
 /**
- * Downloads the binary as a fallback if it is missing on disk. No-op when it is
- * already present (the common case: the build-time postinstall put it there).
- * Throws {@link VoiceTunnelBinaryError} on a failed/timed-out download, or when
- * the download reports success yet leaves no binary.
+ * Downloads the binary as a fallback if missing on disk; no-op when already
+ * present (the common postinstall case). Throws {@link VoiceTunnelBinaryError}
+ * on a failed/timed-out download, or a reported success that leaves no binary.
  */
 async function ensureBinaryPresent({
   mod,
@@ -232,12 +220,9 @@ async function ensureBinaryPresent({
 }
 
 /**
- * Ensures a `cloudflared` binary is resolvable on PATH for the SDK's later bare
- * spawn. No-op when one is already on PATH. Otherwise resolves the npm package,
- * downloads the binary as a fallback if it is missing, and prepends its
- * directory to PATH. Throws {@link VoiceTunnelBinaryError} (carrying the cause
- * chain) on any failure — the worker boot catches it and threads the reason
- * into the run's error.
+ * Ensures `cloudflared` is resolvable on PATH for the SDK's later bare spawn:
+ * no-op if already on PATH, else resolves the package, downloads a fallback
+ * binary if missing, and prepends its directory. Throws {@link VoiceTunnelBinaryError}.
  */
 export async function ensureCloudflaredOnPath(
   deps: EnsureCloudflaredOnPathDeps = {},

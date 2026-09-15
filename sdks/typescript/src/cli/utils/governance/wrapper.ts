@@ -38,12 +38,9 @@ const CODEX_IO_POLL_MS = 2_500;
 const shellQuote = (s: string): string => `'${s.replace(/'/g, "'\\''")}'`;
 
 /**
- * Provider families the tool needs upstream. Used by `preflightWrapper`
- * to verify the org has at least one matching provider configured -
- * otherwise the gateway can authenticate the VK but has nothing to
- * route the request to, surfacing as a confusing tool-side error.
- *
- * Multi-provider tools (cursor, opencode) match any listed family.
+ * Provider families the tool needs upstream, checked by `preflightWrapper`
+ * so a missing provider fails with a clear message instead of a confusing
+ * tool-side error. Multi-provider tools match any listed family.
  */
 const TOOL_PROVIDER_FAMILIES: Record<string, string[]> = {
   claude: ["anthropic"],
@@ -64,21 +61,17 @@ export interface PreflightResult {
   /** Human-readable, action-oriented message rendered to stderr on failure. */
   message?: string;
   /**
-   * Set on a failure a later retry might clear on its own - the gateway data
-   * plane is momentarily unreachable. When absent/false the gateway path is
-   * structurally unusable for this account/org (no virtual key, no provider
-   * configured), so a remembered gateway choice is worth forgetting to re-offer
-   * direct OTLP next time.
+   * True when a retry might clear this on its own (gateway momentarily
+   * unreachable); false/absent means the path is structurally unusable
+   * (no virtual key/provider), so a pinned choice should be forgotten.
    */
   retryable?: boolean;
 }
 
 /**
- * Whether to forget a remembered gateway path choice after a failed gateway
- * preflight. True only when the user had pinned gateway AND the failure is
- * structural (no virtual key / no provider) rather than a retryable
- * gateway-down, so the next run re-prompts and can offer direct OTLP instead
- * of dead-ending on the same pinned choice every time.
+ * Whether to forget a pinned gateway choice after a failed preflight: only
+ * when gateway was pinned and the failure is structural (no virtual
+ * key/provider), not a retryable gateway-down — so the next run can retry.
  */
 export function shouldForgetGatewayPin(args: {
   pinnedMode: string | undefined;
@@ -95,11 +88,9 @@ export interface PreflightOptions {
 }
 
 /**
- * Render the "who to talk to" footer attached to every preflight
- * failure message. Single source of truth so the admin-mailto format
- * stays consistent across the three failure shapes. Bootstrap is the
- * source of `adminEmail`; on legacy servers or unreachable control
- * planes it'll be null and we fall back to a generic line.
+ * Renders the "who to talk to" footer for preflight failures. `adminEmail`
+ * comes from bootstrap and is null on legacy/unreachable control planes,
+ * falling back to a generic line.
  */
 function renderContactFooter(adminEmail: string | null | undefined): string {
   if (adminEmail) {
@@ -109,11 +100,9 @@ function renderContactFooter(adminEmail: string | null | undefined): string {
 }
 
 /**
- * Pre-exec probe for `langwatch <tool>`: three layered checks, each degrading
- * gracefully rather than blocking on a transient hiccup — (1) a personal
- * virtual-key secret is set, else the tool would silently call the upstream
- * provider directly; (2) the gateway's /healthz is reachable (fatal: no
- * recovery from a spin-retry loop); (3) bootstrap's providers cover the tool.
+ * Pre-exec probe for `langwatch <tool>`: (1) a personal virtual-key secret
+ * is set, else the tool silently calls upstream directly; (2) the gateway's
+ * /healthz is reachable (fatal, no retry loop); (3) providers cover the tool.
  */
 export async function preflightWrapper(
   cfg: GovernanceConfig,
@@ -170,12 +159,10 @@ export async function preflightWrapper(
     };
   }
 
-  // The gateway program is opt-in per tool: an org enables it for a coding
-  // assistant by publishing that tool's coding-assistant tile in the AI Tools
-  // catalog. Without a tile for THIS tool the org hasn't turned the gateway on
-  // for it (direct OTLP ingestion stays available separately), so don't route
-  // a virtual key through it. `tools` undefined => legacy server that can't
-  // report the catalog; skip the gate for back-compat.
+  // The gateway program is opt-in per tool: an org must publish that tool's
+  // coding-assistant tile before we route a virtual key through it. `tools`
+  // undefined means a legacy server that can't report the catalog, so skip
+  // the gate for back-compat.
   if (Array.isArray(bootstrap?.tools)) {
     const published = bootstrap.tools.some((t) => t.slug === tool);
     if (!published) {
@@ -218,12 +205,9 @@ export async function preflightWrapper(
 }
 
 /**
- * When the wrapper is invoked without a usable config, decide whether to
- * auto-trigger the device-flow login inline or to fail fast. The device
- * flow needs a TTY (the user has to copy a code or click a browser link),
- * so default ON only when stdin is a TTY. CI/scripted callers can opt in
- * explicitly via `LANGWATCH_AUTO_LOGIN=1`, or opt out via
- * `LANGWATCH_AUTO_LOGIN=0` even on an interactive shell.
+ * Decide whether to auto-trigger device-flow login or fail fast: the
+ * device flow needs a TTY, so default ON only when stdin is a TTY.
+ * Override via `LANGWATCH_AUTO_LOGIN=1` or `=0`.
  */
 function shouldAutoLogin(): boolean {
   const flag = process.env.LANGWATCH_AUTO_LOGIN;
@@ -233,11 +217,9 @@ function shouldAutoLogin(): boolean {
 }
 
 /**
- * Env re-application prefix run inside `$SHELL -i -c` after the rc is
- * sourced, so the wrapper's vars win over anything the rc exported. For
- * scoped-function tools it also `unset -f`s the tool: a persisted rc
- * function would otherwise reapply its frozen env at invocation and win
- * instead — session-only, so aliases and the rc file stay untouched.
+ * Env re-application run inside `$SHELL -i -c` after the rc is sourced, so
+ * the wrapper's vars win over the rc's. Also `unset -f`s scoped-function
+ * tools so a persisted rc function can't reapply its frozen env and win.
  */
 export function buildShellReapply(args: {
   tool: string;
@@ -254,11 +236,9 @@ export function buildShellReapply(args: {
 }
 
 /**
- * Runs one telemetry setup step behind a spinner: reaching the control plane
- * to confirm or mint an ingest key used to happen in silence long enough to
- * read as a hang. The spinner stops before the result/error reaches the
- * caller, so later output lands on a clean line. `discardStdin:false` for
- * the same reason login-flow sets it — ora's raw-mode default swallows Ctrl+C.
+ * Runs one telemetry setup step behind a spinner, since it used to run in
+ * silence long enough to read as a hang. `discardStdin:false` for the same
+ * reason login-flow sets it — ora's raw-mode default swallows Ctrl+C.
  */
 export async function withTelemetrySetupSpinner<T>({
   tool,
@@ -280,10 +260,9 @@ export async function withTelemetrySetupSpinner<T>({
 }
 
 /**
- * Run the named tool routed through the gateway. Inherits stdio so
- * the user gets the same interactive UX they'd have invoking the
- * tool directly. Exits the parent process with the child's exit
- * code (or 2 if the budget pre-check fired).
+ * Run the named tool routed through the gateway, inheriting stdio for the
+ * same interactive UX as invoking it directly. Exits the parent with the
+ * child's exit code (or 2 if the budget pre-check fired).
  */
 export async function runWrapped(tool: string, args: string[]): Promise<never> {
   // Before the config is read, so every save below carries it. The Claude
@@ -389,12 +368,10 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
       run: () => resolveWrapperMode(cfg, tool, gatewayVars, gatewayClears, pathChoice.mode),
     });
   } catch (err) {
-    // Direct-OTLP setup can fail at mint time: an expired device session,
-    // no personal workspace yet, an unreachable control plane. None of
-    // those are a reason to route the tool through the gateway instead;
-    // that path bills model usage to the org and the user has to opt into
-    // it. An expired session is the one recoverable case, so offer the
-    // login inline and retry the same path.
+    // Direct-OTLP setup can fail at mint time (expired session, no
+    // workspace yet, control plane unreachable); none of those justify
+    // routing through the gateway, which bills the org and needs opt-in.
+    // An expired session is recoverable, so retry after inline login.
     if (pathChoice.mode === "ingestion" && classifyIngestionSetupError(err) === "expired_session") {
       const recovery = await recoverExpiredSession({ cfg, tool });
       if (recovery.status === "abort") {
@@ -574,13 +551,10 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
     });
   }
 
-  // Keep the installed plugin current, whichever tool this run wraps. The
-  // plugin is installed once per machine, not once per tool, so tying its
-  // upkeep to `langwatch claude` would leave it to rot on a machine whose
-  // owner mostly wraps something else. It is stamped to once a day, so nearly
-  // every run reads one config field and moves on, and it runs BEFORE the
-  // spawn so a new version reaches the session this launch is about to start
-  // rather than the one after it. Housekeeping, so it warns and continues.
+  // Keep the installed plugin current, whichever tool this run wraps —
+  // installed once per machine, not once per tool. Stamped to once a day
+  // and runs BEFORE spawn so a new version reaches this session rather
+  // than the next. Housekeeping: warns and continues on failure.
   const pluginUpdate = updateLangwatchClaudePlugin({
     // Said before the work, not after it: the check fetches from a network
     // that may be slow or half-open, and a launch that pauses without
@@ -602,14 +576,10 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
     );
   }
 
-  // Scrub conflicting twins from the inherited parent env BEFORE merging
-  // our vars in. The clears list per tool exists because legacy creds
-  // exported in the user's shell (e.g. ANTHROPIC_API_KEY from direct
-  // Anthropic SDK usage) would otherwise race with the gateway-routed
-  // ANTHROPIC_AUTH_TOKEN we set, surfacing as the claude-code warning
-  // "Both ANTHROPIC_AUTH_TOKEN and ANTHROPIC_API_KEY set, auth may not
-  // work as expected" and, worse, occasionally letting the SDK pick the
-  // wrong credential.
+  // Scrub conflicting twins from the inherited env before merging ours in.
+  // Legacy creds (e.g. ANTHROPIC_API_KEY) would otherwise race with the
+  // gateway-routed ANTHROPIC_AUTH_TOKEN, surfacing as claude-code's "auth
+  // may not work as expected" warning or a wrong credential picked silently.
   const parentEnv = { ...process.env };
   for (const key of modeResult.clears ?? []) {
     delete parentEnv[key];
@@ -620,14 +590,11 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
   // `--profile langwatch-gateway`) lead.
   const finalArgs = [...(modeResult.extraArgs ?? []), ...toolArgs];
 
-  // Resolve the tool the way the user's own shell would: route it through
-  // their interactive login shell (zsh/bash) so aliases AND functions are
-  // honored - e.g. `alias claude='claude --dangerously-skip-permissions'`,
-  // not just the bare PATH binary. `-i` sources the rc file where aliases
-  // live; the wrapper's env (mode vars + clears) is re-applied *after* that
-  // so a user's rc can't clobber the gateway / OTLP wiring. Args ride
-  // positional params ("$@") and are never re-quoted. `tool` is whitelisted
-  // (claude/codex/copilot/cursor/gemini/opencode) so the command string is safe.
+  // Resolve the tool via the user's interactive login shell (zsh/bash) so
+  // aliases/functions are honored, not just the PATH binary. `-i` sources
+  // the rc, and the wrapper's env is re-applied *after* so the rc can't
+  // clobber gateway/OTLP wiring. Args ride "$@" unquoted; `tool` is
+  // whitelisted so the command string is safe from injection.
   const shellName = (process.env.SHELL ?? "").split("/").pop() ?? "";
   const aliasShell =
     process.platform !== "win32" && (shellName === "zsh" || shellName === "bash")
@@ -640,13 +607,10 @@ export async function runWrapped(tool: string, args: string[]): Promise<never> {
   // files this run produced (codex names them by start time + mtime).
   const sessionStartMs = Date.now();
 
-  // Codex never puts the prompt or the assistant reply on the wire (its OTLP
-  // spans carry tokens + model only), but it writes the full transcript to an
-  // append-only rollout file whose per-turn `task_started` records the exact
-  // OTLP trace_id. Poll it WHILE codex runs and emit each turn the moment it
-  // completes, so content streams in per turn instead of one multi-megabyte
-  // burst on exit. The poll plus a final sweep on close are idempotent (the
-  // per-turn span id is trace_id-derived), so overlap dedups server-side.
+  // Codex's OTLP spans carry tokens + model only, but its rollout file has
+  // the full transcript with a per-turn trace_id. Poll it while codex runs
+  // to stream each turn as it completes rather than one burst on exit; the
+  // poll and a final sweep are idempotent (span id is trace_id-derived).
   const codexStreamer =
     tool === "codex" &&
     modeResult.mode === "ingestion" &&
