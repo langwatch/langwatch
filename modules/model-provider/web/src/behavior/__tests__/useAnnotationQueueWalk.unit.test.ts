@@ -37,7 +37,7 @@ vi.mock("~/utils/api", () => ({
   },
 }));
 
-vi.mock("../useOrganizationTeamProject", () => ({
+vi.mock("../use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({ project: { id: "project-1" } }),
 }));
 

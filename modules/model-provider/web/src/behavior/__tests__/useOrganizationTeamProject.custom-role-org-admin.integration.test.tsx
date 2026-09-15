@@ -60,7 +60,7 @@ vi.mock("usehooks-ts", () => ({
   ],
 }));
 
-import { useOrganizationTeamProject } from "../useOrganizationTeamProject";
+import { useOrganizationTeamProject } from "../use-organization-team-project.ts";
 
 const USER_ID = "user-analyst";
 

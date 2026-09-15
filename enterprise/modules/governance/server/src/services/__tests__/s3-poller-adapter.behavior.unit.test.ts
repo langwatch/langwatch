@@ -248,7 +248,7 @@ describe("S3PollingPullerAdapter", () => {
     /** @scenario "A read of a stored log that stops at its file limit says it stopped early" */
     it("says it stopped before the end rather than reporting a whole read", async () => {
       const { S3PollingPullerAdapter: AdapterUnderTest } = await import(
-        "../s3PollingPullerAdapter"
+        "../s3-puller.service.ts"
       );
       const adapter = new AdapterUnderTest();
       // One more object than the per-run file cap, so the listing is cut
@@ -293,7 +293,7 @@ describe("S3PollingPullerAdapter", () => {
       // The arm from the far side: without it the assertion above passes on
       // an adapter that reports every run as truncated.
       const { S3PollingPullerAdapter: AdapterUnderTest } = await import(
-        "../s3PollingPullerAdapter"
+        "../s3-puller.service.ts"
       );
       const adapter = new AdapterUnderTest();
       stubObjects = [

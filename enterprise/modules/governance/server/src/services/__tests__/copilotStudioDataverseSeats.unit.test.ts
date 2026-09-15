@@ -210,7 +210,7 @@ async function runPull({
   cursor?: string | null;
 }) {
   const { CopilotStudioDataversePuller } = await import(
-    "../copilotStudioDataverse.puller"
+    "../copilot-studio-dataverse-puller.service.ts"
   );
   const adapter = new CopilotStudioDataversePuller();
   return adapter.runOnce(

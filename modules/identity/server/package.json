@@ -16,8 +16,8 @@
       "default": "./src/index.ts"
     },
     "./adapters/better-auth-identity-birth": {
-      "types": "./dist/adapters/better-auth.identity-birth.adapter.d.ts",
-      "default": "./src/adapters/better-auth.identity-birth.adapter.ts"
+      "types": "./dist/services/better-auth-identity-birth.service.d.ts",
+      "default": "./src/services/better-auth-identity-birth.service.ts"
     },
     "./testing": {
       "types": "./dist/testing.d.ts",

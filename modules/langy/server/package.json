@@ -57,8 +57,8 @@
       "default": "./src/services/langy-turn.service.ts"
     },
     "./ports/langy-turn-runtime": {
-      "types": "./dist/app/langy.infrastructure.d.ts",
-      "default": "./src/app/langy.infrastructure.ts"
+      "types": "./dist/app/langy.members.d.ts",
+      "default": "./src/app/langy.members.ts"
     },
     "./subscribers/langy-conversation": {
       "types": "./dist/subscribers/langy-conversation.subscriber.d.ts",

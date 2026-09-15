@@ -59,7 +59,7 @@ vi.mock("~/utils/api", async (importOriginal) => ({
   },
 }));
 
-import TeamDetailPage from "../teams/[id]";
+import TeamDetailPage from "../governance-team.screen.tsx";
 
 const renderPage = () =>
   render(

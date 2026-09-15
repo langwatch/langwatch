@@ -152,7 +152,7 @@ import {
   writeSampleChoice,
 } from "~/components/governance/sample";
 
-import GovernanceOverviewPage from "../index";
+import GovernanceOverviewPage from "../governance-overview.screen.tsx";
 
 /** The reads the overview's viewer holds, and nothing that manages. */
 const VIEWER = ["organization:view", "governance:view", "activityMonitor:view"];

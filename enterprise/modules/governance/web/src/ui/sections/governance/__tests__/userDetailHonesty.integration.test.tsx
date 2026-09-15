@@ -56,7 +56,7 @@ vi.mock("~/utils/api", async (importOriginal) => ({
   },
 }));
 
-import UserDetailPage from "../users/[id]";
+import UserDetailPage from "../governance-user.screen.tsx";
 
 const renderPage = () =>
   render(

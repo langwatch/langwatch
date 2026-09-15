@@ -4,7 +4,7 @@
  * @see specs/features/agents/voice-phone.feature
  */
 import { describe, expect, it } from "vitest";
-import { PUBLIC_CREDENTIAL_FIELDS } from "../../../utils/constants";
+import { PUBLIC_CREDENTIAL_FIELDS } from "../model-provider-credential.ts";
 import {
   getSchemaShape,
   isSecretCredentialField,

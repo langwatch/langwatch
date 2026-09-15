@@ -119,8 +119,8 @@ vi.mock("~/utils/api", () => {
 });
 
 import { findNativeSelects } from "~/components/governance/filters";
-import BilledPage from "../billed";
-import CostsPage from "../costs";
+import BilledPage from "../governance-billed.screen.tsx";
+import CostsPage from "../governance-costs.screen.tsx";
 
 /** Every string a reader — eyes or screen reader — could get from a subtree. */
 function readableStrings(element: HTMLElement): string[] {

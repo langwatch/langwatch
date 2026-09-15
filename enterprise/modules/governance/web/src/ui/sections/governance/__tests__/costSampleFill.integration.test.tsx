@@ -179,7 +179,7 @@ vi.mock("~/utils/api", () => {
   };
 });
 
-import CostsPage from "../costs";
+import CostsPage from "../governance-costs.screen.tsx";
 
 const renderScreen = () =>
   render(

@@ -92,7 +92,7 @@ vi.mock("~/utils/api", () => {
   };
 });
 
-const { default: CostsPage } = await import("../costs");
+const { default: CostsPage } = await import("../governance-costs.screen.tsx");
 
 function renderPage() {
   return render(

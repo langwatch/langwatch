@@ -94,7 +94,7 @@ vi.mock("~/utils/api", () => {
   return { api: node([]) };
 });
 
-import PeoplePage from "../../../../../docs/ai-governance/people.mdx";
+import PeoplePage from "../governance-people.screen.tsx";
 
 const seenAt = new Date("2026-08-01T00:00:00.000Z");
 

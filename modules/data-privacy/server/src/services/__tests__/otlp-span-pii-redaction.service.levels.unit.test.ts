@@ -1,7 +1,7 @@
 import { PLATFORM_DEFAULT_DATA_PRIVACY } from "@langwatch/data-privacy-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
-import type { PIICheckOptions } from "../../ports/pii-analysis.port.ts";
+import type { PIICheckOptions } from "../../app/data-privacy.members.ts";
 import type { PIIRedactionLevel } from "@langwatch/trace-contract";
 import type { OtlpKeyValue, OtlpResource, OtlpSpan } from "@langwatch/trace-contract";
 import { OtlpSpanPiiRedactionService } from "../otlp-span-pii-redaction.service.ts";

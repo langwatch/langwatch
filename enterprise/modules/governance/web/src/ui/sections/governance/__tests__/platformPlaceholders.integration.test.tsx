@@ -116,7 +116,7 @@ import { EXPLORE_TEMPLATES } from "~/components/governance/platform/exploreQuery
 import { useLangyStore } from "~/features/langy/stores/langyStore";
 import AnalyticsPage from "../analytics";
 import InsightsPage from "../insights";
-import SignalsPage from "../../../../../enterprise/modules/governance/web/src/ui/sections/governance/signals.tsx";
+import SignalsPage from "../signals.tsx";
 
 function renderPage(Page: React.ComponentType) {
   return render(

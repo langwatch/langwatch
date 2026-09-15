@@ -105,7 +105,7 @@ vi.mock("../../../../../behavior/scenario-api.ts", () => ({
   },
 }));
 
-vi.mock("../../use-run-scenario", () => ({
+vi.mock("../../../use-run-scenario.ts", () => ({
   useRunScenario: () => ({ runScenario: mockRunScenario, isRunning: false }),
 }));
 

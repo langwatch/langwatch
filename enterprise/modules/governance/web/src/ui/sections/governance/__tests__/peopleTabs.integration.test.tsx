@@ -160,7 +160,7 @@ vi.mock("~/utils/api", () => {
 
 import { SAMPLE_CHOICE_KEY } from "~/components/governance/sample";
 
-import PeoplePage from "../../../../../docs/ai-governance/people.mdx";
+import PeoplePage from "../governance-people.screen.tsx";
 
 const THREE_DAYS_AGO = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000);
 

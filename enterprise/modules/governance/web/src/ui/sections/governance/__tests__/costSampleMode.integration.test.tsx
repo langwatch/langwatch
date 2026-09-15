@@ -81,7 +81,7 @@ vi.mock("~/utils/api", () => ({
   },
 }));
 
-import CostsPage from "../costs";
+import CostsPage from "../governance-costs.screen.tsx";
 
 /** Invented figure constant to test sample mode visibility. */
 const A_SAMPLE_FIGURE = "support-copilot";
