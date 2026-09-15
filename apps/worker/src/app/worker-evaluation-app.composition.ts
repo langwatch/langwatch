@@ -198,7 +198,7 @@ function numericClickHouseSettings(
 ): Record<string, number> {
   return Object.fromEntries(
     Object.entries(settings ?? {}).filter((entry): entry is [string, number] =>
-      typeof entry[1] === "number" ? true : false,
+      typeof entry[1] === "number",
     ),
   );
 }

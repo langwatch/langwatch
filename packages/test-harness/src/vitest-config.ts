@@ -49,7 +49,7 @@ export function moduleVitestTestOptions(
   // A fresh worker per file is the single largest cost in a suite whose
   // files share a module graph. Off, the graph is evaluated once per worker.
   const resolvedIsolate = isolate ?? false;
-  const resolvedCss = css ?? (FAST_MODE ? false : true);
+  const resolvedCss = css ?? !FAST_MODE;
   const resolvedSetupFiles =
     kind === "unit" ? [CONSOLE_GUARD_SETUP, ...(setupFiles ?? [])] : setupFiles;
   return {
