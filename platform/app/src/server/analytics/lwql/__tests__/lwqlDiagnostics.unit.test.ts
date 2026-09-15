@@ -197,12 +197,12 @@ describe("given a LangWatchQL query that ran", () => {
       const fanout = find(diagnostics, "POSSIBLE_FANOUT");
       expect(codesOf(diagnostics)).toEqual(["POSSIBLE_FANOUT"]);
       expect(fanout!.meta).toMatchObject({
-        dataset: "analytics.traces",
-        multipliedBy: "analytics.spans",
+        view: "analytics.traces",
+        multipliedByView: "analytics.spans",
         unmatchedGrainColumns: ["SpanId"],
         aggregated: true,
       });
-      // The affected columns are the repeated dataset's measures — the ones
+      // The affected columns are the repeated view's measures — the ones
       // where the repetition changes the number rather than only the row count.
       expect(fanout!.meta!.affectedColumns).toContain("TotalDurationMs");
       expect(fanout!.meta!.affectedColumns).toContain("TotalCost");
@@ -261,7 +261,7 @@ describe("given a LangWatchQL query that ran", () => {
 
       // Only one direction: evaluations repeat a trace, a trace never repeats
       // an evaluation.
-      expect(diagnostics.map((diagnostic) => diagnostic.meta?.dataset)).toEqual(
+      expect(diagnostics.map((diagnostic) => diagnostic.meta?.view)).toEqual(
         ["analytics.traces"],
       );
     });
@@ -285,20 +285,20 @@ describe("given a LangWatchQL query that ran", () => {
     });
   });
 
-  describe("when a dataset is read with no condition on its time column", () => {
-    it("names the dataset and the column that would bound the read", () => {
+  describe("when a view is read with no condition on its time column", () => {
+    it("names the view and the column that would bound the read", () => {
       const diagnostics = diagnose({
         sql: "SELECT count() AS n FROM analytics.traces",
       });
 
       expect(codesOf(diagnostics)).toEqual(["UNBOUNDED_TIME_RANGE"]);
       expect(find(diagnostics, "UNBOUNDED_TIME_RANGE")!.meta).toEqual({
-        dataset: "analytics.traces",
+        view: "analytics.traces",
         timeColumn: "OccurredAt",
       });
     });
 
-    it("reports each unbounded dataset once, and not the bounded one beside it", () => {
+    it("reports each unbounded view once, and not the bounded one beside it", () => {
       const diagnostics = diagnose({
         sql:
           "SELECT count() AS n FROM analytics.traces AS t " +
@@ -310,7 +310,7 @@ describe("given a LangWatchQL query that ran", () => {
       expect(
         diagnostics
           .filter((diagnostic) => diagnostic.code === "UNBOUNDED_TIME_RANGE")
-          .map((diagnostic) => diagnostic.meta?.dataset),
+          .map((diagnostic) => diagnostic.meta?.view),
       ).toEqual(["analytics.spans"]);
     });
 
