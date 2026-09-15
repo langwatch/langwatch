@@ -243,18 +243,26 @@ export class ActivityMonitorSpendClickHouseRepository {
     // The governance branch keeps `TenantId = {tenantId:String}` rather than a
     // one-element IN so the SQL the three dollar-reporting screens send is
     // unchanged by this, character for character.
-    const governanceScoped = scope === "governance";
-    const tenantPredicate = governanceScoped
-      ? "TenantId = {tenantId:String}"
-      : "TenantId IN ({tenantIds:Array(String)})";
+    //
+    // Fails closed the same way the ORDER BY above does, and toward the same
+    // scope the service defaults to: the ORGANIZATION literal is the one
+    // tested, so a value matching neither — an erased type upstream — yields
+    // the narrow governance SQL rather than the wide one. Testing the
+    // governance literal instead would have the two halves of the decision
+    // default in opposite directions, and an unmatched value would read the
+    // governance project through `IN` with the source filter dropped.
+    const organizationScoped = scope === "organization";
+    const tenantPredicate = organizationScoped
+      ? "TenantId IN ({tenantIds:Array(String)})"
+      : "TenantId = {tenantId:String}";
     // The source filter travels with the scope. Keeping it in the organization
     // scope would drop every row that did not arrive through a governance
     // ingestion source, which is most of an organization's own traffic — and
     // `findSpendByDepartment`, the panel beside this one, filters on nothing of
     // the kind. Two panels over the same table would still disagree.
-    const originPredicate = governanceScoped
-      ? "AND ts.Attributes[{originKey:String}] = {originValue:String}"
-      : "";
+    const originPredicate = organizationScoped
+      ? ""
+      : "AND ts.Attributes[{originKey:String}] = {originValue:String}";
 
     const result = await ch.query({
       query: `
@@ -309,13 +317,13 @@ export class ActivityMonitorSpendClickHouseRepository {
         // Only the parameters the chosen branch names are bound: an unbound
         // `originValue` in the organization scope is what proves the filter is
         // gone rather than merely matching everything.
-        ...(governanceScoped
-          ? {
+        ...(organizationScoped
+          ? { tenantIds }
+          : {
               tenantId: tenantIds[0] ?? "",
               originKey: ATTR_ORIGIN_KIND,
               originValue: ORIGIN_KIND_VALUE,
-            }
-          : { tenantIds }),
+            }),
         windowStart,
         windowEnd,
         userKey: ATTR_USER_ID,

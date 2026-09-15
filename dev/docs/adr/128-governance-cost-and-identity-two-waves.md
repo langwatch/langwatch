@@ -2081,12 +2081,12 @@ money tables, only the identity tables and read paths.
     measure", and stopped there. They read the same table and report the same
     unit over different populations. `spendByDepartment` resolves every live
     project of the organization and passes `tenantIds`
-    (`platform/app/ee/governance/services/activity-monitor/activityMonitor.service.ts:741`);
+    (`platform/app/ee/governance/services/activity-monitor/activityMonitor.service.ts:742-749`);
     `spendByUser` resolved the one hidden governance project, and the read
     additionally filtered
     `Attributes['langwatch.origin.kind'] = 'ingestion_source'`, which
     `findSpendByDepartment` does not
-    (`...spend.clickhouse.repository.ts:344`). Side by side over the same rows
+    (`...spend.clickhouse.repository.ts:352`). Side by side over the same rows
     the department panel therefore printed a token count and the person panel
     beside it said nothing had been recorded. Measured on a development store
     holding seven traces in the window: every one carried `langwatch.user_id`,
@@ -2104,10 +2104,10 @@ money tables, only the identity tables and read paths.
   - **The decision: scope is a caller's choice, at the render layer.** The same
     seam Rulings 7 and 8 used for the unit. `spendByUser` gains
     `scope: "governance" | "organization"`
-    (`...activityMonitor.clickhouse.schemas.ts:62`), defaulting to
+    (`...activityMonitor.clickhouse.schemas.ts:70-71`), defaulting to
     `"governance"` at the procedure
-    (`platform/app/ee/governance/routers/activityMonitor.ts:84`) and at the
-    service (`...activityMonitor.service.ts:652`). `"governance"` is the
+    (`platform/app/ee/governance/routers/activityMonitor.ts:91`) and at the
+    service (`...activityMonitor.service.ts:656`). `"governance"` is the
     behaviour every caller had: the hidden governance project, and only traffic
     that arrived through a governance source. `"organization"` is every live
     project of the org with no source filter — `findSpendByDepartment`'s
@@ -2116,12 +2116,12 @@ money tables, only the identity tables and read paths.
     The other three render sites name no scope and are answered as before, down
     to the SQL: the governance branch keeps `TenantId = {tenantId:String}`
     rather than a one-element `IN`
-    (`...spend.clickhouse.repository.ts:247`).
+    (`...spend.clickhouse.repository.ts:255-257`).
 
   - **Two things that stay where they are.** The `ORDER BY` remains a lookup
     into `SORT_FIELD_TO_AGG_EXPR`; the scope is a code branch choosing between
     two literal fragments, never caller-supplied text
-    (`...spend.clickhouse.repository.ts:247-257`). And the project ids come
+    (`...spend.clickhouse.repository.ts:254-265`). And the project ids come
     from Prisma scoped to the organization, so a ClickHouse read in the
     organization scope can only ever reach this org's own projects — the same
     construction `spendByDepartment` relies on.
@@ -2158,6 +2158,43 @@ money tables, only the identity tables and read paths.
     request (`costPersonPanelScope.integration.test.tsx`). The organization
     scope is a second query shape, so it takes its own row in the query-bounds
     table rather than riding on the governance one's.
+
+  - **Both halves of the scope decision fail closed, toward governance.** The
+    scope is read twice — the service resolves the tenant ids from it, the
+    repository builds the SQL from it — and the two halves originally defaulted
+    in opposite directions: the service tested the `"organization"` literal and
+    fell back to the governance tenant ids, the repository tested the
+    `"governance"` literal and fell back to the wide `TenantId IN (...)` with
+    the source filter dropped. A value matching neither therefore read the
+    hidden governance project through the organization SQL, a population
+    neither branch intends. The repository now tests the `"organization"`
+    literal so its fallback is the narrow governance SQL
+    (`...spend.clickhouse.repository.ts:254-265`), matching the service and
+    matching the `sortBy` fallback in the same function
+    (`...spend.clickhouse.repository.ts:235-236`). The SQL a genuine
+    `"governance"` call sends is unchanged by construction rather than by
+    luck: both branches carry the same string literals they carried before,
+    and only the ternary arms swapped, so the governance fragments are the
+    identical characters. A whole-query snapshot pins that against future
+    edits (`activityMonitorSpendByUserScopeFailsClosed.unit.test.ts`).
+
+  - **The scope is rejected at the service, not only at the procedure.** These
+    services are deliberately reachable from more than the tRPC routers, so the
+    router's zod enum protects the four screens and nothing else
+    (`platform/app/ee/governance/services/activity-monitor/unsupportedValue.ts:8-12`);
+    `spendByUser` now carries the same `unsupportedValue` guard
+    `anomalyRule.service.ts:143-148` and `ingestionSource.service.ts:1026-1036`
+    already carry (`...activityMonitor.service.ts:665-671`). A `ValidationError`
+    naming the field and the allowed values, not a 5xx for a typo. The list
+    itself becomes the single source of truth — `SPEND_BY_USER_SCOPES` is
+    exported and `SpendByUserScope` derived from it
+    (`...activityMonitor.clickhouse.schemas.ts:70-71`), and the procedure's
+    enum and the guard's `allowed` both read it
+    (`platform/app/ee/governance/routers/activityMonitor.ts:91`), so a member
+    added later cannot reach one half and not the other. The sibling `sortBy`
+    stays a hand-written union because `SORT_FIELD_TO_AGG_EXPR` is a `Record`
+    over it and a drifted member is a compile error; nothing tied the scope
+    that way.
 
 - **v3.20 (2026-09-14, captain: Sergio Esteban).** Removes the two null-gates
   that answered an organization question with the existence of one hidden
@@ -2474,7 +2511,7 @@ money tables, only the identity tables and read paths.
     fires — correct. `findSpendByDepartment` has **no** such filter: it groups
     by `(projectId, actor)` with `actor` possibly empty, and the service
     resolves department by precedence principal user → user's team →
-    **project**, else Unassigned (`activityMonitor.service.ts:567-583`;
+    **project**, else Unassigned (`departmentAttribution.ts:41-51`;
     `specs/ai-gateway/governance/departments.feature:53` binds *"An agent trace
     with no principal user attributes to its project's department"*). So where
     attribution is sparse the department panel does not go empty — it renders,
@@ -2557,7 +2594,7 @@ money tables, only the identity tables and read paths.
     `specs/governance/governance-cost-screen.feature:375-390` pins, and an
     adoption count of zero with nothing connected must not be reported as a
     measurement. Third, the read scans a double window plus a dedup subquery
-    under `max_threads: 2, max_execution_time: 45` (`repository.ts:44-49`);
+    under `max_threads: 2, max_execution_time: 45` (`...spend.clickhouse.repository.ts:49-53`);
     going from one project to every project in a large org is a real cost and
     is gated below. A read that overruns must render as a failure, never as
     zero.
@@ -2570,8 +2607,8 @@ money tables, only the identity tables and read paths.
     > label; they never print a zero.
 
     Its org-wide scope was also previously recorded as a missing
-    filter; that was wrong too — `findSpendByDepartment` (`repository.ts:201-244`)
-    reads every project in the org by design (`activityMonitor.service.ts:567-583`),
+    filter; that was wrong too — `findSpendByDepartment` (`...spend.clickhouse.repository.ts:352`)
+    reads every project in the org by design (`activityMonitor.service.ts:742-749`),
     which is the intended bird's-eye view. What is wrong is the unit. A
     growing share of assistant usage is bought as a subscription or bundle,
     where the per-request cost is zero and the real cost is a fixed seat
@@ -2613,7 +2650,7 @@ money tables, only the identity tables and read paths.
     > three render sites named below keep the governance scope along with their
     > dollars, so nothing here is superseded.
 
-    `findSpendByUser` (`repository.ts:121-194`) gains a token figure alongside
+    `findSpendByUser` (`...spend.clickhouse.repository.ts:207`) gains a token figure alongside
     its dollar figure for the same subscription argument as ruling 7, so the
     two people-facing panels on the cost screen agree on what they measure.
     The three other render sites listed under

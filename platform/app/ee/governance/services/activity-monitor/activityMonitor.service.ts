@@ -73,7 +73,11 @@ import type {
   SpendSortField,
   WindowCountChRow,
 } from "./activityMonitor.clickhouse.schemas";
-import { EMPTY_ACTIVE_USER_COUNT } from "./activityMonitor.clickhouse.schemas";
+import {
+  EMPTY_ACTIVE_USER_COUNT,
+  SPEND_BY_USER_SCOPES,
+} from "./activityMonitor.clickhouse.schemas";
+import { unsupportedValue } from "./unsupportedValue";
 
 // ---------------------------------------------------------------------------
 // Public interfaces — the service's API contract
@@ -650,6 +654,21 @@ export class ActivityMonitorService {
     scope?: SpendByUserScope;
   }): Promise<SpendByUserRow[]> {
     const scope = input.scope ?? "governance";
+    // Rejects here, not only at the procedure. The router's zod enum protects
+    // the four screens; it does not protect a background worker or webhook
+    // adapter calling the service directly, which is the caller every enum
+    // guard in this directory exists for (`unsupportedValue.ts`), and the same
+    // guard `anomalyRule.service.ts` and `ingestionSource.service.ts` carry.
+    // Without it an unmatched value selects a population neither branch
+    // intends: the service resolves the governance tenant ids while the
+    // repository builds the organization SQL around them.
+    if (!SPEND_BY_USER_SCOPES.includes(scope)) {
+      throw unsupportedValue({
+        field: "scope",
+        value: scope,
+        allowed: SPEND_BY_USER_SCOPES,
+      });
+    }
     const tenantIds =
       scope === "organization"
         ? (await this.organizationProjects(input.organizationId)).map(

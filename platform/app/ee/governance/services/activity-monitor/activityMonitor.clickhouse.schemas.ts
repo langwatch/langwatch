@@ -58,8 +58,17 @@ export type SortDir = "asc" | "desc";
  * and three of them still lead with dollars: moving them would change a money
  * figure as a side effect, which ruling 6 forbids. The decision therefore
  * lives with the caller, the same seam ADR-128 used for the unit.
+ *
+ * The list is the source of truth and the type is derived from it, the shape
+ * `SUPPORTED_TILE_TYPES` / `SUPPORTED_SCOPES` use in `aiToolEntry.service.ts`.
+ * The procedure's zod enum and the service's guard both read this array, so a
+ * member added here reaches every half of the decision at once. The sibling
+ * `SpendByUserSortField` can stay a hand-written union because
+ * `SORT_FIELD_TO_AGG_EXPR` is a `Record` over it and a drifted member is a
+ * compile error; nothing ties the scope that way.
  */
-export type SpendByUserScope = "governance" | "organization";
+export const SPEND_BY_USER_SCOPES = ["governance", "organization"] as const;
+export type SpendByUserScope = (typeof SPEND_BY_USER_SCOPES)[number];
 export type SpendOverTimeGroupBy = "team" | "user" | "model";
 
 // ---------------------------------------------------------------------------

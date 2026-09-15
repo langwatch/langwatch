@@ -28,6 +28,7 @@
  */
 import { describe, expect, it, vi } from "vitest";
 
+import type { SpendByUserScope } from "../activityMonitor.clickhouse.schemas";
 import { ActivityMonitorSpendClickHouseRepository } from "../activityMonitor.spend.clickhouse.repository";
 
 /** The real repository over a mock ClickHouse client, plus the capturing spy. */
@@ -49,7 +50,7 @@ const captured = (query: { mock: { calls: unknown[][] } }): CapturedCall =>
 const WINDOW_START = Date.UTC(2026, 0, 1);
 const WINDOW_END = Date.UTC(2026, 1, 1);
 
-const readWith = async (scope: "governance" | "organization") => {
+const readWith = async (scope: SpendByUserScope) => {
   const { repo, query } = makeRepo();
   await repo.findSpendByUser({
     tenantIds:
