@@ -5,18 +5,18 @@ import {
 } from "@langwatch/scenario-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
-  CancellationSubscriberPort,
   NodeScenarioChildProcessAdapter,
   ScenarioExecutionPoolService,
-  ScenarioExecutionRunnerPort,
-  ScenarioChildExecutionSession,
   ScenarioProcessorService,
-  ScenarioProcessorServiceMetricsPort,
   buildOtelResourceAttributes,
   parseChildProcessResult,
   type CancellationMessage,
   type ExecutionJobData,
+  type ScenarioChildExecutionSession,
+  type ScenarioExecutionRunner,
+  type ScenarioProcessorServiceMetrics,
 } from "../index.ts";
+import type { CancellationSubscriber } from "../app/scenario.app.ts";
 
 const job = (id: string): ExecutionJobData => ({
   projectId: "project-1",
@@ -27,7 +27,7 @@ const job = (id: string): ExecutionJobData => ({
   target: { type: "http", referenceId: "agent-1" },
 });
 
-class TestCancellationSubscriber implements CancellationSubscriberPort {
+class TestCancellationSubscriber implements CancellationSubscriber {
   private onCancellation: ((message: CancellationMessage) => void) | undefined = void 0;
 
   subscribe(onCancellation: (message: CancellationMessage) => void): Promise<() => Promise<void>> {
@@ -46,13 +46,13 @@ class TestCancellationSubscriber implements CancellationSubscriberPort {
   }
 }
 
-class TestMetrics implements ScenarioProcessorServiceMetricsPort {
+class TestMetrics implements ScenarioProcessorServiceMetrics {
   started(): void {}
   completed(): void {}
   failed(): void {}
 }
 
-class HoldingExecutionRunner implements ScenarioExecutionRunnerPort {
+class HoldingExecutionRunner implements ScenarioExecutionRunner {
   constructor(
     private readonly pool: ScenarioExecutionPoolService,
     private readonly child: ChildProcess,

@@ -8,7 +8,6 @@ import {
   GithubPullRequestStatusService,
   MAX_STATUS_REFS,
 } from "../github-pull-request-status.service.ts";
-import { GithubRateLimitedError } from "../../app/github.app.ts";
 import type {
   GithubAppTokenCache,
   GithubInstallationDetails,
@@ -28,6 +27,7 @@ import { GithubInstallationsService } from "../github-installations.service.ts";
 import { GithubPullRequestStatusCacheRedisRepository } from "../../repositories/redis/redis.github-pull-request-status-cache.repository.ts";
 import { TestOrganizationService } from "./fixtures/github-services.fixture.ts";
 import { Temporal, nowInstant, toDate } from "@langwatch/time";
+import { GithubRateLimitedError } from "../../channels/http/http.github-api.channel.ts";
 
 const REF = {
   repositoryHost: "github.com",

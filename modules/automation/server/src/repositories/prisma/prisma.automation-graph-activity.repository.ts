@@ -6,7 +6,7 @@ import type {
   AutomationDispatchError,
   AutomationLogger,
   AutomationNotificationDelivery,
-  AutomationProjectIdentityPort,
+  AutomationProjectDirectory,
 } from "../../app/automation.members.ts";
 import { PrismaCustomGraphRepository } from "./prisma.custom-graph.repository.ts";
 import { PrismaGraphTriggerSentRepository } from "./prisma.graph-trigger-sent.repository.ts";
@@ -37,7 +37,7 @@ export class PrismaAutomationGraphActivityRepository {
     /** The one database client the composing process opened. */
     prisma: AutomationGraphActivityDatabase;
     clock: AutomationClock;
-    projects: AutomationProjectIdentityPort;
+    projects: AutomationProjectDirectory;
     analytics: AnalyticsService;
     /** The process's outbound transports: mail, Slack, webhook. */
     delivery: AutomationNotificationDelivery;

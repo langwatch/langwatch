@@ -20,7 +20,6 @@ import type {
 import {
   type SimulationRunStateData,
   SimulationRunStateFoldProjection,
-  withCutAtLimit,
 } from "../simulation-run-state.projection.ts";
 
 const noopStore: FoldProjectionStore<SimulationRunStateData> = {
@@ -97,7 +96,7 @@ function fold(events: SimulationProcessingEvent[]): SimulationRunStateData {
   return state;
 }
 
-describe("withCutAtLimit", () => {
+describe("SimulationRunStateFoldProjection.withCutAtLimit", () => {
   describe("when the metadata already holds the reserved namespace", () => {
     it("sets the flag and keeps everything else", () => {
       const metadata = JSON.stringify({
@@ -105,7 +104,7 @@ describe("withCutAtLimit", () => {
         langwatch: { targetReferenceId: "agent_1" },
       });
 
-      expect(JSON.parse(withCutAtLimit(metadata))).toEqual({
+      expect(JSON.parse(SimulationRunStateFoldProjection.withCutAtLimit(metadata))).toEqual({
         parameters: { model: "gpt-5-mini" },
         langwatch: { targetReferenceId: "agent_1", isCutAtLimit: true },
       });
@@ -114,7 +113,7 @@ describe("withCutAtLimit", () => {
 
   describe("when the run carries no metadata", () => {
     it("writes the namespace with the flag alone", () => {
-      expect(JSON.parse(withCutAtLimit(null))).toEqual({
+      expect(JSON.parse(SimulationRunStateFoldProjection.withCutAtLimit(null))).toEqual({
         langwatch: { isCutAtLimit: true },
       });
     });

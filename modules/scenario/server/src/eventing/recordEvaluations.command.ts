@@ -9,7 +9,7 @@ import {
 import type { ScenarioEvaluationResult } from "@langwatch/scenario-contract";
 import type { Command, CommandHandler } from "@langwatch/eventing";
 import { createTenantId, defineCommandSchema, EventUtils } from "@langwatch/eventing";
-import { finishedStatusOf } from "../projections/simulation-run-state.projection.ts";
+import { SimulationRunStateFoldProjection } from "../projections/simulation-run-state.projection.ts";
 import type { RecordEvaluationsCommandData } from "@langwatch/scenario-contract";
 import { recordEvaluationsCommandDataSchema } from "@langwatch/scenario-contract";
 import {
@@ -112,7 +112,7 @@ function derivePriorGateState(params: {
   const { finished, lastEvaluated } = params;
 
   const judgeVerdict = finished.data.results?.verdict;
-  const judgeStatus = finishedStatusOf({
+  const judgeStatus = SimulationRunStateFoldProjection.finishedStatusOf({
     explicitStatus: finished.data.status,
     verdict: judgeVerdict,
   });

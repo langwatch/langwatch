@@ -6,7 +6,7 @@ import { generateKeyPairSync } from "node:crypto";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { GithubProjectActivity } from "../github.members.ts";
-import { composeGithubBranchDemand } from "../../app/github.app.ts";
+import { GithubApp } from "../../app/github.app.ts";
 import { PrismaGithubInstallationsRepository } from "../../repositories/prisma/prisma.github-installations.repository.ts";
 import { PrismaGithubPullRequestsRepository } from "../../repositories/prisma/prisma.github-pull-requests.repository.ts";
 import type { Instant } from "@langwatch/time";
@@ -103,7 +103,7 @@ function githubApi() {
 }
 
 function demand(client: object, project: GithubProjectActivity) {
-  return composeGithubBranchDemand({
+  return GithubApp.composeBranchDemand({
     repositories: {
       installations: PrismaGithubInstallationsRepository.create(client as unknown as Parameters<typeof PrismaGithubInstallationsRepository.create>[0]),
       pullRequests: PrismaGithubPullRequestsRepository.create(client as unknown as Parameters<typeof PrismaGithubPullRequestsRepository.create>[0]),

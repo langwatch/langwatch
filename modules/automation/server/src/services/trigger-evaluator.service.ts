@@ -6,7 +6,7 @@ import type {
 } from "@langwatch/automation-contract";
 import type { AnalyticsService } from "@langwatch/analytics-contract";
 import type { TimeseriesBucket } from "@langwatch/analytics-contract";
-import type { AutomationProjectIdentityPort } from "../app/automation.members.ts";
+import type { AutomationProjectDirectory } from "../app/automation.members.ts";
 import type {
   AutomationDispatchError,
   AutomationGraphNotifier,
@@ -95,7 +95,7 @@ export type StoredGraphConfig = {
 export type GraphTriggerEvaluationDeps = {
   triggers: TriggerRepository;
   customGraphs: CustomGraphRepository;
-  projects: AutomationProjectIdentityPort;
+  projects: AutomationProjectDirectory;
   analytics: AnalyticsService;
   triggerSent: GraphTriggerSentRepository;
   notifier: AutomationGraphNotifier;

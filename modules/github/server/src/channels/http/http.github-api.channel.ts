@@ -4,17 +4,39 @@ import { createLogger } from "@langwatch/observability";
 import jwt from "jsonwebtoken";
 import { z } from "zod";
 
-import { type GithubAppClient } from "../app/github.app.ts";
-import {
-  GithubInstallationNotFoundError,
-  type GithubInstallationDetails,
-  type GithubInstallationToken,
-  GithubRateLimitedError,
-  type GithubPullRequestSummary,
-  type MintInstallationTokenInput,
-} from "../app/github.app.ts";
-import type { GithubHost } from "../app/github.members.ts";
-import { Temporal, nowInstant } from "@langwatch/time";
+import type {
+  GithubAppClient,
+  GithubInstallationDetails,
+  GithubInstallationToken,
+  GithubPullRequestSummary,
+  MintInstallationTokenInput,
+} from "../../app/github.app.ts";
+import type { GithubHost } from "../../app/github.members.ts";
+import { type Instant, Temporal, nowInstant } from "@langwatch/time";
+
+/** The installation this App JWT asked GitHub for is gone or was never granted. */
+export class GithubInstallationNotFoundError extends Error {
+  readonly installationId: string;
+
+  constructor(installationId: string) {
+    super(`GitHub installation ${installationId} not found`);
+    this.name = "GithubInstallationNotFoundError";
+    this.installationId = installationId;
+  }
+}
+
+/** GitHub refused the call for rate limiting; the headers say when to retry. */
+export class GithubRateLimitedError extends Error {
+  readonly retryAfterSec: number | null;
+  readonly resetAt: Instant | null;
+
+  constructor(input: { retryAfterSec: number | null; resetAt: Instant | null }) {
+    super("GitHub rate limit reached");
+    this.name = "GithubRateLimitedError";
+    this.retryAfterSec = input.retryAfterSec;
+    this.resetAt = input.resetAt;
+  }
+}
 
 const logger = createLogger("langwatch:github:api");
 const HTTP_TIMEOUT_MS = 10_000;
@@ -96,9 +118,9 @@ function toPullRequestSummary(pull: z.infer<typeof pullRequestSchema>): GithubPu
   };
 }
 
-export class GithubApiAdapter implements GithubAppClient {
-  static create(appId: string, privateKey: string, host: GithubHost): GithubApiAdapter {
-    return new GithubApiAdapter(appId, privateKey, host);
+export class HttpGithubApiAdapter implements GithubAppClient {
+  static create(appId: string, privateKey: string, host: GithubHost): HttpGithubApiAdapter {
+    return new HttpGithubApiAdapter(appId, privateKey, host);
   }
 
   private constructor(

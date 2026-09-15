@@ -30,12 +30,12 @@ vi.mock("node:child_process", () => ({
 }));
 
 import { NodeScenarioChildProcessAdapter } from "../services/node-scenario-child-process.service.ts";
-import { ScenarioExecutionPoolService, ScenarioExecutionRunnerPort } from "../index.ts";
+import { ScenarioExecutionPoolService, type ScenarioExecutionRunner } from "../index.ts";
 import type { ExecutionJobData } from "../services/scenario-execution-pool.service.ts";
 
 /** A runner that never actually executes — the pool only needs the job
  * marked active so `registerChild` below finds it. */
-class NoopRunner implements ScenarioExecutionRunnerPort {
+class NoopRunner implements ScenarioExecutionRunner {
   async execute(): Promise<void> {}
   skipCancelled(): void {}
 }

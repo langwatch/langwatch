@@ -16,7 +16,7 @@ import { LangyGithubPermit } from "./langy.members.ts";
 import { LangyBlockOtelMetricsAdapter } from "../services/langy-block-metrics-otel.service.ts";
 import { OtelLangyWorkerMetricsAdapter } from "../services/langy-worker-metrics-otel.service.ts";
 import { UnavailableLangyWorkerAdapter } from "../services/langy-worker-unavailable.service.ts";
-import { LangyWorkerHttpAdapter } from "../services/langy-worker-http.service.ts";
+import { HttpLangyWorkerAdapter } from "../channels/http/http.langy-worker.channel.ts";
 import { LangyTokenBufferRedisRepository } from "../repositories/redis/redis.langy-token-buffer.repository.ts";
 import type { LangyTurnTechnicalMembers } from "../services/langy-turn-shared.service.ts";
 import type {
@@ -123,7 +123,7 @@ export function buildLangyInfrastructure(input: {
   // guessing at an address.
   const worker =
     config.agentUrl && config.internalSecret
-      ? LangyWorkerHttpAdapter.create({
+      ? HttpLangyWorkerAdapter.create({
           agentUrl: config.agentUrl,
           internalSecret: config.internalSecret,
           metrics: workerMetrics,

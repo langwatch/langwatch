@@ -8,13 +8,15 @@ import { createLogger } from "@langwatch/observability";
 
 import {
   type GithubAppTokenCache,
-  GithubInstallationNotFoundError,
-  GithubRateLimitedError,
 } from "../app/github.app.ts";
 import type {
   GithubInstallationRow,
   GithubInstallationsRepository,
 } from "../repositories/github-installations.repository.ts";
+import {
+  GithubInstallationNotFoundError,
+  GithubRateLimitedError,
+} from "../channels/http/http.github-api.channel.ts";
 
 const logger = createLogger("langwatch:github:installation-access");
 

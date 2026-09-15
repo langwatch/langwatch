@@ -5,12 +5,11 @@ import type { GithubHost } from "./github.members.ts";
 import type { GithubTokenCacheRepository } from "../repositories/github-token-cache.repository.ts";
 import type { GithubRedis } from "../repositories/redis/github-redis.connection.ts";
 import { GithubTokenCacheRedisRepository } from "../repositories/redis/redis.github-token-cache.repository.ts";
-import { GithubApiAdapter } from "../services/github-api.service.ts";
+import { HttpGithubApiAdapter } from "../channels/http/http.github-api.channel.ts";
 import { GithubHostService } from "../services/github-host.service.ts";
 import {
   GITHUB_READ_PULL_PERMISSIONS,
   GITHUB_WRITE_PERMISSIONS,
-  GithubInstallationNotFoundError,
   type GithubAppClient,
   type GithubAppTokenCache,
   type GithubInstallationDetails,
@@ -18,6 +17,7 @@ import {
   type GithubPullRequestSummary,
   type MintInstallationTokenInput,
 } from "./github.app.ts";
+import { GithubInstallationNotFoundError } from "../channels/http/http.github-api.channel.ts";
 
 const INSTALLATION_TOKEN_CACHE_TTL_SEC = 50 * 60;
 const LIVENESS_RECHECK_TTL_SEC = 5 * 60;
@@ -31,7 +31,7 @@ export class RedisGithubAppTokenCache implements GithubAppTokenCache {
     redis: GithubRedis | null,
     host: GithubHost = GithubHostService.create(),
   ): RedisGithubAppTokenCache {
-    const api = GithubApiAdapter.create(appId, privateKey, host);
+    const api = HttpGithubApiAdapter.create(appId, privateKey, host);
     const cache = GithubTokenCacheRedisRepository.create({ redis, host });
     return new RedisGithubAppTokenCache(api, cache);
   }

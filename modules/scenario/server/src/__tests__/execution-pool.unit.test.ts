@@ -6,7 +6,7 @@
 import { ChildProcess } from "child_process";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { ExecutionJobData } from "../index.ts";
-import { ScenarioExecutionPoolService, ScenarioExecutionRunnerPort } from "../index.ts";
+import { ScenarioExecutionPoolService, type ScenarioExecutionRunner } from "../index.ts";
 
 function makeJob(id: string): ExecutionJobData {
   return {
@@ -29,7 +29,7 @@ function makeFakeChild(): { child: ChildProcess; kill: ReturnType<typeof vi.fn> 
   return { child, kill };
 }
 
-class TestScenarioExecutionRunner implements ScenarioExecutionRunnerPort {
+class TestScenarioExecutionRunner implements ScenarioExecutionRunner {
   readonly skipped: ExecutionJobData[] = [];
 
   constructor(private readonly executeJob: (jobData: ExecutionJobData) => Promise<void>) {

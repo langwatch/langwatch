@@ -16,7 +16,6 @@ import {
   githubServerConfigSchema,
   type GithubRepository,
 } from "@langwatch/github-contract";
-import type { Instant } from "@langwatch/time";
 import {
   OrganizationApi,
   type OrganizationApi as OrganizationApiContract,
@@ -93,28 +92,6 @@ export type MintInstallationTokenInput = {
   permissions?: Record<string, string>;
 };
 
-export class GithubInstallationNotFoundError extends Error {
-  readonly installationId: string;
-
-  constructor(installationId: string) {
-    super(`GitHub installation ${installationId} not found`);
-    this.name = "GithubInstallationNotFoundError";
-    this.installationId = installationId;
-  }
-}
-
-export class GithubRateLimitedError extends Error {
-  readonly retryAfterSec: number | null;
-  readonly resetAt: Instant | null;
-
-  constructor(input: { retryAfterSec: number | null; resetAt: Instant | null }) {
-    super("GitHub rate limit reached");
-    this.name = "GithubRateLimitedError";
-    this.retryAfterSec = input.retryAfterSec;
-    this.resetAt = input.resetAt;
-  }
-}
-
 /** The raw GitHub App HTTP client this feature needs, keyed by an App JWT. */
 export interface GithubAppClient {
   readonly configured: boolean;
@@ -190,78 +167,6 @@ export type GithubComposition = Readonly<{
   hostConfig?: { host?: string };
 }>;
 
-/**
- * The whole GitHub capability over one set of rows: the installation reads and
- * writes, the branch mapping behind pull-request linkage, the live status read
- * and the installation flow's own signing and rendering.
- */
-export function composeGithubApi(parts: GithubComposition): GithubFeatureService {
-  const host = GithubHostService.create(parts.hostConfig);
-  const redis = parts.redis ? RedisGithubAdapter.create(parts.redis) : null;
-  const appTokens = RedisGithubAppTokenCache.create(
-    parts.config.appId,
-    parts.config.privateKey,
-    redis,
-    host,
-  );
-  const { installations: installationsRepository, pullRequests: pullRequestsRepository } =
-    parts.repositories;
-  const installationAccess = GithubInstallationAccessService.create(
-    installationsRepository,
-    appTokens,
-  );
-  const installations = GithubInstallationsService.create(
-    installationsRepository,
-    appTokens,
-    parts.organization,
-    installationAccess,
-  );
-  const branchMapping = GithubBranchMappingService.create({
-    repository: pullRequestsRepository,
-    installations: installationAccess,
-    appTokens,
-    host,
-  });
-  const branchDemand = GithubBranchDemandService.create({
-    mapping: branchMapping,
-    project: parts.project,
-    host,
-  });
-  const branchMaintenance = GithubBranchMaintenanceService.create({
-    repository: pullRequestsRepository,
-    mapping: branchMapping,
-  });
-  const mapping = GithubPullRequestMappingService.create({
-    repository: pullRequestsRepository,
-    branches: branchMapping,
-    demand: branchDemand,
-    maintenance: branchMaintenance,
-  });
-  const status = GithubPullRequestStatusService.create({
-    repository: pullRequestsRepository,
-    installations,
-    appTokens,
-    cache: GithubPullRequestStatusCacheRedisRepository.create({ redis }),
-  });
-
-  return GithubFeatureService.create({
-    installations,
-    mapping,
-    status,
-    config: {
-      appSlug: parts.config.appSlug,
-      webhookSecret: parts.config.webhookSecret,
-    },
-    host,
-    installState: GithubInstallStateService.create({
-      signingKey: parts.config.signingKey,
-      nonces: GithubInstallNonceRedisRepository.create({ redis }),
-    }),
-    installResponse: GithubInstallResponseRules.create(),
-    pullRequestEvents: GithubPullRequestEventRules.create(),
-  });
-}
-
 /** What the fleet-wide branch sweep needs beside its rows. */
 export type GithubBranchMaintenanceComposition = Readonly<{
   repositories: GithubRepositories;
@@ -269,35 +174,6 @@ export type GithubBranchMaintenanceComposition = Readonly<{
   config: { appId: string; privateKey: string };
   hostConfig?: { host?: string };
 }>;
-
-/**
- * The fleet-wide branch sweep alone: the pull-request rows, the installation
- * reads, an App token minter and the host. A process that wants only the
- * sweep gets it without composing the organization or project services
- * `composeGithubApi` also needs.
- */
-export function composeGithubBranchMaintenance(
-  parts: GithubBranchMaintenanceComposition,
-): GithubBranchMaintenance {
-  const host = GithubHostService.create(parts.hostConfig);
-  const redis = parts.redis ? RedisGithubAdapter.create(parts.redis) : null;
-  const appTokens = RedisGithubAppTokenCache.create(
-    parts.config.appId,
-    parts.config.privateKey,
-    redis,
-    host,
-  );
-  const { installations, pullRequests } = parts.repositories;
-  const installationAccess = GithubInstallationAccessService.create(installations, appTokens);
-  const mapping = GithubBranchMappingService.create({
-    repository: pullRequests,
-    installations: installationAccess,
-    appTokens,
-    host,
-  });
-
-  return GithubBranchMaintenanceService.create({ repository: pullRequests, mapping });
-}
 
 /** What branch demand needs beside its rows: the project fact the demand call reads. */
 export type GithubBranchDemandComposition = Readonly<{
@@ -307,36 +183,6 @@ export type GithubBranchDemandComposition = Readonly<{
   hostConfig?: { host?: string };
   project: GithubProjectActivity;
 }>;
-
-/**
- * The demand half of pull-request linkage alone. Composes the same four
- * objects as the sweep, deliberately: the two halves take different inputs - 
- * demand needs a project seam and the sweep must be composable without one - 
- * and either, both, or neither may be mounted.
- */
-export function composeGithubBranchDemand(
-  parts: GithubBranchDemandComposition,
-): GithubBranchDemand {
-  const host = GithubHostService.create(parts.hostConfig);
-  const redis = parts.redis ? RedisGithubAdapter.create(parts.redis) : null;
-  const appTokens = RedisGithubAppTokenCache.create(
-    parts.config.appId,
-    parts.config.privateKey,
-    redis,
-    host,
-  );
-  const { installations, pullRequests } = parts.repositories;
-  const installationAccess = GithubInstallationAccessService.create(installations, appTokens);
-  const mapping = GithubBranchMappingService.create({
-    repository: pullRequests,
-    installations: installationAccess,
-    appTokens,
-    host,
-  });
-  const demand = GithubBranchDemandService.create({ mapping, project: parts.project, host });
-
-  return ComposedGithubBranchDemand.create({ demand, host });
-}
 
 /**
  * The demand service under the two names its cross-feature consumers know.
@@ -379,9 +225,140 @@ export class GithubApp implements GithubApiContract {
     this.#service = service;
   }
 
+  /**
+   * The whole GitHub capability over one set of rows: the installation reads and
+   * writes, the branch mapping behind pull-request linkage, the live status read
+   * and the installation flow's own signing and rendering.
+   */
+  static composeApi(parts: GithubComposition): GithubFeatureService {
+    const host = GithubHostService.create(parts.hostConfig);
+    const redis = parts.redis ? RedisGithubAdapter.create(parts.redis) : null;
+    const appTokens = RedisGithubAppTokenCache.create(
+      parts.config.appId,
+      parts.config.privateKey,
+      redis,
+      host,
+    );
+    const { installations: installationsRepository, pullRequests: pullRequestsRepository } =
+      parts.repositories;
+    const installationAccess = GithubInstallationAccessService.create(
+      installationsRepository,
+      appTokens,
+    );
+    const installations = GithubInstallationsService.create(
+      installationsRepository,
+      appTokens,
+      parts.organization,
+      installationAccess,
+    );
+    const branchMapping = GithubBranchMappingService.create({
+      repository: pullRequestsRepository,
+      installations: installationAccess,
+      appTokens,
+      host,
+    });
+    const branchDemand = GithubBranchDemandService.create({
+      mapping: branchMapping,
+      project: parts.project,
+      host,
+    });
+    const branchMaintenance = GithubBranchMaintenanceService.create({
+      repository: pullRequestsRepository,
+      mapping: branchMapping,
+    });
+    const mapping = GithubPullRequestMappingService.create({
+      repository: pullRequestsRepository,
+      branches: branchMapping,
+      demand: branchDemand,
+      maintenance: branchMaintenance,
+    });
+    const status = GithubPullRequestStatusService.create({
+      repository: pullRequestsRepository,
+      installations,
+      appTokens,
+      cache: GithubPullRequestStatusCacheRedisRepository.create({ redis }),
+    });
+
+    return GithubFeatureService.create({
+      installations,
+      mapping,
+      status,
+      config: {
+        appSlug: parts.config.appSlug,
+        webhookSecret: parts.config.webhookSecret,
+      },
+      host,
+      installState: GithubInstallStateService.create({
+        signingKey: parts.config.signingKey,
+        nonces: GithubInstallNonceRedisRepository.create({ redis }),
+      }),
+      installResponse: GithubInstallResponseRules.create(),
+      pullRequestEvents: GithubPullRequestEventRules.create(),
+    });
+  }
+
+  /**
+   * The fleet-wide branch sweep alone: the pull-request rows, the installation
+   * reads, an App token minter and the host. A process that wants only the
+   * sweep gets it without composing the organization or project services
+   * {@link GithubApp.composeApi} also needs.
+   */
+  static composeBranchMaintenance(
+    parts: GithubBranchMaintenanceComposition,
+  ): GithubBranchMaintenance {
+    const host = GithubHostService.create(parts.hostConfig);
+    const redis = parts.redis ? RedisGithubAdapter.create(parts.redis) : null;
+    const appTokens = RedisGithubAppTokenCache.create(
+      parts.config.appId,
+      parts.config.privateKey,
+      redis,
+      host,
+    );
+    const { installations, pullRequests } = parts.repositories;
+    const installationAccess = GithubInstallationAccessService.create(installations, appTokens);
+    const mapping = GithubBranchMappingService.create({
+      repository: pullRequests,
+      installations: installationAccess,
+      appTokens,
+      host,
+    });
+
+    return GithubBranchMaintenanceService.create({ repository: pullRequests, mapping });
+  }
+
+  /**
+   * The demand half of pull-request linkage alone. Composes the same four
+   * objects as the sweep, deliberately: the two halves take different inputs - 
+   * demand needs a project seam and the sweep must be composable without one - 
+   * and either, both, or neither may be mounted.
+   */
+  static composeBranchDemand(
+    parts: GithubBranchDemandComposition,
+  ): GithubBranchDemand {
+    const host = GithubHostService.create(parts.hostConfig);
+    const redis = parts.redis ? RedisGithubAdapter.create(parts.redis) : null;
+    const appTokens = RedisGithubAppTokenCache.create(
+      parts.config.appId,
+      parts.config.privateKey,
+      redis,
+      host,
+    );
+    const { installations, pullRequests } = parts.repositories;
+    const installationAccess = GithubInstallationAccessService.create(installations, appTokens);
+    const mapping = GithubBranchMappingService.create({
+      repository: pullRequests,
+      installations: installationAccess,
+      appTokens,
+      host,
+    });
+    const demand = GithubBranchDemandService.create({ mapping, project: parts.project, host });
+
+    return ComposedGithubBranchDemand.create({ demand, host });
+  }
+
   static create({ repositories, members, config, dependencies }: GithubSetup): GithubApp {
     return new GithubApp(
-      composeGithubApi({
+      GithubApp.composeApi({
         repositories,
         redis: members.redis,
         organization: dependencies.organizations,

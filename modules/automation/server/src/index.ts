@@ -193,7 +193,7 @@ export { GraphAlertDispatchService } from "./services/graph-alert-dispatch.servi
 export type { AutomationClock } from "./app/automation.members.ts";
 export type {
   AutomationGraphActivity,
-  AutomationProjectIdentityPort,
+  AutomationProjectDirectory,
 } from "./app/automation.members.ts";
 export {
   PrismaAutomationGraphActivityRepository as PostgresAutomationGraphActivityAdapter,

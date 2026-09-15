@@ -1,6 +1,6 @@
 import {
   LangyAnalyticsEventClickHouseRepository,
-  LangyWorkerHttpAdapter,
+  HttpLangyWorkerAdapter,
   EventingLangyConversationAdapter,
   LangyAnalyticsEventStorageAdapter,
   PostgresLangyAdapter,
@@ -83,7 +83,7 @@ export function createWorkerLangyConversation(
     buffer: LangyTokenBufferRedisRepository.create({ redis: options.redis }),
     handoffStore: LangyTurnHandoffRedisRepository.create({ redis: options.redis }),
     worker: options.config.langy
-      ? LangyWorkerHttpAdapter.create({
+      ? HttpLangyWorkerAdapter.create({
           agentUrl: options.config.langy.agentUrl,
           internalSecret: options.config.langy.internalSecret,
           metrics: workerMetrics,

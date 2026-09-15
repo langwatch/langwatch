@@ -23,7 +23,7 @@ import {
   type StartConversationTurnInput,
 } from "./langy-turn-shared.service.ts";
 import { LangyTurnSharedService } from "./langy-turn-shared.service.ts";
-import { mintRunToken } from "./langy-frame-auth.service.ts";
+import { mintRunToken } from "../rules/langy-frame-auth.rules.ts";
 import { Temporal } from "@langwatch/time";
 
 /** The shared turn helpers. Stateless: one instance for the module. */

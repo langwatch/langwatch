@@ -16,8 +16,8 @@ import {
 import { CanonicalLogStorageMapProjection } from "../projections/canonical-log-storage.projection.ts";
 import type { CanonicalLogRecordAppendRepository } from "../repositories/canonical-log-record-append.repository.ts";
 import { CanonicalLogRecordStore } from "../stores/eventing/eventing.canonical-log-record.store.ts";
-import { CanonicalLogAdapter } from "./canonical-log.service.ts";
-import { RecordCanonicalLogCommand } from "./record-canonical-log.command.ts";
+import { CanonicalLogAdapter } from "../services/canonical-log.service.ts";
+import { RecordCanonicalLogCommand } from "../services/record-canonical-log.command.ts";
 
 export interface LogProcessingPipelineDeps {
   canonicalLogAppendStore: AppendStore<CanonicalLogRecord>;

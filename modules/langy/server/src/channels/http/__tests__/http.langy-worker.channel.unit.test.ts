@@ -2,10 +2,10 @@ import { propagation } from "@opentelemetry/api";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
-  LangyWorkerHttpAdapter,
+  HttpLangyWorkerAdapter,
   NullLangyWorkerMetricsAdapter,
   UnavailableLangyWorkerAdapter,
-} from "../index.ts";
+} from "../../../index.ts";
 
 const tracing = vi.hoisted(() => {
   const span = {
@@ -41,14 +41,14 @@ const dispatchInput = {
 };
 
 function createWorker(metrics = NullLangyWorkerMetricsAdapter.create()) {
-  return LangyWorkerHttpAdapter.create({
+  return HttpLangyWorkerAdapter.create({
     agentUrl: "http://agent",
     internalSecret: "secret",
     metrics,
   });
 }
 
-describe("LangyWorkerHttpAdapter", () => {
+describe("HttpLangyWorkerAdapter", () => {
   beforeEach(() => {
     tracing.span.setAttribute.mockClear();
     tracing.withActiveSpan.mockClear();

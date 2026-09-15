@@ -124,10 +124,10 @@ function createNlpFetchDispatcher({ timeoutMs }: { timeoutMs: number }): Dispatc
 
 /**
  * Closes every cached dispatcher and clears the cache, so a later call
- * builds a fresh `Agent` instead of reusing a closed one. Wired into the
- * worker process's own shutdown.
+ * builds a fresh `Agent` instead of reusing a closed one. Reached through
+ * {@link NlpFetchAdapter.close}, which the worker's shutdown calls.
  */
-export async function closeNlpFetchDispatchers(): Promise<void> {
+async function closeNlpFetchDispatchers(): Promise<void> {
   const dispatchers = [...dispatchersByTimeoutMs.values()];
   dispatchersByTimeoutMs.clear();
   await Promise.all(dispatchers.map((dispatcher) => dispatcher.close()));

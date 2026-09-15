@@ -2,7 +2,7 @@ import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import { codingAgentServer, type CodingAgentBillingPolicy } from "@langwatch/coding-agent-server";
 import { CodingAgentApi } from "@langwatch/coding-agent-contract";
-import { composeGithubApi, PostgresGithubRepositories } from "@langwatch/github-server";
+import { GithubApp, PostgresGithubRepositories } from "@langwatch/github-server";
 import { GithubApi, type GithubServerConfig } from "@langwatch/github-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { PrismaConnection } from "@langwatch/prisma-client";
@@ -51,7 +51,7 @@ export async function createWorkerCodingAgentApp(options: {
   github: GithubServerConfig;
   signingKey: string;
 }): Promise<WorkerCodingAgent> {
-  const github = composeGithubApi({
+  const github = GithubApp.composeApi({
     repositories: PostgresGithubRepositories.create({ prisma: options.database }),
     redis: options.redis,
     organization: options.organizations,

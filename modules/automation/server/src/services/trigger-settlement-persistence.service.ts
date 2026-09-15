@@ -3,7 +3,7 @@ import type { TriggerSummary } from "@langwatch/automation-contract";
 import { DispatchError, isDispatchError, pMapLimited } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import type { AutomationClock } from "../app/automation.members.ts";
-import type { AutomationProjectIdentityPort } from "../app/automation.members.ts";
+import type { AutomationProjectDirectory } from "../app/automation.members.ts";
 import type { AutomationSettlementLedger } from "../repositories/automation-settlement-ledger.repository.ts";
 import type { AutomationSettlementTraceReader } from "../repositories/automation-settlement-read.repository.ts";
 import type { AutomationSettlementMatchConfirmation } from "./automation-settlement-policy.service.ts";
@@ -16,7 +16,7 @@ const CLAIM_RETRY_DELAYS_MS = [200, 500];
 
 type PersistenceComposition = {
   automation: AutomationSettlementLedger;
-  projects: AutomationProjectIdentityPort;
+  projects: AutomationProjectDirectory;
   traces: AutomationSettlementTraceReader;
   confirmation: AutomationSettlementMatchConfirmation;
   persistActions: AutomationPersistActionService;

@@ -35,7 +35,7 @@ import { TraceListService, TraceQueryClickHouseAdapter } from "@langwatch/trace-
 import type { TraceListRepository } from "@langwatch/trace-contract";
 import type { ReportTraceRow } from "@langwatch/automation-contract";
 import type { WorkerAutomationDeliveryComposition } from "./worker-automation-graph.composition.ts";
-import type { AutomationProjectIdentityPort } from "@langwatch/automation-server";
+import type { AutomationProjectDirectory } from "@langwatch/automation-server";
 import { fromDate, toDate, type Instant } from "@langwatch/time";
 
 /**
@@ -194,7 +194,7 @@ export type WorkerReportScheduleCompositionOptions = Readonly<{
   /** The transports and cipher both halves of Automation already share. */
   delivery: WorkerAutomationDeliveryComposition;
   /** The name and slug a report's links and headings are written with. */
-  projects: AutomationProjectIdentityPort;
+  projects: AutomationProjectDirectory;
   /** The timeseries each chart panel is plotted from. */
   analytics: AnalyticsService;
   /** How a trace-query report reads the rows it sends. */

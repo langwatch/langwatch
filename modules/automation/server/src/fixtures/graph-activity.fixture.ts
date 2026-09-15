@@ -1,5 +1,5 @@
 import type { AutomationClock } from "../app/automation.members.ts";
-import type { AutomationProjectIdentityPort } from "../app/automation.members.ts";
+import type { AutomationProjectDirectory } from "../app/automation.members.ts";
 import {
   AutomationDispatchError,
   AutomationLogger,
@@ -159,7 +159,7 @@ export class BreachingAnalytics {
   }
 }
 
-export class OneProject implements AutomationProjectIdentityPort {
+export class OneProject implements AutomationProjectDirectory {
   async findById(
     projectId: string,
   ): Promise<{ id: string; name: string; slug: string } | null> {

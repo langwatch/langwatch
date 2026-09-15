@@ -29,19 +29,10 @@ interface Vectors {
 }
 
 // Single source of truth, shared with the Go suite. Package tests run from
-// `modules/langy/server`, four levels below the repository root.
+// `modules/langy/server`, three levels below the repository root.
 const VECTORS: Vectors = JSON.parse(
   readFileSync(
-    resolve(
-      process.cwd(),
-      "..",
-      "..",
-      "..",
-      "..",
-      "specs",
-      "langy",
-      "langy-frame-auth.vectors.json",
-    ),
+    resolve(process.cwd(), "..", "..", "..", "specs", "langy", "langy-frame-auth.vectors.json"),
     "utf8",
   ),
 ) as Vectors;

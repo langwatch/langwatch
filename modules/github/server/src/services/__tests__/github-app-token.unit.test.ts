@@ -11,10 +11,12 @@ import { RedisGithubAppTokenCache } from "../../app/redis-github-app-token-cache
 import {
   GITHUB_READ_PULL_PERMISSIONS,
   GITHUB_WRITE_PERMISSIONS,
-  GithubInstallationNotFoundError,
-  GithubRateLimitedError,
 } from "../../app/github.app.ts";
 import type { GithubRedis } from "../../repositories/redis/github-redis.connection.ts";
+import {
+  GithubInstallationNotFoundError,
+  GithubRateLimitedError,
+} from "../../channels/http/http.github-api.channel.ts";
 
 const { privateKey, publicKey } = generateKeyPairSync("rsa", {
   modulusLength: 2048,

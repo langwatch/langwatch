@@ -5,7 +5,7 @@
 import { generateKeyPairSync } from "node:crypto";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { composeGithubBranchMaintenance } from "../../app/github.app.ts";
+import { GithubApp } from "../../app/github.app.ts";
 import { PrismaGithubInstallationsRepository } from "../../repositories/prisma/prisma.github-installations.repository.ts";
 import { PrismaGithubPullRequestsRepository } from "../../repositories/prisma/prisma.github-pull-requests.repository.ts";
 
@@ -100,7 +100,7 @@ function githubApi() {
 }
 
 function sweep(client: object) {
-  return composeGithubBranchMaintenance({
+  return GithubApp.composeBranchMaintenance({
     repositories: {
       installations: PrismaGithubInstallationsRepository.create(client as unknown as Parameters<typeof PrismaGithubInstallationsRepository.create>[0]),
       pullRequests: PrismaGithubPullRequestsRepository.create(client as unknown as Parameters<typeof PrismaGithubPullRequestsRepository.create>[0]),
@@ -155,7 +155,7 @@ describe("the GitHub branch sweep composed from Postgres alone", () => {
     it("asks GitHub nothing and writes nothing, rather than failing", async () => {
       const { client, writes } = database();
       const paths = githubApi();
-      const uncredentialed = composeGithubBranchMaintenance({
+      const uncredentialed = GithubApp.composeBranchMaintenance({
         repositories: {
           installations: PrismaGithubInstallationsRepository.create(client as unknown as Parameters<typeof PrismaGithubInstallationsRepository.create>[0]),
           pullRequests: PrismaGithubPullRequestsRepository.create(client as unknown as Parameters<typeof PrismaGithubPullRequestsRepository.create>[0]),
@@ -173,7 +173,7 @@ describe("the GitHub branch sweep composed from Postgres alone", () => {
     /** @scenario "The retention prune runs without App credentials" */
     it("still prunes bookkeeping past the activity horizon", async () => {
       const { client } = database();
-      const uncredentialed = composeGithubBranchMaintenance({
+      const uncredentialed = GithubApp.composeBranchMaintenance({
         repositories: {
           installations: PrismaGithubInstallationsRepository.create(client as unknown as Parameters<typeof PrismaGithubInstallationsRepository.create>[0]),
           pullRequests: PrismaGithubPullRequestsRepository.create(client as unknown as Parameters<typeof PrismaGithubPullRequestsRepository.create>[0]),

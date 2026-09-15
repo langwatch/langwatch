@@ -8,7 +8,7 @@ import {
 import { TraceNotFoundError, type TraceRecord } from "@langwatch/trace-contract";
 import { DispatchError } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
-import type { AutomationProjectIdentityPort } from "../app/automation.members.ts";
+import type { AutomationProjectDirectory } from "../app/automation.members.ts";
 import { AutomationDatasetMapper } from "./automation-dataset-mapper.service.ts";
 import { AutomationPersistActionWriter } from "../repositories/automation-persist-action.repository.ts";
 import type { AutomationSettlementLedger } from "../repositories/automation-settlement-ledger.repository.ts";
@@ -33,7 +33,7 @@ function sanitizeRecord(record: Record<string, string | number>): Record<string,
 export class AutomationPersistActionService {
   private constructor(
     private readonly automation: AutomationSettlementLedger,
-    private readonly projects: AutomationProjectIdentityPort,
+    private readonly projects: AutomationProjectDirectory,
     private readonly traces: AutomationSettlementTraceReader,
     private readonly mapper: AutomationDatasetMapper,
     private readonly writer: AutomationPersistActionWriter,
@@ -41,7 +41,7 @@ export class AutomationPersistActionService {
 
   static create(input: {
     automation: AutomationSettlementLedger;
-    projects: AutomationProjectIdentityPort;
+    projects: AutomationProjectDirectory;
     traces: AutomationSettlementTraceReader;
     mapper: AutomationDatasetMapper;
     writer: AutomationPersistActionWriter;

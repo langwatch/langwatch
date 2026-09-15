@@ -11,9 +11,7 @@ import {
 import { RedisGithubAppTokenCache } from "../../app/redis-github-app-token-cache.ts";
 import {
   type GithubInstallationDetails,
-  GithubInstallationNotFoundError,
   type GithubInstallationToken,
-  GithubRateLimitedError,
   type MintInstallationTokenInput,
 } from "../../app/github.app.ts";
 import type {
@@ -25,6 +23,10 @@ import { GithubInstallationsService } from "../../services/github-installations.
 import { GithubInstallationAccessService } from "../../services/github-installation-access.service.ts";
 import { TestOrganizationService } from "../../services/__tests__/fixtures/github-services.fixture.ts";
 import { Temporal, nowInstant } from "@langwatch/time";
+import {
+  GithubInstallationNotFoundError,
+  GithubRateLimitedError,
+} from "../../channels/http/http.github-api.channel.ts";
 
 function makeRepo(rows: GithubInstallationRow[] = []): GithubInstallationsRepository & {
   upsert: ReturnType<typeof vi.fn>;

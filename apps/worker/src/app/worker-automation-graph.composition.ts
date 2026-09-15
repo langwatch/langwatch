@@ -6,7 +6,7 @@ import {
   type AutomationEmailCapRepository,
   type AutomationGraphActivity,
   AutomationLogger,
-  type AutomationProjectIdentityPort,
+  type AutomationProjectDirectory,
   PostgresAutomationGraphActivityAdapter,
   type AutomationGraphActivityDatabase,
   type AutomationSecretCrypto,
@@ -26,7 +26,7 @@ import { nowInstant, toDate } from "@langwatch/time";
 // Capabilities the graph vertical needs: project identity (narrowed from
 // ProjectApi) and analytics for metric queries
 export type WorkerAutomationGraphDependencies = Readonly<{
-  projects: AutomationProjectIdentityPort;
+  projects: AutomationProjectDirectory;
   analytics: AnalyticsService;
 }>;
 

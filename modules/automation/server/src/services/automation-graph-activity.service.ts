@@ -6,7 +6,7 @@ import type {
 } from "@langwatch/automation-contract";
 import type {
   AutomationGraphActivity,
-  AutomationProjectIdentityPort,
+  AutomationProjectDirectory,
 } from "../app/automation.members.ts";
 import type { AutomationClock } from "../app/automation.members.ts";
 import {
@@ -37,7 +37,7 @@ export class AutomationGraphActivityService implements AutomationGraphActivity {
     /** The suppression, send-claim and webhook-log half a dispatched alert writes. */
     persistence: AutomationGraphDelivery;
     clock: AutomationClock;
-    projects: AutomationProjectIdentityPort;
+    projects: AutomationProjectDirectory;
     analytics: AnalyticsService;
     /** The process's outbound transports: mail, Slack, webhook. */
     delivery: AutomationNotificationDelivery;

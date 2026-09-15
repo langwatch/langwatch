@@ -93,16 +93,6 @@ function mergeLangwatchNamespace(
   });
 }
 
-/**
- * The stored metadata with the call-limit cutoff flag written into its
- * reserved `langwatch` namespace, mirroring {@link withAgentInstance}. The
- * marker is always `true`: the event's existence is the fact, so folding it a
- * second time produces byte-identical metadata (idempotent).
- */
-export function withCutAtLimit(metadata: string | null): string {
-  return mergeLangwatchNamespace(metadata, { isCutAtLimit: true });
-}
-
 function parseMetadataObject(metadata: string | null): Record<string, unknown> {
   if (!metadata) return {};
   try {
@@ -259,23 +249,6 @@ function isTerminalStatus(status: string): boolean {
 }
 
 /**
- * Status a finished run reads with: explicit TERMINAL takes priority, else derives
- * from verdict. Shared with RecordEvaluationsCommand.
- */
-export function finishedStatusOf({
-  explicitStatus,
-  verdict,
-}: {
-  explicitStatus: string | undefined;
-  verdict: string | null | undefined;
-}): string {
-  const explicit = explicitStatus?.toUpperCase();
-  if (explicit && isTerminalStatus(explicit)) return explicit;
-  if (verdict === "success") return "SUCCESS";
-  return "FAILURE";
-}
-
-/**
  * Status and verdict a run stores on finish: PENDING_EVALUATION if pending results,
  * else judge's verdict. Evaluated event first means gate runs on judge's verdict.
  */
@@ -313,14 +286,6 @@ function settledOnFinish({
       : judgeStatus,
     verdict,
   };
-}
-
-/**
- * Whether fold has seen an event that DEFINES the run (non-empty ScenarioRunId).
- * Metrics events carry cost only; don't mint rows. Accumulate until lifecycle event.
- */
-export function hasRunDefiningEvent(state: SimulationRunStateData): boolean {
-  return state.ScenarioRunId.length > 0;
 }
 
 const simulationRunEvents = [
@@ -385,6 +350,33 @@ export class SimulationRunStateFoldProjection
    */
   static hasRunDefiningEvent(state: SimulationRunStateData): boolean {
     return state.ScenarioRunId.length > 0;
+  }
+
+  /**
+   * The stored metadata with the call-limit cutoff flag written into its
+   * reserved `langwatch` namespace, mirroring {@link withAgentInstance}. The
+   * marker is always `true`: the event's existence is the fact, so folding it a
+   * second time produces byte-identical metadata (idempotent).
+   */
+  static withCutAtLimit(metadata: string | null): string {
+    return mergeLangwatchNamespace(metadata, { isCutAtLimit: true });
+  }
+
+  /**
+   * Status a finished run reads with: explicit TERMINAL takes priority, else derives
+   * from verdict. Shared with RecordEvaluationsCommand.
+   */
+  static finishedStatusOf({
+    explicitStatus,
+    verdict,
+  }: {
+    explicitStatus: string | undefined;
+    verdict: string | null | undefined;
+  }): string {
+    const explicit = explicitStatus?.toUpperCase();
+    if (explicit && isTerminalStatus(explicit)) return explicit;
+    if (verdict === "success") return "SUCCESS";
+    return "FAILURE";
   }
 
   readonly name = "simulationRunState";
@@ -657,7 +649,7 @@ export class SimulationRunStateFoldProjection
 
     const results = event.data.results;
     const verdict = results?.verdict ?? null;
-    const judgeStatus = finishedStatusOf({
+    const judgeStatus = SimulationRunStateFoldProjection.finishedStatusOf({
       explicitStatus: event.data.status,
       verdict,
     });
@@ -707,7 +699,7 @@ export class SimulationRunStateFoldProjection
     const verdict = event.data.verdict;
     const judgeStatus =
       state.Status === ScenarioRunStatus.PENDING_EVALUATION
-        ? finishedStatusOf({
+        ? SimulationRunStateFoldProjection.finishedStatusOf({
             explicitStatus: undefined,
             verdict: state.Verdict,
           })
@@ -798,7 +790,7 @@ export class SimulationRunStateFoldProjection
     return {
       ...state,
       ScenarioRunId: state.ScenarioRunId || event.data.scenarioRunId,
-      Metadata: withCutAtLimit(state.Metadata),
+      Metadata: SimulationRunStateFoldProjection.withCutAtLimit(state.Metadata),
     };
   }
 

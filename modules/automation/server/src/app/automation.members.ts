@@ -41,7 +41,7 @@ export interface AutomationInfrastructure {  automationClock: AutomationClock;
   automationLogger: AutomationLogger;
   automationNotificationDelivery: AutomationNotificationDelivery;
   automationPersistActionWriter: AutomationPersistActionWriter;
-  automationProjectIdentity: AutomationProjectIdentityPort;
+  automationProjectDirectory: AutomationProjectDirectory;
   automationRunaway: AutomationRunawayPort;
   automationScheduledIntent: AutomationScheduledIntent;
   automationSlackBotTokenDecryptor: AutomationSlackBotTokenDecryptor;
@@ -132,7 +132,7 @@ export interface AutomationGraphActivity {
  * Project read for graph alerts; narrowing to avoid dragging credentials and authz
  * services into processes that only send alerts.
  */
-export interface AutomationProjectIdentityPort {
+export interface AutomationProjectDirectory {
   findById(projectId: string): Promise<{
     id: string;
     name: string;

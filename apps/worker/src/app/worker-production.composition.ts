@@ -36,8 +36,7 @@ import {
   PostgresAuthzPipelineAdapter,
 } from "@langwatch/authz-server";
 import {
-  composeGithubBranchDemand,
-  composeGithubBranchMaintenance,
+  GithubApp,
   PrismaGithubInstallationsRepository,
   type PrismaGithubInstallationsDatabase,
   PrismaGithubPullRequestsRepository,
@@ -536,7 +535,7 @@ export class WorkerProductionComposition {
     const githubRedis = createWorkerGithubRedis(processRedis);
     const github = GithubWorkerFeatureInstaller.create({
       eventing,
-      branchMaintenance: composeGithubBranchMaintenance({
+      branchMaintenance: GithubApp.composeBranchMaintenance({
         repositories: {
           installations: PrismaGithubInstallationsRepository.create(options.database),
           pullRequests: PrismaGithubPullRequestsRepository.create(options.database),
@@ -565,7 +564,7 @@ export class WorkerProductionComposition {
         redis: eventingOptions.groupQueue.redis,
         traceCanonicalisation,
         projectActivity,
-        pullRequestMapping: composeGithubBranchDemand({
+        pullRequestMapping: GithubApp.composeBranchDemand({
           repositories: {
             installations: PrismaGithubInstallationsRepository.create(options.database),
             pullRequests: PrismaGithubPullRequestsRepository.create(options.database),

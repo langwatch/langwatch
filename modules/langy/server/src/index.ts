@@ -106,17 +106,17 @@ export {
   newFrameNonce,
   signFrame,
   verifyFrame,
-} from "./services/langy-frame-auth.service.ts";
+} from "./rules/langy-frame-auth.rules.ts";
 export { LANGY_AGENT_DISPATCH_TIMEOUT_MS } from "./processes/langy-conversation-process.types.ts";
 export {
   AGENT_DISPATCH_TIMEOUT_MS,
-  LangyWorkerHttpAdapter,
-} from "./services/langy-worker-http.service.ts";
+  HttpLangyWorkerAdapter,
+} from "./channels/http/http.langy-worker.channel.ts";
 export type {
   LangyDispatchOutcome,
   LangyWorkerAdapterConfig,
   LangyWorkerHttpConfig,
-} from "./services/langy-worker-http.service.ts";
+} from "./channels/http/http.langy-worker.channel.ts";
 export { NullLangyWorkerMetricsAdapter } from "./services/langy-worker-metrics-null.service.ts";
 export { NullLangyBlockMetricsAdapter } from "./services/langy-block-metrics-null.service.ts";
 export { UnavailableLangyWorkerAdapter } from "./services/langy-worker-unavailable.service.ts";

@@ -40,7 +40,7 @@ import {
   type AutomationEvent,
   type AutomationGraphActivity,
   type AutomationIntentRetention,
-  type AutomationProjectIdentityPort,
+  type AutomationProjectDirectory,
   type AutomationSettlementLedgerDatabase,
   type AutomationSecretCrypto,
 } from "@langwatch/automation-server";
@@ -78,7 +78,7 @@ export type WorkerAutomationSettlementCompositionOptions = Readonly<{
    * point at. Absent exactly when this deployment named no `BASE_HOST`.
    */
   notifications?: AutomationSettlementNotifications | undefined;
-  projects: AutomationProjectIdentityPort;
+  projects: AutomationProjectDirectory;
   traces: AutomationSettlementTraceReader;
   evaluations: AutomationSettlementEvaluationReader;
   /** The graph half, when this process composed one. */

@@ -5,7 +5,7 @@
 import { type AgentInput, AgentRole } from "@langwatch/scenario";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { CodeAgentData } from "@langwatch/scenario-contract";
-import { closeNlpFetchDispatchers, NlpFetchAdapter } from "../services/nlp-fetch.service.ts";
+import { NlpFetchAdapter } from "../services/nlp-fetch.service.ts";
 import { guardAgainstGlobalFetch } from "./support/global-fetch-guard.ts";
 import recordedNlpgoResponses from "./fixtures/nlpgo-recorded-responses.json";
 

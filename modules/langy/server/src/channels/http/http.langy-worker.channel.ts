@@ -3,14 +3,14 @@ import { context, propagation, trace } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
 import { z } from "zod";
 
-import { LANGY_AGENT_DISPATCH_TIMEOUT_MS } from "../processes/langy-conversation-process.types.ts";
+import { LANGY_AGENT_DISPATCH_TIMEOUT_MS } from "../../processes/langy-conversation-process.types.ts";
 import type {
   LangyDispatchOutcome,
   LangyWorkerMetrics,
   LangyWorker,
-} from "../app/langy.members.ts";
+} from "../../app/langy.members.ts";
 
-export type { LangyDispatchOutcome } from "../app/langy.members.ts";
+export type { LangyDispatchOutcome } from "../../app/langy.members.ts";
 
 const AGENT_WARM_TIMEOUT_MS = 3_000;
 const AGENT_PROBE_TIMEOUT_MS = 1_000;
@@ -60,7 +60,7 @@ function dispatchOutcome(response: Response): LangyDispatchOutcome {
   return "unavailable";
 }
 
-function buildLangyWorkerPort(config: LangyWorkerAdapterConfig): LangyWorker {
+function buildLangyWorker(config: LangyWorkerAdapterConfig): LangyWorker {
   const { agentUrl, internalSecret, metrics } = config;
   const logger = createLogger("langwatch:langy:worker");
   const tracer = getLangWatchTracer("langwatch.langy.chat");
@@ -238,8 +238,8 @@ function buildLangyWorkerPort(config: LangyWorkerAdapterConfig): LangyWorker {
 }
 
 /** HTTP adapter for the process-owned Langy worker manager. */
-export class LangyWorkerHttpAdapter {
+export class HttpLangyWorkerAdapter {
   static create(config: LangyWorkerAdapterConfig): LangyWorker {
-    return buildLangyWorkerPort(config);
+    return buildLangyWorker(config);
   }
 }

@@ -2,7 +2,7 @@
  * @vitest-environment node
  */
 import { generateKeyPairSync } from "crypto";
-import { composeGithubApi, PostgresGithubRepositories } from "@langwatch/github-server";
+import { GithubApp, PostgresGithubRepositories } from "@langwatch/github-server";
 import { type GithubPullRequestEvent, type GithubApi } from "@langwatch/github-contract";
 import {
   PrismaConfigService,
@@ -168,7 +168,7 @@ function harness(input: { host?: string } = {}) {
   return {
     http,
     projects,
-    github: composeGithubApi({
+    github: GithubApp.composeApi({
       repositories: PostgresGithubRepositories.create({ prisma: database() }),
       config: {
         appId: "test-app",

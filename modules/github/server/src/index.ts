@@ -1,4 +1,3 @@
-export { composeGithubApi } from "./app/github.app.ts";
 export { PostgresGithubRepositories } from "./repositories/prisma/prisma.github.repositories.ts";
 export type { GithubRepositories } from "./repositories/github.repositories.ts";
 export {
@@ -9,11 +8,9 @@ export {
   PrismaGithubPullRequestsRepository,
   type PrismaGithubPullRequestsDatabase,
 } from "./repositories/prisma/prisma.github-pull-requests.repository.ts";
-export {
-  composeGithubBranchMaintenance,
-  type GithubBranchMaintenanceComposition,
-  composeGithubBranchDemand,
-  type GithubBranchDemandComposition,
+export type {
+  GithubBranchMaintenanceComposition,
+  GithubBranchDemandComposition,
 } from "./app/github.app.ts";
 export { EventingGithubMaintenanceAdapter } from "./services/github-maintenance.service.ts";
 export type { GithubBranchMaintenance } from "./app/github.members.ts";

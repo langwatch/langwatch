@@ -3,7 +3,7 @@ export type { LogInfrastructure } from "./app/log.app.ts";
 export { logServer } from "./log.server.ts";
 export { CanonicalLogAdapter } from "./services/canonical-log.service.ts";
 export { ClickhouseLogProcessingRepository } from "./repositories/clickhouse/clickhouse.log-processing.repository.ts";
-export type { LogProcessingPipeline } from "./services/log-processing.service.ts";
+export type { LogProcessingPipeline } from "./eventing/log.pipeline.ts";
 export { ClickhouseLogRepository } from "./repositories/clickhouse/clickhouse.log.repository.ts";
 
 /**

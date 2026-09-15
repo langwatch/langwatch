@@ -17,7 +17,7 @@ import type { AutomationSettlementObservability } from "../services/automation-s
 import { AutomationSettlementExecutor } from "./automation-settlement-executor.service.ts";
 import type { AutomationSettlementLedger } from "../repositories/automation-settlement-ledger.repository.ts";
 import type { AutomationSettlementTraceReader } from "../repositories/automation-settlement-read.repository.ts";
-import type { AutomationProjectIdentityPort } from "../app/automation.members.ts";
+import type { AutomationProjectDirectory } from "../app/automation.members.ts";
 import type { AutomationEmailCapService } from "./email-cap.service.ts";
 import type { AutomationPersistActionService } from "./persist-action.service.ts";
 import { TriggerSettlementNotificationService } from "./trigger-settlement-notification.service.ts";
@@ -27,7 +27,7 @@ const logger = createLogger("langwatch:automation:settlement-dispatch");
 
 type SettlementComposition = {
   automation: AutomationSettlementLedger;
-  projects: AutomationProjectIdentityPort;
+  projects: AutomationProjectDirectory;
   traces: AutomationSettlementTraceReader;
   confirmation: AutomationSettlementMatchConfirmation;
   persistActions: AutomationPersistActionService;
