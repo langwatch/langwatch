@@ -1,11 +1,8 @@
-import type {
-  AgentConfig as AgentComponentConfig,
-  AgentInputBinding,
-} from "@langwatch/agent-contract";
 import { describe, expect, it } from "vitest";
 
-import { buildCodeConfig, DEFAULT_CODE, getCodeFromConfig } from "../agent-code-config.ts";
-import type { Field } from "@langwatch/agent-contract";
+import { buildCodeConfig, DEFAULT_CODE, getCodeFromConfig } from "../code-config.ts";
+import type { AgentConfig as AgentComponentConfig } from "../config/index.ts";
+import type { AgentInputBinding, Field } from "../fields.ts";
 
 describe("code-agent-config", () => {
   it("reads a code parameter and uses the default when it is absent", () => {

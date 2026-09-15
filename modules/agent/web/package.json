@@ -32,6 +32,11 @@
       "langwatch-declaration-source": "./src/agent-client.ts",
       "types": "./dist/agent-client.d.ts",
       "default": "./src/agent-client.ts"
+    },
+    "./surfaces/http-config-editor": {
+      "langwatch-declaration-source": "./src/ui/sections/http-config-editor.tsx",
+      "types": "./dist/ui/sections/http-config-editor.d.ts",
+      "default": "./src/ui/sections/http-config-editor.tsx"
     }
   },
   "scripts": {

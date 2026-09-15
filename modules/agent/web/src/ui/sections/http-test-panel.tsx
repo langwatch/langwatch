@@ -14,18 +14,17 @@ import {
 import { AlertCircle, Play } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
 import {
+  type HttpTestErrorExplanation,
+  type HttpTestResult,
   messagesToJson,
-  TestMessagesBuilder,
   type TestMessage,
-} from "../blocks/http-test-messages-builder.tsx";
+} from "@langwatch/agent-contract/http-test";
+import { TestMessagesBuilder } from "../blocks/http-test-messages-builder.tsx";
 import { HttpTestRequestPreview } from "../blocks/http-test-request-preview.tsx";
 import { HttpTestResponseDisplay } from "../blocks/http-test-response-display.tsx";
-import type { HttpTestErrorExplanation, HttpTestResult } from "../../model/http-test.types.ts";
 
 const DEFAULT_THREAD_ID = "test-thread-123";
 const DEFAULT_MESSAGES: TestMessage[] = [{ role: "user", content: "Hello" }];
-
-export type { HttpTestErrorExplanation, HttpTestResult } from "../../model/http-test.types.ts";
 
 export type HttpTestPanelProps = {
   /** Runs the request with template variables, so the engine renders the body. */

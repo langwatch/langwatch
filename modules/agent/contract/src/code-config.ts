@@ -1,9 +1,5 @@
-import type {
-  AgentConfig,
-  AgentInputBinding,
-  CodeAgentConfig,
-  Field,
-} from "@langwatch/agent-contract";
+import type { AgentConfig, CodeAgentConfig } from "./config/index.ts";
+import type { AgentInputBinding, Field } from "./fields.ts";
 
 export const DEFAULT_CODE = `class Code:
     def __call__(self, input: str):

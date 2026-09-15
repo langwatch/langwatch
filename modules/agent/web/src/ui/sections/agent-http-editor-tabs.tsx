@@ -11,8 +11,10 @@ import { OutputPathInput } from "../elements/http-output-path-input.tsx";
 import { SessionPathInput } from "../elements/http-session-path-input.tsx";
 import type { HttpAuth, HttpHeader, HttpMethod } from "@langwatch/agent-contract";
 import type { ReactNode } from "react";
-import type { HttpTestErrorExplanation } from "../../model/http-test.types.ts";
-import type { HttpTestResult } from "../../model/http-test.types.ts";
+import type {
+  HttpTestErrorExplanation,
+  HttpTestResult,
+} from "@langwatch/agent-contract/http-test";
 
 export interface RenderScenarioMappingsInput {
   inputs: Variable[];

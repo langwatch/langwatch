@@ -13,7 +13,7 @@ import {
   HTTP_FIXED_VARIABLE_IDS,
   type HttpAgentEditorOptions,
 } from "../../behavior/use-http-agent-editor.ts";
-import type { HttpTestErrorExplanation } from "../../model/http-test.types.ts";
+import type { HttpTestErrorExplanation } from "@langwatch/agent-contract/http-test";
 
 export interface AgentHttpEditorDrawerProps extends HttpAgentEditorOptions {
   onGoBack?: () => void;

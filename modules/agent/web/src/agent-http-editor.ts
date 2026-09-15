@@ -23,18 +23,17 @@ export {
   HttpMethodSelector,
   type HttpMethodSelectorProps,
 } from "./ui/elements/http-method-selector.tsx";
+export { HttpTestPanel, type HttpTestPanelProps } from "./ui/sections/http-test-panel.tsx";
 export {
-  HttpTestPanel,
-  type HttpTestPanelProps,
   type HttpTestResult,
-} from "./ui/sections/http-test-panel.tsx";
+  messagesToJson,
+  type TestMessage,
+} from "@langwatch/agent-contract/http-test";
 export {
   OutputPathInput,
   type HttpOutputPathInputProps,
 } from "./ui/elements/http-output-path-input.tsx";
 export {
-  messagesToJson,
-  type TestMessage,
   TestMessagesBuilder,
   type TestMessagesBuilderProps,
 } from "./ui/blocks/http-test-messages-builder.tsx";

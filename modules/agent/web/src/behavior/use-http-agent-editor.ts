@@ -10,7 +10,7 @@ import {
 import { hasScenarioInputMapping } from "@langwatch/scenario-contract";
 import { useEffect, useRef, useState } from "react";
 import type { AgentBrowser } from "../model/agent-client.ts";
-import type { HttpTestResult } from "../model/http-test.types.ts";
+import type { HttpTestResult } from "@langwatch/agent-contract/http-test";
 
 export const HTTP_FIXED_VARIABLES: Field[] = [
   { identifier: "threadId", type: "str" },

@@ -2,11 +2,12 @@ import { Box, Field, HStack, Input, Tabs, Text, VStack } from "@chakra-ui/react"
 import { useState } from "react";
 
 import type { HttpAuth, HttpHeader, HttpMethod } from "@langwatch/agent-contract";
+import type { HttpTestResult } from "@langwatch/agent-contract/http-test";
 import { AuthConfigSection } from "../elements/http-auth-config-section.tsx";
 import { BodyTemplateEditor } from "../elements/http-body-template-editor.tsx";
 import { HeadersConfigSection } from "../elements/http-headers-config-section.tsx";
 import { HttpMethodSelector } from "../elements/http-method-selector.tsx";
-import { HttpTestPanel, type HttpTestResult } from "./http-test-panel.tsx";
+import { HttpTestPanel } from "./http-test-panel.tsx";
 import { OutputPathInput } from "../elements/http-output-path-input.tsx";
 
 export type HttpConfigEditorProps = {
@@ -28,10 +29,9 @@ export type HttpConfigEditorProps = {
 };
 
 /**
- * Shared HTTP configuration editor with endpoint URL + method selector
- * and tabbed interface for Body, Auth, Headers, and Test.
- *
- * Used by HttpPropertiesPanel and AgentPropertiesPanel.
+ * The HTTP agent's configuration editor: endpoint and method, with Body, Auth,
+ * Headers and Test tabs. Published as a surface so the studio's HTTP and Agent
+ * properties panels compose it rather than owning a second implementation.
  */
 export function HttpConfigEditor({
   url,

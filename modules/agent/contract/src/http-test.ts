@@ -1,3 +1,14 @@
+/** One turn of the conversation an HTTP agent test sends as `{{messages}}`. */
+export type TestMessage = {
+  role: "user" | "assistant";
+  content: string;
+};
+
+/** Renders the built messages into the JSON string the body template reads. */
+export function messagesToJson(messages: TestMessage[]): string {
+  return JSON.stringify(messages.map((m) => ({ role: m.role, content: m.content })));
+}
+
 export type HttpTestResult = {
   success: boolean;
   response?: unknown;

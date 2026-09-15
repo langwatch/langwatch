@@ -1,12 +1,8 @@
 import { Box, Button, Code, HStack, Spacer, Text, Textarea, VStack } from "@chakra-ui/react";
+import type { TestMessage } from "@langwatch/agent-contract/http-test";
 import { Menu } from "@langwatch/design-system/menu";
 import { Minus, Plus } from "lucide-react";
 import { useCallback } from "react";
-
-export type TestMessage = {
-  role: "user" | "assistant";
-  content: string;
-};
 
 export type TestMessagesBuilderProps = {
   messages: TestMessage[];
@@ -169,11 +165,4 @@ export function TestMessagesBuilder({
       </Box>
     </VStack>
   );
-}
-
-/**
- * Converts messages array to JSON string for template rendering
- */
-export function messagesToJson(messages: TestMessage[]): string {
-  return JSON.stringify(messages.map((m) => ({ role: m.role, content: m.content })));
 }

@@ -4,11 +4,19 @@ import { moduleVitestTestOptions } from "../../../packages/test-harness/src/vite
 
 export default defineConfig({
   resolve: {
-    alias: {
-      "@langwatch/agent-contract": fileURLToPath(
-        new URL("../contract/src/index.ts", import.meta.url),
-      ),
-    },
+    // Anchored, so the package root keeps its alias while the contract's
+    // subpath exports (`/code-config`, `/http-test`) resolve through its own
+    // exports map rather than being rewritten into `index.ts/<subpath>`.
+    alias: [
+      {
+        find: /^@langwatch\/agent-contract$/,
+        replacement: fileURLToPath(new URL("../contract/src/index.ts", import.meta.url)),
+      },
+      {
+        find: /^@langwatch\/agent-contract\/(.+)$/,
+        replacement: `${fileURLToPath(new URL("../contract/src/", import.meta.url))}$1.ts`,
+      },
+    ],
   },
   test: moduleVitestTestOptions({
     kind: "jsdom",

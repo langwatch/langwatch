@@ -2,7 +2,11 @@ export {
   AgentCodeEditorDrawer,
   type AgentCodeEditorDrawerProps,
 } from "./ui/sections/agent-code-editor-drawer.tsx";
-export { buildCodeConfig, DEFAULT_CODE, getCodeFromConfig } from "./model/agent-code-config.ts";
+export {
+  buildCodeConfig,
+  DEFAULT_CODE,
+  getCodeFromConfig,
+} from "@langwatch/agent-contract/code-config";
 export { AgentTestPanel, type AgentTestPanelProps } from "./ui/sections/agent-test-panel.tsx";
 export {
   AgentWorkflowEditorDrawer,
