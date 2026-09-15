@@ -185,6 +185,69 @@ function summedType(valueType: string): string {
   return decimal ? `Decimal(38, ${decimal[1]})` : valueType;
 }
 
+/** Aggregate function names whose merged value keeps its source value type. */
+const VALUE_PRESERVING_AGGREGATES = new Set([
+  "max",
+  "min",
+  "any",
+  "anyLast",
+  "argMax",
+  "argMin",
+]);
+/** Aggregate function names whose merged value is always a plain `UInt64`. */
+const COUNT_LIKE_AGGREGATES = new Set([
+  "count",
+  "uniq",
+  "uniqExact",
+  "uniqHLL12",
+  "uniqCombined",
+  "uniqTheta",
+]);
+/** Aggregate function names whose merged value is always a plain `Float64`. */
+const FLOAT_AGGREGATES = new Set(["avg", "quantile"]);
+/** Aggregate function names whose merged value is always `Array(Float64)`. */
+const ARRAY_FLOAT_AGGREGATES = new Set([
+  "quantiles",
+  "quantilesExact",
+  "quantilesTDigest",
+]);
+
+/**
+ * One `AggregateFunction(name(params)?, valueType, ...)` type, parsed into its
+ * function name, its parenthesised parameters (if any), and its value type —
+ * or `null` when `type` is not an `AggregateFunction(...)` at all.
+ */
+function parseAggregateFunctionType(
+  type: string,
+): { name: string; params: string; valueType?: string } | null {
+  if (!type.startsWith("AggregateFunction(") || !type.endsWith(")"))
+    return null;
+  const inner = type.slice("AggregateFunction(".length, -1);
+  const args = sortTopLevel(inner);
+  const func = args[0];
+  if (!func) return null;
+  const funcName = /^([A-Za-z0-9_]+)(\(.*\))?$/.exec(func);
+  if (!funcName) return null;
+  return { name: funcName[1]!, params: funcName[2] ?? "", valueType: args[1] };
+}
+
+/**
+ * The finalised type an `AggregateFunction`'s `-Merge` combinator reads back,
+ * by function name — or `null` for a func {@link aggregateStateSpec} does not
+ * know how to finalise.
+ */
+function mergedFinalizedType(
+  name: string,
+  valueType: string | undefined,
+): string | null {
+  if (name === "sum") return valueType ? summedType(valueType) : null;
+  if (VALUE_PRESERVING_AGGREGATES.has(name)) return valueType ?? null;
+  if (COUNT_LIKE_AGGREGATES.has(name)) return "UInt64";
+  if (FLOAT_AGGREGATES.has(name)) return "Float64";
+  if (ARRAY_FLOAT_AGGREGATES.has(name)) return "Array(Float64)";
+  return null;
+}
+
 /**
  * How a source column's aggregate-function state is read back, or `null` when
  * the column is not an aggregate state at all.
@@ -207,49 +270,14 @@ function aggregateStateSpec(type: string): AggregateStateSpec | null {
       simple: true,
     };
   }
-  if (!type.startsWith("AggregateFunction(") || !type.endsWith(")"))
-    return null;
-  const inner = type.slice("AggregateFunction(".length, -1);
-  const args = sortTopLevel(inner);
-  const func = args[0];
-  if (!func) return null;
-  const funcName = /^([A-Za-z0-9_]+)(\(.*\))?$/.exec(func);
-  if (!funcName) return null;
-  const name = funcName[1]!;
-  const params = funcName[2] ?? "";
-  const mergeCombinator = `${name}Merge${params}`;
-  const valueType = args[1];
-  switch (name) {
-    case "sum":
-      return valueType
-        ? { combinator: mergeCombinator, finalized: summedType(valueType) }
-        : null;
-    case "max":
-    case "min":
-    case "any":
-    case "anyLast":
-    case "argMax":
-    case "argMin":
-      return valueType
-        ? { combinator: mergeCombinator, finalized: valueType }
-        : null;
-    case "count":
-    case "uniq":
-    case "uniqExact":
-    case "uniqHLL12":
-    case "uniqCombined":
-    case "uniqTheta":
-      return { combinator: mergeCombinator, finalized: "UInt64" };
-    case "avg":
-    case "quantile":
-      return { combinator: mergeCombinator, finalized: "Float64" };
-    case "quantiles":
-    case "quantilesExact":
-    case "quantilesTDigest":
-      return { combinator: mergeCombinator, finalized: "Array(Float64)" };
-    default:
-      return null;
-  }
+  const parsed = parseAggregateFunctionType(type);
+  if (!parsed) return null;
+  const finalized = mergedFinalizedType(parsed.name, parsed.valueType);
+  if (!finalized) return null;
+  return {
+    combinator: `${parsed.name}Merge${parsed.params}`,
+    finalized,
+  };
 }
 
 /** A column's exposed shape, derived from its source type. */
@@ -374,6 +402,94 @@ function exposedColumns({
 }
 
 /**
+ * One exposed column's final shape: its type, description, gates and — for an
+ * aggregate state or a content map — the `expression` {@link projectColumn}
+ * derived for it.
+ */
+function buildViewColumn({
+  column,
+  columnGates,
+  columnUnits,
+  descriptions,
+  aggregating,
+  tableName,
+}: {
+  column: ExposedColumn;
+  columnGates: Readonly<Record<string, readonly FieldProtection[]>>;
+  columnUnits: Readonly<Record<string, LangWatchQLColumnUnit>>;
+  descriptions: Readonly<Record<string, string>>;
+  aggregating: boolean;
+  tableName: string;
+}): LangWatchQLViewColumn {
+  const unit = columnUnits[column.exposedName];
+  const projected = projectColumn({
+    sourceColumn: column.sourceColumn,
+    type: column.type,
+    aggregating,
+    tableName,
+  });
+  return {
+    name: column.exposedName,
+    type: projected.type,
+    description:
+      descriptions[column.exposedName] ??
+      (column.comment || column.exposedName),
+    gates: columnGates[column.exposedName] ?? [],
+    sourceColumns: [column.sourceColumn],
+    ...(projected.expression ? { expression: projected.expression } : {}),
+    ...(projected.aggregate ? { aggregate: true } : {}),
+    ...(unit ? { unit } : {}),
+  };
+}
+
+/** Refuses every per-column annotation map that names a column not exposed. */
+function assertOverridesAreExposed({
+  name,
+  columnGates,
+  columnUnits,
+  descriptions,
+  exposedNames,
+}: {
+  name: string;
+  columnGates: Readonly<Record<string, unknown>>;
+  columnUnits: Readonly<Record<string, unknown>>;
+  descriptions: Readonly<Record<string, unknown>>;
+  exposedNames: ReadonlySet<string>;
+}): void {
+  assertKeysAreExposed({
+    name,
+    map: columnGates,
+    kind: "columnGates",
+    exposedNames,
+  });
+  assertKeysAreExposed({
+    name,
+    map: columnUnits,
+    kind: "columnUnits",
+    exposedNames,
+  });
+  assertKeysAreExposed({
+    name,
+    map: descriptions,
+    kind: "descriptions",
+    exposedNames,
+  });
+}
+
+/** The `dedup` block of a {@link LangWatchQLViewDefinition}, from its input. */
+function buildDedup(
+  dedup: DerivedDatasetDedup,
+  manifestTable: ColumnsManifestTable,
+): LangWatchQLViewDefinition["dedup"] {
+  return {
+    keyColumns: dedup.keyColumns ?? parseSortingKey(manifestTable.sortingKey),
+    ...(dedup.strategy ? { strategy: dedup.strategy } : {}),
+    ...(dedup.versionColumn ? { versionColumn: dedup.versionColumn } : {}),
+    ...(dedup.aggregating ? { aggregating: dedup.aggregating } : {}),
+  };
+}
+
+/**
  * Derives a full {@link LangWatchQLViewDefinition} from one manifest table.
  *
  * Every exposed column is a straight pass-through of a source column — its type
@@ -409,45 +525,23 @@ export function defineDatasetFromTable(
   const manifestTable = columnsManifestTable(manifest, table);
   const exposed = exposedColumns({ manifestTable, aliases, skipColumns });
 
-  const columns: LangWatchQLViewColumn[] = exposed.map((column) => {
-    const unit = columnUnits[column.exposedName];
-    const projected = projectColumn({
-      sourceColumn: column.sourceColumn,
-      type: column.type,
+  const columns: LangWatchQLViewColumn[] = exposed.map((column) =>
+    buildViewColumn({
+      column,
+      columnGates,
+      columnUnits,
+      descriptions,
       aggregating: dedup.aggregating === true,
       tableName: manifestTable.name,
-    });
-    return {
-      name: column.exposedName,
-      type: projected.type,
-      description:
-        descriptions[column.exposedName] ??
-        (column.comment || column.exposedName),
-      gates: columnGates[column.exposedName] ?? [],
-      sourceColumns: [column.sourceColumn],
-      ...(projected.expression ? { expression: projected.expression } : {}),
-      ...(projected.aggregate ? { aggregate: true } : {}),
-      ...(unit ? { unit } : {}),
-    };
-  });
+    }),
+  );
 
   const exposedNames = new Set(columns.map((column) => column.name));
-  assertKeysAreExposed({
+  assertOverridesAreExposed({
     name,
-    map: columnGates,
-    kind: "columnGates",
-    exposedNames,
-  });
-  assertKeysAreExposed({
-    name,
-    map: columnUnits,
-    kind: "columnUnits",
-    exposedNames,
-  });
-  assertKeysAreExposed({
-    name,
-    map: descriptions,
-    kind: "descriptions",
+    columnGates,
+    columnUnits,
+    descriptions,
     exposedNames,
   });
 
@@ -461,12 +555,7 @@ export function defineDatasetFromTable(
     joinKeys,
     timeColumn,
     freshness,
-    dedup: {
-      keyColumns: dedup.keyColumns ?? parseSortingKey(manifestTable.sortingKey),
-      ...(dedup.strategy ? { strategy: dedup.strategy } : {}),
-      ...(dedup.versionColumn ? { versionColumn: dedup.versionColumn } : {}),
-      ...(dedup.aggregating ? { aggregating: dedup.aggregating } : {}),
-    },
+    dedup: buildDedup(dedup, manifestTable),
     columns,
     ...(tenantColumn ? { tenantColumn } : {}),
   };
@@ -697,6 +786,230 @@ function defaultDedup({
   };
 }
 
+/** The default column gates for every exposed column of one derived table. */
+function computeDefaultColumnGates(
+  exposed: readonly ExposedColumn[],
+): Record<string, readonly FieldProtection[]> {
+  const computed: Record<string, readonly FieldProtection[]> = {};
+  for (const column of exposed) {
+    const gates = defaultColumnGates({
+      name: column.exposedName,
+      type: column.type,
+    });
+    if (gates.length > 0) computed[column.exposedName] = gates;
+  }
+  return computed;
+}
+
+/**
+ * A lookup from a source column's physical name to its exposed name, so the
+ * grain and sort key can be spoken in the caller's vocabulary — a source
+ * column renamed by an alias (`CorrelationTraceId` → `TraceId`) appears in the
+ * grain as `TraceId`, matching what the fanout diagnostic and schema endpoint
+ * show.
+ */
+function exposedNameLookup(
+  aliases: Readonly<Record<string, string>>,
+): (physical: string) => string {
+  const reverseAlias: Record<string, string> = {};
+  for (const [exposed, physical] of Object.entries(aliases)) {
+    reverseAlias[physical] = exposed;
+  }
+  return (physical: string): string => reverseAlias[physical] ?? physical;
+}
+
+/**
+ * The grain a derived table publishes.
+ *
+ * An aggregating source keeps the whole engine key as its grain: the view
+ * renders `GROUP BY` the grain, so the tenant column must stay in it or the
+ * group would merge every tenant's rows into one. A superseding source strips
+ * it — its `in-tuple` dedup runs under a row policy already scoped to one
+ * tenant, so grouping by the rest is right and narrower.
+ */
+function computeGrainColumns({
+  override,
+  aggregating,
+  exposedSortKey,
+  sortKey,
+  tenantColumn,
+  exposedOf,
+}: {
+  override?: readonly string[];
+  aggregating: boolean;
+  exposedSortKey: readonly string[];
+  sortKey: readonly string[];
+  tenantColumn: string;
+  exposedOf: (physical: string) => string;
+}): readonly string[] {
+  if (override) return override;
+  if (aggregating) return exposedSortKey;
+  return sortKey.filter((column) => column !== tenantColumn).map(exposedOf);
+}
+
+/**
+ * The join keys a derived table advertises.
+ *
+ * An aggregating view must advertise its whole bucket key as its join keys:
+ * every measure is a merge, so a join on a prefix would add several buckets'
+ * measures under one row rather than repeat it. A superseding view advertises
+ * TenantId (every view is narrowable on it — see the schema-catalog guard
+ * "lists an ungated, joinable TenantId column") plus its shared `*Id` foreign
+ * keys.
+ */
+function computeJoinKeys({
+  aggregating,
+  grainColumns,
+  override,
+  manifestTable,
+  sharedColumns,
+}: {
+  aggregating: boolean;
+  grainColumns: readonly string[];
+  override?: readonly string[];
+  manifestTable: ColumnsManifestTable;
+  sharedColumns: ReadonlySet<string>;
+}): readonly string[] {
+  if (aggregating) return grainColumns;
+  return [
+    DEFAULT_TENANT_COLUMN,
+    ...(override ?? defaultJoinKeys({ manifestTable, sharedColumns })),
+  ].filter((key, index, all) => all.indexOf(key) === index);
+}
+
+/** The per-table shape {@link deriveDataset} computes before building the input. */
+interface DerivedDatasetShape {
+  readonly aliases: Readonly<Record<string, string>>;
+  readonly skipColumns: Readonly<Record<string, string>>;
+  readonly tenantColumn: string;
+  readonly columnGates: Record<string, readonly FieldProtection[]>;
+  readonly exposedSortKey: readonly string[];
+  readonly grainColumns: readonly string[];
+  readonly timeColumn: string;
+  readonly name: string;
+  readonly joinKeys: readonly string[];
+}
+
+/**
+ * Every value {@link deriveDataset} must compute before it can build the
+ * {@link DefineDatasetFromTableInput} — split out so each function stays under
+ * the complexity a single derivation step needs.
+ */
+function deriveDatasetShape({
+  manifestTable,
+  override,
+  sharedColumns,
+}: {
+  manifestTable: ColumnsManifestTable;
+  override: Partial<DatasetOverride>;
+  sharedColumns: ReadonlySet<string>;
+}): DerivedDatasetShape {
+  const aliases = override.aliases ?? {};
+  const skipColumns = override.skipColumns ?? {};
+  const tenantColumn = override.tenantColumn ?? DEFAULT_TENANT_COLUMN;
+
+  const exposed = exposedColumns({ manifestTable, aliases, skipColumns });
+  const columnGates = {
+    ...computeDefaultColumnGates(exposed),
+    ...(override.columnGates ?? {}),
+  };
+
+  const sortKey = parseSortingKey(manifestTable.sortingKey);
+  const exposedOf = exposedNameLookup(aliases);
+  const exposedSortKey = sortKey.map(exposedOf);
+  const aggregating = override.dedup?.aggregating === true;
+  const grainColumns = computeGrainColumns({
+    override: override.grainColumns,
+    aggregating,
+    exposedSortKey,
+    sortKey,
+    tenantColumn,
+    exposedOf,
+  });
+  const timeColumn = override.timeColumn ?? defaultTimeColumn(manifestTable);
+  const name = override.name ?? defaultDatasetName(manifestTable.name);
+  const joinKeys = computeJoinKeys({
+    aggregating,
+    grainColumns,
+    override: override.joinKeys,
+    manifestTable,
+    sharedColumns,
+  });
+
+  return {
+    aliases,
+    skipColumns,
+    tenantColumn,
+    columnGates,
+    exposedSortKey,
+    grainColumns,
+    timeColumn,
+    name,
+    joinKeys,
+  };
+}
+
+/** Builds the {@link DefineDatasetFromTableInput} from a table's derived shape. */
+function buildDatasetInput({
+  manifestTable,
+  override,
+  shape,
+  manifest,
+}: {
+  manifestTable: ColumnsManifestTable;
+  override: Partial<DatasetOverride>;
+  shape: DerivedDatasetShape;
+  manifest: ColumnsManifest;
+}): DefineDatasetFromTableInput {
+  const { aliases, skipColumns, tenantColumn, columnGates, grainColumns } =
+    shape;
+  return {
+    table: manifestTable.name,
+    name: shape.name,
+    description:
+      override.description ??
+      `Rows of the ${manifestTable.name} table, one per (${grainColumns.join(", ")}).`,
+    grain:
+      override.grain ??
+      `one row per (${grainColumns.join(", ")}), latest version only`,
+    grainColumns,
+    joinKeys: shape.joinKeys,
+    timeColumn: shape.timeColumn,
+    freshness: override.freshness ?? DEFAULT_FRESHNESS,
+    ...(override.gates ? { gates: override.gates } : {}),
+    dedup: defaultDedup({
+      sortKey: shape.exposedSortKey,
+      grainColumns,
+      override: override.dedup,
+    }),
+    columnGates,
+    ...(override.columnUnits ? { columnUnits: override.columnUnits } : {}),
+    aliases,
+    skipColumns,
+    ...(override.descriptions ? { descriptions: override.descriptions } : {}),
+    ...(tenantColumn === DEFAULT_TENANT_COLUMN ? {} : { tenantColumn }),
+    manifest,
+  };
+}
+
+/** Derives one manifest table's view definition, applying its override. */
+function deriveDataset({
+  manifestTable,
+  override,
+  sharedColumns,
+  manifest,
+}: {
+  manifestTable: ColumnsManifestTable;
+  override: Partial<DatasetOverride>;
+  sharedColumns: ReadonlySet<string>;
+  manifest: ColumnsManifest;
+}): LangWatchQLViewDefinition {
+  const shape = deriveDatasetShape({ manifestTable, override, sharedColumns });
+  return defineDatasetFromTable(
+    buildDatasetInput({ manifestTable, override, shape, manifest }),
+  );
+}
+
 /**
  * Every manifest table that is neither hand-written nor skipped, as a derived
  * view definition.
@@ -729,91 +1042,14 @@ export function deriveDefaultCatalog({
   );
   const sharedColumns = columnsSharedAcrossTables(candidates);
 
-  return candidates.map((manifestTable) => {
-    const override = overrides[manifestTable.name] ?? {};
-    const aliases = override.aliases ?? {};
-    const skipColumns = override.skipColumns ?? {};
-    const tenantColumn = override.tenantColumn ?? DEFAULT_TENANT_COLUMN;
-
-    const exposed = exposedColumns({ manifestTable, aliases, skipColumns });
-    const computedGates: Record<string, readonly FieldProtection[]> = {};
-    for (const column of exposed) {
-      const gates = defaultColumnGates({
-        name: column.exposedName,
-        type: column.type,
-      });
-      if (gates.length > 0) computedGates[column.exposedName] = gates;
-    }
-    const columnGates = { ...computedGates, ...(override.columnGates ?? {}) };
-
-    const sortKey = parseSortingKey(manifestTable.sortingKey);
-    // Grain and key columns are exposed under the names a caller sees: a source
-    // column renamed by an alias (`CorrelationTraceId` → `TraceId`) appears in
-    // the grain as `TraceId`, so the fanout diagnostic and the schema endpoint
-    // speak the caller's vocabulary. The dedup body maps each back to its
-    // physical source column (`lwqlPhysicalColumn`).
-    const reverseAlias: Record<string, string> = {};
-    for (const [exposed, physical] of Object.entries(aliases)) {
-      reverseAlias[physical] = exposed;
-    }
-    const exposedOf = (physical: string): string =>
-      reverseAlias[physical] ?? physical;
-    const exposedSortKey = sortKey.map(exposedOf);
-    // An aggregating source keeps the whole engine key as its grain: the view
-    // renders `GROUP BY` the grain, so the tenant column must stay in it or the
-    // group would merge every tenant's rows into one. A superseding source
-    // strips it — its `in-tuple` dedup runs under a row policy already scoped to
-    // one tenant, so grouping by the rest is right and narrower.
-    const aggregating = override.dedup?.aggregating === true;
-    const grainColumns =
-      override.grainColumns ??
-      (aggregating
-        ? exposedSortKey
-        : sortKey.filter((column) => column !== tenantColumn).map(exposedOf));
-    const timeColumn = override.timeColumn ?? defaultTimeColumn(manifestTable);
-    const name = override.name ?? defaultDatasetName(manifestTable.name);
-    // An aggregating view must advertise its whole bucket key as its join
-    // keys: every measure is a merge, so a join on a prefix would add several
-    // buckets' measures under one row rather than repeat it. A superseding
-    // view advertises TenantId (every view is narrowable on it — see the
-    // schema-catalog guard "lists an ungated, joinable TenantId column") plus
-    // its shared `*Id` foreign keys.
-    const joinKeys = aggregating
-      ? grainColumns
-      : [
-          DEFAULT_TENANT_COLUMN,
-          ...(override.joinKeys ??
-            defaultJoinKeys({ manifestTable, sharedColumns })),
-        ].filter((key, index, all) => all.indexOf(key) === index);
-
-    return defineDatasetFromTable({
-      table: manifestTable.name,
-      name,
-      description:
-        override.description ??
-        `Rows of the ${manifestTable.name} table, one per (${grainColumns.join(", ")}).`,
-      grain:
-        override.grain ??
-        `one row per (${grainColumns.join(", ")}), latest version only`,
-      grainColumns,
-      joinKeys,
-      timeColumn,
-      freshness: override.freshness ?? DEFAULT_FRESHNESS,
-      ...(override.gates ? { gates: override.gates } : {}),
-      dedup: defaultDedup({
-        sortKey: exposedSortKey,
-        grainColumns,
-        override: override.dedup,
-      }),
-      columnGates,
-      ...(override.columnUnits ? { columnUnits: override.columnUnits } : {}),
-      aliases,
-      skipColumns,
-      ...(override.descriptions ? { descriptions: override.descriptions } : {}),
-      ...(tenantColumn === DEFAULT_TENANT_COLUMN ? {} : { tenantColumn }),
+  return candidates.map((manifestTable) =>
+    deriveDataset({
+      manifestTable,
+      override: overrides[manifestTable.name] ?? {},
+      sharedColumns,
       manifest,
-    });
-  });
+    }),
+  );
 }
 
 /** Refuses an annotation map keyed on a name no exposed column carries. */
