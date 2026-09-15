@@ -58,6 +58,7 @@ import { env } from "~/env.mjs";
 import type { PrismaClient } from "~/generated/prisma/client";
 import { auth0BridgeActive } from "~/utils/auth0-bridge";
 import { changeAuth0Password } from "../../auth0/passwordService";
+import { deploymentIssuesOwnPasswords } from "../../better-auth/config/email-and-password";
 import type { SecondaryStorageDeps } from "../../better-auth/config/secondary-storage";
 import { LastWayInGuard } from "../../better-auth/last-way-in";
 import { PasskeySignUpRegistration } from "../../better-auth/passkey-signup";
@@ -562,7 +563,11 @@ export async function localSignUpDecision(
       identityUsers.findUserIdByEmail({ normalizedValue }),
     resolveDefaultMethods: async () =>
       (await signInMethodPolicyPort.resolvePolicy()).defaultMethods,
-    passwordIsAllowed: async () => (await resolveAuthProvider()) === "email",
+    // Email mode first, because it answers on its own; the switch is only
+    // about a deployment that ALSO federates keeping a password door.
+    passwordIsAllowed: async () =>
+      (await resolveAuthProvider()) === "email" ||
+      deploymentIssuesOwnPasswords(env),
   });
 }
 

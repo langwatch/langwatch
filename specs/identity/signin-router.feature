@@ -315,6 +315,45 @@ Feature: The identifier-first sign-in router - one auth screen, routed by data
     When the hand-off to the provider is dialed
     Then the address is sent as the sign-in hint so the provider's screen arrives prefilled
 
+  # ── A deployment that issues its own passwords (D09) ───────────────────
+  #
+  # The rule this relaxes came from NextAuth: a deployment offered EITHER a
+  # provider OR passwords, never both, so nobody could sidestep the configured
+  # identity provider. On a deployment brokering through Auth0 that sentence
+  # is already untrue — the broker's own screen offers a password box and a
+  # sign-up link — so the door exists and is merely hosted elsewhere. Turning
+  # this on moves it here, which is what stops every new password account
+  # being minted inside the tenant we are leaving.
+  #
+  # Off by default, and email mode never asks: a deployment with no provider
+  # issues its own passwords by definition.
+
+  @unit
+  Scenario: A deployment that issues its own passwords offers one beside its provider
+    Given a deployment whose provider is configured and licensed
+    And that deployment issues its own passwords
+    When the sign-in page is requested
+    Then the password is offered alongside the federated methods
+    And the federated methods still lead the rail
+    And a deployment that does not issue its own passwords offers no password beside them
+
+  # The gate that would otherwise refuse the very form the door just drew.
+  @unit
+  Scenario: The credential routes answer on a deployment that offers a password
+    Given a deployment whose offered methods include a password and a federated method
+    When a credential sign-in is attempted
+    Then the request is not refused as provider-managed
+    And a deployment offering only federated methods still refuses it
+
+  # The switch has to reach the enrolment half too, or the door offers a
+  # password that nothing will create.
+  @unit
+  Scenario: Sign-up offers a password where the deployment issues its own
+    Given a deployment that federates and issues its own passwords
+    When an unknown address reaches the sign-up decision
+    Then a password is among the ways it may enroll
+    And an address whose domain routes to a connection is still handed to that provider
+
   # ── The license gate rides along (ADR-027, mechanism amended) ──────────
 
   @unit

@@ -46,6 +46,7 @@ import { UserService } from "~/server/users/user.service";
 import { isAdmin as checkIsAdmin } from "../../../../ee/admin/isAdmin";
 import { env } from "../../../env.mjs";
 import type { Session } from "../../auth";
+import { deploymentIssuesOwnPasswords } from "../../better-auth/config/email-and-password";
 import { createTRPCRouter, protectedProcedure, publicProcedure } from "../trpc";
 
 const logger = createLogger("langwatch:user-router");
@@ -280,7 +281,16 @@ export const userRouter = createTRPCRouter({
       // deployment to email mode (ADR-027 Decision 4), and this tRPC path is
       // the signup form's actual backend — blocking it would kill the
       // fresh-signup recovery route (Decision 5c).
-      if ((await resolveAuthProvider()) !== "email") {
+      //
+      // A deployment that issues its own passwords beside its provider (D09)
+      // passes here too. The method-set check immediately below is the real
+      // authority either way: it refuses unless the router actually offered a
+      // password for THIS address, so a domain routed to a connection still
+      // never reaches a password, switch or no switch.
+      if (
+        (await resolveAuthProvider()) !== "email" &&
+        !deploymentIssuesOwnPasswords(env)
+      ) {
         throw new DirectRegistrationUnavailableError();
       }
       const enrollment = await localSignUpDecision(email);
@@ -588,9 +598,15 @@ export const userRouter = createTRPCRouter({
         });
       }
 
-      // Email mode only. Under Auth0 the password lives in the Auth0 tenant
-      // and this row is not where it would go.
-      if ((await resolveAuthProvider()) !== "email") {
+      // Under a broker the password lives in the broker's tenant and this row
+      // is not where it would go — unless the deployment issues its own
+      // passwords (D09), which is exactly the claim that this row IS where it
+      // goes. `setFirstPassword` still refuses to REPLACE one, so this can
+      // only ever fill an empty slot.
+      if (
+        (await resolveAuthProvider()) !== "email" &&
+        !deploymentIssuesOwnPasswords(env)
+      ) {
         throw new DirectRegistrationUnavailableError();
       }
 

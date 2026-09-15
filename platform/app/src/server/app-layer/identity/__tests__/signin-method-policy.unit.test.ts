@@ -24,6 +24,9 @@ vi.mock("~/env.mjs", () => ({
     AZURE_AD_CLIENT_ID: undefined as string | undefined,
     AZURE_AD_CLIENT_SECRET: undefined as string | undefined,
     AZURE_AD_TENANT_ID: undefined as string | undefined,
+    // The schema's own default: a deployment does not issue its own passwords
+    // beside its provider unless somebody says so.
+    LOCAL_PASSWORDS_ENABLED: "off",
   },
 }));
 
@@ -114,6 +117,7 @@ describe("the instance sign-in method policy", () => {
     envMock.NEXTAUTH_PROVIDER = "auth0";
     envMock.IS_SAAS = false;
     envMock.PASSKEYS_ENABLED = "on";
+    envMock.LOCAL_PASSWORDS_ENABLED = "off";
     for (const key of [
       "GOOGLE_CLIENT_ID",
       "GOOGLE_CLIENT_SECRET",
@@ -408,6 +412,72 @@ describe("the instance sign-in method policy", () => {
 
       expect(methodIds(policy.defaultMethods)).toContain("google");
       expect(methodIds(policy.defaultMethods)).not.toContain("azure-ad");
+    });
+  });
+
+  describe("when the deployment issues its own passwords beside its provider", () => {
+    beforeEach(() => {
+      licensedStore(true);
+      envMock.LOCAL_PASSWORDS_ENABLED = "on";
+    });
+
+    /** @scenario "A deployment that issues its own passwords offers one beside its provider" */
+    it("offers the password behind the federated methods, which still lead", async () => {
+      const policy = await resolveSignInMethodPolicy();
+
+      expect(methodIds(policy.defaultMethods)).toEqual([
+        "auth0",
+        "password",
+        "passkey",
+      ]);
+      // The one anybody reaches for is still first.
+      expect(policy.defaultMethods[0]).toEqual({
+        id: "auth0",
+        kind: "federated",
+        connectionId: null,
+      });
+    });
+
+    /** @scenario "A deployment that issues its own passwords offers one beside its provider" */
+    it("offers no password beside them when the deployment does not issue its own", async () => {
+      envMock.LOCAL_PASSWORDS_ENABLED = "off";
+
+      const policy = await resolveSignInMethodPolicy();
+
+      expect(methodIds(policy.defaultMethods)).toEqual(["auth0", "passkey"]);
+    });
+
+    /** @scenario "A deployment that issues its own passwords offers one beside its provider" */
+    it("keeps the branded bridge buttons ahead of the password on SaaS", async () => {
+      envMock.IS_SAAS = true;
+
+      const policy = await resolveSignInMethodPolicy();
+
+      expect(methodIds(policy.defaultMethods)).toEqual([
+        "auth0-google",
+        "auth0-github",
+        "auth0-microsoft",
+        "auth0",
+        "password",
+        "passkey",
+      ]);
+    });
+
+    /** @scenario "The credential routes answer on a deployment that offers a password" */
+    it("ranks a password the account holds, which is what lets it be offered back", async () => {
+      const policy = await resolveSignInMethodPolicy();
+
+      // `rankAccountMethods` intersects with exactly this set — a password
+      // absent from it is a password nobody with one can be routed to.
+      const decision = routeSignIn({
+        identifier: null,
+        breakGlass: false,
+        policy,
+        domainConnection: null,
+        activeConnections: [],
+      });
+
+      expect(methodIds(decision.methodSet)).toContain("password");
     });
   });
 

@@ -67,6 +67,15 @@ function refusesCredentialRoute({
 }): boolean {
   if (!isResetPath && !isEmailAuthPath(pathname)) return false;
 
+  // A deployment that OFFERS a password beside its provider (D09) must also
+  // accept one. Read off the resolved policy rather than the environment, so
+  // the route this refuses and the button the door draws are decided by one
+  // answer: refusing a form the screen just offered is the failure this whole
+  // gate's docblock is about, and it would be self-inflicted here.
+  if (policy.defaultMethods.some((method) => method.kind === "password")) {
+    return false;
+  }
+
   return policy.defaultMethods.some((method) => method.kind === "federated");
 }
 

@@ -27,8 +27,35 @@ import { sendResetPasswordEmail } from "../../mailer/resetPasswordEmail";
  * without re-initializing the module under a different `NEXTAUTH_PROVIDER`.
  */
 export const isEmailPasswordEnabled = (
-  e: Pick<typeof env, "NEXTAUTH_PROVIDER" | "IS_SAAS">,
-): boolean => e.NEXTAUTH_PROVIDER === "email" || !e.IS_SAAS;
+  e: Pick<
+    typeof env,
+    "NEXTAUTH_PROVIDER" | "IS_SAAS" | "LOCAL_PASSWORDS_ENABLED"
+  >,
+): boolean =>
+  e.NEXTAUTH_PROVIDER === "email" ||
+  !e.IS_SAAS ||
+  deploymentIssuesOwnPasswords(e);
+
+/**
+ * Whether this deployment issues and verifies its own passwords WHILE a
+ * federated provider is also configured (D09).
+ *
+ * The one predicate behind a rule that five sites used to spell separately —
+ * the sign-up method set, `user.register`, `user.setPassword`, the
+ * credential-route refusal, and the mounting above. Each said "on this
+ * deployment, passwords live at the identity provider" as
+ * `resolveAuthProvider() === "email"`, and a flip that reached four of the
+ * five would leave a door that offers a password nothing will accept, or
+ * accepts one nothing offers.
+ *
+ * Email mode is NOT asked here, and callers must check it first: a
+ * deployment in email mode issues its own passwords by definition, whatever
+ * this says. This answers only the harder question — whether a deployment
+ * that ALSO federates keeps a password door of its own.
+ */
+export const deploymentIssuesOwnPasswords = (
+  e: Pick<typeof env, "LOCAL_PASSWORDS_ENABLED">,
+): boolean => e.LOCAL_PASSWORDS_ENABLED === "on";
 
 export interface EmailAndPasswordDeps {
   /**
