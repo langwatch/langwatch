@@ -56,6 +56,15 @@ type lwqlCatalog struct {
 	// "project_id"). An absent table, an absent map, and an empty value all
 	// mean the default, so an older manifest renders exactly as before.
 	TenantColumns map[string]string `json:"tenantColumns"`
+	// SourceColumns is the exact column set the restricted identity is granted
+	// on each source table, keyed by table name — mirroring the app's
+	// column-scoped grants (catalogStatements.ts lwqlSourceColumnGrants) so the
+	// chart-rendered SaaS role reads only the columns the catalog exposes, not
+	// every column of the fact table. Sparse: a table absent here (every
+	// PostgreSQL-engine *_pg bridge table, whose whole column list IS the
+	// exposed surface) takes the whole-object GRANT SELECT instead, so an older
+	// manifest with no map renders exactly as before.
+	SourceColumns map[string][]string `json:"sourceColumns"`
 }
 
 // lwqlSourceTables is the fixed set of tables the langwatch_lwql user may read,
@@ -75,6 +84,7 @@ var (
 	lwqlSourceTables  []string
 	lwqlViewNames     []string
 	lwqlTenantColumns map[string]string
+	lwqlSourceColumns map[string][]string
 )
 
 func init() {
@@ -88,6 +98,7 @@ func init() {
 	lwqlSourceTables = catalog.SourceTables
 	lwqlViewNames = catalog.ViewNames
 	lwqlTenantColumns = catalog.TenantColumns
+	lwqlSourceColumns = catalog.SourceColumns
 }
 
 // lwqlTenantColumnFor is the project column a source table's row filter applies
@@ -99,6 +110,25 @@ func lwqlTenantColumnFor(table string) string {
 		return col
 	}
 	return "TenantId"
+}
+
+// lwqlSourceGrant is the SELECT grant for one source table: column-scoped
+// (`GRANT SELECT(`col`, …) ON db.table`) when the manifest lists the columns
+// the catalog exposes on it, and whole-object (`GRANT SELECT ON db.table`)
+// otherwise. Absent from the map means "grant the whole object" — the shape the
+// PostgreSQL-engine bridge tables need, whose whole column list is the exposed
+// surface. Columns are backtick-quoted to match the app's grants and to carry
+// any dotted nested-column name unambiguously.
+func lwqlSourceGrant(db, table string) string {
+	cols, ok := lwqlSourceColumns[table]
+	if !ok || len(cols) == 0 {
+		return fmt.Sprintf("GRANT SELECT ON %s.%s", db, table)
+	}
+	quoted := make([]string, len(cols))
+	for i, col := range cols {
+		quoted[i] = "`" + col + "`"
+	}
+	return fmt.Sprintf("GRANT SELECT(%s) ON %s.%s", strings.Join(quoted, ", "), db, table)
 }
 
 // lwqlUsersFile is users.d/lwql.yaml: the restricted profile beside its only
@@ -222,7 +252,7 @@ func renderLWQL(input *config.Input, usersD, configD string) error {
 		"lwql_api_key_tenant_map": {Filter: keyMapSelfFilter},
 	}
 	for _, table := range lwqlSourceTables {
-		grants = append(grants, fmt.Sprintf("GRANT SELECT ON %s.%s", db, table))
+		grants = append(grants, lwqlSourceGrant(db, table))
 		tableFilters[table] = lwqlRowFilter{Filter: tenantFilterFor(table)}
 	}
 	for _, view := range lwqlViewNames {

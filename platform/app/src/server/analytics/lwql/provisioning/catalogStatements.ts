@@ -746,6 +746,54 @@ export function lwqlSourceTables({
 }
 
 /**
+ * The columns the restricted identity is granted on each ClickHouse source
+ * table, keyed by table — the single source of truth the Go chart renderer
+ * mirrors so its SaaS grants are column-scoped like the self-hosted ones.
+ *
+ * The exact set {@link lwqlSourceColumnGrantStatement} (primary) and
+ * {@link lwqlJoinSourceColumnGrantStatement} (joined side) grant, unioned per
+ * table and sorted, so a table read by two views is granted the union both
+ * need. PostgreSQL-resident sources are absent: their engine table carries
+ * exactly the exposed columns already and takes the whole-object grant
+ * ({@link lwqlGrantStatement}), which the Go renderer emits for any table this
+ * map omits — matching the whole-table grant the views themselves take.
+ *
+ * Emitted into `lwql_catalog.json` and asserted equal there by
+ * `../catalog/__tests__/manifestParity.unit.test.ts`, so the Go binary grants
+ * exactly the columns this catalog exposes rather than every column of the
+ * source table.
+ */
+export function lwqlSourceColumnGrants({
+  views = LWQL_VIEW_CATALOG,
+}: {
+  views?: readonly LangWatchQLViewDefinition[];
+} = {}): Record<string, string[]> {
+  const byTable = new Map<string, Set<string>>();
+  const add = (table: string, columns: readonly string[]): void => {
+    const set = byTable.get(table) ?? new Set<string>();
+    for (const column of columns) set.add(column);
+    byTable.set(table, set);
+  };
+  for (const view of views) {
+    // A PostgreSQL-engine table takes the whole-object grant, not a column-scoped
+    // one, so it contributes no entry and renders as a whole-table grant in Go.
+    if (isPostgresResident(view)) continue;
+    add(view.sourceTable, lwqlGrantedSourceColumns(view));
+    if (view.join) {
+      add(view.join.table, [
+        ...view.join.sourceColumns,
+        ...(view.join.onSourceColumns?.joined ?? []),
+      ]);
+    }
+  }
+  const out: Record<string, string[]> = {};
+  for (const [table, columns] of byTable) {
+    out[table] = [...columns].sort();
+  }
+  return out;
+}
+
+/**
  * The approved PostgreSQL views the catalog's PostgreSQL-resident datasets
  * read, as statements to run *against PostgreSQL*.
  *

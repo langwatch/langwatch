@@ -583,7 +583,10 @@ func TestRenderAll_LWQLRendersAccessModel(t *testing.T) {
 		fmt.Sprintf("%x", h),
 		"profile: lwql_restricted",
 		"GRANT SELECT ON langwatch.lwql_*",
-		"GRANT SELECT ON langwatch.trace_summaries",
+		// Source tables are column-scoped to the exposed columns (#8085); views
+		// keep the whole-object grant.
+		"GRANT SELECT(`",
+		"ON langwatch.trace_summaries",
 		"GRANT SELECT ON langwatch.traces",
 		"GRANT SELECT ON langwatch.prompt_versions",
 		"splitByChar(',', getSetting('custom_api_key_hash'))",
@@ -596,6 +599,11 @@ func TestRenderAll_LWQLRendersAccessModel(t *testing.T) {
 			t.Errorf("users.d/lwql.yaml missing %q\n--- actual ---\n%s", want, users)
 		}
 	}
+	// A source table must be column-scoped, never granted whole-object (#8085).
+	if strings.Contains(users, "GRANT SELECT ON langwatch.trace_summaries") {
+		t.Errorf("trace_summaries must be column-scoped, not whole-object\n--- actual ---\n%s", users)
+	}
+
 	// The plaintext LWQL password must never reach the rendered config; only its
 	// hash does.
 	if strings.Contains(users, "lwql-secret") {
