@@ -69,8 +69,11 @@ func TestRenderLWQL_PerTableTenantColumn(t *testing.T) {
 	}
 }
 
-// The default render (embedded manifest, no overrides) must still filter every
-// source on TenantId — the backwards-compatible path.
+// The default render (embedded manifest, no overrides) filters every source
+// on TenantId, except stored_objects (exposed as `objects`), whose physical
+// column is project_id (#8085/#8116 Part B) — both the backwards-compatible
+// default and the one per-table override the shipped catalog actually needs
+// must render correctly straight from the embedded manifest.
 func TestRenderLWQL_DefaultManifestFiltersTenantId(t *testing.T) {
 	usersD := t.TempDir()
 	configD := t.TempDir()
@@ -83,7 +86,11 @@ func TestRenderLWQL_DefaultManifestFiltersTenantId(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read lwql.yaml: %v", err)
 	}
-	if strings.Contains(string(data), "project_id IN") {
-		t.Errorf("default manifest unexpectedly rendered a project_id filter\n--- actual ---\n%s", string(data))
+	users := string(data)
+	if !strings.Contains(users, "project_id IN") {
+		t.Errorf("default manifest should render stored_objects' project_id filter\n--- actual ---\n%s", users)
+	}
+	if !strings.Contains(users, "TenantId IN") {
+		t.Errorf("default manifest should still render the default TenantId filter for every other source\n--- actual ---\n%s", users)
 	}
 }

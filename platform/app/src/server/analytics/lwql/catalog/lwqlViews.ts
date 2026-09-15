@@ -74,6 +74,8 @@
  */
 
 import { contentFilteredMapSql } from "./contentGating";
+import { LWQL_DERIVED_CATALOG } from "./derivedViews";
+import { CODING_TOOL_RESULTS } from "./overrides/coding";
 import { LWQL_POSTGRES_CATALOG } from "./postgresViews";
 import type { LangWatchQLViewDefinition } from "./types";
 
@@ -2735,6 +2737,8 @@ export const LWQL_VIEW_CATALOG: readonly LangWatchQLViewDefinition[] = [
   EVALUATION_METRICS_BY_MINUTE,
   CODING_AGENT_SESSIONS,
   CODING_AGENT_SESSION_EVENTS,
+  CODING_TOOL_RESULTS,
+  ...LWQL_DERIVED_CATALOG,
   ...LWQL_POSTGRES_CATALOG,
 ];
 

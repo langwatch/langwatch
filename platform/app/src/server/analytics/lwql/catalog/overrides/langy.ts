@@ -14,13 +14,20 @@ import type { DatasetOverride } from "../defineDatasetFromTable";
 
 export const LANGY_OVERRIDES: Record<string, Partial<DatasetOverride>> = {
   langy_messages: {
+    name: "langy_conversation_messages",
     description: "Langy conversation turns, one row per message.",
     grain: "one row per (TenantId, ConversationId, MessageId)",
     timeColumn: "CreatedAt",
+    dedup: { versionColumn: "UpdatedAt" },
   },
   langy_analytics_events: {
+    name: "langy_usage_events",
     description: "Langy usage telemetry: tool calls, outcomes and durations.",
     grain: "one row per (TenantId, OccurredAt, EventId)",
     timeColumn: "OccurredAt",
+    dedup: { versionColumn: "ProjectedAt" },
+    columnUnits: {
+      DurationMs: "ms",
+    },
   },
 };

@@ -25,6 +25,13 @@ export const LEGACY_OVERRIDES: Record<string, Partial<DatasetOverride>> = {
       "Pre-canonical OpenTelemetry log record storage, superseded by " +
       "log_records; retained for rolling-deployment reads and draining " +
       "under its own TTL.",
+    dedup: { versionColumn: "UpdatedAt" },
+    columnUnits: {
+      TimeUnixMs: "ms",
+    },
+    // See catalog/overrides/gateway.ts's gateway_spend for why an unfiltered
+    // Map is dropped rather than exposed.
+    skipColumns: ["Attributes", "ResourceAttributes"],
   },
   stored_metric_records: {
     name: "legacy_metric_records",
@@ -32,5 +39,10 @@ export const LEGACY_OVERRIDES: Record<string, Partial<DatasetOverride>> = {
       "Pre-canonical OpenTelemetry metric record storage, superseded by " +
       "the metric_data_points family; retained for rolling-deployment reads " +
       "and draining under its own TTL.",
+    dedup: { versionColumn: "UpdatedAt" },
+    columnUnits: {
+      TimeUnixMs: "ms",
+    },
+    skipColumns: ["Attributes", "ResourceAttributes"],
   },
 };

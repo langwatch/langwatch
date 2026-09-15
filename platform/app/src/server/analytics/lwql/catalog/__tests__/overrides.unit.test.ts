@@ -8,6 +8,7 @@ import columnsManifest from "../columnsManifest.generated.json";
 import { AUDIT_OVERRIDES } from "../overrides/audit";
 import { EXPERIMENTS_OVERRIDES } from "../overrides/experiments";
 import { GATEWAY_OVERRIDES } from "../overrides/gateway";
+import { GOVERNANCE_OVERRIDES } from "../overrides/governance";
 import { METRICS_OVERRIDES } from "../overrides/metrics";
 
 const ALL_OVERRIDES = {
@@ -15,6 +16,7 @@ const ALL_OVERRIDES = {
   ...METRICS_OVERRIDES,
   ...GATEWAY_OVERRIDES,
   ...AUDIT_OVERRIDES,
+  ...GOVERNANCE_OVERRIDES,
 };
 
 describe("Dataset overrides", () => {
@@ -99,31 +101,25 @@ describe("Dataset overrides", () => {
       expect(override.columnGates?.AmountNanoUSD).toEqual(["costs"]);
     });
 
-    it("gateway_budget_scope_totals.SpendUSD is gated costs", () => {
-      const override = GATEWAY_OVERRIDES.gateway_budget_scope_totals;
-      expect(override.columnGates?.SpendUSD).toEqual(["costs"]);
+    it("governance_cost_rollup_1d.AmountNanoMinor is gated costs", () => {
+      const override = GOVERNANCE_OVERRIDES.governance_cost_rollup_1d;
+      expect(override.columnGates?.AmountNanoMinor).toEqual(["costs"]);
     });
 
-    it("gateway_budget_scope_totals.SpendNanoUSD is gated costs", () => {
-      const override = GATEWAY_OVERRIDES.gateway_budget_scope_totals;
-      expect(override.columnGates?.SpendNanoUSD).toEqual(["costs"]);
+    it("governance_ocsf_events.RawOcsfJson is gated output", () => {
+      const override = GOVERNANCE_OVERRIDES.governance_ocsf_events;
+      expect(override.columnGates?.RawOcsfJson).toEqual(["output"]);
     });
   });
 
   describe("dedup configuration", () => {
-    it("metric_time_rollups is aggregating", () => {
-      const override = METRICS_OVERRIDES.metric_time_rollups;
-      expect(override.dedup?.aggregating).toBe(true);
-    });
-
-    it("simulation_run_metrics_rollup is aggregating", () => {
-      const override = METRICS_OVERRIDES.simulation_run_metrics_rollup;
-      expect(override.dedup?.aggregating).toBe(true);
-    });
-
-    it("gateway_budget_scope_totals is aggregating", () => {
-      const override = GATEWAY_OVERRIDES.gateway_budget_scope_totals;
-      expect(override.dedup?.aggregating).toBe(true);
+    // metric_time_rollups, simulation_run_metrics_rollup and
+    // gateway_budget_scope_totals are AggregatingMergeTree sources whose
+    // AggregateFunction-state columns the derived builder cannot merge
+    // correctly — they are skipped (see ../skippedTables.ts), not overridden.
+    it("carries no aggregating override for a skipped AggregatingMergeTree table", () => {
+      expect(METRICS_OVERRIDES.metric_time_rollups).toBeUndefined();
+      expect(GATEWAY_OVERRIDES.gateway_budget_scope_totals).toBeUndefined();
     });
   });
 

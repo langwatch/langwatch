@@ -21,6 +21,11 @@
  * Two shapes of skip: an exact table name in {@link LWQL_CATALOG_SKIPPED_TABLES},
  * and a family match in {@link matchesSkipPattern} for tables whose whole prefix
  * or suffix is bookkeeping ({@link skipReason} consults both).
+ *
+ * `governance_*` is deliberately NOT a skip family: every row of those tables
+ * is written under the org's hidden `internal_governance` project, so
+ * visibility is a row-policy question, not a cataloguing one — see
+ * `catalog/overrides/governance.ts`.
  */
 
 /**
@@ -35,24 +40,30 @@ export const LWQL_CATALOG_SKIPPED_TABLES: Record<string, string> = {
   goose_db_version:
     "the goose migration-version table, engine-internal tooling state — no " +
     "tenant column at all",
+  gateway_budget_scope_totals:
+    "AggregatingMergeTree with AggregateFunction/SimpleAggregateFunction " +
+    "state columns (sum/count/max/argMax) — the derived builder only knows " +
+    "how to pass a column through or sum a plain numeric measure, not merge " +
+    "an aggregate-function state; needs a hand-written view like the " +
+    "existing *_by_minute rollups. Follow-up, not customer-data omission.",
+  metric_time_rollups:
+    "AggregatingMergeTree whose rollup columns (Min/Max/Sum/GaugeLast/...) " +
+    "are plain-typed but semantically merge via a domain-specific rule the " +
+    "derived builder cannot infer from the column type alone. Follow-up.",
+  simulation_run_metrics_rollup:
+    "AggregatingMergeTree with AggregateFunction(argMax, ...) state columns " +
+    "— same gap as gateway_budget_scope_totals. Follow-up.",
 };
 
 /**
  * The reason a table is skipped by family, or `undefined` when no family
  * matches.
  *
- *  - `governance_*` — every row is keyed by the org's hidden
- *    `internal_governance` project id (see 00026_create_governance_ocsf_events.sql),
- *    never a real customer project's TenantId, so there is no customer row to
- *    expose.
  *  - `*_mv` / materialised-view internals — engine plumbing, not a table a
  *    caller would query; its data is already exposed through the table it
  *    feeds.
  */
 export function matchesSkipPattern(table: string): string | undefined {
-  if (table.startsWith("governance_")) {
-    return "internal governance bookkeeping, keyed by the hidden internal_governance tenant, never a customer project";
-  }
   if (table.endsWith("_mv") || table.includes(".inner")) {
     return "materialised-view internal, not a customer-facing table";
   }

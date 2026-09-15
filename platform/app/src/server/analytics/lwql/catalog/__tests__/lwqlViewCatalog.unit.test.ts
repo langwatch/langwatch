@@ -48,10 +48,13 @@ const MAP_KEY_ACCESS = /\[\s*'([^']+)'\s*\]/g;
 /** Stands in for the view's source-table alias when an expression is built. */
 const SOURCE = (name: string) => `SRC.\`${name}\``;
 
+/** Stands in for a join's alias, for the one view whose columns read one. */
+const JOINED = (name: string) => `JOINED.\`${name}\``;
+
 /** A column's SQL, with source references qualified the way the generator does. */
 const expressionOf = (
   column: Parameters<typeof columnExpression>[0]["column"],
-) => columnExpression({ column, source: SOURCE });
+) => columnExpression({ column, source: SOURCE, joined: JOINED });
 
 /** Which content category a span-attribute key belongs to, if any. */
 function contentCategoryOf(key: string): ContentCategory | null {

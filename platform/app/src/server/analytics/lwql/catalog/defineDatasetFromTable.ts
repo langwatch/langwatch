@@ -428,6 +428,41 @@ function columnsSharedAcrossTables(
 }
 
 /**
+ * A derived table's dedup, with the override merged onto a computed default
+ * rather than replacing it outright.
+ *
+ * The default engine key is the sort key, and the default strategy is
+ * `in-tuple` exactly when the published grain is narrower than that key —
+ * which it always is once {@link deriveDefaultCatalog} strips the tenant
+ * column from the grain — because plain `FINAL` can only merge on the whole
+ * engine key, never a subset of it. An override that sets `aggregating: true`
+ * turns the narrowing off here: an aggregating source delivers its narrower
+ * grain through the `GROUP BY` render instead, and carrying both would be a
+ * claim about two mutually exclusive rendering strategies at once. An override
+ * that names its own `strategy` or `keyColumns` wins over the computed
+ * default, same as every other override field.
+ */
+function defaultDedup({
+  sortKey,
+  grainColumns,
+  override,
+}: {
+  sortKey: readonly string[];
+  grainColumns: readonly string[];
+  override?: DerivedDatasetDedup;
+}): DerivedDatasetDedup {
+  const aggregating = override?.aggregating === true;
+  const narrowerThanKey = grainColumns.length < sortKey.length;
+  return {
+    keyColumns: sortKey,
+    ...(!aggregating && narrowerThanKey
+      ? { strategy: "in-tuple" as const }
+      : {}),
+    ...override,
+  };
+}
+
+/**
  * Every manifest table that is neither hand-written nor skipped, as a derived
  * dataset definition.
  *
@@ -498,7 +533,7 @@ export function deriveDefaultCatalog({
       timeColumn,
       freshness: override.freshness ?? DEFAULT_FRESHNESS,
       ...(override.gates ? { gates: override.gates } : {}),
-      dedup: override.dedup ?? { keyColumns: sortKey },
+      dedup: defaultDedup({ sortKey, grainColumns, override: override.dedup }),
       columnGates,
       ...(override.columnUnits ? { columnUnits: override.columnUnits } : {}),
       aliases,

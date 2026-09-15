@@ -19,10 +19,15 @@ import {
 } from "../columnsManifest";
 import {
   defaultColumnGates,
-  defaultDatasetName,
   defineDatasetFromTable,
-  deriveDefaultCatalog,
 } from "../defineDatasetFromTable";
+import {
+  LWQL_DERIVED_CATALOG,
+  LWQL_HAND_WRITTEN_SOURCE_TABLES,
+} from "../derivedViews";
+// `lwqlViews` is imported before `derivedViews` deliberately — see the same
+// note in tenantTableCoverage.unit.test.ts: both sit in one ESM cycle, and
+// only entering it through lwqlViews resolves cleanly.
 import { LWQL_VIEW_CATALOG } from "../lwqlViews";
 import { LWQL_CATALOG_SKIPPED_TABLES, skipReason } from "../skippedTables";
 
@@ -182,12 +187,8 @@ describe("given the default gate classifier", () => {
 });
 
 describe("given the opt-out catalog over the committed manifest", () => {
-  const handWritten = LWQL_VIEW_CATALOG.map((view) => view.sourceTable);
-  const derived = deriveDefaultCatalog({
-    manifest: LWQL_COLUMNS_MANIFEST,
-    skip: LWQL_CATALOG_SKIPPED_TABLES,
-    handWritten,
-  });
+  const handWritten = LWQL_HAND_WRITTEN_SOURCE_TABLES;
+  const derived = LWQL_DERIVED_CATALOG;
   const bySource = new Map(derived.map((view) => [view.sourceTable, view]));
 
   it("yields a definition for every table that is neither hand-written nor skipped", () => {
@@ -199,6 +200,15 @@ describe("given the opt-out catalog over the committed manifest", () => {
           skipReason(name, LWQL_CATALOG_SKIPPED_TABLES) === undefined,
       );
     expect([...bySource.keys()].sort()).toEqual([...expected].sort());
+    const catalogSourceTables = new Set(
+      LWQL_VIEW_CATALOG.map((view) => view.sourceTable),
+    );
+    for (const table of expected) {
+      expect(
+        catalogSourceTables.has(table),
+        `"${table}" is derived but missing from the merged LWQL_VIEW_CATALOG`,
+      ).toBe(true);
+    }
     expect(derived.length).toBeGreaterThan(0);
   });
 
@@ -210,13 +220,21 @@ describe("given the opt-out catalog over the committed manifest", () => {
   });
 
   it("gives every table a caller-facing name that is not its physical name", () => {
+    // Either the unrefined default (a `stored_` prefix stripped) or an
+    // override's own `name` — both are required to differ from the physical
+    // table name (`lwqlAllowedTables` guards that invariant catalog-wide in
+    // ../__tests__/lwqlViewCatalog.unit.test.ts); this only checks that every
+    // derived view actually picked ONE of the two, not the raw table name.
     for (const view of derived) {
-      expect(defaultDatasetName(view.sourceTable)).toBe(view.name);
+      expect(view.name).not.toBe(view.sourceTable);
     }
   });
 
   it.each([
-    ["log_records", "BodyText", ["output"]],
+    // A body column carries a request on one row and a response on the
+    // next (EventName says which, not the column) — see
+    // ../overrides/observability.ts's REQUEST_OR_RESPONSE_CONTENT.
+    ["log_records", "BodyText", ["input", "output"]],
     ["experiment_run_items", "TargetCost", ["costs"]],
     ["metric_series", "SeriesId", []],
   ] as const)("classifies %s.%s as %j", (sourceTable, columnName, expectedGates) => {
