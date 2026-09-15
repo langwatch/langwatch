@@ -1,10 +1,3 @@
-// The one cross-package import in this file, and it is deliberate: the drawer
-// store is the trace explorer's own, and pushing the trace into it before the
-// address lands is what makes the replay open on the same frame as the click.
-// Reaching a sibling web package is a recorded finding; a second store would be
-// a second answer to "which trace is open".
-import { useDrawerStore } from "@langwatch/trace-web/surfaces/trace-drawer-store";
-
 import type { codingAgentApi } from "./coding-agent-api.ts";
 import type { CodingAgentToaster } from "./coding-agent-feedback.ts";
 import type { CodingAgentRouter } from "./coding-agent-router.ts";
@@ -44,9 +37,10 @@ export function sayNothingWasStored(toaster: CodingAgentToaster): void {
 }
 
 /**
- * The trace explorer drawer's address, written as raw keys since
- * `useDrawer` is composition a feature-web package can't reach. KNOWN GAP:
- * nothing opens until the chrome layout route lands — still right to write.
+ * The trace explorer drawer's address, written as raw keys since `useDrawer`
+ * is composition a feature-web package can't reach. KNOWN GAP: nothing opens
+ * until the chrome layout route lands. The URL is the whole contract now —
+ * trace-web's own hydrator applies `mode` and `projectId` from it.
  */
 export function openReplayHere({
   turn,
@@ -57,13 +51,6 @@ export function openReplayHere({
   projectId: string;
   router: CodingAgentRouter;
 }): void {
-  // The store is what the global drawer mount watches, so pushing it before
-  // the URL lands means the drawer opens on the same frame as the click. The
-  // view mode is set transiently: this reader asked for one replay, not for
-  // every trace they open next to be a terminal.
-  const store = useDrawerStore.getState();
-  store.openTrace(turn.traceId, turn.timestamp, { projectId });
-  store.setViewModeTransient("terminal");
   // The project travels with the trace, since the chrome is still sitting in
   // whichever project was last visited, and a drawer resolving its own
   // project would query the wrong one. Every `drawer.` key is taken off

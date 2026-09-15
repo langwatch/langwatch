@@ -273,3 +273,101 @@ describe("given a correction with nothing changed yet", () => {
     });
   });
 });
+
+// Reuses this file's own `mocks`/`useTraceDrawerUrlHydrator` wiring rather
+// than a separate file: this package runs with `isolate: false`, and a
+// second file mocking `use-drawer.ts` (or the router beneath it) for the
+// same hydrator module races this one for which mock the shared module
+// cache keeps, which is exactly the drawer.mode/projectId path under test.
+describe("drawer.mode and drawer.projectId on a soft navigation into the drawer", () => {
+  function HydratorOnlyHarness() {
+    useTraceDrawerUrlHydrator();
+    return null;
+  }
+
+  function renderHydratorOnly() {
+    const utils = render(<HydratorOnlyHarness />);
+    return { ...utils, followUrl: () => utils.rerender(<HydratorOnlyHarness />) };
+  }
+
+  beforeEach(() => {
+    // The outer `beforeEach` opens TRACE in edit mode; none of that applies
+    // here, so it's undone before each case sets up its own scenario.
+    useTraceEditStore.getState().discard();
+    useDrawerStore.getState().closeDrawer();
+    useDrawerStore.getState().hydrateUrlState({
+      viewMode: "summary",
+      vizTab: "waterfall",
+      selectedSpanId: null,
+      pinnedSpanIds: [],
+      isEditing: false,
+    });
+    mocks.currentDrawer = undefined;
+    mocks.drawerParams = {};
+  });
+
+  /** @scenario "A soft navigation into a named view mode lands there, not on the default" */
+  it("applies drawer.mode and drawer.projectId on the same navigation that opens the trace", () => {
+    const { followUrl } = renderHydratorOnly();
+
+    act(() => {
+      mocks.currentDrawer = "traceV2Details";
+      mocks.drawerParams = {
+        traceId: "trace-99",
+        t: "1700000000000",
+        mode: "terminal",
+        projectId: "proj-other",
+      };
+      followUrl();
+    });
+
+    const store = useDrawerStore.getState();
+    expect(store.traceId).toBe("trace-99");
+    expect(store.occurredAtMs).toBe(1_700_000_000_000);
+    expect(store.viewMode).toBe("terminal");
+    expect(store.projectId).toBe("proj-other");
+  });
+
+  it("applies a repeat navigation's newly requested mode rather than keeping the last one shown", () => {
+    const { followUrl } = renderHydratorOnly();
+
+    act(() => {
+      mocks.currentDrawer = "traceV2Details";
+      mocks.drawerParams = { traceId: "trace-99", t: "1700000000000", mode: "terminal" };
+      followUrl();
+    });
+    expect(useDrawerStore.getState().viewMode).toBe("terminal");
+
+    // The reader switched to the Trace tab inside the drawer — the same
+    // change `useDrawerUrlSync` would have already mirrored into the URL by
+    // the time of the next click.
+    act(() => {
+      useDrawerStore.getState().setViewModeTransient("trace");
+      mocks.drawerParams = { ...mocks.drawerParams, mode: "trace" };
+      followUrl();
+    });
+    expect(useDrawerStore.getState().viewMode).toBe("trace");
+
+    // Then asked for the same turn's replay again — same traceId and
+    // timestamp, mode forced back to terminal.
+    act(() => {
+      mocks.drawerParams = { ...mocks.drawerParams, mode: "terminal" };
+      followUrl();
+    });
+    expect(useDrawerStore.getState().viewMode).toBe("terminal");
+  });
+
+  it("leaves the persisted mode alone when the navigation names no view mode", () => {
+    useDrawerStore.getState().setViewModeTransient("conversation");
+    const { followUrl } = renderHydratorOnly();
+
+    act(() => {
+      mocks.currentDrawer = "traceV2Details";
+      mocks.drawerParams = { traceId: "trace-only", t: "1700000000000" };
+      followUrl();
+    });
+
+    expect(useDrawerStore.getState().traceId).toBe("trace-only");
+    expect(useDrawerStore.getState().viewMode).toBe("conversation");
+  });
+});

@@ -1,33 +1,20 @@
 /**
  * @vitest-environment jsdom
  * Personal Sessions table: rows, empty state, search/period/sort/page filtering,
- * and replay with terminal view; tRPC proxy and drawer mocked.
+ * and replay with terminal view; tRPC proxy mocked. The replay itself only
+ * writes the drawer's address — nothing here reaches into trace-web's store.
  * @see specs/coding-agent/sessions-screen.feature
  */
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { queryImpls, utils, mockOpenTrace, mockSetViewModeTransient, mockStoreCloseDrawer } =
-  vi.hoisted(() => ({
-    queryImpls: {} as Record<string, (input: unknown) => unknown>,
-    utils: {
-      tracesV2: {
-        conversationContext: { fetch: vi.fn(), prefetch: vi.fn() },
-      },
+const { queryImpls, utils } = vi.hoisted(() => ({
+  queryImpls: {} as Record<string, (input: unknown) => unknown>,
+  utils: {
+    tracesV2: {
+      conversationContext: { fetch: vi.fn(), prefetch: vi.fn() },
     },
-    mockOpenTrace: vi.fn(),
-    mockSetViewModeTransient: vi.fn(),
-    mockStoreCloseDrawer: vi.fn(),
-  }));
-
-vi.mock("@langwatch/trace-web/drawer.store", () => ({
-  useDrawerStore: {
-    getState: () => ({
-      openTrace: mockOpenTrace,
-      setViewModeTransient: mockSetViewModeTransient,
-      closeDrawer: mockStoreCloseDrawer,
-    }),
   },
 }));
 
@@ -549,27 +536,23 @@ describe("the personal Sessions table", () => {
 
       await user.click(screen.getByText("Link sessions to pull requests"));
 
+      // The drawer is somebody else's component and it opens from the address,
+      // so what this table owes is the address.
       await waitFor(() =>
-        expect(mockOpenTrace).toHaveBeenCalledWith("trace-last", LONG_AGO + 5_000, {
-          projectId: "proj-personal",
-        }),
+        expect(writtenQueries()).toEqual([
+          {
+            "drawer.open": "traceV2Details",
+            "drawer.traceId": "trace-last",
+            "drawer.t": String(LONG_AGO + 5_000),
+            "drawer.mode": "terminal",
+            "drawer.projectId": "proj-personal",
+          },
+        ]),
       );
       expect(utils.tracesV2.conversationContext.fetch).toHaveBeenCalledWith({
         projectId: "proj-personal",
         conversationId: "session-1",
       });
-      expect(mockSetViewModeTransient).toHaveBeenCalledWith("terminal");
-      // The drawer is somebody else's component and it opens from the address,
-      // so what this table owes is the address.
-      expect(writtenQueries()).toEqual([
-        {
-          "drawer.open": "traceV2Details",
-          "drawer.traceId": "trace-last",
-          "drawer.t": String(LONG_AGO + 5_000),
-          "drawer.mode": "terminal",
-          "drawer.projectId": "proj-personal",
-        },
-      ]);
       // The replay opens where the reader already is; nothing navigates.
       expect(host.recording.navigations).toEqual([]);
     });
@@ -619,7 +602,7 @@ describe("the personal Sessions table", () => {
           }),
         ),
       );
-      expect(mockOpenTrace).not.toHaveBeenCalled();
+      expect(writtenQueries()).toEqual([]);
     });
 
     it("reports a failed lookup rather than opening an empty replay", async () => {
@@ -671,7 +654,6 @@ describe("the personal Sessions table", () => {
 
       await user.click(screen.getByText("#4218"));
 
-      expect(mockOpenTrace).not.toHaveBeenCalled();
       expect(writtenQueries()).toEqual([{ pullRequest: "github.com|acme/widgets|4218" }]);
     });
   });
@@ -708,7 +690,7 @@ describe("the personal Sessions table", () => {
       expect(narrowed).toEqual(["Queue heavy session", "Queue light session"]);
 
       await user.click(screen.getByText("Queue heavy session"));
-      await waitFor(() => expect(mockOpenTrace).toHaveBeenCalled());
+      await waitFor(() => expect(writtenQueries().length).toBeGreaterThan(0));
 
       // Closing is the drawer's own doing, and it is what makes the table
       // visible again rather than what rebuilds it. What has to hold is that

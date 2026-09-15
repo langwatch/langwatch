@@ -8,11 +8,6 @@
       "expires": "2026-10-01"
     },
     {
-      "key": "cross-feature|modules/coding-agent/web/package.json|@langwatch/trace-web",
-      "measured": "2026-09-08",
-      "expires": "2026-10-01"
-    },
-    {
       "key": "cross-feature|modules/dataset/web/package.json|@langwatch/workflow-web",
       "measured": "2026-09-08",
       "expires": "2026-10-01"

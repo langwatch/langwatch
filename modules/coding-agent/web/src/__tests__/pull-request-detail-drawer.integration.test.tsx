@@ -1,26 +1,23 @@
 /**
  * @vitest-environment jsdom
  * Pull-request detail drawer: what it shows a reader and what it must never
- * carry; tRPC proxy wiring under test.
+ * carry; tRPC proxy wiring under test. The replay itself only writes the
+ * drawer's address — nothing here reaches into trace-web's store.
  * @see specs/coding-agent/pull-request-linkage.feature
  */
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { queryImpls, utils, mockOnClose, mockOpenTrace, mockSetViewModeTransient } = vi.hoisted(
-  () => ({
-    queryImpls: {} as Record<string, (input: unknown) => unknown>,
-    utils: {
-      tracesV2: {
-        conversationContext: { fetch: vi.fn(), prefetch: vi.fn() },
-      },
+const { queryImpls, utils, mockOnClose } = vi.hoisted(() => ({
+  queryImpls: {} as Record<string, (input: unknown) => unknown>,
+  utils: {
+    tracesV2: {
+      conversationContext: { fetch: vi.fn(), prefetch: vi.fn() },
     },
-    mockOnClose: vi.fn(),
-    mockOpenTrace: vi.fn(),
-    mockSetViewModeTransient: vi.fn(),
-  }),
-);
+  },
+  mockOnClose: vi.fn(),
+}));
 
 vi.mock("../coding-agent-api.ts", () => {
   const defaultQuery = () => ({
@@ -54,15 +51,6 @@ vi.mock("../coding-agent-api.ts", () => {
   };
   return { codingAgentApi: makeNode("") };
 });
-
-vi.mock("@langwatch/trace-web/drawer.store", () => ({
-  useDrawerStore: {
-    getState: () => ({
-      openTrace: mockOpenTrace,
-      setViewModeTransient: mockSetViewModeTransient,
-    }),
-  },
-}));
 
 import { PullRequestDetailDrawer } from "../pull-request-detail-drawer.tsx";
 import {
@@ -221,8 +209,6 @@ beforeEach(() => {
   utils.tracesV2.conversationContext.fetch.mockReset();
   utils.tracesV2.conversationContext.prefetch.mockReset();
   mockOnClose.mockClear();
-  mockOpenTrace.mockClear();
-  mockSetViewModeTransient.mockClear();
 });
 
 afterEach(() => {
@@ -617,16 +603,12 @@ describe("the pull request detail drawer", () => {
             conversationId: "session-a",
           }),
         );
-        // The project travels with the trace. These rows are read from the
-        // caller's own workspace, so a drawer left to resolve the project
-        // itself would query whichever one the chrome was sitting in and
-        // report the trace missing.
-        expect(mockOpenTrace).toHaveBeenCalledWith("trace-last", 2_000, {
-          projectId: "proj-personal",
-        });
-        expect(mockSetViewModeTransient).toHaveBeenCalledWith("terminal");
         // The drawer the replay opens is somebody else's component, and it
-        // opens from the address, so what this one owes is the address.
+        // opens from the address, so what this one owes is the address. The
+        // project travels with the trace here too: these rows are read from
+        // the caller's own workspace, so a drawer left to resolve the
+        // project itself would query whichever one the chrome was sitting
+        // in and report the trace missing.
         expect(host.recording.queries.map((write) => write.next)).toEqual([
           {
             "drawer.open": "traceV2Details",
@@ -772,7 +754,6 @@ describe("the pull request detail drawer", () => {
           ),
         );
         expect(host.recording.queries).toEqual([]);
-        expect(mockOpenTrace).not.toHaveBeenCalled();
       });
 
       it("reports a failed lookup through the shared error toast", async () => {

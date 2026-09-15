@@ -62,7 +62,6 @@
     "@langwatch/design-system": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
-    "@langwatch/trace-web": "workspace:*",
     "@langwatch/ui-host": "workspace:*",
     "lucide-react": "catalog:",
     "numeral": "catalog:",

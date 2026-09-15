@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { useDrawer, useDrawerParams } from "../../../../behavior/use-drawer.ts";
-import { parseEditParam, useDrawerStore } from "../../../../behavior/drawer.store.ts";
+import { isViewMode, parseEditParam, useDrawerStore } from "../../../../behavior/drawer.store.ts";
 import {
   selectIsTraceEditDirty,
   useTraceEditStore,
@@ -25,11 +25,13 @@ export function useTraceDrawerUrlHydrator(): void {
     hydrateDrawerFromUrl({
       drawer: drawerRef.current,
       editParam: params.edit,
+      modeParam: params.mode,
       occurredAtMs: timestampParam(params.t),
+      projectIdParam: params.projectId,
       traceId: params.traceId ?? null,
       wantsOpen: currentDrawer === "traceV2Details",
     });
-  }, [currentDrawer, params.traceId, params.t, params.edit]);
+  }, [currentDrawer, params.traceId, params.t, params.edit, params.mode, params.projectId]);
 }
 
 /** The `t` link parameter as a timestamp, or null when it names no usable one. */
@@ -43,13 +45,17 @@ function timestampParam(raw: string | undefined): number | null {
 function hydrateDrawerFromUrl({
   drawer,
   editParam,
+  modeParam,
   occurredAtMs,
+  projectIdParam,
   traceId,
   wantsOpen,
 }: {
   drawer: Pick<ReturnType<typeof useDrawer>, "openDrawer" | "closeDrawer">;
   editParam: string | undefined;
+  modeParam: string | undefined;
   occurredAtMs: number | null;
+  projectIdParam: string | undefined;
   traceId: string | null;
   wantsOpen: boolean;
 }): void {
@@ -57,7 +63,18 @@ function hydrateDrawerFromUrl({
 
   if (wantsOpen && traceId) {
     const alreadyOnTrace = store.traceId === traceId && store.occurredAtMs === occurredAtMs;
-    if (!alreadyOnTrace) store.openTrace(traceId, occurredAtMs);
+    // `drawer.projectId` travels on the same navigation as the trace it names —
+    // read it here too (not only at module load), or a trace opened from
+    // another project than the chrome's resolves against the wrong one on
+    // every soft navigation.
+    if (!alreadyOnTrace) store.openTrace(traceId, occurredAtMs, { projectId: projectIdParam });
+    // `drawer.mode` is applied here too (not only at load/popstate), or a
+    // soft navigation into a named mode silently falls back to whatever was
+    // last used. Compared to the store first so it's a no-op once the two
+    // already agree.
+    if (modeParam && isViewMode(modeParam) && modeParam !== store.viewMode) {
+      store.setViewModeTransient(modeParam);
+    }
     syncEditMode({ traceId, editParam, openDrawer: drawer.openDrawer });
     return;
   }
