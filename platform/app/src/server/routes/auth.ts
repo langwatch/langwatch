@@ -9,15 +9,20 @@
  */
 
 import { resolveAuthProvider } from "@ee/sso/sso-gate";
-import { runWithIdentityBirth } from "@langwatch/identity-server/better-auth";
 import { createLogger } from "@langwatch/observability";
 import type { Context } from "hono";
 import { env } from "~/env.mjs";
 import { createServiceApp, publicEndpoint } from "~/server/api/security";
-import { tryGetApp } from "~/server/app-layer/app";
+import {
+  passwordResetSessionBridge,
+  sessionCallbackEvidence,
+  sessionRevocation,
+} from "~/server/app-layer/identity/runtime";
 import { getServerAuthSession } from "~/server/auth";
+import { requestStatingCaller } from "~/server/auth/caller-header";
+import { getAuthRateLimitClientIpFromHonoContext } from "~/server/auth/rate-limit-client-ip";
 import { auth } from "~/server/better-auth";
-import { isBornFinalizedSignUp } from "~/server/better-auth/bornFinalizedOptIn";
+import { translateBetterAuthError } from "~/server/better-auth/handled-errors";
 import { isAllowedAuthOrigin } from "~/server/better-auth/originGate";
 import { prisma } from "~/server/db";
 
@@ -94,26 +99,10 @@ const logoutHandler = async (c: Context) => {
       const session = await auth.api.getSession({ headers });
 
       if (session) {
-        const token = session.session.token;
-
-        try {
-          await prisma.session.delete({
-            where: { sessionToken: token },
-          });
-        } catch {
-          // Session may already be deleted
-        }
-
-        const redisConnection = tryGetApp()?.redis ?? null;
-        if (redisConnection) {
-          try {
-            await redisConnection.del(`better-auth:${token}`);
-            const listKey = `better-auth:active-sessions-${session.user.id}`;
-            await redisConnection.del(listKey);
-          } catch {
-            // Redis cleanup is best-effort
-          }
-        }
+        await sessionRevocation().revokeOne({
+          token: session.session.token,
+          userId: session.user.id,
+        });
       }
     } catch {
       // Session lookup failed — still clear cookies below
@@ -163,6 +152,7 @@ secured.access(authPolicy()).get("/auth/logout", logoutHandler);
 secured.access(authPolicy()).post("/auth/logout", logoutHandler);
 
 // ---------- /api/auth/* catch-all (BetterAuth) ----------
+
 const betterAuthCatchAll = async (c: Context) => {
   // Origin gate for state-changing requests
   if (
@@ -190,17 +180,35 @@ const betterAuthCatchAll = async (c: Context) => {
     return c.json({ message: "Invalid origin", code: "INVALID_ORIGIN" }, 403);
   }
 
-  // ADR-116 §3: the born-finalized entrance's request-scoped marker, set
-  // HERE and only here, and only once the backend allowlist check has
-  // passed. Nothing below re-decides it, and outside a marked request the
-  // entrance is never reached — which is what makes deploying it a no-op
-  // until an operator targets an organization.
-  if (await isBornFinalizedSignUp({ request: c.req.raw })) {
-    return runWithIdentityBirth(() => auth.handler(c.req.raw));
-  }
-
-  // BetterAuth's auth.handler is fetch-compatible (Request => Response)
-  return auth.handler(c.req.raw);
+  // BetterAuth's auth.handler is fetch-compatible (Request => Response). The
+  // marker only changes which BRANCH the writes inside it take; the answer
+  // that comes back is the same shape either way, and is translated the same
+  // way below. Handling the two through one `response` is what stops them
+  // drifting: the entrance used to return straight out of here, so a sign-up
+  // the allowlist had opted IN was the one sign-up whose refusals skipped the
+  // handled-error contract and reached the browser in better-auth's own
+  // vocabulary.
+  // Better Auth decides its own rate-limit buckets from the request it is
+  // handed, so it is handed the caller this application already resolved from
+  // the connection. See `auth/caller-header.ts`.
+  const handle = () =>
+    auth.handler(
+      requestStatingCaller({
+        request: c.req.raw,
+        caller: getAuthRateLimitClientIpFromHonoContext(c),
+      }),
+    );
+  // The reset scope is opened around EVERY request rather than only the
+  // reset path: it is a per-request slot that costs nothing empty, and the
+  // path check belongs to the hook that reads it, not to the route.
+  const response = await sessionCallbackEvidence().runWithScope(() =>
+    passwordResetSessionBridge().runWithScope(handle),
+  );
+  // better-auth's refusals speak its own vocabulary, which is neither a
+  // registered code nor copy anybody wrote for a customer. This is where the
+  // families we have translated join the handled-error contract; everything
+  // else passes through byte for byte. See `better-auth/handled-errors.ts`.
+  return translateBetterAuthError({ response, path: c.req.path });
 };
 
 // `.all` (not a 5-verb loop) so OPTIONS/HEAD and CORS preflight reach

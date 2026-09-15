@@ -27,6 +27,12 @@ Feature: Rotate the project base API key
     And a direct attempt to rotate the base key is rejected
     And the base key is left unchanged
 
+  Scenario: An API key principal cannot rotate the base key
+    Given an API key principal whose scope includes permission to manage the project
+    When it attempts to rotate the project base API key
+    Then the request is rejected as forbidden
+    And the base key is left unchanged
+
   Scenario: The base key keeps working until it is explicitly rotated
     Given other API keys are created and revoked in the project
     When I have not rotated the project base API key

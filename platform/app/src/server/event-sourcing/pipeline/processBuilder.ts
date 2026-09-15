@@ -83,6 +83,9 @@ export interface ProcessManagerIntentStage<
   toPayload(
     map: (event: E) => ProcessEventEnvelope["payload"],
   ): ProcessManagerIntentStage<E, State, Intents>;
+  keyBy(
+    key: (event: E) => string,
+  ): ProcessManagerIntentStage<E, State, Intents>;
 }
 
 export interface ProcessManagerHandledStage<
@@ -105,6 +108,9 @@ export interface ProcessManagerHandledStage<
   toPayload(
     map: (event: E) => ProcessEventEnvelope["payload"],
   ): ProcessManagerHandledStage<E, State, Intents>;
+  keyBy(
+    key: (event: E) => string,
+  ): ProcessManagerHandledStage<E, State, Intents>;
 }
 
 export type ProcessManagerBuildableStage =
@@ -123,6 +129,7 @@ class ProcessManagerBuilder<E extends Event> {
   private payloadMapper:
     | ((event: E) => ProcessEventEnvelope["payload"])
     | undefined;
+  private keyMapper: ((event: E) => string) | undefined;
 
   constructor(private readonly name: string) {}
 
@@ -225,6 +232,23 @@ class ProcessManagerBuilder<E extends Event> {
     return this;
   }
 
+  /**
+   * Chooses the process instance an event belongs to — see
+   * `ProcessManagerConfig.keyBy`. The key doubles as the generated
+   * subscriber's queue group, so it must derive from the event alone.
+   */
+  keyBy(key: (event: E) => string): this {
+    if (this.keyMapper) {
+      throw new ConfigurationError(
+        "ProcessManagerBuilder",
+        `Process manager "${this.name}" already declares keyBy`,
+        { name: this.name },
+      );
+    }
+    this.keyMapper = key;
+    return this;
+  }
+
   schedule(options: { everyMs: number }): this {
     if (!Number.isFinite(options.everyMs) || options.everyMs <= 0) {
       throw new ConfigurationError(
@@ -261,6 +285,7 @@ class ProcessManagerBuilder<E extends Event> {
       toPayload: this.payloadMapper as
         | ((event: Event) => ProcessEventEnvelope["payload"])
         | undefined,
+      keyBy: this.keyMapper as ((event: Event) => string) | undefined,
       intents: this.intents,
       outbox: this.outboxOptions,
       schedule: this.scheduleOptions,

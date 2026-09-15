@@ -32,9 +32,13 @@ export class IdentityIdentifierBackfillMigration implements SystemMigration {
   // Dark preparation: finalization opens event EMISSION for the user; no
   // decision, no sign-in behavior and nothing customer-visible changes.
   readonly requiresOperatorConfirmation = false;
-  // Ships inert on self-hosted until a release flips this after the cloud
-  // rollout has soaked (the in-place doctrine's release act).
-  readonly runsAutomaticallyOnSelfHosted = false;
+  // The release act the in-place doctrine calls for, taken here because the
+  // front door now depends on it. A self-hosted installation includes every
+  // organization in any migration it runs at all, so this is the only thing
+  // standing between a self-hosted user and an identity history — and with
+  // the legacy screens deleted, a user with no history is told there is no
+  // account for their address.
+  readonly runsAutomaticallyOnSelfHosted = true;
   // Still soaking on cloud: the identity rollout is paced by enrollment, so
   // deploying this changes nothing until an operator enrolls an
   // organization. Flip it only once the rollout is finished and the

@@ -46,6 +46,12 @@ Write criteria about outcomes and actions, not wording. A criterion about an int
 
 When the test suite declares [fields](/agent-testing/test-suites#fields), the editor shows one control per field after the criteria, and the value is stored on the scenario. An [evaluator](/agent-testing/evaluators) attached to the suite reads the value through its mapping, for example `expected_output` from `golden_sql`.
 
+<Frame>
+<img className="block" src="/images/agent-testing/scenario-editor-field-values.png" alt="The scenario editor with the golden_sql and table_schema boxes filled in under the criteria" />
+</Frame>
+
+The `golden_sql` and `table_schema` boxes under the criteria are the fields the `Case lookups` suite declares. A text box grows with its text.
+
 A blank value is no value: the evaluators that read the field are skipped for this scenario, with the reason `no golden_sql on this scenario`. A scenario moved to another suite keeps the values it holds; the editor lists the ones the new suite does not declare under **Not in this suite**, each with a remove action.
 
 From the CLI, `langwatch scenario create` and `langwatch scenario update` take `--field identifier=value`, repeated once per field. A number field reads a number and a boolean field reads `true` or `false`, and a field the suite does not declare is refused with the list it does. On `update` the flags together replace the values the scenario holds.

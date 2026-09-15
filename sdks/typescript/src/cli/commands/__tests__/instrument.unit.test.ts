@@ -53,7 +53,7 @@ const asMock = (fn: unknown): ReturnType<typeof vi.fn> =>
 const personalCredential = {
   token: "ik-lw-personal00000000_secret",
   prefix: undefined,
-  endpoint: "http://app.example.com/api/otel",
+  endpoint: "https://app.example.com/api/otel",
   minted: false,
   scope: "personal" as const,
 };
@@ -71,8 +71,8 @@ beforeEach(() => {
   prevKeyEnv = process.env.LANGWATCH_INGEST_KEY;
   delete process.env.LANGWATCH_INGEST_KEY;
   cfg = {
-    gateway_url: "http://gw.example.com",
-    control_plane_url: "http://app.example.com",
+    gateway_url: "https://gw.example.com",
+    control_plane_url: "https://app.example.com",
     access_token: "tok",
   };
   asMock(configMod.loadConfig).mockReturnValue(cfg);
@@ -110,6 +110,49 @@ describe("instrumentCommand", () => {
       expect(writtenTo(stderrSpy)).toContain(notice);
     });
   });
+  describe("given an endpoint that carries the ingest key in the clear", () => {
+    const withEndpoint = (endpoint: string) =>
+      asMock(telemetryRefreshMod.resolveIngestionCredential).mockResolvedValue({
+        ...personalCredential,
+        endpoint,
+      });
+
+    /** @scenario "A plain http endpoint to another host warns and still wires" */
+    it("names the host the key travels to unencrypted, and wires anyway", async () => {
+      withEndpoint("http://lw.acme.dev/api/otel");
+
+      await instrumentCommand("codex", {});
+
+      expect(writtenTo(stderrSpy)).toContain(
+        "the ingest key will travel unencrypted to lw.acme.dev",
+      );
+      // A warning, never a refusal: the wiring still lands and the command
+      // reports success, so no flag is needed to allow a private network.
+      expect(installTelemetryWiring).toHaveBeenCalled();
+      expect(writtenTo(stdoutSpy)).toContain("runs now send telemetry to");
+    });
+
+    /** @scenario "An https endpoint is wired without a word about the scheme" */
+    it("says nothing about the scheme for https", async () => {
+      withEndpoint("https://lw.acme.dev/api/otel");
+
+      await instrumentCommand("codex", {});
+
+      expect(writtenTo(stderrSpy)).not.toContain("unencrypted");
+      expect(writtenTo(stdoutSpy)).toContain("runs now send telemetry to");
+    });
+
+    /** @scenario "A loopback endpoint over http is not worth warning about" */
+    it("says nothing for http to loopback, which local development runs on", async () => {
+      withEndpoint("http://localhost:5570/api/otel");
+
+      await instrumentCommand("codex", {});
+
+      expect(writtenTo(stderrSpy)).not.toContain("unencrypted");
+      expect(writtenTo(stdoutSpy)).toContain("runs now send telemetry to");
+    });
+  });
+
   describe("given a companion write the wiring depends on failed", () => {
     it("fails instead of reporting a wired tool", async () => {
       asMock(installTelemetryWiring).mockReturnValue({
@@ -308,7 +351,7 @@ describe("instrumentCommand", () => {
         asMock(pinToolToProject).mockResolvedValue({ label: "acme-app" });
         asMock(telemetryRefreshMod.resolveIngestionCredential).mockResolvedValue({
           token: "ik-lw-proj00000000000_secret",
-          endpoint: "http://app.example.com/api/otel",
+          endpoint: "https://app.example.com/api/otel",
           minted: false,
           scope: "project" as const,
           projectLabel: "acme-app",
@@ -346,7 +389,7 @@ describe("instrumentCommand", () => {
       cfg.tool_project_keys = { codex: { secret: "sk-lw-pinned" } };
       asMock(telemetryRefreshMod.resolveIngestionCredential).mockResolvedValue({
         token: "sk-lw-pinned",
-        endpoint: "http://app.example.com/api/otel",
+        endpoint: "https://app.example.com/api/otel",
         minted: false,
         scope: "project" as const,
         projectLabel: undefined,

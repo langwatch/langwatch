@@ -85,6 +85,11 @@ const paramsFor = (
     session: (authed ? session : null) as any,
     permissionChecked: false,
     organizationRole: undefined as any,
+    // The seam's own suite, not the second-factor gate's: the gate runs after
+    // the permission and reads the organization it guards, which no fixture
+    // here creates. Handed in through the ctx slot that exists for exactly
+    // this — `mfa-gate`'s behaviour is asserted by its own tests.
+    mfaGate: { offered: () => false } as any,
   },
   input,
   next: vi.fn().mockReturnValue("next-called"),
@@ -258,8 +263,8 @@ describe("checkDeclaredPermission", () => {
      * The regression this whole split exists for: a routine bad request used
      * to land on the error dashboard as a platform fault and page the team.
      *
-     * @scenario "A scope id the caller left blank is answered as invalid input"
      */
+    /** @scenario "A scope id the caller left blank is answered as invalid input" */
     it("does not report the caller's blank id as an internal error", async () => {
       await rejection(() =>
         checkDeclaredPermission({ permission: "traces:view" })(
@@ -326,6 +331,49 @@ describe("checkDeclaredPermission", () => {
         "permission_denied",
       );
       expect(denied.message).not.toContain("does-not-exist");
+    });
+
+    it("can conceal a project outside the caller's organization as not found", async () => {
+      resolveProjectPermission.mockResolvedValue({
+        permitted: false,
+        organizationRole: null,
+        denialReason: "no-membership",
+      });
+      const middleware = checkDeclaredPermission({
+        permission: "project:manage",
+        nondisclosure: "not-found-outside-organization",
+      });
+
+      const error = await rejection(() =>
+        middleware(paramsFor({ projectId: "project-foreign" }) as any),
+      );
+
+      expect(error).toMatchObject({
+        code: "NOT_FOUND",
+        message: "Project not found",
+      });
+      expect(authzDeclarationOf(middleware)).toMatchObject({
+        kind: "permission",
+        permission: "project:manage",
+        nondisclosure: "not-found-outside-organization",
+      });
+    });
+
+    it("does not conceal a same-organization permission denial", async () => {
+      resolveProjectPermission.mockResolvedValue({
+        permitted: false,
+        organizationRole: "MEMBER",
+        denialReason: "no-binding",
+      });
+
+      const error = await rejection(() =>
+        checkDeclaredPermission({
+          permission: "project:manage",
+          nondisclosure: "not-found-outside-organization",
+        })(paramsFor({ projectId: "project-own" }) as any),
+      );
+
+      expect(error.cause).toBeInstanceOf(PermissionDeniedError);
     });
 
     /** @scenario "A lite member's denial is distinguishable from a missing grant" */
@@ -428,6 +476,71 @@ describe("declaredNoPermission", () => {
         allow: { organizationId: "creating inside this organization" },
       })(paramsFor({ organizationId: "org-1" }) as any),
     ).resolves.toBe("next-called");
+  });
+
+  /** @scenario "An opted-out procedure cannot silently read scoped input" */
+  it("passes a procedure that declares no input at all, rather than throwing on it", async () => {
+    // `in` throws on `undefined`, so a procedure with no `.input()` used to
+    // fail here — every call became a 500 at the boundary before the handler
+    // ran, which is how `identity.myIdentifiers` took the authentication
+    // settings page down. Nothing is skipped by allowing it: an input that
+    // does not exist carries no scope id to smuggle past the check.
+    const middleware = declaredNoPermission({ reason: "no input at all" });
+    const params = { ...paramsFor({}), input: undefined };
+
+    await expect(middleware(params as any)).resolves.toBe("next-called");
+    expect(params.ctx.permissionChecked).toBe(true);
+  });
+
+  describe("given an organization that holds this member at its MFA gate", () => {
+    const heldParams = () => {
+      const standingForSession = vi.fn(async () => ({
+        satisfaction: { satisfied: false } as const,
+      }));
+      const params = paramsFor({ organizationId: "org-acme" });
+      params.ctx.mfaGate = {
+        offered: () => true,
+        organizationMfa: () => ({ standingForSession }),
+      } as any;
+      return { params, standingForSession };
+    };
+
+    it("still blocks an ordinary no-permission route such as an API-key mutation", async () => {
+      const { params } = heldParams();
+      const middleware = declaredNoPermission({
+        reason: "the caller's own API keys",
+        allow: {
+          organizationId: "creating a key in the caller's organization",
+        },
+      });
+
+      await expect(middleware(params as any)).rejects.toMatchObject({
+        code: "identity_mfa_enrollment_required",
+      });
+      expect(params.next).not.toHaveBeenCalled();
+    });
+
+    it("allows only an explicitly declared recovery read past the MFA gate", async () => {
+      const { params, standingForSession } = heldParams();
+      const middleware = declaredNoPermission({
+        reason: "the caller's own MFA standing",
+        allow: { organizationId: "the organization whose gate they reached" },
+        mfaRecovery: {
+          reason:
+            "the standing answer tells the caller how to satisfy the gate",
+        },
+      });
+
+      await expect(middleware(params as any)).resolves.toBe("next-called");
+      expect(standingForSession).not.toHaveBeenCalled();
+      expect(authzDeclarationOf(middleware)).toMatchObject({
+        kind: "no-permission",
+        mfaRecovery: {
+          reason:
+            "the standing answer tells the caller how to satisfy the gate",
+        },
+      });
+    });
   });
 });
 

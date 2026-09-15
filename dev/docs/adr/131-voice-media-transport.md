@@ -123,6 +123,51 @@ scenario child, and the per-call nonce travels in the URL path.
 - Because the endpoint faces the internet, the nonce check is load-bearing
   rather than defence in depth.
 
+## Turn-taking on the media stream
+
+Read this before touching any timing knob on the phone adapter. It was
+re-derived once from a production recording in which the simulated caller
+spoke exactly once and the callee was left asking "hello? are you still there?"
+for the rest of the call.
+
+Twilio Media Streams has **no notion of a turn**. It sends a 20 ms µ-law frame
+every 20 ms for the whole call, silence included, and the protocol carries no
+speech, silence or VAD event of any kind (`mark` is only a playback-completion
+echo; the speech-endpointing knobs — `speechTimeout`, `eotThreshold` — belong
+to ConversationRelay, which we do not use). Every turn boundary on a phone call
+is therefore something *we* decide from the audio.
+
+The scenario SDK's runtime decides it by silence: after the first inbound chunk
+it keeps reading until `responseTailSilence` (0.6 s by default) passes with no
+chunk arriving, and that gap ends the callee's turn. On a raw Media Stream a
+chunk arrives every 100 ms no matter what, so the gap never occurs and the turn
+only ends on hang-up or the SDK's 60 s hard ceiling (`responseMaxDuration × 2`).
+Traces show it plainly: `voice.audio.receive` is always terminated by
+`terminal_chunk` or `hard_ceiling`, never `tail_silence`.
+
+The fix (scenario SDK `1.7.0-dev.voice8`) is an **inbound speech gate** in the
+Twilio adapter: each 100 ms chunk's RMS is measured on the int16 scale the SDK
+already produces, chunks below the threshold are dropped (so silence becomes a
+real gap), speech is admitted with a hangover so the short dips inside an
+utterance do not split it, and a bounded pre-roll is replayed at onset so the
+first syllable is not clipped. The defaults come from a real call against an
+ElevenLabs callee: between-utterance noise p95 ≈ 740, speech p10 ≈ 940,
+p50 ≈ 1380 — threshold 800, hangover 400 ms, pre-roll 300 ms. The margin is
+thin, which is why the hangover is not optional.
+
+Our side sets one knob on top: `responseTailSilence` is raised to 0.8 s for
+phone targets (`PHONE_RESPONSE_TAIL_SILENCE_SECONDS` in `phone.transport.ts`).
+The gate stays at the SDK default; override `speechGate` there only with a new
+measurement to justify it.
+
+Two things this does **not** solve, recorded so they are not re-diagnosed:
+
+- The judge may still end a run after one exchange when the criteria are
+  already met (langwatch/scenario#980). A scenario that must exercise several
+  exchanges sets a `minTurns` floor; the app forwards it to the SDK judge.
+- The Python SDK's Twilio adapter has the same continuous-frame gap; the parity
+  issue is filed on langwatch/scenario alongside the JS fix.
+
 ## How the public endpoint is provided
 
 The transport decision above is settled. How we obtain the hostname is a

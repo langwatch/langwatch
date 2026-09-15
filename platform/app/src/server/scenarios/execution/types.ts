@@ -280,6 +280,14 @@ export const PhoneVoiceTargetSchema = z.object({
       fromNumber: z.string(),
     })
     .nullable(),
+  /**
+   * Which way the call goes. On "inbound" the agent under test answers and
+   * greets on connect, so the run opens with the agent's turn (the greeting is
+   * captured) before handing over to the simulator/judge loop; "outbound" (the
+   * default) opens with the caller. Defaulted so a job queued before this field
+   * existed still parses.
+   */
+  callDirection: z.enum(["inbound", "outbound"]).default("outbound"),
 });
 export const VoiceTargetSchema = z.discriminatedUnion("transport", [
   ElevenLabsVoiceTargetSchema,

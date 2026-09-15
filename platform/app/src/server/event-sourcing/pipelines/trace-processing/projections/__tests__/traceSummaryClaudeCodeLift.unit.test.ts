@@ -297,6 +297,31 @@ describe("TraceSummaryFoldProjection — log-path lift", () => {
     });
   });
 
+  describe("codex conversation id lift", () => {
+    /** @scenario "A codex turn is filed under its session by its log records alone" */
+    it("files a turn under its session off the user_prompt record when no turn span landed", () => {
+      const projection = makeProjection();
+      const state = createInitState();
+      const after = projection.handleTraceLogRecordReceived(
+        makeLogEvent(
+          {
+            "event.name": "codex.user_prompt",
+            prompt: "just say ping",
+            "conversation.id": "01a09acb-adc2-7f12-b671-b357653cc057",
+          },
+          { scopeName: "codex_cli_rs", body: "codex.user_prompt" },
+        ),
+        state,
+      );
+      expect(after.attributes["gen_ai.conversation.id"]).toBe(
+        "01a09acb-adc2-7f12-b671-b357653cc057",
+      );
+      expect(after.attributes["langwatch.thread.id"]).toBe(
+        "01a09acb-adc2-7f12-b671-b357653cc057",
+      );
+    });
+  });
+
   describe("gemini / gen_ai.* defensive lift", () => {
     it("lifts every gen_ai canonical field a gemini log carries", () => {
       const projection = makeProjection();

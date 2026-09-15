@@ -1614,6 +1614,27 @@ const presentations = {
     describe: () =>
       "We could not confirm the access change in time, so nothing was granted. Try again in a moment.",
   },
+  auth_rate_limited: {
+    title: "Too many attempts",
+    describe: (error) => {
+      const seconds = num(error, "retryAfterSeconds", 0);
+      if (seconds <= 0) return "Wait a few minutes, then try again.";
+      const minutes = Math.ceil(seconds / 60);
+      return minutes <= 1
+        ? "Wait a minute, then try again."
+        : `Wait ${minutes} minutes, then try again.`;
+    },
+  },
+  auth_no_address_to_confirm: {
+    title: "This account has no email address",
+    describe: () =>
+      "Add an email address in your account settings, then confirm it.",
+  },
+  auth_direct_registration_unavailable: {
+    title: "Accounts here are created by your identity provider",
+    describe: () =>
+      "Use the sign-in method your organization set up. Ask an administrator if you are not sure which one that is.",
+  },
   authz_ledger_unavailable: {
     title: "Access changes are paused",
     describe: () =>
@@ -1751,6 +1772,15 @@ const presentations = {
     title: "This account is deactivated",
     describe: () =>
       "Its sessions were revoked on purpose. Reactivate the account first.",
+  },
+  cannot_reimpersonate_while_impersonating: {
+    // A deliberate denial: you are already impersonating an account, so the
+    // audit trail has to return to you before it can name you acting as
+    // somebody else. Stopping the current impersonation is the way to start
+    // another, so the copy names that action rather than inviting a retry.
+    title: "Stop impersonating first",
+    describe: () =>
+      "You are already impersonating an account. Stop before impersonating another.",
   },
   user_to_impersonate_not_found: {
     title: "User not found",
@@ -2051,6 +2081,11 @@ const presentations = {
     title: "Seat billing is unavailable right now",
     describe: () => "Nothing was charged. Try again in a moment.",
   },
+  session_is_current: {
+    title: "This is the browser you're using",
+    describe: () =>
+      "Signing out here would end this visit. Use the sign-out control instead.",
+  },
   subscription_ambiguous: {
     // fault: platform. Two live plans on one account, which only an operator
     // can have created and only an operator can resolve. Nothing was charged,
@@ -2100,6 +2135,15 @@ const presentations = {
     title: "That verification link has expired",
     describe: () => "Request a new verification email and use the newest link.",
   },
+  // Deliberately NOT "didn't work" and not "expired": the link is still good
+  // and the person did nothing wrong, so the copy asks for the one thing that
+  // actually resolves it rather than sending them back to their inbox for a
+  // new email they do not need.
+  identity_verification_not_settled: {
+    title: "We're still confirming that address",
+    describe: () =>
+      "Your confirmation went through and we're finishing up. Open the same link again in a moment.",
+  },
   identity_identifier_not_found: {
     title: "That sign-in method is no longer on your account",
     describe: () =>
@@ -2144,6 +2188,20 @@ const presentations = {
     describe: () =>
       "This is your last way in, or the last one we could reach you at. Add a verified email address first, then remove this one.",
   },
+  // better-auth's own codes, thrown by `LastWayInGuard`
+  // (`src/server/better-auth/last-way-in.ts`) on `/passkey/delete-passkey`
+  // and `/two-factor/disable`. See `codes.ts` for why these two are spelled
+  // SCREAMING_CASE rather than our usual snake_case.
+  LAST_WAY_IN: {
+    title: "You'd have no way back into your account",
+    describe: () =>
+      "That is the only way into this account. Add another way to sign in first.",
+  },
+  MFA_REQUIRED_BY_ORGANIZATION: {
+    title: "Your organization requires two-step verification",
+    describe: () =>
+      "Your organization requires two-step verification, so this cannot be removed.",
+  },
   identity_mfa_code_invalid: {
     // Deliberately says nothing about whether two-step verification is even
     // set up on this account. A wrong code and a code for an enrollment
@@ -2167,10 +2225,20 @@ const presentations = {
     describe: () =>
       "Sign in with your authenticator app and generate a new set, or ask an administrator to reset two-step verification for you.",
   },
+  identity_mfa_password_invalid: {
+    title: "That password didn't match",
+    describe: () =>
+      "Enter the password you sign in to LangWatch with, then try again.",
+  },
   identity_mfa_required_by_organization: {
     title: "An organization you belong to requires two-step verification",
     describe: () =>
       "You can't turn it off while you're a member. Ask an administrator to lift the requirement, or leave the organization first.",
+  },
+  identity_mfa_requirement_not_licensed: {
+    title: "Requiring two-step verification needs the Enterprise plan",
+    describe: () =>
+      "Your organization's plan doesn't include this control. Members can still set two-step verification up on their own accounts. Talk to your account team about upgrading to require it of everybody.",
   },
   identity_mfa_enrollment_required: {
     // Not an authentication failure: nobody is signed out and every other
@@ -2184,6 +2252,31 @@ const presentations = {
     title: "That passkey attempt didn't finish",
     describe: () =>
       "It may have been cancelled or timed out. Try again, or use another way to sign in.",
+  },
+  identity_passkey_already_registered: {
+    title: "That passkey is already on your account",
+    describe: () =>
+      "You can sign in with it now. To add a different one, use another device or security key.",
+  },
+  identity_password_rejected: {
+    title: "That password wasn't accepted",
+    describe: () =>
+      "Choose one of at least 8 characters, with at least one character that is not a space.",
+  },
+  identity_reset_link_invalid: {
+    title: "That password reset link no longer works",
+    describe: () =>
+      "It may have expired or already been used. Request a new one and open the newest email.",
+  },
+  identity_sign_in_refused: {
+    title: "That email or password is wrong",
+    describe: () =>
+      "Check both and try again. If you have forgotten the password, reset it from the sign-in screen.",
+  },
+  identity_identifier_already_held: {
+    title: "That address is already on your account",
+    describe: () =>
+      "You can already sign in with it. To add another way in, use a different address.",
   },
   identity_passkey_not_recognized: {
     // Same answer whether the credential belongs to somebody else or to
@@ -2235,6 +2328,14 @@ const presentations = {
     describe: () =>
       "Approving a domain claim and vouching for a domain are LangWatch's to do. Prove the domain by publishing the record we give you, or contact support.",
   },
+  sso_connection_issuer_not_public: {
+    title: "That issuer address cannot be reached from the internet",
+    // Says what to do and nothing about our network: the rejected string is
+    // the reader's own, and describing what it resolved to would tell a
+    // prober more than it tells an administrator.
+    describe: () =>
+      "Enter the issuer URL your identity provider publishes, starting with https. An address that only works inside a private network cannot be used here.",
+  },
   sso_saml_not_self_serve: {
     title: "SAML connections are set up with us",
     describe: () =>
@@ -2247,6 +2348,24 @@ const presentations = {
     // and that is not necessarily the owner of the address.
     describe: () =>
       "Your workspace administrator has been asked to confirm it. Try again once they have.",
+  },
+  identity_link_proposal_not_found: {
+    title: "That waiting sign-in is no longer there",
+    describe: () =>
+      "It was decided or withdrawn since this page was loaded. Reload the person and look at what is waiting now.",
+  },
+  identity_link_proposal_resolved: {
+    title: "Somebody already decided this sign-in",
+    describe: (error) => {
+      const outcome =
+        str(error, "decidedOutcome", "decided") === "confirmed"
+          ? "confirmed"
+          : "rejected";
+      const by = str(error, "decidedByActorId", "");
+      return by
+        ? `It was ${outcome} by ${by}. Reload the person to see what changed, and talk to them before deciding anything else here.`
+        : `It was ${outcome} already. Reload the person to see what changed.`;
+    },
   },
   identity_jit_disabled: {
     title: "This workspace does not create accounts automatically",
@@ -2263,11 +2382,6 @@ const presentations = {
     describe: () =>
       "Another account already holds it. Sign in with that account, or use a different address here.",
   },
-  identity_engine_unavailable: {
-    title: "We couldn't finish creating your account",
-    describe: () =>
-      "Nothing was created, and we've been alerted. Try again in a moment, and contact support if it keeps happening.",
-  },
 
   // ---- governance ----
   anomaly_rule_not_found: {
@@ -2278,6 +2392,14 @@ const presentations = {
     title: "Ingestion source not found",
     describe: () =>
       "It may have been archived. Reload to see the current list.",
+  },
+  impersonation_cannot_change_credentials: {
+    // A deliberate denial, like the admin-to-admin impersonation one: how an
+    // account signs in belongs to its owner, and support access must never
+    // mint or replace a credential on it.
+    title: "Not available while impersonating",
+    describe: () =>
+      "Leave impersonation first. How this account signs in can only be changed by its owner.",
   },
   ingestion_key_not_found: {
     title: "Ingestion key not found",

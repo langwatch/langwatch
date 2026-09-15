@@ -190,6 +190,47 @@ export const buildSocialProviders = (
 };
 
 /**
+ * The social providers, in the order a sign-in rail draws them, as a map from
+ * the key BetterAuth mounts them under to the id the product dials.
+ *
+ * The two differ for exactly one provider: BetterAuth calls it `microsoft`,
+ * and everything outside better-auth — `NEXTAUTH_PROVIDER`, the `Account`
+ * rows, the callback path customers registered with Azure, the method labels
+ * — has always called it `azure-ad`. `auth-client` maps one to the other at
+ * the moment of the dial; this table is the same pairing, read the other way,
+ * so a method offered by the door carries the id the door knows how to dial.
+ */
+const SOCIAL_PROVIDER_METHOD_IDS: readonly (readonly [string, string])[] = [
+  ["google", "google"],
+  ["github", "github"],
+  ["gitlab", "gitlab"],
+  ["microsoft", "azure-ad"],
+];
+
+/**
+ * The social providers this deployment actually MOUNTED, by the id the
+ * product dials them under, in rail order.
+ *
+ * Derived from `buildSocialProviders` rather than restated beside it, and that
+ * is the whole point: a sign-in door reading this can never offer a button
+ * that dials a provider better-auth never registered. Whatever widens or
+ * narrows what gets mounted — a credential appearing, `NEXTAUTH_PROVIDER`
+ * changing, a provider being added to the builder — moves this answer with it,
+ * in one place.
+ *
+ * It reports what is MOUNTED, never what is LICENSED. ADR-027's gate is a
+ * separate question, asked by the method policy that consumes this.
+ */
+export const configuredSocialProviderIds = (
+  e: SocialProviderEnv,
+): readonly string[] => {
+  const mounted = buildSocialProviders(e);
+  return SOCIAL_PROVIDER_METHOD_IDS.filter(
+    ([betterAuthKey]) => betterAuthKey in mounted,
+  ).map(([, methodId]) => methodId);
+};
+
+/**
  * Forgiving issuer URL parser. Accepts:
  *   - `https://tenant.us.auth0.com/`
  *   - `https://tenant.us.auth0.com` (no trailing slash)
@@ -528,5 +569,11 @@ export const buildGenericOAuthConfigs = (
   return genericOAuthConfigs.map((config) => ({
     ...config,
     accountIssuer: issuerForProviderId(config.providerId),
+    // Auth0 and Okta session MFA evidence comes from their callback ID token.
+    // Refuse those providers at initialization when discovery cannot supply
+    // the issuer and JWKS needed for BetterAuth to verify that proof.
+    ...(config.providerId === "auth0" || config.providerId === "okta"
+      ? { requireIdTokenVerification: true }
+      : {}),
   }));
 };

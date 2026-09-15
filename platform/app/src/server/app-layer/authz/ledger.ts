@@ -75,6 +75,7 @@ import {
 import { NON_AUDITABLE_SOURCES } from "~/server/event-sourcing/pipelines/authz-grants/subscribers/authzAuditTrail.subscriber";
 import { prisma as appPrisma } from "../../db";
 import { RoleDuplicateNameError } from "../../role/errors/role-duplicate-name.error";
+import { BACKGROUND_READ_YOUR_WRITES } from "../_shared/read-your-writes-window";
 import { tryGetApp } from "../app";
 import { organizationOnAuthzEngine } from "./engine-gate";
 import { bumpAuthzEpoch } from "./epoch";
@@ -211,8 +212,23 @@ export function newLedgerCommandId(): string {
   return generate("authzcmd").toString();
 }
 
-const CONVERGENCE_POLL_MS = 150;
-const CONVERGENCE_TIMEOUT_MS = 8_000;
+/**
+ * The grants ledger waits on the background window: eight seconds, the value
+ * it has always used, now named for the reason it is longer than identity's.
+ *
+ * A grant that is read back before its fold has landed is an authorization
+ * answer derived from state the log may not hold, and that is the one class of
+ * wrong answer this system must not give. Waiting costs a job slot; being
+ * wrong costs a permission decision.
+ *
+ * The poll moves 150ms -> 250ms, which over a window this long is at most
+ * thirty-two reads of the same cursor row instead of fifty-three, and no
+ * accuracy: the fold either lands early or is not landing on this timescale.
+ *
+ * @see ../_shared/read-your-writes-window.ts — why this and identity's
+ *      two-second window are two questions rather than one disagreement.
+ */
+const AUTHZ_CONVERGENCE = BACKGROUND_READ_YOUR_WRITES;
 
 export type LedgerBindingAttach = Omit<RoleBindingWrite, "organizationId">;
 
@@ -1542,8 +1558,8 @@ export class GrantsLedgerWriter {
     check: () => Promise<boolean>;
   }): Promise<boolean> {
     const poll = this.deps.poll ?? {
-      intervalMs: CONVERGENCE_POLL_MS,
-      timeoutMs: CONVERGENCE_TIMEOUT_MS,
+      intervalMs: AUTHZ_CONVERGENCE.pollMs,
+      timeoutMs: AUTHZ_CONVERGENCE.timeoutMs,
     };
     // Deadline uses wall-clock time, not `this.now()`: `deps.now` is
     // injectable business time (frozen in tests for deterministic

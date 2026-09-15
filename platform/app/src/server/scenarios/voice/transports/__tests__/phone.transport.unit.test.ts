@@ -15,6 +15,7 @@ import {
   createPhoneTransport,
   PHONE_CONNECT_REJECTED_PREFIX,
   PHONE_NO_BROWSER_CALL_MESSAGE,
+  PHONE_RESPONSE_TAIL_SILENCE_SECONDS,
   phoneTransport,
   resolvePublicBaseUrl,
   TWILIO_MAX_CALL_DURATION_CAP_SECONDS,
@@ -863,6 +864,37 @@ describe("phoneTransport", () => {
 
         await transport.endCall(built);
         expect(disconnect).toHaveBeenCalledTimes(1);
+      });
+
+      /** @scenario "The default phone factory ends the callee's turn on a phone-length pause" */
+      it("the default factory ends the callee's turn on a phone-length pause and leaves the speech gate at the SDK default", () => {
+        expect(PHONE_RESPONSE_TAIL_SILENCE_SECONDS).toBeGreaterThan(0.6);
+
+        const sdkAdapter = {
+          role: AgentRole.AGENT,
+          connect: vi.fn(async () => {}),
+          disconnect: vi.fn(async () => {}),
+          placeCall: vi.fn(async () => {}),
+        };
+        twilioAgentMock.mockReturnValue(sdkAdapter);
+
+        const transport = createPhoneTransport({
+          processEnv: { VOICE_PUBLIC_BASE_URL: "https://voice.example.com" },
+          registerNonce: autoAckRegisterNonce,
+          raceUpgradeRefusal: identityRaceUpgradeRefusal,
+        });
+        transport.createAgentAdapter({
+          agentId: TARGET,
+          credential: TWILIO_CREDENTIAL,
+          maxCallSeconds: 120,
+        });
+
+        expect(
+          (sdkAdapter as unknown as { responseTailSilence: number })
+            .responseTailSilence,
+        ).toBe(PHONE_RESPONSE_TAIL_SILENCE_SECONDS);
+        const opts = twilioAgentMock.mock.calls[0]?.[0];
+        expect(opts).not.toHaveProperty("speechGate");
       });
     });
   });

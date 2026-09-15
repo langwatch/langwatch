@@ -299,14 +299,6 @@ export function createEnvConfig() {
       // ADR-117 §7: the one flag covering the identifier-first router (D03)
       // and the screens that render its decisions (D13). Three-valued and
       // shipped `off`, because the front door is the highest-risk flip in the
-      // identity program: `shadow` computes the router's decision on every
-      // live login and logs how it compares against the legacy outcome
-      // WITHOUT changing anything, `enforce` is the flip, and `off` leaves the
-      // legacy path byte-for-byte untouched. Rollback is this value.
-      IDENTITY_ROUTER_V2: z
-        .enum(["off", "shadow", "enforce"])
-        .optional()
-        .default("off"),
       // D06: whether two-step verification exists at all. Reached SIGNED
       // OUT — a challenge stands between a password and a session — so it is
       // an env flag rather than a feature flag, which is read per project
@@ -318,11 +310,21 @@ export function createEnvConfig() {
       // set one up signed in and their enrollment rows intact — it stops
       // being ASKED for, and nothing is deleted.
       MFA_ENROLLMENT_OPEN: z.enum(["off", "on"]).optional().default("off"),
-      // D07: whether passkeys exist. Same reasoning — registering a passkey
-      // is reached signed out, on the sign-in screen. Off unmounts the
-      // ceremony routes and hides the option; passkeys already registered
-      // are left alone, so turning it on again finds them still there.
-      PASSKEYS_ENABLED: z.enum(["off", "on"]).optional().default("off"),
+      // D07: whether this deployment offers passkeys. Same reasoning as the
+      // flag above for why it is an env value — registering a passkey is
+      // reached signed out, on the sign-in screen — and the opposite default,
+      // because passkeys shipped and are now the shortest and strongest way
+      // in. The setting is for the operator who must refuse them, not a
+      // staged rollout.
+      //
+      // One switch governs the whole surface: `off` omits the method from
+      // every method set AND leaves the plugin unregistered, so its ceremony
+      // routes are not mounted. A deployment where the button exists and the
+      // endpoint does not is the state that arrangement makes unreachable.
+      //
+      // Off is not a deletion. Passkeys already registered are left alone and
+      // nobody is signed out, so turning it back on finds them still there.
+      PASSKEYS_ENABLED: z.enum(["off", "on"]).optional().default("on"),
       // ADR-117 §5: where the router's DOMAIN LOOKUP reads from. Three-valued
       // and shipped `off` for the same reason the router's own flag is: the
       // front door is the highest-risk flip in the identity program.
@@ -425,6 +427,7 @@ export function createEnvConfig() {
       // blocked). Default: false.
       BLOCK_LOCAL_HTTP_CALLS: z.boolean().optional(),
       ALLOWED_PROXY_HOSTS: z.string().optional(),
+      TRUSTED_PROXY_ADDRESSES: z.string().optional(),
       SHOW_OPS_IN_MAIN_SIDEBAR: z.string().optional(),
       // Post-2026-05-11 loop-prevention kill-switch. Set to "1" to
       // bypass the subscriber depth check; emergency rollback only.
@@ -686,7 +689,6 @@ export function createEnvConfig() {
       TOPIC_CLUSTERING_MAX_PAYLOAD_BYTES:
         process.env.TOPIC_CLUSTERING_MAX_PAYLOAD_BYTES,
       LANGWATCH_LICENSE_KEY: process.env.LANGWATCH_LICENSE_KEY,
-      IDENTITY_ROUTER_V2: process.env.IDENTITY_ROUTER_V2,
       MFA_ENROLLMENT_OPEN: process.env.MFA_ENROLLMENT_OPEN,
       PASSKEYS_ENABLED: process.env.PASSKEYS_ENABLED,
       SSOCONN_ROUTING: process.env.SSOCONN_ROUTING,
@@ -731,6 +733,7 @@ export function createEnvConfig() {
         process.env.BLOCK_LOCAL_HTTP_CALLS === "1" ||
         process.env.BLOCK_LOCAL_HTTP_CALLS?.toLowerCase() === "true",
       ALLOWED_PROXY_HOSTS: process.env.ALLOWED_PROXY_HOSTS,
+      TRUSTED_PROXY_ADDRESSES: process.env.TRUSTED_PROXY_ADDRESSES,
       SHOW_OPS_IN_MAIN_SIDEBAR: process.env.SHOW_OPS_IN_MAIN_SIDEBAR,
       LANGWATCH_DISABLE_CAUSALITY_LOOP_GUARD:
         process.env.LANGWATCH_DISABLE_CAUSALITY_LOOP_GUARD,

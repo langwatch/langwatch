@@ -33041,6 +33041,12 @@ export interface operations {
                                 cache_read_input_tokens: number;
                                 cache_creation_input_tokens: number;
                                 reasoning_tokens: number;
+                                /** @description Image tokens billed on the input side, 0 when the request carried no image. Priced at its own rate and disjoint from input_tokens, which never includes it. */
+                                input_image_tokens: number;
+                                /** @description Image tokens the answer was billed for, 0 when the answer held no image. Priced at its own rate and disjoint from output_tokens: an image_generation row reports output_tokens 0 and its render here, so a reconciler reading output_tokens alone sees none of the image traffic. */
+                                output_image_tokens: number;
+                                /** @description Images the request carried, 0 when it carried none. Display only: no rate prices it, so it never belongs in a cost sum. */
+                                image_count: number;
                             };
                             cost: {
                                 /** @description Display value. Decimal string, up to 9 fractional digits, trailing zeros trimmed, never exponent notation. Use nano_usd for arithmetic. */
@@ -33186,6 +33192,12 @@ export interface operations {
                                     cache_read_input_tokens: number;
                                     cache_creation_input_tokens: number;
                                     reasoning_tokens: number;
+                                    /** @description Image tokens billed on the input side, 0 when the request carried no image. Priced at its own rate and disjoint from input_tokens, which never includes it. */
+                                    input_image_tokens: number;
+                                    /** @description Image tokens the answer was billed for, 0 when the answer held no image. Priced at its own rate and disjoint from output_tokens: an image_generation row reports output_tokens 0 and its render here, so a reconciler reading output_tokens alone sees none of the image traffic. */
+                                    output_image_tokens: number;
+                                    /** @description Images the request carried, 0 when it carried none. Display only: no rate prices it, so it never belongs in a cost sum. */
+                                    image_count: number;
                                 } | null;
                                 cost: {
                                     /** @description Display value. Decimal string, up to 9 fractional digits, trailing zeros trimmed, never exponent notation. Use nano_usd for arithmetic. */
@@ -33336,6 +33348,12 @@ export interface operations {
                                 cache_read_input_tokens: number;
                                 cache_creation_input_tokens: number;
                                 reasoning_tokens: number;
+                                /** @description Image tokens billed on the input side, 0 when the request carried no image. Priced at its own rate and disjoint from input_tokens, which never includes it. */
+                                input_image_tokens: number;
+                                /** @description Image tokens the answer was billed for, 0 when the answer held no image. Priced at its own rate and disjoint from output_tokens: an image_generation row reports output_tokens 0 and its render here, so a reconciler reading output_tokens alone sees none of the image traffic. */
+                                output_image_tokens: number;
+                                /** @description Images the request carried, 0 when it carried none. Display only: no rate prices it, so it never belongs in a cost sum. */
+                                image_count: number;
                             };
                             caps: {
                                 budget_id: string;

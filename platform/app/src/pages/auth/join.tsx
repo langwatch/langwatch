@@ -1,7 +1,7 @@
 import { useCallback } from "react";
 import { LoadingScreen } from "~/components/LoadingScreen";
 import { SetupLayout } from "~/components/SetupLayout";
-import { JoinBeforeCreateInterstitial } from "~/features/auth-front-door";
+import { JoinBeforeCreateInterstitial } from "~/features/auth";
 import { useRequiredSession } from "~/hooks/useRequiredSession";
 import { hardRedirect } from "~/utils/hardRedirect";
 

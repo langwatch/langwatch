@@ -83,6 +83,30 @@ Feature: Voice agents: reach an agent by phone
     Then connecting and disconnecting are delegated to the SDK's own adapter
 
   # ---------------------------------------------------------------------------
+  # Turn-taking on the call (#8014 — the caller must get more than one turn)
+  # ---------------------------------------------------------------------------
+  # Twilio streams a frame every 20 ms for the whole call, silence included, and
+  # signals no turn boundary. The SDK adapter gates inbound audio on speech so a
+  # pause reaches the runtime as a gap; the phone transport sets how long that
+  # gap must be before the callee's turn ends. See ADR-131 "Turn-taking".
+
+  @unit
+  Scenario: The default phone factory ends the callee's turn on a phone-length pause
+    Given the default Twilio agent factory builds an adapter for a phone target
+    When the SDK constructs its own adapter for that target
+    Then the adapter is built with the phone transport's response tail-silence, longer than the SDK's default
+    And the SDK's inbound speech gate is left enabled at its default
+
+  @integration @unimplemented
+  # Verified live against a real phone number, not by an automated test — see
+  # the PR's Human verification section.
+  Scenario: A phone call against a talkative callee gives the caller several turns
+    Given a phone target whose callee pauses between sentences
+    When a scenario with a minimum of three turns runs against it
+    Then the callee's turn ends on tail silence, not on the hard ceiling or the hang-up
+    And the simulated caller speaks at least three times on a single trace
+
+  # ---------------------------------------------------------------------------
   # Whole-call audio (#8014 — "they can listen to the whole call")
   # ---------------------------------------------------------------------------
 
@@ -397,3 +421,27 @@ Feature: Voice agents: reach an agent by phone
     Given the worker recorded why its public URL tunnel failed to open
     When the phone transport builds the outbound adapter with no public base URL
     Then the run error names that recorded reason rather than a generic message
+
+  # ---------------------------------------------------------------------------
+  # Inbound call direction (scenario#995, scenario#992 — inbound agents greet on connect)
+  # ---------------------------------------------------------------------------
+
+  @e2e
+  Scenario: An inbound agent that greets on connect opens the call
+    Given a phone target whose agent greets as soon as the call connects
+    And the call direction is set to inbound for that target and saved
+    When a scenario run places the call
+    Then the callee's greeting is recorded as the first turn of the conversation
+    And the simulator's first line is spoken only after the greeting ends, and replies to it
+    And the run completes without the callee asking whether anyone is there
+
+  # ---------------------------------------------------------------------------
+  # Callee transcript in the run conversation (scenario#994)
+  # ---------------------------------------------------------------------------
+
+  @e2e
+  Scenario: Callee turns show their transcript in the run conversation
+    Given a phone target and a scenario that runs several turns
+    When the run finishes and its conversation is viewed
+    Then every callee turn shows an audio player with its transcript beside it, the same way the simulator's turns do
+    And the transcript text matches what the judge was given for that turn
