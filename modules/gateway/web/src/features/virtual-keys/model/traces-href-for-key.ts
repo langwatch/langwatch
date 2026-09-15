@@ -13,11 +13,8 @@ const PRESET_ID = "30d";
 
 /**
  * The period the link opens on: one of the explorer's own presets, or an
- * exact pair of instants for a period it has no preset for.
- *
- * The explorer reads `preset` in preference to `from`/`to`, so the two are
- * a union rather than two optional fields that could contradict each other.
- * Epoch milliseconds, both or neither, matching `parseFragment`.
+ * exact instant pair for one it has none for. A union, not two optional
+ * fields, since the explorer prefers `preset` and the two could contradict.
  */
 export type TracesWindow = { presetId: string } | { fromMs: number; toMs: number };
 
@@ -50,12 +47,9 @@ export function tracesHrefForKey({
 }
 
 /**
- * The link for one key, or undefined when there is nothing worth linking to.
- *
- * `teams` carries only the teams the viewer belongs to, so a destination that
- * does not resolve to a slug is one they cannot open: the target page would
- * bounce them. A deleted destination resolves to nothing worth reading
- * either, since the project serves no traces any more.
+ * The link for one key, or undefined when nothing is worth linking to.
+ * `teams` carries only the viewer's own teams, so an unresolved slug is a
+ * page they'd bounce from; a deleted destination has no traces to read either.
  */
 export function resolveTracesHrefForKey({
   teams,

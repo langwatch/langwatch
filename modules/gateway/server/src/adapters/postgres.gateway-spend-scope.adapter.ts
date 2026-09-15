@@ -1,18 +1,15 @@
 /**
- * Resolve the spend filters that name Postgres records into the ids
- * ClickHouse actually stores (gateway_spend holds only tenant and virtual
- * key ids). A filter that resolves to nothing resolves to an EMPTY list,
- * never "unfiltered" — a team with no projects must answer with no spend,
- * not the organization's entire spend.
+ * Resolve spend filters naming Postgres records into ids ClickHouse stores
+ * (tenant and virtual key ids only). Resolves to nothing → EMPTY list, never
+ * "unfiltered" — a team with no projects answers no spend, not everyone's.
  */
 
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 
 /**
- * Reading every project of an organization is a cheap query that a
- * project-per-customer account runs on every page of every walk. Thirty
- * seconds is long enough to collapse a paging burst and short enough that a
- * project created mid-reconciliation shows up within one page.
+ * Reading every org project is cheap but run on every page of every walk by
+ * a project-per-customer account. Thirty seconds collapses a paging burst
+ * yet is short enough a mid-reconciliation project shows within one page.
  */
 const PROJECT_CACHE_TTL_MS = 30_000;
 /** Bounded so a busy multi-tenant process cannot grow this without limit. */
@@ -24,11 +21,9 @@ interface CachedProjects {
 }
 
 /**
- * The resolver, holding its own cache and its own database.
- *
- * A class rather than module functions over a global client: the cache is
- * per-process state, and two processes composing this over different
- * databases must not share one map keyed only by organization id.
+ * The resolver, holding its own cache and database — a class rather than
+ * module functions over a global client, since two processes composing
+ * this over different databases must not share one org-keyed map.
  */
 export class GatewaySpendScopeAdapter {
   static create(options: { database: PrismaClient }): GatewaySpendScopeAdapter {

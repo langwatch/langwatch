@@ -1,10 +1,8 @@
 import { Temporal } from "@langwatch/time";
 /**
- * Gateway spend: the per-request billing record, projected from the gateway_spend_processing
- * pipeline, one row per REQUEST at its latest lifecycle status, keyed (TenantId,
- * GatewayRequestId) on a ReplacingMergeTree versioned by the fold's monotonic updatedAt — every
- * read here is FINAL since RMT dedup is eventual. CostNanoUSD is the integer of record; costUsd
- * is derived at the read boundary. See migration 00067_create_gateway_spend.sql.
+ * Gateway spend: the per-request billing record, one row per REQUEST at its
+ * latest status, keyed (TenantId, GatewayRequestId) on a ReplacingMergeTree;
+ * every read here is FINAL since RMT dedup is eventual. CostNanoUSD is canonical.
  */
 
 import { createLogger } from "@langwatch/observability";
@@ -304,10 +302,9 @@ export class GatewaySpendEventsRepository extends GatewaySpendEvents {
   }
 
   /**
-   * Org-wide cursor page for the reconciliation pull surface. Ordered ASCENDING by
-   * (EventTimestamp, GatewayRequestId) — EventTimestamp is the fold's replacement version, so
-   * late-restated rows sort after an in-flight cursor and are never skipped. from/to stay
-   * OccurredAt bounds (billing periods are request-time periods).
+   * Org-wide cursor page for reconciliation. Ordered ASCENDING by
+   * (EventTimestamp, GatewayRequestId) so late-restated rows sort after the
+   * cursor, never skipped; from/to stay OccurredAt (request-time) bounds.
    */
   async walkSpendEvents({
     tenantIds,
@@ -368,12 +365,9 @@ export class GatewaySpendEventsRepository extends GatewaySpendEvents {
   }
 
   /**
-   * Windowed end-user rollup: sums the integer nano column, deriving the USD string once. The
-   * reconciliation checksum fast path sums only priced outcomes (confirmed/failed); settled
-   * requests are counted SEPARATELY so unpriced spend stays visible rather than reading as zero,
-   * and admitted rows are excluded. Paged by GROUP KEY ascending, not cost descending — a cost
-   * ordering keeps moving as late folds land, so a key could cross the page boundary and be
-   * served twice or skipped; the group key is immutable, so this walk is exact.
+   * Windowed end-user rollup, summing the integer nano column once. Settled
+   * spend is counted SEPARATELY so it stays visible rather than reading as
+   * zero. Paged by GROUP KEY (immutable), not cost — cost moves as folds land.
    */
   async readSpendSummaries({
     tenantIds,
@@ -674,11 +668,9 @@ export class GatewaySpendEventsRepository extends GatewaySpendEvents {
   }
 
   /**
-   * Tuple comparison over the grouping expressions: the one predicate advancing a multi-dimension
-   * walk without serving a boundary group twice. A cursor whose arity mismatches the grouping
-   * names a different shape and is refused — dropping the predicate instead would silently reset
-   * to page one, letting a reconciliation fold the same groups twice. The REST boundary refuses
-   * this before the read, so reaching here is a caller bug.
+   * Tuple comparison over the grouping expressions, advancing a multi-dimension
+   * walk without serving a boundary group twice. Arity mismatch is refused,
+   * not dropped — dropping it would silently reset to page one.
    */
   private static summariesWalkClause({
     cursor,
@@ -776,12 +768,9 @@ export class GatewaySpendEventsRepository extends GatewaySpendEvents {
   }
 
   /**
-   * Quantities a spend row carries, or null if it measured nothing. Non-token columns are read
-   * straight off the raw row, not through {@link mapSpendEventRow} (which shapes REST/UI
-   * responses) — the fold needs them regardless, since a late admission folding over a confirmed
-   * request rewrites the whole row, and a quantity that doesn't decode here zeroes on the next
-   * write. Any measured quantity counts as usage, not tokens alone (e.g. a character-priced call
-   * has zero tokens and 4000 characters).
+   * Quantities a spend row carries, or null if it measured nothing, read off
+   * the raw row since a late admission rewrites it whole. Usage isn't tokens
+   * alone — a character-priced call has zero tokens, thousands of characters.
    */
   private static foldUsage(row: SpendEventRow, raw: Record<string, unknown>): SpendUsage | null {
     const quantity = (column: string): number => Number(raw[column] ?? 0);

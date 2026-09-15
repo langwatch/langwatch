@@ -15,10 +15,9 @@ function providerModels(provider: OrgModelProvider | undefined): string[] {
 }
 
 /**
- * One provider row of the access section: the checkbox, the origin
- * chips, and the expandable per-model restriction list. Model
- * restrictions are keyed by vendor wire id (`vendor/model`), so two
- * rows of the same vendor render one shared restriction.
+ * One provider row: checkbox, origin chips, expandable per-model
+ * restriction list. Restrictions are keyed by vendor wire id
+ * (`vendor/model`), so two rows of the same vendor share one restriction.
  */
 export function ProviderRow({
   mp,

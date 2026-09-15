@@ -1,9 +1,7 @@
 /**
  * @vitest-environment jsdom
- *
- * RTL coverage for the webhook endpoint drawer: registry-driven checkbox
- * grouping, the family wildcard locking its children, the not-yet-emitting
- * label, and the save payload; plus the secret dialog's shown-once framing.
+ * RTL coverage: registry-driven checkbox grouping, family wildcard locking
+ * children, not-yet-emitting label, save payload, secret shown-once dialog.
  */
 import { cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";

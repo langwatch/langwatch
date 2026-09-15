@@ -1,8 +1,7 @@
 /**
- * The AI Gateway's portable capability: the operations a process's own doors
- * call, and the one budget-resolution read the spend graph makes into this
- * module. It replaces the abstract `GatewayService` the contract used to
- * carry - an interface plus its token, never a class to inherit from.
+ * The AI Gateway's portable capability: operations a process's own doors
+ * call, plus the one budget-resolution read the spend graph makes. Replaces
+ * the abstract `GatewayService` — an interface plus its token, not a class.
  */
 import { moduleApi } from "@langwatch/runtime-composition";
 import type { Instant } from "@langwatch/time";
@@ -281,8 +280,7 @@ export interface GatewayApi {
 
   /**
    * Organization keys narrowed to what this person can see. Visibility is
-   * membership-based, not permission-based: a caller sees a key when one of
-   * its scopes intersects their membership set, so a non-member gets an empty
+   * membership-based, not permission-based, so a non-member gets an empty
    * list rather than a refusal.
    */
   listVisibleVirtualKeys(input: {
@@ -311,10 +309,9 @@ export interface GatewayApi {
     id: string;
   }): Promise<GatewayVirtualKeyRecord>;
   /**
-   * Keys a PROJECT CREDENTIAL may see on a page: org-scoped keys, its own
-   * team's, its own project's -- never a sibling team's. Applied to the page,
-   * not the query, so a page can be shorter than `limit` without the walk
-   * being done.
+   * Keys a PROJECT CREDENTIAL may see on a page: org-scoped, its own team's,
+   * its own project's — never a sibling team's. Applied to the page, not the
+   * query, so a page can be shorter than `limit` without the walk done.
    */
   visibleToProjectCredential(input: {
     project: { id: string };
@@ -428,9 +425,8 @@ export interface GatewayApi {
 
   /**
    * One page of the spend-event ledger for a project, newest first, with
-   * virtual-key names resolved for display. Answers null when this
-   * deployment has no ClickHouse spend source, so a door renders the
-   * disabled state rather than an empty page.
+   * virtual-key names resolved. Answers null with no ClickHouse spend
+   * source, so a door renders disabled rather than an empty page.
    */
   findSpendEventsPage(input: {
     projectId: string;

@@ -80,9 +80,8 @@ export function formatResetDay(resetsAt: string | null): string | null {
 
 /**
  * How much of a budget is spent, and the two thresholds every surface
- * judges it by. One definition: the progress bar's colour, the /me
- * banners and anything else that reacts to a budget filling up must
- * agree, or the bar turns red while the banner still says "approaching".
+ * judges it by — one definition, or the progress bar could turn red while
+ * a /me banner still says "approaching".
  */
 export function budgetPctUsed(item: BudgetOverviewItemView): number {
   const limit = Number.parseFloat(item.limitUsd);

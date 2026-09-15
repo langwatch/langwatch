@@ -1,7 +1,6 @@
 /**
  * @vitest-environment node
- * Real Postgres + real internal auth route. Reversible disable/enable: the state machine (grace
- * preservation, revoke terminality) and the distinct rejection a disabled key's traffic gets.
+ * Real Postgres + real auth: disable/enable state machine, disabled key's rejection.
  * Spec: specs/ai-gateway/virtual-key-lifecycle.feature
  */
 

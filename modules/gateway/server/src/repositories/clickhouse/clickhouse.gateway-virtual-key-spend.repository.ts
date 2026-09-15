@@ -1,10 +1,8 @@
 import { Temporal } from "@langwatch/time";
 /**
- * Per-virtual-key spend, read from the cost path rather than the budget ledger: the ledger only
- * holds rows for keys with an applicable budget, so it reports $0.00 for uncapped keys and
- * double-counts doubly-capped ones. trace_summaries carries per-trace cost plus
- * langwatch.virtual_key_id on every span — the same store the product bills from. Dedup: RMT
- * keyed (TenantId, TraceId), collapsed with argMax(..., UpdatedAt) before summing.
+ * Per-virtual-key spend, read from the cost path, not the budget ledger:
+ * that only holds rows for keys with a budget, so it $0.00s uncapped keys
+ * and double-counts doubly-capped ones. RMT deduped via argMax(UpdatedAt).
  */
 import { createLogger } from "@langwatch/observability";
 
@@ -32,11 +30,9 @@ export class GatewayVirtualKeySpendRepository implements GatewayVirtualKeySpend 
   }
 
   /**
-   * Spend per key over a window, summed across the given project tenants (plural, because a
-   * key's traces land in whichever project resolved as its trace destination — org/team-scoped
-   * keys land in the org's governance project, not whatever an admin is looking at; reading a
-   * single tenant is how those keys showed nothing). Keys with no traffic are absent from the
-   * result; callers render $0.00 for them.
+   * Spend per key over a window, summed across given project tenants
+   * (plural: org/team-scoped keys land in the org's governance project, not
+   * whatever an admin is viewing). Keys with no traffic are absent; $0.00.
    */
   async spendByVirtualKey(args: {
     tenantIds: string[];
@@ -116,10 +112,9 @@ export class GatewayVirtualKeySpendRepository implements GatewayVirtualKeySpend 
   }
 
   /**
-   * The Usage tab's slices (per key/model/day, totals, blocked count), aggregated in one grouped
-   * ClickHouse query over deduped traces so every slice stays consistent and bounded by keys x
-   * models x days, not by traffic — a busy project's 90-day window is millions of traces but
-   * only a page of buckets.
+   * The Usage tab's slices (per key/model/day, totals, blocked count), one
+   * grouped ClickHouse query over deduped traces, bounded by keys x models x
+   * days, not traffic — a busy 90-day window is millions of traces, one page.
    */
   async usageBuckets(args: {
     tenantIds: string[];

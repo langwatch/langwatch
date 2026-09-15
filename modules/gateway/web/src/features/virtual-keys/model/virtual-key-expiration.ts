@@ -27,10 +27,9 @@ export const VIRTUAL_KEY_EXPIRATION_OPTIONS: readonly {
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
 /**
- * The instant the chosen option means, or null for a key that never expires.
- *
- * Returns null for a custom option with no date yet, so a half-filled form
- * asks for nothing rather than sending a date nobody typed.
+ * The instant the chosen option means, or null for a key that never expires,
+ * or for a custom option with no date yet, so a half-filled form asks for
+ * nothing rather than sending a date nobody typed.
  */
 export function resolveExpiresAt({
   preset,
@@ -76,21 +75,18 @@ export function dateInputValue(at: Instant): string {
 }
 
 /**
- * The earliest day the date input accepts: tomorrow.
- *
- * Today is refused rather than accepted-and-then-rejected. A key that
- * expires at the end of today is legal by the server's rule, but a date
- * picker whose smallest useful answer is "in a few hours" reads as broken.
+ * The earliest day the date input accepts: tomorrow. Today is refused rather
+ * than accepted-and-then-rejected — legal by the server's rule, but a picker
+ * whose smallest useful answer is "in a few hours" reads as broken.
  */
 export function earliestCustomDate(now: Instant = nowInstant()): string {
   return dateInputValue(now.add({ milliseconds: MS_PER_DAY }));
 }
 
 /**
- * The date in words, for the line under the select: "Thu, Aug 20, 2026".
- *
- * UTC, like everything else here, so the sentence names the day that was
- * picked rather than the one the reader's timezone rolls it into.
+ * The date in words, for the line under the select: "Thu, Aug 20, 2026", in
+ * UTC like everything else here, so it names the day that was picked rather
+ * than the one the reader's timezone rolls it into.
  */
 export function formatExpiry(at: Instant): string {
   return readableDate(at).toLocaleDateString("en-US", {
@@ -103,11 +99,9 @@ export function formatExpiry(at: Instant): string {
 }
 
 /**
- * The option that reproduces a stored date.
- *
- * Always "custom": a relative period cannot round-trip, because "7 days"
- * meant seven days from the moment it was saved and reopening the drawer
- * a week later would silently re-arm it.
+ * The option that reproduces a stored date: always "custom". A relative
+ * period cannot round-trip — "7 days" meant seven days from when it was
+ * saved, and reopening the drawer a week later would silently re-arm it.
  */
 export function expirationStateFromStored(expiresAt: string | Instant | null): {
   preset: VirtualKeyExpirationPreset;
@@ -124,10 +118,9 @@ export function expirationStateFromStored(expiresAt: string | Instant | null): {
 }
 
 /**
- * Why the expiration choice cannot be submitted yet, or null.
- *
- * The one incomplete state a date field has is "Custom date" with no day
- * typed. Every other option already carries its own answer.
+ * Why the expiration choice cannot be submitted yet, or null. The one
+ * incomplete state a date field has is "Custom date" with no day typed;
+ * every other option already carries its own answer.
  */
 export function expiryIncompleteReason({
   preset,
@@ -143,11 +136,9 @@ export function expiryIncompleteReason({
 }
 
 /**
- * The complaint to paint under the expiration field, or null.
- *
- * A rejected date is the one failure a drawer can point at, so it goes on
- * the field rather than into a toast the reader has to map back to a form
- * they are still looking at. Anything else is somebody else's error.
+ * The complaint to paint under the expiration field, or null. A rejected
+ * date is the one failure a drawer can point at, rather than a toast the
+ * reader must map back to a form; anything else is somebody else's error.
  */
 export function expiryFieldErrorFrom(error: unknown): string | null {
   const handled = readHandledError(error);
@@ -164,10 +155,8 @@ export function expiryFieldErrorFrom(error: unknown): string | null {
 
 /**
  * Whether a key's date has passed, which is what every badge derives from.
- *
- * Status is not consulted: an expired key is still ACTIVE on the wire, and
- * a revoked or disabled one has a stop of its own to report first. Callers
- * decide the precedence; this answers the one question.
+ * Status is not consulted: an expired key is still ACTIVE on the wire, and a
+ * revoked or disabled key reports its own stop; callers decide precedence.
  */
 export function isExpired(
   expiresAt: string | Instant | null | undefined,

@@ -1,6 +1,5 @@
 /**
  * @vitest-environment jsdom
- *
  * The list's destination column: what an operator reads to tell one
  * endpoint's transport from another's at a glance.
  */

@@ -266,9 +266,8 @@ function useDeliveriesDrawerData(organizationId: string, endpoint: EndpointView 
 
 /**
  * Read-only delivery history for one endpoint: the health strip on top,
- * then one row per attempt with the receiver's own status code, latency,
- * and error excerpt. The rows are the WebhookEndpointDelivery log the
- * delivery process manager records on every attempt.
+ * then one row per attempt (status code, latency, error excerpt) — the
+ * WebhookEndpointDelivery log the delivery process manager records.
  */
 export function WebhookDeliveriesDrawer({
   organizationId,

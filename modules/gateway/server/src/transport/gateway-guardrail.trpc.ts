@@ -1,7 +1,6 @@
 /**
- * The server half of `gatewayGuardrails.*`: the administrative surface behind
- * /gateway/guardrails. A virtual key opts in through
- * `config.guardrailAttachments[]`.
+ * The server half of `gatewayGuardrails.*`: the administrative surface
+ * behind /gateway/guardrails; a key opts in via `config.guardrailAttachments[]`.
  * Spec: specs/ai-gateway/governance/guardrails-project-scope.feature
  */
 import { defineTrpcRouter } from "@langwatch/api/trpc";

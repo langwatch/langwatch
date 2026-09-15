@@ -1,7 +1,6 @@
 /**
  * @vitest-environment jsdom
- * Tests virtual key creation drawer: ownership, budget, providers, failover.
- * Real component tree, network mocked only.
+ * Ownership, budget, providers, failover — real component tree, network mocked only.
  * Spec: specs/ai-gateway/virtual-key-creation.feature
  */
 import type { Instant } from "@langwatch/time";
@@ -117,9 +116,8 @@ vi.mock("../../../behavior/gateway-api.ts", () => ({
 }));
 
 /**
- * The application the drawer is mounted in: one organization with one team and
- * one project, an admin, and a signed-in reader whose id a personal key is
- * stamped with. Answers what the platform suite mocked out of
+ * The application the drawer is mounted in: one org, one team, one project,
+ * an admin, and a reader whose id a personal key is stamped with. Answers
  * `useOrganizationTeamProject` and `useRequiredSession`.
  */
 const host = fakeGatewayHost({

@@ -155,10 +155,9 @@ export type GatewayVirtualKeyScope = {
 export type ScopeInput = GatewayVirtualKeyScope;
 
 /**
- * A key with the joins every read of it carries: the scopes it is reachable
- * from, the person it acts for, and the routing policy it fails over through.
- * `metadata` and `config` stay unknown here - both are customer-authored Json
- * that only the parsers in this package are allowed to interpret.
+ * A key with the joins every read carries: the scopes it's reachable from,
+ * who it acts for, and its routing policy fallback. `metadata`/`config`
+ * stay unknown — customer-authored Json only this package's parsers may read.
  */
 export type GatewayVirtualKeyRecord = {
   id: string;

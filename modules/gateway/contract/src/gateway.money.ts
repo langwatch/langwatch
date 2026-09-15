@@ -4,11 +4,9 @@
  */
 
 /**
- * What every `_usd` display string on this surface promises.
- *
- * Published on each field so the generated document STATES the format instead
- * of leaving a caller to infer it from examples. A `z.string()` on its own
- * documents a money field as "some text".
+ * What every `_usd` display string on this surface promises. Published on
+ * each field so the document STATES the format rather than a caller
+ * inferring it from examples — a bare `z.string()` says "some text".
  */
 export const USD_DISPLAY_STRING_FORMAT =
   "Decimal string, up to 9 fractional digits, trailing zeros trimmed, never exponent notation.";
@@ -20,11 +18,9 @@ const NANO_PER_USD = 1_000_000_000n;
 const NANO_DIGITS = 9;
 
 /**
- * `[sign][whole][.fraction][e[sign]exponent]`.
- *
- * Exponent notation is accepted because ClickHouse's `toString` of a `Float64`
- * emits it for small sums, and a sub-cent spend is exactly the amount this
- * surface has to render.
+ * `[sign][whole][.fraction][e[sign]exponent]`. Exponent notation is accepted
+ * because ClickHouse's `toString` of a `Float64` emits it for small sums —
+ * exactly the sub-cent spend this surface has to render.
  */
 const DECIMAL_PATTERN = /^([+-]?)(\d*)(?:\.(\d*))?(?:[eE]([+-]?\d+))?$/;
 

@@ -78,9 +78,8 @@ export function EligibleModelProvidersPreview({
   routingPolicyProviderIds?: string[] | null;
   /**
    * When provided, rows render as clickable. Clicking writes the
-   * provider's vendor-prefixed default model back via the callback
-   * (e.g. `anthropic/claude-sonnet-4-5`) so a parent code-example
-   * surface can rewrite its `model="..."` line.
+   * provider's vendor-prefixed default model back via the callback (e.g.
+   * `anthropic/claude-sonnet-4-5`) so a parent can rewrite `model="..."`.
    */
   selectedModel?: string;
   onSelectProviderModel?: (model: string) => void;

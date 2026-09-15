@@ -42,12 +42,9 @@ const DIMENSION_COPY: Record<
 };
 
 /**
- * Deny and allow rules per dimension, collapsed when there are none.
- *
- * Collapsing is the empty-state behavior only. Hiding rules an operator has
- * already configured would be a footgun: a policy that refuses traffic should
- * say so where it is edited, so the trigger carries the count and the section
- * opens itself whenever anything is set.
+ * Deny and allow rules per dimension, collapsed only when there are none.
+ * Hiding configured rules would be a footgun — a refusing policy should
+ * say so where it's edited, so the section opens itself when anything is set.
  */
 export function RestrictionsSection({
   control,
@@ -59,12 +56,10 @@ export function RestrictionsSection({
   const restrictions = useWatch({ control, name: "restrictions" });
   const ruleCount = countRestrictions({ restrictions });
 
-  // Controlled, not defaultValue. The form is reset once the policy query
-  // resolves, so an existing policy's rules arrive after the first render.
-  // With defaultValue the section would still be sitting closed over them,
-  // which is the exact footgun collapsing is supposed to avoid. The operator
-  // can still close it: openedFor remembers the count that opened it, so a
-  // deliberate close is not undone on the next keystroke.
+  // Controlled, not defaultValue: the form resets after the policy query
+  // resolves, so rules arrive after the first render and defaultValue would
+  // sit closed over them. openedFor remembers the count that opened it, so
+  // a deliberate close survives the next keystroke.
   const [open, setOpen] = useState<string[]>([]);
   const [openedFor, setOpenedFor] = useState(0);
   if (ruleCount > 0 && openedFor === 0) {

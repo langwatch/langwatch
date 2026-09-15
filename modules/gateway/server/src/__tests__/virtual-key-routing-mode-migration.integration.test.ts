@@ -1,6 +1,7 @@
 /**
  * @vitest-environment node
- * Real Postgres, replaying the shipped migration: routingMode made the old implicit "null = fall back everywhere" explicit, with NONE as the safer default for new keys only. Spec: specs/ai-gateway/fallback.feature
+ * Real Postgres: routingMode's implicit null-fallback made explicit; NONE is the new default.
+ * Spec: specs/ai-gateway/fallback.feature
  */
 import { readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";

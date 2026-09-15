@@ -13,12 +13,9 @@ function formatLabel(option: ProviderCredentialOption): string {
 }
 
 /**
- * Ordered multi-select for the providers a policy routes through. The order
- * is the order the gateway tries them in.
- *
- * A dropdown of the organization's configured providers by name rather than a
- * free-text field: the underlying value is an opaque identifier, and every
- * hand-typed one was a rejected save.
+ * Ordered multi-select for the providers a policy routes through, in gateway
+ * try-order. A dropdown by name, not free text: the value is an opaque
+ * identifier, and every hand-typed one was a rejected save.
  */
 export function ProviderCredentialPicker({
   selectedIds,

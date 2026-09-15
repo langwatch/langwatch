@@ -1,10 +1,9 @@
 /**
- * `/api/gateway/v1`, through the real `gatewayPlatformRest` declaration mounted on a
- * package-local runtime. Finding H12: the family is a PROJECT door, so its declared
- * permission resolves at the caller's own project, while every by-id budget/cache-rule write
- * widens to the organization before writing — authorized where it acts.
+ * `/api/gateway/v1`, real declaration. Finding H12: a PROJECT-door family
+ * resolves at the caller's project; by-id writes widen to the org first.
  * @see specs/security/resource-scope-permission-checks.feature
  */
+
 // @vitest-environment node
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import {

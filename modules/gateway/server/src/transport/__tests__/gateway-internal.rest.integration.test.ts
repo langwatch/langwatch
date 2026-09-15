@@ -1,9 +1,7 @@
 /**
  * @vitest-environment node
- * The Go data plane's door into this process, driven over real HTTP against
- * the family's declaration: the HMAC gate, change feed, spend batch and
- * guardrail verdict. Spec: specs/ai-gateway/gateway-health.feature,
- * guardrail-check-endpoint.feature, billing-spend-events.feature
+ * The Go data plane's door: HMAC gate, change feed, spend batch, guardrail verdict, real HTTP.
+ * Spec: specs/ai-gateway/gateway-health.feature
  */
 import type { SingleEvaluationResult } from "@langwatch/evaluator-contract";
 import type { GatewayGuardrailBundleEntry, GatewayGuardrailResource } from "@langwatch/gateway-contract";

@@ -1,9 +1,7 @@
 /**
  * Product-managed virtual keys (`purpose != USER` — today the Langy VK) are
- * provisioned and owned by the product, not the customer. The settings UI
- * badged and locked them, but that was presentation only: the tRPC router
- * and its public REST twin both reach the same service, and the service let
- * every by-id mutation through.
+ * owned by the product, not the customer. The settings UI badged and locked
+ * them, but that was presentation only — the service let every mutation through.
  */
 
 import { Temporal, toDate } from "@langwatch/time";

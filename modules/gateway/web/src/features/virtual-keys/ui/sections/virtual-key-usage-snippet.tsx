@@ -17,10 +17,9 @@ import { resolveSnippetGatewayBaseUrl } from "../../model/gateway-snippet-url.ts
 
 export type VirtualKeyUsageSnippetProps = {
   /**
-   * The VK secret to embed in the curl snippet. When omitted the
-   * snippets fall back to the `$LANGWATCH_VK_SECRET` env-var pattern
-   * — which is what you want on detail pages and from the 3-dots
-   * menu, where the raw secret is no longer retrievable.
+   * The VK secret to embed in the curl snippet. Omitted falls back to the
+   * `$LANGWATCH_VK_SECRET` env-var pattern — right for detail pages and the
+   * 3-dots menu, where the raw secret is no longer retrievable.
    */
   secret?: string;
   /**
@@ -31,11 +30,9 @@ export type VirtualKeyUsageSnippetProps = {
   /** Heading shown above the language selector. */
   title?: string;
   /**
-   * Model string embedded in every snippet's chat-completions call, in
-   * resolver-safe `vendor/model` form (e.g. `custom/Qwen2.5-0.5B-Instruct`).
-   * Callers thread the key's first eligible provider so the example names a
-   * model the key can actually serve. Falls back to `gpt-5-mini` only as a
-   * placeholder when the caller has no provider context.
+   * Model string embedded in every snippet's call, `vendor/model` form (e.g.
+   * `custom/Qwen2.5-0.5B-Instruct`). Callers thread the key's first eligible
+   * provider; `gpt-5-mini` is only the placeholder with no provider context.
    */
   model?: string;
 };
@@ -51,10 +48,9 @@ interface TabItem {
 }
 
 /**
- * Copy-paste integration snippets for a LangWatch virtual key, showing
- * Python/TypeScript/Go/cURL examples for the OpenAI SDK baseURL pattern.
- * The real default is the key's first eligible provider; gpt-5-mini is only
- * the fallback.
+ * Copy-paste integration snippets for a virtual key: Python/TypeScript/Go/
+ * cURL examples for the OpenAI SDK baseURL pattern. The real default is the
+ * key's first eligible provider; gpt-5-mini is only the fallback.
  */
 export function VirtualKeyUsageSnippet({
   secret,

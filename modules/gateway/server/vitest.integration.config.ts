@@ -3,8 +3,7 @@ import { defineConfig } from "vitest/config";
 /**
  * Integration lane: `*.integration.test.ts` under `src/`, excluded from the
  * unit lane. Needs Postgres (`DATABASE_URL`) and ClickHouse
- * (`CI_CLICKHOUSE_URL`/`TEST_CLICKHOUSE_URL`) — the virtual-key and budget
- * suites assert against real rows.
+ * (`CI_CLICKHOUSE_URL`/`TEST_CLICKHOUSE_URL`) for real-row assertions.
  */
 export default defineConfig({
   test: {

@@ -4,11 +4,9 @@ import { z } from "zod";
 export const gatewayGuardrailDirectionSchema = z.enum(["PRE", "POST", "STREAM_CHUNK"]);
 
 /**
- * The directions the Go data plane sends, per contract 4.6. Deliberately NOT
- * the stored Prisma values above: the wire contract and the storage enum are
- * separate vocabularies, and conflating them is what broke the guardrail check
- * endpoint before. In the contract because the internal REST family parses a
- * request with them and the evaluation service maps them back.
+ * The directions the Go data plane sends, per contract 4.6 — deliberately
+ * NOT the stored Prisma values: conflating the two vocabularies is what
+ * broke the guardrail check endpoint before. The REST family parses these.
  */
 export const GUARDRAIL_WIRE_DIRECTIONS = ["request", "response", "stream_chunk"] as const;
 

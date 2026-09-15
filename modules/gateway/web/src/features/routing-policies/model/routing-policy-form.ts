@@ -122,10 +122,9 @@ export function routingPolicyToFormValues(policy: StoredRoutingPolicy): RoutingP
 }
 
 /**
- * The model name mapping as the gateway will see it: the tiers a policy names
- * a target for, plus every ordinary mapping. A tier left blank is absent, so
- * it falls through to the default model at materialization rather than being
- * pinned to an empty string here.
+ * The model name mapping as the gateway will see it: named tiers plus every
+ * ordinary mapping. A blank tier is absent, falling through to the default
+ * model at materialization rather than pinned to an empty string here.
  */
 export function modelAliasesFromForm(values: RoutingPolicyFormValues): Record<string, string> {
   const aliases: Record<string, string> = {};

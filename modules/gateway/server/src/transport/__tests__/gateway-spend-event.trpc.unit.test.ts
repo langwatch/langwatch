@@ -1,10 +1,7 @@
 /**
  * @vitest-environment node
- *
- * The `gatewaySpendEvents.list` transport: it is a thin handler over
- * {@link GatewayApp.findSpendEventsPage}, so this file pins only the wiring -
- * the declared scope and the shape it hands back - leaving the assembly
- * itself to `gateway-spend-events-page.unit.test.ts`.
+ * The `gatewaySpendEvents.list` transport is a thin handler over
+ * `GatewayApp.findSpendEventsPage`, pinning only the wiring and shape.
  */
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import { createTrpcRuntime, type TrpcRuntimePorts } from "@langwatch/api/trpc";

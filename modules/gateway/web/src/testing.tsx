@@ -38,10 +38,9 @@ export type GatewayHostRecording = {
   navigations: string[];
   queries: { next: GatewayQuery; replace: boolean }[];
   /**
-   * RECORDED RATHER THAN SPELLED. The `drawer.` vocabulary is the composing
-   * application's — its adapter writes `?drawer.open=<name>` plus one
-   * `drawer.<key>` per parameter, and its own suite pins that. What this
-   * package can state is WHICH overlay a click asked for, and with what.
+   * RECORDED RATHER THAN SPELLED: the `drawer.` vocabulary is the composing
+   * application's, pinned by its own suite. This package states only WHICH
+   * overlay a click asked for, and with what.
    */
   drawerOpens: RecordedGatewayDrawerOpen[];
   successes: GatewaySuccessNotice[];
@@ -282,10 +281,9 @@ function GatewayHostHarness({ host, children }: { host: FakeGatewayHost; childre
 }
 
 /**
- * jsdom ships neither of these, and both are reached by Chakra's overlays on
- * the way to positioning themselves. A missing `ResizeObserver` surfaces as an
- * unhandled rejection out of an animation frame rather than as a failure, so
- * the shard fails with its own summary all green.
+ * jsdom ships neither of these; both are reached by Chakra's overlays while
+ * positioning. A missing `ResizeObserver` surfaces as an unhandled rejection
+ * from an animation frame, not a failure — the shard fails green.
  */
 function installBrowserApisJsdomLacks(): void {
   if (typeof window === "undefined") return;

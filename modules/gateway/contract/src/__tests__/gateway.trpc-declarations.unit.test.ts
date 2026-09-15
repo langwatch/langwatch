@@ -1,10 +1,7 @@
 /**
  * @vitest-environment node
- *
- * The wire the browser already calls, pinned as a declaration: the namespace
- * each contract mounts under, the procedures inside it, and whether each one
- * reads or writes. A rename here is a client-breaking change, and this is
- * where it has to be made deliberately.
+ * The wire the browser already calls: namespace, procedures, and read/write
+ * per procedure. A rename here is a deliberate client-breaking change.
  */
 import { describe, expect, it } from "vitest";
 

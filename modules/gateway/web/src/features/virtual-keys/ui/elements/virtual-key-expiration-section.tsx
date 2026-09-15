@@ -22,12 +22,9 @@ export const NEVER_EXPIRES: VirtualKeyExpirationValue = {
 };
 
 /**
- * The expiration block both virtual-key drawers end with.
- *
- * One component rather than two copies, because the create and edit forms
- * have to mean the same thing by the same words: the period picked here
- * resolves through the same rules on both, and the resolved date is stated
- * back either way so nobody has to work out what "6 months" lands on.
+ * The expiration block both virtual-key drawers end with. One component,
+ * not two copies: create and edit resolve the same period through the same
+ * rules, and the resolved date is stated back so "6 months" is never a guess.
  */
 export function VirtualKeyExpirationSection({
   value,
@@ -43,14 +40,10 @@ export function VirtualKeyExpirationSection({
     () => resolveExpiresAt({ preset: value.preset, customDate: value.customDate }),
     [value.preset, value.customDate],
   );
-  // Recomputed every render rather than memoised once, so the floor tracks
-  // the clock while the drawer stays open. The floor sits a whole day ahead,
-  // which absorbs a single UTC-day boundary: the stale value then names today,
-  // and today still resolves to 23:59:59.999Z, which the server accepts. It
-  // takes a drawer left open for more than a day before the stale floor names
-  // a date already gone, which the server refuses with
-  // virtual_key_expiry_in_past. Any interaction re-renders and brings it
-  // current.
+  // Recomputed every render, not memoised: the floor tracks the clock while
+  // the drawer stays open. It sits a day ahead to absorb a UTC-day boundary,
+  // so only a drawer left open over a day could name an already-gone date
+  // (refused as virtual_key_expiry_in_past); any interaction re-renders it.
   const minDate = earliestCustomDate();
 
   return (

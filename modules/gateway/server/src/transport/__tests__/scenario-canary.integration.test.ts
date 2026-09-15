@@ -1,10 +1,8 @@
 /**
  * @vitest-environment node
  * @see specs/scenarios/scenario-canary-healthcheck.feature
- * Route-level proof for `GET /api/health/scenarios`: auth, a busy 429, and a
- * healthy/unhealthy outcome map onto the documented response shape. Retry/budget
- * logic is unit-tested separately; this file mocks `runScenarioHealthCanary` as
- * the one boundary this route crosses.
+ * Route-level proof for `GET /api/health/scenarios`: auth, a busy 429, and
+ * healthy/unhealthy outcomes; only `runScenarioHealthCanary` itself is mocked.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 

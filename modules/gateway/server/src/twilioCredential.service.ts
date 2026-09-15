@@ -32,11 +32,8 @@ async function twilioKeys(
 
 /**
  * The id of the enabled Twilio provider row a project can reach, or null.
- *
- * A run resolves its credential in two steps: this finds the row that dials
- * the project's phone targets, and {@link getTwilioCredential} reads the keys
- * off it. The lookup uses the same scope chain (org, team, project) every
- * other provider read does.
+ * A run resolves credentials in two steps: this finds the row,
+ * {@link getTwilioCredential} reads its keys, same scope chain as any provider.
  */
 export async function findTwilioProviderForProject({
   projectId,
@@ -50,10 +47,9 @@ export async function findTwilioProviderForProject({
 }
 
 /**
- * The account SID, auth token and from-number to dial a phone target with, or
- * null when the row is not a Twilio row or any of the three is missing. All
- * three are required to place a call, so a half-configured row resolves to null
- * rather than reaching Twilio with an empty field.
+ * The account SID, auth token and from-number to dial with, or null if not
+ * a Twilio row or any of the three is missing. All three are required, so a
+ * half-configured row resolves to null rather than an empty field to Twilio.
  */
 export async function getTwilioCredential({
   modelProviderId,

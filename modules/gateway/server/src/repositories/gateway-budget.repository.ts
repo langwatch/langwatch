@@ -152,11 +152,9 @@ export abstract class GatewayBudgetRepository {
     virtualKeyProjectScopes: GatewayVirtualKeyProjectScope[],
   ): Promise<Map<string, GatewayBudgetScopeTarget>>;
   /**
-   * The attributed-user budget templates an end user's caps are read from,
-   * and the bucket boundaries that say when each one's period started.
-   *
-   * Two reads rather than one join: the boundaries are keyed by budget AND
-   * bucket scope, and only the caller knows which bucket an end user falls in.
+   * The attributed-user budget templates an end user's caps read from, and
+   * the bucket boundaries for when each period started. Two reads, not one
+   * join: boundaries key by budget AND bucket scope, which only the caller knows.
    */
   abstract findAttributedUserTemplates(input: {
     organizationId: string;

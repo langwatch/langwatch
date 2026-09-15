@@ -257,10 +257,9 @@ export type BudgetCheckResult = {
 };
 
 /**
- * The client slice the whole budget chain binds to — its own writes plus the audit,
- * change-feed, reach, resolution and scope-target repositories it builds. Stated here so the
- * composition adapter can declare what Gateway persistence needs without importing the
- * generated client declaration itself.
+ * The client slice the whole budget chain binds to — its own writes plus the
+ * audit, change-feed, reach, resolution and scope-target repositories, so the
+ * composition adapter can declare this without importing the generated client.
  */
 export type GatewayBudgetDatabase = Pick<
   PrismaClient,
@@ -376,11 +375,9 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
   }
 
   /**
-   * Decorates budgets with current-period CH ledger spend instead of the stale post-cutover
-   * GatewayBudget.spentUsd column, falling back to PG when CH isn't wired (mirrors check()).
-   * CH is keyed by TenantId = the project a trace landed in, but ORG/TEAM/PRINCIPAL budgets
-   * accumulate across MULTIPLE projects, so this sums across every project in the org via
-   * getSpendForBudgetsAcrossTenants.
+   * Decorates budgets with current-period CH ledger spend (falls back to PG
+   * when CH isn't wired). CH is keyed by TenantId = one project, but ORG/TEAM/
+   * PRINCIPAL budgets span multiple, so this sums across the whole org.
    */
   private async applyClickHouseSpend(
     budgets: GatewayBudgetResource[],
@@ -391,11 +388,9 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
   }
 
   /**
-   * As applyClickHouseSpend, but also reports whether the figures actually came from the
-   * ledger. GatewayBudget.spentUsd in Postgres has had no writer since the ledger cutover, so
-   * falling back to it renders a confident $0.00/$X, 0% on a budget that isn't really being
-   * totalled or enforced — callers must surface spendAvailable: false instead of showing
-   * that zero.
+   * As applyClickHouseSpend, but also reports whether the figures came from the
+   * ledger: GatewayBudget.spentUsd has had no writer since the cutover, so a PG
+   * fallback must surface spendAvailable: false rather than a confident zero.
    */
   private async applyClickHouseSpendWithHealth(
     budgets: GatewayBudgetResource[],
@@ -593,10 +588,9 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
   }
 
   /**
-   * One page of the org's budgets, newest first, keyed (createdAt, id). Scope-type filter is
-   * pushed into the query, not applied to the page afterwards — filtering post-page would
-   * make limit mean "rows examined" instead of "rows returned", silently shorting a caller
-   * asking for 50 group budgets.
+   * One page of the org's budgets, newest first, keyed (createdAt, id). The
+   * scope-type filter is pushed into the query, not applied after the page —
+   * that would make limit mean "rows examined", silently shorting a caller.
    */
   async listPageWithHealth(
     args: GatewayBudgetPageInput & GatewayOrganizationBudgetReadInput,
@@ -778,10 +772,9 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
   } as const;
 
   /**
-   * Whether any active key can produce traffic this scope matches. Read separately from the
-   * create guard (which only runs for the three scopes it can refuse), since omitting the
-   * field from create's response would make it disagree with the row the very next read
-   * returns — and callers do compare those.
+   * Whether any active key can produce traffic this scope matches. Read apart
+   * from the create guard (which only refuses three scopes), since omitting
+   * it from create's response would disagree with the very next read.
    */
   listScopeReachCandidates(organizationId: string): Promise<GatewayKeyReachCandidate[]> {
     return this.scopeReach.list(organizationId);
@@ -1107,11 +1100,9 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
   }
 
   /**
-   * Moves a budget's period boundary to now. NEVER mutates recorded spend (ledger + billing
-   * events are immutable) — the boundary move alone restarts the current-period figure.
-   * Calendar windows truncate the running period; MANUAL windows stay open until the next
-   * reset. With endUserId, only that bucket's boundary moves — the single-user mid-cycle
-   * reset.
+   * Moves a budget's period boundary to now; NEVER mutates recorded spend
+   * (ledger + billing are immutable). Calendar windows truncate the running
+   * period, MANUAL stays open until reset; endUserId moves one bucket only.
    */
   async reset(input: {
     id: string;
@@ -1218,11 +1209,10 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
     ).filter((r) => budgetAppliesToProvider(r.budget, input.providerKey));
     const applicable = resolved.map((r) => r.budget);
 
-    // Prefers ClickHouse spend (debit ledger) when wired, falls back to PG
-    // spentUsd otherwise. CH rollup is keyed by (budget, current period) so
-    // it self-resets at boundaries; PG needs shouldResetBudget since it
-    // accumulates until reset. ORG/TEAM/PRINCIPAL budgets fan out across
-    // every project in the org, not just the resolved trace project (mirrors
+    // Prefers ClickHouse spend (debit ledger) when wired, else PG spentUsd. CH
+    // rolls up by (budget, period) so it self-resets; PG needs shouldResetBudget
+    // since it accumulates. ORG/TEAM/PRINCIPAL budgets fan out across every
+    // project in the org, not just the resolved trace project (mirrors
     // materialiser's loadCurrentSpend).
     const chSpendByBudgetId = this.chRepo
       ? await (async () => {

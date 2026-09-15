@@ -162,10 +162,9 @@ export type GatewayApplicableBudget = {
    */
   isPerMember: boolean;
   /**
-   * Set when this row is the budget a key's drawer field manages. The edit
-   * drawer seeds its field from this row and hides it from the inherited
-   * list; independently created key-targeted budgets show as inherited
-   * constraints like any other.
+   * Set when this row is the budget a key's drawer field manages: the edit
+   * drawer seeds from it and hides it from the inherited list. Independently
+   * created key-targeted budgets still show as inherited constraints.
    */
   managedByVirtualKeyId: string | null;
 };
@@ -194,11 +193,9 @@ export type GatewayBudgetScopeTarget = {
 };
 
 /**
- * The key format of the map the budget-decision scope-target read answers.
- *
- * It lives beside that map's value type because every caller of the method
- * has to build the same key to read it back, and a second spelling of
- * `${scopeType}:${scopeId}` anywhere would silently miss every lookup.
+ * The key format of the map the budget-decision scope-target read answers,
+ * kept beside its value type so every caller builds the same key — a second
+ * spelling of `${scopeType}:${scopeId}` anywhere would silently miss lookups.
  */
 export function scopeTargetKey(scopeType: string, scopeId: string): string {
   return `${scopeType}:${scopeId}`;

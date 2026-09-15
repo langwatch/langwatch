@@ -1,11 +1,9 @@
 /** @vitest-environment node */
 
 /**
- * The gateway's handled errors, and the three properties that made them
- * worth writing: assertions are on `code`, `fault` and `meta` — never the
- * sentence, since customer-facing words come from the presentation registry
- * keyed by `code` (ADR-045). That registry lives outside this package, so
- * only the half the feature owns is pinned here.
+ * The gateway's handled errors: assertions are on `code`, `fault` and
+ * `meta`, never the sentence — customer copy comes from the presentation
+ * registry keyed by `code` (ADR-045), pinned only on this package's half.
  */
 import { describe, expect, it } from "vitest";
 
@@ -26,13 +24,10 @@ describe("gateway handled errors", () => {
       expect(error.fault).toBe("customer");
       expect(error.meta).toEqual({ scope_type: "team" });
 
-      // The id is the whole point: it belongs to a record in an organization
-      // this caller has no part in, and the message it used to sit inside
-      // handed both it and ours back to whoever probed.
-      // Matched on the ID SHAPE (a prefix followed by a generated suffix),
-      // not the bare prefix — `gateway_scope_org_mismatch` legitimately
-      // contains "org_", and a test that trips on its own code name teaches
-      // nothing.
+      // The id is the whole point: it belongs to a record in an org this
+      // caller has no part in, once handed back by the message it sat inside.
+      // Matched on ID SHAPE, not the bare prefix — `gateway_scope_org_mismatch`
+      // legitimately contains "org_", and tripping on its own code name teaches nothing.
       const serialized = JSON.stringify(new GatewayScopeOrgMismatchError("team").serialize());
       expect(serialized).not.toMatch(/\b(?:organization|project|team|tm|org|prj)_[A-Za-z0-9]{8,}/);
     });

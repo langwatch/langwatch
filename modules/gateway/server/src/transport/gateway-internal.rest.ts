@@ -1,10 +1,7 @@
 /**
- * `/api/internal/gateway` — control plane between the two halves of one
- * deployment. Contract: specs/ai-gateway/_shared/contract.md §4. Every route
- * answers behind {@link gatewayInternalSignature}'s HMAC gate, so routes
- * declare `publicRoute` on purpose — the gate authenticates, not the
- * framework. Each capability is OPTIONAL: an absent one refuses its own
- * route (503) rather than mounting silently.
+ * `/api/internal/gateway`: control plane between the two halves of one
+ * deployment. Every route answers behind {@link gatewayInternalSignature}'s
+ * HMAC gate; each capability is OPTIONAL, refusing (503) rather than silent.
  */
 import { publicRoute } from "@langwatch/api/access";
 import {
@@ -197,12 +194,9 @@ function logAuthDecision(
 }
 
 /**
- * This family's whole gate, travelling with the declaration rather than the
- * process that mounts it, since a published control plane can't change what
- * a deployed Go gateway demands. Checks headers, then signature
- * (constant-time), then timestamp, in that order — HMAC first avoids a
- * timing channel. An unset secret answers 500 rather than letting
- * `undefined === undefined` admit everyone.
+ * This family's gate travels with the declaration since a published control
+ * plane can't change what a deployed Go gateway demands. HMAC checked before
+ * timestamp (avoids a timing channel); an unset secret 500s, never admits all.
  */
 export function gatewayInternalSignature(secretOf: () => string | undefined): MiddlewareHandler {
   return async function verify(c: Context, next: Next) {
@@ -441,8 +435,7 @@ function pricedOutcomeData(
 /**
  * The internal command data one wire record maps to, or why it cannot be
  * accepted. `project_id` on the wire is the internal `tenantId`; only admits
- * carry the pod identity the gap detector reads, and outcomes are priced on the
- * way through.
+ * carry the pod identity the gap detector reads.
  */
 function toSpendCommandData(
   record: GatewayInternalSpendCommandRecord,
@@ -604,10 +597,9 @@ async function touchAdmittedVirtualKeys(
 }
 
 /**
- * Joins every admission to attribution the gateway cannot see, via two batched
- * reads. A missing key/team degrades to empty attribution and is logged for
- * reconciliation; a Prisma failure 500s so the drainer retries — nothing
- * resolvable is ever silently dropped.
+ * Joins every admission to attribution the gateway cannot see, via two
+ * batched reads. A missing key/team degrades to empty attribution (logged);
+ * a Prisma failure 500s so the drainer retries — nothing is silently dropped.
  */
 function reportAttributionGaps({
   identity,

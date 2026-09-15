@@ -32,12 +32,16 @@ export const GATEWAY_SPEND_PROCESSING_EVENT_TYPES = [
 export const GATEWAY_SPEND_EVENT_VERSION_LATEST = "2026-07-29" as const;
 
 /**
- * Schema-snapshot version of the gatewaySpend fold (calendar date), stamped on the projected row; the store's read-back only trusts the current stamp, so an older-shape row refolds once from the event log instead of decoding column defaults into wrong state.
+ * Schema-snapshot version of the gatewaySpend fold, stamped on the projected
+ * row. The read-back only trusts the current stamp, so an older-shape row
+ * refolds from the event log instead of decoding wrong column defaults.
  */
 export const GATEWAY_SPEND_PROJECTION_VERSION_LATEST = "2026-07-29";
 
 /**
- * Command payloads for the gateway_spend_processing pipeline. *WireSchema shapes are the internal ingest route's contract with the Go gateway — every admission/completion field is declared there and nowhere else, and no cost crosses that boundary (quantities travel, the server prices them). An outcome is priced exactly once at the ingest seam; the event then CARRIES the money (fold, attributed-user debits and webhook envelope all copy the same cost_nano_usd) so no two can disagree. No prompt/response content, no PII.
+ * Command payloads for the gateway_spend_processing pipeline. *WireSchema
+ * shapes are the Go gateway's ingest contract: priced once at ingest, then
+ * CARRIED on the event so no two disagree. No prompt/response content, no PII.
  */
 
 /** Bounds mirror the gateway edge: ids are opaque tokens, metadata is a
@@ -94,7 +98,9 @@ export const EMPTY_SPEND_USAGE: SpendUsage = {
 };
 
 /**
- * Who a request is billed against, as the gateway knows it — carried on both admission and outcome so a consumer can read attribution off the one event it's handling, rather than keeping durable per-request state to join them; the Go emitter fills it from the same call.Bundle admission reads, so the two can never disagree. Every field defaults, since a record from a previous build is read back by this one and a field without a default would be a permanent parse failure rather than a billed request.
+ * Who a request is billed against. Carried on both admission and outcome so
+ * a consumer reads attribution off one event, not durable per-request state;
+ * every field defaults so an older build's record still parses cleanly.
  */
 export const spendAttributionWireSchema = z.object({
   organization_id: z.string().max(256).default(""),
@@ -144,13 +150,17 @@ export const admitSpendWireSchema = z.object({
   pod_id: z.string().max(128).default(""),
   pod_seq: z.number().int().min(0).default(0),
   /**
-   * The emitter repeats this attribution on the outcome, so a consumer joining the two need not persist anything at admission time. Declared on the admission (the decision must be made before the outcome exists), and always self-consistent since both come from the same pod/build — letting gateway and control plane roll in either order. Removable once no fleet runs a build that omits it.
+   * The emitter repeats this attribution on the outcome so a consumer need not
+   * persist anything at admission time; both come from the same build, so
+   * gateway and control plane can roll independently. Removable once no fleet omits it.
    */
   outcome_carries_attribution: z.boolean().default(false),
 });
 
 /**
- * What the ingest seam appends after joining control-plane attribution the gateway can't see: team_id, resolved per drain batch alongside the key's principal. The debits process manager is its only reader, so the fold, webhook process manager and delivered envelope keep their frozen shapes — adopting team_id later costs no wire change.
+ * What the ingest seam appends after joining control-plane attribution the
+ * gateway can't see: team_id, resolved per drain batch. Read only by the
+ * debits process manager, so fold/webhook/envelope keep their frozen shapes.
  */
 export const admitSpendCommandDataSchema = admitSpendWireSchema.extend({
   team_id: z.string().max(256).default(""),
@@ -226,7 +236,9 @@ export const settleSpendCommandDataSchema = z.object({
   ...spendAttributionWireSchema.shape,
   ...spendControlPlaneAttributionSchema.shape,
   /**
-   * The model identity ADMISSION requested — a settlement resolves none of its own, but the request still named one, and the settled envelope has always carried it. Rides the command rather than being recovered downstream because the consumer building the envelope no longer keeps the admission; reading only the outcome would silently empty the field on every settled delivery.
+   * The model identity ADMISSION requested — settlement resolves none of its
+   * own, but the settled envelope has always carried it. Rides the command,
+   * since reading only the outcome would silently empty this field.
    */
   model: z.string().max(512).default(""),
   model_provider_id: z.string().max(256).default(""),

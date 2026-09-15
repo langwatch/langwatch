@@ -88,10 +88,8 @@ const ORGANIZATION = {
 };
 
 /**
- * The page, opened at one address.
- *
- * The screen reads its filters out of the host's route reading rather than out
- * of a router, so the address a case opens on is a host option and the
+ * The page, opened at one address: the screen reads filters off the host's
+ * route, not a router, so the opening address is a host option and the
  * `MemoryRouter` these cases needed goes with the compat layer.
  */
 function renderUsagePage(initialUrl: string) {

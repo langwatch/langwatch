@@ -1,5 +1,7 @@
 /**
- * Shared DTO for VirtualKey (tRPC camelCase, REST snake_case). Post-collapse: providerCredentialIds/providerChain are gone from the wire — eligible providers derive from the scope graph + RoutingPolicy at request time (scopeResolver.ts). Token is vk-lw-<ulid>, no env field since the gateway never branches on environment.
+ * Shared DTO for VirtualKey (tRPC camelCase, REST snake_case). Post-collapse:
+ * providerCredentialIds/providerChain are gone — eligible providers derive
+ * from the scope graph + RoutingPolicy at request time (scopeResolver.ts).
  */
 import { toDate } from "@langwatch/time";
 import type { VirtualKeyWithScopes } from "@langwatch/gateway-contract";
@@ -8,7 +10,9 @@ import type { ProjectApi } from "@langwatch/project-contract";
 import { metadataFromRow, type ResourceMetadata, toWireEnum } from "@langwatch/gateway-contract";
 
 /**
- * A key follows its stored trace-destination pointer even after the project behind it is deleted — spans keep landing there and reappear if restored — which a reader can't work out from the row alone, so it's read once per listing and published.
+ * A key follows its stored trace-destination pointer even after the project
+ * behind it is deleted — spans keep landing there and reappear if restored.
+ * Unreadable from the row alone, so it's read once per listing and published.
  */
 export type TraceDestinationFacts = {
   archivedProjectIds: ReadonlySet<string>;
@@ -54,7 +58,9 @@ export type VirtualKeyCamelDto = {
   lastUsedAt: string | null;
   revokedAt: string | null;
   /**
-   * `status` stays "active" past the expiry date on purpose: the three status values are what clients switch on, and "expired" is derivable from this date by any of them — keeping the key editable, the point of a date over a status.
+   * `status` stays "active" past the expiry date on purpose: the three
+   * status values are what clients switch on; "expired" is derivable from
+   * this date — keeping the key editable is the point of a date over a status.
    */
   expiresAt: string | null;
 };
@@ -145,7 +151,9 @@ export class GatewayVirtualKeyDtoAdapter {
   private constructor() {}
 
   /**
-   * Loads the flag for a page of keys in one query. Passed to the DTO explicitly, not defaulted, since a caller that forgets it would publish trace_project_archived: false for a deleted project.
+   * Loads the flag for a page of keys in one query. Passed to the DTO
+   * explicitly, not defaulted, since a forgetful caller would publish
+   * trace_project_archived: false for a deleted project.
    */
   async loadTraceDestinationFacts({
     projects,

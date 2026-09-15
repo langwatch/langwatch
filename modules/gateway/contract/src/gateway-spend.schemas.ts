@@ -1,9 +1,7 @@
 /**
  * Spend-event filter vocabulary and row shape shared by every reader of the
- * `gateway_spend` ledger: the tRPC page read, the REST events and rollup
- * reads, and the repositories underneath them. One module owns the query
- * shape and the domain type so the screen and a reconciliation script cannot
- * come to mean something different by the same narrowing.
+ * `gateway_spend` ledger: tRPC, REST, and the repositories underneath. One
+ * module owns it so the screen and a reconciliation script never diverge.
  */
 import { z } from "zod";
 import type { Instant } from "@langwatch/time";
@@ -58,9 +56,8 @@ const longId = z.string().min(1).max(256);
 
 /**
  * The structured spelling of the spend-event filter vocabulary, for a caller
- * that already speaks structured values rather than query strings - the
- * tRPC surface, so the Billing events screen narrows exactly the way the
- * REST reads do.
+ * speaking structured values rather than query strings — the tRPC surface —
+ * so the Billing events screen narrows exactly the way REST reads do.
  */
 export const spendFiltersSchema = z.object({
   virtualKeyIds: z.array(id).max(MAX_FILTER_VALUES).optional(),
@@ -135,9 +132,8 @@ export type SpendEventRow = {
 
 /**
  * Billing quantities: named fields (not a map, to preserve sumIf rollups and
- * per-field defaults). audio/image_tokens are disjoint from text tokens.
- * image_count and reasoning_tokens are display-only. audio_ms divides by 1000
- * at the rating seam.
+ * per-field defaults). audio/image_tokens are disjoint from text tokens;
+ * image_count/reasoning_tokens are display-only; audio_ms /1000 at rating.
  */
 export const spendUsageSchema = z.object({
   input_tokens: z.number().int().min(0).default(0),

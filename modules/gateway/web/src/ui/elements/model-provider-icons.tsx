@@ -90,10 +90,9 @@ function CerebrasIcon() {
 }
 
 /**
- * Two treatments toggled by color mode with pure CSS on `<g>` groups (no hook,
- * so it is SSR- and test-safe): the full-color brand tile in light mode, and
- * the monochrome glyph in white for dark mode, where the light tile's white
- * rounded square would otherwise glare.
+ * Two treatments toggled by color mode with pure CSS on `<g>` (no hook, so
+ * SSR- and test-safe): the full-color tile in light mode, monochrome white
+ * glyph in dark mode, where the light tile's white square would glare.
  */
 function CodexIcon() {
   return (

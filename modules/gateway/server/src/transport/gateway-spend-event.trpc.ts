@@ -1,9 +1,7 @@
 /**
  * The server half of `gatewaySpendEvents.*`: a thin handler over
- * {@link GatewayApi.findSpendEventsPage}, which does the whole assembly
- * (page read, organization resolution, key-name resolution, the
- * `occurredAt` to `Date` conversion) and answers `null` when this
- * deployment has no ClickHouse spend source.
+ * {@link GatewayApi.findSpendEventsPage}, which does the whole assembly and
+ * answers `null` when this deployment has no ClickHouse spend source.
  */
 import { defineTrpcRouter } from "@langwatch/api/trpc";
 import { GatewayApi, gatewaySpendEventTrpc } from "@langwatch/gateway-contract";

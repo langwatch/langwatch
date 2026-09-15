@@ -1,15 +1,13 @@
 /**
  * The settlement sweeper's read side: admissions whose confirmation never
- * arrived, found by asking the spend record rather than keeping a durable
- * timer per request. Reading through a port keeps settlement to one process
- * instance for the whole install, free of a ClickHouse client.
+ * arrived, found by asking the spend record rather than a durable timer.
+ * A port keeps settlement to one process for the install, free of ClickHouse.
  */
 
 /**
  * An admission still waiting for its outcome, with the attribution the fold
- * recorded for it. The settle command carries this forward so a settled
- * webhook envelope names the organization and key the request belonged to
- * rather than arriving anonymous.
+ * recorded. The settle command carries this forward so a settled webhook
+ * envelope names the org and key the request belonged to, not anonymous.
  */
 export interface OpenAdmission {
   tenantId: string;

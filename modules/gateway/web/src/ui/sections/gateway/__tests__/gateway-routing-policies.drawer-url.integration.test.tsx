@@ -200,13 +200,10 @@ describe("given a shared link that carries a policy", () => {
     expect(screen.getByDisplayValue("openai/gpt-5-mini")).toBeInTheDocument();
   });
 
-  // The rules arrive with the form reset that follows the policy query, which
-  // is after the first render. An uncontrolled accordion would still be closed
-  // over them, which is the footgun collapsing is meant to avoid.
-  //
-  // Asserts the expansion state, not the presence of the content: Chakra keeps
-  // a closed accordion's content mounted, so querying for the rule text passes
-  // just as happily when the section is shut.
+  // The rules arrive after the first render's form reset; an uncontrolled
+  // accordion would stay closed over them without the collapsing fix.
+  // Asserts expansion state, not content presence — Chakra keeps a closed
+  // accordion's content mounted, so querying rule text passes even when shut.
   it("opens Restrictions for a policy that already has rules", async () => {
     renderEditor();
 

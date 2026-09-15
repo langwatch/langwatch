@@ -1,7 +1,6 @@
 /**
  * @vitest-environment jsdom
- * Edit drawer reads and persists key state: routing mode, budget, provider allowlist.
- * Tests sharp edges: routing survival, budget archiving, no duplicate presentation.
+ * Edit drawer's sharp edges: routing survival, budget archiving, no duplicate presentation.
  * Spec: specs/ai-gateway/virtual-key-creation.feature
  */
 import type { Instant } from "@langwatch/time";

@@ -43,9 +43,8 @@ export type EligibleModelProvider = {
   modelCount: number;
   /**
    * The scope the provider itself is attached to — the broadest one that
-   * reaches the key. This is where the provider was configured, never the
-   * key's own scope: an organization-wide credential inherited by a
-   * project key still comes from the organization.
+   * reaches the key, never the key's own scope: an org-wide credential
+   * inherited by a project key still comes from the organization.
    */
   definedAt: ModelProviderScopeEntry;
   defaultModel: string;
@@ -182,10 +181,9 @@ export function resolveEligible({
 }
 
 /**
- * The snippet-ready default model for a VK, in resolver-safe `vendor/model`
- * form: the first eligible provider's default. Undefined when no provider is
- * eligible/resolvable yet (callers fall back to a placeholder). This is what
- * makes the copy-paste usage example name a model the key can actually serve.
+ * The snippet-ready default model for a VK, `vendor/model` form: the first
+ * eligible provider's default, undefined when none is eligible yet (callers
+ * fall back to a placeholder) — names a model the key can actually serve.
  */
 export function firstEligibleDefaultModel(args: {
   scopes: VirtualKeyScopeEntry[];

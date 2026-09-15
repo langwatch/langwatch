@@ -1,6 +1,5 @@
 /**
  * @vitest-environment node
- *
  * Signature coverage for the ElevenLabs post-call webhook.
  * Spec: specs/ai-gateway/realtime-sessions.feature
  */

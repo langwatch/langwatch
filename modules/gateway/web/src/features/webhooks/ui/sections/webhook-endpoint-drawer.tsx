@@ -384,11 +384,9 @@ function SqsDestinationFields({ form }: { form: EndpointForm }) {
 }
 
 /**
- * Where this endpoint delivers, and the address that goes with it.
- *
- * The choice is locked once the endpoint exists: batches already planned
- * against the old transport are in flight, so moving means a new endpoint
- * beside this one until the old one has drained.
+ * Where this endpoint delivers, and the address that goes with it. Locked
+ * once the endpoint exists — batches already planned against the old
+ * transport are in flight, so moving means a new endpoint until it drains.
  */
 function DestinationSection({ form, isEditing }: { form: EndpointForm; isEditing: boolean }) {
   return (
@@ -637,10 +635,9 @@ function EndpointFormFields({
 }
 
 /**
- * Create/edit drawer for one webhook endpoint: the URL plus the event
- * subscription, rendered as one checkbox per registry type grouped by
- * family. The family header checkbox is the `<family>.*` wildcard: while
- * it is on, the individual types are implied and their checkboxes locked.
+ * Create/edit drawer for one webhook endpoint: URL plus event subscription,
+ * one checkbox per registry type grouped by family. The family header is
+ * the `<family>.*` wildcard — on, it implies and locks its children.
  */
 export function WebhookEndpointDrawer({
   isOpen,

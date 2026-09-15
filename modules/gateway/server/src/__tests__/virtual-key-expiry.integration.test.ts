@@ -1,5 +1,5 @@
 /**
- * Writing a virtual key's expiration date, against real Postgres: what create stores, the three things an update can mean by the field, what a date already in the past does, and what the key publishes afterwards.
+ * Real Postgres: what create stores, what update means, a past date, what's published after.
  * @vitest-environment node
  * Spec: specs/ai-gateway/virtual-key-creation.feature
  */

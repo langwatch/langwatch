@@ -33,9 +33,8 @@ export type GatewayJwtSubject = Omit<GatewayJwtClaims, "vk_expires_at"> & {
 
 /**
  * The signing identity, held per instance rather than read from the
- * environment on every call: the process parses `LW_GATEWAY_JWT_SECRET` once
- * through its own configuration and hands it here. It is never logged and
- * never returned.
+ * environment on every call: the process parses `LW_GATEWAY_JWT_SECRET`
+ * once and hands it here. Never logged, never returned.
  */
 export class GatewayJwtAdapter {
   static create(options: { secret: string }): GatewayJwtAdapter {

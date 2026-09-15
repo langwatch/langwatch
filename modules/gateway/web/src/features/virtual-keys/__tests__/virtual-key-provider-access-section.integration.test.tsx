@@ -1,7 +1,6 @@
 /**
  * @vitest-environment jsdom
- * Provider access section: all/none master checkbox stores wildcard or clears selection.
- * Real component tree, no mocks.
+ * Provider access: all/none master checkbox stores wildcard or clears selection.
  * Spec: specs/ai-gateway/governance/vk-provider-access.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

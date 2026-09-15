@@ -1,13 +1,7 @@
 /**
  * @vitest-environment node
- *
- * What the budgets list hands the UI for a per-person template.
- *
- * Two things the screen cannot render without: the standing (how many people
- * are over their own cap) and the Scope column's anchor name. Both are
- * computed off the real ClickHouse-backed control plane here (fake Prisma and
- * fake ClickHouse members, real `buildGatewayControlPlane`), so this file
- * pins the same seat-counting and scope-resolution logic production runs.
+ * What the budgets list hands the UI: standing (people over their own cap)
+ * and the Scope column's anchor name, off the real control plane.
  */
 import type { AuthzPermission } from "@langwatch/authz-contract";
 import { createTrpcRuntime, type TrpcRuntimePorts } from "@langwatch/api/trpc";

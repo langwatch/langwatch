@@ -1,7 +1,6 @@
 /**
  * @vitest-environment node
- * Real Postgres. Only the evaluator call is injected; everything else runs against real rows.
- * Guards against the endpoint's old always-allow stub regressing.
+ * Real Postgres; only the evaluator call is injected. Guards the old always-allow stub regressing.
  * Spec: specs/ai-gateway/guardrail-check-endpoint.feature
  */
 import { nanoid } from "nanoid";

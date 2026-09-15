@@ -93,10 +93,9 @@ export const virtualKeyApplicableBudgetsSchema = z
 export type VirtualKeyApplicableBudgets = z.infer<typeof virtualKeyApplicableBudgetsSchema>;
 
 /**
- * The cache-rule wire row. `modeEnum` keeps its historical name — the browser
- * and the CLI read it — even though the canonical resource calls the field
- * `mode`; timestamps travel as ISO strings, matching the DTO this transport
- * has always answered with.
+ * The cache-rule wire row. `modeEnum` keeps its historical name — browser
+ * and CLI read it — though the canonical resource calls it `mode`;
+ * timestamps travel as ISO strings, matching this transport's old DTO.
  */
 export const gatewayCacheRuleDtoSchema = z
   .object({

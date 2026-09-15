@@ -1,9 +1,7 @@
 /**
- * Handled errors for the gateway domain (ADR-045).
- *
- * Framework-agnostic: the tRPC boundary maps `httpStatus` to a code, and the
- * client renders copy keyed off `code`. Nothing here writes customer-facing
- * prose — `message` is for whoever reads the trace.
+ * Handled errors for the gateway domain (ADR-045). Framework-agnostic: the
+ * tRPC boundary maps `httpStatus` to a code, client copy keyed off `code`.
+ * Nothing here writes customer-facing prose — `message` is for the trace.
  */
 import { HandledError, remediation } from "@langwatch/handled-error";
 import { Temporal } from "@langwatch/time";
@@ -214,12 +212,9 @@ export class GatewayGroupBudgetUnsupportedError extends HandledError {
 }
 
 /**
- * A key was written with nowhere for its traces to land.
- *
- * Per-key spend is read off the trace path, so a key whose traces land
- * nowhere is invisible in every usage view and its spend can be capped by
- * no budget. Reached only when the organization has no governance project
- * either, which is the older self-hosted shape.
+ * A key was written with nowhere for its traces to land. Per-key spend is
+ * read off the trace path, so such a key is invisible in every usage view
+ * and uncapped by any budget. Reached only in the older self-hosted shape.
  */
 export class GatewayTraceProjectRequiredError extends HandledError {
   declare readonly code: "trace_project_required";
@@ -274,10 +269,8 @@ export class GatewayTraceProjectAmbiguousError extends HandledError {
 
 /**
  * How many of the organization's projects the refusal names before it stops
- * counting. An organization running a project per customer has hundreds, and
- * an error payload is not a listing endpoint; `reachable_project_count` says
- * how many there were in total so a client never mistakes the sample for all
- * of them.
+ * counting — an error payload is not a listing endpoint.
+ * `reachable_project_count` gives the true total instead of the sample.
  */
 const REACHABLE_PROJECT_HINT_LIMIT = 10;
 
@@ -294,9 +287,8 @@ export class GatewayBudgetScopeUnreachableError extends HandledError {
   }: {
     /**
      * The three scopes whose reach depends on a key. The other four are
-     * either reachable by construction or matched directly, so they never
-     * arrive here, and a wider type would let one onto the published
-     * `meta.scope_type` that the documented values do not include.
+     * reachable by construction or matched directly. A wider type here would
+     * let one onto the published `meta.scope_type`, which excludes them.
      */
     scopeType: "team" | "project" | "group";
     reachableProjectIds: string[];

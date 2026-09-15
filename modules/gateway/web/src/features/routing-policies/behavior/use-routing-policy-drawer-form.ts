@@ -1,9 +1,7 @@
 /**
- * Everything the routing-policy drawer needs to render, derived in one place:
- * the form, the row it is editing, the providers it can offer, and the
- * problems worth telling the operator about before they save.
- *
- * Returns state and callbacks, never JSX.
+ * Everything the routing-policy drawer needs to render, derived in one
+ * place: the form, the row being edited, the providers on offer, and the
+ * problems worth telling the operator before they save. Never JSX.
  */
 import { readableDate } from "../../../model/readable-date.ts";
 import type { Instant } from "@langwatch/time";

@@ -28,12 +28,9 @@ function formatLimit(limitUsd: string): string {
 }
 
 /**
- * The one deliberately visible line on this form. "Resets at midnight" is
- * a different promise in each timezone, and the wrong assumption is only
- * discovered by being billed; so the reset instant and its timezone are
- * spelled out instead of tucked behind a tooltip. Enforcement computes
- * resets in UTC only (budgetWindow.ts), so the copy always says UTC; the
- * drawer offers a timezone choice again once enforcement honors one.
+ * The one deliberately visible line on this form: the reset instant and its
+ * timezone, spelled out rather than tucked behind a tooltip, since "resets
+ * at midnight" is a different promise per timezone. Enforcement is UTC-only.
  */
 export function budgetAnnotation(value: VirtualKeyBudgetValue): string {
   if (!value.limitUsd.trim()) return "No max spending for this key";

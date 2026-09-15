@@ -1,8 +1,7 @@
 /**
  * The Tags field's copy and caps, pinned to the limits the server actually
- * applies. Copy that quotes a number has to be derived from the code that
- * enforces it, or it drifts into a promise we do not keep
- * (dev/docs/best_practices/copywriting.md).
+ * applies — a quoted number must derive from the enforcing code, or it
+ * drifts into a promise we do not keep (dev/docs/best_practices/copywriting.md).
  */
 import { describe, expect, it } from "vitest";
 

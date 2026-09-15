@@ -1,8 +1,6 @@
 /**
  * @vitest-environment node
- * Real Postgres + real signed internal route. Pins the ingest seam's join and
- * its two failure modes: a MISSING row degrades one record and says so; an
- * unreadable database fails the whole batch so the drainer retries.
+ * Real signed route: MISSING degrades one record; unreadable DB fails the batch, drainer retries.
  * Spec: specs/ai-gateway/billing-spend-events.feature
  */
 import { nanoid } from "nanoid";

@@ -25,11 +25,9 @@ import { humanizeGatewayError } from "../../../../model/gateway-error-copy.ts";
 import { useGatewayToaster } from "../../../../behavior/gateway-feedback.ts";
 
 /**
- * A budget on a scope no active key can reach is refused, because it would
- * never spend and never block. Provisioning one ahead of the keys that will
- * use it is legitimate, so the refusal offers the way through instead of
- * being a dead end. Offered here rather than as a checkbox on the form: an
- * admin who has not hit the refusal has no way to know what it would mean.
+ * A budget on an unreachable scope is refused: it would never spend or
+ * block. Provisioning ahead of the keys that will use it is legitimate,
+ * so the refusal offers a way through instead of a dead end.
  */
 const UNREACHABLE_SCOPE_CODE = "gateway_budget_scope_unreachable";
 
@@ -179,10 +177,9 @@ export function BudgetCreateDrawer({ open, onOpenChange, onCreated }: BudgetCrea
   };
 
   /**
-   * The refusal was about the scope that was picked, and the retry beside it
-   * resubmits the form as it stands with `allowUnreachable` set. Left behind
-   * after a different scope is picked, that button would wave through a
-   * scope the server never refused.
+   * The refusal was about the scope that was picked; the retry beside it
+   * resubmits with `allowUnreachable` set. Cleared on a scope change, or the
+   * button would wave through a scope the server never refused.
    */
   const clearRefusal = () => {
     setSubmitError(null);

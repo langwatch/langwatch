@@ -1,5 +1,7 @@
 /**
- * The one resolver for "what does this budget scope point at, for humans": given (scopeType, scopeId) pairs, the display name plus the secondary bits each view renders (slug, email, member count, VK prefix). Read by the budgets list, detail page, VK drawer and budget-overview service, so one team never renders under two names. Batch-shaped: one findMany per scope kind regardless of how many budgets are labelled.
+ * The one resolver for "what a budget scope points at, for humans": display
+ * name plus secondary bits (slug, email, member count, VK prefix) for a
+ * (scopeType, scopeId). Shared so one team never renders under two names.
  */
 import { scopeTargetKey } from "@langwatch/gateway-contract";
 import type { ProjectIdentity } from "@langwatch/project-contract";
@@ -31,7 +33,9 @@ type AddTargetArgs = {
 };
 
 /**
- * Which spend targets a set of budgets resolves to. A budget names a scope, not the rows it covers; the six private add* steps below are the six ways a scope expands (name, project, VK, principal, group, attributed user), collected here so a scope kind expanding differently from the rest is a visible bug rather than a loose one.
+ * Which spend targets a set of budgets resolves to: the six private add*
+ * steps below are the six ways a scope expands (name, project, VK,
+ * principal, group, attributed user), collected so a divergent one is a visible bug.
  */
 export class PrismaGatewayBudgetScopeTargetRepository {
   private constructor() {}
@@ -215,7 +219,9 @@ export class PrismaGatewayBudgetScopeTargetRepository {
   }
 
   /**
-   * Resolve display targets for budget scopes, grouped by scopeType so each kind costs at most one findMany. VK, GROUP and PRINCIPAL lookups pin organizationId so a stray scopeId can never surface another tenant's name, key or member.
+   * Resolve display targets for budget scopes, grouped by scopeType so each
+   * kind costs at most one findMany. VK, GROUP and PRINCIPAL lookups pin
+   * organizationId so a stray scopeId can't surface another tenant's data.
    */
   async resolveScopeTargetsBatch(
     prisma: GatewayBudgetScopeTargetDatabase,

@@ -13,12 +13,9 @@ import {
 import { ProviderRow } from "./virtual-key-provider-row.tsx";
 
 /**
- * Which providers a key may dispatch to.
- *
- * `allProviders: true` persists as `providers_allowed: null`: every
- * provider the key can reach through its ownership, including providers
- * added later. An explicit selection persists the listed ModelProvider
- * row ids and never grows on its own.
+ * Which providers a key may dispatch to. `allProviders: true` persists as
+ * `providers_allowed: null` — every provider the key's ownership reaches,
+ * including ones added later; an explicit selection never grows on its own.
  */
 export type ProviderAccessValue = {
   allProviders: boolean;
@@ -64,12 +61,9 @@ export function providerAccessInvalidReason(
 /** The models a provider row can serve, in bare form. */
 
 /**
- * Checkbox list of every provider this key's ownership reaches, with the
- * scope the provider comes from, and a per-provider model accordion for
- * the uncommon "only these models" path. The "All" master checkbox is
- * the future-proof default: it is stored as the absence of a list, which
- * is what keeps a provider added next month reachable without editing
- * the key.
+ * Checkbox list of every provider this key's ownership reaches, with a
+ * per-provider model accordion for "only these models". "All" is the
+ * future-proof default: stored as no list, so a later provider needs no edit.
  */
 export function VirtualKeyProviderAccessSection({
   value,

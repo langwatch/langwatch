@@ -1,9 +1,6 @@
 /**
- * The gateway token's lifetime. The gateway caches what it verifies here and
- * keeps serving from that cache while the control plane is unreachable, so a
- * token that outlives its key is what lets an expired key keep calling
- * providers through an outage.
- *
+ * The gateway token's lifetime: cached and served while the control plane is
+ * unreachable, so a token can outlive its key through an outage.
  * Spec: specs/ai-gateway/virtual-key-lifecycle.feature
  */
 import { nowInstant } from "@langwatch/time";

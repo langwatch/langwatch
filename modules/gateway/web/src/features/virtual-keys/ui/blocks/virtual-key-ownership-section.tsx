@@ -38,12 +38,9 @@ export type OwnershipContext = {
 };
 
 /**
- * The scope rows a chosen ownership persists as, or null while the choice
- * is incomplete (e.g. org ownership with no trace project picked yet).
- * The scopes are ACCESS rows only: an org- or team-owned key's trace
- * destination rides `traceProjectId` (see `ownershipTraceProjectId`),
- * never a scope row, because scope rows grant visibility and operate
- * rights and the trace destination must grant neither.
+ * The scope rows a chosen ownership persists as, or null while incomplete.
+ * ACCESS rows only — trace destination rides `traceProjectId` instead,
+ * since a scope row grants rights the destination must never grant.
  */
 export function ownershipToScopes(
   value: VirtualKeyOwnership,
@@ -68,9 +65,8 @@ export function ownershipToScopes(
 }
 
 /**
- * The explicit trace destination the ownership carries, when it is a
- * separate decision from the access scope. Project- and personal-owned
- * keys return null: their single PROJECT access scope IS the
+ * The explicit trace destination, when separate from the access scope.
+ * Project/personal keys return null: their single PROJECT scope IS the
  * destination, and duplicating it would create a value that can drift.
  */
 export function ownershipTraceProjectId(value: VirtualKeyOwnership): string | null {

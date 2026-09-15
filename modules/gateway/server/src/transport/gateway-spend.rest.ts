@@ -103,9 +103,8 @@ export type GatewaySpendWebhookDelivery = {
 
 /**
  * The whole of what the four reconciliation routes ask the application for.
- * The webhook half stays structural (not importing `WebhookApi`, though the
- * peer permits it) so the type states exactly what a route reads, not the
- * whole platform surface it does not use.
+ * The webhook half stays structural (not importing `WebhookApi`) so the type
+ * states what a route reads, not the whole platform surface it doesn't use.
  */
 export type GatewaySpendApp = Readonly<{
   /**
@@ -168,12 +167,9 @@ export type GatewaySpendApp = Readonly<{
 export const GatewaySpendApi = moduleApi<GatewaySpendApp>("gateway");
 
 /**
- * Whether the credential's organization holds the plan the billing events API
- * is sold under (ADR-072: pull and push are two views of one enterprise
- * capability). Bound in this module's own `withTransportFacts` against the
- * `entitlement` peer its App declares, and resolved right before each handler
- * — after authentication and after the permission check, the ordering the
- * pre-conversion per-route gate held.
+ * Whether the credential's organization holds the plan billing events is
+ * sold under (ADR-072). Bound via `withTransportFacts` against the
+ * `entitlement` peer, resolved after auth and the permission check.
  */
 export const gatewaySpendBillingPlanGate = defineRestMiddleware(
   "gatewaySpendBillingPlanGate",
@@ -237,12 +233,9 @@ const usageSchema = z.object({
 });
 
 /**
- * `usageSchema` plus the image quantities, for the two reads this repository
- * rolls up itself (spend-summaries, one end user's spend). /spend-events'
- * envelope stays on the base schema: it is shaped by the shared webhook
- * envelope builder, which does not carry these fields yet — adding them
- * there before that builder does would make every settled/confirmed event
- * fail its declared output schema.
+ * `usageSchema` plus image quantities, for this repository's own rollups
+ * (spend-summaries, end-user spend). /spend-events stays on the base schema
+ * since the shared webhook envelope builder doesn't carry these fields yet.
  */
 const usageWithImagesSchema = z.object({
   ...usageSchema.shape,

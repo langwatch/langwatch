@@ -62,10 +62,9 @@ let budgets: GatewayBudgetClickHouseRepository;
 let app: ReturnType<typeof mountSpendFamily>;
 
 /**
- * Canonical envelope, reduced to the two fields these scenarios read. Wire format belongs to
- * the Enterprise webhook platform (this package may not depend on it), so what matters here is
- * that the id carries the request + family, letting a page walk and tenant fence be asserted
- * on the join key.
+ * Canonical envelope, reduced to the two fields these scenarios read. Wire
+ * format belongs to the Enterprise webhook platform (out of this package's
+ * reach), so the id alone lets a page walk and tenant fence be asserted.
  */
 function testEnvelope(row: SpendEventRow) {
   const family = row.status === "confirmed" ? "completed" : row.status;

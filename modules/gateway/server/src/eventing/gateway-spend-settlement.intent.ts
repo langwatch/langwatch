@@ -6,37 +6,30 @@ import type { SettleSpendCommandData } from "./gateway-spend-commands.process.ts
 const logger = createLogger("langwatch:gateway-spend:settlement");
 
 /**
- * The settlement grace: how long an admission may sit unconfirmed before the
- * sweeper settles it as cost-unknown. Sized for the SLOWEST legitimate
- * request, not the median (a long stream can hold a connection for minutes).
- * Settling early is recoverable: a late confirmation supersedes the settled
- * record with the completed envelope.
+ * How long an admission may sit unconfirmed before the sweeper settles it as
+ * cost-unknown. Sized for the SLOWEST legitimate request, not the median;
+ * settling early is recoverable since a late confirmation supersedes it.
  */
 export const SETTLEMENT_GRACE_MS_DEFAULT = 30 * 60 * 1000;
 
 /**
  * How far back a sweep looks. `OccurredAt` is the spend table's partition
- * key, so this bound keeps the scan on the two most recent partitions
- * instead of the full 13-month retention, including the cold ones on object
- * storage. Seven days is far past any grace an operator can configure, so
- * the only rows excluded are ones a sweep already had many chances to settle.
+ * key, so this bound keeps the scan off the full 13-month (cold-storage)
+ * retention; seven days is past any grace an operator can configure.
  */
 export const SETTLEMENT_LOOKBACK_MS = 7 * 24 * 60 * 60 * 1000;
 
 /**
- * Sanity cap on one sweep: a result this large means something upstream
- * stopped confirming, not steady-state drift. Applied TWICE, and both are
- * load-bearing — once per ClickHouse instance to bound its own query, and
- * again after the instances are merged, so the sweep settles at most this
- * cap rather than the cap times the number of instances.
+ * Sanity cap on one sweep: this large a result means something upstream
+ * stopped confirming, not steady-state drift. Applied TWICE — per instance,
+ * then again after merging — so the sweep settles at most this cap.
  */
 export const MAX_OPEN_ADMISSIONS_PER_SWEEP = 10_000;
 
 /**
- * Operator override, epoch-milliseconds. Bounded below so a typo cannot turn
- * every in-flight request into a settlement storm. The raw value arrives as
- * an argument, parsed here once, so the REST settlement policy and the
- * sweeper cannot disagree about what the operator asked for.
+ * Operator override, epoch-milliseconds, bounded below so a typo cannot turn
+ * every in-flight request into a settlement storm. Parsed here once so the
+ * REST policy and the sweeper cannot disagree about what was asked for.
  */
 export function settlementGraceMs(raw: string | undefined): number {
   if (!raw) return SETTLEMENT_GRACE_MS_DEFAULT;
@@ -67,12 +60,9 @@ export interface SpendSettlementProcessDeps {
 }
 
 /**
- * Settles every admission past its grace.
- *
- * Best-effort per row: one tenant's failed send must not cost the rest of
- * the sweep, because the next wake would find the same backlog plus another
- * interval of it. A row that fails is left open and retried on the next
- * sweep, which is exactly what the sweep is for.
+ * Settles every admission past its grace, best-effort per row: one tenant's
+ * failed send must not cost the rest of the sweep. A row that fails stays
+ * open and is retried on the next sweep, which is what the sweep is for.
  */
 export function runSpendSettlementSweep(deps: SpendSettlementProcessDeps) {
   return async (_payload: { scheduledFor: number }, context: IntentContext): Promise<void> => {
@@ -115,11 +105,9 @@ export function runSpendSettlementSweep(deps: SpendSettlementProcessDeps) {
 }
 
 /**
- * The settle command for one admission whose confirmation never arrived.
- *
+ * The settle command for an admission whose confirmation never arrived.
  * Every attribution field is copied off the spend record rather than
- * re-resolved, so the settled record and the envelope it delivers name the
- * same organization and key the request was admitted against.
+ * re-resolved, so it names the same org and key the request was admitted against.
  */
 function settleCommandFor(admission: OpenAdmission, now: number): SettleSpendCommandData {
   return {

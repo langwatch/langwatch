@@ -13,19 +13,17 @@ import type { GatewaySpendApp } from "../../transport/gateway-spend.rest.ts";
 import type { GatewayApp } from "../gateway.app.ts";
 
 /**
- * `withTransports` type-checks a family's declared Api, never the App the
- * module provides, so a member the four `/api/gateway/v1` spend routes read
- * off `GatewaySpendApp` can go missing from `GatewayApp` and still compile.
- * This is the one compile-time proof that the mount is whole.
+ * `withTransports` type-checks a family's declared Api, never its App, so a
+ * member the spend routes read off `GatewaySpendApp` could go missing from
+ * `GatewayApp` and still compile. The one proof the mount is whole.
  */
 type GatewayAppServesSpend = GatewayApp extends GatewaySpendApp ? true : never;
 const spendFamilyIsWhole: GatewayAppServesSpend = true;
 
 /**
- * The two members `GatewayApp` declares it reads. Nothing in a boot touches a
- * store — the control plane only constructs repositories over them — so each
- * member has to EXIST and refuses on first use, which keeps "the installation
- * test reached a datastore" a named failure rather than a silent query.
+ * The two members `GatewayApp` declares it reads. Boot touches no store —
+ * the control plane only constructs repositories — so each must EXIST and
+ * refuse on first use, naming "the test reached a datastore" as a failure.
  */
 function membersWithoutStores() {
   const refusing = (member: string) =>

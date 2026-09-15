@@ -50,12 +50,9 @@ export type GatewaySuccessNotice = {
 };
 
 /**
- * A failure, as the screen knows it.
- *
- * The raw `error` travels and never a sentence the screen composed: since the
- * wire message of a handled error is its code slug, a screen that wrote its own
- * copy would print the slug at the customer. `fallbackTitle` names the action
- * that failed, so an unrecognised code still says what the reader was doing.
+ * A failure, as the screen knows it. The raw `error` travels, never a
+ * screen-composed sentence — its wire message is a code slug. `fallbackTitle`
+ * names the action, so an unrecognised code still says what was happening.
  */
 export type GatewayFailureNotice = {
   error: unknown;
@@ -64,12 +61,9 @@ export type GatewayFailureNotice = {
 };
 
 /**
- * The shape of the deployment, as the usage snippet and the install copy read
- * it.
- *
- * `gatewayBaseUrl` is the address a customer's SDK points at, which is not this
- * application's address on any deployment — hence its own field rather than
- * something derived from `appBaseUrl`.
+ * The shape of the deployment, as the usage snippet and install copy read it.
+ * `gatewayBaseUrl` is the address a customer's SDK points at, not this
+ * application's — its own field rather than derived from `appBaseUrl`.
  */
 export type GatewayDeployment = {
   isSaas: boolean;
@@ -78,11 +72,9 @@ export type GatewayDeployment = {
 };
 
 /**
- * Which plan the organization is on, for the surfaces that are gated on it.
- *
- * `webhookEndpointsEnabled` rather than the whole plan object: the webhooks
- * page asks one question of the plan, and a port that handed over the licence
- * row would invite every later screen to ask a different one.
+ * Which plan the organization is on, for surfaces gated on it.
+ * `webhookEndpointsEnabled` rather than the whole plan object: a port that
+ * handed over the licence row would invite every screen to ask its own question.
  */
 export type GatewayPlan = {
   isEnterprise: boolean;
@@ -154,10 +146,9 @@ const GatewayHostContext = createContext<GatewayHostPort | undefined>(void 0);
 export const GatewayHostProvider = GatewayHostContext.Provider;
 
 /**
- * The application this screen is running in.
- *
- * Missing means the screen was mounted outside its frontend feature, which is a
- * composition fault rather than something the screen can degrade around.
+ * The application this screen is running in. Missing means the screen was
+ * mounted outside its frontend feature — a composition fault, not something
+ * the screen can degrade around.
  */
 export function useGatewayHost(): GatewayHostPort {
   const host = useContext(GatewayHostContext);

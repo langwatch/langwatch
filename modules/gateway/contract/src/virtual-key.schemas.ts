@@ -9,11 +9,9 @@ import { virtualKeyConfigSchema } from "./virtual-key-config.ts";
 export const virtualKeyApiRoutingModeSchema = z.enum(["NONE", "FALLBACK_ALL", "POLICY"]);
 
 /**
- * The gateway's own scope-assignment wire shape. Every handler hands a parsed
- * `scopes[]` straight to the virtual-key port, which takes
- * `GatewayVirtualKeyScope[]`, so a tier added to the key's scope vocabulary
- * and not to this enum is a compile error at each of those call sites rather
- * than a silently unaccepted value.
+ * The gateway's own scope-assignment wire shape. Every handler hands parsed
+ * `scopes[]` straight to the virtual-key port's `GatewayVirtualKeyScope[]`,
+ * so a tier missing from this enum is a compile error, not a silent value.
  */
 export const virtualKeyApiScopeAssignmentSchema = z.object({
   scopeType: z.enum(["ORGANIZATION", "TEAM", "PROJECT"]),
@@ -48,10 +46,9 @@ export const virtualKeyApiApplicableBudgetsInputSchema = z.object({
 });
 
 /**
- * The budget a key carries on itself, created in the same transaction as the
- * key. `null` on update removes the cap by archiving. One parser, shared by
- * tRPC and REST, so the decimal regex and the positive-amount refinement
- * cannot drift into two answers.
+ * The budget a key carries on itself, created in the same transaction.
+ * `null` on update archives it. One parser, shared by tRPC and REST, so the
+ * decimal regex and positive-amount refinement cannot drift into two answers.
  */
 export const virtualKeyBudgetInputSchema = z.object({
   // A decimal number of dollars, strictly positive. String rather

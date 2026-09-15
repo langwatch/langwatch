@@ -63,10 +63,8 @@ type PrismaLike = Pick<PrismaClient, "gatewayBudget" | "groupMembership" | "virt
 
 /**
  * Which budgets a request is subject to: a budget names a SCOPE, not
- * requests, so this expands every scope kind a request could sit under and
- * unions them — one kind wrong silently stops enforcing a budget somebody
- * set. Ordered, so a caller stopping at the first blocking budget stops at
- * the same one every time.
+ * requests, so this expands and unions every scope kind — one kind wrong
+ * silently stops enforcing a budget. Ordered, so the first blocker is stable.
  */
 export class PrismaGatewayBudgetResolutionRepository {
   private constructor() {}

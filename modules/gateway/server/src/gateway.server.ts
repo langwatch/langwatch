@@ -75,11 +75,9 @@ export const gatewayServer = defineServerModule("gateway")
       signature: context.req.header("elevenlabs-signature"),
     })),
     /**
-     * ADR-072: the reconciliation pull gates under the webhook platform's own plan flag, since
-     * pull and push are two views of one capability. Resolved per request, after authentication
-     * and the permission check — the ordering the pre-conversion per-route gate held. Fail-closed:
-     * a plan lookup that rejects refuses the request, and a process composed with no plan store
-     * never reaches here — it refuses at boot naming the module and the peer.
+     * ADR-072: the reconciliation pull gates under the webhook platform's
+     * plan flag, resolved per request after auth and the permission check.
+     * Fail-closed: a rejected lookup refuses; no plan store refuses at boot.
      */
     bindRestMiddleware(gatewaySpendBillingPlanGate, async (context) => {
       const organization = context.get("organization") as { id: string };

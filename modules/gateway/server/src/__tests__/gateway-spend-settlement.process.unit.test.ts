@@ -1,10 +1,7 @@
 /**
- * The settlement sweeper end to end: ONE scheduled process instance for the
- * install asks the spend record which admissions are still open past their
- * grace and settles each one, and the fold (against real ClickHouse) records
- * the settled row that a late confirmation then supersedes. The definition
- * under test is the exact one the runtime mounts, built through the
- * pipeline's own applier.
+ * The settlement sweeper end to end: asks the spend record which admissions
+ * are open past grace, settles each, and folds (real ClickHouse) the row a
+ * late confirmation later supersedes. Built through the runtime's own applier.
  */
 
 import type { ProcessEventEnvelope } from "@langwatch/eventing";

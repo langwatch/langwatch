@@ -1,9 +1,7 @@
 /**
- * Relative time, as the gateway tables say it.
- *
- * A family-local copy of `platform/app/src/utils/formatTimeAgo.ts`, trimmed to
- * the one export the gateway screens call. The platform module keeps the rest
- * for its own callers and dies with them.
+ * Relative time, as the gateway tables say it — a family-local copy of
+ * `platform/app/src/utils/formatTimeAgo.ts`, trimmed to the one export the
+ * gateway screens call. The platform module keeps the rest for its own callers.
  */
 
 import { format, formatDistanceToNow, nowInstant } from "@langwatch/time";

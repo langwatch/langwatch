@@ -1,10 +1,7 @@
 /**
  * @vitest-environment node
- * Real family + real Postgres. GET /api/internal/gateway/config/:vk_id: the materialiser reads
- * vk.routingPolicy off whatever the caller included, so a materialiser test with its own include
- * can't catch the route forgetting one (bundle comes back with empty alias/deny lists).
- * Spec: ai-gateway/provider-routing.feature, governance/routing-policy-aliases-and-rules.feature,
- * auth-cache.feature
+ * GET config/:vk_id must include vk.routingPolicy itself or bundle returns empty lists.
+ * Spec: specs/ai-gateway/provider-routing.feature
  */
 import { nowInstant, toDate } from "@langwatch/time";
 import { nanoid } from "nanoid";

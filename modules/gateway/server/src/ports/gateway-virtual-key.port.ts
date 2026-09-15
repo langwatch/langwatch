@@ -78,9 +78,8 @@ export abstract class GatewayVirtualKeys {
   ): Promise<GatewayVirtualKeyRecord | null>;
   /**
    * Just name and prefix, for keys the caller already has ids for (usage
-   * surfaces label ledger rows). Scoped to the organization even though ids
-   * alone would find the rows — a read answerable within only one tenant
-   * can't be made to leak by a caller's id list from somewhere unexpected.
+   * labels ledger rows). Scoped to the organization even though ids alone
+   * would find the rows, so a stray id list can't leak across tenants.
    */
   abstract findMetaByIds(input: {
     organizationId: string;

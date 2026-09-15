@@ -409,10 +409,9 @@ function BillingEventsTable({
 }
 
 /**
- * The billing events ledger: the per-request `gateway_spend_events` table
- * rendered newest-first with keyset load-more. Every row is one gateway
- * request as billing sees it: token classes, rated cost, attribution, and
- * status, with a drill-through to the trace behind it.
+ * The billing events ledger: the per-request `gateway_spend_events` table,
+ * newest-first with keyset load-more. Each row: token classes, rated cost,
+ * attribution and status, with a drill-through to the trace behind it.
  */
 function BillingEventsPage() {
   const { project } = useOrganizationTeamProject();

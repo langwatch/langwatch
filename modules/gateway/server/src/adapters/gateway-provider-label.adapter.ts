@@ -1,8 +1,7 @@
 /**
- * The display fallback every budget surface wants: the resolved provider
- * label, else the raw key, else null when the budget filters on no provider.
- * Pure, so it lives here rather than beside the Postgres lookup that fills
- * the map — a transport must not reach into `repositories/prisma` for it.
+ * The display fallback every budget surface wants: resolved provider label,
+ * else raw key, else null with no provider filter. Pure, so it lives here —
+ * a transport must not reach into `repositories/prisma` for it.
  */
 export class GatewayProviderLabelAdapter {
   static create(): GatewayProviderLabelAdapter {

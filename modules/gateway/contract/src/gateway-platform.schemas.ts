@@ -1,8 +1,7 @@
 /**
- * Wire schemas for the public `/api/gateway/v1` virtual-key, budget and
- * cache-rule surface. Every enum here is lower_snake_case, input and output:
- * the stored SCREAMING_SNAKE is Prisma's convention, not a contract, and
- * `toWireEnum` / `toStoredEnum` translate at the transport in both directions.
+ * Wire schemas for the public `/api/gateway/v1` surface. Every enum is
+ * lower_snake_case in and out — the stored SCREAMING_SNAKE is Prisma's
+ * convention, not a contract; `toWireEnum`/`toStoredEnum` translate both ways.
  */
 import { z } from "zod";
 

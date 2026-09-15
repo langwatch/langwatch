@@ -1,9 +1,7 @@
 /**
  * @vitest-environment jsdom
- *
- * RTL coverage for the deliveries drawer: the health strip renders, the
- * delivery log paginates with a Load more control, and advancing the page
- * passes the previous page's cursor back to the query.
+ * RTL coverage: health strip renders, delivery log paginates with Load more,
+ * and advancing the page passes the previous cursor back to the query.
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import { cleanup, render, screen } from "@testing-library/react";

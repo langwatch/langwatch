@@ -21,9 +21,8 @@ export abstract class GatewayInternalStore {
 
   /**
    * The per-user reset boundary for one bucket of an attributed-user budget.
-   *
-   * `null` where the bucket has never been reset, which means the template's
-   * own period boundary is the only one bounding the sum.
+   * `null` means never reset — the template's own period boundary is the
+   * only one bounding the sum.
    */
   abstract tryFindBucketBoundary(input: {
     budgetId: string;
@@ -37,11 +36,9 @@ export abstract class GatewayInternalStore {
   abstract listProjectIdsForOrganization(organizationId: string): Promise<string[]>;
 
   /**
-   * The key rows a batch of spend admissions is attributed against.
-   *
-   * One read for a whole batch of up to 500 records: the appended event
-   * carries the result from then on, so nothing downstream re-reads identity
-   * per request.
+   * The key rows a batch of spend admissions is attributed against. One
+   * read for up to 500 records: the appended event carries the result from
+   * then on, so nothing downstream re-reads identity per request.
    */
   abstract findVirtualKeysForAttribution(virtualKeyIds: readonly string[]): Promise<
     {
@@ -58,11 +55,9 @@ export abstract class GatewayInternalStore {
   ): Promise<{ id: string; teamId: string }[]>;
 
   /**
-   * Advance `lastUsedAt` on the keys a drain batch admitted.
-   *
-   * Best effort by contract: the column is administrative oversight rather
-   * than enforcement, and failing a batch of billing records over it would
-   * cost the drainer a retry of records that already appended.
+   * Advance `lastUsedAt` on the keys a drain batch admitted. Best effort:
+   * the column is administrative oversight, not enforcement, so failing the
+   * batch over it would cost the drainer a retry of records already appended.
    */
   abstract touchVirtualKeysLastUsed(input: {
     virtualKeyIds: readonly string[];

@@ -1,10 +1,7 @@
 /**
  * @vitest-environment node
- *
- * Regression guard for issue #6141: the rollup only returns a row when the
- * period asked for is exactly the period the materialised view bucketed the
- * debit into. Those two drifted before — four of six windows wrote into a
- * bucket nothing read, so budgets accrued nothing forever, silently.
+ * Regression guard for #6141: rollup returns a row only when the asked
+ * period matches the bucketed period — four of six windows used to drift.
  */
 
 import { nowInstant } from "@langwatch/time";

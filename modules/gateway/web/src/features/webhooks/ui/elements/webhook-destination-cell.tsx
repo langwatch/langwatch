@@ -13,11 +13,9 @@ export interface WebhookDestinationSummary {
 }
 
 /**
- * What to print for a queue. Every Amazon SQS URL opens with the same
- * `https://sqs.<region>.amazonaws.com/`, and the cell clips the tail, so
- * printing the URL gives every row an identical visible string and hides the
- * account and the queue name, which are the only parts that say which queue
- * this is. The full URL stays in the title.
+ * What to print for a queue. Every SQS URL shares the same host, so the
+ * clipped URL would look identical on every row and hide the account and
+ * queue name — the only parts that say which queue it is. Full URL in title.
  */
 function queueLabel(sqs: { queueUrl: string; accountId: string; queueName: string }): string {
   if (!sqs.accountId || !sqs.queueName) return sqs.queueUrl;
@@ -25,12 +23,9 @@ function queueLabel(sqs: { queueUrl: string; accountId: string; queueName: strin
 }
 
 /**
- * Where the endpoint delivers, in one cell: a badge naming the transport and
- * the address it uses.
- *
- * The address falls through to the queue rather than reading `url`, because a
- * queue endpoint has no URL and this column would otherwise be blank on one
- * of the two kinds.
+ * Where the endpoint delivers, in one cell: a badge naming the transport
+ * and its address. Falls through to the queue rather than `url`, since a
+ * queue endpoint has no URL and the column would otherwise sit blank.
  */
 export function WebhookDestinationCell({ endpoint }: { endpoint: WebhookDestinationSummary }) {
   const address = endpoint.sqs ? queueLabel(endpoint.sqs) : (endpoint.url ?? "");

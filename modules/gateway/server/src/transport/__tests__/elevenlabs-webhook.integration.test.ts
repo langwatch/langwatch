@@ -1,7 +1,6 @@
 /**
  * @vitest-environment node
- * Real Postgres. This canonical webhook and the reconciler are the two paths
- * to billing a brokered ElevenLabs call.
+ * Real Postgres: webhook and reconciler are the two paths to billing a brokered call.
  * Spec: specs/ai-gateway/realtime-sessions.feature
  */
 import { createHmac } from "crypto";

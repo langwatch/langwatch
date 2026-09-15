@@ -8,10 +8,9 @@ export type GatewayErrorPanelProps = {
 };
 
 /**
- * Renders a consistent error surface for gateway list pages when the
- * tRPC query fails (500, network blip, permission regression, etc).
- * Replaces the silent infinite-spinner anti-pattern where pages only
- * branch on isLoading and never surface isError to the operator.
+ * A consistent error surface for gateway list pages when the tRPC query
+ * fails. Replaces the silent infinite-spinner anti-pattern where a page
+ * branches on isLoading and never surfaces isError to the operator.
  */
 export function GatewayErrorPanel({
   title = "Failed to load data",

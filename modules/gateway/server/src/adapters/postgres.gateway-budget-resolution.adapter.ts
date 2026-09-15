@@ -16,10 +16,8 @@ export type GatewayBudgetResolutionApi = Pick<GatewayApi, "resolveApplicableBudg
 
 /**
  * The ONE read the spend graph's debit path makes into Gateway. Composing
- * the whole gateway app for it would drag in the write graph behind budget
- * CRUD, the guardrail catalogue and cache rules — none of which a debit
- * reaches. Same trade as `worker-trace-capability-services.composition.ts`
- * for record-span: publish just the read half, named by its operation.
+ * the whole app would drag in budget CRUD, guardrails and cache rules —
+ * none of which a debit reaches, so only the read half is published here.
  */
 export class PostgresGatewayBudgetResolutionAdapter implements GatewayBudgetResolutionApi {
   static create(options: {

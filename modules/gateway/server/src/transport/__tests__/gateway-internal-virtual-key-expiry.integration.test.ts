@@ -1,8 +1,7 @@
 /**
  * @vitest-environment node
- * Real Postgres + real internal auth route, no mocks. Expiry is read at
- * resolve time; a stored stop still wins over it. Spec:
- * specs/ai-gateway/virtual-key-lifecycle.feature
+ * Real internal auth, no mocks: expiry reads at resolve time; a stored stop still wins.
+ * Spec: specs/ai-gateway/virtual-key-lifecycle.feature
  */
 
 import { type Instant, nowInstant, toDate } from "@langwatch/time";

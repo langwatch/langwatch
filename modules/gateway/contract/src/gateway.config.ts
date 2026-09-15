@@ -62,12 +62,9 @@ export class GatewaySecretsConfigurationError extends Error {
 }
 
 /**
- * Refuses a partial or too-short set of gateway secrets, and says nothing
- * otherwise.
- *
- * Length is checked first: a deployment that set one secret to a placeholder
- * has a length problem, and naming the two it has not reached yet would name
- * the wrong fix.
+ * Refuses a partial or too-short set of gateway secrets, silent otherwise.
+ * Length is checked first: a placeholder secret has a length problem, and
+ * naming the two not yet reached would name the wrong fix.
  */
 export function assertGatewaySecretsAllOrNone(source: Readonly<Record<string, unknown>>): void {
   const present = GATEWAY_SECRET_ENVS.filter((env) => stated(source[env]) !== undefined);

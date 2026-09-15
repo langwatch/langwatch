@@ -25,11 +25,9 @@ export const gatewayInternalConfigParamsSchema = z.object({
 });
 
 /**
- * One guardrail verdict request.
- *
- * The direction vocabulary is the WIRE's, deliberately not the stored Prisma
- * enum: a storage-value mismatch here fails every real call, and a guardrail
- * that cannot answer falls open.
+ * One guardrail verdict request. The direction vocabulary is the WIRE's,
+ * deliberately not the stored Prisma enum: a mismatch here fails every real
+ * call, and a guardrail that cannot answer falls open.
  */
 export const gatewayInternalGuardrailCheckSchema = z.object({
   vk_id: z.string().min(1),
@@ -59,10 +57,9 @@ export const GATEWAY_INTERNAL_SPEND_COMMANDS = [
 export type GatewayInternalSpendCommandName = (typeof GATEWAY_INTERNAL_SPEND_COMMANDS)[number];
 
 /**
- * One drained spend record. The payload is left unread here and validated
- * against the command's own schema after `project_id` is mapped to the
- * internal tenant id, so a record rejected for its payload is told apart from
- * a record whose envelope was malformed.
+ * One drained spend record. The payload is left unread here, validated
+ * against the command's own schema after `project_id` maps to the tenant
+ * id — a payload rejection is told apart from a malformed envelope.
  */
 export const gatewayInternalSpendCommandSchema = z.object({
   command: z.enum(GATEWAY_INTERNAL_SPEND_COMMANDS),
@@ -98,11 +95,9 @@ export const gatewayInternalReserveSessionSchema = z.object({
 });
 
 /**
- * A correlation or a terminal status on a booked session.
- *
- * Both fields are optional on their own; the refinement stops a project_id-only
- * body from parsing, applying nothing, and answering 404 as though the session
- * were missing.
+ * A correlation or a terminal status on a booked session. Both fields are
+ * optional alone; the refinement stops a project_id-only body from parsing
+ * and 404ing as though the session were missing.
  */
 export const gatewayInternalPatchSessionSchema = z
   .object({
@@ -116,11 +111,9 @@ export const gatewayInternalPatchSessionSchema = z
   });
 
 /**
- * What one booked session consumed.
- *
- * `virtual_key_id` is required, not optional: several virtual keys can point at
- * one project, so the project alone does not say whose session this is, and the
- * spend record belongs to the key that was admitted.
+ * What one booked session consumed. `virtual_key_id` is required: several
+ * keys can point at one project, so the project alone doesn't say whose
+ * session this is — spend belongs to the key that was admitted.
  */
 export const gatewayInternalReportUsageSchema = z.object({
   project_id: z.string().min(1).max(256),

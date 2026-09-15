@@ -1,7 +1,6 @@
 /**
  * @vitest-environment node
  * @see specs/ai-gateway/gateway-spend-rest.feature
- *
  * Real Postgres + real ClickHouse. Pins filtered-reconciliation trust:
  * nothing-matching narrowing answers nothing, a team resolves to owned projects.
  */

@@ -1,8 +1,7 @@
 /**
  * The migrated ClickHouse these repository suites read and write, or null.
- * Replaces `startTestContainers()` (went with platform/app): reads the
- * connection string the job supplies and `describe.skipIf` away when none,
- * the same shape every other datastore-needing package suite uses.
+ * Reads the connection string the job supplies and `describe.skipIf` away
+ * when none — the same shape every other datastore-needing suite uses.
  */
 import { createClient, type ClickHouseClient } from "@clickhouse/client";
 

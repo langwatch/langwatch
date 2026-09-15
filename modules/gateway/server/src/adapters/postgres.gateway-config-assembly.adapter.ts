@@ -1,8 +1,7 @@
 /**
- * Version token for GET /api/internal/gateway/config/:vk_id: VirtualKey.revision covers the key;
- * a provider digest over the materialiser's own resolver covers the dispatch chain the revision
- * never reaches. Moves on any write, even one bypassing the service; budgets/cache/guardrails/
- * spend excluded by decision.
+ * Version token for GET config/:vk_id: VirtualKey.revision covers the key;
+ * a provider digest covers the dispatch chain the revision never reaches.
+ * Moves on any write, even bypassing the service; budgets/cache excluded.
  */
 import { createHash } from "node:crypto";
 import type { VirtualKeyWithScopes } from "@langwatch/gateway-contract";

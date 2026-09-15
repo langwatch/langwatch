@@ -1,9 +1,7 @@
 /**
  * @vitest-environment node
- * `GatewayApp.findSpendEventsPage`: the ledger read, filter/cursor
- * passthrough, and virtual-key display-name resolution. The whole assembly
- * used to live in the tRPC transport; it now lives here so a REST door and
- * the tRPC door read the same behaviour.
+ * `GatewayApp.findSpendEventsPage`: ledger read, filter/cursor passthrough,
+ * virtual-key display-name resolution — moved here so REST and tRPC agree.
  */
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";

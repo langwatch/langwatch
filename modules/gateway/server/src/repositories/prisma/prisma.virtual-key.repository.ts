@@ -1,8 +1,7 @@
 /**
- * Data-access for VirtualKey. Post-collapse model: organization-scoped + reachable from N
- * (scopeType, scopeId) entries in VirtualKeyScope. dbMultiTenancyProtection enforces every
- * where-clause carries organizationId, a row id, a hashedSecret, or a scopes:{some:{...}}
- * predicate.
+ * Data-access for VirtualKey. Post-collapse: organization-scoped + reachable
+ * from N (scopeType, scopeId) VirtualKeyScope entries. dbMultiTenancyProtection
+ * enforces every where-clause carries organizationId, an id, a secret, or scopes.
  */
 import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
 import type { GatewayVirtualKeyRecord, GatewayVirtualKeyScope } from "@langwatch/gateway-contract";

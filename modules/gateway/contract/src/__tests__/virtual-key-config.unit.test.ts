@@ -1,8 +1,7 @@
 /**
  * @vitest-environment node
- *
- * VK tag normalization keeps the Label facet bounded; must hold for REST API
- * and drawer input. Spec: specs/ai-gateway/span-shape.feature
+ * VK tag normalization keeps the Label facet bounded for REST API and drawer input.
+ * Spec: specs/ai-gateway/span-shape.feature
  */
 import { describe, expect, it } from "vitest";
 

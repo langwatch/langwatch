@@ -1,8 +1,7 @@
 /**
  * The server half of `virtualKeys.*`, organization-scoped. Authorization is
  * per-scope and data-dependent, so every procedure declares itself
- * service-authorized and the application performs the real check. The
- * plaintext key is answered only by create and rotate, once at mint.
+ * service-authorized; the plaintext key answers only from create and rotate.
  */
 import { defineTrpcFact, defineTrpcRouter } from "@langwatch/api/trpc";
 import { GatewayApi, virtualKeyTrpc, GatewayWindow } from "@langwatch/gateway-contract";

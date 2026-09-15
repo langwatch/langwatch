@@ -29,7 +29,9 @@ import type { GatewaySpendProcessingEvent } from "../eventing/gateway-spend.inte
 import { GatewaySpendFoldProjection } from "../eventing/gateway-spend.projection.ts";
 
 /**
- * A process manager another feature owns, mounted here under the name its durable rows are already keyed by — renaming loses inbox/state/outbox rows. Webhook delivery (ADR-073) and Governance debits live in packages this one may not depend on.
+ * A process manager another feature owns, mounted here under the name its
+ * durable rows are already keyed by — renaming loses inbox/state/outbox
+ * rows. Webhook delivery (ADR-073) and debits live in packages this one may not depend on.
  */
 export interface GatewaySpendProcessManagerMount {
   name: string;
@@ -61,7 +63,9 @@ export interface EventingGatewaySpendAdapterOptions {
 }
 
 /**
- * The gateway spend pipeline (spend-command spine). One aggregate per request (gateway's own ULID); rated in the fold to integer nano-USD. connectSettlement binds the sweeper's sender at registration, not settlement, so a mis-registered graph fails at boot, not per tenant.
+ * The gateway spend pipeline (spend-command spine). One aggregate per
+ * request, rated in the fold to integer nano-USD. connectSettlement binds
+ * the sweeper's sender at registration, so a mis-registered graph fails at boot.
  */
 export class EventingGatewaySpendAdapter {
   static create(options: EventingGatewaySpendAdapterOptions): EventingGatewaySpendAdapter {

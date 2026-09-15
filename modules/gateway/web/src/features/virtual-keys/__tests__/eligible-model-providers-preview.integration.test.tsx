@@ -1,7 +1,6 @@
 /**
  * @vitest-environment jsdom
- * Tests eligible model providers panel for three critical failure modes:
- * unavailable provider advertising, inherited provider attribution, and scope display.
+ * Three failure modes: unavailable provider advertising, inherited attribution, scope display.
  * Spec: specs/ai-gateway/governance/vk-scope-inheritance.feature
  */
 import { ChakraProvider, defaultSystem } from "@chakra-ui/react";

@@ -1,7 +1,6 @@
 /**
  * @vitest-environment node
- * Real Postgres, no mocks: reachability depends on virtual key scopes and the project a key's
- * traces land in — exactly what a stub would fake.
+ * Real Postgres, no mocks: reachability follows virtual key scope and project.
  * Spec: specs/ai-gateway/gateway-budget-targeting.feature
  */
 import {

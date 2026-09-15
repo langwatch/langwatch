@@ -458,23 +458,18 @@ export interface GatewaySpanIngestion {
 }
 
 /**
- * Hands a confirmation to the gateway spend pipeline.
- *
- * The port exists so a voice settlement reaches the SAME pipeline the
- * gateway's own drainer sends to. A process that registered no such pipeline
- * refuses by name rather than dropping the confirmation, because a dropped
- * confirmation leaves an admitted spend record to settle as cost-unknown.
+ * Hands a confirmation to the gateway spend pipeline. The port exists so
+ * voice settlement reaches the SAME pipeline the drainer sends to. No
+ * pipeline registered refuses by name — a dropped one settles as unknown.
  */
 export interface GatewaySpendConfirmation {
   confirmSpend(data: ConfirmSpendCommandData): Promise<void>;
 }
 
 /**
- * Prices measured quantities.
- *
- * One rating seam for the whole vertical: the voice settlement and the
- * gateway's own drainer must not price the same call twice, which is how two
- * money surfaces come to disagree about it.
+ * Prices measured quantities. One rating seam for the whole vertical: voice
+ * settlement and the drainer must not price the same call twice, which is
+ * how two money surfaces come to disagree.
  */
 export interface GatewaySpendRating {
   rate(input: { model: string; usage: SpendUsage; rateVersion?: string }): {

@@ -1,9 +1,7 @@
 /**
  * @vitest-environment jsdom
- *
- * RTL coverage for the Billing Events ledger page: rows render with token
- * classes, cost, provider, and trace drill-through; filters reset paging
- * and reach the query input; load-more appears only with a next cursor.
+ * RTL coverage: rows render token classes/cost/provider/trace drill-through;
+ * filters reset paging and reach the query; load-more needs a next cursor.
  */
 import { cleanup, screen } from "@testing-library/react";
 

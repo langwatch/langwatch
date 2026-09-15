@@ -1,9 +1,7 @@
 /**
- * The Tags field shared by the virtual-key create and edit drawers: the copy
- * behind its (i), the input cap, and the parsing both drawers do on save.
- *
- * The two drawers render the same field, so the copy and the limits live here
- * rather than being written twice and drifting apart.
+ * The Tags field shared by the virtual-key create and edit drawers: the
+ * copy behind its (i), the input cap, and the parsing both do on save —
+ * living here so the two drawers can't drift apart.
  */
 import { VK_TAG_MAX_LENGTH, VK_TAGS_MAX_COUNT } from "@langwatch/gateway-contract";
 
@@ -34,12 +32,9 @@ export function parseTagsCsv(csv: string): string[] {
 }
 
 /**
- * What saving would quietly do to what is currently typed, or null when it
- * would keep every tag as written. Shown under the field only while it
- * applies, so a person never loses a tag without being told first.
- *
- * Repeats and blanks are left out on purpose: dropping them costs the person
- * nothing, and the (i) already says they go.
+ * What saving would quietly do to what is typed, or null if unchanged.
+ * Shown only while it applies, so nobody loses a tag unwarned. Repeats and
+ * blanks drop silently — the (i) already says they go.
  */
 export function tagsBeyondLimitsNotice(csv: string): string | null {
   const tags = parseTagsCsv(csv);

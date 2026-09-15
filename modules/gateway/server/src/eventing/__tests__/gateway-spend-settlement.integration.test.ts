@@ -1,7 +1,6 @@
 /**
  * @vitest-environment node
- * Real ClickHouse: a sweeper-settled admission records unknown cost (never zero) with
- * NeedsReconciliation set, and a late confirmation supersedes it (replace, never sum).
+ * Real ClickHouse: settlement is unknown cost, never zero; confirmation replaces, never sums.
  * Spec: specs/ai-gateway/billing-spend-events.feature
  */
 
