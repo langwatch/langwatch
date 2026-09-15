@@ -314,9 +314,11 @@ spec:
                    error naming this variable. */}}
             {{- include "langwatch.gatewayBaseUrlEnv" . | nindent 12 }}
 
-            # NextAuth configuration (NEXTAUTH_SECRET lives in sharedEnv —
-            # every app-image consumer needs it, see _helpers.tpl)
-            - name: NEXTAUTH_PROVIDER
+            # Auth configuration (NEXTAUTH_SECRET lives in sharedEnv —
+            # every app-image consumer needs it, see _helpers.tpl).
+            # AUTH_PROVIDER is the app's supported name for this setting;
+            # the values key keeps its NextAuth-era path for compatibility.
+            - name: AUTH_PROVIDER
               value: {{ .Values.app.nextAuth.provider | quote }}
 
             # NextAuth - SSO OAuth providers (auth0, azureAd, cognito, github,

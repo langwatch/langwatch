@@ -15,6 +15,7 @@ Feature: The identifier-first sign-in router - one auth screen, routed by data
   #   (?local=1)              →    local method picker       break_glass
   #   email → normalize       →    domain in ACTIVE conn?
   #     yes                   →    redirect to the IdP       domain_routed
+  #     no, sole federated    →    redirect to the IdP       account_methods
   #     no, known account     →    account's method picker   account_methods
   #     no, unknown account   →    continue to sign-up       identifier_unknown
   #     lookup not wired      →    default method picker     no_domain_match
@@ -90,6 +91,21 @@ Feature: The identifier-first sign-in router - one auth screen, routed by data
     Then the decision offers the passkey and not the password
     And the methods are ordered strongest first
     And a method this deployment does not offer is never offered
+
+  # Nearly every cloud account today holds exactly the legacy identity
+  # provider, so without this the address step answered with a picker whose
+  # one button restated the question. A sole passkey or password never
+  # redirects: the passkey's ceremony and the password's form are the screen's
+  # to draw, and both need the person still on it.
+  @unit
+  Scenario: An account whose only method is federated redirects straight to it
+    Given "home.net" belongs to no ACTIVE connection
+    And the account for "sam@home.net" holds one federated method and nothing else
+    When "sam@home.net" is submitted to the router
+    Then the decision is a redirect to that method's identity provider
+    And the decision carries the reason code "account_methods"
+    And an account also holding a second method still gets the picker
+    And a method belonging to an organization's connection keeps the picker, whose route can see the connection's state
 
   @unit
   Scenario: A connected domain routes before the account is consulted
@@ -205,6 +221,13 @@ Feature: The identifier-first sign-in router - one auth screen, routed by data
     Then the configured provider is the offered method, exactly as before
     And a second method can be added without ending the first
 
+  @unit
+  Scenario: The provider setting answers to its modern name
+    Given a deployment setting AUTH_PROVIDER
+    Then the configured provider applies exactly as the legacy name configured it
+    And a deployment still setting only NEXTAUTH_PROVIDER keeps working and is warned once that the name is deprecated
+    And when both are set the modern name wins
+
   # ── Which social providers the door offers ─────────────────────────────
   #
   # A social button is an offer to dial a provider. An offer the deployment
@@ -223,9 +246,74 @@ Feature: The identifier-first sign-in router - one auth screen, routed by data
 
   @unit
   Scenario: A social provider this deployment never mounted is never offered
-    Given credentials are present for a social provider this deployment does not mount
+    Given a social provider's credentials are incomplete, so better-auth never mounted it
     When the sign-in page is requested
     Then that provider is not one of the offered methods
+
+  # Retiring the NextAuth-era "exactly one provider" rule is what lets the
+  # native providers mount beside the Auth0 broker during its migration
+  # (D09). Setting a client id and secret is the mounting decision; the
+  # provider env keeps selecting the generic-OAuth branch and leading the
+  # rail, and a provider env naming something unmountable still lands in
+  # email mode even while another provider's credentials are present.
+  @unit
+  Scenario: Social providers mount on their credentials, not on the provider env
+    Given credentials are present for two social identity providers
+    And the provider env names only one of them
+    When the sign-in page is requested
+    Then both providers are among the offered methods
+    And a provider whose credentials are absent is still never offered
+    And a deployment that chose email mode mounts and offers no social provider, whatever credentials linger
+    And a provider env naming something unmountable still lands in email mode with the password offered
+
+  # ── The Auth0 connection bridge (deliberately short-term, D09) ─────────
+  #
+  # SaaS's social sign-ins still broker through Auth0. Until they are native,
+  # the door shows each brokered connection as its own branded button, and
+  # clicking one dials Auth0 pre-scoped to that connection — the person picks
+  # their provider exactly once, on our screen, and Auth0's own picker never
+  # appears. Self-hosted Auth0 deployments are untouched: their tenant's
+  # connections have names no hardcoded bridge may guess, so they keep the
+  # generic hand-off to Auth0's own screen.
+
+  @unit
+  Scenario: SaaS shows the broker's social connections as their own buttons
+    Given a SaaS deployment whose provider is the Auth0 broker
+    When the sign-in page is requested
+    Then Google, GitHub and Microsoft are offered as branded methods ahead of the generic one
+    And dialing a branded method names the connection Auth0's own screen offered
+    And a self-hosted Auth0 deployment is offered only the generic method
+
+  @unit
+  Scenario: An account brokered through a social connection routes to its own button
+    Given the account for "sam@home.net" signed in through the broker's Google connection
+    When "sam@home.net" is submitted to the router on SaaS
+    Then the decision redirects to the branded Google method
+    And an account the broker holds as a database user keeps the generic method
+
+  # How the bridge ends: one provider at a time, on its credentials. Mounting
+  # a native client for a bridged provider IS that provider's cutover — the
+  # rail can never draw two buttons that both say "Continue with Google", and
+  # the accounts already brokered through that connection must follow the
+  # button the rail actually draws, or ranking drops them onto the generic
+  # picker the bridge exists to avoid.
+  @unit
+  Scenario: A natively mounted provider takes over its own bridge button
+    Given a SaaS deployment whose provider is the Auth0 broker
+    And credentials are present for the native Google provider
+    When the sign-in page is requested
+    Then the native Google method stands in the bridge's Google slot
+    And the providers with no native credentials keep their branded bridge methods
+    And an account brokered through the Google connection routes to the native method
+
+  # What of the ask survives on every deployment: the address was already
+  # typed once, on our screen, and typing it again on the provider's is the
+  # provider's screen failing to be told.
+  @unit
+  Scenario: The address typed on our screen rides along to the identity provider
+    Given an address that routes to a federated method
+    When the hand-off to the provider is dialed
+    Then the address is sent as the sign-in hint so the provider's screen arrives prefilled
 
   # ── The license gate rides along (ADR-027, mechanism amended) ──────────
 

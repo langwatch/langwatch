@@ -1,3 +1,5 @@
+import { nativeProviderIdOfAuth0Strategy } from "@langwatch/identity";
+
 /** One better-auth `Account` row, of the parts these screens read. */
 export interface LinkedAccount {
   id: string;
@@ -6,25 +8,17 @@ export interface LinkedAccount {
 }
 
 /**
- * The identity an Auth0 subject actually belongs to.
- *
- * An Auth0 deployment holds every identity under the one `auth0` provider and
- * names the real one in the subject — `google-oauth2|…`, `windowslive|…` — so
- * a row would otherwise read "Auth0" to somebody who has only ever clicked a
- * Google button.
- */
-const AUTH0_STRATEGY_METHODS: Record<string, string> = {
-  "google-oauth2": "google",
-  windowslive: "microsoft",
-  github: "github",
-};
-
-/**
  * Which sign-in method a linked account IS.
  *
- * A method id rather than a name, so the row's mark and the row's words come
- * from the same two places the auth screens' own buttons take them from — a
- * second table of provider names is a second thing to keep in step.
+ * An Auth0 deployment holds every identity under the one `auth0` provider
+ * and names the real one in the subject — `google-oauth2|…`,
+ * `windowslive|…` — so a row would otherwise read "Auth0" to somebody who
+ * has only ever clicked a Google button. The strategy vocabulary is
+ * `@langwatch/identity`'s one table, shared with the backfill's derivation
+ * and the connection bridge, so the row here and the button there can never
+ * name the same identity differently. A method id rather than a name, so
+ * the row's mark and words come from the same places the auth screens'
+ * buttons take them from.
  */
 export function linkedAccountMethodId({
   provider,
@@ -36,7 +30,9 @@ export function linkedAccountMethodId({
   if (provider !== "auth0") return provider;
 
   const [strategy] = providerAccountId.split("|");
-  return AUTH0_STRATEGY_METHODS[strategy ?? ""] ?? strategy ?? provider;
+  return (
+    nativeProviderIdOfAuth0Strategy(strategy ?? "") ?? strategy ?? provider
+  );
 }
 
 /**

@@ -297,7 +297,8 @@ describe("given the identifier-first sign-in screen", () => {
 
   describe("when an address routes to an identity provider", () => {
     /** @scenario The email step renders the routed outcome */
-    it("sends the person to the provider the decision named", async () => {
+    /** @scenario "The address typed on our screen rides along to the identity provider" */
+    it("sends the person to the provider the decision named, address in hand", async () => {
       routeMock.mockResolvedValueOnce(localPicker).mockResolvedValueOnce({
         outcome: "redirect_to_connection",
         connectionId: "org:acme",
@@ -309,8 +310,11 @@ describe("given the identifier-first sign-in screen", () => {
       await enterEmail("sam@acme.com");
 
       await waitFor(() => {
+        // The typed address rides along as the OIDC login hint, so the
+        // provider's screen arrives prefilled with it.
         expect(signInMock).toHaveBeenCalledWith("okta", {
           callbackUrl: undefined,
+          loginHint: "sam@acme.com",
         });
       });
       expect(

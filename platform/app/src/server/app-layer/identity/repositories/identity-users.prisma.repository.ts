@@ -92,7 +92,10 @@ export class PrismaIdentityUsersRepository
               { provider: "credential", password: { not: "" } },
             ],
           },
-          select: { provider: true },
+          // The subject rides along for exactly one reader: the connection
+          // bridge, which routes an Auth0-brokered row to its own branded
+          // button. An opaque identifier, never a secret.
+          select: { provider: true, providerAccountId: true },
         },
         accountCredentials: {
           where: {
@@ -124,6 +127,9 @@ export class PrismaIdentityUsersRepository
         ],
         connectionIds: [],
       },
+      auth0Subjects: user.accounts
+        .filter((account) => account.provider === "auth0")
+        .map((account) => account.providerAccountId),
     };
   }
 

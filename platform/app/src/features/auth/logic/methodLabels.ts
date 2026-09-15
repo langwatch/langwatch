@@ -18,6 +18,12 @@ const FEDERATED_METHOD_LABELS: Record<string, string> = {
   okta: "Okta",
   cognito: "Amazon Cognito",
   onelogin: "OneLogin",
+  // The Auth0 connection bridge (`utils/auth0-bridge.ts`): each id IS the
+  // consumer identity it dials through the broker, and the broker's name on
+  // the button would be the operator's word, not the customer's.
+  "auth0-google": "Google",
+  "auth0-github": "GitHub",
+  "auth0-microsoft": "Microsoft",
 };
 
 const SINGLE_SIGN_ON = "single sign-on";

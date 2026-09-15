@@ -154,6 +154,23 @@ export const issuerForProviderId = (providerId: string): string =>
     ? `${LOCAL_ISSUER_PREFIX}${encodeURIComponent(providerId)}`
     : `${OAUTH_ISSUER_PREFIX}${encodeURIComponent(providerId)}`;
 
+/**
+ * The issuer better-auth 1.7 keys a BUILT-IN social provider's account by —
+ * what a row must carry to answer that provider's own callback lookup.
+ *
+ * Google is the one built-in that declares a real issuer, hardcoded in the
+ * provider itself and not overridable from config; everything else gets the
+ * synthetic namespace. The mirror of the `account_issuer` migration's
+ * backfill rule, stated here so a row written ahead of a native sign-in — the
+ * backfill's derived identifiers — is keyed the way the callback will ask.
+ * Microsoft is deliberately unanswerable: its issuer is the per-tenant `iss`
+ * of a token that has not been seen yet, which is why nothing derives it.
+ */
+export const nativeSocialIssuerFor = (providerId: string): string =>
+  providerId === "google"
+    ? "https://accounts.google.com"
+    : issuerForProviderId(providerId);
+
 export const providerIdFromIssuer = (issuer: string): string | null => {
   for (const prefix of [OAUTH_ISSUER_PREFIX, LOCAL_ISSUER_PREFIX]) {
     if (issuer.startsWith(prefix)) {

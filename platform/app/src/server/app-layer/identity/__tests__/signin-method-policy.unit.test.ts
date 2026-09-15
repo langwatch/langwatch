@@ -275,17 +275,17 @@ describe("the instance sign-in method policy", () => {
     });
   });
 
-  describe("when credentials are present for a provider the deployment does not mount", () => {
+  describe("when credentials are present for several social providers", () => {
     beforeEach(() => {
       licensedStore(true);
     });
 
-    /** @scenario "A social provider this deployment never mounted is never offered" */
-    it("never offers a provider better-auth was not handed", async () => {
-      // Both sets of credentials are present; only one provider is mounted,
-      // because `buildSocialProviders` builds the one `NEXTAUTH_PROVIDER`
-      // names. Offering the other would draw a button whose sign-in call
-      // reaches a provider better-auth has never heard of.
+    /** @scenario "Social providers mount on their credentials, not on the provider env" */
+    it("offers every social provider whose credentials are present", async () => {
+      // Credentials ARE the mounting decision now (D09): the Auth0-broker
+      // migration needs the native providers mounted beside the one
+      // `NEXTAUTH_PROVIDER` names, and an operator sets a client id and
+      // secret for no reason other than to offer that provider.
       envMock.NEXTAUTH_PROVIDER = "google";
       socialCredentials("google");
       socialCredentials("github");
@@ -293,7 +293,121 @@ describe("the instance sign-in method policy", () => {
       const policy = await resolveSignInMethodPolicy();
 
       expect(methodIds(policy.defaultMethods)).toContain("google");
+      expect(methodIds(policy.defaultMethods)).toContain("github");
+    });
+
+    /** @scenario "Social providers mount on their credentials, not on the provider env" */
+    it("still never offers a provider whose credentials are absent", async () => {
+      envMock.NEXTAUTH_PROVIDER = "google";
+      socialCredentials("google");
+
+      const policy = await resolveSignInMethodPolicy();
+
+      expect(methodIds(policy.defaultMethods)).toContain("google");
       expect(methodIds(policy.defaultMethods)).not.toContain("github");
+      expect(methodIds(policy.defaultMethods)).not.toContain("gitlab");
+    });
+
+    /** @scenario "SaaS shows the broker's social connections as their own buttons" */
+    it("offers the branded bridge methods ahead of the generic one on SaaS", async () => {
+      envMock.IS_SAAS = true;
+
+      const policy = await resolveSignInMethodPolicy();
+
+      expect(methodIds(policy.defaultMethods)).toEqual([
+        "auth0-google",
+        "auth0-github",
+        "auth0-microsoft",
+        "auth0",
+        "passkey",
+      ]);
+    });
+
+    /** @scenario "SaaS shows the broker's social connections as their own buttons" */
+    it("keeps a self-hosted Auth0 deployment on the generic method alone", async () => {
+      envMock.IS_SAAS = false;
+
+      const policy = await resolveSignInMethodPolicy();
+
+      expect(methodIds(policy.defaultMethods)).toEqual(["auth0", "passkey"]);
+    });
+
+    /** @scenario "A natively mounted provider takes over its own bridge button" */
+    it("draws one Google button when the native client is mounted beside the bridge", async () => {
+      // The cutover: the Google credentials land, and the bridge button for
+      // Google steps aside for the native one rather than standing beside it.
+      // Two buttons both reading "Continue with Google" is the failure this
+      // prevents — nothing on either would tell a person which is theirs.
+      envMock.IS_SAAS = true;
+      socialCredentials("google");
+
+      const policy = await resolveSignInMethodPolicy();
+
+      expect(methodIds(policy.defaultMethods)).toEqual([
+        "google",
+        "auth0-github",
+        "auth0-microsoft",
+        "auth0",
+        "passkey",
+      ]);
+    });
+
+    /** @scenario "A natively mounted provider takes over its own bridge button" */
+    it("cuts providers over one at a time, leaving the rest brokered", async () => {
+      envMock.IS_SAAS = true;
+      socialCredentials("google");
+      socialCredentials("azure-ad");
+
+      const policy = await resolveSignInMethodPolicy();
+
+      expect(methodIds(policy.defaultMethods)).toEqual([
+        "google",
+        "auth0-github",
+        "azure-ad",
+        "auth0",
+        "passkey",
+      ]);
+    });
+
+    /** @scenario "Social providers mount on their credentials, not on the provider env" */
+    it("mounts and offers nothing in email mode, whatever credentials linger", async () => {
+      // Email mode is exactly what ADR-027 means by DENY, and the federation
+      // request hook stands down entirely there — a provider mounted in email
+      // mode would be a live, license-ungated sign-in endpoint.
+      envMock.NEXTAUTH_PROVIDER = "email";
+      socialCredentials("google");
+
+      const policy = await resolveSignInMethodPolicy();
+
+      expect(methodIds(policy.defaultMethods)).toEqual(["password", "passkey"]);
+    });
+
+    /** @scenario "Social providers mount on their credentials, not on the provider env" */
+    it("keeps the password offered when the named provider is a typo", async () => {
+      // The typo coerces to email mode; a stray credential's social method
+      // must not overrule that landing — a federated method in the default
+      // set is the exact predicate that 403s the password and reset routes.
+      envMock.NEXTAUTH_PROVIDER = "gogle";
+      socialCredentials("github");
+
+      const policy = await resolveSignInMethodPolicy();
+
+      expect(methodIds(policy.defaultMethods)).toEqual(["password", "passkey"]);
+    });
+
+    /** @scenario "A social provider this deployment never mounted is never offered" */
+    it("never offers a provider whose credentials are incomplete", async () => {
+      envMock.NEXTAUTH_PROVIDER = "google";
+      socialCredentials("google");
+      // Two of azure-ad's three values: better-auth is never handed the
+      // provider, so no button may dial it.
+      envMock.AZURE_AD_CLIENT_ID = "azure-client";
+      envMock.AZURE_AD_CLIENT_SECRET = "azure-secret";
+
+      const policy = await resolveSignInMethodPolicy();
+
+      expect(methodIds(policy.defaultMethods)).toContain("google");
+      expect(methodIds(policy.defaultMethods)).not.toContain("azure-ad");
     });
   });
 

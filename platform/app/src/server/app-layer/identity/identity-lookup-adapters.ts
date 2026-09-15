@@ -1,4 +1,5 @@
 import type { LinkProposalDirectoryPort } from "@langwatch/identity-server";
+import { nativeSocialIssuerFor } from "@langwatch/identity-server/better-auth";
 import { createLogger } from "@langwatch/observability";
 import type { PrismaClient } from "~/generated/prisma/client";
 import { InviteService } from "~/server/invites/invite.service";
@@ -155,7 +156,9 @@ export class BetterAuthLinkProposalDirectory
       if (issuer) return issuer;
     }
     if (provider === "credential") return "local:credential";
-    if (provider === "google") return "https://accounts.google.com";
-    return `local:oauth:${provider}`;
+    // The one statement of the rule, shared with the backfill's derived
+    // rows, so a live-written row and a derived one can never split the
+    // (issuer, accountId) key convention.
+    return nativeSocialIssuerFor(provider);
   }
 }

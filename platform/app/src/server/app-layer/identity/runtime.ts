@@ -11,6 +11,7 @@
  */
 
 import { PlanTypes } from "@ee/billing/planTypes";
+import { configuredSocialProviderIds } from "@ee/sso/providers";
 import { platformSSOAllowed, resolveAuthProvider } from "@ee/sso/sso-gate";
 import {
   normalizeIdentifierValue,
@@ -55,6 +56,7 @@ import { prismaAdapter } from "better-auth/adapters/prisma";
 import { nanoid } from "nanoid";
 import { env } from "~/env.mjs";
 import type { PrismaClient } from "~/generated/prisma/client";
+import { auth0BridgeActive } from "~/utils/auth0-bridge";
 import { changeAuth0Password } from "../../auth0/passwordService";
 import type { SecondaryStorageDeps } from "../../better-auth/config/secondary-storage";
 import { LastWayInGuard } from "../../better-auth/last-way-in";
@@ -438,11 +440,26 @@ const signInRouterService = new SignInRouterService({
   domains: signInDomainRoutingPort(),
   policy: signInMethodPolicyPort,
   breakGlass: breakGlassLimiter,
-  accounts: new ProjectionSignInAccountLookup(
-    identityHeads,
-    identityUsers,
+  accounts: new ProjectionSignInAccountLookup({
+    heads: identityHeads,
+    legacy: identityUsers,
     isLatched,
-  ),
+    // The same predicate the method policy gates the branded buttons on
+    // (`signin-method-policy.ts`). The policy additionally requires the
+    // resolved, license-checked method to be auth0; this composition-time
+    // read cannot await that, and does not need to — a bridge id the policy
+    // never offered drops out of ranking, which intersects with the policy's
+    // own default set.
+    auth0BridgeIsActive: auth0BridgeActive({
+      isSaas: env.IS_SAAS,
+      authProvider: env.NEXTAUTH_PROVIDER,
+    }),
+    // The same set the policy builds its rail from, so a provider cut over to
+    // its native client routes its brokered accounts to the button the rail
+    // actually draws. Both readings are of the mounted providers, which do
+    // not change after boot.
+    mountedSocialMethodIds: configuredSocialProviderIds(env),
+  }),
 });
 
 export function signInRouter(): SignInRouterService {

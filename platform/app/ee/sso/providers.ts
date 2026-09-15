@@ -99,24 +99,40 @@ type SocialProviderEnv = Pick<
 
 /**
  * Builds BetterAuth's `socialProviders` map from environment configuration.
- * Mirrors the original NextAuth "exactly one provider" behavior: only the
- * provider named by `NEXTAUTH_PROVIDER` is configured, and only when its
- * client credentials are present.
+ * On a deployment that names ANY federated provider, a social provider
+ * mounts when its client credentials are present — the credentials ARE the
+ * operator's intent, since they exist for no other reason. The named
+ * provider still selects the generic-OAuth branch (auth0, okta, oidc) and
+ * still leads the sign-in rail, so a single-provider deployment reads
+ * exactly as it always did.
+ *
+ * This retired the NextAuth-era "exactly one provider" rule on purpose
+ * (D09): migrating off the Auth0 broker means the native providers mount
+ * BESIDE it during grace, and a rule that could mount only the broker made
+ * that impossible. `sso-gate.ts#authProviderIsMounted` answers for the named
+ * provider specifically, so the typo protection did not widen with this.
+ *
+ * EMAIL MODE STAYS AUTHORITATIVE. A deployment that chose email mode mounts
+ * no social provider whatever credentials linger in its environment: email
+ * mode is exactly what ADR-027 means by DENY, and the federation request
+ * hook stands down entirely in email mode
+ * (`deploymentIsFederationCapable`), so a provider mounted here would be a
+ * live, license-ungated sign-in endpoint nothing offered and nothing
+ * refuses.
  *
  * Exported for unit testing — lets us exercise google/github/gitlab/azure
  * selection directly, without re-initializing the module under a different
- * `NEXTAUTH_PROVIDER`.
+ * environment.
  */
 export const buildSocialProviders = (
   e: SocialProviderEnv,
 ): NonNullable<BetterAuthOptions["socialProviders"]> => {
   const socialProviders: NonNullable<BetterAuthOptions["socialProviders"]> = {};
+  if (!e.NEXTAUTH_PROVIDER || e.NEXTAUTH_PROVIDER === "email") {
+    return socialProviders;
+  }
 
-  if (
-    e.NEXTAUTH_PROVIDER === "google" &&
-    e.GOOGLE_CLIENT_ID &&
-    e.GOOGLE_CLIENT_SECRET
-  ) {
+  if (e.GOOGLE_CLIENT_ID && e.GOOGLE_CLIENT_SECRET) {
     socialProviders.google = {
       clientId: e.GOOGLE_CLIENT_ID,
       clientSecret: e.GOOGLE_CLIENT_SECRET,
@@ -128,11 +144,7 @@ export const buildSocialProviders = (
     };
   }
 
-  if (
-    e.NEXTAUTH_PROVIDER === "github" &&
-    e.GITHUB_CLIENT_ID &&
-    e.GITHUB_CLIENT_SECRET
-  ) {
+  if (e.GITHUB_CLIENT_ID && e.GITHUB_CLIENT_SECRET) {
     socialProviders.github = {
       clientId: e.GITHUB_CLIENT_ID,
       clientSecret: e.GITHUB_CLIENT_SECRET,
@@ -144,11 +156,7 @@ export const buildSocialProviders = (
     };
   }
 
-  if (
-    e.NEXTAUTH_PROVIDER === "gitlab" &&
-    e.GITLAB_CLIENT_ID &&
-    e.GITLAB_CLIENT_SECRET
-  ) {
+  if (e.GITLAB_CLIENT_ID && e.GITLAB_CLIENT_SECRET) {
     socialProviders.gitlab = {
       clientId: e.GITLAB_CLIENT_ID,
       clientSecret: e.GITLAB_CLIENT_SECRET,
@@ -161,7 +169,6 @@ export const buildSocialProviders = (
   }
 
   if (
-    e.NEXTAUTH_PROVIDER === "azure-ad" &&
     e.AZURE_AD_CLIENT_ID &&
     e.AZURE_AD_CLIENT_SECRET &&
     e.AZURE_AD_TENANT_ID
@@ -229,6 +236,17 @@ export const configuredSocialProviderIds = (
     ([betterAuthKey]) => betterAuthKey in mounted,
   ).map(([, methodId]) => methodId);
 };
+
+/**
+ * The better-auth key a social method id mounts under, or null for an id
+ * that is not a social provider at all (a generic-OAuth id, `email`, a
+ * typo). What `authProviderIsMounted` needs now that the social map mounts
+ * on credentials rather than on `NEXTAUTH_PROVIDER`: "is anything mounted"
+ * no longer answers "is the NAMED provider mounted", and the named one is
+ * the only one the typo protection is about.
+ */
+export const socialProviderKeyFor = (methodId: string): string | null =>
+  SOCIAL_PROVIDER_METHOD_IDS.find(([, id]) => id === methodId)?.[0] ?? null;
 
 /**
  * Forgiving issuer URL parser. Accepts:

@@ -11,6 +11,7 @@ import {
   useState,
 } from "react";
 import { readHandledError } from "~/features/errors/logic/readHandledError";
+import { auth0BridgeConnectionOf } from "~/utils/auth0-bridge";
 
 /**
  * Client-side auth wrapper exposing a NextAuth-compatible API surface over
@@ -223,6 +224,13 @@ export const signIn = async (
     password?: string;
     callbackUrl?: string;
     redirect?: boolean;
+    /**
+     * The address already typed on our screen, handed to a federated
+     * provider as OIDC `login_hint` so its own screen arrives prefilled —
+     * or, where the provider routes on it, skipped entirely. Nothing for
+     * the credential path, which carries the email in the body already.
+     */
+    loginHint?: string;
   },
 ): Promise<
   | {
@@ -322,14 +330,27 @@ export const signIn = async (
   // is unset.
   //
   // Normalize `azure-ad` to `microsoft` (BetterAuth's internal provider id)
-  // to match `linkAccount()` which does the same mapping. Also honor
+  // to match `linkAccount()` which does the same mapping. A bridge id
+  // (`auth0-google` and friends) is a BUTTON, not a provider: it dials plain
+  // `auth0` with the `connection` Auth0's own screen would have set, so the
+  // person picks their provider exactly once, on ours. Also honor
   // `redirect: false` by passing `disableRedirect: true` so the caller can
   // handle navigation itself.
-  const mappedProvider = provider === "azure-ad" ? "microsoft" : provider;
+  const bridgeConnection = auth0BridgeConnectionOf(provider);
+  const mappedProvider =
+    bridgeConnection !== null
+      ? "auth0"
+      : provider === "azure-ad"
+        ? "microsoft"
+        : provider;
   const result = await client.signIn.social({
     provider: mappedProvider as "google",
     callbackURL,
     disableRedirect: !shouldRedirect,
+    ...(options?.loginHint ? { loginHint: options.loginHint } : {}),
+    ...(bridgeConnection !== null
+      ? { additionalParams: { connection: bridgeConnection } }
+      : {}),
   });
   if (result.error) {
     return {
