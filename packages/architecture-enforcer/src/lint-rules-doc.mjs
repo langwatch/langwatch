@@ -45,6 +45,30 @@ function messageSection(id, definition) {
   return lines;
 }
 
+// Whether a rule actually enforces anything. A rule can be registered in the
+// plugin and still be switched off everywhere, which is how seven of them once
+// sat in this reference looking like law while reporting nothing.
+let configText;
+
+function enforcementOf(root, name) {
+  configText ??= readFileSync(
+    join(root, "packages/architecture-enforcer/oxlint.architecture.jsonc"),
+    "utf8",
+  );
+  const found = new RegExp(
+    `"langwatch/${name}"\\s*:\\s*(?:"(error|warn|off)"|\\[\\s*"(error|warn|off)")`,
+  ).exec(configText);
+  if (!found) {
+    return "**no** — registered here but not enabled in `oxlint.architecture.jsonc`, so it reports nothing";
+  }
+  const severity = found[1] ?? found[2];
+  if (severity === "off") {
+    return "**no** — explicitly `off` in `oxlint.architecture.jsonc`";
+  }
+
+  return `yes, at \`${severity}\``;
+}
+
 function ruleSection(root, name, rule) {
   const docs = rule.meta.docs ?? {};
   const spec = specPathFor(root, name);
@@ -53,6 +77,7 @@ function ruleSection(root, name, rule) {
     `- Applies to: ${docs.applies ?? "every file"}`,
     `- Fixable: ${rule.meta.fixable ?? "no"}`,
     `- Spec: ${spec ? `\`${spec}\`` : "none yet"}`,
+    `- Enforced: ${enforcementOf(root, name)}`,
   ];
   const messages = Object.entries(docs.messages ?? {}).sort(([a], [b]) => a.localeCompare(b));
 

@@ -25,6 +25,7 @@
     "langwatch/zod-object-composition": "error",
     "langwatch/fallible-result-naming": "error",
     "langwatch/no-try-prefix": "error",
+    "langwatch/return-await-outside-try": "error",
     "langwatch/feature-source-filename": "error",
     "langwatch/feature-source-layout": "error",
     "langwatch/feature-source-subject": "error",
