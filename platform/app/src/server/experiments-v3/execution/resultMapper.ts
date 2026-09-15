@@ -261,6 +261,36 @@ const persistableInputs = (
 };
 
 /**
+ * What the evaluator spent, as the result carries it. An absent cost is not a
+ * zero cost: an evaluator that reports 0 says it spent nothing, one that
+ * reports nothing says it does not know, and the stored row keeps them apart.
+ */
+const billedCost = (
+  cost: number | undefined,
+): { currency: "USD"; amount: number } | undefined =>
+  typeof cost === "number" ? { currency: "USD", amount: cost } : undefined;
+
+/**
+ * The result of an evaluator that declined the row. The reason travels in
+ * the details, and whatever the judge spent before declining is kept, since
+ * a skip is not an error: it may have cost something without scoring.
+ */
+const skippedResult = (executionState: {
+  outputs?: Record<string, unknown>;
+  cost?: number;
+}): SingleEvaluationResult => {
+  const cost = billedCost(executionState.cost);
+  return {
+    status: "skipped",
+    ...(typeof executionState.outputs?.details === "string" &&
+    executionState.outputs.details
+      ? { details: executionState.outputs.details }
+      : {}),
+    ...(cost ? { cost } : {}),
+  };
+};
+
+/**
  * Maps an evaluator completion event to an evaluator_result SSE event.
  *
  * @param nodeId - The node ID in format "{targetId}.{evaluatorId}"
@@ -324,30 +354,30 @@ export const mapEvaluatorResult = (
             ? { domainError: classifiedDomainError.serialize() }
             : {}),
         }
-      : {
-          status: "processed",
-          // Strip score for guardrail-type evaluators where score is just 0 or 1
-          score: options?.stripScore
-            ? undefined
-            : coerceScore(executionState.outputs?.score),
-          passed: coercePassed(executionState.outputs?.passed),
-          label:
-            typeof executionState.outputs?.label === "string"
-              ? executionState.outputs.label
-              : undefined,
-          // Only include details when it's a non-empty string.
-          // Python's EvaluationResultWithMetadata always serializes details
-          // (default None -> null), so we filter out null/undefined to prevent
-          // the "sticky details" bug where details appears even after removal.
-          details:
-            typeof executionState.outputs?.details === "string" &&
-            executionState.outputs.details
-              ? executionState.outputs.details
-              : undefined,
-          cost: executionState.cost
-            ? { currency: "USD", amount: executionState.cost }
-            : undefined,
-        };
+      : executionState.outputs?.status === "skipped"
+        ? skippedResult(executionState)
+        : {
+            status: "processed",
+            // Strip score for guardrail-type evaluators where score is just 0 or 1
+            score: options?.stripScore
+              ? undefined
+              : coerceScore(executionState.outputs?.score),
+            passed: coercePassed(executionState.outputs?.passed),
+            label:
+              typeof executionState.outputs?.label === "string"
+                ? executionState.outputs.label
+                : undefined,
+            // Only include details when it's a non-empty string.
+            // Python's EvaluationResultWithMetadata always serializes details
+            // (default None -> null), so we filter out null/undefined to prevent
+            // the "sticky details" bug where details appears even after removal.
+            details:
+              typeof executionState.outputs?.details === "string" &&
+              executionState.outputs.details
+                ? executionState.outputs.details
+                : undefined,
+            cost: billedCost(executionState.cost),
+          };
 
   return {
     type: "evaluator_result",
@@ -567,23 +597,23 @@ export const mapWorkflowEvaluatorResult = (
           traceback: [],
           ...(domainError ? { domainError } : {}),
         }
-      : {
-          status: "processed",
-          score: coerceScore(executionState.outputs?.score),
-          passed: coercePassed(executionState.outputs?.passed),
-          label:
-            typeof executionState.outputs?.label === "string"
-              ? executionState.outputs.label
-              : undefined,
-          details:
-            typeof executionState.outputs?.details === "string" &&
-            executionState.outputs.details
-              ? executionState.outputs.details
-              : undefined,
-          cost: executionState.cost
-            ? { currency: "USD", amount: executionState.cost }
-            : undefined,
-        };
+      : executionState.outputs?.status === "skipped"
+        ? skippedResult(executionState)
+        : {
+            status: "processed",
+            score: coerceScore(executionState.outputs?.score),
+            passed: coercePassed(executionState.outputs?.passed),
+            label:
+              typeof executionState.outputs?.label === "string"
+                ? executionState.outputs.label
+                : undefined,
+            details:
+              typeof executionState.outputs?.details === "string" &&
+              executionState.outputs.details
+                ? executionState.outputs.details
+                : undefined,
+            cost: billedCost(executionState.cost),
+          };
 
   return {
     type: "evaluator_result",
