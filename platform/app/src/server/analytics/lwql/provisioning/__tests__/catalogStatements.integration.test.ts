@@ -343,7 +343,16 @@ describe("given the LangWatchQL views provisioned over the shipped fact tables",
           // A PostgreSQL-engine table sits in the LangWatchQL database, which is
           // `recordSeedControl`'s default; only the fact tables live elsewhere.
           ...(isPostgresResident(view) ? {} : { database: facts }),
-          tenantColumn: "TenantId",
+          // The physical tenant column: almost always TenantId, but
+          // `stored_objects` polices on `project_id` — the exposed column is
+          // always TenantId regardless of what the source calls it. A
+          // PostgreSQL-resident source's engine table is already mapped onto
+          // the catalog's exposed names (see `mapPostgresIntoClickHouse`), so
+          // its physical name IS `TenantId` — `sourceColumns` there names the
+          // *Postgres*-side column instead, which this proof never queries.
+          tenantColumn: isPostgresResident(view)
+            ? "TenantId"
+            : lwqlPhysicalColumn(view, "TenantId"),
         });
         const rows = await selectRows<{ TenantId: string }>(
           tenantA,
@@ -1053,9 +1062,10 @@ describe("given the LangWatchQL views provisioned over the shipped fact tables",
       for (const view of LWQL_VIEW_CATALOG.filter(
         (candidate) => !isPostgresResident(candidate),
       )) {
+        const physicalTenantColumn = lwqlPhysicalColumn(view, "TenantId");
         const tenants = await selectRows<{ TenantId: string }>(
           harness.admin,
-          `SELECT DISTINCT TenantId FROM ${facts}.${view.sourceTable} ORDER BY TenantId`,
+          `SELECT DISTINCT ${physicalTenantColumn} AS TenantId FROM ${facts}.${view.sourceTable} ORDER BY TenantId`,
         );
         expect(
           tenants.map((row) => row.TenantId),

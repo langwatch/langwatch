@@ -75,6 +75,10 @@ export const METRICS_OVERRIDES: Record<string, Partial<DatasetOverride>> = {
     // builder finalises with its merge combinator (argMaxMerge, maxMerge) under
     // a GROUP BY the engine key.
     dedup: { aggregating: true },
-    timeColumn: "OccurredAt",
+    // The source partitions by PartitionMonth (a plain YYYYMM anchor), not by
+    // OccurredAt — OccurredAt is the merged AggregateFunction state exposed
+    // for reading, but it prunes nothing. PartitionMonth is the column a
+    // caller filters on to skip partitions.
+    timeColumn: "PartitionMonth",
   },
 };
