@@ -1,3 +1,38 @@
 {
-  "layoutVersion": 0
+  "layoutVersion": 0,
+  "web": {
+    "uses": {
+      "surfaces": [
+        "@langwatch/dataset-web/surfaces/dataset-editor-table",
+        "@langwatch/dataset-web/surfaces/dataset-image-preview-table",
+        "@langwatch/dataset-web/surfaces/dataset-picker-list",
+        "@langwatch/dataset-web/surfaces/upload-csv-drawer",
+        "@langwatch/evaluator-web/surfaces/available-evaluators",
+        "@langwatch/evaluator-web/surfaces/dynamic-zod-form",
+        "@langwatch/evaluator-web/surfaces/evaluator-editor-content",
+        "@langwatch/evaluator-web/surfaces/evaluator-editor-shared",
+        "@langwatch/evaluator-web/surfaces/evaluator-result-chip",
+        "@langwatch/experiment-web/surfaces/batch-evaluation-state",
+        "@langwatch/experiment-web/surfaces/batch-results",
+        "@langwatch/experiment-web/surfaces/cell-failure",
+        "@langwatch/experiment-web/surfaces/evaluation-progress-bar",
+        "@langwatch/experiment-web/surfaces/workbench-types",
+        "@langwatch/model-provider-web/surfaces/ai-sparkles-loader",
+        "@langwatch/model-provider-web/surfaces/history-icon",
+        "@langwatch/model-provider-web/surfaces/model-selector",
+        "@langwatch/model-provider-web/surfaces/provider-icons",
+        "@langwatch/prompt-web/surfaces/api-snippet",
+        "@langwatch/prompt-web/surfaces/llm-config-field",
+        "@langwatch/prompt-web/surfaces/llm-config-popover",
+        "@langwatch/prompt-web/surfaces/llm-model-display",
+        "@langwatch/prompt-web/surfaces/llm-prompt-config-utils",
+        "@langwatch/prompt-web/surfaces/outputs-section",
+        "@langwatch/prompt-web/surfaces/prompt-editor-drawer",
+        "@langwatch/prompt-web/surfaces/variables",
+        "@langwatch/trace-web/surfaces/render-input-output",
+        "@langwatch/trace-web/surfaces/span-details",
+        "@langwatch/trace-web/surfaces/trace-id-peek"
+      ]
+    }
+  }
 }

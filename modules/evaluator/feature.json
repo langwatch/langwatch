@@ -1,3 +1,43 @@
 {
-  "layoutVersion": 0
+  "layoutVersion": 0,
+  "web": {
+    "uses": {
+      "surfaces": [
+        "@langwatch/analytics-web/surfaces/filter-params",
+        "@langwatch/analytics-web/surfaces/filter-registry",
+        "@langwatch/analytics-web/surfaces/filter-sidebar",
+        "@langwatch/analytics-web/surfaces/filter-toggle",
+        "@langwatch/analytics-web/surfaces/filter-types",
+        "@langwatch/analytics-web/surfaces/period-selector",
+        "@langwatch/analytics-web/surfaces/precondition-matchers",
+        "@langwatch/experiment-web/surfaces/comparison-config-form",
+        "@langwatch/experiment-web/surfaces/evaluator-editor-callbacks",
+        "@langwatch/experiment-web/surfaces/mapping-validation",
+        "@langwatch/experiment-web/surfaces/workbench-types",
+        "@langwatch/model-provider-web/surfaces/model-selector",
+        "@langwatch/model-provider-web/surfaces/no-models-configured-callout",
+        "@langwatch/prompt-web/surfaces/llm-config-popover",
+        "@langwatch/prompt-web/surfaces/llm-model-display",
+        "@langwatch/prompt-web/surfaces/llm-parameters",
+        "@langwatch/prompt-web/surfaces/variables",
+        "@langwatch/trace-web/surfaces/project-span-names",
+        "@langwatch/trace-web/surfaces/traces-mapping",
+        "@langwatch/workflow-web/surfaces/add-model-provider-key",
+        "@langwatch/workflow-web/surfaces/code-agent",
+        "@langwatch/workflow-web/surfaces/code-editor-transport",
+        "@langwatch/workflow-web/surfaces/emoji-picker-modal",
+        "@langwatch/workflow-web/surfaces/feature-flag",
+        "@langwatch/workflow-web/surfaces/handled-error-views",
+        "@langwatch/workflow-web/surfaces/hoverable-big-text",
+        "@langwatch/workflow-web/surfaces/next-link",
+        "@langwatch/workflow-web/surfaces/platform-defaults",
+        "@langwatch/workflow-web/surfaces/redacted-field",
+        "@langwatch/workflow-web/surfaces/render-code",
+        "@langwatch/workflow-web/surfaces/workflow-api",
+        "@langwatch/workflow-web/surfaces/workflow-card",
+        "@langwatch/workflow-web/surfaces/workflow-icons",
+        "@langwatch/workflow-web/surfaces/workflow-templates"
+      ]
+    }
+  }
 }

@@ -1,3 +1,22 @@
 {
-  "layoutVersion": 0
+  "layoutVersion": 0,
+  "web": {
+    "uses": {
+      "surfaces": [
+        "@langwatch/github-web/surfaces/github-connect-popup",
+        "@langwatch/model-provider-web/surfaces/edit-model-provider-form",
+        "@langwatch/model-provider-web/surfaces/model-selector",
+        "@langwatch/model-provider-web/surfaces/provider-icons",
+        "@langwatch/ops-web/surfaces/keyboard-key",
+        "@langwatch/trace-web/surfaces/sse-subscription",
+        "@langwatch/trace-web/surfaces/trace-filters",
+        "@langwatch/trace-web/surfaces/trace-origins",
+        "@langwatch/trace-web/surfaces/trace-selection",
+        "@langwatch/trace-web/surfaces/trace-view-state",
+        "@langwatch/workflow-web/surfaces/isolated-error-boundary",
+        "@langwatch/workflow-web/surfaces/markdown",
+        "@langwatch/workflow-web/surfaces/workflow-api"
+      ]
+    }
+  }
 }

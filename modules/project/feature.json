@@ -1,3 +1,16 @@
 {
-  "layoutVersion": 0
+  "layoutVersion": 0,
+  "web": {
+    "uses": {
+      "surfaces": [
+        "@langwatch/analytics-web/surfaces/analytics-registry",
+        "@langwatch/analytics-web/surfaces/custom-graph",
+        "@langwatch/analytics-web/surfaces/period-selector",
+        "@langwatch/navigation-web/surfaces/command-bar",
+        "@langwatch/organization-web/surfaces/department-picker",
+        "@langwatch/trace-web/surfaces/setup-with-agent-button",
+        "@langwatch/trace-web/surfaces/trace-drawer-chip"
+      ]
+    }
+  }
 }

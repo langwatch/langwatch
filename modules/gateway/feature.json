@@ -1,1 +1,12 @@
-{ "layoutVersion": 0 }
+{
+  "layoutVersion": 0,
+  "web": {
+    "uses": {
+      "surfaces": [
+        "@langwatch/authz-web/surfaces/scope-picker",
+        "@langwatch/enterprise-billing-web/surfaces/contact-sales",
+        "@langwatch/trace-web/surfaces/trace-filters"
+      ]
+    }
+  }
+}

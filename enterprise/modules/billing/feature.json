@@ -1,1 +1,10 @@
-{ "layoutVersion": 0 }
+{
+  "layoutVersion": 0,
+  "web": {
+    "uses": {
+      "surfaces": [
+        "@langwatch/enterprise-licensing-web/surfaces/resource-limits"
+      ]
+    }
+  }
+}

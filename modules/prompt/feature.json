@@ -1,3 +1,34 @@
 {
-  "layoutVersion": 0
+  "layoutVersion": 0,
+  "web": {
+    "uses": {
+      "surfaces": [
+        "@langwatch/dataset-web/surfaces/dataset-preview-table",
+        "@langwatch/experiment-web/surfaces/evaluation-mappings",
+        "@langwatch/experiment-web/surfaces/mapping-validation",
+        "@langwatch/experiment-web/surfaces/workbench-types",
+        "@langwatch/model-provider-web/surfaces/clamp-max-tokens",
+        "@langwatch/model-provider-web/surfaces/history-icon",
+        "@langwatch/model-provider-web/surfaces/model-limits",
+        "@langwatch/model-provider-web/surfaces/model-provider-settings",
+        "@langwatch/model-provider-web/surfaces/model-selector",
+        "@langwatch/model-provider-web/surfaces/no-models-configured-callout",
+        "@langwatch/model-provider-web/surfaces/provider-icons",
+        "@langwatch/onboarding-web/surfaces/code-preview",
+        "@langwatch/trace-web/surfaces/conversation",
+        "@langwatch/workflow-web/surfaces/add-model-provider-key",
+        "@langwatch/workflow-web/surfaces/code-editor-transport",
+        "@langwatch/workflow-web/surfaces/component-types",
+        "@langwatch/workflow-web/surfaces/copy-button",
+        "@langwatch/workflow-web/surfaces/evaluate-api-snippet",
+        "@langwatch/workflow-web/surfaces/fetch-sse",
+        "@langwatch/workflow-web/surfaces/generate-api-snippet-dialog",
+        "@langwatch/workflow-web/surfaces/studio-drawer-footer",
+        "@langwatch/workflow-web/surfaces/studio-scope",
+        "@langwatch/workflow-web/surfaces/workflow-api",
+        "@langwatch/workflow-web/surfaces/workflow-code-editor",
+        "@langwatch/workflow-web/surfaces/workflow-icons"
+      ]
+    }
+  }
 }

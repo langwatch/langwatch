@@ -1,3 +1,13 @@
 {
-  "layoutVersion": 0
+  "layoutVersion": 0,
+  "web": {
+    "uses": {
+      "surfaces": [
+        "@langwatch/evaluator-web/surfaces/evaluation-types",
+        "@langwatch/prompt-web/surfaces/variables",
+        "@langwatch/workflow-web/surfaces/feature-flag",
+        "@langwatch/workflow-web/surfaces/workflow-api"
+      ]
+    }
+  }
 }

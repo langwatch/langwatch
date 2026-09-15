@@ -1,3 +1,13 @@
 {
-  "layoutVersion": 0
+  "layoutVersion": 0,
+  "web": {
+    "uses": {
+      "surfaces": [
+        "@langwatch/scenario-web/surfaces/dialog-fields",
+        "@langwatch/scenario-web/surfaces/parameter-line",
+        "@langwatch/scenario-web/surfaces/parameter-line-field",
+        "@langwatch/scenario-web/surfaces/parameter-suggestions"
+      ]
+    }
+  }
 }

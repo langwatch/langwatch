@@ -1,3 +1,44 @@
 {
-  "layoutVersion": 0
+  "layoutVersion": 0,
+  "web": {
+    "uses": {
+      "surfaces": [
+        "@langwatch/dataset-web/surfaces/dataset-drawer",
+        "@langwatch/dataset-web/surfaces/dataset-record-sync",
+        "@langwatch/dataset-web/surfaces/dataset-table",
+        "@langwatch/dataset-web/surfaces/render-dataset-image",
+        "@langwatch/evaluator-web/surfaces/evaluation-results",
+        "@langwatch/evaluator-web/surfaces/evaluator-result-chip",
+        "@langwatch/langy-web/surfaces/langy-context",
+        "@langwatch/langy-web/surfaces/langy-page-registration",
+        "@langwatch/langy-web/surfaces/langy-store",
+        "@langwatch/langy-web/surfaces/langy-ui-actions",
+        "@langwatch/model-provider-web/surfaces/copy-icon",
+        "@langwatch/prompt-web/surfaces/latest-prompt-version",
+        "@langwatch/prompt-web/surfaces/prompt-version",
+        "@langwatch/prompt-web/surfaces/variables",
+        "@langwatch/trace-web/surfaces/format-milliseconds",
+        "@langwatch/trace-web/surfaces/render-input-output",
+        "@langwatch/trace-web/surfaces/sse-subscription",
+        "@langwatch/trace-web/surfaces/trace-id-peek",
+        "@langwatch/workflow-web/surfaces/crisp-bubble-policy",
+        "@langwatch/workflow-web/surfaces/deja-view-link",
+        "@langwatch/workflow-web/surfaces/feature-flag",
+        "@langwatch/workflow-web/surfaces/fetch-sse",
+        "@langwatch/workflow-web/surfaces/format-money",
+        "@langwatch/workflow-web/surfaces/generate-api-snippet-dialog",
+        "@langwatch/workflow-web/surfaces/handled-error-views",
+        "@langwatch/workflow-web/surfaces/hoverable-big-text",
+        "@langwatch/workflow-web/surfaces/markdown",
+        "@langwatch/workflow-web/surfaces/run-snippets",
+        "@langwatch/workflow-web/surfaces/run-via-api-data-source-picker",
+        "@langwatch/workflow-web/surfaces/run-via-api-tabs",
+        "@langwatch/workflow-web/surfaces/studio-dataset-columns",
+        "@langwatch/workflow-web/surfaces/studio-scope",
+        "@langwatch/workflow-web/surfaces/version-history",
+        "@langwatch/workflow-web/surfaces/workflow-api",
+        "@langwatch/workflow-web/surfaces/workflow-icons"
+      ]
+    }
+  }
 }

@@ -1,3 +1,36 @@
 {
-  "layoutVersion": 0
+  "layoutVersion": 0,
+  "web": {
+    "uses": {
+      "surfaces": [
+        "@langwatch/analytics-web/surfaces/period-selector",
+        "@langwatch/model-provider-web/surfaces/model-provider-settings",
+        "@langwatch/model-provider-web/surfaces/model-selector",
+        "@langwatch/model-provider-web/surfaces/provider-model-selector",
+        "@langwatch/prompt-web/surfaces/llm-model-display",
+        "@langwatch/prompt-web/surfaces/prompt-editor-drawer",
+        "@langwatch/prompt-web/surfaces/variables",
+        "@langwatch/trace-web/surfaces/conversation",
+        "@langwatch/trace-web/surfaces/conversation-bubble",
+        "@langwatch/trace-web/surfaces/conversation-expand-context",
+        "@langwatch/trace-web/surfaces/export-types",
+        "@langwatch/trace-web/surfaces/page-visibility",
+        "@langwatch/trace-web/surfaces/scenario-role",
+        "@langwatch/trace-web/surfaces/setup-with-agent-button",
+        "@langwatch/trace-web/surfaces/sse-subscription",
+        "@langwatch/trace-web/surfaces/suggestion-dropdown",
+        "@langwatch/trace-web/surfaces/suggestion-items",
+        "@langwatch/trace-web/surfaces/suggestion-state",
+        "@langwatch/trace-web/surfaces/suggestion-ui",
+        "@langwatch/trace-web/surfaces/trace-drawer-chip",
+        "@langwatch/trace-web/surfaces/trace-id-peek",
+        "@langwatch/trace-web/surfaces/trace-selection",
+        "@langwatch/workflow-web/surfaces/code-editor-transport",
+        "@langwatch/workflow-web/surfaces/copy-button",
+        "@langwatch/workflow-web/surfaces/deja-view-link",
+        "@langwatch/workflow-web/surfaces/workflow-host",
+        "@langwatch/workflow-web/surfaces/workflow-routes"
+      ]
+    }
+  }
 }
